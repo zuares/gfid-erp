@@ -38,8 +38,8 @@
         }
 
         /* ===========================
-               MOBILE: ITEM → TAMPILKAN KODE
-               =========================== */
+                       MOBILE: ITEM → TAMPILKAN KODE
+                       =========================== */
         @media (max-width: 768px) {
             .po-item-name {
                 display: none;
@@ -66,13 +66,19 @@
             </div>
 
             <div class="d-flex gap-2">
-                <a href="{{ route('purchasing.purchase_orders.edit', $order->id) }}" class="btn btn-primary">
-                    ✏️ Edit
+                <a href="{{ route('purchasing.purchase_orders.index') }}" class="btn btn-outline-secondary btn-sm">
+                    &larr; Kembali
                 </a>
-                <a href="{{ route('purchasing.purchase_orders.index') }}" class="btn btn-outline-secondary">
-                    ⬅️ Kembali
+
+                {{-- tombol edit PO dsb kalau ada --}}
+
+                {{-- 🔥 NEW: tombol buat GRN dari PO ini --}}
+                <a href="{{ route('purchasing.purchase_receipts.create_from_order', $order->id) }}"
+                    class="btn btn-primary btn-sm">
+                    Buat GRN dari PO ini
                 </a>
             </div>
+
         </div>
 
         {{-- INFO CARD --}}

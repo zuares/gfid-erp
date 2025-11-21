@@ -29,7 +29,7 @@
     }
 
     .app-navbar .navbar-inner {
-        max-width: 1080px;
+        max-width: 100%;
         margin-inline: auto;
         width: 100%;
 
@@ -193,23 +193,7 @@
             {{-- DESKTOP NAVIGATION --}}
             <div class="desktop-nav d-none d-md-flex">
 
-                {{-- LEFT MENU --}}
-                <ul class="navbar-nav me-2">
-                    @auth
-                        <li class="nav-item">
-                            <a class="nav-link {{ request()->routeIs('dashboard') ? 'active' : '' }}"
-                                href="{{ route('dashboard') }}">
-                                Dashboard
-                            </a>
-                        </li>
 
-                        <li class="nav-item">
-                            <a class="nav-link {{ request()->routeIs('purchasing.*') ? 'active' : '' }}"
-                                href="{{ route('purchasing.purchase_orders.index') }}">
-                                Purchasing
-                            </a>
-                        </li>
-                    @endauth
                 </ul>
 
                 {{-- RIGHT: auth --}}

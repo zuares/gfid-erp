@@ -22,6 +22,8 @@ class DatabaseSeeder extends Seeder
             SupplierSeeder::class,
             ItemSeeder::class,
             EmployeeSeeder::class,
+            WarehouseSeeder::class,
+            InventoryTransferDemoSeeder::class,
         ]);
     }
 }
