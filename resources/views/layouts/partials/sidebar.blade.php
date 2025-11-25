@@ -12,6 +12,9 @@
 
     // Production Cutting Jobs
     $prodCutOpen = request()->routeIs('production.cutting_jobs.*');
+
+    // Production QC (cutting / sewing nanti)
+    $prodQcOpen = request()->routeIs('production.qc.*');
 @endphp
 
 <style>
@@ -356,6 +359,34 @@
                     <span class="icon">＋</span>
                     <span>Cutting Job Baru</span>
                 </a>
+            </div>
+        </li>
+
+        {{-- GROUP: Production QC --}}
+        <li class="mb-1">
+            <button class="sidebar-link sidebar-toggle {{ $prodQcOpen ? 'is-open' : '' }}" type="button"
+                data-bs-toggle="collapse" data-bs-target="#navProductionQc"
+                aria-expanded="{{ $prodQcOpen ? 'true' : 'false' }}" aria-controls="navProductionQc">
+                <span class="icon">✅</span>
+                <span>Quality Control</span>
+                <span class="chevron">▸</span>
+            </button>
+
+            <div class="collapse {{ $prodQcOpen ? 'show' : '' }}" id="navProductionQc">
+                {{-- Untuk sekarang arahkan ke list Cutting Job dengan view QC.
+                     Nanti bisa ditambah QC Sewing, QC Finishing, dll. --}}
+                <a href="{{ route('production.cutting_jobs.index', ['view' => 'qc']) }}"
+                    class="sidebar-link sidebar-link-sub {{ request()->routeIs('production.qc.cutting.*') ? 'active' : '' }}">
+                    <span class="icon">✂️</span>
+                    <span>QC Cutting</span>
+                </a>
+
+                {{-- Placeholder untuk nanti:
+                <a href="#" class="sidebar-link sidebar-link-sub {{ request()->routeIs('production.qc.sewing.*') ? 'active' : '' }}">
+                    <span class="icon">🧵</span>
+                    <span>QC Sewing</span>
+                </a>
+                --}}
             </div>
         </li>
 

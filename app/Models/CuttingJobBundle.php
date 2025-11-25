@@ -43,4 +43,13 @@ class CuttingJobBundle extends Model
     {
         return $this->belongsTo(Employee::class, 'operator_id');
     }
+
+    // app/Models/CuttingJob.php
+// app/Models/CuttingJobBundle.php
+
+    public function qcResults()
+    {
+        return $this->hasMany(QcResult::class, 'cutting_job_bundle_id');
+    }
+
 }

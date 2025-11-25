@@ -33,7 +33,7 @@ class CuttingJob extends Model
 
     public function lot()
     {
-        return $this->belongsTo(Lot::class);
+        return $this->belongsTo(\App\Models\Lot::class, 'lot_id');
     }
 
     public function fabricItem()
@@ -50,4 +50,11 @@ class CuttingJob extends Model
     {
         return $this->hasMany(CuttingJobBundle::class);
     }
+    // app/Models/CuttingJob.php
+
+    public function qcResults()
+    {
+        return $this->hasMany(QcResult::class);
+    }
+
 }

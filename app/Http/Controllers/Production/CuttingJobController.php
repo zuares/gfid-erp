@@ -327,17 +327,30 @@ class CuttingJobController extends Controller
     /**
      * Detail satu Cutting Job.
      */
+    // app/Http/Controllers/Production/CuttingJobController.php
+
     public function show(CuttingJob $cuttingJob)
     {
+        // Load relasi yang dibutuhkan
         $cuttingJob->load([
             'warehouse',
             'lot.item',
             'bundles.finishedItem',
             'bundles.operator',
+            'bundles.qcResults' => function ($q) {
+                $q->where('stage', 'cutting');
+            },
         ]);
+
+        // Cek apakah sudah pernah di-QC Cutting
+        $hasQcCutting = $cuttingJob->bundles->contains(function ($bundle) {
+            return $bundle->qcResults->where('stage', 'cutting')->isNotEmpty();
+        });
 
         return view('production.cutting_jobs.show', [
             'job' => $cuttingJob,
+            'hasQcCutting' => $hasQcCutting,
         ]);
     }
+
 }

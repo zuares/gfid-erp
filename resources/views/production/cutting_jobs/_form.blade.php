@@ -173,10 +173,10 @@
 
                             {{-- Qty (pcs) --}}
                             <td data-label="Qty (pcs)">
-                                <input type="number" step="0.01" min="0"
+                                <input type="number" step="1" min="0" inputmode="numeric" pattern="\d*"
                                     name="bundles[{{ $i }}][qty_pcs]"
                                     class="form-control form-control-sm text-end bundle-qty"
-                                    value="{{ $row['qty_pcs'] ?? '' }}">
+                                    value="{{ isset($row['qty_pcs']) ? (int) $row['qty_pcs'] : '' }}">
                             </td>
 
                             {{-- Item Category (auto) --}}
@@ -232,6 +232,15 @@
         // saldo LOT ke JS
         const lotQty = {{ $lotQty }};
 
+        function attachSelectAllOnFocus(input) {
+            input.addEventListener('focus', function() {
+                setTimeout(() => this.select(), 0);
+            });
+            input.addEventListener('mouseup', function(e) {
+                e.preventDefault();
+            });
+        }
+
         function renumberRows() {
             if (!bundleRows) return;
             const rows = bundleRows.querySelectorAll('tr');
@@ -250,12 +259,17 @@
             const count = rows.length;
 
             let totalQtyPcs = 0;
+
             rows.forEach(tr => {
                 const qtyInput = tr.querySelector('.bundle-qty');
                 if (!qtyInput) return;
 
-                const raw = (qtyInput.value || '0').toString().replace(',', '.');
-                const v = parseFloat(raw) || 0;
+                let v = parseInt(qtyInput.value || '0', 10);
+                if (isNaN(v) || v < 0) v = 0;
+
+                // normalisasi kembali ke input (kalau user ketik 1.5 jadi 1)
+                qtyInput.value = v;
+
                 totalQtyPcs += v;
             });
 
@@ -291,8 +305,7 @@
             }
 
             const opt = select.selectedOptions[0];
-            const catName =
-                opt.getAttribute('data-category-name') ||
+            const catName = opt.getAttribute('data-category-name') ||
                 opt.getAttribute('data-category-code') ||
                 '-';
 
@@ -311,6 +324,7 @@
             }
 
             if (qtyInput) {
+                attachSelectAllOnFocus(qtyInput);
                 qtyInput.addEventListener('input', function() {
                     recalcAll();
                 });
@@ -343,7 +357,11 @@
         </select>
     </td>
     <td data-label="Qty (pcs)">
-        <input type="number" step="0.01" min="0"
+        <input type="number"
+               step="1"
+               min="0"
+               inputmode="numeric"
+               pattern="\\d*"
                name="bundles[${index}][qty_pcs]"
                class="form-control form-control-sm text-end bundle-qty">
     </td>

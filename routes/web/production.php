@@ -2,7 +2,7 @@
 <?php
 
 use App\Http\Controllers\Production\CuttingJobController;
-use App\Http\Controllers\Production\QcCuttingController;
+use App\Http\Controllers\Production\QcController;
 
 Route::middleware(['auth'])->group(function () {
     Route::prefix('production/cutting-jobs')
@@ -30,26 +30,21 @@ Route::middleware(['auth'])->group(function () {
         });
 });
 
-Route::prefix('production/qc')
-    ->middleware(['auth'])
-    ->name('production.qc.')
-    ->group(function () {
+Route::middleware(['auth'])->group(function () {
 
-        // QC Cutting
-        Route::prefix('cutting')
-            ->name('cutting.')
-            ->group(function () {
+    Route::prefix('production/qc')
+        ->name('production.qc.')
+        ->group(function () {
 
-                // List QC Cutting (optional)
-                Route::get('/', [QcCuttingController::class, 'index'])
-                    ->name('index');
+            // QC Cutting
+            Route::get('/cutting/{cuttingJob}/edit', [QcController::class, 'editCutting'])
+                ->name('cutting.edit');
 
-                // Edit QC untuk 1 cutting_job_bundle
-                Route::get('/{bundle}/edit', [QcCuttingController::class, 'edit'])
-                    ->name('edit');
+            Route::put('/cutting/{cuttingJob}', [QcController::class, 'updateCutting'])
+                ->name('cutting.update');
 
-                // Update QC
-                Route::put('/{bundle}', [QcCuttingController::class, 'update'])
-                    ->name('update');
-            });
-    });
+            // nanti bisa tambah:
+            // Route::get('/sewing/{sewingJob}/edit', [...])->name('sewing.edit');
+            // Route::put('/sewing/{sewingJob}', [...])->name('sewing.update');
+        });
+});
