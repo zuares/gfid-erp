@@ -1,6 +1,8 @@
 <?php
 namespace App\Models;
 
+use App\Models\CuttingJobBundle;
+use App\Models\SewingPickup;
 use Illuminate\Database\Eloquent\Model;
 
 class SewingPickupLine extends Model
@@ -16,7 +18,8 @@ class SewingPickupLine extends Model
         'notes',
     ];
 
-    public function pickup()
+    // 🔹 Header Sewing Pickup
+    public function sewingPickup()
     {
         return $this->belongsTo(SewingPickup::class, 'sewing_pickup_id');
     }

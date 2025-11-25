@@ -44,4 +44,13 @@ class QcResult extends Model
     {
         return $this->belongsTo(Employee::class, 'operator_id');
     }
+
+    // 🔹 Relasi ke CuttingJob (header)
+
+    // 🔹 Relasi ke CuttingJobBundle (detail/bundle)
+    public function cuttingJobBundle()
+    {
+        return $this->belongsTo(CuttingJobBundle::class, 'cutting_job_bundle_id');
+    }
+
 }

@@ -24,6 +24,20 @@ class WarehouseSeeder extends Seeder
         ]);
 
         Warehouse::create([
+            'code' => 'WIP-SEW',
+            'name' => 'WIP Sewing Warehouse',
+            'type' => 'wip',
+            'active' => 1,
+        ]);
+
+        Warehouse::create([
+            'code' => 'WIP-FIN',
+            'name' => 'WIP Finishing Warehouse',
+            'type' => 'wip',
+            'active' => 1,
+        ]);
+
+        Warehouse::create([
             'code' => 'FG',
             'name' => 'Finished Goods Warehouse',
             'type' => 'internal',

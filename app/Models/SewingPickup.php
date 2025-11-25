@@ -32,4 +32,5 @@ class SewingPickup extends Model
     {
         return $this->hasMany(SewingPickupLine::class);
     }
+
 }

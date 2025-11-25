@@ -19,6 +19,15 @@
     // Production Sewing (pickups + returns)
     $prodSewOpen =
         request()->routeIs('production.sewing_pickups.*') || request()->routeIs('production.sewing_returns.*');
+
+    // Production Reports (cutting→sewing loss, daily, operator, reject detail, per item, ageing WIP)
+    $prodReportOpen =
+        request()->routeIs('production.reports.cutting_to_sewing_loss') ||
+        request()->routeIs('production.reports.daily_production') ||
+        request()->routeIs('production.reports.reject_detail') ||
+        request()->routeIs('production.reports.sewing_per_item') ||
+        request()->routeIs('production.reports.wip_sewing_age') ||
+        request()->routeIs('production.sewing_returns.report_operators');
 @endphp
 
 <style>
@@ -423,13 +432,68 @@
                     <span>QC Cutting</span>
                 </a>
 
-                {{-- Placeholder untuk nanti QC Sewing --}}
+                {{-- Placeholder QC Sewing kalau nanti ada --}}
                 {{--
                 <a href="#" class="sidebar-link sidebar-link-sub {{ request()->routeIs('production.qc.sewing.*') ? 'active' : '' }}">
                     <span class="icon">🧵</span>
                     <span>QC Sewing</span>
                 </a>
                 --}}
+            </div>
+        </li>
+
+        {{-- GROUP: Laporan Produksi --}}
+        <li class="mb-1">
+            <button class="sidebar-link sidebar-toggle {{ $prodReportOpen ? 'is-open' : '' }}" type="button"
+                data-bs-toggle="collapse" data-bs-target="#navProductionReports"
+                aria-expanded="{{ $prodReportOpen ? 'true' : 'false' }}" aria-controls="navProductionReports">
+                <span class="icon">📈</span>
+                <span>Laporan Produksi</span>
+                <span class="chevron">▸</span>
+            </button>
+
+            <div class="collapse {{ $prodReportOpen ? 'show' : '' }}" id="navProductionReports">
+                {{-- Daily Production --}}
+                <a href="{{ route('production.reports.daily_production') }}"
+                    class="sidebar-link sidebar-link-sub {{ request()->routeIs('production.reports.daily_production') ? 'active' : '' }}">
+                    <span class="icon">📅</span>
+                    <span>Rekap Harian Produksi</span>
+                </a>
+
+                {{-- Cutting → Sewing Loss --}}
+                <a href="{{ route('production.reports.cutting_to_sewing_loss') }}"
+                    class="sidebar-link sidebar-link-sub {{ request()->routeIs('production.reports.cutting_to_sewing_loss') ? 'active' : '' }}">
+                    <span class="icon">↔︎</span>
+                    <span>Cutting → Sewing Loss</span>
+                </a>
+
+                {{-- Performa Operator Jahit --}}
+                <a href="{{ route('production.sewing_returns.report_operators') }}"
+                    class="sidebar-link sidebar-link-sub {{ request()->routeIs('production.sewing_returns.report_operators') ? 'active' : '' }}">
+                    <span class="icon">🧍</span>
+                    <span>Performa Operator Jahit</span>
+                </a>
+
+                {{-- Performa Jahit per Item --}}
+                <a href="{{ route('production.reports.sewing_per_item') }}"
+                    class="sidebar-link sidebar-link-sub {{ request()->routeIs('production.reports.sewing_per_item') ? 'active' : '' }}">
+                    <span class="icon">🧵</span>
+                    <span>Performa Jahit per Item</span>
+                </a>
+
+                {{-- Ageing WIP Sewing --}}
+                <a href="{{ route('production.reports.wip_sewing_age') }}"
+                    class="sidebar-link sidebar-link-sub {{ request()->routeIs('production.reports.wip_sewing_age') ? 'active' : '' }}">
+                    <span class="icon">⏳</span>
+                    <span>Ageing WIP Sewing</span>
+                </a>
+
+                {{-- Reject Detail --}}
+                <a href="{{ route('production.reports.reject_detail') }}"
+                    class="sidebar-link sidebar-link-sub {{ request()->routeIs('production.reports.reject_detail') ? 'active' : '' }}">
+                    <span class="icon">⚠️</span>
+                    <span>Reject Detail</span>
+                </a>
             </div>
         </li>
 

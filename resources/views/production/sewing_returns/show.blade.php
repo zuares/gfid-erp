@@ -39,52 +39,37 @@
 
 @section('content')
     @php
-        $totalBundles = $return->lines->count();
+        $totalLines = $return->lines->count();
         $totalOk = $return->lines->sum('qty_ok');
         $totalReject = $return->lines->sum('qty_reject');
 
         $statusMap = [
-            'draft' => ['DRAFT', 'secondary'],
-            'posted' => ['POSTED', 'primary'],
-            'closed' => ['CLOSED', 'success'],
+            'draft' => ['label' => 'DRAFT', 'class' => 'secondary'],
+            'posted' => ['label' => 'POSTED', 'class' => 'primary'],
+            'closed' => ['label' => 'CLOSED', 'class' => 'success'],
         ];
-        $cfg = $statusMap[$return->status] ?? [strtoupper($return->status ?? '-'), 'secondary'];
 
-        $firstLine = $return->lines->first();
-        $pickupLine = $firstLine?->pickupLine;
-        $pickup = $pickupLine?->pickup;
-        $warehouse = $return->warehouse ?? $pickup?->warehouse;
+        $cfg = $statusMap[$return->status] ?? [
+            'label' => strtoupper($return->status ?? '-'),
+            'class' => 'secondary',
+        ];
     @endphp
 
     <div class="page-wrap">
 
-        {{-- HEADER --}}
+        {{-- HEADER ATAS --}}
         <div class="card p-3 mb-3">
             <div class="d-flex justify-content-between align-items-start gap-3">
                 <div>
                     <h1 class="h5 mb-1">Sewing Return: {{ $return->code }}</h1>
+
                     <div class="help">
-                        Tanggal: {{ $return->date?->format('Y-m-d') ?? $return->date }}
+                        Tanggal: {{ $return->date?->format('Y-m-d') ?? $return->date }} •
+                        Gudang Sewing: {{ $return->warehouse?->code ?? '-' }} —
+                        {{ $return->warehouse?->name ?? '-' }}
                     </div>
+
                     <div class="help mt-1">
-                        Pickup:
-                        @if ($pickup)
-                            <span class="mono">{{ $pickup->code }}</span>
-                        @else
-                            <span class="text-muted">-</span>
-                        @endif
-                    </div>
-                    <div class="help">
-                        Gudang Sewing:
-                        @if ($warehouse)
-                            <span class="mono">
-                                {{ $warehouse->code }} — {{ $warehouse->name }}
-                            </span>
-                        @else
-                            <span class="text-muted">-</span>
-                        @endif
-                    </div>
-                    <div class="help">
                         Operator Jahit:
                         @if ($return->operator)
                             <span class="mono">
@@ -94,25 +79,26 @@
                             <span class="text-muted">-</span>
                         @endif
                     </div>
+
+                    @if ($pickup)
+                        <div class="help mt-1">
+                            Pickup Terkait:
+                            <a href="{{ route('production.sewing_pickups.show', $pickup) }}" class="link-primary mono">
+                                {{ $pickup->code }}
+                            </a>
+                        </div>
+                    @endif
                 </div>
 
                 <div class="d-flex flex-column align-items-end gap-2">
-                    <span class="badge bg-{{ $cfg[1] }} px-3 py-2">
-                        {{ $cfg[0] }}
+                    <span class="badge bg-{{ $cfg['class'] }} px-3 py-2">
+                        {{ $cfg['label'] }}
                     </span>
 
                     <div class="d-flex gap-2">
-                        <a href="{{ route('production.qc.index', ['stage' => 'sewing']) }}"
-                            class="btn btn-sm btn-outline-secondary">
-                            Kembali ke QC Sewing
+                        <a href="{{ route('production.sewing_pickups.index') }}" class="btn btn-sm btn-outline-secondary">
+                            Kembali ke Sewing Pickup
                         </a>
-
-                        @if ($pickup && Route::has('production.sewing_pickups.show'))
-                            <a href="{{ route('production.sewing_pickups.show', $pickup) }}"
-                                class="btn btn-sm btn-outline-primary">
-                                Lihat Pickup
-                            </a>
-                        @endif
                     </div>
                 </div>
             </div>
@@ -124,43 +110,46 @@
             @endif
         </div>
 
-        {{-- SUMMARY --}}
+        {{-- RINGKASAN --}}
         <div class="card p-3 mb-3">
-            <h2 class="h6 mb-2">Ringkasan Sewing Return</h2>
+            <h2 class="h6 mb-2">Ringkasan Hasil Jahit</h2>
 
             <div class="row g-3">
                 <div class="col-md-3 col-6">
-                    <div class="help mb-1">Jumlah Bundles</div>
+                    <div class="help mb-1">Jumlah Baris</div>
                     <div class="mono">
-                        {{ $totalBundles }}
+                        {{ $totalLines }}
                     </div>
                 </div>
+
                 <div class="col-md-3 col-6">
-                    <div class="help mb-1">Total Qty OK (pcs)</div>
+                    <div class="help mb-1">Total OK (pcs)</div>
                     <div class="mono">
                         {{ number_format($totalOk, 2, ',', '.') }}
                     </div>
                 </div>
+
                 <div class="col-md-3 col-6">
-                    <div class="help mb-1">Total Qty Reject (pcs)</div>
-                    <div class="mono">
+                    <div class="help mb-1">Total Reject (pcs)</div>
+                    <div class="mono text-danger">
                         {{ number_format($totalReject, 2, ',', '.') }}
                     </div>
                 </div>
+
                 <div class="col-md-3 col-6">
-                    <div class="help mb-1">Perpindahan Stok</div>
+                    <div class="help mb-1">Gudang Tujuan</div>
                     <div class="small">
-                        <span class="mono">
-                            From: {{ $warehouse?->code ?? 'SEWING' }}
-                        </span>
-                        <span class="mx-1">→</span>
-                        <span class="mono">WIP-FIN & REJECT</span>
+                        <span class="mono">WIP-FIN</span>
+                        @if ($totalReject > 0)
+                            <span class="mx-1">/</span>
+                            <span class="mono">REJECT</span>
+                        @endif
                     </div>
                 </div>
             </div>
         </div>
 
-        {{-- DETAIL LINES --}}
+        {{-- DETAIL BUNDLE --}}
         <div class="card p-3 mb-4">
             <h2 class="h6 mb-2">Detail Bundles</h2>
 
@@ -169,31 +158,36 @@
                     <thead>
                         <tr>
                             <th style="width: 40px;">#</th>
-                            <th style="width: 130px;">Pickup</th>
+                            <th style="width: 150px;">Pickup Code</th>
                             <th style="width: 150px;">Bundle Code</th>
                             <th style="width: 160px;">Item Jadi</th>
-                            <th style="width: 200px;">Lot</th>
+                            <th style="width: 180px;">Lot</th>
+                            <th style="width: 120px;">Qty Pickup</th>
                             <th style="width: 120px;">Qty OK</th>
                             <th style="width: 120px;">Qty Reject</th>
-                            <th style="width: 200px;">Catatan</th>
+                            <th>Catatan</th>
                         </tr>
                     </thead>
                     <tbody>
                         @forelse ($return->lines as $line)
-                            @dump($line->toArray())
-                            @dump($line->pickupLine?->toArray())
-                            @dump($line->pickupLine?->bundle?->toArray())
                             @php
-                                dd($line);
-
-                                $pickupLine = $line->pickupLine;
-                                $pickupRow = $pickupLine?->pickup;
+                                $pickupLine = $line->sewingPickupLine;
+                                $pickupRow = $pickupLine?->sewingPickup;
                                 $bundle = $pickupLine?->bundle;
                                 $lot = $bundle?->cuttingJob?->lot;
                             @endphp
                             <tr>
                                 <td>{{ $loop->iteration }}</td>
-                                <td>{{ $pickupRow?->code ?? '-' }}</td>
+                                <td>
+                                    @if ($pickupRow)
+                                        <a href="{{ route('production.sewing_pickups.show', $pickupRow) }}"
+                                            class="link-primary">
+                                            {{ $pickupRow->code }}
+                                        </a>
+                                    @else
+                                        -
+                                    @endif
+                                </td>
                                 <td>{{ $bundle?->bundle_code ?? '-' }}</td>
                                 <td>{{ $bundle?->finishedItem?->code ?? '-' }}</td>
                                 <td>
@@ -206,14 +200,17 @@
                                         -
                                     @endif
                                 </td>
+                                <td>{{ number_format($pickupLine->qty_bundle ?? 0, 2, ',', '.') }}</td>
                                 <td>{{ number_format($line->qty_ok ?? 0, 2, ',', '.') }}</td>
-                                <td>{{ number_format($line->qty_reject ?? 0, 2, ',', '.') }}</td>
-                                <td>{{ $line->notes ?? '-' }}</td>
+                                <td class="text-danger">{{ number_format($line->qty_reject ?? 0, 2, ',', '.') }}</td>
+                                <td class="small">
+                                    {{ $line->notes ?? '-' }}
+                                </td>
                             </tr>
                         @empty
                             <tr>
-                                <td colspan="8" class="text-center text-muted small">
-                                    Belum ada detail untuk Sewing Return ini.
+                                <td colspan="9" class="text-center text-muted small">
+                                    Belum ada detail Sewing Return.
                                 </td>
                             </tr>
                         @endforelse
