@@ -1,9 +1,17 @@
 {{-- resources/views/layouts/partials/sidebar.blade.php --}}
 @php
-    // Flag untuk buka/tutup collapse
+    // Flag untuk buka/tutup collapse per grup
     $poOpen = request()->routeIs('purchasing.purchase_orders.*');
     $grnOpen = request()->routeIs('purchasing.purchase_receipts.*');
-    $invOpen = request()->routeIs('inventory.*');
+
+    // Inventory internal (stock card + transfers)
+    $invOpen = request()->routeIs('inventory.stock_card.*') || request()->routeIs('inventory.transfers.*');
+
+    // Inventory external transfers
+    $extInvOpen = request()->routeIs('inventory.external_transfers.*');
+
+    // Production Cutting Jobs
+    $prodCutOpen = request()->routeIs('production.cutting_jobs.*');
 @endphp
 
 <style>
@@ -95,7 +103,7 @@
         color: var(--text);
         text-decoration: none;
         font-size: .93rem;
-        transition: background .18s ease, box-shadow .18s ease, transform .12s ease;
+        transition: background .18s ease, box-shadow .18s ease, transform .12s ease, color .18s ease;
     }
 
     .sidebar-link .icon {
@@ -105,16 +113,17 @@
     }
 
     .sidebar-link:hover {
-        background: color-mix(in srgb, var(--accent-soft) 30%, var(--card) 70%);
+        background: color-mix(in srgb, var(--accent-soft) 18%, var(--card) 82%);
         box-shadow: inset 0 0 0 1px var(--line);
         transform: translateX(1px);
     }
 
-    /* ACTIVE UTAMA: tanpa geser padding kiri */
+    /* ACTIVE UTAMA: cukup garis halus di kiri, tanpa glass */
     .sidebar-link.active {
-        background: color-mix(in srgb, var(--accent-soft) 60%, var(--card) 40%);
+        background: transparent;
         font-weight: 600;
         box-shadow: inset 2px 0 0 var(--accent);
+        color: var(--accent);
     }
 
     /* GROUP TOGGLE (header collapse) */
@@ -137,17 +146,24 @@
         transform: rotate(90deg);
     }
 
-    /* Saat group open, kasih indikasi halus (bukan active penuh) */
+    /* Saat group open: tanpa glass, cuma accent tipis */
     .sidebar-toggle.is-open {
-        background: color-mix(in srgb, var(--accent-soft) 25%, var(--card) 75%);
-        box-shadow: inset 0 0 0 1px rgba(148, 163, 184, .6);
+        background: transparent;
+        box-shadow: none;
+        color: var(--accent);
+        font-weight: 600;
+    }
+
+    .sidebar-toggle.is-open .icon {
+        color: var(--accent);
     }
 
     /* SUB LINK: List & Create di dalam collapse */
     .sidebar-link-sub {
+        position: relative;
         font-size: .86rem;
         padding: .4rem .9rem .4rem 2.3rem;
-        opacity: .9;
+        opacity: .95;
         border-radius: 10px;
     }
 
@@ -156,19 +172,32 @@
         font-size: .9rem;
     }
 
-    /* Hover: lebih transparan dan TIDAK geser */
+    /* Hover submenu: lebih transparan, tanpa geser */
     .sidebar-link-sub:hover {
-        background: color-mix(in srgb, var(--accent-soft) 24%, var(--card) 76%);
+        background: color-mix(in srgb, var(--accent-soft) 16%, var(--card) 84%);
         box-shadow: inset 0 0 0 1px var(--line);
         transform: none;
     }
 
-    /* Active SUBMENU: hanya submenu yang “nyala”, parent tidak */
+    /* Active SUBMENU: hanya penanda garis + dot kecil, tanpa glass */
     .sidebar-link-sub.active {
-        background: color-mix(in srgb, var(--accent-soft) 70%, var(--card) 30%);
+        background: transparent;
         font-weight: 600;
         box-shadow: inset 2px 0 0 var(--accent);
         opacity: 1;
+        color: var(--accent);
+    }
+
+    .sidebar-link-sub.active::before {
+        content: '';
+        position: absolute;
+        left: 1.4rem;
+        top: 50%;
+        transform: translateY(-50%);
+        width: 6px;
+        height: 6px;
+        border-radius: 999px;
+        background: var(--accent);
     }
 </style>
 
@@ -240,10 +269,10 @@
             </div>
         </li>
 
-        {{-- WAREHOUSE / INVENTORY --}}
+        {{-- INVENTORY --}}
         <li class="mt-2 text-uppercase small menu-label">Inventory</li>
 
-        {{-- GROUP: Inventory (Stock Card + Transfers) --}}
+        {{-- GROUP: Inventory Internal (Stock Card + Transfers) --}}
         <li class="mb-1">
             <button class="sidebar-link sidebar-toggle {{ $invOpen ? 'is-open' : '' }}" type="button"
                 data-bs-toggle="collapse" data-bs-target="#navInventory"
@@ -277,15 +306,60 @@
             </div>
         </li>
 
-        {{-- PRODUCTION --}}
-        <li class="mt-2 text-uppercase small menu-label">Production</li>
-        <li>
-            <a href="#" class="sidebar-link">
-                <span class="icon">✂️</span>
-                <span>Cutting &amp; Sewing</span>
-            </a>
+        {{-- GROUP: External Transfers --}}
+        <li class="mb-1">
+            <button class="sidebar-link sidebar-toggle {{ $extInvOpen ? 'is-open' : '' }}" type="button"
+                data-bs-toggle="collapse" data-bs-target="#navInventoryExternal"
+                aria-expanded="{{ $extInvOpen ? 'true' : 'false' }}" aria-controls="navInventoryExternal">
+                <span class="icon">🚚</span>
+                <span>External Transfers</span>
+                <span class="chevron">▸</span>
+            </button>
+
+            <div class="collapse {{ $extInvOpen ? 'show' : '' }}" id="navInventoryExternal">
+                <a href="{{ route('inventory.external_transfers.index') }}"
+                    class="sidebar-link sidebar-link-sub {{ request()->routeIs('inventory.external_transfers.index') ? 'active' : '' }}">
+                    <span class="icon">≡</span>
+                    <span>Daftar External TF</span>
+                </a>
+
+                <a href="{{ route('inventory.external_transfers.create') }}"
+                    class="sidebar-link sidebar-link-sub {{ request()->routeIs('inventory.external_transfers.create') ? 'active' : '' }}">
+                    <span class="icon">➕</span>
+                    <span>External TF Baru</span>
+                </a>
+            </div>
         </li>
 
+        {{-- PRODUCTION --}}
+        <li class="mt-2 text-uppercase small menu-label">Production</li>
+
+        {{-- GROUP: Cutting Jobs --}}
+        <li class="mb-1">
+            <button class="sidebar-link sidebar-toggle {{ $prodCutOpen ? 'is-open' : '' }}" type="button"
+                data-bs-toggle="collapse" data-bs-target="#navProductionCutting"
+                aria-expanded="{{ $prodCutOpen ? 'true' : 'false' }}" aria-controls="navProductionCutting">
+                <span class="icon">✂️</span>
+                <span>Cutting Jobs</span>
+                <span class="chevron">▸</span>
+            </button>
+
+            <div class="collapse {{ $prodCutOpen ? 'show' : '' }}" id="navProductionCutting">
+                <a href="{{ route('production.cutting_jobs.index') }}"
+                    class="sidebar-link sidebar-link-sub {{ request()->routeIs('production.cutting_jobs.index') ? 'active' : '' }}">
+                    <span class="icon">≡</span>
+                    <span>Daftar Cutting Job</span>
+                </a>
+
+                <a href="{{ route('production.cutting_jobs.create') }}"
+                    class="sidebar-link sidebar-link-sub {{ request()->routeIs('production.cutting_jobs.create') ? 'active' : '' }}">
+                    <span class="icon">＋</span>
+                    <span>Cutting Job Baru</span>
+                </a>
+            </div>
+        </li>
+
+        {{-- Placeholder Finishing (nanti bisa dibikin collapse juga) --}}
         <li>
             <a href="#" class="sidebar-link">
                 <span class="icon">🧵</span>

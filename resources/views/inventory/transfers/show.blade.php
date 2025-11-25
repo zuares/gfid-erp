@@ -47,20 +47,12 @@
 
                             <dt class="col-sm-4">Gudang Asal</dt>
                             <dd class="col-sm-8">
-                                @if ($transfer->fromWarehouse)
-                                    {{ $transfer->fromWarehouse->name }} ({{ $transfer->fromWarehouse->code }})
-                                @else
-                                    <span class="text-muted">-</span>
-                                @endif
+                                {{ $transfer->fromWarehouse?->name }} ({{ $transfer->fromWarehouse?->code }})
                             </dd>
 
                             <dt class="col-sm-4">Gudang Tujuan</dt>
                             <dd class="col-sm-8">
-                                @if ($transfer->toWarehouse)
-                                    {{ $transfer->toWarehouse->name }} ({{ $transfer->toWarehouse->code }})
-                                @else
-                                    <span class="text-muted">-</span>
-                                @endif
+                                {{ $transfer->toWarehouse?->name }} ({{ $transfer->toWarehouse?->code }})
                             </dd>
 
                             <dt class="col-sm-4">Dibuat oleh</dt>
@@ -87,13 +79,11 @@
                         <h6 class="fw-semibold mb-3">Ringkasan</h6>
                         <dl class="row mb-0">
                             <dt class="col-sm-5">Jumlah Item</dt>
-                            <dd class="col-sm-7 text-end">
-                                {{ $transfer->lines->count() }}
-                            </dd>
+                            <dd class="col-sm-7 text-end">{{ $transfer->lines->count() }}</dd>
 
                             <dt class="col-sm-5">Total Qty</dt>
                             <dd class="col-sm-7 text-end">
-                                {{ number_format($totalQty, 3, ',', '.') }}
+                                {{ number_format($totalQty, 2, ',', '.') }}
                             </dd>
                         </dl>
                     </div>
@@ -120,15 +110,11 @@
                             @forelse ($transfer->lines as $line)
                                 <tr>
                                     <td>
-                                        @if ($line->item)
-                                            <div class="fw-semibold">{{ $line->item->name }}</div>
-                                            <div class="text-muted small">{{ $line->item->code }}</div>
-                                        @else
-                                            <span class="text-muted">-</span>
-                                        @endif
+                                        <div class="fw-semibold">{{ $line->item->name }}</div>
+                                        <div class="text-muted small">{{ $line->item->code }}</div>
                                     </td>
                                     <td class="text-end">
-                                        {{ number_format($line->qty, 3, ',', '.') }}
+                                        {{ number_format($line->qty, 2, ',', '.') }}
                                     </td>
                                     <td>
                                         {{ $line->notes ?: '-' }}
@@ -146,7 +132,7 @@
                             <tr>
                                 <th class="text-end">Total Qty</th>
                                 <th class="text-end">
-                                    {{ number_format($totalQty, 3, ',', '.') }}
+                                    {{ number_format($totalQty, 2, ',', '.') }}
                                 </th>
                                 <th></th>
                             </tr>

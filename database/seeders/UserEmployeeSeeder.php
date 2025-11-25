@@ -33,7 +33,7 @@ class UserEmployeeSeeder extends Seeder
             ],
             [
                 'code' => 'MRF',
-                'name' => 'Operator Cutting',
+                'name' => 'Mang Arip',
                 'role' => 'cutting',
                 'active' => 1,
                 'phone' => '081200000003',

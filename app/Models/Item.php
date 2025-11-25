@@ -20,12 +20,17 @@ class Item extends Model
         'last_purchase_price',
         'hpp',
         'active',
+        'consumption_cutting', // ⭐ NEW
+
+        'consumption_cutting_basis_qty', // ⭐ NEW
     ];
 
     protected $casts = [
         'last_purchase_price' => 'decimal:2',
         'hpp' => 'decimal:2',
         'active' => 'boolean',
+        'consumption_cutting' => 'decimal:2', // ⭐ NEW
+        'consumption_cutting_basis_qty' => 'decimal:4', // ⭐ NEW
     ];
 
     /* ==========================

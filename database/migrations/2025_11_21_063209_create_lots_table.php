@@ -10,25 +10,20 @@ return new class extends Migration
     {
         Schema::create('lots', function (Blueprint $table) {
             $table->id();
-
-            // Kode LOT, misal: LOT-20251121-001
             $table->string('code')->unique();
+            $table->foreignId('item_id')->constrained()->cascadeOnDelete();
 
-            // Optional: kaitkan ke item (bahan)
-            $table->foreignId('item_id')
-                ->nullable()
-                ->constrained('items')
-                ->nullOnDelete();
+            $table->decimal('initial_qty', 15, 2)->default(0);
+            $table->decimal('initial_cost', 15, 2)->default(0);
 
-            // Qty dan unit (optional, bisa kamu pakai nanti di modul produksi)
-            $table->decimal('qty', 15, 3)->default(0);
-            $table->string('unit', 10)->default('pcs');
+            $table->decimal('qty_onhand', 15, 3)->default(0);
+            $table->decimal('total_cost', 15, 2)->default(0);
+            $table->decimal('avg_cost', 15, 4)->default(0);
 
-            // Status LOT (raw / wip / used / etc), sementara default 'raw'
-            $table->string('status', 20)->default('raw');
-
+            $table->string('status')->default('open');
             $table->timestamps();
         });
+
     }
 
     public function down(): void

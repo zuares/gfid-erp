@@ -15,6 +15,9 @@ class InventoryMutation extends Model
         'source_type',
         'source_id',
         'notes',
+        'lot_id', // ⭐ WAJIB
+        'unit_cost', // ⭐ WAJIB
+        'total_cost', // ⭐ WAJIB
     ];
 
     protected $casts = [
@@ -81,4 +84,9 @@ class InventoryMutation extends Model
 
         return $label;
     }
+    public function lot()
+    {
+        return $this->belongsTo(\App\Models\Lot::class, 'lot_id');
+    }
+
 }

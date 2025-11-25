@@ -4,6 +4,7 @@ namespace App\Services\Purchasing;
 
 use App\Helpers\CodeGenerator;
 use App\Models\Item;
+use App\Models\Lot;
 use App\Models\PurchaseReceipt;
 use App\Models\PurchaseReceiptLine;
 use App\Models\SupplierPrice;
@@ -41,7 +42,6 @@ class GoodsReceiptService
      *          'notes'         => 'Roll 1-5',
      *          'lot_id'        => null, // optional
      *      ],
-     *      // ...
      *   ],
      * ]
      */
@@ -126,7 +126,7 @@ class GoodsReceiptService
     }
 
     /**
-     * POST GRN → stok masuk ke gudang.
+     * POST GRN → stok masuk ke gudang + update LOT & moving average.
      */
     public function post(PurchaseReceipt $grn): PurchaseReceipt
     {
@@ -139,15 +139,40 @@ class GoodsReceiptService
                 throw new \RuntimeException("Goods Receipt belum punya gudang tujuan.");
             }
 
-            // muat lines dulu untuk keamanan
-            $grn->loadMissing('lines');
+            // muat lines + item untuk keamanan
+            $grn->loadMissing('lines.item');
 
             foreach ($grn->lines as $line) {
                 if ($line->qty_received <= 0) {
                     continue;
                 }
 
-                // pakai InventoryService stockIn
+                // ==========================
+                // 1. Pastikan LOT ada
+                // ==========================
+                if ($line->lot_id) {
+                    // kalau dari form sudah diset lot_id
+                    $lot = $line->lot ?? Lot::findOrFail($line->lot_id);
+                } else {
+                    // kalau belum ada lot_id → buat LOT baru per baris item
+                    $lot = Lot::create([
+                        'code' => CodeGenerator::generate('LOT'),
+                        'item_id' => $line->item_id,
+                        'initial_qty' => 0,
+                        'initial_cost' => 0,
+                        'qty_onhand' => 0,
+                        'total_cost' => 0,
+                        'avg_cost' => 0,
+                        'status' => 'open',
+                    ]);
+
+                    $line->lot_id = $lot->id;
+                    $line->save();
+                }
+
+                // ==========================
+                // 2. Stok masuk via InventoryService + LOT & unit_cost
+                // ==========================
                 $this->inventory->stockIn(
                     warehouseId: $grn->warehouse_id,
                     itemId: $line->item_id,
@@ -156,7 +181,14 @@ class GoodsReceiptService
                     sourceType: 'purchase_receipt',
                     sourceId: $grn->id,
                     notes: "GRN {$grn->code} line {$line->id}",
+                    lotId: $lot->id, // <<— kunci LOT
+                    unitCost: $line->unit_price, // <<— unit cost untuk moving average
                 );
+
+                // ==========================
+                // 3. Update harga terakhir item & supplier
+                // ==========================
+                $this->touchLastPrices($grn, $line->item_id, $line->unit_price);
             }
 
             $grn->status = 'posted';
@@ -167,7 +199,7 @@ class GoodsReceiptService
     }
 
     /**
-     * UNPOST GRN → stok dikurangi lagi (reverse).
+     * UNPOST GRN → stok dikurangi lagi (reverse) + rollback LOT cost.
      */
     public function unpost(PurchaseReceipt $grn): PurchaseReceipt
     {
@@ -187,7 +219,22 @@ class GoodsReceiptService
                     continue;
                 }
 
-                // pakai InventoryService stockOut
+                // Kalau belum pakai LOT (legacy), still jalan tapi tanpa cost accuracy
+                if (!$line->lot_id) {
+                    $this->inventory->stockOut(
+                        warehouseId: $grn->warehouse_id,
+                        itemId: $line->item_id,
+                        qty: $line->qty_received,
+                        date: now(),
+                        sourceType: 'purchase_receipt_reverse',
+                        sourceId: $grn->id,
+                        notes: "UNPOST GRN {$grn->code} line {$line->id}",
+                        allowNegative: false,
+                    );
+                    continue;
+                }
+
+                // Dengan LOT: cost & qty di LOT ikut rollback
                 $this->inventory->stockOut(
                     warehouseId: $grn->warehouse_id,
                     itemId: $line->item_id,
@@ -197,6 +244,7 @@ class GoodsReceiptService
                     sourceId: $grn->id,
                     notes: "UNPOST GRN {$grn->code} line {$line->id}",
                     allowNegative: false,
+                    lotId: $line->lot_id, // <<— penting
                 );
             }
 

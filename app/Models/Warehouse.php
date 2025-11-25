@@ -50,4 +50,15 @@ class Warehouse extends Model
     {
         return $this->hasMany(PurchaseReceipt::class);
     }
+
+    public function externalTransfersFrom()
+    {
+        return $this->hasMany(ExternalTransfer::class, 'from_warehouse_id');
+    }
+
+    public function externalTransfersTo()
+    {
+        return $this->hasMany(ExternalTransfer::class, 'to_warehouse_id');
+    }
+
 }

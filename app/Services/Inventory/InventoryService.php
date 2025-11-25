@@ -4,22 +4,19 @@ namespace App\Services\Inventory;
 
 use App\Models\InventoryMutation;
 use App\Models\InventoryStock;
+use App\Services\Inventory\LotCostService;
 use Illuminate\Support\Carbon;
+use Illuminate\Support\Collection;
 use Illuminate\Support\Facades\DB;
 
 class InventoryService
 {
+    public function __construct(
+        protected LotCostService $lotCost, // service moving average per LOT
+    ) {}
+
     /**
      * Tambah stok (IN) ke suatu gudang/item.
-     *
-     * @param  int                             $warehouseId
-     * @param  int                             $itemId
-     * @param  float|int|string                $qty
-     * @param  string|\DateTimeInterface|null  $date
-     * @param  string|null                     $sourceType  contoh: 'purchase_receipt', 'cutting_receive'
-     * @param  int|null                        $sourceId    id dokumen sumber
-     * @param  string|null                     $notes
-     * @return InventoryMutation|null
      */
     public function stockIn(
         int $warehouseId,
@@ -29,6 +26,8 @@ class InventoryService
         ?string $sourceType = null,
         ?int $sourceId = null,
         ?string $notes = null,
+        ?int $lotId = null, // optional LOT
+        float | int | string | null $unitCost = null, // harga per unit (untuk moving average)
     ): ?InventoryMutation {
         $qty = $this->num($qty);
         if ($qty <= 0) {
@@ -37,7 +36,6 @@ class InventoryService
 
         $date = $this->normalizeDate($date);
 
-        // update / buat stok
         /** @var InventoryStock $stock */
         $stock = InventoryStock::firstOrCreate(
             [
@@ -52,8 +50,12 @@ class InventoryService
         $stock->qty = $this->num($stock->qty) + $qty;
         $stock->save();
 
-        // catat mutasi
-        return InventoryMutation::create([
+        // cost
+        $unitCostValue = $unitCost !== null ? $this->num($unitCost) : null;
+        $totalCost = $unitCostValue !== null ? $unitCostValue * $qty : null;
+
+        // catat mutasi (IN: qty_change +, total_cost +)
+        $mutation = InventoryMutation::create([
             'date' => $date,
             'warehouse_id' => $warehouseId,
             'item_id' => $itemId,
@@ -62,13 +64,21 @@ class InventoryService
             'source_type' => $sourceType,
             'source_id' => $sourceId,
             'notes' => $notes,
+            'lot_id' => $lotId,
+            'unit_cost' => $unitCostValue,
+            'total_cost' => $totalCost,
         ]);
+
+        // update moving average LOT kalau ada lotId + unitCost
+        if ($lotId && $unitCostValue !== null) {
+            $this->lotCost->addReceipt($lotId, $qty, $unitCostValue);
+        }
+
+        return $mutation;
     }
 
     /**
      * Kurangi stok (OUT) dari suatu gudang/item.
-     *
-     * @return InventoryMutation|null
      */
     public function stockOut(
         int $warehouseId,
@@ -79,6 +89,7 @@ class InventoryService
         ?int $sourceId = null,
         ?string $notes = null,
         bool $allowNegative = false,
+        ?int $lotId = null, // optional LOT
     ): ?InventoryMutation {
         $qty = $this->num($qty);
         if ($qty <= 0) {
@@ -110,8 +121,18 @@ class InventoryService
         $stock->qty = $this->num($stock->qty) - $qty;
         $stock->save();
 
-        // catat mutasi
-        return InventoryMutation::create([
+        // kalau ada LOT → ambil avg cost
+        $avgCost = null;
+        $totalCost = null;
+
+        if ($lotId) {
+            $avgCost = $this->lotCost->getAvgCost($lotId);
+            // OUT kita simpan sebagai nilai NEGATIF, biar bisa langsung dijumlah
+            $totalCost = -($avgCost * $qty);
+        }
+
+        // catat mutasi (OUT: qty_change -, total_cost -)
+        $mutation = InventoryMutation::create([
             'date' => $date,
             'warehouse_id' => $warehouseId,
             'item_id' => $itemId,
@@ -120,12 +141,20 @@ class InventoryService
             'source_type' => $sourceType,
             'source_id' => $sourceId,
             'notes' => $notes,
+            'lot_id' => $lotId,
+            'unit_cost' => $avgCost,
+            'total_cost' => $totalCost,
         ]);
+
+        if ($lotId) {
+            $this->lotCost->consume($lotId, $qty);
+        }
+
+        return $mutation;
     }
 
     /**
-     * Transfer stok antar gudang.
-     * Menghasilkan 2 mutasi: out dari gudang asal, in ke gudang tujuan.
+     * Transfer stok antar gudang. (bisa bawa LOT juga)
      */
     public function transfer(
         int $fromWarehouseId,
@@ -137,6 +166,7 @@ class InventoryService
         ?int $sourceId = null,
         ?string $notes = null,
         bool $allowNegative = false,
+        ?int $lotId = null, // kalau lot-nya ikut pindah gudang
     ): array {
         $qty = $this->num($qty);
         if ($qty <= 0) {
@@ -156,6 +186,7 @@ class InventoryService
             $sourceId,
             $notes,
             $allowNegative,
+            $lotId,
             &$mutations
         ) {
             // keluar dulu dari gudang asal
@@ -168,7 +199,13 @@ class InventoryService
                 sourceId: $sourceId,
                 notes: $notes,
                 allowNegative: $allowNegative,
+                lotId: $lotId,
             );
+
+            // ambil avg cost LOT untuk masuk ke gudang tujuan
+            $unitCost = $lotId
+            ? $this->lotCost->getAvgCost($lotId)
+            : null;
 
             // masuk ke gudang tujuan
             $mutations['in'] = $this->stockIn(
@@ -179,6 +216,8 @@ class InventoryService
                 sourceType: $sourceType ?? 'transfer_in',
                 sourceId: $sourceId,
                 notes: $notes,
+                lotId: $lotId,
+                unitCost: $unitCost
             );
         });
 
@@ -197,6 +236,7 @@ class InventoryService
         ?string $sourceType = 'adjustment',
         ?int $sourceId = null,
         ?string $notes = null,
+        ?int $lotId = null, // bisa juga per LOT
     ): ?InventoryMutation {
         $newQty = $this->num($newQty);
         $date = $this->normalizeDate($date);
@@ -215,6 +255,7 @@ class InventoryService
         }
 
         if ($diff > 0) {
+            // stok kurang → masuk
             return $this->stockIn(
                 warehouseId: $warehouseId,
                 itemId: $itemId,
@@ -223,9 +264,11 @@ class InventoryService
                 sourceType: $sourceType,
                 sourceId: $sourceId,
                 notes: $notes,
+                lotId: $lotId,
             );
         }
 
+        // stok kelebihan → keluar
         return $this->stockOut(
             warehouseId: $warehouseId,
             itemId: $itemId,
@@ -235,7 +278,35 @@ class InventoryService
             sourceId: $sourceId,
             notes: $notes,
             allowNegative: false,
+            lotId: $lotId,
         );
+    }
+
+    public function getAvailableLots(
+        ?int $warehouseId = null,
+        ?int $itemId = null,
+    ): Collection {
+        $q = InventoryMutation::query()
+            ->selectRaw('
+                lot_id,
+                warehouse_id,
+                item_id,
+                SUM(qty_change) as qty_balance
+            ')
+            ->whereNotNull('lot_id')
+            ->groupBy('lot_id', 'warehouse_id', 'item_id')
+            ->having('qty_balance', '>', 0)
+            ->with(['lot.item', 'warehouse']); // pastikan relasi ini ada di model
+
+        if ($warehouseId) {
+            $q->where('warehouse_id', $warehouseId);
+        }
+
+        if ($itemId) {
+            $q->where('item_id', $itemId);
+        }
+
+        return $q->get();
     }
 
     // =====================================================================
@@ -257,37 +328,26 @@ class InventoryService
 
     protected function num(float | int | string | null $value): float
     {
-
-        // dd($value);
         if ($value === null || $value === '') {
             return 0.0;
         }
 
-        // Kalau sudah numeric (hasil validasi / cast Laravel), langsung saja
         if (is_int($value) || is_float($value)) {
             return (float) $value;
         }
 
-        // Pastikan string
         $value = trim((string) $value);
         $value = str_replace(' ', '', $value);
 
-        // Kalau ada koma → anggap format Indonesia: "1.234,56" / "24,00"
+        // Kalau ada koma → anggap format Indonesia (1.234,56)
         if (strpos($value, ',') !== false) {
-            // Hilangkan titik ribuan
-            $value = str_replace('.', '', $value);
-            // Ganti koma jadi titik desimal
-            $value = str_replace(',', '.', $value);
+            $value = str_replace('.', '', $value); // buang titik ribuan
+            $value = str_replace(',', '.', $value); // koma jadi titik
             return (float) $value;
         }
 
-        // Kalau tidak ada koma, tapi pola ribuan: "1.234" atau "1.234.567"
-        if (preg_match('/^\d{1,3}(\.\d{3})+$/', $value)) {
-            $value = str_replace('.', '', $value);
-            return (float) $value;
-        }
-
-        // Default: biarkan Laravel terjemahkan (mis. "1234.56")
+        // Kalau tidak ada koma → biarkan floatval yang baca
+        // "25.000" => 25, "1234.5" => 1234.5
         return (float) $value;
     }
 }
