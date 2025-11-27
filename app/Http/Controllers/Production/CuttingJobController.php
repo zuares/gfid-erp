@@ -6,6 +6,7 @@ use App\Http\Controllers\Controller;
 use App\Models\CuttingJob;
 use App\Models\Employee;
 use App\Models\Item;
+use App\Models\QcResult;
 use App\Models\Warehouse;
 use App\Services\Inventory\InventoryService;
 use App\Services\Production\CuttingService;
@@ -56,55 +57,50 @@ class CuttingJobController extends Controller
      */
     public function create(Request $request)
     {
-        // semua LOT dengan saldo > 0 (sudah include relasi lot.item & warehouse di service)
-        // cari gudang RM
+        // 1️⃣ Cari gudang RM (wajib ada)
         $rmWarehouseId = Warehouse::where('code', 'RM')->value('id');
 
         if (!$rmWarehouseId) {
-            // optional: bisa dibikin redirect / error yang lebih halus
-            throw new \RuntimeException('Warehouse RM belum dikonfigurasi di tabel warehouses.');
+            // optional: bisa abort(500) atau redirect dengan flash message
+            throw new \RuntimeException('Warehouse RM belum dikonfigurasi di tabel warehouses (code = RM).');
         }
 
-        // semua LOT dengan saldo > 0 khusus di gudang RM
+        // 2️⃣ Ambil semua LOT dengan saldo > 0 di gudang RM
+        //    (asumsi getAvailableLots() sudah include relasi lot & warehouse)
         $lotStocks = $this->inventory->getAvailableLots(
             warehouseId: $rmWarehouseId,
             itemId: null, // bisa diisi kalau mau filter per item
         );
 
-        // ambil lot_id dari query (ketika user klik "Input Outputs")
-        $selectedLotId = $request->get('lot_id') ?? old('lot_id');
+        // 3️⃣ Tentukan LOT yang dipilih:
+        //    - dari query ?lot_id=...
+        //    - atau dari old('lot_id') setelah validation error
+        $selectedLotId = $request->query('lot_id') ?: old('lot_id');
         $selectedLotRow = null;
 
         if ($selectedLotId) {
             $selectedLotRow = $lotStocks->firstWhere('lot_id', (int) $selectedLotId);
         }
 
-        // data master item jadi & operator cutting (dipakai kalau LOT sudah dipilih)
-        $items = Item::query()
-            ->select('id', 'code', 'item_category_id')
-            ->where('type', 'finished_good')
-            ->with(['category:id,code,name'])
-            ->orderBy('code')
-            ->get();
+        // 4️⃣ Kalau belum ada LOT terpilih atau lot_id tidak valid,
+        //    tapi stok LOT ada → auto-pilih LOT pertama supaya form tidak "kosong".
+        if (!$selectedLotRow && $lotStocks->isNotEmpty()) {
+            $selectedLotRow = $lotStocks->first();
+            $selectedLotId = $selectedLotRow->lot_id;
+        }
 
-        $operators = Employee::query()
-            ->select('id', 'code', 'name')
-            ->where('role', 'cutting')
-            ->orderBy('code')
-            ->get();
-
-        // kalau LOT belum dipilih → tidak perlu siapkan $lot, $warehouse, dst
+        // 5️⃣ Siapkan variable untuk view
         $lot = null;
         $warehouse = null;
         $lotBalance = 0.0;
         $rows = [];
 
         if ($selectedLotRow) {
-            $lot = $selectedLotRow->lot;
-            $warehouse = $selectedLotRow->warehouse;
+            $lot = $selectedLotRow->lot; // relasi Lot model
+            $warehouse = $selectedLotRow->warehouse; // relasi Warehouse model
             $lotBalance = (float) $selectedLotRow->qty_balance;
 
-            // rows initial (kalau ada old input, pakai itu)
+            // Rows initial (kalau ada old input, pakai itu; kalau tidak, buat 1 baris kosong)
             $oldBundles = old('bundles');
             if ($oldBundles) {
                 $rows = $oldBundles;
@@ -122,12 +118,26 @@ class CuttingJobController extends Controller
             }
         }
 
+        // 6️⃣ Data master item jadi & operator cutting
+        $items = Item::query()
+            ->select('id', 'code', 'item_category_id')
+            ->where('type', 'finished_good')
+            ->with(['category:id,code,name'])
+            ->orderBy('code')
+            ->get();
+
+        $operators = Employee::query()
+            ->select('id', 'code', 'name')
+            ->where('role', 'cutting')
+            ->orderBy('code')
+            ->get();
+
         return view('production.cutting_jobs.create', [
             'lotStocks' => $lotStocks,
             'selectedLotId' => $selectedLotId,
             'selectedLotRow' => $selectedLotRow,
 
-            // untuk _form
+            // untuk _form.blade.php
             'mode' => 'create',
             'job' => null, // hanya dipakai di edit
             'lot' => $lot,
@@ -148,7 +158,8 @@ class CuttingJobController extends Controller
             'date' => ['required', 'date'],
             'warehouse_id' => ['required', 'exists:warehouses,id'],
             'lot_id' => ['required', 'exists:lots,id'],
-            'fabric_item_id' => ['nullable', 'exists:items,id'],
+            'fabric_item_id' => ['required', 'integer', 'exists:items,id'],
+            'lot_id' => ['required', 'integer', 'exists:lots,id'],
 
             // Wajib pilih operator
             'operator_id' => ['required', 'exists:employees,id'],
@@ -350,14 +361,15 @@ class CuttingJobController extends Controller
             'bundles.finishedItem',
             'bundles.operator',
             'bundles.qcResults' => function ($q) {
-                $q->where('stage', 'cutting');
+                $q->where('stage', QcResult::STAGE_CUTTING); // atau 'cutting' kalau belum pakai constant
             },
         ]);
-
-        // Cek apakah sudah pernah di-QC Cutting
-        $hasQcCutting = $cuttingJob->bundles->contains(function ($bundle) {
-            return $bundle->qcResults->where('stage', 'cutting')->isNotEmpty();
-        });
+        // Cek apakah sudah pernah di-QC Cutting (langsung via query)
+        $hasQcCutting = $cuttingJob->bundles()
+            ->whereHas('qcResults', function ($q) {
+                $q->where('stage', QcResult::STAGE_CUTTING); // atau 'cutting'
+            })
+            ->exists();
 
         return view('production.cutting_jobs.show', [
             'job' => $cuttingJob,

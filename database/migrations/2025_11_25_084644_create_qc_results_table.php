@@ -15,7 +15,7 @@ return new class extends Migration
             $table->string('stage', 20); // 'cutting', 'sewing', 'finishing', ...
 
             // Anchor utama: bundle dari Cutting
-            $table->foreignId('bundle_id')
+            $table->foreignId('cutting_job_bundle_id')
                 ->nullable()
                 ->constrained('cutting_job_bundles')
                 ->cascadeOnUpdate()
@@ -28,7 +28,7 @@ return new class extends Migration
                 ->cascadeOnUpdate()
                 ->nullOnDelete();
 
-            // Disiapkan untuk modul sewing (bisa nanti dikasih FK kalau sudah fix table-nya)
+            // Disiapkan untuk modul sewing
             $table->foreignId('sewing_job_id')
                 ->nullable();
 
@@ -64,7 +64,7 @@ return new class extends Migration
             $table->timestamps();
 
             // Index untuk report / filter cepat
-            $table->index(['stage', 'bundle_id']);
+            $table->index(['stage', 'cutting_job_bundle_id']);
             $table->index(['stage', 'cutting_job_id']);
             $table->index(['stage', 'sewing_job_id']);
             $table->index(['stage', 'finishing_job_id']);

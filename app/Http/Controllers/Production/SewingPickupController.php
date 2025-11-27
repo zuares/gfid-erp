@@ -92,7 +92,6 @@ class SewingPickupController extends Controller
     }
     public function store(Request $request)
     {
-        // HAPUS dd() supaya fungsi jalan normal
         $validated = $request->validate([
             'date' => ['required', 'date'],
             'warehouse_id' => ['required', 'exists:warehouses,id'], // gudang sewing (WIP-SEW)
@@ -119,7 +118,7 @@ class SewingPickupController extends Controller
                 ]);
             }
 
-            $sewingWarehouseId = (int) $validated['warehouse_id'];
+            $sewingWarehouseId = (int) $validated['warehouse_id']; // biasanya WIP-SEW
             $date = $validated['date'];
 
             $code = CodeGenerator::generate('SWP');
@@ -160,7 +159,7 @@ class SewingPickupController extends Controller
                     ->sortByDesc('qc_date')
                     ->first();
 
-                // Batas maksimum qty hasil QC
+                // Batas maksimum qty hasil QC:
                 // - kalau ada QC → pakai qty_ok
                 // - kalau belum ada QC → fallback ke qty_pcs
                 if ($lastQc && $lastQc->qty_ok !== null) {
@@ -222,33 +221,57 @@ class SewingPickupController extends Controller
 
                 $bundle->save();
 
-                // 🔹 INVENTORY: WIP-CUT → WIP-SEW
+                // =======================
+                // 🔁 BLOK COSTING / INVENTORY
+                // =======================
+
                 $notes = "Sewing pickup {$pickup->code} - bundle {$bundle->bundle_code}";
 
-                // 1) Keluar dari WIP-CUT (barang WIP Cutting)
+                // 1️⃣ Ambil unit_cost per pcs dari WIP-CUT untuk LOT + item ini
+                //    Ini memastikan biaya di WIP-SEW = biaya di WIP-CUT (tidak bikin HPP baru).
+                $unitCostPerPiece = $this->inventory->getItemIncomingUnitCost(
+                    warehouseId: $wipCutWarehouseId,
+                    itemId: $bundle->finished_item_id,
+                );
+
+                // Kalau mau extra safety:
+                if ($unitCostPerPiece === null || $unitCostPerPiece <= 0) {
+                    // fallback: kalau misal belum ada saldo WIP-CUT (kasus error data)
+                    // - bisa pakai getItemIncomingUnitCost
+                    // - atau set 0 tapi kamu harus aware HPP akan 0
+                    $unitCostPerPiece = $this->inventory->getItemIncomingUnitCost(
+                        warehouseId: $wipCutWarehouseId,
+                        itemId: $bundle->finished_item_id,
+                    );
+                }
+
+                // 1) Keluar dari WIP-CUT
                 $this->inventory->stockOut(
                     warehouseId: $wipCutWarehouseId,
                     itemId: $bundle->finished_item_id,
                     qty: $qty,
                     date: $date,
-                    sourceType: 'sewing_pickup',
+                    sourceType: SewingPickup::class,
                     sourceId: $pickup->id,
                     notes: $notes,
                     allowNegative: false,
-                    lotId: $bundle->lot_id, // penting: untuk cost & trace LOT
+                    lotId: $bundle->lot_id,
+                    unitCostOverride: $unitCostPerPiece, // ⬅️ pakai cost WIP, bukan LotCost kain
+                    affectLotCost: false, // ⬅️ jangan konsumsi LotCost lagi
                 );
 
-                // 2) Masuk ke gudang sewing (misal WIP-SEW)
+// 2) Masuk ke WIP-SEW
                 $this->inventory->stockIn(
                     warehouseId: $sewingWarehouseId,
                     itemId: $bundle->finished_item_id,
                     qty: $qty,
                     date: $date,
-                    sourceType: 'sewing_pickup',
+                    sourceType: SewingPickup::class,
                     sourceId: $pickup->id,
                     notes: $notes,
                     lotId: $bundle->lot_id,
-                    unitCost: null, // biarkan ikut moving average LOT, jangan bikin layer baru
+                    unitCost: $unitCostPerPiece,
+                    affectLotCost: false,
                 );
 
                 $createdLines++;
@@ -264,7 +287,7 @@ class SewingPickupController extends Controller
 
         return redirect()
             ->route('production.sewing_pickups.index')
-            ->with('success', 'Sewing pickup berhasil dibuat dan stok sudah dipindahkan dari WIP-CUT ke gudang sewing + bundle ter-update sisa qty-nya.');
+            ->with('success', 'Sewing pickup berhasil dibuat. Stok sudah dipindahkan dari WIP-CUT ke gudang sewing dengan costing yang mengikuti saldo WIP-CUT.');
     }
 
 }

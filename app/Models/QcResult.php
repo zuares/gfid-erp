@@ -14,7 +14,7 @@ class QcResult extends Model
 
     protected $fillable = [
         'stage',
-        'bundle_id',
+        'cutting_job_bundle_id',
         'cutting_job_id',
         'sewing_job_id',
         'finishing_job_id',
@@ -39,14 +39,14 @@ class QcResult extends Model
     |--------------------------------------------------------------------------
      */
 
-    public function bundle(): BelongsTo
-    {
-        return $this->belongsTo(CuttingJobBundle::class, 'bundle_id');
-    }
-
     public function cuttingJob(): BelongsTo
     {
         return $this->belongsTo(CuttingJob::class, 'cutting_job_id');
+    }
+
+    public function cuttingBundle()
+    {
+        return $this->belongsTo(CuttingJobBundle::class, 'cutting_job_bundle_id');
     }
 
     public function finishingJob(): BelongsTo
@@ -79,4 +79,5 @@ class QcResult extends Model
     {
         return $query->where('stage', self::STAGE_FINISHING);
     }
+
 }

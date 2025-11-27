@@ -39,17 +39,25 @@
             {{ number_format($lotQty, 2, ',', '.') }} Kg
         </span>
     </div>
-
     {{-- hidden --}}
     <input type="hidden" name="warehouse_id" value="{{ $warehouse?->id }}">
     <input type="hidden" name="lot_id" value="{{ $lot?->id }}">
     <input type="hidden" name="lot_balance" value="{{ $lotQty }}">
+
+    {{-- 🔥 fabric item (item kain) ikut dikirim ke backend --}}
+    <input type="hidden" name="fabric_item_id"
+        value="{{ old('fabric_item_id', $isEdit ? $job->fabric_item_id : $lot?->item_id ?? null) }}">
+
 
     {{-- =========================
          BAGIAN INFORMASI LOT (DESKTOP SAJA)
     ========================== --}}
     <div class="card p-3 mb-3 d-none d-md-block">
         <h2 class="h6 mb-2">Informasi Lot Kain</h2>
+        @error('fabric_item_id')
+            <div class="text-danger small mt-1">{{ $message }}</div>
+        @enderror
+
 
         {{-- HEADER: Tgl Beli, Nama Bahan, Qty --}}
         <div class="row g-3 mb-2">
@@ -215,8 +223,8 @@
 
                             {{-- Qty (pcs) --}}
                             <td data-label="Qty (pcs)">
-                                <input type="number" step="1" min="0" inputmode="numeric" pattern="\d*"
-                                    name="bundles[{{ $i }}][qty_pcs]"
+                                <input type="number" step="1" min="0" inputmode="numeric"
+                                    pattern="\d*" name="bundles[{{ $i }}][qty_pcs]"
                                     class="form-control form-control-sm text-end bundle-qty"
                                     value="{{ isset($row['qty_pcs']) ? (int) $row['qty_pcs'] : '' }}">
                             </td>

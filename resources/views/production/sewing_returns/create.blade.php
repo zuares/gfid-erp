@@ -1,3 +1,4 @@
+{{-- resources/views/production/sewing_returns/create.blade.php --}}
 @extends('layouts.app')
 
 @section('title', 'Produksi • Sewing Return')
@@ -46,6 +47,19 @@
             flex-wrap: wrap;
         }
 
+        /* HEADER FORM STICKY */
+        .card-header-sticky {
+            position: sticky;
+            top: .5rem;
+            z-index: 20;
+        }
+
+        @media (max-width: 767.98px) {
+            .card-header-sticky {
+                top: .35rem;
+            }
+        }
+
         /* ====== ROW STATE (bundle) ====== */
         .return-row {
             transition:
@@ -58,14 +72,12 @@
             border-top-color: rgba(148, 163, 184, 0.25) !important;
         }
 
-        /* belum diisi */
         .row-empty {
             box-shadow:
                 inset 3px 0 0 color-mix(in srgb, var(--line) 80%, transparent 20%);
             background: var(--card);
         }
 
-        /* sudah diisi */
         .row-filled {
             background: color-mix(in srgb,
                     var(--card) 82%,
@@ -89,22 +101,13 @@
                     rgba(34, 197, 94, 0.7) 60%);
         }
 
-        .summary-chip {
-            border-radius: 999px;
-            padding: .15rem .6rem;
-            font-size: .76rem;
-            background: color-mix(in srgb, var(--card) 80%, var(--line) 20%);
-            color: var(--muted);
-        }
-
-        .summary-selected {
-            font-size: .78rem;
-            color: var(--muted);
-        }
-
         .qty-input {
             font-weight: 500;
-            transition: font-weight .12s ease, box-shadow .12s ease, border-color .12s ease, background-color .12s ease;
+            transition:
+                font-weight .12s ease,
+                box-shadow .12s ease,
+                border-color .12s ease,
+                background-color .12s ease;
         }
 
         .qty-input-active {
@@ -114,30 +117,13 @@
             background: color-mix(in srgb, var(--card) 85%, rgba(34, 197, 94, .12) 15%);
         }
 
-        .btn-quick {
-            font-size: .72rem;
-            padding-inline: .5rem;
-            padding-block: .18rem;
-            border-radius: 999px;
-        }
-
-        .btn-quick.btn-outline-success {
-            border-color: color-mix(in srgb, var(--line) 40%, rgba(34, 197, 94, .9) 60%);
-        }
-
-        .btn-quick.btn-outline-danger {
-            border-color: color-mix(in srgb, var(--line) 40%, rgba(220, 38, 38, .9) 60%);
-        }
-
         .notes-input {
             font-size: .78rem;
         }
 
-        .cell-label {
-            font-size: .7rem;
-            text-transform: uppercase;
+        .mobile-muted-soft {
             color: var(--muted);
-            margin-bottom: .12rem;
+            font-size: .76rem;
         }
 
         /* ============ MOBILE (<= 767.98px) ============ */
@@ -147,7 +133,7 @@
             }
 
             .page-wrap {
-                padding-bottom: 6rem;
+                padding-bottom: 6.5rem;
             }
 
             .header-row {
@@ -165,7 +151,7 @@
 
             .table-sewing-return {
                 border-collapse: separate;
-                border-spacing: 0 6px;
+                border-spacing: 0 8px;
             }
 
             .table-sewing-return thead {
@@ -176,9 +162,8 @@
                 display: block;
                 border-radius: 11px;
                 border: 1px solid var(--line);
-                padding: .52rem .6rem .6rem;
+                padding: .52rem .6rem .55rem;
                 margin-bottom: .5rem;
-                background: var(--card);
             }
 
             .table-sewing-return tbody tr:last-child {
@@ -188,7 +173,7 @@
             .table-sewing-return td {
                 display: block;
                 border: none !important;
-                padding: .12rem 0;
+                padding: .08rem 0;
             }
 
             .td-desktop-only {
@@ -200,24 +185,18 @@
                 justify-content: space-between;
                 align-items: flex-start;
                 gap: .75rem;
-                margin-bottom: .2rem;
+                margin-bottom: .12rem;
             }
 
             .mobile-top-left {
                 font-size: .84rem;
                 display: flex;
                 flex-direction: column;
-                gap: .1rem;
-            }
-
-            .mobile-top-line {
-                display: flex;
-                align-items: center;
-                gap: .32rem;
+                gap: .12rem;
             }
 
             .mobile-top-left .row-index {
-                font-size: .74rem;
+                font-size: .72rem;
                 color: var(--muted);
             }
 
@@ -234,41 +213,43 @@
                 font-size: .7rem;
                 text-transform: uppercase;
                 color: var(--muted);
+                margin-bottom: .08rem;
             }
 
             .mobile-meta {
+                font-size: .76rem;
+                color: var(--muted);
+                margin-bottom: .08rem;
+            }
+
+            .mobile-meta span+span {
+                margin-left: .25rem;
+            }
+
+            .mobile-muted-soft {
                 font-size: .75rem;
                 color: var(--muted);
-                margin-bottom: .18rem;
             }
 
             .cell-qty-row {
                 display: flex;
                 gap: .35rem;
+                margin-top: .18rem;
             }
 
             .cell-qty-row .form-control {
                 flex: 1;
             }
 
-            .cell-actions {
-                display: flex;
-                flex-wrap: wrap;
-                gap: .3rem;
-                margin-top: .25rem;
-            }
-
-            .cell-actions .btn-quick {
-                flex: 1;
-                min-width: 110px;
-                text-align: center;
+            .cell-notes {
+                margin-top: .2rem;
             }
 
             /* FOOTER: floating kanan bawah */
             .form-footer {
                 position: fixed;
                 right: .9rem;
-                bottom: 4.2rem;
+                bottom: 2.9rem;
                 left: auto;
                 z-index: 30;
 
@@ -328,6 +309,20 @@
 @endpush
 
 @section('content')
+    @php
+        /** @var \App\Models\SewingPickup|null $selectedPickup */
+        $selectedPickupId = old('pickup_id', $pickupId ?? null);
+        $defaultDate = old('date', optional($selectedPickup?->date)->format('Y-m-d') ?? now()->format('Y-m-d'));
+
+        $itemCodes = $lines
+            ->map(function ($l) {
+                return optional(optional($l->bundle)->finishedItem)->code;
+            })
+            ->filter()
+            ->unique()
+            ->values();
+    @endphp
+
     <div class="page-wrap py-3 py-md-4">
 
         {{-- HEADER --}}
@@ -335,9 +330,6 @@
             <div class="header-row">
                 <div>
                     <h1 class="h5 mb-1">Sewing Return</h1>
-                    <div class="help">
-                        Setor hasil jahit (OK / Reject) per bundle dari Sewing Pickup.
-                    </div>
                 </div>
 
                 <div class="d-flex flex-wrap gap-2">
@@ -355,105 +347,115 @@
             </div>
         </div>
 
-        @php
-            $selectedPickupId = old('pickup_id', optional($currentPickup)->id);
-            $defaultDate = old(
-                'date',
-                optional($currentPickup->date ?? null)?->format('Y-m-d') ?? now()->format('Y-m-d'),
-            );
-        @endphp
-
         <form id="sewing-return-form" action="{{ route('production.sewing_returns.store') }}" method="post">
             @csrf
 
-            {{-- HEADER FORM --}}
-            <div class="card p-3 mb-3">
-                <div class="row g-3">
-                    {{-- Pickup (flow: pilih tanggal pickup) --}}
-                    <div class="col-md-6 col-12">
-                        <div class="help mb-1">Pickup</div>
-                        <select name="pickup_id" class="form-select form-select-sm @error('pickup_id') is-invalid @enderror"
-                            onchange="if(this.value){ window.location='{{ route('production.sewing_returns.create') }}?pickup_id=' + this.value; }">
-                            <option value="">Pilih tanggal pickup...</option>
-                            @foreach ($pickups as $p)
-                                @php
-                                    /** @var \Carbon\Carbon|null $dateObj */
-                                    $dateObj = $p->date ? \Carbon\Carbon::parse($p->date) : null;
-                                    $dayLabel = $dateObj ? $dateObj->translatedFormat('D') : '';
-                                    $dateLabel = $dateObj ? $dateObj->format('d/m') : $p->date;
-                                    $opName = $p->operator?->name ?? '-';
-                                    $isSelected = $selectedPickupId == $p->id;
-                                @endphp
-                                <option value="{{ $p->id }}" {{ $isSelected ? 'selected' : '' }}>
-                                    {{ $dayLabel }} • {{ $dateLabel }} • {{ $opName }}
-                                </option>
-                            @endforeach
-                        </select>
-                        @error('pickup_id')
-                            <div class="invalid-feedback">{{ $message }}</div>
-                        @enderror
-                        @if (!$currentPickup)
-                            <div class="small text-muted mt-1">
-                                Pilih tanggal pickup + operator jahit yang akan disetor hasilnya.
-                            </div>
-                        @endif
-                    </div>
-
+            {{-- HEADER FORM (STICKY) --}}
+            <div class="card p-3 mb-3 card-header-sticky">
+                <div class="row g-3 align-items-end">
                     {{-- Tanggal Return --}}
                     <div class="col-md-3 col-6">
-                        <div class="help mb-1">Tanggal Return</div>
+                        <div class="help mb-1">Tanggal Setor</div>
                         <input type="date" name="date"
                             class="form-control form-control-sm @error('date') is-invalid @enderror"
                             value="{{ $defaultDate }}">
                         @error('date')
                             <div class="invalid-feedback">{{ $message }}</div>
                         @enderror
+
+                        <input type="hidden" name="qc_date" value="{{ old('qc_date', $defaultDate) }}">
                     </div>
 
-                    {{-- Catatan header --}}
-                    <div class="col-md-3 col-6">
-                        <input type="text" name="notes"
-                            class="form-control form-control-sm @error('notes') is-invalid @enderror"
-                            value="{{ old('notes') }}" placeholder="Catatan umum (opsional)">
-                        @error('notes')
+                    {{-- Pilih Sewing Pickup (hanya yg masih punya sisa) --}}
+                    <div class="col-md-5 col-12">
+                        <div class="help mb-1">Tanggal + Operator Ambil Jahit</div>
+                        <select name="pickup_id" id="pickup_id_select"
+                            class="form-select form-select-sm @error('pickup_id') is-invalid @enderror"
+                            onchange="if(this.value){ window.location='{{ route('production.sewing_returns.create') }}?pickup_id=' + this.value; }">
+                            <option value="">Pilih Tanggal Ambil...</option>
+                            @foreach ($pickups as $pickup)
+                                @php
+                                    // Hitung total sisa (belum setor) per pickup
+                                    $pickupLines = $pickup->lines ?? collect();
+                                    $totalRemaining = $pickupLines->sum(function ($line) {
+                                        $qtyBundle = (float) ($line->qty_bundle ?? 0);
+                                        $returnedOk = (float) ($line->qty_returned_ok ?? 0);
+                                        $returnedRej = (float) ($line->qty_returned_reject ?? 0);
+                                        return max($qtyBundle - ($returnedOk + $returnedRej), 0);
+                                    });
+                                @endphp
+
+                                @if ($totalRemaining > 0)
+                                    <option value="{{ $pickup->id }}"
+                                        {{ (int) $selectedPickupId === (int) $pickup->id ? 'selected' : '' }}>
+                                        {{ $pickup->operator?->name ?? '(Tanpa operator)' }}
+                                        -
+                                        @php
+                                            try {
+                                                $labelDate = $pickup->date ? id_day($pickup->date) : '-';
+                                            } catch (\Throwable $e) {
+                                                $labelDate = optional($pickup->date)->format('d/m/Y') ?? '-';
+                                            }
+                                        @endphp
+                                        {{ $labelDate }}
+                                    </option>
+                                @endif
+                            @endforeach
+                        </select>
+                        @error('pickup_id')
                             <div class="invalid-feedback">{{ $message }}</div>
                         @enderror
+                        {{-- 🔥 operator_id langsung ikut SewingPickup --}}
+                        @if ($selectedPickup)
+                            <input type="hidden" name="operator_id" value="{{ $selectedPickup->operator_id }}">
+                        @endif
+                        @if (!$selectedPickup)
+                            <div class="small text-muted mt-1">
+                                Pilih Sewing Pickup untuk menampilkan bundles.
+                            </div>
+                        @endif
+
+                        {{-- FILTER KODE ITEM: MOBILE (di bawah sewing pickup) --}}
+                        @if ($itemCodes->isNotEmpty())
+                            <div class="mt-3 d-md-none">
+                                <div class="help mb-1">Filter Kode Item (opsional)</div>
+                                <select id="filter-item-code" class="form-select form-select-sm">
+                                    <option value="">Semua item...</option>
+                                    @foreach ($itemCodes as $code)
+                                        <option value="{{ $code }}">{{ $code }}</option>
+                                    @endforeach
+                                </select>
+                            </div>
+                        @endif
                     </div>
+
+                    {{-- FILTER KODE ITEM: DESKTOP (kolom ketiga sejajar) --}}
+                    @if ($itemCodes->isNotEmpty())
+                        <div class="col-md-4 d-none d-md-block">
+                            <div class="help mb-1">Filter Kode Item (opsional)</div>
+                            <select id="filter-item-code" class="form-select form-select-sm">
+                                <option value="">Semua item...</option>
+                                @foreach ($itemCodes as $code)
+                                    <option value="{{ $code }}">{{ $code }}</option>
+                                @endforeach
+                            </select>
+                        </div>
+                    @endif
                 </div>
+            </div>
+
+            {{-- GLOBAL CLIENT-SIDE ERROR --}}
+            <div id="client-error-box" class="alert alert-warning py-2 small d-none mb-3">
+                <i class="bi bi-exclamation-triangle me-1"></i>
+                <span id="client-error-text"></span>
             </div>
 
             {{-- BUNDLES --}}
             <div class="card p-3 mb-3">
-                @php
-                    $totalBundles = $lines->count();
-                    $totalRemaining = $lines->sum(fn($l) => (float) ($l->remaining_qty ?? 0));
-                @endphp
-
                 <div class="d-flex justify-content-between align-items-center mb-2 flex-wrap gap-2">
                     <div>
-                        <h2 class="h6 mb-0">Bundles dari Pickup</h2>
-                        <div class="help">
-                            Isi Qty OK / Reject per bundle (maks = qty sisa).
-                        </div>
+                        <h2 class="h6 mb-0">Daftar Ambil Jahit</h2>
                     </div>
-
-                    @if ($totalBundles > 0)
-                        <div class="d-flex flex-column align-items-md-end gap-1">
-                            <div class="d-flex flex-wrap gap-2">
-                                <span class="summary-chip mono">
-                                    {{ number_format($totalBundles, 0, ',', '.') }} bundle
-                                </span>
-                                <span class="summary-chip mono">
-                                    {{ number_format($totalRemaining, 2, ',', '.') }} pcs sisa
-                                </span>
-                            </div>
-                            <div class="summary-selected mono" id="summary-selected-wrapper">
-                                <span id="summary-selected-bundles">0</span> bundle diisi /
-                                <span id="summary-selected-ok">0,00</span> OK /
-                                <span id="summary-selected-reject">0,00</span> Reject
-                            </div>
-                        </div>
-                    @endif
                 </div>
 
                 @error('results')
@@ -467,49 +469,74 @@
                         <thead>
                             <tr>
                                 <th style="width: 40px;" class="text-center">#</th>
-                                <th style="width: 170px;">Bundle / Item Jadi</th>
-                                <th style="width: 150px;">Lot</th>
-                                <th style="width: 100px;" class="text-end">Sisa</th>
-                                <th style="width: 110px;" class="text-end">Qty OK</th>
-                                <th style="width: 110px;" class="text-end">Qty Reject</th>
-                                <th style="width: 180px;">Catatan</th>
-                                <th style="width: 150px;" class="text-center">Quick</th>
+                                <th style="width: 210px;">Tanggal Ambil Jahit</th>
+                                <th style="width: 210px;">Item</th>
+                                <th style="width: 120px;" class="text-end">
+                                    Belum Setor
+                                </th>
+                                <th style="width: 130px;" class="text-center">
+                                    Setor
+                                </th>
+                                <th style="width: 130px;" class="text-center">
+                                    Reject
+                                </th>
+                                <th style="width: 220px;">Catatan</th>
                             </tr>
                         </thead>
                         <tbody>
                             @forelse ($lines as $idx => $line)
                                 @php
+                                    /** @var \App\Models\SewingPickupLine $line */
                                     $bundle = $line->bundle;
+                                    $pickup = $line->sewingPickup ?? $selectedPickup;
                                     $lot = $bundle?->cuttingJob?->lot;
+
                                     $remaining = (float) ($line->remaining_qty ?? 0);
+
+                                    $pickupDateLabel = '';
+                                    if ($pickup && $pickup->date) {
+                                        try {
+                                            $pickupDateLabel = id_day_datetime($pickup->created_at);
+                                        } catch (\Throwable $e) {
+                                            $pickupDateLabel = (string) $pickup->date;
+                                        }
+                                    }
 
                                     $oldResult = old('results.' . $idx, []);
                                     $defaultOk = $oldResult['qty_ok'] ?? null;
                                     $defaultReject = $oldResult['qty_reject'] ?? null;
                                     $defaultNotes = $oldResult['notes'] ?? null;
+
+                                    $shouldShowNotes =
+                                        ($defaultReject && $defaultReject > 0) ||
+                                        ($defaultNotes && $defaultNotes !== '');
                                 @endphp
 
                                 <tr class="return-row row-empty" data-row-index="{{ $idx }}"
-                                    data-remaining="{{ $remaining }}" data-bundle-code="{{ $bundle?->bundle_code }}"
-                                    data-item-code="{{ $bundle?->finishedItem?->code }}"
-                                    data-item-name="{{ $bundle?->finishedItem?->name }}">
-                                    <input type="hidden" name="results[{{ $idx }}][line_id]"
+                                    data-remaining="{{ $remaining }}"
+                                    data-item-code="{{ $bundle?->finishedItem?->code }}">
+                                    {{-- ID line SewingPickupLine --}}
+                                    <input type="hidden" name="results[{{ $idx }}][sewing_pickup_line_id]"
                                         value="{{ $line->id }}">
+                                    {{-- bundle_id kalau perlu nanti --}}
+                                    <input type="hidden" name="results[{{ $idx }}][bundle_id]"
+                                        value="{{ $bundle?->id }}">
 
-                                    {{-- INDEX / MOBILE TOP --}}
-                                    <td>
-                                        {{-- mobile top --}}
-                                        <div class="mobile-row-top td-mobile-only">
+                                    {{-- INDEX + MOBILE TOP --}}
+                                    <td class="align-top">
+                                        <div class="d-none d-md-flex justify-content-center">
+                                            <span class="small text-muted">{{ $loop->iteration }}</span>
+                                        </div>
+
+                                        <div class="mobile-row-top d-md-none">
                                             <div class="mobile-top-left">
-                                                <div class="mobile-top-line">
-                                                    <span class="row-index">#{{ $loop->iteration }}</span>
-                                                    <span class="item-code">
-                                                        {{ $bundle?->finishedItem?->code ?? '-' }}
-                                                    </span>
-                                                </div>
+                                                <span class="row-index">#{{ $loop->iteration }}</span>
+                                                <span class="item-code">
+                                                    {{ $bundle?->finishedItem?->code ?? '-' }}
+                                                </span>
                                             </div>
                                             <div class="mobile-top-right">
-                                                <div class="qty-remaining-label">Sisa</div>
+                                                <div class="qty-remaining-label">Belum Setor</div>
                                                 <div>
                                                     <span class="qty-remaining-pill">
                                                         {{ number_format($remaining, 2, ',', '.') }}
@@ -517,104 +544,140 @@
                                                 </div>
                                             </div>
                                         </div>
-
-                                        {{-- desktop index --}}
-                                        <div class="d-none d-md-block text-center">
-                                            <span class="small text-muted">{{ $loop->iteration }}</span>
-                                        </div>
                                     </td>
 
-                                    {{-- BUNDLE / ITEM --}}
-                                    <td>
+                                    {{-- TANGGAL PICKUP + OPERATOR + BUNDLE --}}
+                                    <td class="align-top">
+                                        {{-- Desktop --}}
                                         <div class="d-none d-md-block">
-                                            <div class="fw-bold">
-                                                {{ $bundle?->finishedItem?->code ?? '-' }}
+                                            <div class="fw-bold mb-1">
+                                                {{ $pickupDateLabel ?: '-' }}
                                             </div>
-                                            <div class="small text-muted">
-                                                {{ $bundle?->finishedItem?->name ?? '' }}
-                                            </div>
-                                            <div class="small text-muted">
-                                                Bundle:
-                                                <span class="mono">{{ $bundle?->bundle_code ?? '-' }}</span>
+                                            <div class="d-flex flex-wrap align-items-center gap-1">
+                                                @if ($pickup && $pickup->operator)
+                                                    <span class="badge-soft mono">
+                                                        {{ $pickup->operator->code ?? '-' }}
+                                                    </span>
+                                                @endif
+                                                @if ($bundle && $bundle->bundle_code)
+                                                    <span class="badge-soft mono">
+                                                        {{ $bundle->bundle_code }}
+                                                    </span>
+                                                @endif
                                             </div>
                                         </div>
 
-                                        <div class="mobile-meta td-mobile-only">
-                                            <span class="mono">{{ $bundle?->bundle_code ?? '-' }}</span>
-                                            @if ($lot)
-                                                • <span class="mono">{{ $lot->code }}</span>
+                                        {{-- Mobile --}}
+                                        <div class="d-md-none mobile-meta">
+                                            @if ($pickupDateLabel)
+                                                <span class="fw-bold">{{ $pickupDateLabel }}</span>
+                                            @endif
+                                            @if ($pickup && $pickup->operator)
+                                                <span class="badge-soft mono">
+                                                    {{ $pickup->operator->code ?? '-' }}
+                                                </span>
+                                            @endif
+                                            @if ($bundle && $bundle->bundle_code)
+                                                <span class="badge-soft mono">
+                                                    {{ $bundle->bundle_code }}
+                                                </span>
                                             @endif
                                         </div>
                                     </td>
 
-                                    {{-- LOT (desktop only) --}}
-                                    <td class="d-none d-md-table-cell td-desktop-only">
+                                    {{-- ITEM --}}
+                                    <td class="align-top">
+                                        <div class="fw-bold d-none d-md-block">
+                                            {{ $bundle?->finishedItem?->code ?? '-' }}
+                                        </div>
+
+                                        <div class="small text-muted d-none d-md-block">
+                                            {{ $bundle?->finishedItem?->name ?? '' }}
+                                        </div>
+
                                         @if ($lot)
-                                            {{ $lot->item?->code ?? '-' }}
-                                            <span class="badge-soft ms-1">
-                                                {{ $lot->code }}
-                                            </span>
-                                        @else
-                                            -
+                                            <div class="small text-muted d-none d-md-block">
+                                                LOT: <span class="mono">{{ $lot->code }}</span>
+                                            </div>
                                         @endif
+
+                                        <div class="d-md-none mobile-muted-soft">
+                                            {{ $bundle?->finishedItem?->name ?? '' }}
+                                            @if ($lot)
+                                                • LOT: <span class="mono">{{ $lot->code }}</span>
+                                            @endif
+                                        </div>
                                     </td>
 
-                                    {{-- SISA (desktop only) --}}
-                                    <td class="text-end d-none d-md-table-cell td-desktop-only">
+                                    {{-- SISA JADI (desktop) --}}
+                                    <td class="text-end align-top d-none d-md-table-cell">
                                         <span class="qty-remaining-pill">
                                             {{ number_format($remaining, 2, ',', '.') }}
                                         </span>
                                     </td>
 
-                                    {{-- QTY OK --}}
-                                    <td class="text-end">
-                                        <input type="number" step="0.01" min="0" inputmode="decimal"
-                                            name="results[{{ $idx }}][qty_ok]"
-                                            class="form-control form-control-sm text-end qty-input qty-ok-input @error("results.$idx.qty_ok") is-invalid @enderror"
-                                            value="{{ $defaultOk ?? '' }}" placeholder="OK">
+                                    {{-- QTY OK JADI --}}
+                                    <td class="text-end align-top">
+                                        {{-- Desktop --}}
+                                        <div class="d-none d-md-block">
+                                            <input type="number" step="0.01" min="0" inputmode="decimal"
+                                                name="results[{{ $idx }}][qty_ok]"
+                                                class="form-control form-control-sm text-end qty-input qty-ok-input qty-ok-desktop @error("results.$idx.qty_ok") is-invalid @enderror"
+                                                value="{{ $defaultOk ?? '' }}" placeholder="Jumlah setor">
+                                        </div>
+
+                                        {{-- Mobile --}}
+                                        <div class="cell-qty-row d-md-none">
+                                            <input type="number" step="0.01" min="0" inputmode="decimal"
+                                                name="results[{{ $idx }}][qty_ok]"
+                                                class="form-control form-control-sm text-end qty-input qty-ok-input qty-ok-mobile @error("results.$idx.qty_ok") is-invalid @enderror"
+                                                value="{{ $defaultOk ?? '' }}" placeholder="OK">
+                                            <input type="number" step="0.01" min="0" inputmode="decimal"
+                                                name="results[{{ $idx }}][qty_reject]"
+                                                class="form-control form-control-sm text-end qty-input qty-reject-input qty-reject-mobile @error("results.$idx.qty_reject") is-invalid @enderror"
+                                                value="{{ $defaultReject ?? '' }}" placeholder="RJ">
+                                        </div>
+
                                         @error("results.$idx.qty_ok")
                                             <div class="invalid-feedback d-block">{{ $message }}</div>
                                         @enderror
+                                        @error("results.$idx.qty_reject")
+                                            <div class="invalid-feedback d-block d-md-none">{{ $message }}</div>
+                                        @enderror
                                     </td>
 
-                                    {{-- QTY REJECT --}}
-                                    <td class="text-end">
+                                    {{-- QTY REJECT (desktop) --}}
+                                    <td class="text-end align-top d-none d-md-table-cell">
                                         <input type="number" step="0.01" min="0" inputmode="decimal"
                                             name="results[{{ $idx }}][qty_reject]"
-                                            class="form-control form-control-sm text-end qty-input qty-reject-input @error("results.$idx.qty_reject") is-invalid @enderror"
-                                            value="{{ $defaultReject ?? '' }}" placeholder="RJ">
+                                            class="form-control form-control-sm text-end qty-input qty-reject-input qty-reject-desktop @error("results.$idx.qty_reject") is-invalid @enderror"
+                                            value="{{ $defaultReject ?? '' }}" placeholder="Qty reject">
                                         @error("results.$idx.qty_reject")
                                             <div class="invalid-feedback d-block">{{ $message }}</div>
                                         @enderror
                                     </td>
 
                                     {{-- CATATAN --}}
-                                    <td>
-                                        <input type="text" name="results[{{ $idx }}][notes]"
-                                            class="form-control form-control-sm notes-input @error("results.$idx.notes") is-invalid @enderror"
-                                            value="{{ $defaultNotes ?? '' }}" placeholder="Catatan (opsional)">
-                                        @error("results.$idx.notes")
-                                            <div class="invalid-feedback d-block">{{ $message }}</div>
-                                        @enderror
-                                    </td>
-
-                                    {{-- QUICK BUTTONS --}}
-                                    <td class="text-center">
-                                        <div class="cell-actions">
-                                            <button type="button" class="btn btn-outline-success btn-quick btn-full-ok">
-                                                Full OK
-                                            </button>
-                                            <button type="button"
-                                                class="btn btn-outline-danger btn-quick btn-full-reject">
-                                                Full RJ
-                                            </button>
+                                    <td class="align-top cell-notes">
+                                        <div class="notes-wrapper {{ $shouldShowNotes ? '' : 'd-none' }}">
+                                            <input type="text" name="results[{{ $idx }}][notes]"
+                                                class="form-control form-control-sm notes-input @error("results.$idx.notes") is-invalid @enderror"
+                                                value="{{ $defaultNotes ?? '' }}"
+                                                placeholder="Catatan reject (opsional)">
+                                            @error("results.$idx.notes")
+                                                <div class="invalid-feedback d-block">{{ $message }}</div>
+                                            @enderror
                                         </div>
                                     </td>
                                 </tr>
                             @empty
                                 <tr>
-                                    <td colspan="8" class="text-center text-muted small py-3">
-                                        Tidak ada bundle dengan qty sisa di Sewing Pickup ini.
+                                    <td colspan="7" class="text-center text-muted small py-3">
+                                        @if ($selectedPickupId)
+                                            Tidak ada bundles Sewing Pickup (sisa 0 atau belum ada data).
+                                        @else
+                                            Pilih Sewing Pickup terlebih dahulu untuk melihat bundles.
+                                        @endif
                                     </td>
                                 </tr>
                             @endforelse
@@ -643,33 +706,103 @@
     <script>
         document.addEventListener('DOMContentLoaded', function() {
             const rows = document.querySelectorAll('.return-row');
-            const summaryBundles = document.getElementById('summary-selected-bundles');
-            const summaryOk = document.getElementById('summary-selected-ok');
-            const summaryReject = document.getElementById('summary-selected-reject');
+            const filterItemSelect = document.getElementById('filter-item-code');
 
-            let nf;
-            try {
-                nf = new Intl.NumberFormat('id-ID', {
-                    minimumFractionDigits: 2,
-                    maximumFractionDigits: 2
-                });
-            } catch (e) {
-                nf = {
-                    format: function(num) {
-                        return (num || 0).toFixed(2);
+            const clientErrorBox = document.getElementById('client-error-box');
+            const clientErrorText = document.getElementById('client-error-text');
+
+            const isMobile = () => window.innerWidth <= 767;
+
+            function showClientError(message) {
+                if (!clientErrorBox || !clientErrorText) return;
+                clientErrorText.textContent = message;
+                clientErrorBox.classList.remove('d-none');
+            }
+
+            function hideClientError() {
+                if (!clientErrorBox || !clientErrorText) return;
+                clientErrorBox.classList.add('d-none');
+                clientErrorText.textContent = '';
+            }
+
+            function parseNum(val) {
+                const n = parseFloat(val);
+                return isNaN(n) ? 0 : n;
+            }
+
+            function getOk(row) {
+                const desktop = row.querySelector('.qty-ok-desktop');
+                const mobile = row.querySelector('.qty-ok-mobile');
+                if (isMobile() && mobile) return parseNum(mobile.value);
+                if (desktop && desktop.value !== '') return parseNum(desktop.value);
+                if (mobile && mobile.value !== '') return parseNum(mobile.value);
+                return 0;
+            }
+
+            function getReject(row) {
+                const desktop = row.querySelector('.qty-reject-desktop');
+                const mobile = row.querySelector('.qty-reject-mobile');
+                if (isMobile() && mobile) return parseNum(mobile.value);
+                if (desktop && desktop.value !== '') return parseNum(desktop.value);
+                if (mobile && mobile.value !== '') return parseNum(mobile.value);
+                return 0;
+            }
+
+            function setOk(row, value) {
+                const desktop = row.querySelector('.qty-ok-desktop');
+                const mobile = row.querySelector('.qty-ok-mobile');
+                const v = value > 0 ? value : '';
+                if (desktop) desktop.value = v;
+                if (mobile) mobile.value = v;
+            }
+
+            function setReject(row, value) {
+                const desktop = row.querySelector('.qty-reject-desktop');
+                const mobile = row.querySelector('.qty-reject-mobile');
+                const v = value > 0 ? value : '';
+                if (desktop) desktop.value = v;
+                if (mobile) mobile.value = v;
+            }
+
+            // Clamp: OK + Reject tidak boleh melebihi "Belum Setor"
+            function clampToRemaining(row, showError = false) {
+                const remaining = parseNum(row.dataset.remaining || '0');
+
+                let ok = getOk(row);
+                let reject = getReject(row);
+
+                if (ok < 0) ok = 0;
+                if (reject < 0) reject = 0;
+
+                if (ok + reject > remaining) {
+                    const diff = ok + reject - remaining;
+                    const last = row.dataset.lastChanged || 'ok';
+
+                    if (last === 'reject') {
+                        reject = Math.max(0, reject - diff);
+                    } else {
+                        ok = Math.max(0, ok - diff);
                     }
-                };
+
+                    if (showError) {
+                        const index = parseInt(row.dataset.rowIndex || '0', 10) + 1;
+                        showClientError(
+                            `Qty OK + Reject tidak boleh melebihi Sisa Jadi (baris #${index}). Input sudah disesuaikan.`
+                        );
+                    }
+                } else if (showError) {
+                    hideClientError();
+                }
+
+                setOk(row, ok);
+                setReject(row, reject);
             }
 
             function updateRowVisual(row) {
-                const okInput = row.querySelector('.qty-ok-input');
-                const rejectInput = row.querySelector('.qty-reject-input');
+                const ok = getOk(row);
+                const reject = getReject(row);
 
-                const ok = okInput ? parseFloat(okInput.value || '0') : 0;
-                const reject = rejectInput ? parseFloat(rejectInput.value || '0') : 0;
-                const isFilled = (ok + reject) > 0;
-
-                if (isFilled) {
+                if (ok + reject > 0) {
                     row.classList.add('row-filled');
                     row.classList.remove('row-empty');
                 } else {
@@ -678,139 +811,146 @@
                 }
             }
 
-            function updateSummary() {
-                if (!summaryBundles || !summaryOk || !summaryReject) return;
+            function updateNotesVisibility(row) {
+                const reject = getReject(row);
+                const notesWrapper = row.querySelector('.notes-wrapper');
+                if (!notesWrapper) return;
 
-                let count = 0;
-                let totalOk = 0;
-                let totalReject = 0;
-
-                rows.forEach(function(row) {
-                    const okInput = row.querySelector('.qty-ok-input');
-                    const rejectInput = row.querySelector('.qty-reject-input');
-
-                    const ok = okInput ? parseFloat(okInput.value || '0') : 0;
-                    const reject = rejectInput ? parseFloat(rejectInput.value || '0') : 0;
-
-                    if ((ok + reject) > 0) {
-                        count++;
-                        totalOk += ok;
-                        totalReject += reject;
+                if (reject > 0) {
+                    notesWrapper.classList.remove('d-none');
+                } else {
+                    const notesInput = notesWrapper.querySelector('input[type="text"]');
+                    if (notesInput && notesInput.value === '') {
+                        notesWrapper.classList.add('d-none');
                     }
-                });
+                }
+            }
 
-                summaryBundles.textContent = count.toString();
-                summaryOk.textContent = nf.format(totalOk);
-                summaryReject.textContent = nf.format(totalReject);
+            // FILTER KODE ITEM
+            if (filterItemSelect) {
+                filterItemSelect.addEventListener('change', function() {
+                    const code = this.value || '';
+
+                    rows.forEach(function(row) {
+                        const rowCode = (row.dataset.itemCode || '').trim();
+                        row.hidden = code && rowCode !== code;
+                    });
+                });
             }
 
             rows.forEach(function(row) {
-                const remaining = parseFloat(row.dataset.remaining || '0');
-                const okInput = row.querySelector('.qty-ok-input');
-                const rejectInput = row.querySelector('.qty-reject-input');
-                const btnFullOk = row.querySelector('.btn-full-ok');
-                const btnFullReject = row.querySelector('.btn-full-reject');
+                const okDesktop = row.querySelector('.qty-ok-desktop');
+                const okMobile = row.querySelector('.qty-ok-mobile');
+                const rejectDesktop = row.querySelector('.qty-reject-desktop');
+                const rejectMobile = row.querySelector('.qty-reject-mobile');
+                const notesWrapper = row.querySelector('.notes-wrapper');
+                const itemCodeSpan = row.querySelector('.item-code');
+                const remaining = parseNum(row.dataset.remaining || '0');
 
-                function getPair() {
-                    let ok = okInput ? parseFloat(okInput.value || '0') : 0;
-                    let reject = rejectInput ? parseFloat(rejectInput.value || '0') : 0;
-                    return {
-                        ok,
-                        reject
-                    };
+                function focusOk() {
+                    const target = isMobile() ? (okMobile || okDesktop) : (okDesktop || okMobile);
+                    if (!target) return;
+                    target.focus();
+                    target.select();
+                    target.classList.add('qty-input-active');
                 }
 
-                function applyPair(ok, reject) {
-                    if (okInput) okInput.value = ok > 0 ? ok : '';
-                    if (rejectInput) rejectInput.value = reject > 0 ? reject : '';
-                }
+                // klik seluruh ROW → toggle OK = remaining / 0
+                row.addEventListener('click', function(e) {
+                    const target = e.target;
 
-                function clampAndApply() {
-                    let {
-                        ok,
-                        reject
-                    } = getPair();
+                    if (target.closest('input, select, textarea, button, a')) {
+                        return;
+                    }
 
-                    if (ok < 0) ok = 0;
-                    if (reject < 0) reject = 0;
+                    hideClientError();
 
-                    if (ok + reject > remaining) {
-                        const total = ok + reject;
+                    let ok = getOk(row);
+                    let reject = getReject(row);
 
-                        if (reject > 0) {
-                            const excess = total - remaining;
-                            reject = Math.max(0, reject - excess);
+                    if (ok === remaining && reject === 0) {
+                        setOk(row, 0);
+                        setReject(row, 0);
+                        if (notesWrapper) {
+                            const notesInput = notesWrapper.querySelector('input[type="text"]');
+                            if (notesInput) notesInput.value = '';
+                            notesWrapper.classList.add('d-none');
                         }
-
-                        if (ok + reject > remaining) {
-                            ok = Math.min(ok, remaining);
-                            reject = Math.max(0, remaining - ok);
+                    } else {
+                        setOk(row, remaining);
+                        setReject(row, 0);
+                        if (notesWrapper) {
+                            const notesInput = notesWrapper.querySelector('input[type="text"]');
+                            if (notesInput) notesInput.value = '';
+                            notesWrapper.classList.add('d-none');
                         }
                     }
 
-                    applyPair(ok, reject);
-                }
+                    row.dataset.lastChanged = 'ok';
+                    clampToRemaining(row, false);
+                    updateRowVisual(row);
+                    updateNotesVisibility(row);
+                    focusOk();
+                });
 
-                // Full OK
-                if (btnFullOk) {
-                    btnFullOk.addEventListener('click', function(e) {
-                        e.preventDefault();
-                        applyPair(remaining > 0 ? remaining : 0, 0);
-                        updateRowVisual(row);
-                        updateSummary();
+                // klik kode item di mobile = trigger klik row
+                if (itemCodeSpan) {
+                    itemCodeSpan.style.cursor = 'pointer';
+                    itemCodeSpan.addEventListener('click', function(e) {
+                        e.stopPropagation();
+                        row.click();
                     });
                 }
 
-                // Full Reject
-                if (btnFullReject) {
-                    btnFullReject.addEventListener('click', function(e) {
-                        e.preventDefault();
-                        applyPair(0, remaining > 0 ? remaining : 0);
-                        updateRowVisual(row);
-                        updateSummary();
-                    });
-                }
+                // Handler OK
+                [okDesktop, okMobile].forEach(function(input) {
+                    if (!input) return;
 
-                // Input events
-                if (okInput) {
-                    okInput.addEventListener('focus', function() {
+                    input.addEventListener('focus', function() {
                         this.select();
                         this.classList.add('qty-input-active');
                     });
-                    okInput.addEventListener('blur', function() {
+                    input.addEventListener('blur', function() {
                         this.classList.remove('qty-input-active');
-                        clampAndApply();
+                        row.dataset.lastChanged = 'ok';
+                        clampToRemaining(row, true);
                         updateRowVisual(row);
-                        updateSummary();
                     });
-                    okInput.addEventListener('input', function() {
+                    input.addEventListener('input', function() {
+                        row.dataset.lastChanged = 'ok';
+                        clampToRemaining(row, true);
                         updateRowVisual(row);
-                        updateSummary();
                     });
-                }
+                });
 
-                if (rejectInput) {
-                    rejectInput.addEventListener('focus', function() {
+                // Handler Reject
+                [rejectDesktop, rejectMobile].forEach(function(input) {
+                    if (!input) return;
+
+                    input.addEventListener('focus', function() {
                         this.select();
                         this.classList.add('qty-input-active');
                     });
-                    rejectInput.addEventListener('blur', function() {
+                    input.addEventListener('blur', function() {
                         this.classList.remove('qty-input-active');
-                        clampAndApply();
+                        row.dataset.lastChanged = 'reject';
+                        clampToRemaining(row, true);
                         updateRowVisual(row);
-                        updateSummary();
+                        updateNotesVisibility(row);
                     });
-                    rejectInput.addEventListener('input', function() {
+                    input.addEventListener('input', function() {
+                        row.dataset.lastChanged = 'reject';
+                        clampToRemaining(row, true);
                         updateRowVisual(row);
-                        updateSummary();
+                        updateNotesVisibility(row);
                     });
-                }
+                });
 
-                // init
+                // init awal
+                clampToRemaining(row, false);
                 updateRowVisual(row);
+                updateNotesVisibility(row);
             });
-
-            updateSummary();
         });
     </script>
 @endpush

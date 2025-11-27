@@ -1,3 +1,4 @@
+{{-- resources/views/production/qc/index.blade.php --}}
 @extends('layouts.app')
 
 @section('title', 'Produksi • QC Overview')
@@ -106,24 +107,21 @@
                                     $totalBundles = $job->bundles->count();
                                     $totalQty = $job->bundles->sum('qty_pcs');
 
-                                    // status badge
                                     $rawStatus = $job->status ?? '-';
 
-                                    if ($rawStatus === 'cut_sent_to_qc') {
-                                        $statusLabel = 'BELUM QC';
-                                        $statusClass = 'warning';
-                                    } else {
-                                        $map = [
-                                            'cut' => ['CUT', 'secondary'],
-                                            'cut_qc_done' => ['QC DONE', 'info'],
-                                            'qc_ok' => ['QC OK', 'success'],
-                                            'qc_mixed' => ['QC MIXED', 'warning'],
-                                            'qc_reject' => ['QC REJECT', 'danger'],
-                                        ];
-                                        $cfg = $map[$rawStatus] ?? [strtoupper($rawStatus), 'secondary'];
-                                        $statusLabel = $cfg[0];
-                                        $statusClass = $cfg[1];
-                                    }
+                                    // mapping status CuttingJob versi terbaru
+                                    $map = [
+                                        'draft' => ['DRAFT', 'secondary'],
+                                        'cut' => ['CUT', 'primary'],
+                                        'sent_to_qc' => ['BELUM QC', 'warning'],
+                                        'qc_done' => ['QC DONE', 'success'],
+                                        'qc_ok' => ['QC OK', 'success'],
+                                        'qc_mixed' => ['QC MIXED', 'warning'],
+                                        'qc_reject' => ['QC REJECT', 'danger'],
+                                    ];
+
+                                    $cfg = $map[$rawStatus] ?? [strtoupper($rawStatus), 'secondary'];
+                                    [$statusLabel, $statusClass] = $cfg;
                                 @endphp
                                 <tr>
                                     <td>{{ $loop->iteration + ($records->currentPage() - 1) * $records->perPage() }}</td>

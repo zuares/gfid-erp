@@ -170,7 +170,7 @@ class FinishingJobController extends Controller
     {
         $date = Carbon::today()->toDateString();
 
-        // Operator list (kalau form masih pakai dropdown)
+        // Operator list (untuk dropdown di baris detail)
         $operators = Employee::query()
             ->orderBy('name')
             ->get();
@@ -181,15 +181,15 @@ class FinishingJobController extends Controller
         $bundlesQuery = CuttingJobBundle::query()
             ->with(['cuttingJob', 'lot.item', 'finishedItem'])
             ->when($wipFinWarehouseId, function ($q) use ($wipFinWarehouseId) {
-                $q->where('wip_warehouse_id', $wipFinWarehouseId)
-                    ->where('wip_qty', '>', 0.0001);
+                $q->where('wip_warehouse_id', $wipFinWarehouseId);
             })
+            ->where('wip_qty', '>', 0.0001)
             ->orderBy('cutting_job_id')
             ->orderBy('bundle_no');
 
         $bundles = $bundlesQuery->get();
 
-        // bundle_ids[] dari bundles_ready
+        // bundle_ids[] dari halaman bundles_ready (kalau user pilih dari sana)
         $bundleIds = (array) $request->input('bundle_ids', []);
 
         $lines = [];
@@ -216,11 +216,11 @@ class FinishingJobController extends Controller
                     'item_id' => $itemId,
                     'item_label' => $itemLabel,
                     'wip_balance' => $wipQty,
-                    'qty_in' => $wipQty,
-                    'qty_ok' => $wipQty,
+                    // qty_in & qty_ok nanti dihitung di Blade/JS sebagai wip_balance & wip_balance - reject
                     'qty_reject' => 0,
                     'operator_id' => null,
                     'reject_reason' => null,
+                    'reject_notes' => null,
                 ];
             }
         }
@@ -569,6 +569,8 @@ class FinishingJobController extends Controller
      * POST (WIP-FIN → FG + REJECT)
      * ============================ */
 
+// pastikan use ini ada di atas controller
+
     public function post(FinishingJob $finishing_job): RedirectResponse
     {
         $job = $finishing_job;
@@ -610,67 +612,88 @@ class FinishingJobController extends Controller
         ? $job->date
         : Carbon::parse($job->date);
 
-        $job->load(['lines', 'lines.bundle']);
+        // load line + bundle + item
+        $job->load(['lines', 'lines.bundle', 'lines.item']);
 
         DB::transaction(function () use ($job, $wipFinWarehouseId, $fgWarehouseId, $rejectWarehouseId, $date) {
+
             foreach ($job->lines as $line) {
-                if (
-                    ($line->qty_in ?? 0) <= 0
-                    && ($line->qty_ok ?? 0) <= 0
-                    && ($line->qty_reject ?? 0) <= 0
-                ) {
+                $qtyIn = (float) ($line->qty_in ?? 0);
+                $qtyOk = (float) ($line->qty_ok ?? 0);
+                $qtyReject = (float) ($line->qty_reject ?? 0);
+
+                if ($qtyIn <= 0 && $qtyOk <= 0 && $qtyReject <= 0) {
                     continue;
                 }
 
-                if ($line->qty_in > 0) {
+                // 🔎 Ambil unit_cost rata-rata item ini di WIP-FIN
+                // Ambil unit cost dari WIP-FIN (hasil sewing sebelumnya)
+                $unitCostWipFin = $this->inventory->getItemIncomingUnitCost(
+                    warehouseId: $wipFinWarehouseId,
+                    itemId: $line->item_id,
+                );
+
+                $movementDate = $date;
+                $movementUnitCost = $unitCostWipFin > 0 ? $unitCostWipFin : null;
+
+// ==== 1) OUT dari WIP-FIN: qty_in (OK + reject) ====
+                if ($qtyIn > 0) {
                     $this->inventory->stockOut(
-                        $wipFinWarehouseId,
-                        $line->item_id,
-                        $line->qty_in,
-                        $date,
-                        FinishingJob::class,
-                        $job->id,
-                        'Finishing ' . $job->code,
-                        false,
-                        null
+                        warehouseId: $wipFinWarehouseId,
+                        itemId: $line->item_id,
+                        qty: $qtyIn,
+                        date: $movementDate,
+                        sourceType: FinishingJob::class,
+                        sourceId: $job->id,
+                        notes: 'Finishing ' . $job->code,
+                        allowNegative: false,
+                        lotId: null, // barang jadi tanpa lot kain (kalau mau trace LOT, bisa diisi nanti)
+                        unitCostOverride: $movementUnitCost, // 🔥 pakai cost WIP-FIN, bukan LotCost kain
+                        affectLotCost: false, // 🔥 jangan sentuh LotCost (ini pure WIP → FG)
                     );
                 }
 
-                if ($line->qty_ok > 0) {
+// ==== 2) IN ke FG: qty_ok ====
+                if ($qtyOk > 0) {
                     $this->inventory->stockIn(
-                        $fgWarehouseId,
-                        $line->item_id,
-                        $line->qty_ok,
-                        $date,
-                        FinishingJob::class,
-                        $job->id,
-                        'Finishing OK ' . $job->code,
-                        false,
-                        null
+                        warehouseId: $fgWarehouseId,
+                        itemId: $line->item_id,
+                        qty: $qtyOk,
+                        date: $movementDate,
+                        sourceType: FinishingJob::class,
+                        sourceId: $job->id,
+                        notes: 'Finishing OK ' . $job->code,
+                        lotId: null, // kalau nanti kamu mau FG per LOT, bisa ganti pakai lot_id bundle
+                        unitCost: $movementUnitCost,
+                        affectLotCost: false, // tetap WIP/FG, jangan ngubah LotCost kain
                     );
                 }
 
-                if ($line->qty_reject > 0) {
+// ==== 3) IN ke REJECT: qty_reject ====
+                if ($qtyReject > 0) {
                     $this->inventory->stockIn(
-                        $rejectWarehouseId,
-                        $line->item_id,
-                        $line->qty_reject,
-                        $date,
-                        FinishingJob::class,
-                        $job->id,
-                        'Finishing REJECT ' . $job->code,
-                        false,
-                        null
+                        warehouseId: $rejectWarehouseId,
+                        itemId: $line->item_id,
+                        qty: $qtyReject,
+                        date: $movementDate,
+                        sourceType: FinishingJob::class,
+                        sourceId: $job->id,
+                        notes: 'Finishing REJECT ' . $job->code,
+                        lotId: null,
+                        unitCost: $movementUnitCost,
+                        affectLotCost: false,
                     );
                 }
 
-                if ($line->qty_in > 0 && $line->bundle) {
+                // ==== 4) Kurangi WIP qty di bundle ====
+                if ($qtyIn > 0 && $line->bundle) {
                     $bundle = $line->bundle;
                     $current = (float) ($bundle->wip_qty ?? 0);
-                    $used = (float) $line->qty_in;
+                    $used = $qtyIn;
 
                     $newWipQty = $current - $used;
 
+                    // jaga-jaga floating error
                     if ($newWipQty < 0 && abs($newWipQty) > 0.0001) {
                         $newWipQty = 0;
                     }
@@ -687,19 +710,18 @@ class FinishingJobController extends Controller
             $job->update([
                 'status' => 'posted',
                 'posted_at' => now(),
-                'updated_by' => Auth::id(),
+                'updated_by' => auth()->id(),
             ]);
         });
 
         return redirect()
             ->route('production.finishing_jobs.show', $job->id)
-            ->with('status', 'Finishing Job berhasil diposting dan stok sudah diperbarui.');
+            ->with('status', 'Finishing Job berhasil diposting, stok & costing sudah dipindahkan dari WIP-FIN ke FG/REJECT.');
     }
 
     /* ============================
      * UNPOST (FG + REJECT → WIP-FIN)
      * ============================ */
-
     public function unpost(FinishingJob $finishingJob): RedirectResponse
     {
         $job = $finishingJob;
@@ -728,44 +750,87 @@ class FinishingJobController extends Controller
         $inventory = $this->inventory;
 
         try {
-            DB::transaction(function () use ($job, $inventory, $wipFinWarehouseId, $fgWarehouseId, $rejectWarehouseId, $date) {
+            DB::transaction(function () use (
+                $job,
+                $inventory,
+                $wipFinWarehouseId,
+                $fgWarehouseId,
+                $rejectWarehouseId,
+                $date
+            ) {
+                // perlu bundle juga supaya bisa balikin wip_qty
                 $job->load(['lines.bundle']);
 
                 foreach ($job->lines as $line) {
-                    if ($line->qty_ok > 0) {
+                    $qtyIn = (float) ($line->qty_in ?? 0);
+                    $qtyOk = (float) ($line->qty_ok ?? 0);
+                    $qtyReject = (float) ($line->qty_reject ?? 0);
+
+                    if ($qtyIn <= 0 && $qtyOk <= 0 && $qtyReject <= 0) {
+                        continue;
+                    }
+
+                    // 🔎 Ambil unit_cost dari FG sebagai estimasi cost yang akan balik ke WIP-FIN
+                    $unitCostFromFg = $inventory->getItemIncomingUnitCost(
+                        warehouseId: $fgWarehouseId,
+                        itemId: $line->item_id,
+                    );
+
+                    // 1) OUT dari FG: qty_ok
+                    if ($qtyOk > 0) {
                         $inventory->stockOut(
-                            $fgWarehouseId,
-                            $line->item_id,
-                            $line->qty_ok,
-                            $date,
-                            FinishingJob::class,
-                            $job->id,
-                            'Unpost Finishing OK ' . $job->code
+                            warehouseId: $fgWarehouseId,
+                            itemId: $line->item_id,
+                            qty: $qtyOk,
+                            date: $date,
+                            sourceType: FinishingJob::class,
+                            sourceId: $job->id,
+                            notes: 'Unpost Finishing OK ' . $job->code,
+                            allowNegative: false,
+                            lotId: null
                         );
                     }
 
-                    if ($line->qty_reject > 0) {
+                    // 2) OUT dari REJECT: qty_reject
+                    if ($qtyReject > 0) {
                         $inventory->stockOut(
-                            $rejectWarehouseId,
-                            $line->item_id,
-                            $line->qty_reject,
-                            $date,
-                            FinishingJob::class,
-                            $job->id,
-                            'Unpost Finishing REJECT ' . $job->code
+                            warehouseId: $rejectWarehouseId,
+                            itemId: $line->item_id,
+                            qty: $qtyReject,
+                            date: $date,
+                            sourceType: FinishingJob::class,
+                            sourceId: $job->id,
+                            notes: 'Unpost Finishing REJECT ' . $job->code,
+                            allowNegative: false,
+                            lotId: null
                         );
                     }
 
-                    if ($line->qty_in > 0) {
+                    // 3) IN kembali ke WIP-FIN: qty_in
+                    if ($qtyIn > 0) {
                         $inventory->stockIn(
-                            $wipFinWarehouseId,
-                            $line->item_id,
-                            $line->qty_in,
-                            $date,
-                            FinishingJob::class,
-                            $job->id,
-                            'Unpost Finishing ' . $job->code
+                            warehouseId: $wipFinWarehouseId,
+                            itemId: $line->item_id,
+                            qty: $qtyIn,
+                            date: $date,
+                            sourceType: FinishingJob::class,
+                            sourceId: $job->id,
+                            notes: 'Unpost Finishing ' . $job->code,
+                            lotId: null,
+                            unitCost: $unitCostFromFg > 0 ? $unitCostFromFg : null,
                         );
+                    }
+
+                    // 4) Balikin wip_qty bundle di WIP-FIN
+                    if ($qtyIn > 0 && $line->bundle) {
+                        $bundle = $line->bundle;
+                        $current = (float) ($bundle->wip_qty ?? 0);
+
+                        // karena waktu POST kita kurangi wip_qty dengan qty_in,
+                        // sekarang UNPOST kita tambahkan lagi qty_in
+                        $bundle->wip_qty = $current + $qtyIn;
+                        $bundle->wip_warehouse_id = $wipFinWarehouseId;
+                        $bundle->save();
                     }
                 }
 
@@ -784,22 +849,22 @@ class FinishingJobController extends Controller
 
         return redirect()
             ->route('production.finishing_jobs.show', $job->id)
-            ->with('status', 'Finishing Job berhasil di-unpost dan stok sudah dikembalikan.');
+            ->with('status', 'Finishing Job berhasil di-unpost: stok & wip bundle sudah dikembalikan ke WIP-FIN.');
     }
 
     public function reportPerItem(Request $request): View
     {
-        // Filter
+        // ===== FILTER =====
         $dateFrom = $request->input('date_from');
         $dateTo = $request->input('date_to');
         $itemId = $request->input('item_id');
 
-        // List item (barang jadi) buat filter dropdown
+        // List item buat dropdown filter
         $items = Item::query()
             ->orderBy('code')
             ->get();
 
-        // Query: ambil line finishing yang SUDAH POSTED
+        // ===== AGREGAT QTY DARI FINISHING JOB LINES =====
         $linesQuery = FinishingJobLine::query()
             ->selectRaw('
             item_id,
@@ -829,10 +894,84 @@ class FinishingJobController extends Controller
             ->orderBy('item_id')
             ->get();
 
-        // Hitung grand total
+        // ===== COSTING: BACA DARI MUTASI MASUK FG (HPP) =====
+
+        $fgWarehouseId = Warehouse::where('code', 'FG')->value('id');
+
+        $costByItem = collect();
+
+        if ($fgWarehouseId) {
+            $costQuery = InventoryMutation::query()
+                ->selectRaw('
+                item_id,
+                SUM(qty_change) as total_qty_in_fg,
+                SUM(total_cost) as total_cost_fg
+            ')
+                ->where('warehouse_id', $fgWarehouseId)
+                ->where('direction', 'in')
+                ->where('source_type', FinishingJob::class);
+
+            if ($dateFrom) {
+                $costQuery->whereDate('date', '>=', $dateFrom);
+            }
+
+            if ($dateTo) {
+                $costQuery->whereDate('date', '<=', $dateTo);
+            }
+
+            if ($itemId) {
+                $costQuery->where('item_id', $itemId);
+            }
+
+            $mutations = $costQuery
+                ->groupBy('item_id')
+                ->get();
+
+            $costByItem = $mutations->mapWithKeys(function ($m) {
+                $qty = (float) ($m->total_qty_in_fg ?? 0);
+                $cost = (float) ($m->total_cost_fg ?? 0);
+                $unit = $qty > 0 ? $cost / $qty : 0;
+
+                return [
+                    (int) $m->item_id => [
+                        'qty_in_fg' => $qty,
+                        'total_cost_fg' => $cost,
+                        'unit_cost_fg' => $unit,
+                    ],
+                ];
+            });
+        }
+
+        // Merge qty + costing per item
+        foreach ($rows as $row) {
+            $id = (int) $row->item_id;
+
+            $costInfo = $costByItem[$id] ?? [
+                'qty_in_fg' => 0,
+                'total_cost_fg' => 0,
+                'unit_cost_fg' => 0,
+            ];
+
+            $row->qty_in_fg = $costInfo['qty_in_fg'];
+            $row->total_cost_fg = $costInfo['total_cost_fg'];
+            $row->unit_cost_fg = $costInfo['unit_cost_fg'];
+
+            // HPP untuk qty OK (reject nggak ikut ke HPP FG)
+            $row->total_hpp_ok = $row->total_ok * $row->unit_cost_fg;
+        }
+
+        // ===== GRAND TOTAL =====
         $grandTotalIn = $rows->sum('total_in');
         $grandTotalOk = $rows->sum('total_ok');
         $grandTotalReject = $rows->sum('total_reject');
+
+        $grandQtyInFg = $rows->sum('qty_in_fg');
+        $grandCostFg = $rows->sum('total_cost_fg');
+        $grandHppOk = $rows->sum('total_hpp_ok');
+
+        $avgUnitCostOk = $grandTotalOk > 0
+        ? $grandHppOk / $grandTotalOk
+        : 0;
 
         return view('production.finishing_jobs.report_per_item', [
             'rows' => $rows,
@@ -840,9 +979,15 @@ class FinishingJobController extends Controller
             'dateFrom' => $dateFrom,
             'dateTo' => $dateTo,
             'itemId' => $itemId,
+
             'grandTotalIn' => $grandTotalIn,
             'grandTotalOk' => $grandTotalOk,
             'grandTotalReject' => $grandTotalReject,
+
+            'grandQtyInFg' => $grandQtyInFg,
+            'grandCostFg' => $grandCostFg,
+            'grandHppOk' => $grandHppOk,
+            'avgUnitCostOk' => $avgUnitCostOk,
         ]);
     }
 
@@ -851,14 +996,14 @@ class FinishingJobController extends Controller
         $dateFrom = $request->input('date_from');
         $dateTo = $request->input('date_to');
 
-        // Ambil agregat per finishing_job_id untuk item ini
+        // Ambil agregat per finishing_job_id untuk item ini (qty saja dulu)
         $linesQuery = FinishingJobLine::query()
             ->selectRaw('
-                finishing_job_id,
-                SUM(qty_in)     as total_in,
-                SUM(qty_ok)     as total_ok,
-                SUM(qty_reject) as total_reject
-            ')
+            finishing_job_id,
+            SUM(qty_in)     as total_in,
+            SUM(qty_ok)     as total_ok,
+            SUM(qty_reject) as total_reject
+        ')
             ->where('item_id', $item->id)
             ->whereHas('job', function ($q) use ($dateFrom, $dateTo) {
                 $q->where('status', 'posted');
@@ -886,10 +1031,76 @@ class FinishingJobController extends Controller
             ->get()
             ->keyBy('id');
 
-        // Hitung grand total
+        // ============================
+        //  COSTING dari FG (HPP)
+        // ============================
+
+        // Cari id warehouse FG
+        $fgWarehouseId = Warehouse::where('code', 'FG')->value('id');
+
+        $costByJob = collect();
+
+        if ($fgWarehouseId && !empty($jobIds)) {
+            // Ambil mutasi "IN" ke gudang FG untuk item ini, bersumber dari FinishingJob
+            $mutations = InventoryMutation::query()
+                ->selectRaw('
+                source_id,
+                SUM(qty_change)  as total_qty_in_fg,
+                SUM(total_cost)  as total_cost_fg
+            ')
+                ->where('warehouse_id', $fgWarehouseId)
+                ->where('item_id', $item->id)
+                ->where('direction', 'in')
+                ->where('source_type', FinishingJob::class)
+                ->whereIn('source_id', $jobIds)
+                ->groupBy('source_id')
+                ->get();
+
+            // Map: finishing_job_id => info costing
+            $costByJob = $mutations->mapWithKeys(function ($m) {
+                $qty = (float) ($m->total_qty_in_fg ?? 0);
+                $cost = (float) ($m->total_cost_fg ?? 0);
+                $unit = $qty > 0 ? $cost / $qty : 0;
+
+                return [
+                    (int) $m->source_id => [
+                        'qty_in_fg' => $qty, // qty yang benar-benar masuk FG dari job ini
+                        'total_cost_fg' => $cost, // total rupiah yang dialihkan ke FG
+                        'unit_cost_fg' => $unit, // HPP/pcs di FG untuk batch ini
+                    ],
+                ];
+            });
+        }
+
+        // Tambahkan info costing ke setiap row
+        foreach ($rows as $row) {
+            $jobId = (int) $row->finishing_job_id;
+            $costInfo = $costByJob[$jobId] ?? [
+                'qty_in_fg' => 0,
+                'total_cost_fg' => 0,
+                'unit_cost_fg' => 0,
+            ];
+
+            $row->qty_in_fg = $costInfo['qty_in_fg'];
+            $row->total_cost_fg = $costInfo['total_cost_fg'];
+            $row->unit_cost_fg = $costInfo['unit_cost_fg'];
+
+            // Total HPP hanya untuk qty OK (reject tidak ikut HPP FG)
+            $row->total_hpp_ok = $row->total_ok * $row->unit_cost_fg;
+        }
+
+        // Hitung grand total (qty & cost)
         $grandTotalIn = $rows->sum('total_in');
         $grandTotalOk = $rows->sum('total_ok');
         $grandTotalReject = $rows->sum('total_reject');
+
+        $grandTotalCostFg = $rows->sum('total_cost_fg'); // total rupiah yang masuk FG (semua job)
+        $grandTotalHppOk = $rows->sum('total_hpp_ok'); // total HPP untuk qty OK saja
+
+        // HPP rata-rata (weighted) untuk OK di periode ini
+        $avgUnitCostOk = $grandTotalOk > 0
+        ? $grandTotalHppOk / $grandTotalOk
+        : 0;
 
         return view('production.finishing_jobs.report_per_item_detail', [
             'item' => $item,
@@ -900,6 +1111,11 @@ class FinishingJobController extends Controller
             'grandTotalIn' => $grandTotalIn,
             'grandTotalOk' => $grandTotalOk,
             'grandTotalReject' => $grandTotalReject,
+
+            // costing
+            'grandTotalCostFg' => $grandTotalCostFg,
+            'grandTotalHppOk' => $grandTotalHppOk,
+            'avgUnitCostOk' => $avgUnitCostOk,
         ]);
     }
 

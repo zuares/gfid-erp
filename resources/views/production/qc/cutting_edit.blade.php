@@ -1,6 +1,7 @@
+{{-- resources/views/production/qc/cutting_edit.blade.php --}}
 @extends('layouts.app')
 
-@section('title', 'Produksi • QC Cutting ' . $job->code)
+@section('title', 'Produksi • QC Cutting ' . $cuttingJob->code)
 
 @push('head')
     <style>
@@ -47,8 +48,8 @@
 
 @section('content')
     @php
-        $lot = $job->lot;
-        $warehouse = $job->warehouse;
+        $lot = $cuttingJob->lot;
+        $warehouse = $cuttingJob->warehouse;
 
         // Default operator dari user login (kalau ada)
         $defaultOperatorId = old('operator_id', $loginOperator->id ?? null);
@@ -63,7 +64,7 @@
         <div class="card p-3 mb-3">
             <div class="d-flex justify-content-between align-items-center gap-3">
                 <div>
-                    <h1 class="h5 mb-1">QC Cutting: {{ $job->code }}</h1>
+                    <h1 class="h5 mb-1">QC Cutting: {{ $cuttingJob->code }}</h1>
                     <div class="help">
                         LOT: {{ $lot?->code ?? '-' }} •
                         Item: {{ $lot?->item?->code ?? '-' }} •
@@ -79,21 +80,24 @@
                             'qc_ok' => 'success',
                             'qc_mixed' => 'warning',
                             'qc_reject' => 'danger',
-                        ][$job->status] ?? 'secondary';
+                            'sent_to_qc' => 'info',
+                            'qc_done' => 'success',
+                        ][$cuttingJob->status] ?? 'secondary';
                 @endphp
 
                 <div class="d-flex flex-column align-items-end">
                     <span class="badge bg-{{ $statusClass }} px-3 py-2 mb-1">
-                        {{ strtoupper($job->status) }}
+                        {{ strtoupper($cuttingJob->status) }}
                     </span>
-                    <a href="{{ route('production.cutting_jobs.show', $job) }}" class="btn btn-sm btn-outline-secondary">
+                    <a href="{{ route('production.cutting_jobs.show', $cuttingJob) }}"
+                        class="btn btn-sm btn-outline-secondary">
                         Kembali ke Cutting Job
                     </a>
                 </div>
             </div>
         </div>
 
-        <form action="{{ route('production.qc.cutting.update', $job) }}" method="post">
+        <form action="{{ route('production.qc.cutting.update', $cuttingJob) }}" method="post">
             @csrf
             @method('PUT')
 
@@ -143,7 +147,7 @@
                     <div>
                         <h2 class="h6 mb-0">QC per Bundle</h2>
                         <div class="help">
-                            Input hanya <strong>Qty Reject</strong>. Qty OK otomatis = Qty Bundle − Qty Reject.
+                            Input hanya <strong>Qty Reject</strong>. Qty OK otomatis dihitung = Qty Bundle − Qty Reject.
                         </div>
                     </div>
 
@@ -162,6 +166,7 @@
                                 <th class="text-end">Qty Bundle</th>
                                 <th class="text-end">Qty OK (auto)</th>
                                 <th class="text-end">Qty Reject</th>
+                                <th>Alasan Reject</th>
                                 <th>Status</th>
                                 <th>Catatan</th>
                             </tr>
@@ -169,14 +174,21 @@
                         <tbody>
                             @foreach ($rows as $i => $row)
                                 @php
-                                    $qtyBundle = (int) $row['qty_pcs'];
-                                    $qtyReject = (int) ($row['qty_reject'] ?? 0);
+                                    $qtyBundle = (float) $row['qty_pcs'];
+                                    $qtyRejectOld = old("results.$i.qty_reject", $row['qty_reject'] ?? 0);
+                                    $qtyReject = (float) $qtyRejectOld;
+                                    if ($qtyReject < 0) {
+                                        $qtyReject = 0;
+                                    }
+                                    if ($qtyReject > $qtyBundle) {
+                                        $qtyReject = $qtyBundle;
+                                    }
                                     $qtyOk = max($qtyBundle - $qtyReject, 0);
                                 @endphp
                                 <tr>
-                                    {{-- bundle_id --}}
-                                    <input type="hidden" name="results[{{ $i }}][bundle_id]"
-                                        value="{{ $row['bundle_id'] }}">
+                                    {{-- cutting_job_bundle_id --}}
+                                    <input type="hidden" name="results[{{ $i }}][cutting_job_bundle_id]"
+                                        value="{{ $row['cutting_job_bundle_id'] }}">
 
                                     {{-- hidden qty_ok (server tetap pakai field ini) --}}
                                     <input type="hidden" name="results[{{ $i }}][qty_ok]"
@@ -196,7 +208,7 @@
                                     </td>
 
                                     <td data-label="Qty Bundle" class="text-end">
-                                        {{ number_format($row['qty_pcs'], 2, ',', '.') }}
+                                        {{ number_format($qtyBundle, 2, ',', '.') }}
                                     </td>
 
                                     <td data-label="Qty OK (auto)" class="text-end">
@@ -208,14 +220,27 @@
                                     <td data-label="Qty Reject" class="text-end">
                                         <input type="number" step="1" min="0" inputmode="numeric"
                                             pattern="\d*" name="results[{{ $i }}][qty_reject]"
-                                            class="form-control form-control-sm text-end input-reject"
+                                            class="form-control form-control-sm text-end input-reject @error("results.$i.qty_reject") is-invalid @enderror"
                                             value="{{ old("results.$i.qty_reject", $qtyReject) }}"
                                             data-bundle="{{ $qtyBundle }}">
+                                        @error("results.$i.qty_reject")
+                                            <div class="invalid-feedback">{{ $message }}</div>
+                                        @enderror
+                                    </td>
+
+                                    <td data-label="Alasan Reject" style="min-width: 140px;">
+                                        <input type="text" name="results[{{ $i }}][reject_reason]"
+                                            class="form-control form-control-sm @error("results.$i.reject_reason") is-invalid @enderror"
+                                            value="{{ old("results.$i.reject_reason", $row['reject_reason'] ?? '') }}"
+                                            placeholder="mis: bolong / kotor">
+                                        @error("results.$i.reject_reason")
+                                            <div class="invalid-feedback">{{ $message }}</div>
+                                        @enderror
                                     </td>
 
                                     <td data-label="Status">
                                         @php
-                                            $st = $row['status'];
+                                            $st = $row['status'] ?: 'cut';
                                             $cls =
                                                 [
                                                     'cut' => 'secondary',
@@ -225,14 +250,17 @@
                                                 ][$st] ?? 'secondary';
                                         @endphp
                                         <span class="badge-soft bg-{{ $cls }}">
-                                            {{ $st ?: 'cut' }}
+                                            {{ $st }}
                                         </span>
                                     </td>
 
                                     <td data-label="Catatan" style="min-width: 160px;">
                                         <input type="text" name="results[{{ $i }}][notes]"
-                                            class="form-control form-control-sm"
-                                            value="{{ old("results.$i.notes", $row['notes']) }}">
+                                            class="form-control form-control-sm @error("results.$i.notes") is-invalid @enderror"
+                                            value="{{ old("results.$i.notes", $row['notes'] ?? '') }}">
+                                        @error("results.$i.notes")
+                                            <div class="invalid-feedback">{{ $message }}</div>
+                                        @enderror
                                     </td>
                                 </tr>
                             @endforeach
@@ -245,12 +273,12 @@
                 @enderror
 
                 <div id="qc-warning" class="text-danger small mt-2" style="display:none;">
-                    ⚠️ Ada baris di mana Qty Reject melebihi Qty Bundle. Nilai akan dikunci ke batas maksimum.
+                    ⚠️ Ada baris di mana Qty Reject melebihi Qty Bundle. Nilai dikunci ke batas maksimum.
                 </div>
             </div>
 
             <div class="d-flex justify-content-end mb-5 gap-2">
-                <a href="{{ route('production.cutting_jobs.show', $job) }}" class="btn btn-outline-secondary">
+                <a href="{{ route('production.cutting_jobs.show', $cuttingJob) }}" class="btn btn-outline-secondary">
                     Batal
                 </a>
                 <button type="submit" class="btn btn-primary">
@@ -269,12 +297,10 @@
         const warningEl = document.getElementById('qc-warning');
 
         function attachSelectAllOnFocus(input) {
-            // saat fokus, select semua isi
             input.addEventListener('focus', function() {
                 setTimeout(() => this.select(), 0);
             });
 
-            // cegah mouseup menghapus seleksi
             input.addEventListener('mouseup', function(e) {
                 e.preventDefault();
             });
@@ -289,9 +315,9 @@
                 const tr = rejInput.closest('tr');
                 const okHidden = tr.querySelector('.input-ok-hidden');
                 const okCell = tr.querySelector('.cell-ok');
-                const maxBundle = parseInt(rejInput.dataset.bundle || '0', 10) || 0;
+                const maxBundle = parseFloat(rejInput.dataset.bundle || '0') || 0;
 
-                let rej = parseInt(rejInput.value || '0', 10);
+                let rej = parseFloat(rejInput.value || '0');
                 if (isNaN(rej) || rej < 0) rej = 0;
 
                 if (rej > maxBundle) {

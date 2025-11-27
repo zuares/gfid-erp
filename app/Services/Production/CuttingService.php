@@ -5,6 +5,7 @@ namespace App\Services\Production;
 use App\Helpers\CodeGenerator;
 use App\Models\CuttingJob;
 use App\Models\CuttingJobBundle;
+use App\Models\Warehouse;
 use App\Services\Inventory\InventoryService;
 use Illuminate\Support\Facades\DB;
 
@@ -32,7 +33,7 @@ class CuttingService
             $job = CuttingJob::create([
                 'code' => $payload['code'],
                 'date' => $payload['date'],
-                'warehouse_id' => $payload['warehouse_id'],
+                'warehouse_id' => $payload['warehouse_id'], // gudang RM / LOT
                 'lot_id' => $payload['lot_id'],
                 'fabric_item_id' => $payload['fabric_item_id'] ?? null,
                 'notes' => $payload['notes'] ?? null,
@@ -44,7 +45,12 @@ class CuttingService
 
             $operatorId = $payload['operator_id'] ?? null;
 
-            // Simpan bundles
+            // Ambil gudang WIP-CUT untuk di-injek ke bundle sebagai posisi WIP
+            $wipCutWarehouseId = Warehouse::where('code', 'WIP-CUT')->value('id');
+
+            // =========================
+            // SIMPAN BUNDLES
+            // =========================
             $running = 1;
             $totalBundles = 0;
             $totalQtyPcs = 0.0;
@@ -73,6 +79,10 @@ class CuttingService
                     'operator_id' => $operatorId,
                     'status' => 'cut',
                     'notes' => $row['notes'] ?? null,
+
+                    // posisi awal WIP-CUT di level bundle (lebih ke info, bukan stok beneran)
+                    'wip_warehouse_id' => null, // boleh null kalau belum ada WIP-CUT
+                    'wip_qty' => 0,
                 ]);
 
                 $running++;
@@ -85,6 +95,97 @@ class CuttingService
                 'total_bundles' => $totalBundles,
                 'total_qty_pcs' => $totalQtyPcs,
             ]);
+
+            // ==========================================
+            // === MUTASI LOT: RM → WIP-CUT (sekali) ===
+            // ==========================================
+            $lot = $job->lot; // relasi lot()
+
+            // if ($lot && $wipCutWarehouseId) {
+            //     $rmWarehouseId = $job->warehouse_id; // gudang asal LOT (RM)
+
+            //     // Ambil saldo LOT di RM
+            //     $lotQtyInRm = $this->inventory->getLotBalance(
+            //         warehouseId: $rmWarehouseId,
+            //         itemId: $lot->item_id,
+            //         lotId: $lot->id,
+            //     );
+
+            //     if ($lotQtyInRm > 0) {
+            //         // 1) OUT dari RM (LOT kain)
+            //         $this->inventory->stockOut(
+            //             warehouseId: $rmWarehouseId,
+            //             itemId: $lot->item_id,
+            //             qty: $lotQtyInRm,
+            //             date: $job->date,
+            //             sourceType: 'cutting_issue_rm',
+            //             sourceId: $job->id,
+            //             notes: "Issue kain LOT {$lot->code} ke WIP-CUT untuk job {$job->code}",
+            //             allowNegative: false,
+            //             lotId: $lot->id,
+            //         );
+
+            //         // 2) IN ke WIP-CUT (LOT kain yang sama, masih 1 lot)
+            //         $this->inventory->stockIn(
+            //             warehouseId: $wipCutWarehouseId,
+            //             itemId: $lot->item_id,
+            //             qty: $lotQtyInRm,
+            //             date: $job->date,
+            //             sourceType: 'cutting_issue_wip',
+            //             sourceId: $job->id,
+            //             notes: "Terima kain LOT {$lot->code} di WIP-CUT untuk job {$job->code}",
+            //             lotId: $lot->id,
+            //             unitCost: null,
+            //         );
+            //     }
+            // }
+            if ($lot && $wipCutWarehouseId) {
+                $rmWarehouseId = $job->warehouse_id; // gudang asal LOT (RM)
+
+                // Ambil saldo LOT di RM
+                $lotQtyInRm = $this->inventory->getLotBalance(
+                    warehouseId: $rmWarehouseId,
+                    itemId: $lot->item_id,
+                    lotId: $lot->id,
+                );
+
+                // Ambil unit_cost LOT dari pembelian
+                $lotUnitCost = $this->inventory->getLotPurchaseUnitCost(
+                    itemId: $lot->item_id,
+                    lotId: $lot->id,
+                );
+
+                if ($lotQtyInRm > 0) {
+                    // 1) OUT dari RM (LOT kain) – InventoryService sudah pakai avg cost di RM
+
+                    $this->inventory->stockOut(
+                        warehouseId: $rmWarehouseId,
+                        itemId: $job->fabric_item_id,
+                        qty: $lotQtyInRm, // dalam meter
+                        date: $job->date,
+                        sourceType: CuttingJob::class,
+                        sourceId: $job->id,
+                        notes: "Pakai kain LOT {$job->lot_code} untuk CUT {$job->code}",
+                        allowNegative: false,
+                        lotId: $job->lot_id,
+                        unitCostOverride: null,
+                        affectLotCost: true, // ⬅️ ini yang ngurangin LotCost
+                    );
+
+                    // 2) IN ke WIP-CUT (LOT kain yang sama, bawa unit_cost LOT)
+                    $this->inventory->stockIn(
+                        warehouseId: $wipCutWarehouseId,
+                        itemId: $lot->item_id,
+                        qty: $lotQtyInRm,
+                        date: $job->date,
+                        sourceType: 'cutting_issue_wip',
+                        sourceId: $job->id,
+                        notes: "Terima kain LOT {$lot->code} di WIP-CUT untuk job {$job->code}",
+                        lotId: $lot->id,
+                        unitCost: $lotUnitCost > 0 ? $lotUnitCost : null,
+                    );
+                }
+            }
 
             return $job;
         });

@@ -27,7 +27,8 @@ class InventoryService
         ?int $sourceId = null,
         ?string $notes = null,
         ?int $lotId = null, // optional LOT
-        float | int | string | null $unitCost = null, // harga per unit (untuk moving average)
+        float | int | string | null $unitCost = null, // harga per unit (untuk moving average / nilai mutasi)
+        bool $affectLotCost = true, // ⬅️ baru: apakah mutasi ini ikut update LotCost (hanya untuk kain mentah)
     ): ?InventoryMutation {
         $qty = $this->num($qty);
         if ($qty <= 0) {
@@ -47,14 +48,15 @@ class InventoryService
             ]
         );
 
+        // UPDATE SALDO QTY
         $stock->qty = $this->num($stock->qty) + $qty;
         $stock->save();
 
-        // cost
+        // COST
         $unitCostValue = $unitCost !== null ? $this->num($unitCost) : null;
         $totalCost = $unitCostValue !== null ? $unitCostValue * $qty : null;
 
-        // catat mutasi (IN: qty_change +, total_cost +)
+        // CATAT MUTASI (IN: qty_change +, total_cost +)
         $mutation = InventoryMutation::create([
             'date' => $date,
             'warehouse_id' => $warehouseId,
@@ -69,8 +71,8 @@ class InventoryService
             'total_cost' => $totalCost,
         ]);
 
-        // update moving average LOT kalau ada lotId + unitCost
-        if ($lotId && $unitCostValue !== null) {
+        // UPDATE LOT COST (HANYA JIKA MEMANG MAU PENGARUHI LOT KAIN)
+        if ($affectLotCost && $lotId && $unitCostValue !== null) {
             $this->lotCost->addReceipt($lotId, $qty, $unitCostValue);
         }
 
@@ -90,6 +92,8 @@ class InventoryService
         ?string $notes = null,
         bool $allowNegative = false,
         ?int $lotId = null, // optional LOT
+        float | int | string | null $unitCostOverride = null, // ⬅️ baru: untuk WIP, kita bisa pakai unit_cost custom
+        bool $affectLotCost = true, // ⬅️ baru: hanya true untuk pemakaian kain mentah
     ): ?InventoryMutation {
         $qty = $this->num($qty);
         if ($qty <= 0) {
@@ -118,20 +122,25 @@ class InventoryService
             ]);
         }
 
+        // UPDATE SALDO QTY
         $stock->qty = $this->num($stock->qty) - $qty;
         $stock->save();
 
-        // kalau ada LOT → ambil avg cost
+        // ===== COSTING =====
         $avgCost = null;
         $totalCost = null;
 
-        if ($lotId) {
+        if ($unitCostOverride !== null) {
+            // Kasus WIP: kita pakai unit_cost yang dikirim caller (misal avg WIP-CUT)
+            $avgCost = $this->num($unitCostOverride);
+            $totalCost = -($avgCost * $qty);
+        } elseif ($lotId && $affectLotCost) {
+            // Kasus kain mentah: pakai LotCost (avg cost per lot untuk RM)
             $avgCost = $this->lotCost->getAvgCost($lotId);
-            // OUT kita simpan sebagai nilai NEGATIF, biar bisa langsung dijumlah
             $totalCost = -($avgCost * $qty);
         }
 
-        // catat mutasi (OUT: qty_change -, total_cost -)
+        // CATAT MUTASI (OUT: qty_change -, total_cost -)
         $mutation = InventoryMutation::create([
             'date' => $date,
             'warehouse_id' => $warehouseId,
@@ -146,7 +155,8 @@ class InventoryService
             'total_cost' => $totalCost,
         ]);
 
-        if ($lotId) {
+        // UPDATE LotCost HANYA UNTUK PEMAKAIAN KAIN MENTAH
+        if ($lotId && $affectLotCost && $avgCost !== null) {
             $this->lotCost->consume($lotId, $qty);
         }
 
@@ -362,4 +372,89 @@ class InventoryService
         // "25.000" => 25, "1234.5" => 1234.5
         return (float) $value;
     }
+
+    public function getBalance(int $warehouseId, int $itemId): float
+    {
+        return (float) InventoryMutation::query()
+            ->where('warehouse_id', $warehouseId)
+            ->where('item_id', $itemId)
+            ->sum('qty_change');
+    }
+
+    public function getLotPurchaseUnitCost(int $itemId, int $lotId): float
+    {
+        $query = InventoryMutation::query()
+            ->where('item_id', $itemId)
+            ->where('lot_id', $lotId)
+            ->where('direction', 'in')
+            ->where('source_type', 'purchase_receipt')
+            ->whereNotNull('unit_cost');
+
+        $totalQty = (float) $query->sum('qty_change');
+        $totalCost = (float) $query->sum(DB::raw('qty_change * unit_cost'));
+
+        if ($totalQty <= 0.000001) {
+            return 0.0;
+        }
+
+        return $totalCost / $totalQty;
+    }
+
+    public function getItemIncomingUnitCost(int $warehouseId, int $itemId): float
+    {
+        $query = InventoryMutation::query()
+            ->where('warehouse_id', $warehouseId)
+            ->where('item_id', $itemId)
+            ->where('direction', 'in')
+            ->whereNotNull('unit_cost');
+
+        $totalQty = (float) $query->sum('qty_change');
+        $totalCost = (float) $query->sum('total_cost');
+
+        if ($totalQty <= 0.000001) {
+            return 0.0;
+        }
+
+        return $totalCost / $totalQty;
+    }
+
+    public function getMovingAverageFgCost(int $fgWarehouseId, int $itemId): float
+    {
+        $row = \App\Models\InventoryMutation::query()
+            ->selectRaw('
+            COALESCE(SUM(CASE WHEN direction = "in"  THEN total_cost ELSE 0 END), 0) AS total_in_cost,
+            COALESCE(SUM(CASE WHEN direction = "in"  THEN qty_change ELSE 0 END), 0) AS total_in_qty
+        ')
+            ->where('warehouse_id', $fgWarehouseId)
+            ->where('item_id', $itemId)
+            ->first();
+
+        if (!$row || $row->total_in_qty <= 0) {
+            return 0.0;
+        }
+
+        return (float) ($row->total_in_cost / $row->total_in_qty); // rp/pcs
+    }
+
+    public function getLotMovingAverageUnitCost(int $warehouseId, int $itemId, int $lotId): ?float
+    {
+        // Contoh logika:
+        // Ambil saldo terakhir / moving average dari inventory_mutations
+        // untuk kombinasi warehouse + item + lot ini.
+
+        $mutation = \DB::table('inventory_mutations')
+            ->where('warehouse_id', $warehouseId)
+            ->where('item_id', $itemId)
+            ->where('lot_id', $lotId)
+            ->orderByDesc('date')
+            ->orderByDesc('id')
+            ->first();
+
+        if (!$mutation || $mutation->unit_cost === null) {
+            return null;
+        }
+
+        return (float) $mutation->unit_cost;
+    }
+
 }

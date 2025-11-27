@@ -199,7 +199,6 @@
                 padding-inline: 0;
             }
 
-            /* ====== MOBILE: TABLE → CARD-LIKE LIST ====== */
             .table-finishing {
                 border-spacing: 0 0.6rem;
             }
@@ -269,7 +268,8 @@
 @php
     /** @var \App\Models\FinishingJob|null $job */
     $isEdit = isset($job) && $job instanceof \App\Models\FinishingJob && $job->exists;
-    // default operator = karyawan user yang login (kalau ada relasi employee)
+
+    // default operator = employee user yang login (kalau ada relasi employee)
     $loggedInOperatorId = optional(optional(auth()->user())->employee)->id;
 @endphp
 
@@ -294,7 +294,7 @@
             <div class="page-header">
                 <div class="page-title-wrap">
                     <div class="page-icon">
-                        <i class="bi bi-scissors"></i>
+                        <i class="bi bi-ui-checks-grid"></i>
                     </div>
                     <div>
                         <h1 class="page-title">
@@ -305,7 +305,7 @@
                             @endif
                         </h1>
                         <div class="page-subtitle">
-                            Proses hasil jahit (WIP-FIN) menjadi barang jadi.
+                            Proses hasil jahit di gudang <strong>WIP-FIN</strong> menjadi barang jadi (FG).
                             Qty In & Qty OK otomatis, kamu cukup isi <strong>Qty Reject</strong> & alasan (jika ada).
                         </div>
                     </div>
@@ -345,7 +345,7 @@
                     <div class="col-md-4">
                         <label class="form-label small mb-1">Tanggal proses</label>
                         <input type="date" name="date" class="form-control form-control-sm"
-                            value="{{ old('date', $date) }}" required>
+                            value="{{ old('date', $date ?? now()->toDateString()) }}" required>
                         <div class="help mt-1">
                             Biasanya tanggal fisik barang diproses di finishing.
                         </div>
@@ -353,7 +353,7 @@
                     <div class="col-md-8">
                         <label class="form-label small mb-1">Catatan (opsional)</label>
                         <textarea name="notes" class="form-control form-control-sm" rows="2"
-                            placeholder="Misal: Finishing harian, shift pagi.">{{ old('notes', $job->notes ?? '') }}</textarea>
+                            placeholder="Misal: Finishing harian, shift pagi.">{{ old('notes', $isEdit ? $job->notes ?? '' : '') }}</textarea>
                     </div>
                 </div>
             </div>
@@ -368,7 +368,7 @@
                         <div class="section-title">Bundle dari WIP-FIN</div>
                         <div class="help">
                             Qty In & Qty OK otomatis dari saldo WIP-FIN.
-                            Operator otomatis diisi user yang login (bisa diubah).
+                            Operator boleh diisi per baris (default: karyawan user login kalau ada).
                             Kamu hanya perlu isi Qty Reject (jika ada) & alasan.
                         </div>
                     </div>
@@ -425,8 +425,8 @@
 
                                         $wipBalance = $line['wip_balance'] ?? (float) ($bundleModel->wip_qty ?? 0);
 
-                                        $qtyIn = $wipBalance;
                                         $qtyReject = $line['qty_reject'] ?? 0;
+                                        $qtyIn = $wipBalance;
                                         $qtyOk = max(0, $qtyIn - $qtyReject);
 
                                         $selectedOperatorId = $line['operator_id'] ?? $loggedInOperatorId;
@@ -466,6 +466,10 @@
 
                                             <input type="hidden" name="lines[{{ $i }}][item_id]"
                                                 class="item-id-input" value="{{ $itemId }}">
+                                            <input type="hidden" name="lines[{{ $i }}][item_label]"
+                                                value="{{ $itemLabel }}">
+                                            <input type="hidden" name="lines[{{ $i }}][wip_balance]"
+                                                value="{{ $wipBalance }}">
                                         </td>
 
                                         {{-- ITEM LABEL --}}
@@ -473,13 +477,9 @@
                                             <div class="small mono item-label">
                                                 {{ $itemLabel }}
                                             </div>
-                                            <input type="hidden" name="lines[{{ $i }}][item_label]"
-                                                value="{{ $itemLabel }}">
-                                            <input type="hidden" name="lines[{{ $i }}][wip_balance]"
-                                                value="{{ $wipBalance }}">
                                         </td>
 
-                                        {{-- OPERATOR (default = user login) --}}
+                                        {{-- OPERATOR --}}
                                         <td data-label="Operator">
                                             <select name="lines[{{ $i }}][operator_id]"
                                                 class="form-select form-select-sm">
@@ -515,7 +515,7 @@
                                                 value="{{ $qtyOk }}" readonly tabindex="-1">
                                         </td>
 
-                                        {{-- QTY REJECT (hanya ini yang diinput user) --}}
+                                        {{-- QTY REJECT (input user) --}}
                                         <td class="text-end" data-label="Reject">
                                             <input type="number" min="0" step="1"
                                                 name="lines[{{ $i }}][qty_reject]"
@@ -540,7 +540,7 @@
                                     </tr>
                                 @endforeach
                             @else
-                                {{-- Default: 1 baris kosong (kalau belum ada bundle_ids / lines) --}}
+                                {{-- Default: 1 baris kosong --}}
                                 @php
                                     $defaultOperatorId = old('lines.0.operator_id', $loggedInOperatorId);
                                 @endphp
@@ -634,7 +634,7 @@
                     <div class="help mb-1">
                         Qty In = saldo WIP-FIN, Qty OK = Qty In - Qty Reject.
                         Qty Reject tidak boleh lebih besar dari saldo WIP-FIN.
-                        Angka negatif / kosong akan otomatis dirapikan seperti form QC.
+                        Angka kosong / negatif akan otomatis dirapikan saat disimpan.
                     </div>
                 </div>
             </div>
@@ -695,7 +695,7 @@
                 return num;
             }
 
-            // === LOGIKA: semua qty auto dari saldo & reject ===
+            // Hitung Qty In & Qty OK dari saldo WIP-FIN & Reject
             function sanitizeRow(row) {
                 const qtyInInput = row.querySelector('.qty-in-input');
                 const qtyOkInput = row.querySelector('.qty-ok-input');
@@ -721,7 +721,6 @@
                 qtyOkInput.value = qtyOk;
                 qtyRejectInput.value = qtyReject;
 
-                // Soft invalid kalau ada yang aneh (harusnya nggak kejadian dengan rumus ini)
                 const hasOver = (qtyOk + qtyReject) > qtyIn + 0.000001;
                 [qtyInInput, qtyOkInput, qtyRejectInput].forEach(el => {
                     if (!el) return;
@@ -753,10 +752,9 @@
                 if (hiddenItemLabel) hiddenItemLabel.value = itemLabel;
                 if (hiddenWipBalance) hiddenWipBalance.value = wipBalStr;
 
-                // Default: proses semua, tidak ada reject
+                // Default: proses semua, reject 0
                 if (qtyRejectInput) qtyRejectInput.value = 0;
 
-                // Hitung ulang qty_in & qty_ok dari saldo & reject
                 sanitizeRow(row);
             }
 
@@ -769,7 +767,6 @@
                 // reset nilai inputs
                 newRow.querySelectorAll('input').forEach(input => {
                     if (input.type === 'hidden') {
-                        // untuk hidden, reset yang bukan wip_balance
                         if (input.name && input.name.includes('[wip_balance]')) {
                             input.value = '0';
                         } else {
@@ -779,7 +776,11 @@
                     }
 
                     if (['number', 'text'].includes(input.type)) {
-                        input.value = 0;
+                        if (input.classList.contains('qty-reject-input')) {
+                            input.value = 0;
+                        } else {
+                            input.value = 0;
+                        }
                     }
                 });
 
@@ -800,15 +801,14 @@
                 sanitizeRow(newRow);
             }
 
-            // ==== BLOK: Cegah scroll & karakter aneh di input number (kayak QC) ====
+            // cegah scroll & karakter aneh di input number
             function attachNumberGuards(container) {
                 container.querySelectorAll('input[type="number"]').forEach(input => {
                     input.addEventListener('wheel', function(e) {
-                        this.blur(); // biar scroll nggak ngubah value
+                        this.blur();
                     });
 
                     input.addEventListener('keydown', function(e) {
-                        // blok e, E, +, - supaya nggak bisa 1e5 dsb
                         if (['e', 'E', '+', '-'].includes(e.key)) {
                             e.preventDefault();
                         }
@@ -842,7 +842,7 @@
                 }
             });
 
-            // User hanya input di Qty Reject → sisanya auto (ala QC)
+            // User hanya input di Qty Reject → sisanya auto
             tableBody.addEventListener('input', function(e) {
                 if (e.target.classList.contains('qty-reject-input')) {
                     const row = e.target.closest('.line-row');
@@ -851,7 +851,6 @@
                 }
             });
 
-            // Saat blur, rapihin angka juga (kalau user kosongin field)
             tableBody.addEventListener('blur', function(e) {
                 if (e.target.classList.contains('qty-reject-input')) {
                     const row = e.target.closest('.line-row');

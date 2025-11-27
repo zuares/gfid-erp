@@ -50,6 +50,18 @@ class WarehouseSeeder extends Seeder
             'active' => 1,
         ]);
         Warehouse::create([
+            'code' => 'REJ-CUT',
+            'name' => 'WIP Reject Cutting',
+            'type' => 'internal',
+            'active' => 1,
+        ]);
+        Warehouse::create([
+            'code' => 'REJ-SEW',
+            'name' => 'WIP Reject Jahit',
+            'type' => 'internal',
+            'active' => 1,
+        ]);
+        Warehouse::create([
             'code' => 'PACKDED',
             'name' => 'WIP Packing',
             'type' => 'internal',
