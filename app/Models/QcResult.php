@@ -3,17 +3,25 @@
 namespace App\Models;
 
 use Illuminate\Database\Eloquent\Model;
+use Illuminate\Database\Eloquent\Relations\BelongsTo;
 
 class QcResult extends Model
 {
+    // Stage constant biar nggak typo
+    public const STAGE_CUTTING = 'cutting';
+    public const STAGE_SEWING = 'sewing';
+    public const STAGE_FINISHING = 'finishing';
+
     protected $fillable = [
         'stage',
+        'bundle_id',
         'cutting_job_id',
-        'cutting_job_bundle_id',
         'sewing_job_id',
+        'finishing_job_id',
         'qc_date',
         'qty_ok',
         'qty_reject',
+        'reject_reason',
         'operator_id',
         'status',
         'notes',
@@ -21,36 +29,54 @@ class QcResult extends Model
 
     protected $casts = [
         'qc_date' => 'date',
-        'qty_ok' => 'float',
-        'qty_reject' => 'float',
+        'qty_ok' => 'decimal:2',
+        'qty_reject' => 'decimal:2',
     ];
 
-    public function cuttingJob()
+    /*
+    |--------------------------------------------------------------------------
+    | Relationships
+    |--------------------------------------------------------------------------
+     */
+
+    public function bundle(): BelongsTo
     {
-        return $this->belongsTo(CuttingJob::class);
+        return $this->belongsTo(CuttingJobBundle::class, 'bundle_id');
     }
 
-    public function cuttingBundle()
+    public function cuttingJob(): BelongsTo
     {
-        return $this->belongsTo(CuttingJobBundle::class, 'cutting_job_bundle_id');
+        return $this->belongsTo(CuttingJob::class, 'cutting_job_id');
     }
 
-    public function sewingJob()
+    public function finishingJob(): BelongsTo
     {
-        return $this->belongsTo(SewingJob::class);
+        return $this->belongsTo(FinishingJob::class, 'finishing_job_id');
     }
 
-    public function operator()
+    public function operator(): BelongsTo
     {
         return $this->belongsTo(Employee::class, 'operator_id');
     }
 
-    // 🔹 Relasi ke CuttingJob (header)
+    /*
+    |--------------------------------------------------------------------------
+    | Query Scopes
+    |--------------------------------------------------------------------------
+     */
 
-    // 🔹 Relasi ke CuttingJobBundle (detail/bundle)
-    public function cuttingJobBundle()
+    public function scopeCutting($query)
     {
-        return $this->belongsTo(CuttingJobBundle::class, 'cutting_job_bundle_id');
+        return $query->where('stage', self::STAGE_CUTTING);
     }
 
+    public function scopeSewing($query)
+    {
+        return $query->where('stage', self::STAGE_SEWING);
+    }
+
+    public function scopeFinishing($query)
+    {
+        return $query->where('stage', self::STAGE_FINISHING);
+    }
 }

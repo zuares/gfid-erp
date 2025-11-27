@@ -122,4 +122,10 @@ class CuttingJobBundle extends Model
         return $query->where('wip_qty', '>', 0.0001);
     }
 
+// Kalau mau ambil khusus QC Cutting:
+    public function qcCutting()
+    {
+        return $this->qcResults()->cutting();
+    }
+
 }

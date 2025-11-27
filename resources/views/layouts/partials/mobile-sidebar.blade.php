@@ -240,13 +240,11 @@
         request()->routeIs('production.finishing_jobs.*') ||
         request()->routeIs('production.finishing_jobs.bundles_ready');
 
+    // Production Reports (SAAT INI: hanya operator sewing + finishing per item)
     $prodReportOpen =
-        request()->routeIs('production.reports.cutting_to_sewing_loss') ||
-        request()->routeIs('production.reports.daily_production') ||
-        request()->routeIs('production.reports.reject_detail') ||
-        request()->routeIs('production.reports.sewing_per_item') ||
-        request()->routeIs('production.reports.wip_sewing_age') ||
-        request()->routeIs('production.sewing_returns.report_operators');
+        request()->routeIs('production.sewing_returns.report_operators') ||
+        request()->routeIs('production.finishing_jobs.report_per_item') ||
+        request()->routeIs('production.finishing_jobs.report_per_item_detail');
 @endphp
 
 {{-- OVERLAY --}}
@@ -515,7 +513,7 @@
                     </div>
                 </li>
 
-                {{-- Laporan Produksi --}}
+                {{-- Laporan Produksi (match desktop: hanya route yang ada) --}}
                 <li class="mb-1">
                     <button class="mobile-sidebar-link mobile-sidebar-toggle {{ $prodReportOpen ? 'is-open' : '' }}"
                         type="button" data-bs-toggle="collapse" data-bs-target="#navProductionReportsMobile"
@@ -527,40 +525,16 @@
                     </button>
 
                     <div class="collapse {{ $prodReportOpen ? 'show' : '' }}" id="navProductionReportsMobile">
-                        <a href="{{ route('production.reports.daily_production') }}"
-                            class="mobile-sidebar-link mobile-sidebar-link-sub {{ request()->routeIs('production.reports.daily_production') ? 'active' : '' }}">
-                            <span class="icon">📅</span>
-                            <span>Rekap Harian Produksi</span>
-                        </a>
-
-                        <a href="{{ route('production.reports.cutting_to_sewing_loss') }}"
-                            class="mobile-sidebar-link mobile-sidebar-link-sub {{ request()->routeIs('production.reports.cutting_to_sewing_loss') ? 'active' : '' }}">
-                            <span class="icon">↔︎</span>
-                            <span>Cutting → Sewing Loss</span>
-                        </a>
-
                         <a href="{{ route('production.sewing_returns.report_operators') }}"
                             class="mobile-sidebar-link mobile-sidebar-link-sub {{ request()->routeIs('production.sewing_returns.report_operators') ? 'active' : '' }}">
                             <span class="icon">🧍</span>
                             <span>Performa Operator Jahit</span>
                         </a>
 
-                        <a href="{{ route('production.reports.sewing_per_item') }}"
-                            class="mobile-sidebar-link mobile-sidebar-link-sub {{ request()->routeIs('production.reports.sewing_per_item') ? 'active' : '' }}">
-                            <span class="icon">🧵</span>
-                            <span>Performa Jahit per Item</span>
-                        </a>
-
-                        <a href="{{ route('production.reports.wip_sewing_age') }}"
-                            class="mobile-sidebar-link mobile-sidebar-link-sub {{ request()->routeIs('production.reports.wip_sewing_age') ? 'active' : '' }}">
-                            <span class="icon">⏳</span>
-                            <span>Ageing WIP Sewing</span>
-                        </a>
-
-                        <a href="{{ route('production.reports.reject_detail') }}"
-                            class="mobile-sidebar-link mobile-sidebar-link-sub {{ request()->routeIs('production.reports.reject_detail') ? 'active' : '' }}">
-                            <span class="icon">⚠️</span>
-                            <span>Reject Detail</span>
+                        <a href="{{ route('production.finishing_jobs.report_per_item') }}"
+                            class="mobile-sidebar-link mobile-sidebar-link-sub {{ request()->routeIs('production.finishing_jobs.report_per_item') || request()->routeIs('production.finishing_jobs.report_per_item_detail') ? 'active' : '' }}">
+                            <span class="icon">📦</span>
+                            <span>Finishing per Item (WIP-FIN → FG)</span>
                         </a>
                     </div>
                 </li>

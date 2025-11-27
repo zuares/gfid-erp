@@ -49,5 +49,11 @@ class WarehouseSeeder extends Seeder
             'type' => 'internal',
             'active' => 1,
         ]);
+        Warehouse::create([
+            'code' => 'PACKDED',
+            'name' => 'WIP Packing',
+            'type' => 'internal',
+            'active' => 1,
+        ]);
     }
 }

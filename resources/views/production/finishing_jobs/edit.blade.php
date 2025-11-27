@@ -1,7 +1,7 @@
-{{-- resources/views/production/finishing_jobs/create.blade.php --}}
+{{-- resources/views/production/finishing_jobs/edit.blade.php --}}
 @extends('layouts.app')
 
-@section('title', 'Produksi • Finishing Job Baru')
+@section('title', 'Produksi • Edit Finishing Job ' . $job->code)
 
 @push('head')
     <style>
@@ -199,7 +199,6 @@
                 padding-inline: 0;
             }
 
-            /* ====== MOBILE: TABLE → CARD-LIKE LIST ====== */
             .table-finishing {
                 border-spacing: 0 0.6rem;
             }
@@ -266,13 +265,6 @@
     </style>
 @endpush
 
-@php
-    /** @var \App\Models\FinishingJob|null $job */
-    $isEdit = isset($job) && $job instanceof \App\Models\FinishingJob && $job->exists;
-    // default operator = karyawan user yang login (kalau ada relasi employee)
-    $loggedInOperatorId = optional(optional(auth()->user())->employee)->id;
-@endphp
-
 @section('content')
     <div class="page-wrap">
 
@@ -285,7 +277,7 @@
                         <li>{{ $error }}</li>
                     @endforeach
                 </ul>
-                <button type="button" class="btn-close" data-bs-dismiss="alert" aria-label="Close"></button>
+                <button type="button" class="btn-close" data-bs-dismiss="alert"></button>
             </div>
         @endif
 
@@ -298,34 +290,27 @@
                     </div>
                     <div>
                         <h1 class="page-title">
-                            @if ($isEdit)
-                                Edit Finishing Job <span class="mono">{{ $job->code }}</span>
-                            @else
-                                Finishing Job Baru
-                            @endif
+                            Edit Finishing Job
+                            <span class="mono">{{ $job->code }}</span>
                         </h1>
                         <div class="page-subtitle">
-                            Proses hasil jahit (WIP-FIN) menjadi barang jadi.
-                            Qty In & Qty OK otomatis, kamu cukup isi <strong>Qty Reject</strong> & alasan (jika ada).
+                            Ubah hasil finishing sebelum diposting / setelah di-unpost.
                         </div>
                     </div>
                 </div>
                 <div class="d-flex align-items-center gap-2">
-                    <a href="{{ route('production.finishing_jobs.index') }}" class="btn btn-sm btn-outline-secondary">
-                        <i class="bi bi-arrow-left me-1"></i> Kembali
+                    <a href="{{ route('production.finishing_jobs.show', $job->id) }}"
+                        class="btn btn-sm btn-outline-secondary">
+                        <i class="bi bi-arrow-left me-1"></i> Kembali ke Detail
                     </a>
                 </div>
             </div>
         </div>
 
         {{-- FORM --}}
-        <form
-            action="{{ $isEdit ? route('production.finishing_jobs.update', $job) : route('production.finishing_jobs.store') }}"
-            method="post">
+        <form action="{{ route('production.finishing_jobs.update', $job->id) }}" method="post">
             @csrf
-            @if ($isEdit)
-                @method('PUT')
-            @endif
+            @method('PUT')
 
             {{-- HEADER FORM --}}
             <div class="card p-3 p-md-3 mb-3">
@@ -336,7 +321,7 @@
                         </div>
                         <div class="section-title">Detail Finishing</div>
                         <div class="help">
-                            Tentukan tanggal proses dan catatan umum untuk finishing job ini.
+                            Sesuaikan tanggal proses & catatan jika diperlukan.
                         </div>
                     </div>
                 </div>
@@ -345,7 +330,7 @@
                     <div class="col-md-4">
                         <label class="form-label small mb-1">Tanggal proses</label>
                         <input type="date" name="date" class="form-control form-control-sm"
-                            value="{{ old('date', $date) }}" required>
+                            value="{{ old('date', $job->date->format('Y-m-d')) }}" required>
                         <div class="help mt-1">
                             Biasanya tanggal fisik barang diproses di finishing.
                         </div>
@@ -353,7 +338,7 @@
                     <div class="col-md-8">
                         <label class="form-label small mb-1">Catatan (opsional)</label>
                         <textarea name="notes" class="form-control form-control-sm" rows="2"
-                            placeholder="Misal: Finishing harian, shift pagi.">{{ old('notes', $job->notes ?? '') }}</textarea>
+                            placeholder="Misal: koreksi reject, revisi data.">{{ old('notes', $job->notes) }}</textarea>
                     </div>
                 </div>
             </div>
@@ -367,9 +352,8 @@
                         </div>
                         <div class="section-title">Bundle dari WIP-FIN</div>
                         <div class="help">
-                            Qty In & Qty OK otomatis dari saldo WIP-FIN.
-                            Operator otomatis diisi user yang login (bisa diubah).
-                            Kamu hanya perlu isi Qty Reject (jika ada) & alasan.
+                            Qty In & Qty OK otomatis dari saldo WIP-FIN + Qty Reject.
+                            Kamu hanya mengubah Qty Reject & alasan reject.
                         </div>
                     </div>
                     <div class="section-actions">
@@ -379,6 +363,46 @@
                         </button>
                     </div>
                 </div>
+
+                @php
+                    // Data untuk form:
+                    // 1) kalau ada old('lines') -> pakai itu
+                    // 2) kalau tidak, map dari $job->lines
+                    $formLines = old('lines');
+                    if (!$formLines) {
+                        $formLines = $job->lines
+                            ->map(function ($line) use ($bundles) {
+                                $bundleModel = $bundles->firstWhere('id', $line->bundle_id);
+                                $itemModel = $bundleModel?->finishedItem ?? ($bundleModel?->lot?->item ?? $line->item);
+
+                                $itemLabel = $itemModel
+                                    ? trim(
+                                        ($itemModel->code ?? '') .
+                                            ' — ' .
+                                            ($itemModel->name ?? '') .
+                                            ' ' .
+                                            ($itemModel->color ?? ''),
+                                    )
+                                    : '';
+
+                                $wipBalance = (float) ($bundleModel->wip_qty ?? 0);
+
+                                return [
+                                    'bundle_id' => $line->bundle_id,
+                                    'item_id' => $itemModel?->id,
+                                    'item_label' => $itemLabel,
+                                    'wip_balance' => $wipBalance,
+                                    'operator_id' => $line->operator_id,
+                                    'qty_in' => $line->qty_in,
+                                    'qty_ok' => $line->qty_ok,
+                                    'qty_reject' => $line->qty_reject,
+                                    'reject_reason' => $line->reject_reason,
+                                    'reject_notes' => $line->reject_notes,
+                                ];
+                            })
+                            ->toArray();
+                    }
+                @endphp
 
                 <div class="table-wrap">
                     <table class="table table-sm align-middle table-finishing" id="lines-table">
@@ -396,228 +420,130 @@
                             </tr>
                         </thead>
                         <tbody>
-                            @php
-                                // kalau ada error, pakai old('lines'); kalau tidak, pakai $lines dari controller
-                                $formLines = old('lines', $lines ?? []);
-                            @endphp
-
-                            @if (!empty($formLines))
-                                @foreach ($formLines as $i => $line)
-                                    @php
-                                        $bundleModel = $bundles->firstWhere('id', $line['bundle_id'] ?? null);
-                                        $itemModel = $bundleModel?->finishedItem ?? $bundleModel?->lot?->item;
-
-                                        $itemId =
-                                            $line['item_id'] ??
-                                            ($bundleModel?->finished_item_id ?? ($bundleModel?->lot?->item_id ?? null));
-
-                                        $itemLabel =
-                                            $line['item_label'] ??
-                                            ($itemModel
-                                                ? trim(
-                                                    ($itemModel->code ?? '') .
-                                                        ' — ' .
-                                                        ($itemModel->name ?? '') .
-                                                        ' ' .
-                                                        ($itemModel->color ?? ''),
-                                                )
-                                                : '');
-
-                                        $wipBalance = $line['wip_balance'] ?? (float) ($bundleModel->wip_qty ?? 0);
-
-                                        $qtyIn = $wipBalance;
-                                        $qtyReject = $line['qty_reject'] ?? 0;
-                                        $qtyOk = max(0, $qtyIn - $qtyReject);
-
-                                        $selectedOperatorId = $line['operator_id'] ?? $loggedInOperatorId;
-                                    @endphp
-
-                                    <tr class="line-row">
-                                        {{-- BUNDLE --}}
-                                        <td data-label="Bundle">
-                                            <select name="lines[{{ $i }}][bundle_id]"
-                                                class="form-select form-select-sm bundle-select"
-                                                data-line-index="{{ $i }}">
-                                                <option value="">Pilih bundle...</option>
-                                                @foreach ($bundles as $bundle)
-                                                    @php
-                                                        $optItem = $bundle->finishedItem ?? $bundle->lot?->item;
-                                                        $optLabel = $optItem
-                                                            ? trim(
-                                                                ($optItem->code ?? '') .
-                                                                    ' — ' .
-                                                                    ($optItem->name ?? '') .
-                                                                    ' ' .
-                                                                    ($optItem->color ?? ''),
-                                                            )
-                                                            : '';
-                                                        $optWip = (float) ($bundle->wip_qty ?? 0);
-                                                        $optItemId =
-                                                            $bundle->finished_item_id ?? ($bundle->lot?->item_id ?? '');
-                                                    @endphp
-                                                    <option value="{{ $bundle->id }}" data-item-id="{{ $optItemId }}"
-                                                        data-item-label="{{ $optLabel }}"
-                                                        data-wip-balance="{{ $optWip }}"
-                                                        @selected(($line['bundle_id'] ?? null) == $bundle->id)>
-                                                        {{ $bundle->bundle_code }} ({{ number_format($optWip) }} pcs)
-                                                    </option>
-                                                @endforeach
-                                            </select>
-
-                                            <input type="hidden" name="lines[{{ $i }}][item_id]"
-                                                class="item-id-input" value="{{ $itemId }}">
-                                        </td>
-
-                                        {{-- ITEM LABEL --}}
-                                        <td data-label="Item">
-                                            <div class="small mono item-label">
-                                                {{ $itemLabel }}
-                                            </div>
-                                            <input type="hidden" name="lines[{{ $i }}][item_label]"
-                                                value="{{ $itemLabel }}">
-                                            <input type="hidden" name="lines[{{ $i }}][wip_balance]"
-                                                value="{{ $wipBalance }}">
-                                        </td>
-
-                                        {{-- OPERATOR (default = user login) --}}
-                                        <td data-label="Operator">
-                                            <select name="lines[{{ $i }}][operator_id]"
-                                                class="form-select form-select-sm">
-                                                <option value="">-</option>
-                                                @foreach ($operators as $op)
-                                                    <option value="{{ $op->id }}" @selected($op->id == $selectedOperatorId)>
-                                                        {{ $op->code ?? '' }} — {{ $op->name }}
-                                                    </option>
-                                                @endforeach
-                                            </select>
-                                        </td>
-
-                                        {{-- SALDO WIP-FIN --}}
-                                        <td class="text-end mono" data-label="Saldo WIP-FIN">
-                                            <span class="wip-balance-label">
-                                                {{ number_format($wipBalance) }}
-                                            </span>
-                                        </td>
-
-                                        {{-- QTY IN (readonly, auto = wip_balance) --}}
-                                        <td class="text-end" data-label="Qty In">
-                                            <input type="number" min="0" step="1"
-                                                name="lines[{{ $i }}][qty_in]"
-                                                class="form-control form-control-sm text-end qty-in-input"
-                                                value="{{ $qtyIn }}" readonly tabindex="-1">
-                                        </td>
-
-                                        {{-- QTY OK (readonly, auto = Qty In - Reject) --}}
-                                        <td class="text-end" data-label="OK">
-                                            <input type="number" min="0" step="1"
-                                                name="lines[{{ $i }}][qty_ok]"
-                                                class="form-control form-control-sm text-end qty-ok-input"
-                                                value="{{ $qtyOk }}" readonly tabindex="-1">
-                                        </td>
-
-                                        {{-- QTY REJECT (hanya ini yang diinput user) --}}
-                                        <td class="text-end" data-label="Reject">
-                                            <input type="number" min="0" step="1"
-                                                name="lines[{{ $i }}][qty_reject]"
-                                                class="form-control form-control-sm text-end qty-reject-input"
-                                                value="{{ $qtyReject }}" inputmode="decimal" pattern="[0-9]*">
-                                        </td>
-
-                                        {{-- ALASAN REJECT --}}
-                                        <td data-label="Alasan Reject">
-                                            <input type="text" name="lines[{{ $i }}][reject_reason]"
-                                                class="form-control form-control-sm"
-                                                value="{{ $line['reject_reason'] ?? '' }}" placeholder="Opsional">
-                                        </td>
-
-                                        {{-- DELETE --}}
-                                        <td class="text-center td-actions" data-label="">
-                                            <button type="button" class="btn btn-sm btn-link text-danger btn-remove-line"
-                                                tabindex="-1">
-                                                <i class="bi bi-x-lg"></i>
-                                            </button>
-                                        </td>
-                                    </tr>
-                                @endforeach
-                            @else
-                                {{-- Default: 1 baris kosong (kalau belum ada bundle_ids / lines) --}}
+                            @forelse ($formLines as $i => $line)
                                 @php
-                                    $defaultOperatorId = old('lines.0.operator_id', $loggedInOperatorId);
+                                    $bundleModel = $bundles->firstWhere('id', $line['bundle_id'] ?? null);
+                                    $itemModel = $bundleModel?->finishedItem ?? $bundleModel?->lot?->item;
+
+                                    $itemId = $line['item_id'] ?? $itemModel?->id;
+
+                                    $itemLabel =
+                                        $line['item_label'] ??
+                                        ($itemModel
+                                            ? trim(
+                                                ($itemModel->code ?? '') .
+                                                    ' — ' .
+                                                    ($itemModel->name ?? '') .
+                                                    ' ' .
+                                                    ($itemModel->color ?? ''),
+                                            )
+                                            : '');
+
+                                    $wipBalance = $line['wip_balance'] ?? (float) ($bundleModel->wip_qty ?? 0);
+
+                                    $qtyIn = $wipBalance; // behavior: selalu proses full saldo
+                                    $qtyReject = $line['qty_reject'] ?? 0;
+                                    $qtyOk = max(0, $qtyIn - $qtyReject);
                                 @endphp
+
                                 <tr class="line-row">
+                                    {{-- BUNDLE --}}
                                     <td data-label="Bundle">
-                                        <select name="lines[0][bundle_id]"
-                                            class="form-select form-select-sm bundle-select" data-line-index="0">
+                                        <select name="lines[{{ $i }}][bundle_id]"
+                                            class="form-select form-select-sm bundle-select"
+                                            data-line-index="{{ $i }}">
                                             <option value="">Pilih bundle...</option>
                                             @foreach ($bundles as $bundle)
                                                 @php
-                                                    $itemModel = $bundle->finishedItem ?? $bundle->lot?->item;
-                                                    $itemLabel = $itemModel
+                                                    $optItem = $bundle->finishedItem ?? $bundle->lot?->item;
+                                                    $optLabel = $optItem
                                                         ? trim(
-                                                            ($itemModel->code ?? '') .
+                                                            ($optItem->code ?? '') .
                                                                 ' — ' .
-                                                                ($itemModel->name ?? '') .
+                                                                ($optItem->name ?? '') .
                                                                 ' ' .
-                                                                ($itemModel->color ?? ''),
+                                                                ($optItem->color ?? ''),
                                                         )
                                                         : '';
-                                                    $wipBalance = (float) ($bundle->wip_qty ?? 0);
-                                                    $itemId =
+                                                    $optWip = (float) ($bundle->wip_qty ?? 0);
+                                                    $optItemId =
                                                         $bundle->finished_item_id ?? ($bundle->lot?->item_id ?? '');
                                                 @endphp
-                                                <option value="{{ $bundle->id }}" data-item-id="{{ $itemId }}"
-                                                    data-item-label="{{ $itemLabel }}"
-                                                    data-wip-balance="{{ $wipBalance }}">
-                                                    {{ $bundle->bundle_code }} ({{ number_format($wipBalance) }} pcs)
+                                                <option value="{{ $bundle->id }}" data-item-id="{{ $optItemId }}"
+                                                    data-item-label="{{ $optLabel }}"
+                                                    data-wip-balance="{{ $optWip }}" @selected(($line['bundle_id'] ?? null) == $bundle->id)>
+                                                    {{ $bundle->bundle_code }} ({{ number_format($optWip) }} pcs)
                                                 </option>
                                             @endforeach
                                         </select>
 
-                                        <input type="hidden" name="lines[0][item_id]" class="item-id-input">
-                                        <input type="hidden" name="lines[0][item_label]" value="">
-                                        <input type="hidden" name="lines[0][wip_balance]" value="0">
+                                        <input type="hidden" name="lines[{{ $i }}][item_id]"
+                                            class="item-id-input" value="{{ $itemId }}">
                                     </td>
+
+                                    {{-- ITEM --}}
                                     <td data-label="Item">
-                                        <div class="small mono item-label text-muted">
-                                            @if ($bundles->isEmpty())
-                                                <span class="help">Belum ada bundle ready untuk finishing.</span>
-                                            @else
-                                                <span class="help">Item otomatis terisi dari bundle.</span>
-                                            @endif
+                                        <div class="small mono item-label">
+                                            {{ $itemLabel }}
                                         </div>
+                                        <input type="hidden" name="lines[{{ $i }}][item_label]"
+                                            value="{{ $itemLabel }}">
+                                        <input type="hidden" name="lines[{{ $i }}][wip_balance]"
+                                            value="{{ $wipBalance }}">
                                     </td>
+
+                                    {{-- OPERATOR --}}
                                     <td data-label="Operator">
-                                        <select name="lines[0][operator_id]" class="form-select form-select-sm">
+                                        <select name="lines[{{ $i }}][operator_id]"
+                                            class="form-select form-select-sm">
                                             <option value="">-</option>
                                             @foreach ($operators as $op)
-                                                <option value="{{ $op->id }}" @selected($op->id == $defaultOperatorId)>
+                                                <option value="{{ $op->id }}" @selected(($line['operator_id'] ?? null) == $op->id)>
                                                     {{ $op->code ?? '' }} — {{ $op->name }}
                                                 </option>
                                             @endforeach
                                         </select>
                                     </td>
+
+                                    {{-- SALDO WIP-FIN --}}
                                     <td class="text-end mono" data-label="Saldo WIP-FIN">
-                                        <span class="wip-balance-label">0</span>
+                                        <span class="wip-balance-label">
+                                            {{ number_format($wipBalance) }}
+                                        </span>
                                     </td>
+
+                                    {{-- QTY IN --}}
                                     <td class="text-end" data-label="Qty In">
-                                        <input type="number" min="0" step="1" name="lines[0][qty_in]"
-                                            class="form-control form-control-sm text-end qty-in-input" value="0"
-                                            readonly tabindex="-1">
+                                        <input type="number" min="0" step="1"
+                                            name="lines[{{ $i }}][qty_in]"
+                                            class="form-control form-control-sm text-end qty-in-input"
+                                            value="{{ $qtyIn }}" readonly tabindex="-1">
                                     </td>
+
+                                    {{-- QTY OK --}}
                                     <td class="text-end" data-label="OK">
-                                        <input type="number" min="0" step="1" name="lines[0][qty_ok]"
-                                            class="form-control form-control-sm text-end qty-ok-input" value="0"
-                                            readonly tabindex="-1">
+                                        <input type="number" min="0" step="1"
+                                            name="lines[{{ $i }}][qty_ok]"
+                                            class="form-control form-control-sm text-end qty-ok-input"
+                                            value="{{ $qtyOk }}" readonly tabindex="-1">
                                     </td>
+
+                                    {{-- QTY REJECT --}}
                                     <td class="text-end" data-label="Reject">
-                                        <input type="number" min="0" step="1" name="lines[0][qty_reject]"
-                                            class="form-control form-control-sm text-end qty-reject-input" value="0"
-                                            inputmode="decimal" pattern="[0-9]*">
+                                        <input type="number" min="0" step="1"
+                                            name="lines[{{ $i }}][qty_reject]"
+                                            class="form-control form-control-sm text-end qty-reject-input"
+                                            value="{{ $qtyReject }}">
                                     </td>
+
+                                    {{-- ALASAN REJECT --}}
                                     <td data-label="Alasan Reject">
-                                        <input type="text" name="lines[0][reject_reason]"
-                                            class="form-control form-control-sm" placeholder="Opsional">
+                                        <input type="text" name="lines[{{ $i }}][reject_reason]"
+                                            class="form-control form-control-sm"
+                                            value="{{ $line['reject_reason'] ?? '' }}" placeholder="Opsional">
                                     </td>
+
+                                    {{-- DELETE --}}
                                     <td class="text-center td-actions" data-label="">
                                         <button type="button" class="btn btn-sm btn-link text-danger btn-remove-line"
                                             tabindex="-1">
@@ -625,7 +551,13 @@
                                         </button>
                                     </td>
                                 </tr>
-                            @endif
+                            @empty
+                                <tr>
+                                    <td colspan="9" class="text-center text-muted py-4">
+                                        Tidak ada detail finishing untuk job ini.
+                                    </td>
+                                </tr>
+                            @endforelse
                         </tbody>
                     </table>
                 </div>
@@ -634,7 +566,6 @@
                     <div class="help mb-1">
                         Qty In = saldo WIP-FIN, Qty OK = Qty In - Qty Reject.
                         Qty Reject tidak boleh lebih besar dari saldo WIP-FIN.
-                        Angka negatif / kosong akan otomatis dirapikan seperti form QC.
                     </div>
                 </div>
             </div>
@@ -643,17 +574,17 @@
             <div class="d-flex justify-content-between align-items-center mb-4 flex-wrap gap-2">
                 <div class="footer-note">
                     <span>
-                        Finishing Job akan disimpan sebagai <strong>draft</strong>.
+                        Perubahan akan disimpan sebagai <strong>draft</strong>.
                         Stok baru bergerak setelah kamu klik <em>Posting</em> di halaman detail.
                     </span>
                     <span class="pill-info">
                         <i class="bi bi-shield-check"></i>
-                        Data tetap bisa diedit lagi sebelum diposting.
+                        Data masih bisa diubah lagi sebelum diposting.
                     </span>
                 </div>
                 <div class="d-flex gap-2">
                     <button type="submit" class="btn btn-primary">
-                        {{ $isEdit ? 'Update Draft' : 'Simpan Draft' }}
+                        Simpan Perubahan
                     </button>
                 </div>
             </div>
@@ -684,17 +615,6 @@
                 });
             }
 
-            // Normalisasi angka ala QC: kosong / NaN / negatif -> 0
-            function normalizeNumber(raw) {
-                if (raw === null || raw === undefined) return 0;
-                let str = String(raw).replace(',', '.').trim();
-                if (str === '') return 0;
-                let num = parseFloat(str);
-                if (isNaN(num) || !isFinite(num)) return 0;
-                if (num < 0) num = 0;
-                return num;
-            }
-
             // === LOGIKA: semua qty auto dari saldo & reject ===
             function sanitizeRow(row) {
                 const qtyInInput = row.querySelector('.qty-in-input');
@@ -706,8 +626,12 @@
                     return;
                 }
 
-                let wipBal = normalizeNumber(hiddenWipBalance.value);
-                let qtyReject = normalizeNumber(qtyRejectInput.value);
+                let wipBal = parseFloat(hiddenWipBalance.value || '0');
+                if (isNaN(wipBal) || wipBal < 0) wipBal = 0;
+
+                let qtyReject = parseFloat(qtyRejectInput.value || '0');
+                if (isNaN(qtyReject)) qtyReject = 0;
+                qtyReject = Math.max(0, qtyReject);
 
                 // Reject tidak boleh melebihi saldo WIP-FIN
                 if (qtyReject > wipBal) {
@@ -721,7 +645,6 @@
                 qtyOkInput.value = qtyOk;
                 qtyRejectInput.value = qtyReject;
 
-                // Soft invalid kalau ada yang aneh (harusnya nggak kejadian dengan rumus ini)
                 const hasOver = (qtyOk + qtyReject) > qtyIn + 0.000001;
                 [qtyInInput, qtyOkInput, qtyRejectInput].forEach(el => {
                     if (!el) return;
@@ -756,7 +679,6 @@
                 // Default: proses semua, tidak ada reject
                 if (qtyRejectInput) qtyRejectInput.value = 0;
 
-                // Hitung ulang qty_in & qty_ok dari saldo & reject
                 sanitizeRow(row);
             }
 
@@ -766,10 +688,8 @@
 
                 const newRow = lastRow.cloneNode(true);
 
-                // reset nilai inputs
                 newRow.querySelectorAll('input').forEach(input => {
                     if (input.type === 'hidden') {
-                        // untuk hidden, reset yang bukan wip_balance
                         if (input.name && input.name.includes('[wip_balance]')) {
                             input.value = '0';
                         } else {
@@ -779,16 +699,18 @@
                     }
 
                     if (['number', 'text'].includes(input.type)) {
-                        input.value = 0;
+                        if (input.classList.contains('qty-reject-input')) {
+                            input.value = 0;
+                        } else {
+                            input.value = 0;
+                        }
                     }
                 });
 
-                // reset select
                 newRow.querySelectorAll('select').forEach(select => {
                     select.selectedIndex = 0;
                 });
 
-                // reset label item & saldo
                 const itemLabelEl = newRow.querySelector('.item-label');
                 const wipBalanceEl = newRow.querySelector('.wip-balance-label');
                 if (itemLabelEl) itemLabelEl.textContent = '';
@@ -796,53 +718,28 @@
 
                 tableBody.appendChild(newRow);
                 reindexLines();
-                attachNumberGuards(newRow);
                 sanitizeRow(newRow);
             }
 
-            // ==== BLOK: Cegah scroll & karakter aneh di input number (kayak QC) ====
-            function attachNumberGuards(container) {
-                container.querySelectorAll('input[type="number"]').forEach(input => {
-                    input.addEventListener('wheel', function(e) {
-                        this.blur(); // biar scroll nggak ngubah value
-                    });
-
-                    input.addEventListener('keydown', function(e) {
-                        // blok e, E, +, - supaya nggak bisa 1e5 dsb
-                        if (['e', 'E', '+', '-'].includes(e.key)) {
-                            e.preventDefault();
-                        }
-                    });
-                });
-            }
-
-            attachNumberGuards(tableBody);
-
-            // Tambah baris
             if (btnAdd) {
-                btnAdd.addEventListener('click', function() {
-                    addLineRow();
-                });
+                btnAdd.addEventListener('click', addLineRow);
             }
 
-            // Hapus baris
             tableBody.addEventListener('click', function(e) {
                 if (e.target.closest('.btn-remove-line')) {
                     const rows = tableBody.querySelectorAll('.line-row');
-                    if (rows.length <= 1) return; // minimal 1 baris
+                    if (rows.length <= 1) return;
                     e.target.closest('.line-row').remove();
                     reindexLines();
                 }
             });
 
-            // Ganti bundle
             tableBody.addEventListener('change', function(e) {
                 if (e.target.classList.contains('bundle-select')) {
                     handleBundleChange(e);
                 }
             });
 
-            // User hanya input di Qty Reject → sisanya auto (ala QC)
             tableBody.addEventListener('input', function(e) {
                 if (e.target.classList.contains('qty-reject-input')) {
                     const row = e.target.closest('.line-row');
@@ -851,21 +748,8 @@
                 }
             });
 
-            // Saat blur, rapihin angka juga (kalau user kosongin field)
-            tableBody.addEventListener('blur', function(e) {
-                if (e.target.classList.contains('qty-reject-input')) {
-                    const row = e.target.closest('.line-row');
-                    if (!row) return;
-                    e.target.value = normalizeNumber(e.target.value);
-                    sanitizeRow(row);
-                }
-            }, true);
-
-            // Init: sanitize semua baris awal
-            tableBody.querySelectorAll('.line-row').forEach(row => {
-                attachNumberGuards(row);
-                sanitizeRow(row);
-            });
+            // Init: biar auto jalan pas buka halaman edit
+            tableBody.querySelectorAll('.line-row').forEach(row => sanitizeRow(row));
         })();
     </script>
 @endpush

@@ -2,17 +2,20 @@
 
 namespace App\Models;
 
-use App\Models\User;
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Eloquent\Relations\BelongsTo;
 use Illuminate\Database\Eloquent\Relations\HasMany;
 
-class FinishingJob extends Model
+class PackingJob extends Model
 {
     protected $fillable = [
         'code',
         'date',
         'status',
+        'posted_at',
+        'unposted_at',
+        'channel',
+        'reference',
         'notes',
         'created_by',
         'updated_by',
@@ -20,13 +23,13 @@ class FinishingJob extends Model
 
     protected $casts = [
         'date' => 'date',
+        'posted_at' => 'datetime',
+        'unposted_at' => 'datetime',
     ];
-
-    // ====== RELATIONSHIPS ======
 
     public function lines(): HasMany
     {
-        return $this->hasMany(FinishingJobLine::class);
+        return $this->hasMany(PackingJobLine::class);
     }
 
     public function createdBy(): BelongsTo
@@ -38,22 +41,4 @@ class FinishingJob extends Model
     {
         return $this->belongsTo(User::class, 'updated_by');
     }
-
-    // ====== HELPERS ======
-
-    public function isPosted(): bool
-    {
-        return $this->status === 'posted';
-    }
-
-    public function job()
-    {
-        return $this->belongsTo(FinishingJob::class, 'finishing_job_id');
-    }
-
-    public function item()
-    {
-        return $this->belongsTo(Item::class);
-    }
-
 }

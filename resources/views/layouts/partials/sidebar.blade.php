@@ -25,17 +25,18 @@
         request()->routeIs('production.finishing_jobs.*') ||
         request()->routeIs('production.finishing_jobs.bundles_ready');
 
+    // Production Packing
+    $prodPackOpen =
+        request()->routeIs('production.packing_jobs.*') || request()->routeIs('production.packing.fg_ready');
+
     // Production QC (cutting / sewing nanti)
     $prodQcOpen = request()->routeIs('production.qc.*');
 
-    // Production Reports (cutting→sewing loss, daily, operator, reject detail, per item, ageing WIP)
+    // Production Reports (saat ini: operator sewing + finishing per item)
     $prodReportOpen =
-        request()->routeIs('production.reports.cutting_to_sewing_loss') ||
-        request()->routeIs('production.reports.daily_production') ||
-        request()->routeIs('production.reports.reject_detail') ||
-        request()->routeIs('production.reports.sewing_per_item') ||
-        request()->routeIs('production.reports.wip_sewing_age') ||
-        request()->routeIs('production.sewing_returns.report_operators');
+        request()->routeIs('production.sewing_returns.report_operators') ||
+        request()->routeIs('production.finishing_jobs.report_per_item') ||
+        request()->routeIs('production.finishing_jobs.report_per_item_detail');
 @endphp
 
 <style>
@@ -453,6 +454,37 @@
             </div>
         </li>
 
+        {{-- Packing --}}
+        <li class="mb-1">
+            <button class="sidebar-link sidebar-toggle {{ $prodPackOpen ? 'is-open' : '' }}" type="button"
+                data-bs-toggle="collapse" data-bs-target="#navProductionPacking"
+                aria-expanded="{{ $prodPackOpen ? 'true' : 'false' }}" aria-controls="navProductionPacking">
+                <span class="icon">📦</span>
+                <span>Packing</span>
+                <span class="chevron">▸</span>
+            </button>
+
+            <div class="collapse {{ $prodPackOpen ? 'show' : '' }}" id="navProductionPacking">
+                <a href="{{ route('production.packing_jobs.index') }}"
+                    class="sidebar-link sidebar-link-sub {{ request()->routeIs('production.packing_jobs.index') ? 'active' : '' }}">
+                    <span class="icon">≡</span>
+                    <span>Daftar Packing Job</span>
+                </a>
+
+                <a href="{{ route('production.packing_jobs.create') }}"
+                    class="sidebar-link sidebar-link-sub {{ request()->routeIs('production.packing_jobs.create') ? 'active' : '' }}">
+                    <span class="icon">＋</span>
+                    <span>Packing Job Baru</span>
+                </a>
+
+                <a href="{{ route('production.packing.fg_ready') }}"
+                    class="sidebar-link sidebar-link-sub {{ request()->routeIs('production.packing.fg_ready') ? 'active' : '' }}">
+                    <span class="icon">📦</span>
+                    <span>FG Ready to Pack</span>
+                </a>
+            </div>
+        </li>
+
         {{-- Quality Control --}}
         <li class="mb-1">
             <button class="sidebar-link sidebar-toggle {{ $prodQcOpen ? 'is-open' : '' }}" type="button"
@@ -473,7 +505,7 @@
             </div>
         </li>
 
-        {{-- Laporan Produksi --}}
+        {{-- Laporan Produksi (yang route-nya sudah ada) --}}
         <li class="mb-1">
             <button class="sidebar-link sidebar-toggle {{ $prodReportOpen ? 'is-open' : '' }}" type="button"
                 data-bs-toggle="collapse" data-bs-target="#navProductionReports"
@@ -484,40 +516,16 @@
             </button>
 
             <div class="collapse {{ $prodReportOpen ? 'show' : '' }}" id="navProductionReports">
-                <a href="{{ route('production.reports.daily_production') }}"
-                    class="sidebar-link sidebar-link-sub {{ request()->routeIs('production.reports.daily_production') ? 'active' : '' }}">
-                    <span class="icon">📅</span>
-                    <span>Rekap Harian Produksi</span>
-                </a>
-
-                <a href="{{ route('production.reports.cutting_to_sewing_loss') }}"
-                    class="sidebar-link sidebar-link-sub {{ request()->routeIs('production.reports.cutting_to_sewing_loss') ? 'active' : '' }}">
-                    <span class="icon">↔︎</span>
-                    <span>Cutting → Sewing Loss</span>
-                </a>
-
                 <a href="{{ route('production.sewing_returns.report_operators') }}"
                     class="sidebar-link sidebar-link-sub {{ request()->routeIs('production.sewing_returns.report_operators') ? 'active' : '' }}">
                     <span class="icon">🧍</span>
                     <span>Performa Operator Jahit</span>
                 </a>
 
-                <a href="{{ route('production.reports.sewing_per_item') }}"
-                    class="sidebar-link sidebar-link-sub {{ request()->routeIs('production.reports.sewing_per_item') ? 'active' : '' }}">
-                    <span class="icon">🧵</span>
-                    <span>Performa Jahit per Item</span>
-                </a>
-
-                <a href="{{ route('production.reports.wip_sewing_age') }}"
-                    class="sidebar-link sidebar-link-sub {{ request()->routeIs('production.reports.wip_sewing_age') ? 'active' : '' }}">
-                    <span class="icon">⏳</span>
-                    <span>Ageing WIP Sewing</span>
-                </a>
-
-                <a href="{{ route('production.reports.reject_detail') }}"
-                    class="sidebar-link sidebar-link-sub {{ request()->routeIs('production.reports.reject_detail') ? 'active' : '' }}">
-                    <span class="icon">⚠️</span>
-                    <span>Reject Detail</span>
+                <a href="{{ route('production.finishing_jobs.report_per_item') }}"
+                    class="sidebar-link sidebar-link-sub {{ request()->routeIs('production.finishing_jobs.report_per_item') || request()->routeIs('production.finishing_jobs.report_per_item_detail') ? 'active' : '' }}">
+                    <span class="icon">📦</span>
+                    <span>Finishing per Item (WIP-FIN → FG)</span>
                 </a>
             </div>
         </li>

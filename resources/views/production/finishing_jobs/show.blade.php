@@ -8,12 +8,13 @@
         .page-wrap {
             max-width: 1100px;
             margin-inline: auto;
+            padding-bottom: 1rem;
         }
 
         .card {
             background: var(--card);
             border: 1px solid var(--line);
-            border-radius: 14px;
+            border-radius: 16px;
         }
 
         .mono {
@@ -30,31 +31,31 @@
             border-radius: 999px;
             padding: .14rem .6rem;
             font-size: .7rem;
-            text-transform: uppercase;
+            font-weight: 600;
             letter-spacing: .05em;
         }
 
         .badge-status-draft {
-            background: color-mix(in srgb, var(--card) 85%, orange 15%);
+            background: rgba(255, 163, 31, .15);
             color: #b35a00;
         }
 
         .badge-status-posted {
-            background: color-mix(in srgb, var(--card) 85%, seagreen 15%);
-            color: #166534;
+            background: rgba(16, 185, 129, .15);
+            color: #0f5132;
         }
 
         .table-wrap {
             overflow-x: auto;
         }
 
-        @media (max-width: 767.98px) {
+        @media (max-width: 768px) {
             .page-wrap {
                 padding-inline: .5rem;
             }
 
             .table-wrap {
-                font-size: .86rem;
+                font-size: .85rem;
             }
         }
     </style>
@@ -63,22 +64,24 @@
 @section('content')
     <div class="page-wrap">
 
-        {{-- FLASH MESSAGE --}}
+        {{-- FLASH --}}
         @if (session('status'))
-            <div class="alert alert-success alert-dismissible fade show mb-3" role="alert">
+            <div class="alert alert-success alert-dismissible fade show mb-3">
                 {{ session('status') }}
-                <button type="button" class="btn-close" data-bs-dismiss="alert" aria-label="Close"></button>
+                <button class="btn-close" data-bs-dismiss="alert"></button>
             </div>
         @endif
 
-        {{-- HEADER CARD --}}
+        {{-- ===========================
+         HEADER
+    ============================ --}}
         <div class="card p-3 mb-3">
-            <div class="d-flex justify-content-between align-items-start gap-3 flex-wrap">
+            <div class="d-flex justify-content-between align-items-start flex-wrap gap-3">
+
                 <div>
                     <div class="d-flex align-items-center gap-2 mb-1 flex-wrap">
                         <h1 class="h5 mb-0">
-                            Finishing Job
-                            <span class="mono">{{ $job->code }}</span>
+                            Finishing Job <span class="mono">{{ $job->code }}</span>
                         </h1>
 
                         @if ($job->status === 'posted')
@@ -93,6 +96,7 @@
                         <span class="mono">
                             {{ function_exists('id_date') ? id_date($job->date) : $job->date->format('Y-m-d') }}
                         </span>
+
                         @if ($job->createdBy)
                             · Dibuat oleh:
                             <span class="mono">{{ $job->createdBy->name }}</span>
@@ -100,46 +104,64 @@
                     </div>
 
                     @if ($job->notes)
-                        <div class="mt-2 small">
+                        <div class="small mt-2">
                             <span class="fw-semibold">Catatan:</span>
                             {!! nl2br(e($job->notes)) !!}
                         </div>
                     @endif
                 </div>
 
-                <div class="text-end d-flex flex-column gap-2 align-items-end">
+                {{-- ACTION BUTTONS --}}
+                <div class="d-flex flex-column align-items-end gap-2">
+
                     <div class="d-flex gap-2">
                         <a href="{{ route('production.finishing_jobs.index') }}" class="btn btn-sm btn-outline-secondary">
                             <i class="bi bi-arrow-left me-1"></i> Kembali
                         </a>
 
-                        @if ($job->status !== 'posted')
-                            <a href="{{ route('production.finishing_jobs.edit', $job) }}"
+                        @if ($job->status === 'draft')
+                            <a href="{{ route('production.finishing_jobs.edit', $job->id) }}"
                                 class="btn btn-sm btn-outline-primary">
                                 <i class="bi bi-pencil-square me-1"></i> Edit Draft
                             </a>
                         @endif
                     </div>
 
-                    @if ($job->status !== 'posted')
-                        <form action="{{ route('production.finishing_jobs.post', $job) }}" method="post"
-                            onsubmit="return confirm('Posting Finishing Job akan mengupdate stok:\nWIP-FIN → FG + REJECT.\nLanjutkan?');">
+                    {{-- POST --}}
+                    @if ($job->status === 'draft')
+                        <form action="{{ route('production.finishing_jobs.post', $job->id) }}" method="post"
+                            onsubmit="return confirm('Posting akan memindahkan stok: WIP-FIN → FG + REJECT.\nLanjutkan?');">
                             @csrf
-                            <button type="submit" class="btn btn-sm btn-success mt-1">
+                            <button class="btn btn-sm btn-success mt-1">
                                 <i class="bi bi-check2-circle me-1"></i>
                                 Posting & Update Stok
                             </button>
                         </form>
+
+                        {{-- UNPOST --}}
                     @else
+                        <form action="{{ route('production.finishing_jobs.unpost', $job->id) }}" method="post"
+                            onsubmit="return confirm('Unpost akan membalik stok FG + REJECT → WIP-FIN.\nPastikan stok FG/REJECT masih tersedia.\nLanjutkan?');">
+                            @csrf
+                            <button class="btn btn-sm btn-outline-danger mt-1">
+                                <i class="bi bi-arrow-counterclockwise me-1"></i>
+                                Unpost & Balikkan Stok
+                            </button>
+                        </form>
+
                         <div class="help mt-1">
-                            Stok sudah ter-update pada saat posting.
+                            Stok sudah dipindahkan ketika posting.
                         </div>
                     @endif
                 </div>
+
             </div>
         </div>
 
-        {{-- SUMMARY CARD --}}
+
+        {{-- ===========================
+         SUMMARY
+    ============================ --}}
         @php
             $totalIn = $job->lines->sum('qty_in');
             $totalOk = $job->lines->sum('qty_ok');
@@ -150,31 +172,35 @@
             <div class="row g-3">
                 <div class="col-md-4">
                     <div class="small text-muted mb-1">Total Qty In</div>
-                    <div class="h5 mono mb-0">{{ number_format($totalIn) }}</div>
-                    <div class="help">Jumlah pcs yang masuk proses finishing.</div>
+                    <div class="h5 mono">{{ number_format($totalIn) }}</div>
+                    <div class="help">Masuk proses finishing.</div>
                 </div>
+
                 <div class="col-md-4">
                     <div class="small text-muted mb-1">Total OK (FG)</div>
-                    <div class="h5 mono text-success mb-0">{{ number_format($totalOk) }}</div>
-                    <div class="help">Masuk ke gudang FG setelah posting.</div>
+                    <div class="h5 mono text-success">{{ number_format($totalOk) }}</div>
+                    <div class="help">Akan masuk FG saat posting.</div>
                 </div>
+
                 <div class="col-md-4">
                     <div class="small text-muted mb-1">Total Reject</div>
-                    <div class="h5 mono text-danger mb-0">{{ number_format($totalReject) }}</div>
-                    <div class="help">Masuk ke gudang REJECT (final reject).</div>
+                    <div class="h5 mono text-danger">{{ number_format($totalReject) }}</div>
+                    <div class="help">Masuk gudang REJECT.</div>
                 </div>
             </div>
         </div>
 
-        {{-- DETAIL LINES --}}
+
+        {{-- ===========================
+         DETAIL GRID
+    ============================ --}}
         <div class="card p-0 mb-4">
-            <div class="px-3 pt-3 pb-2 d-flex justify-content-between align-items-center">
+            <div class="px-3 pt-3 pb-2 d-flex justify-content-between">
                 <div>
                     <div class="fw-semibold">Detail Bundle</div>
-                    <div class="help">
-                        Hasil finishing per bundle: qty masuk, OK, dan reject.
-                    </div>
+                    <div class="help">Hasil finishing per bundle.</div>
                 </div>
+
                 <div class="help">
                     Total baris: {{ $job->lines->count() }}
                 </div>
@@ -184,66 +210,45 @@
                 <table class="table table-sm align-middle mb-0">
                     <thead class="table-light">
                         <tr>
-                            <th style="width: 1%;">#</th>
+                            <th>#</th>
                             <th>Bundle</th>
-                            <th>Item (Barang Jadi)</th>
+                            <th>Item</th>
                             <th>Operator</th>
                             <th class="text-end">Qty In</th>
                             <th class="text-end text-success">OK</th>
                             <th class="text-end text-danger">Reject</th>
-                            <th>Alasan Reject</th>
+                            <th>Alasan</th>
                         </tr>
                     </thead>
+
                     <tbody>
-                        @forelse ($job->lines as $i => $line)
+                        @foreach ($job->lines as $i => $line)
                             @php
                                 $bundle = $line->bundle;
                                 $cutJob = $bundle?->cuttingJob;
-
-                                // 🔁 PRIORITAS: barang jadi (finished item)
-                                // 1) $line->item  (kolom item_id di finishing_job_lines → harusnya sudah finished item, K7BLK)
-                                // 2) $bundle->finishedItem (fallback)
-                                // 3) baru terakhir: lot item (raw material) kalau benar-benar kosong
-                                $item = $line->item ?? ($bundle?->finishedItem ?? $bundle?->cuttingJob?->lot?->item);
+                                $item = $bundle?->finishedItem ?? $line->item; // barang jadi pasti ada
                             @endphp
+
                             <tr>
-                                {{-- NO --}}
-                                <td class="text-muted small">
-                                    {{ $i + 1 }}
-                                </td>
+                                <td class="text-muted small">{{ $i + 1 }}</td>
 
                                 {{-- BUNDLE --}}
                                 <td class="mono">
-                                    @if ($bundle)
-                                        @php
-                                            $bundleCode =
-                                                $bundle->bundle_code ?? ($bundle->code ?? 'BND-' . $bundle->id);
-                                        @endphp
-
-                                        @if ($cutJob)
-                                            {{-- link drilldown ke Cutting Job --}}
-                                            <a href="{{ route('production.cutting_jobs.show', $cutJob) }}">
-                                                {{ $bundleCode }}
-                                            </a>
-                                        @else
-                                            {{ $bundleCode }}
-                                        @endif
+                                    @if ($bundle && $cutJob)
+                                        <a href="{{ route('production.cutting_jobs.show', $cutJob->id) }}">
+                                            {{ $bundle->bundle_code }}
+                                        </a>
                                     @else
-                                        <span class="text-muted">-</span>
+                                        {{ $bundle->bundle_code ?? 'BND-' . $bundle->id }}
                                     @endif
                                 </td>
 
-                                {{-- ITEM (BARANG JADI) --}}
+                                {{-- ITEM (FINISHED ITEM) --}}
                                 <td>
                                     @if ($item)
-                                        <div class="small fw-semibold">
-                                            {{ $item->code ?? '' }} — {{ $item->name ?? '' }}
-                                        </div>
+                                        <div class="small fw-semibold">{{ $item->code }}</div>
                                         <div class="small text-muted">
-                                            {{ $item->color ?? '' }}
-                                            @if (isset($bundle->size_label))
-                                                · Size: {{ $bundle->size_label }}
-                                            @endif
+                                            {{ $item->name }} · {{ $item->color }}
                                         </div>
                                     @else
                                         <span class="text-muted small">Item tidak ditemukan</span>
@@ -254,54 +259,34 @@
                                 <td>
                                     @if ($line->operator)
                                         <div class="small fw-semibold">
-                                            {{ $line->operator->code ?? '' }} — {{ $line->operator->name }}
+                                            {{ $line->operator->code }} — {{ $line->operator->name }}
                                         </div>
                                     @else
                                         <span class="text-muted small">-</span>
                                     @endif
                                 </td>
 
-                                {{-- QTY IN --}}
-                                <td class="text-end mono">
-                                    {{ number_format($line->qty_in) }}
-                                </td>
-
-                                {{-- OK --}}
-                                <td class="text-end mono text-success">
-                                    {{ number_format($line->qty_ok) }}
-                                </td>
-
-                                {{-- REJECT --}}
-                                <td class="text-end mono text-danger">
-                                    {{ number_format($line->qty_reject) }}
-                                </td>
+                                <td class="text-end mono">{{ number_format($line->qty_in) }}</td>
+                                <td class="text-end mono text-success">{{ number_format($line->qty_ok) }}</td>
+                                <td class="text-end mono text-danger">{{ number_format($line->qty_reject) }}</td>
 
                                 {{-- REJECT REASON --}}
                                 <td>
                                     @if ($line->qty_reject > 0)
                                         @if ($line->reject_reason)
-                                            <div class="small fw-semibold text-danger">
-                                                {{ $line->reject_reason }}
-                                            </div>
+                                            <div class="small fw-semibold text-danger">{{ $line->reject_reason }}</div>
                                         @endif
                                         @if ($line->reject_notes)
-                                            <div class="small text-muted">
-                                                {!! nl2br(e($line->reject_notes)) !!}
-                                            </div>
+                                            <div class="small text-muted">{!! nl2br(e($line->reject_notes)) !!}</div>
                                         @endif
                                     @else
                                         <span class="text-muted small">-</span>
                                     @endif
                                 </td>
                             </tr>
-                        @empty
-                            <tr>
-                                <td colspan="8" class="text-center text-muted py-4">
-                                    Belum ada detail finishing untuk job ini.
-                                </td>
-                            </tr>
-                        @endforelse
+                        @endforeach
                     </tbody>
+
                     @if ($job->lines->isNotEmpty())
                         <tfoot>
                             <tr class="table-light">
@@ -317,7 +302,8 @@
             </div>
         </div>
 
-        {{-- FOOT NOTE --}}
+
+        {{-- FOOTNOTE --}}
         <div class="help mb-4">
             Dibuat:
             <span class="mono">
@@ -328,5 +314,6 @@
                 {{ function_exists('id_datetime') ? id_datetime($job->updated_at) : $job->updated_at->format('Y-m-d H:i') }}
             </span>
         </div>
+
     </div>
 @endsection

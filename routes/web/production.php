@@ -2,7 +2,7 @@
 
 use App\Http\Controllers\Production\CuttingJobController;
 use App\Http\Controllers\Production\FinishingJobController;
-use App\Http\Controllers\Production\ProductionReportController;
+use App\Http\Controllers\Production\PackingJobController;
 use App\Http\Controllers\Production\QcController;
 use App\Http\Controllers\Production\SewingPickupController;
 use App\Http\Controllers\Production\SewingReturnController;
@@ -128,37 +128,45 @@ Route::middleware(['auth'])->group(function () {
         // ==========================
         // PRODUCTION REPORTS
         // ==========================
-        Route::prefix('reports')->name('reports.')->group(function () {
-
-            // 2️⃣ Laporan Performa Cutting → Sewing (Lead Time & Loss)
-            Route::get('/cutting-to-sewing-loss', [ProductionReportController::class, 'cuttingToSewingLoss'])
-                ->name('cutting_to_sewing_loss');
-
-            // 4️⃣ Laporan Rekap Harian Produksi (Daily Production Summary)
-            Route::get('/daily-production', [ProductionReportController::class, 'dailyProduction'])
-                ->name('daily_production');
-
-            // 5️⃣ Laporan Reject Detail (Root Cause Hunting)
-            Route::get('/reject-detail', [ProductionReportController::class, 'rejectDetail'])
-                ->name('reject_detail');
-
-            Route::get('sewing-per-item', [ProductionReportController::class, 'sewingPerItem'])
-                ->name('sewing_per_item');
-
-            Route::get('wip-sewing-age', [ProductionReportController::class, 'wipSewingAge'])
-                ->name('wip_sewing_age');
-            Route::get('/finishing-jobs', [ProductionReportController::class, 'finishingJobs'])
-                ->name('reports.finishing_jobs');
-
-        });
 
         // action khusus untuk posting & jalankan inventory
         Route::post('finishing_jobs/{finishing_job}/post', [FinishingJobController::class, 'post'])
             ->name('finishing_jobs.post');
+        // 🔁 action untuk UNPOST (balikkan stok)
+        Route::post('finishing_jobs/{finishing_job}/unpost', [FinishingJobController::class, 'unpost'])
+            ->name('finishing_jobs.unpost');
         Route::get('finishing_jobs/bundles-ready', [FinishingJobController::class, 'readyBundles'])
             ->name('finishing_jobs.bundles_ready');
         Route::resource('finishing_jobs', FinishingJobController::class)
             ->except(['destroy']);
+        // Report Finishing per Item (header)
+        Route::get('finishing_jobs/report/per-item', [FinishingJobController::class, 'reportPerItem'])
+            ->name('finishing_jobs.report_per_item');
+
+        // 🔍 Drilldown: detail per item → list finishing job
+        Route::get('finishing_jobs/report/per-item/{item}', [FinishingJobController::class, 'reportPerItemDetail'])
+            ->name('finishing_jobs.report_per_item_detail');
 
     });
 });
+
+Route::prefix('production')
+    ->name('production.')
+    ->middleware(['auth'])
+    ->group(function () {
+
+        Route::get('packing/fg-ready', [PackingJobController::class, 'readyItems'])
+            ->name('packing.fg_ready');
+        Route::resource('packing_jobs', PackingJobController::class)
+            ->except(['destroy']);
+
+        Route::post('packing_jobs/{packing_job}/post', [PackingJobController::class, 'post'])
+            ->name('packing_jobs.post');
+
+        Route::post('packing_jobs/{packing_job}/unpost', [PackingJobController::class, 'unpost'])
+            ->name('packing_jobs.unpost');
+
+        // (opsional) daftar item FG ready to pack
+        Route::get('packing/fg-ready', [PackingJobController::class, 'readyItems'])
+            ->name('packing.fg_ready');
+    });

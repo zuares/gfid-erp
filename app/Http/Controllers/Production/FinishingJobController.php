@@ -25,14 +25,14 @@ class FinishingJobController extends Controller
     ) {
     }
 
-    /**
-     * Index Finishing Job.
-     */
+    /* ============================
+     * INDEX
+     * ============================ */
 
-    public function index(Request $request)
+    public function index(Request $request): View
     {
-        $status = $request->input('status'); // draft / posted / null (semua)
-        $search = $request->input('search'); // cari kode / catatan
+        $status = $request->input('status'); // draft / posted
+        $search = $request->input('search'); // code / notes
         $dateFrom = $request->input('date_from');
         $dateTo = $request->input('date_to');
 
@@ -74,17 +74,16 @@ class FinishingJobController extends Controller
         ]);
     }
 
-    /**
-     * Bundles Ready for Finishing: bundle yang WIP-nya sedang di WIP-FIN dan wip_qty > 0.
-     */
+    /* ============================
+     * READY BUNDLES (WIP-FIN)
+     * ============================ */
+
     public function readyBundles(Request $request): View
     {
-        // 1. Cari warehouse WIP-FIN (sekalian objeknya biar bisa dipakai di view)
         $wipFinWarehouse = Warehouse::query()
-            ->where('code', 'WIP-FIN') // pastikan code di tabel warehouses = 'WIP-FIN'
+            ->where('code', 'WIP-FIN')
             ->first();
 
-        // Kalau warehouse WIP-FIN belum ada, return kosong
         if (!$wipFinWarehouse) {
             $bundles = collect();
             $totalBundles = 0;
@@ -98,7 +97,6 @@ class FinishingJobController extends Controller
             ));
         }
 
-        // 2. Base query: bundle yang WIP-nya di WIP-FIN dan ada saldo
         $query = CuttingJobBundle::query()
             ->with([
                 'cuttingJob',
@@ -109,8 +107,6 @@ class FinishingJobController extends Controller
             ->where('wip_warehouse_id', $wipFinWarehouse->id)
             ->where('wip_qty', '>', 0.0001);
 
-        // 3. FILTER optional
-
         // Filter item_id via lot.item
         if ($itemId = $request->input('item_id')) {
             $query->whereHas('lot', function ($q) use ($itemId) {
@@ -118,7 +114,7 @@ class FinishingJobController extends Controller
             });
         }
 
-        // Filter warna (color) via lot.item.color
+        // Filter warna
         if ($color = $request->input('color')) {
             $query->whereHas('lot.item', function ($q) use ($color) {
                 $q->where('color', 'like', '%' . $color . '%');
@@ -130,7 +126,7 @@ class FinishingJobController extends Controller
             $query->where('bundle_code', 'like', '%' . $bundleCode . '%');
         }
 
-        // (opsional) filter search umum (kode job / kode item)
+        // Search umum
         if ($q = $request->input('q')) {
             $q = trim($q);
             $query->where(function ($sub) use ($q) {
@@ -145,12 +141,12 @@ class FinishingJobController extends Controller
             });
         }
 
-        // 4. Summary (total bundle & total WIP-FIN untuk header)
+        // Summary
         $summaryQuery = clone $query;
         $totalBundles = (clone $summaryQuery)->count();
         $totalWipQty = (clone $summaryQuery)->sum('wip_qty');
 
-        // 5. Paginate (urut per cutting job + bundle_no biar logis)
+        // Data
         $bundles = $query
             ->orderBy('cutting_job_id')
             ->orderBy('bundle_no')
@@ -158,7 +154,6 @@ class FinishingJobController extends Controller
             ->paginate(20)
             ->withQueryString();
 
-        // 6. Kirim ke view
         return view('production.finishing_jobs.bundles_ready', compact(
             'bundles',
             'totalBundles',
@@ -167,20 +162,20 @@ class FinishingJobController extends Controller
         ));
     }
 
-    /**
-     * Form create Finishing Job.
-     * Bisa menerima bundle_ids[] dari Bundles Ready for Finishing.
-     */
+    /* ============================
+     * CREATE
+     * ============================ */
+
     public function create(Request $request): View
     {
         $date = Carbon::today()->toDateString();
 
-        // Operator finishing (bisa disaring role kalau mau)
+        // Operator list (kalau form masih pakai dropdown)
         $operators = Employee::query()
             ->orderBy('name')
             ->get();
 
-        // Ambil semua bundle yang punya saldo WIP-FIN > 0
+        // Bundles dengan saldo WIP-FIN
         $wipFinWarehouseId = Warehouse::where('code', 'WIP-FIN')->value('id');
 
         $bundlesQuery = CuttingJobBundle::query()
@@ -192,23 +187,20 @@ class FinishingJobController extends Controller
             ->orderBy('cutting_job_id')
             ->orderBy('bundle_no');
 
-        // Semua bundle ready → untuk dropdown
         $bundles = $bundlesQuery->get();
 
-        // bundle_ids[] dari Bundles Ready
+        // bundle_ids[] dari bundles_ready
         $bundleIds = (array) $request->input('bundle_ids', []);
 
         $lines = [];
 
         if (!empty($bundleIds)) {
-            // subset yang dipilih
             $initialBundles = $bundles->whereIn('id', $bundleIds);
 
             foreach ($initialBundles as $bundle) {
                 $itemModel = $bundle->finishedItem ?? $bundle->lot?->item;
                 $itemId = $bundle->finished_item_id ?? $bundle->lot?->item_id ?? null;
 
-                // label item
                 $itemLabel = $itemModel
                 ? trim(
                     ($itemModel->code ?? '') . ' — ' .
@@ -217,25 +209,16 @@ class FinishingJobController extends Controller
                 )
                 : '';
 
-                // jumlah yang sudah setor jahit OK → wip_qty
-                $alreadyReturnedOk = (float) ($bundle->wip_qty ?? 0);
+                $wipQty = (float) ($bundle->wip_qty ?? 0);
 
-                // build line default
                 $lines[] = [
                     'bundle_id' => $bundle->id,
                     'item_id' => $itemId,
                     'item_label' => $itemLabel,
-
-                    // qty_in = hanya yang sudah setor OK (saldo WIP-FIN)
-                    'qty_in' => $alreadyReturnedOk,
-
-                    // finishing OK default ikut qty_in
-                    'qty_ok' => $alreadyReturnedOk,
-
-                    // default reject = 0
+                    'wip_balance' => $wipQty,
+                    'qty_in' => $wipQty,
+                    'qty_ok' => $wipQty,
                     'qty_reject' => 0,
-
-                    'wip_balance' => $alreadyReturnedOk,
                     'operator_id' => null,
                     'reject_reason' => null,
                 ];
@@ -250,9 +233,10 @@ class FinishingJobController extends Controller
         ));
     }
 
-    /**
-     * Simpan draft Finishing Job.
-     */
+    /* ============================
+     * STORE (DRAFT)
+     * ============================ */
+
     public function store(Request $request): RedirectResponse
     {
         $validated = $request->validate([
@@ -263,91 +247,124 @@ class FinishingJobController extends Controller
 
             'lines.*.bundle_id' => ['required', 'integer', 'exists:cutting_job_bundles,id'],
             'lines.*.operator_id' => ['nullable', 'integer', 'exists:employees,id'],
-            'lines.*.qty_in' => ['required', 'numeric', 'min:0'],
-            'lines.*.qty_ok' => ['required', 'numeric', 'min:0'],
+            // qty_in & qty_ok diabaikan, dihitung ulang di server
             'lines.*.qty_reject' => ['required', 'numeric', 'min:0'],
             'lines.*.reject_reason' => ['nullable', 'string', 'max:100'],
             'lines.*.reject_notes' => ['nullable', 'string'],
         ]);
 
-        $code = CodeGenerator::generate('FIN');
+        $normalizedLines = [];
 
-        $job = FinishingJob::create([
-            'code' => $code,
-            'date' => $validated['date'],
-            'status' => 'draft',
-            'notes' => $validated['notes'] ?? null,
-            'created_by' => $request->user()->id,
-            'updated_by' => $request->user()->id,
-        ]);
-
-        foreach ($validated['lines'] as $lineData) {
-            $qtyIn = (float) $lineData['qty_in'];
-            $qtyOk = (float) $lineData['qty_ok'];
-            $qtyReject = (float) $lineData['qty_reject'];
-
-            if ($qtyOk + $qtyReject > $qtyIn + 0.0001) {
-                return back()
-                    ->withInput()
-                    ->withErrors(['lines' => 'Qty OK + Reject tidak boleh melebihi Qty In.']);
-            }
-
+        foreach ($validated['lines'] as $index => $lineData) {
             /** @var CuttingJobBundle $bundle */
             $bundle = CuttingJobBundle::query()
                 ->with(['finishedItem', 'lot.item'])
                 ->findOrFail($lineData['bundle_id']);
 
             $wipBalance = (float) ($bundle->wip_qty ?? 0);
-            if ($qtyIn > $wipBalance + 0.0001) {
+
+            // qty_reject dari user → dibersihkan
+            $qtyReject = (float) ($lineData['qty_reject'] ?? 0);
+            if ($qtyReject < 0) {
+                $qtyReject = 0;
+            }
+
+            if ($qtyReject > $wipBalance + 0.0001) {
                 return back()
                     ->withInput()
                     ->withErrors([
-                        'lines' => 'Qty In untuk bundle ' . ($bundle->bundle_code ?? $bundle->id)
-                        . ' melebihi saldo WIP-FIN (' . $wipBalance . ').',
+                        "lines.{$index}.qty_reject" =>
+                        'Qty Reject untuk bundle ' . ($bundle->bundle_code ?? $bundle->id) .
+                        ' melebihi saldo WIP-FIN (' . $wipBalance . ').',
                     ]);
             }
 
-            // Finishing WAJIB pakai finished_item_id, jangan fallback ke lot item
+            $qtyIn = $wipBalance;
+            $qtyOk = max(0, $qtyIn - $qtyReject);
+
+            // Finishing WAJIB pakai finished_item_id
             $itemId = $bundle->finished_item_id;
 
             if (!$itemId) {
                 return back()
                     ->withInput()
                     ->withErrors([
-                        'lines' => 'Item finishing untuk bundle '
-                        . ($bundle->bundle_code ?? $bundle->id)
+                        "lines.{$index}.bundle_id" =>
+                        'Item finishing untuk bundle ' . ($bundle->bundle_code ?? $bundle->id)
                         . ' belum di-set (finished_item_id kosong). Silakan perbaiki Cutting Job / Bundle.',
                     ]);
             }
 
-            FinishingJobLine::create([
-                'finishing_job_id' => $job->id,
-                'bundle_id' => $bundle->id,
-                'operator_id' => $lineData['operator_id'] ?? null,
-                'item_id' => $itemId, // Pasti finished item (misal K7BLK)
-                'qty_in' => $qtyIn,
-                'qty_ok' => $qtyOk,
-                'qty_reject' => $qtyReject,
-                'reject_reason' => $lineData['reject_reason'] ?? null,
-                'reject_notes' => $lineData['reject_notes'] ?? null,
-                'processed_at' => $validated['date'],
-            ]);
+            // Operator: kalau kosong, coba fallback ke employee_id user login (kalau ada)
+            $operatorId = $lineData['operator_id'] ?? null;
+            if (!$operatorId && Auth::user() && property_exists(Auth::user(), 'employee_id')) {
+                $operatorId = Auth::user()->employee_id;
+            }
+
+            $normalizedLines[] = [
+                'bundle' => $bundle,
+                'data' => [
+                    'bundle_id' => $bundle->id,
+                    'item_id' => $itemId,
+                    'operator_id' => $operatorId,
+                    'qty_in' => $qtyIn,
+                    'qty_ok' => $qtyOk,
+                    'qty_reject' => $qtyReject,
+                    'reject_reason' => $lineData['reject_reason'] ?? null,
+                    'reject_notes' => $lineData['reject_notes'] ?? null,
+                ],
+            ];
         }
 
+        $job = null;
+
+        DB::transaction(function () use ($request, $validated, $normalizedLines, &$job) {
+            $code = CodeGenerator::generate('FIN');
+
+            /** @var FinishingJob $jobLocal */
+            $jobLocal = FinishingJob::create([
+                'code' => $code,
+                'date' => $validated['date'],
+                'status' => 'draft',
+                'notes' => $validated['notes'] ?? null,
+                'created_by' => $request->user()->id,
+                'updated_by' => $request->user()->id,
+            ]);
+
+            foreach ($normalizedLines as $line) {
+                FinishingJobLine::create([
+                    'finishing_job_id' => $jobLocal->id,
+                    'bundle_id' => $line['data']['bundle_id'],
+                    'operator_id' => $line['data']['operator_id'],
+                    'item_id' => $line['data']['item_id'],
+                    'qty_in' => $line['data']['qty_in'],
+                    'qty_ok' => $line['data']['qty_ok'],
+                    'qty_reject' => $line['data']['qty_reject'],
+                    'reject_reason' => $line['data']['reject_reason'],
+                    'reject_notes' => $line['data']['reject_notes'],
+                    'processed_at' => $validated['date'],
+                ]);
+            }
+
+            $job = $jobLocal;
+        });
+
         return redirect()
-            ->route('production.finishing_jobs.show', $job)
+            ->route('production.finishing_jobs.show', $job->id)
             ->with('status', 'Finishing Job berhasil dibuat sebagai draft.');
     }
 
-    /**
-     * Show Finishing Job.
-     */
+    /* ============================
+     * SHOW
+     * ============================ */
+
     public function show(FinishingJob $finishing_job): View
     {
         $finishing_job->load([
             'lines.bundle.cuttingJob',
             'lines.bundle.lot.item',
             'lines.bundle.finishedItem',
+            'lines.item',
             'lines.operator',
             'createdBy',
         ]);
@@ -357,59 +374,203 @@ class FinishingJobController extends Controller
         ]);
     }
 
-    /**
-     * Edit draft (header saja dulu).
-     */
-    public function edit(FinishingJob $finishing_job): View
+    /* ============================
+     * EDIT (HEADER + DETAIL)
+     * ============================ */
+
+    public function edit(FinishingJob $finishing_job): View | RedirectResponse
     {
-        if ($finishing_job->isPosted()) {
-            abort(403, 'Finishing Job yang sudah posted tidak bisa di-edit.');
+        $job = $finishing_job;
+
+        if ($job->status === 'posted') {
+            return redirect()
+                ->route('production.finishing_jobs.show', $job->id)
+                ->with('status', 'Finishing Job sudah diposting dan tidak bisa diedit.');
         }
 
-        $finishing_job->load([
-            'lines.bundle.lot.item',
-            'lines.bundle.finishedItem',
-            'lines.operator',
-        ]);
+        $date = $job->date instanceof \DateTimeInterface
+        ? $job->date->format('Y-m-d')
+        : Carbon::parse($job->date)->format('Y-m-d');
 
-        $operators = Employee::orderBy('name')->get();
+        $bundles = CuttingJobBundle::query()
+            ->with(['finishedItem', 'lot.item'])
+            ->where('wip_qty', '>', 0)
+            ->orderBy('bundle_code')
+            ->get();
+
+        $operators = Employee::query()
+            ->orderBy('name')
+            ->get();
+
+        $lines = $job->lines->map(function (FinishingJobLine $line) {
+            $bundle = $line->bundle;
+            $bundleItem = $bundle?->finishedItem ?? $bundle?->lot?->item ?? $line->item;
+
+            $itemLabel = $bundleItem
+            ? trim(
+                ($bundleItem->code ?? '') .
+                ' — ' .
+                ($bundleItem->name ?? '') .
+                ' ' .
+                ($bundleItem->color ?? '')
+            )
+            : '';
+
+            $wipBalance = (float) ($bundle->wip_qty ?? $line->qty_in ?? 0);
+
+            return [
+                'bundle_id' => $bundle?->id,
+                'item_id' => $line->item_id,
+                'item_label' => $itemLabel,
+                'wip_balance' => $wipBalance,
+                'operator_id' => $line->operator_id,
+                'qty_in' => $line->qty_in,
+                'qty_ok' => $line->qty_ok,
+                'qty_reject' => $line->qty_reject,
+                'reject_reason' => $line->reject_reason,
+                'reject_notes' => $line->reject_notes,
+            ];
+        })->values()->all();
 
         return view('production.finishing_jobs.edit', [
-            'job' => $finishing_job,
+            'job' => $job,
+            'date' => $date,
+            'bundles' => $bundles,
             'operators' => $operators,
+            'lines' => $lines,
         ]);
     }
+
+    /* ============================
+     * UPDATE (DRAFT)
+     * ============================ */
 
     public function update(Request $request, FinishingJob $finishing_job): RedirectResponse
     {
-        if ($finishing_job->isPosted()) {
-            abort(403, 'Finishing Job yang sudah posted tidak bisa di-update.');
+        // Biar konsisten pakai $job
+        $job = $finishing_job->fresh(); // ambil ulang dari DB, jaga-jaga status sudah berubah
+
+        // Hanya boleh update kalau masih draft
+        if (($job->status ?? 'draft') !== 'draft') {
+            return redirect()
+                ->route('production.finishing_jobs.show', $job->id)
+                ->with('status', 'Finishing Job sudah diposting dan tidak bisa diedit.');
         }
 
-        $data = $request->validate([
+        // 1. Validasi dasar
+        $validated = $request->validate([
             'date' => ['required', 'date'],
             'notes' => ['nullable', 'string'],
+
+            'lines' => ['required', 'array', 'min:1'],
+
+            'lines.*.bundle_id' => ['required', 'integer', 'exists:cutting_job_bundles,id'],
+            'lines.*.operator_id' => ['nullable', 'integer', 'exists:employees,id'],
+            // qty_in & qty_ok NGGAK kita percaya dari request → server yang hitung
+            'lines.*.qty_reject' => ['required', 'numeric', 'min:0'],
+            'lines.*.reject_reason' => ['nullable', 'string', 'max:100'],
+            'lines.*.reject_notes' => ['nullable', 'string'],
         ]);
 
-        $finishing_job->update([
-            'date' => $data['date'],
-            'notes' => $data['notes'] ?? null,
-            'updated_by' => $request->user()->id,
-        ]);
+        $normalizedLines = [];
+
+        // 2. Normalisasi & validasi per baris, hitung qty_in & qty_ok di server
+        foreach ($validated['lines'] as $index => $lineData) {
+            /** @var CuttingJobBundle $bundle */
+            $bundle = CuttingJobBundle::query()
+                ->with(['finishedItem', 'lot.item'])
+                ->findOrFail($lineData['bundle_id']);
+
+            // saldo WIP-FIN terkini
+            $wipBalance = (float) ($bundle->wip_qty ?? 0);
+
+            // Qty reject dari user
+            $qtyReject = (float) ($lineData['qty_reject'] ?? 0);
+            if ($qtyReject < 0) {
+                $qtyReject = 0;
+            }
+
+            // Reject tidak boleh melebihi saldo WIP-FIN
+            if ($qtyReject > $wipBalance + 0.0001) {
+                return back()
+                    ->withInput()
+                    ->withErrors([
+                        "lines.{$index}.qty_reject" =>
+                        'Qty Reject untuk bundle ' . ($bundle->bundle_code ?? $bundle->id) .
+                        ' melebihi saldo WIP-FIN (' . $wipBalance . ').',
+                    ]);
+            }
+
+            // Server yang tentukan:
+            $qtyIn = $wipBalance; // proses full saldo WIP-FIN
+            $qtyOk = max(0, $qtyIn - $qtyReject); // sisanya OK
+
+            // Finishing WAJIB pakai finished_item_id, fallback ke LOT cuma kalau benar-benar nggak ada
+            $itemId = $bundle->finished_item_id ?: $bundle->lot?->item_id;
+            if (!$itemId) {
+                return back()
+                    ->withInput()
+                    ->withErrors([
+                        "lines.{$index}.bundle_id" =>
+                        'Item finishing untuk bundle ' . ($bundle->bundle_code ?? $bundle->id) .
+                        ' tidak ditemukan (finished_item_id & lot item kosong).',
+                    ]);
+            }
+
+            $normalizedLines[] = [
+                'bundle' => $bundle,
+                'data' => [
+                    'bundle_id' => $bundle->id,
+                    'item_id' => $itemId,
+                    'operator_id' => $lineData['operator_id'] ?? null,
+                    'qty_in' => $qtyIn,
+                    'qty_ok' => $qtyOk,
+                    'qty_reject' => $qtyReject,
+                    'reject_reason' => $lineData['reject_reason'] ?? null,
+                    'reject_notes' => $lineData['reject_notes'] ?? null,
+                ],
+            ];
+        }
+
+        // 3. Simpan perubahan dalam transaksi
+        DB::transaction(function () use ($job, $validated, $normalizedLines, $request) {
+            // Update header
+            $job->update([
+                'date' => $validated['date'],
+                'notes' => $validated['notes'] ?? null,
+                'updated_by' => $request->user()->id,
+            ]);
+
+            // Hapus semua line lama, insert ulang (karena masih draft aman)
+            $job->lines()->delete();
+
+            foreach ($normalizedLines as $line) {
+                FinishingJobLine::create([
+                    'finishing_job_id' => $job->id,
+                    'bundle_id' => $line['data']['bundle_id'],
+                    'operator_id' => $line['data']['operator_id'],
+                    'item_id' => $line['data']['item_id'],
+                    'qty_in' => $line['data']['qty_in'],
+                    'qty_ok' => $line['data']['qty_ok'],
+                    'qty_reject' => $line['data']['qty_reject'],
+                    'reject_reason' => $line['data']['reject_reason'],
+                    'reject_notes' => $line['data']['reject_notes'],
+                    'processed_at' => $validated['date'],
+                ]);
+            }
+        });
 
         return redirect()
-            ->route('production.finishing_jobs.show', $finishing_job)
-            ->with('status', 'Header Finishing Job berhasil diperbarui.');
+            ->route('production.finishing_jobs.show', $job->id)
+            ->with('status', 'Finishing Job berhasil diperbarui.');
     }
 
-    /**
-     * Posting Finishing Job:
-     *  - WIP-FIN → FG + REJECT
-     *  - update wip_qty bundle (INI YANG BIKIN BUNDLE HILANG DARI READY LIST)
-     */
+    /* ============================
+     * POST (WIP-FIN → FG + REJECT)
+     * ============================ */
+
     public function post(FinishingJob $finishing_job): RedirectResponse
     {
-        // Pakai alias $job supaya lebih enak dibaca
         $job = $finishing_job;
 
         if (!$job || !$job->id) {
@@ -418,14 +579,12 @@ class FinishingJobController extends Controller
                 ->withErrors(['finishing_job' => 'Finishing Job tidak ditemukan.']);
         }
 
-        // 1. Hanya boleh posting kalau masih draft
         if ($job->status === 'posted') {
             return redirect()
-                ->route('production.finishing_jobs.show', ['finishing_job' => $job->id])
+                ->route('production.finishing_jobs.show', $job->id)
                 ->with('status', 'Finishing Job ini sudah diposting sebelumnya.');
         }
 
-        // 2. Pastikan warehouse WIP-FIN, FG, REJECT ada
         $requiredCodes = ['WIP-FIN', 'FG', 'REJECT'];
 
         $warehouses = Warehouse::query()
@@ -447,12 +606,10 @@ class FinishingJobController extends Controller
         $fgWarehouseId = $warehouses['FG']->id;
         $rejectWarehouseId = $warehouses['REJECT']->id;
 
-        // 3. Siapkan tanggal mutasi (pakai tanggal finishing job)
         $date = $job->date instanceof \DateTimeInterface
         ? $job->date
         : Carbon::parse($job->date);
 
-        // 4. Load relasi supaya nggak N+1
         $job->load(['lines', 'lines.bundle']);
 
         DB::transaction(function () use ($job, $wipFinWarehouseId, $fgWarehouseId, $rejectWarehouseId, $date) {
@@ -465,7 +622,6 @@ class FinishingJobController extends Controller
                     continue;
                 }
 
-                // 1) STOCK OUT dari WIP-FIN (qty_in)
                 if ($line->qty_in > 0) {
                     $this->inventory->stockOut(
                         $wipFinWarehouseId,
@@ -480,7 +636,6 @@ class FinishingJobController extends Controller
                     );
                 }
 
-                // 2) STOCK IN ke FG (qty OK)
                 if ($line->qty_ok > 0) {
                     $this->inventory->stockIn(
                         $fgWarehouseId,
@@ -495,7 +650,6 @@ class FinishingJobController extends Controller
                     );
                 }
 
-                // 3) STOCK IN ke REJECT (qty reject)
                 if ($line->qty_reject > 0) {
                     $this->inventory->stockIn(
                         $rejectWarehouseId,
@@ -510,8 +664,6 @@ class FinishingJobController extends Controller
                     );
                 }
 
-                // 4) KURANGI SALDO WIP-FIN DI BUNDLE
-                //    Supaya bundle hilang (atau berkurang) dari daftar Ready Bundles
                 if ($line->qty_in > 0 && $line->bundle) {
                     $bundle = $line->bundle;
                     $current = (float) ($bundle->wip_qty ?? 0);
@@ -520,29 +672,18 @@ class FinishingJobController extends Controller
                     $newWipQty = $current - $used;
 
                     if ($newWipQty < 0 && abs($newWipQty) > 0.0001) {
-                        // Kalau sampai minus, clamp jadi 0 saja biar aman
                         $newWipQty = 0;
                     }
 
-                    // Normalisasi epsilon kecil
                     if ($newWipQty < 0.0001) {
                         $newWipQty = 0;
                     }
 
                     $bundle->wip_qty = $newWipQty;
-
-                    // Opsional: kalau sudah 0, bisa juga kosongkan lokasinya
-                    // supaya secara logis tidak dianggap lagi ada di WIP-FIN
-                    if ($newWipQty === 0.0) {
-                        // $bundle->wip_warehouse_id = null;
-                        // kalau mau tetap tahu history lokasi terakhir, biarkan saja
-                    }
-
                     $bundle->save();
                 }
             }
 
-            // Update status job jadi posted
             $job->update([
                 'status' => 'posted',
                 'posted_at' => now(),
@@ -551,7 +692,215 @@ class FinishingJobController extends Controller
         });
 
         return redirect()
-            ->route('production.finishing_jobs.show', ['finishing_job' => $job->id])
+            ->route('production.finishing_jobs.show', $job->id)
             ->with('status', 'Finishing Job berhasil diposting dan stok sudah diperbarui.');
     }
+
+    /* ============================
+     * UNPOST (FG + REJECT → WIP-FIN)
+     * ============================ */
+
+    public function unpost(FinishingJob $finishingJob): RedirectResponse
+    {
+        $job = $finishingJob;
+
+        if ($job->status !== 'posted') {
+            return back()->with('status', 'Finishing Job belum diposting, tidak bisa di-unpost.');
+        }
+
+        $warehouses = Warehouse::query()
+            ->whereIn('code', ['WIP-FIN', 'FG', 'REJECT'])
+            ->get()
+            ->keyBy('code');
+
+        if (!isset($warehouses['WIP-FIN'], $warehouses['FG'], $warehouses['REJECT'])) {
+            return back()->with('status', 'Warehouse WIP-FIN, FG, dan REJECT belum dikonfigurasi lengkap.');
+        }
+
+        $wipFinWarehouseId = $warehouses['WIP-FIN']->id;
+        $fgWarehouseId = $warehouses['FG']->id;
+        $rejectWarehouseId = $warehouses['REJECT']->id;
+
+        $date = $job->date instanceof \DateTimeInterface
+        ? $job->date
+        : Carbon::parse($job->date);
+
+        $inventory = $this->inventory;
+
+        try {
+            DB::transaction(function () use ($job, $inventory, $wipFinWarehouseId, $fgWarehouseId, $rejectWarehouseId, $date) {
+                $job->load(['lines.bundle']);
+
+                foreach ($job->lines as $line) {
+                    if ($line->qty_ok > 0) {
+                        $inventory->stockOut(
+                            $fgWarehouseId,
+                            $line->item_id,
+                            $line->qty_ok,
+                            $date,
+                            FinishingJob::class,
+                            $job->id,
+                            'Unpost Finishing OK ' . $job->code
+                        );
+                    }
+
+                    if ($line->qty_reject > 0) {
+                        $inventory->stockOut(
+                            $rejectWarehouseId,
+                            $line->item_id,
+                            $line->qty_reject,
+                            $date,
+                            FinishingJob::class,
+                            $job->id,
+                            'Unpost Finishing REJECT ' . $job->code
+                        );
+                    }
+
+                    if ($line->qty_in > 0) {
+                        $inventory->stockIn(
+                            $wipFinWarehouseId,
+                            $line->item_id,
+                            $line->qty_in,
+                            $date,
+                            FinishingJob::class,
+                            $job->id,
+                            'Unpost Finishing ' . $job->code
+                        );
+                    }
+                }
+
+                $job->update([
+                    'status' => 'draft',
+                    'posted_at' => null,
+                    'unposted_at' => now(),
+                    'updated_by' => auth()->id(),
+                ]);
+            });
+        } catch (\Throwable $e) {
+            report($e);
+
+            return back()->with('status', 'Gagal unpost Finishing Job: ' . $e->getMessage());
+        }
+
+        return redirect()
+            ->route('production.finishing_jobs.show', $job->id)
+            ->with('status', 'Finishing Job berhasil di-unpost dan stok sudah dikembalikan.');
+    }
+
+    public function reportPerItem(Request $request): View
+    {
+        // Filter
+        $dateFrom = $request->input('date_from');
+        $dateTo = $request->input('date_to');
+        $itemId = $request->input('item_id');
+
+        // List item (barang jadi) buat filter dropdown
+        $items = Item::query()
+            ->orderBy('code')
+            ->get();
+
+        // Query: ambil line finishing yang SUDAH POSTED
+        $linesQuery = FinishingJobLine::query()
+            ->selectRaw('
+            item_id,
+            SUM(qty_in)     as total_in,
+            SUM(qty_ok)     as total_ok,
+            SUM(qty_reject) as total_reject
+        ')
+            ->with('item')
+            ->whereHas('job', function ($q) use ($dateFrom, $dateTo) {
+                $q->where('status', 'posted');
+
+                if ($dateFrom) {
+                    $q->whereDate('date', '>=', $dateFrom);
+                }
+
+                if ($dateTo) {
+                    $q->whereDate('date', '<=', $dateTo);
+                }
+            });
+
+        if ($itemId) {
+            $linesQuery->where('item_id', $itemId);
+        }
+
+        $rows = $linesQuery
+            ->groupBy('item_id')
+            ->orderBy('item_id')
+            ->get();
+
+        // Hitung grand total
+        $grandTotalIn = $rows->sum('total_in');
+        $grandTotalOk = $rows->sum('total_ok');
+        $grandTotalReject = $rows->sum('total_reject');
+
+        return view('production.finishing_jobs.report_per_item', [
+            'rows' => $rows,
+            'items' => $items,
+            'dateFrom' => $dateFrom,
+            'dateTo' => $dateTo,
+            'itemId' => $itemId,
+            'grandTotalIn' => $grandTotalIn,
+            'grandTotalOk' => $grandTotalOk,
+            'grandTotalReject' => $grandTotalReject,
+        ]);
+    }
+
+    public function reportPerItemDetail(Request $request, Item $item): View
+    {
+        $dateFrom = $request->input('date_from');
+        $dateTo = $request->input('date_to');
+
+        // Ambil agregat per finishing_job_id untuk item ini
+        $linesQuery = FinishingJobLine::query()
+            ->selectRaw('
+                finishing_job_id,
+                SUM(qty_in)     as total_in,
+                SUM(qty_ok)     as total_ok,
+                SUM(qty_reject) as total_reject
+            ')
+            ->where('item_id', $item->id)
+            ->whereHas('job', function ($q) use ($dateFrom, $dateTo) {
+                $q->where('status', 'posted');
+
+                if ($dateFrom) {
+                    $q->whereDate('date', '>=', $dateFrom);
+                }
+
+                if ($dateTo) {
+                    $q->whereDate('date', '<=', $dateTo);
+                }
+            });
+
+        $rows = $linesQuery
+            ->groupBy('finishing_job_id')
+            ->orderBy('finishing_job_id')
+            ->get();
+
+        // Load FinishingJob untuk setiap row
+        $jobIds = $rows->pluck('finishing_job_id')->filter()->unique()->values()->all();
+
+        $jobs = FinishingJob::query()
+            ->with('createdBy')
+            ->whereIn('id', $jobIds)
+            ->get()
+            ->keyBy('id');
+
+        // Hitung grand total
+        $grandTotalIn = $rows->sum('total_in');
+        $grandTotalOk = $rows->sum('total_ok');
+        $grandTotalReject = $rows->sum('total_reject');
+
+        return view('production.finishing_jobs.report_per_item_detail', [
+            'item' => $item,
+            'rows' => $rows,
+            'jobs' => $jobs,
+            'dateFrom' => $dateFrom,
+            'dateTo' => $dateTo,
+            'grandTotalIn' => $grandTotalIn,
+            'grandTotalOk' => $grandTotalOk,
+            'grandTotalReject' => $grandTotalReject,
+        ]);
+    }
+
 }
