@@ -312,24 +312,28 @@
             </button>
 
             <div class="collapse {{ $invOpen ? 'show' : '' }}" id="navInventory">
+                {{-- Stok per Item --}}
                 <a href="{{ route('inventory.stocks.items') }}"
                     class="sidebar-link sidebar-link-sub {{ request()->routeIs('inventory.stocks.items') ? 'active' : '' }}">
                     <span class="icon">📦</span>
                     <span>Stok per Item</span>
                 </a>
 
+                {{-- Stok per LOT --}}
                 <a href="{{ route('inventory.stocks.lots') }}"
                     class="sidebar-link sidebar-link-sub {{ request()->routeIs('inventory.stocks.lots') ? 'active' : '' }}">
                     <span class="icon">🎫</span>
                     <span>Stok per LOT</span>
                 </a>
 
+                {{-- Stock Card --}}
                 <a href="{{ route('inventory.stock_card.index') }}"
                     class="sidebar-link sidebar-link-sub {{ request()->routeIs('inventory.stock_card.index') ? 'active' : '' }}">
                     <span class="icon">📋</span>
                     <span>Kartu Stok</span>
                 </a>
 
+                {{-- Internal Transfers --}}
                 <a href="{{ route('inventory.transfers.index') }}"
                     class="sidebar-link sidebar-link-sub {{ request()->routeIs('inventory.transfers.index') ? 'active' : '' }}">
                     <span class="icon">🔁</span>
@@ -344,16 +348,28 @@
 
                 {{-- Stock Opname --}}
                 <a href="{{ route('inventory.stock_opnames.index') }}"
-                    class="sidebar-link sidebar-link-sub {{ request()->routeIs('inventory.stock_opnames.*') ? 'active' : '' }}">
+                    class="sidebar-link sidebar-link-sub {{ request()->routeIs('inventory.stock_opnames.index') ? 'active' : '' }}">
                     <span class="icon">📊</span>
-                    <span>Stock Opname</span>
+                    <span>Daftar Stock Opname</span>
+                </a>
+
+                <a href="{{ route('inventory.stock_opnames.create') }}"
+                    class="sidebar-link sidebar-link-sub {{ request()->routeIs('inventory.stock_opnames.create') ? 'active' : '' }}">
+                    <span class="icon">＋</span>
+                    <span>Stock Opname Baru</span>
                 </a>
 
                 {{-- Inventory Adjustments --}}
                 <a href="{{ route('inventory.adjustments.index') }}"
-                    class="sidebar-link sidebar-link-sub {{ request()->routeIs('inventory.adjustments.*') ? 'active' : '' }}">
+                    class="sidebar-link sidebar-link-sub {{ request()->routeIs('inventory.adjustments.index') ? 'active' : '' }}">
                     <span class="icon">⚖️</span>
-                    <span>Inventory Adjustments</span>
+                    <span>Daftar Adjustment</span>
+                </a>
+
+                <a href="{{ route('inventory.adjustments.manual.create') }}"
+                    class="sidebar-link sidebar-link-sub {{ request()->routeIs('inventory.adjustments.manual.create') ? 'active' : '' }}">
+                    <span class="icon">✏️</span>
+                    <span>Manual Adjustment</span>
                 </a>
             </div>
         </li>
@@ -570,7 +586,7 @@
             <div class="collapse {{ $prodReportOpen ? 'show' : '' }}" id="navProductionReports">
                 {{-- Daily Sewing Dashboard --}}
                 <a href="{{ route('production.reports.dashboard') }}"
-                    class="sidebar-link sidebar-link-sub {{ request()->routeIs('production.reports.sewing.dashboard') ? 'active' : '' }}">
+                    class="sidebar-link sidebar-link-sub {{ request()->routeIs('production.reports.dashboard') ? 'active' : '' }}">
                     <span class="icon">📆</span>
                     <span>Dashboard Sewing Harian</span>
                 </a>
@@ -626,10 +642,7 @@
 
                 {{-- Finishing per Item --}}
                 <a href="{{ route('production.finishing_jobs.report_per_item') }}"
-                    class="sidebar-link sidebar-link-sub {{ request()->routeIs('production.finishing_jobs.report_per_item') ||
-                    request()->routeIs('production.finishing_jobs.report_per_item_detail')
-                        ? 'active'
-                        : '' }}">
+                    class="sidebar-link sidebar-link-sub {{ request()->routeIs('production.finishing_jobs.report_per_item') || request()->routeIs('production.finishing_jobs.report_per_item_detail') ? 'active' : '' }}">
                     <span class="icon">📦</span>
                     <span>Finishing per Item</span>
                 </a>

@@ -5,24 +5,15 @@ namespace App\Http\Controllers\Api;
 use App\Http\Controllers\Controller;
 use App\Models\Item;
 use Illuminate\Http\Request;
+use Illuminate\Support\Facades\DB;
 
 class ItemController extends Controller
 {
     /**
-     * GET /api/v1/items
-     *
-     * Query param:
-     * - q               : search code / name
-     * - type            : material / finished_good / dsb
-     *                     (bisa multi: ?type=material,finished_good)
-     * - item_category_id: filter kategori
-     * - active          : 1/0 (default: 1 -> hanya active)
-     * - per_page        : default 20, max 100
+     * Helper: apply filter umum untuk Item query.
      */
-    public function index(Request $request)
+    protected function applyCommonFilters($query, Request $request)
     {
-        $query = Item::query()->with('category');
-
         // 🔎 Search kode / nama
         if ($search = $request->input('q')) {
             $query->where(function ($q) use ($search) {
@@ -31,9 +22,8 @@ class ItemController extends Controller
             });
         }
 
-        // 🎯 Filter type (bisa single / multi)
+        // 🎯 Filter type (single / multi)
         if ($type = $request->input('type')) {
-            // contoh: ?type=material atau ?type=material,finished_good
             $types = collect(explode(',', $type))
                 ->map(fn($t) => trim($t))
                 ->filter()
@@ -56,7 +46,38 @@ class ItemController extends Controller
             $query->where('active', 1);
         }
 
-        // 📄 Pagination
+        return $query;
+    }
+
+    /**
+     * Helper: standard bentuk item JSON.
+     *
+     * $extra bisa diisi:
+     * ['on_hand' => 10, 'warehouse_id' => 2, dll]
+     */
+    protected function mapItem(Item $item, array $extra = []): array
+    {
+        return array_merge([
+            'id' => $item->id,
+            'code' => $item->code,
+            'name' => $item->name,
+            'type' => $item->type,
+            'item_category_id' => $item->item_category_id,
+            'item_category' => optional($item->category)->name,
+        ], $extra);
+    }
+
+    /**
+     * GET /api/v1/items
+     *
+     * Listing lengkap + pagination (lebih berat).
+     */
+    public function index(Request $request)
+    {
+        $query = Item::query()->with('category');
+
+        $this->applyCommonFilters($query, $request);
+
         $perPage = (int) $request->input('per_page', 20);
         $perPage = $perPage > 100 ? 100 : $perPage;
 
@@ -67,7 +88,9 @@ class ItemController extends Controller
 
         return response()->json([
             'success' => true,
-            'data' => $items->items(), // sudah include relasi "category"
+            'data' => $items->getCollection()->map(function (Item $item) {
+                return $this->mapItem($item);
+            }),
             'meta' => [
                 'current_page' => $items->currentPage(),
                 'per_page' => $items->perPage(),
@@ -86,54 +109,54 @@ class ItemController extends Controller
     /**
      * GET /api/v1/items/suggest
      *
-     * Dipakai untuk autocomplete: return ringan
+     * Dipakai untuk autocomplete: return ringan.
+     *
      * Query param:
      * - q
      * - type (opsional)
      * - item_category_id (opsional)
-     * - limit (default 20)
+     * - limit (default 20, max 50)
+     * - warehouse_id (opsional, kalau diisi → include on_hand di gudang tsb)
      */
     public function suggest(Request $request)
     {
-        $q = $request->query('q');
-        $type = $request->query('type'); // material / finished_good / dll
-        $itemCategoryId = $request->query('item_category_id');
         $limit = (int) $request->query('limit', 20);
+        $limit = $limit > 50 ? 50 : $limit;
 
-        $limit = $limit > 50 ? 50 : $limit; // batas aman
+        $warehouseId = $request->query('warehouse_id');
 
-        $items = Item::query()
-            ->with('category') // ⬅️ supaya bisa ambil nama kategori
-            ->where('active', 1)
-            ->when($q, function ($query, $q) {
-                $like = '%' . $q . '%';
+        $query = Item::query()
+            ->with('category');
 
-                $query->where(function ($qq) use ($like) {
-                    $qq->where('code', 'like', $like)
-                        ->orWhere('name', 'like', $like);
-                });
+        $this->applyCommonFilters($query, $request);
+
+        if ($warehouseId) {
+            // join ke inventory_stocks untuk ambil stok per gudang
+            $query->leftJoin('inventory_stocks as s', function ($join) use ($warehouseId) {
+                $join->on('s.item_id', '=', 'items.id')
+                    ->where('s.warehouse_id', '=', $warehouseId);
             })
-            ->when($type, function ($query, $type) {
-                $query->where('type', $type);
-            })
-            ->when($itemCategoryId, function ($query, $catId) {
-                $query->where('item_category_id', $catId);
-            })
-            ->orderBy('code')
-            ->limit($limit)
-            ->get();
+                ->addSelect('items.*')
+                ->addSelect(DB::raw('COALESCE(s.qty, 0) as on_hand'));
+        }
+
+        $query->orderBy('items.code')
+            ->limit($limit);
+
+        $items = $query->get();
 
         return response()->json([
-            'data' => $items->map(function (Item $item) {
-                return [
-                    'id' => $item->id,
-                    'code' => $item->code,
-                    'name' => $item->name,
-                    'type' => $item->type,
-                    'item_category_id' => $item->item_category_id,
-                    // ⬇⬇⬇ INI YANG PENTING – DIPAKAI HIDDEN "item_category"
-                    'item_category' => optional($item->category)->name,
-                ];
+            'data' => $items->map(function ($row) use ($warehouseId) {
+                // kalau pakai join, $row->on_hand sudah ada, kalau tidak → null
+                $extra = [];
+                if ($warehouseId !== null) {
+                    $extra['warehouse_id'] = (int) $warehouseId;
+                    $extra['on_hand'] = isset($row->on_hand)
+                    ? (float) $row->on_hand
+                    : 0.0;
+                }
+
+                return $this->mapItem($row, $extra);
             }),
         ]);
     }
@@ -147,7 +170,7 @@ class ItemController extends Controller
 
         return response()->json([
             'success' => true,
-            'data' => $item,
+            'data' => $this->mapItem($item),
         ]);
     }
 }

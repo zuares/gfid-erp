@@ -99,7 +99,7 @@
 
 {{-- DETAIL --}}
 <div class="card">
-    <div class="card-header d-flex justify-content-between">
+    <div class="card-header d-flex justify-content-between align-items-center">
         <span>Detail Barang</span>
         <button type="button" id="btn-add-line" class="btn btn-sm btn-outline-primary">
             + Tambah Baris
@@ -133,20 +133,19 @@
                         // - kalau dari old('lines') → jangan diformat lagi
                         // - kalau dari DB          → boleh diformat angka()
                         $linePrice = $usingOldLines ? $linePriceRaw : angka($linePriceRaw);
+
+                        // display awal di input (mini → cuma kode cukup)
+                        $itemCode = $line['item']['code'] ?? null;
+                        $itemDisplay = $itemCode ?? '';
                     @endphp
 
                     <tr>
                         <td class="text-center align-middle line-index">{{ $loop->iteration }}</td>
 
+                        {{-- ITEM pakai item-suggest (varian mini) --}}
                         <td>
-                            <select name="lines[{{ $i }}][item_id]" class="form-select form-select-sm">
-                                <option value="">- pilih item -</option>
-                                @foreach ($items as $item)
-                                    <option value="{{ $item->id }}" @selected($lineItemId == $item->id)>
-                                        {{ $item->code }}
-                                    </option>
-                                @endforeach
-                            </select>
+                            <x-item-suggest :items="$items" idName="lines[{{ $i }}][item_id]"
+                                :idValue="$lineItemId" :displayValue="$itemDisplay" type="material" variant="mini" :minChars="1" />
                             @error("lines.$i.item_id")
                                 <div class="text-danger small">{{ $message }}</div>
                             @enderror
@@ -182,14 +181,11 @@
                         <td class="text-center align-middle line-index">1</td>
 
                         <td>
-                            <select name="lines[0][item_id]" class="form-select form-select-sm">
-                                <option value="">- pilih item -</option>
-                                @foreach ($items as $item)
-                                    <option value="{{ $item->id }}">
-                                        {{ $item->code }}
-                                    </option>
-                                @endforeach
-                            </select>
+                            {{-- <x-item-suggest :items="$items" idName="lines[0][item_id]" type="material" variant="mini"
+                                :minChars="1" /> --}}
+                            <x-item-suggest idName="lines[0][item_id]" :items="$items" displayMode="code-name"
+                                :showName="true" :showCategory="false" {{-- baris kedua: tanpa kategori --}} type="material"
+                                placeholder="Cari kode / nama item" placeholder="Masukan Kode Barang" />
                         </td>
 
                         <td>
@@ -219,7 +215,6 @@
                     <th></th>
                 </tr>
             </tfoot>
-
         </table>
     </div>
 </div>
@@ -301,7 +296,7 @@
                     if (idxCell) idxCell.textContent = index + 1;
 
                     // Update name attribute sesuai index
-                    tr.querySelectorAll('select, input').forEach(function(el) {
+                    tr.querySelectorAll('input, select').forEach(function(el) {
                         const name = el.getAttribute('name');
                         if (!name) return;
                         el.setAttribute(
@@ -316,19 +311,39 @@
                 const lastRow = tableBody.querySelector('tr:last-child');
                 const newRow = lastRow.cloneNode(true);
 
-                // reset value
-                newRow.querySelectorAll('input').forEach(function(input) {
+                // reset value input qty / price
+                newRow.querySelectorAll('.line-qty, .line-price').forEach(function(input) {
                     input.value = '';
                 });
-                newRow.querySelectorAll('select').forEach(function(select) {
-                    select.selectedIndex = 0;
+
+                // reset item-suggest (display + hidden id/category)
+                newRow.querySelectorAll('.js-item-suggest-input').forEach(function(input) {
+                    input.value = '';
                 });
+                newRow.querySelectorAll('.js-item-suggest-id').forEach(function(hidden) {
+                    hidden.value = '';
+                });
+                newRow.querySelectorAll('.js-item-suggest-category').forEach(function(hidden) {
+                    hidden.value = '';
+                });
+
+                // reset total
                 const totalCell = newRow.querySelector('.line-total');
                 if (totalCell) totalCell.textContent = '';
+
+                // supaya initItemSuggestInputs bisa detect ini row baru lagi
+                newRow.querySelectorAll('.item-suggest-wrap').forEach(function(wrap) {
+                    wrap.removeAttribute('data-suggest-inited');
+                });
 
                 tableBody.appendChild(newRow);
                 renumberLines();
                 recalcAll();
+
+                // INIT item-suggest untuk row baru
+                if (window.initItemSuggestInputs) {
+                    window.initItemSuggestInputs(newRow);
+                }
             });
 
             tableBody.addEventListener('click', function(e) {
@@ -337,12 +352,17 @@
                     if (rows.length <= 1) {
                         // kalau cuma 1 baris: kosongkan saja
                         const row = rows[0];
-                        row.querySelectorAll('input').forEach(function(input) {
+                        row.querySelectorAll('.line-qty, .line-price').forEach(function(input) {
                             input.value = '';
                         });
-                        row.querySelectorAll('select').forEach(function(select) {
-                            select.selectedIndex = 0;
+                        row.querySelectorAll('.js-item-suggest-input').forEach(function(input) {
+                            input.value = '';
                         });
+                        row.querySelectorAll('.js-item-suggest-id, .js-item-suggest-category').forEach(
+                            function(
+                                hidden) {
+                                hidden.value = '';
+                            });
                         const totalCell = row.querySelector('.line-total');
                         if (totalCell) totalCell.textContent = '';
                         recalcAll();
@@ -366,6 +386,11 @@
 
             // Inisialisasi pertama kali
             recalcAll();
+
+            // Inisialisasi item-suggest awal (kalau script komponen sudah dimuat)
+            if (window.initItemSuggestInputs) {
+                window.initItemSuggestInputs();
+            }
         });
     </script>
 @endpush

@@ -28,7 +28,7 @@ class InventoryService
         ?string $notes = null,
         ?int $lotId = null, // optional LOT
         float | int | string | null $unitCost = null, // harga per unit (untuk moving average / nilai mutasi)
-        bool $affectLotCost = true, // ⬅️ baru: apakah mutasi ini ikut update LotCost (hanya untuk kain mentah)
+        bool $affectLotCost = true, // apakah mutasi ini ikut update LotCost (hanya untuk kain mentah)
     ): ?InventoryMutation {
         $qty = $this->num($qty);
         if ($qty <= 0) {
@@ -92,8 +92,8 @@ class InventoryService
         ?string $notes = null,
         bool $allowNegative = false,
         ?int $lotId = null, // optional LOT
-        float | int | string | null $unitCostOverride = null, // ⬅️ baru: untuk WIP, kita bisa pakai unit_cost custom
-        bool $affectLotCost = true, // ⬅️ baru: hanya true untuk pemakaian kain mentah
+        float | int | string | null $unitCostOverride = null, // untuk WIP, bisa pakai unit_cost custom
+        bool $affectLotCost = true, // hanya true untuk pemakaian kain mentah
     ): ?InventoryMutation {
         $qty = $this->num($qty);
         if ($qty <= 0) {
@@ -131,7 +131,7 @@ class InventoryService
         $totalCost = null;
 
         if ($unitCostOverride !== null) {
-            // Kasus WIP: kita pakai unit_cost yang dikirim caller (misal avg WIP-CUT)
+            // Kasus WIP: pakai unit_cost yang dikirim caller (misal avg WIP-CUT)
             $avgCost = $this->num($unitCostOverride);
             $totalCost = -($avgCost * $qty);
         } elseif ($lotId && $affectLotCost) {
@@ -235,7 +235,7 @@ class InventoryService
     }
 
     /**
-     * Sesuaikan stok supaya sama dengan nilai baru (stock opname).
+     * Sesuaikan stok supaya sama dengan nilai baru (stock opname / physical adjust).
      * Akan membuat mutasi in/out sesuai selisih.
      */
     public function adjustTo(
@@ -291,13 +291,14 @@ class InventoryService
             lotId: $lotId,
         );
     }
-/**
- * Ambil daftar LOT yang masih memiliki saldo (qty_balance > 0),
- * bisa difilter per gudang dan per item.
- *
- * Return: Collection berisi baris (per lot_id + warehouse_id + item_id)
- *         dengan tambahan relasi lot, item, warehouse.
- */
+
+    /**
+     * Ambil daftar LOT yang masih memiliki saldo (qty_balance > 0),
+     * bisa difilter per gudang dan per item.
+     *
+     * Return: Collection berisi baris (per lot_id + warehouse_id + item_id)
+     *         dengan tambahan relasi lot, item, warehouse.
+     */
     public function getAvailableLots(
         ?int $warehouseId = null, // filter opsional: pilih gudang tertentu
         ?int $itemId = null, // filter opsional: pilih item tertentu
@@ -307,30 +308,25 @@ class InventoryService
         //    Kita hitung total qty_change per group (lot, warehouse, item).
         $q = InventoryMutation::query()
             ->selectRaw('
-            lot_id,
-            warehouse_id,
-            item_id,
-            SUM(qty_change) as qty_balance
-        ')
+                lot_id,
+                warehouse_id,
+                item_id,
+                SUM(qty_change) as qty_balance
+            ')
         // 2️⃣ Pastikan ini benar-benar data LOT
             ->whereNotNull('lot_id')
-
         // 3️⃣ Group untuk hitung saldo per:
         //    - lot_id (LOT siapa)
         //    - warehouse_id (lokasi mana)
         //    - item_id (jenis kain apa)
             ->groupBy('lot_id', 'warehouse_id', 'item_id')
-
-        // 4️⃣ Hanya LOT yang MASIH ada sisa
-        //    qty_balance = total (qty_in - qty_out)
+        // 4️⃣ Hanya LOT yang MASIH ada sisa (qty_balance > 0)
             ->having('qty_balance', '>', 0)
-
         // 5️⃣ Preload relasi supaya Blade tidak N+1 query
             ->with([
                 'lot.item', // akses: $row->lot->item->name
                 'warehouse', // akses: $row->warehouse->name
             ])
-
         // 6️⃣ Urutkan biar rapi saat ditampilkan di dropdown / tabel
             ->orderBy('lot_id')
             ->orderBy('warehouse_id');
@@ -452,9 +448,9 @@ class InventoryService
     {
         $row = \App\Models\InventoryMutation::query()
             ->selectRaw('
-            COALESCE(SUM(CASE WHEN direction = "in"  THEN total_cost ELSE 0 END), 0) AS total_in_cost,
-            COALESCE(SUM(CASE WHEN direction = "in"  THEN qty_change ELSE 0 END), 0) AS total_in_qty
-        ')
+                COALESCE(SUM(CASE WHEN direction = "in"  THEN total_cost ELSE 0 END), 0) AS total_in_cost,
+                COALESCE(SUM(CASE WHEN direction = "in"  THEN qty_change ELSE 0 END), 0) AS total_in_qty
+            ')
             ->where('warehouse_id', $fgWarehouseId)
             ->where('item_id', $itemId)
             ->first();
@@ -468,10 +464,7 @@ class InventoryService
 
     public function getLotMovingAverageUnitCost(int $warehouseId, int $itemId, int $lotId): ?float
     {
-        // Contoh logika:
-        // Ambil saldo terakhir / moving average dari inventory_mutations
-        // untuk kombinasi warehouse + item + lot ini.
-
+        // Ambil mutasi terakhir untuk kombinasi warehouse + item + lot ini.
         $mutation = \DB::table('inventory_mutations')
             ->where('warehouse_id', $warehouseId)
             ->where('item_id', $itemId)
@@ -509,19 +502,6 @@ class InventoryService
 
     /**
      * Ringkasan stok per gudang untuk 1 item.
-     *
-     * Return array:
-     * [
-     *   [
-     *     'warehouse_id' => 2,
-     *     'code'         => 'WH-PRD',
-     *     'name'         => 'Gudang Produksi',
-     *     'on_hand'      => 150,
-     *     'reserved'     => 0,
-     *     'available'    => 150,
-     *   ],
-     *   ...
-     * ]
      */
     public function getStockSummaryForItem(int $itemId): array
     {
@@ -580,4 +560,62 @@ class InventoryService
         );
     }
 
+    /**
+     * (Baru, opsional) Adjust berbasis SELISIH qty.
+     *
+     * - qtyChange > 0 → stok IN
+     * - qtyChange < 0 → stok OUT
+     * - qtyChange = 0 → return null
+     *
+     * Cocok buat manual adjustment "by difference" kalau nanti dibutuhkan.
+     */
+    public function adjustByDifference(
+        int $warehouseId,
+        int $itemId,
+        float | int | string $qtyChange,
+        string | \DateTimeInterface  | null $date = null,
+        ?string $sourceType = 'adjustment',
+        ?int $sourceId = null,
+        ?string $notes = null,
+        ?int $lotId = null,
+        bool $allowNegative = false,
+        float | int | string | null $unitCostOverride = null,
+        bool $affectLotCost = true,
+    ): ?InventoryMutation {
+        $diff = $this->num($qtyChange);
+        if (abs($diff) < 0.0000001) {
+            return null;
+        }
+
+        $date = $this->normalizeDate($date);
+
+        if ($diff > 0) {
+            return $this->stockIn(
+                warehouseId: $warehouseId,
+                itemId: $itemId,
+                qty: $diff,
+                date: $date,
+                sourceType: $sourceType,
+                sourceId: $sourceId,
+                notes: $notes,
+                lotId: $lotId,
+                unitCost: $unitCostOverride,
+                affectLotCost: $affectLotCost,
+            );
+        }
+
+        return $this->stockOut(
+            warehouseId: $warehouseId,
+            itemId: $itemId,
+            qty: abs($diff),
+            date: $date,
+            sourceType: $sourceType,
+            sourceId: $sourceId,
+            notes: $notes,
+            allowNegative: $allowNegative,
+            lotId: $lotId,
+            unitCostOverride: $unitCostOverride,
+            affectLotCost: $affectLotCost,
+        );
+    }
 }

@@ -374,4 +374,62 @@
     textarea {
         font-size: 16px;
     }
+
+
+    .item-suggest {
+        position: relative;
+    }
+
+    .item-suggest-dropdown {
+        position: absolute;
+        z-index: 30;
+        top: 100%;
+        left: 0;
+        right: 0;
+        margin-top: 2px;
+        background: var(--card, #fff);
+        border-radius: 10px;
+        border: 1px solid rgba(148, 163, 184, 0.5);
+        box-shadow:
+            0 12px 30px rgba(15, 23, 42, .18),
+            0 0 0 1px rgba(15, 23, 42, 0.04);
+        max-height: 260px;
+        overflow-y: auto;
+        padding: 2px;
+        font-size: .82rem;
+    }
+
+    .item-suggest-item {
+        padding: .25rem .45rem;
+        border-radius: 8px;
+        cursor: pointer;
+        display: flex;
+        flex-direction: column;
+        gap: 1px;
+    }
+
+    .item-suggest-item strong {
+        font-size: .84rem;
+    }
+
+    .item-suggest-item small {
+        font-size: .74rem;
+    }
+
+    .item-suggest-item:hover,
+    .item-suggest-item--active {
+        background: rgba(59, 130, 246, 0.14);
+    }
+
+    .item-suggest-empty {
+        padding: .35rem .5rem;
+        font-size: .78rem;
+        color: #94a3b8;
+    }
+
+    @media (max-width: 767.98px) {
+        .item-suggest-dropdown {
+            max-height: 220px;
+        }
+    }
 </style>

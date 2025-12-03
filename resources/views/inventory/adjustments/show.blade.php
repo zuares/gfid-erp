@@ -280,13 +280,13 @@
                             <div>
                                 Masuk:
                                 <span class="text-mono diff-plus">
-                                    +{{ number_format($totalIn, 3) }}
+                                    +{{ number_format($totalIn, 2) }}
                                 </span>
                             </div>
                             <div>
                                 Keluar:
                                 <span class="text-mono diff-minus">
-                                    -{{ number_format($totalOut, 3) }}
+                                    -{{ number_format($totalOut, 2) }}
                                 </span>
                             </div>
                         </div>
@@ -336,8 +336,8 @@
 
                                     $qtyChangeText =
                                         $line->direction === 'in'
-                                            ? '+' . number_format($line->qty_change, 3)
-                                            : '-' . number_format($line->qty_change, 3);
+                                            ? '+' . number_format($line->qty_change, 2)
+                                            : '-' . number_format($line->qty_change, 2);
                                 @endphp
                                 <tr>
                                     <td data-label="#">
@@ -362,14 +362,14 @@
                                     </td>
                                     <td data-label="Qty sebelum" class="text-end text-mono">
                                         @if (!is_null($line->qty_before))
-                                            {{ number_format($line->qty_before, 3) }}
+                                            {{ number_format($line->qty_before, 2) }}
                                         @else
                                             <span class="text-muted">-</span>
                                         @endif
                                     </td>
                                     <td data-label="Qty sesudah" class="text-end text-mono">
                                         @if (!is_null($line->qty_after))
-                                            {{ number_format($line->qty_after, 3) }}
+                                            {{ number_format($line->qty_after, 2) }}
                                         @else
                                             <span class="text-muted">-</span>
                                         @endif

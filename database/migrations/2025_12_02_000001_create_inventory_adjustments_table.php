@@ -1,4 +1,3 @@
-
 <?php
 
 use App\Models\User;
@@ -13,7 +12,7 @@ return new class extends Migration
     {
         Schema::create('inventory_adjustments', function (Blueprint $table) {
             $table->id();
-            $table->string('code')->unique(); // ADJ-YYYYMMDD-###
+            $table->string('code')->unique(); // ADJ-YYYYMMDD-XXX
             $table->date('date');
 
             $table->foreignIdFor(Warehouse::class)
@@ -44,6 +43,9 @@ return new class extends Migration
             $table->timestamp('approved_at')->nullable();
 
             $table->timestamps();
+
+            // Supaya trace dari source (StockOpname, dsb) ke adjustment cepat
+            $table->index(['source_type', 'source_id'], 'inv_adj_source_idx');
         });
 
         Schema::create('inventory_adjustment_lines', function (Blueprint $table) {
@@ -59,14 +61,21 @@ return new class extends Migration
                 ->cascadeOnUpdate()
                 ->restrictOnDelete();
 
-            // Snapshot sebelum & sesudah adjustment (opsional tapi enak buat audit)
+            // Opsional: kalau suatu hari perlu adjustment per LOT
+            $table->foreignId('lot_id')
+                ->nullable()
+                ->constrained('lots')
+                ->nullOnDelete();
+
+            // Snapshot sebelum & sesudah adjustment (enak buat audit)
             $table->decimal('qty_before', 15, 3)->nullable();
             $table->decimal('qty_after', 15, 3)->nullable();
 
             // Perubahan qty (boleh plus / minus)
             $table->decimal('qty_change', 15, 3);
 
-            // in / out hanya untuk referensi cepat, sedangkan sign di qty_change tetap dipakai
+            // in / out hanya untuk referensi cepat,
+            // sign di qty_change tetap dipakai di perhitungan.
             $table->enum('direction', ['in', 'out']);
 
             $table->text('notes')->nullable();
