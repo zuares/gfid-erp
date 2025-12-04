@@ -4,8 +4,10 @@ namespace App\Http\Controllers\Api;
 
 use App\Http\Controllers\Controller;
 use App\Models\Item;
+use App\Models\ItemBarcode;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\DB;
+use Symfony\Component\HttpFoundation\Response;
 
 class ItemController extends Controller
 {
@@ -171,6 +173,56 @@ class ItemController extends Controller
         return response()->json([
             'success' => true,
             'data' => $this->mapItem($item),
+        ]);
+    }
+
+    /**
+     * GET /api/v1/items/by-barcode?barcode=XXXX
+     *
+     * Dipakai di modul scan (shipment, adjustment, opname, dll).
+     */
+    public function findByBarcode(Request $request)
+    {
+        $validated = $request->validate([
+            'barcode' => ['required', 'string', 'max:190'],
+        ]);
+
+        $barcode = trim($validated['barcode']);
+
+        if ($barcode === '') {
+            return response()->json([
+                'success' => false,
+                'message' => 'Barcode kosong.',
+            ], Response::HTTP_BAD_REQUEST);
+        }
+
+        /** @var \App\Models\ItemBarcode|null $barcodeRow */
+        $barcodeRow = ItemBarcode::query()
+            ->where('barcode', $barcode)
+            ->where('is_active', true)
+            ->with(['item.category'])
+            ->first();
+
+        if (!$barcodeRow || !$barcodeRow->item) {
+            return response()->json([
+                'success' => false,
+                'message' => 'Item dengan barcode tersebut tidak ditemukan atau nonaktif.',
+            ], Response::HTTP_NOT_FOUND);
+        }
+
+        $item = $barcodeRow->item;
+
+        return response()->json([
+            'success' => true,
+            'data' => [
+                'item' => $this->mapItem($item),
+                'barcode' => [
+                    'id' => $barcodeRow->id,
+                    'barcode' => $barcodeRow->barcode,
+                    'type' => $barcodeRow->type,
+                    'notes' => $barcodeRow->notes,
+                ],
+            ],
         ]);
     }
 }

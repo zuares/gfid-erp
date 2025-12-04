@@ -37,18 +37,24 @@
     // Production QC (cutting / sewing nanti)
     $prodQcOpen = request()->routeIs('production.qc.*');
 
-    // Production Reports (semua laporan di ProductionReportController + finishing per item)
+    // Production Reports
     $prodReportOpen =
         request()->routeIs('production.reports.*') ||
         request()->routeIs('production.finishing_jobs.report_per_item') ||
         request()->routeIs('production.finishing_jobs.report_per_item_detail');
 
-    // Finance → Payroll (cutting, sewing, piece rates, reports)
+    // Finance → Payroll
     $payrollOpen =
         request()->routeIs('payroll.cutting.*') ||
         request()->routeIs('payroll.sewing.*') ||
         request()->routeIs('payroll.piece_rates.*') ||
         request()->routeIs('payroll.reports.*');
+
+    // MASTER DATA (items + customers)
+    $masterOpen = request()->routeIs('items.*') || request()->routeIs('customers.*');
+
+    // SALES / MARKETPLACE
+    $marketplaceOpen = request()->routeIs('marketplace.orders.*');
 @endphp
 
 <style>
@@ -245,6 +251,33 @@
             </a>
         </li>
 
+        {{-- MASTER DATA --}}
+        <li class="mt-2 text-uppercase small menu-label">Master Data</li>
+
+        <li class="mb-1">
+            <button class="sidebar-link sidebar-toggle {{ $masterOpen ? 'is-open' : '' }}" type="button"
+                data-bs-toggle="collapse" data-bs-target="#navMaster"
+                aria-expanded="{{ $masterOpen ? 'true' : 'false' }}" aria-controls="navMaster">
+                <span class="icon">🗂️</span>
+                <span>Master</span>
+                <span class="chevron">▸</span>
+            </button>
+
+            <div class="collapse {{ $masterOpen ? 'show' : '' }}" id="navMaster">
+                <a href="{{ route('items.index') }}"
+                    class="sidebar-link sidebar-link-sub {{ request()->routeIs('items.*') ? 'active' : '' }}">
+                    <span class="icon">🏷️</span>
+                    <span>Items</span>
+                </a>
+
+                <a href="{{ route('customers.index') }}"
+                    class="sidebar-link sidebar-link-sub {{ request()->routeIs('customers.*') ? 'active' : '' }}">
+                    <span class="icon">👤</span>
+                    <span>Customers</span>
+                </a>
+            </div>
+        </li>
+
         {{-- PURCHASING --}}
         <li class="mt-2 text-uppercase small menu-label">Purchasing</li>
 
@@ -298,6 +331,33 @@
             </div>
         </li>
 
+        {{-- SALES / MARKETPLACE --}}
+        <li class="mt-2 text-uppercase small menu-label">Sales &amp; Marketplace</li>
+
+        <li class="mb-1">
+            <button class="sidebar-link sidebar-toggle {{ $marketplaceOpen ? 'is-open' : '' }}" type="button"
+                data-bs-toggle="collapse" data-bs-target="#navMarketplace"
+                aria-expanded="{{ $marketplaceOpen ? 'true' : 'false' }}" aria-controls="navMarketplace">
+                <span class="icon">🛒</span>
+                <span>Marketplace Orders</span>
+                <span class="chevron">▸</span>
+            </button>
+
+            <div class="collapse {{ $marketplaceOpen ? 'show' : '' }}" id="navMarketplace">
+                <a href="{{ route('marketplace.orders.index') }}"
+                    class="sidebar-link sidebar-link-sub {{ request()->routeIs('marketplace.orders.index') ? 'active' : '' }}">
+                    <span class="icon">≡</span>
+                    <span>Daftar Order</span>
+                </a>
+
+                <a href="{{ route('marketplace.orders.create') }}"
+                    class="sidebar-link sidebar-link-sub {{ request()->routeIs('marketplace.orders.create') ? 'active' : '' }}">
+                    <span class="icon">＋</span>
+                    <span>Order Manual</span>
+                </a>
+            </div>
+        </li>
+
         {{-- INVENTORY --}}
         <li class="mt-2 text-uppercase small menu-label">Inventory</li>
 
@@ -312,28 +372,24 @@
             </button>
 
             <div class="collapse {{ $invOpen ? 'show' : '' }}" id="navInventory">
-                {{-- Stok per Item --}}
                 <a href="{{ route('inventory.stocks.items') }}"
                     class="sidebar-link sidebar-link-sub {{ request()->routeIs('inventory.stocks.items') ? 'active' : '' }}">
                     <span class="icon">📦</span>
                     <span>Stok per Item</span>
                 </a>
 
-                {{-- Stok per LOT --}}
                 <a href="{{ route('inventory.stocks.lots') }}"
                     class="sidebar-link sidebar-link-sub {{ request()->routeIs('inventory.stocks.lots') ? 'active' : '' }}">
                     <span class="icon">🎫</span>
                     <span>Stok per LOT</span>
                 </a>
 
-                {{-- Stock Card --}}
                 <a href="{{ route('inventory.stock_card.index') }}"
                     class="sidebar-link sidebar-link-sub {{ request()->routeIs('inventory.stock_card.index') ? 'active' : '' }}">
                     <span class="icon">📋</span>
                     <span>Kartu Stok</span>
                 </a>
 
-                {{-- Internal Transfers --}}
                 <a href="{{ route('inventory.transfers.index') }}"
                     class="sidebar-link sidebar-link-sub {{ request()->routeIs('inventory.transfers.index') ? 'active' : '' }}">
                     <span class="icon">🔁</span>
@@ -346,7 +402,6 @@
                     <span>Transfer Baru</span>
                 </a>
 
-                {{-- Stock Opname --}}
                 <a href="{{ route('inventory.stock_opnames.index') }}"
                     class="sidebar-link sidebar-link-sub {{ request()->routeIs('inventory.stock_opnames.index') ? 'active' : '' }}">
                     <span class="icon">📊</span>
@@ -359,7 +414,6 @@
                     <span>Stock Opname Baru</span>
                 </a>
 
-                {{-- Inventory Adjustments --}}
                 <a href="{{ route('inventory.adjustments.index') }}"
                     class="sidebar-link sidebar-link-sub {{ request()->routeIs('inventory.adjustments.index') ? 'active' : '' }}">
                     <span class="icon">⚖️</span>
@@ -410,14 +464,12 @@
             </button>
 
             <div class="collapse {{ $stockReqOpen ? 'show' : '' }}" id="navInventoryStockRequests">
-                {{-- RTS side (Gudang Siap Jual / Packing Online) --}}
                 <a href="{{ route('rts.stock-requests.index') }}"
                     class="sidebar-link sidebar-link-sub {{ request()->routeIs('rts.stock-requests.*') ? 'active' : '' }}">
                     <span class="icon">🛒</span>
                     <span>Permintaan Stok RTS</span>
                 </a>
 
-                {{-- PRD side (Gudang Produksi) --}}
                 <a href="{{ route('prd.stock-requests.index') }}"
                     class="sidebar-link sidebar-link-sub {{ request()->routeIs('prd.stock-requests.*') ? 'active' : '' }}">
                     <span class="icon">🏭</span>
@@ -584,38 +636,30 @@
             </button>
 
             <div class="collapse {{ $prodReportOpen ? 'show' : '' }}" id="navProductionReports">
-                {{-- Production Chain per Item (LOT → WIP-CUT → WIP-SEW → WIP-FIN → WH-PRD) --}}
-
-                {{-- Daily Production Summary --}}
                 <a href="{{ route('production.reports.daily_production') }}"
                     class="sidebar-link sidebar-link-sub {{ request()->routeIs('production.reports.daily_production') ? 'active' : '' }}">
                     <span class="icon">📆</span>
                     <span>Daily Production Summary</span>
                 </a>
 
-
-                {{-- WIP Sewing Age --}}
                 <a href="{{ route('production.reports.wip_sewing_age') }}"
                     class="sidebar-link sidebar-link-sub {{ request()->routeIs('production.reports.wip_sewing_age') ? 'active' : '' }}">
                     <span class="icon">⏳</span>
                     <span>WIP Sewing Age</span>
                 </a>
 
-                {{-- Sewing per Item --}}
                 <a href="{{ route('production.reports.sewing_per_item') }}"
                     class="sidebar-link sidebar-link-sub {{ request()->routeIs('production.reports.sewing_per_item') ? 'active' : '' }}">
                     <span class="icon">🧵</span>
                     <span>Sewing per Item</span>
                 </a>
 
-                {{-- Reject Detail (Cutting + Sewing) --}}
                 <a href="{{ route('production.reports.reject_detail') }}"
                     class="sidebar-link sidebar-link-sub {{ request()->routeIs('production.reports.reject_detail') ? 'active' : '' }}">
                     <span class="icon">⚠️</span>
                     <span>Reject Detail</span>
                 </a>
 
-                {{-- Finishing per Item --}}
                 <a href="{{ route('production.finishing_jobs.report_per_item') }}"
                     class="sidebar-link sidebar-link-sub {{ request()->routeIs('production.finishing_jobs.report_per_item') || request()->routeIs('production.finishing_jobs.report_per_item_detail') ? 'active' : '' }}">
                     <span class="icon">📦</span>
@@ -638,41 +682,35 @@
             </button>
 
             <div class="collapse {{ $payrollOpen ? 'show' : '' }}" id="navFinancePayroll">
-                {{-- Cutting Payroll --}}
                 <a href="{{ route('payroll.cutting.index') }}"
                     class="sidebar-link sidebar-link-sub {{ request()->routeIs('payroll.cutting.*') ? 'active' : '' }}">
                     <span class="icon">✂️</span>
                     <span>Cutting Payroll</span>
                 </a>
 
-                {{-- Sewing Payroll --}}
                 <a href="{{ route('payroll.sewing.index') }}"
                     class="sidebar-link sidebar-link-sub {{ request()->routeIs('payroll.sewing.*') ? 'active' : '' }}">
                     <span class="icon">🧵</span>
                     <span>Sewing Payroll</span>
                 </a>
 
-                {{-- Master Piece Rates --}}
                 <a href="{{ route('payroll.piece_rates.index') }}"
                     class="sidebar-link sidebar-link-sub {{ request()->routeIs('payroll.piece_rates.*') ? 'active' : '' }}">
                     <span class="icon">📑</span>
                     <span>Master Piece Rates</span>
                 </a>
 
-                {{-- Divider kecil: Payroll Reports --}}
                 <div class="px-3 pt-2 pb-1 text-uppercase"
                     style="font-size:.68rem; letter-spacing:.12em; color:var(--muted);">
                     Payroll Reports
                 </div>
 
-                {{-- Rekap Payroll per Operator --}}
                 <a href="{{ route('payroll.reports.operators') }}"
                     class="sidebar-link sidebar-link-sub {{ request()->routeIs('payroll.reports.operators') || request()->routeIs('payroll.reports.operator_detail') ? 'active' : '' }}">
                     <span class="icon">📊</span>
                     <span>Rekap per Operator</span>
                 </a>
 
-                {{-- Slip Borongan Semua Operator --}}
                 <a href="{{ route('payroll.reports.operator_slips') }}"
                     class="sidebar-link sidebar-link-sub {{ request()->routeIs('payroll.reports.operator_slips') ? 'active' : '' }}">
                     <span class="icon">🧾</span>
@@ -681,7 +719,6 @@
             </div>
         </li>
 
-        {{-- Placeholder Finance Reports (kalau nanti ada) --}}
         <li>
             <a href="#" class="sidebar-link">
                 <span class="icon">📊</span>

@@ -88,45 +88,45 @@ class HppService
      *   finishing_unit_cost, packaging_unit_cost, overhead_unit_cost
      *   notes (string|null)
      */
-    public function createSnapshot(array $data): ItemCostSnapshot
-    {
-        $snapshotDate = $this->normalizeDate($data['snapshot_date'] ?? null);
-
-        $rm = $this->num($data['rm_unit_cost'] ?? 0);
-        $cutting = $this->num($data['cutting_unit_cost'] ?? 0);
-        $sewing = $this->num($data['sewing_unit_cost'] ?? 0);
-        $finishing = $this->num($data['finishing_unit_cost'] ?? 0);
-        $packaging = $this->num($data['packaging_unit_cost'] ?? 0);
-        $overhead = $this->num($data['overhead_unit_cost'] ?? 0);
-
-        $total = $this->calculateTotalHpp([
-            $rm,
-            $cutting,
-            $sewing,
-            $finishing,
-            $packaging,
-            $overhead,
-        ]);
+    public function createSnapshot(
+        int $itemId,
+        ?int $warehouseId,
+        string $snapshotDate,
+        ?string $referenceType,
+        ?int $referenceId,
+        ?float $qtyBasis,
+        ?float $rmUnitCost,
+        ?float $cuttingUnitCost,
+        ?float $sewingUnitCost,
+        ?float $finishingUnitCost,
+        ?float $packagingUnitCost,
+        ?float $overheadUnitCost,
+        ?string $notes = null,
+    ): ItemCostSnapshot {
+        $totalUnitCost =
+            ($rmUnitCost ?? 0) +
+            ($cuttingUnitCost ?? 0) +
+            ($sewingUnitCost ?? 0) +
+            ($finishingUnitCost ?? 0) +
+            ($packagingUnitCost ?? 0) +
+            ($overheadUnitCost ?? 0);
 
         $snapshot = new ItemCostSnapshot();
-        $snapshot->item_id = (int) $data['item_id'];
-        $snapshot->warehouse_id = isset($data['warehouse_id']) ? (int) $data['warehouse_id'] : null;
+        $snapshot->item_id = $itemId;
+        $snapshot->warehouse_id = $warehouseId;
         $snapshot->snapshot_date = $snapshotDate;
-        $snapshot->reference_type = $data['reference_type'] ?? null;
-        $snapshot->reference_id = $data['reference_id'] ?? null;
-        $snapshot->qty_basis = isset($data['qty_basis']) ? $this->num($data['qty_basis']) : null;
-
-        $snapshot->rm_unit_cost = $rm;
-        $snapshot->cutting_unit_cost = $cutting;
-        $snapshot->sewing_unit_cost = $sewing;
-        $snapshot->finishing_unit_cost = $finishing;
-        $snapshot->packaging_unit_cost = $packaging;
-        $snapshot->overhead_unit_cost = $overhead;
-        $snapshot->total_unit_cost = $total;
-
-        $snapshot->notes = $data['notes'] ?? null;
+        $snapshot->reference_type = $referenceType;
+        $snapshot->reference_id = $referenceId;
+        $snapshot->qty_basis = $qtyBasis;
+        $snapshot->rm_unit_cost = $rmUnitCost;
+        $snapshot->cutting_unit_cost = $cuttingUnitCost;
+        $snapshot->sewing_unit_cost = $sewingUnitCost;
+        $snapshot->finishing_unit_cost = $finishingUnitCost;
+        $snapshot->packaging_unit_cost = $packagingUnitCost;
+        $snapshot->overhead_unit_cost = $overheadUnitCost;
+        $snapshot->total_unit_cost = $totalUnitCost;
+        $snapshot->notes = $notes;
         $snapshot->created_by = Auth::id();
-
         $snapshot->save();
 
         return $snapshot;
