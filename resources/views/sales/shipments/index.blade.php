@@ -28,15 +28,27 @@
 
         .badge-soft {
             border-radius: 999px;
-            padding: .15rem .65rem;
+            padding: .25rem .8rem;
             font-size: .75rem;
             border: 1px solid rgba(148, 163, 184, 0.45);
             background: rgba(15, 23, 42, 0.02);
         }
 
+        .badge-label {
+            text-transform: uppercase;
+            letter-spacing: .08em;
+            font-size: .68rem;
+            color: #9ca3af;
+        }
+
+        .badge-value {
+            font-weight: 600;
+            font-size: .9rem;
+        }
+
         .badge-status {
             border-radius: 999px;
-            padding: .18rem .65rem;
+            padding: .18rem .7rem;
             font-size: .72rem;
             letter-spacing: .06em;
             text-transform: uppercase;
@@ -45,7 +57,7 @@
         .badge-status-draft {
             background: rgba(245, 158, 11, 0.08);
             color: #92400e;
-            border: 1px solid rgba(245, 158, 11, 0.3);
+            border: 1px solid rgba(245, 158, 11, 0.35);
         }
 
         .badge-status-submitted {
@@ -65,12 +77,12 @@
 
         .table-list tbody td {
             vertical-align: middle;
-            border-top-color: rgba(148, 163, 184, 0.2);
+            border-top-color: rgba(148, 163, 184, 0.18);
         }
 
         .shipment-no {
+            font-size: .95rem;
             font-weight: 600;
-            font-size: .92rem;
         }
 
         .shipment-no a {
@@ -80,248 +92,148 @@
         .shipment-no a:hover {
             text-decoration: underline;
         }
+
+        .btn-primary {
+            border-radius: 999px;
+            padding-inline: 1rem;
+        }
     </style>
 @endpush
 
 @section('content')
     <div class="page-wrap">
-        {{-- Header --}}
+
+        @php
+            $pageTotalQty = $shipments->sum('total_items');
+        @endphp
+
+        {{-- HEADER --}}
         <div class="d-flex justify-content-between align-items-center mb-3">
             <div>
                 <h1 class="h4 mb-1">
                     Shipments Keluar Barang
                 </h1>
-                <p class="text-muted mb-0 small">
-                    Rekap dokumen pengeluaran barang dari gudang (scan shipment).
+                <p class="text-muted small mb-0">
+                    Rekap dokumen barang keluar dari gudang siap jual.
                 </p>
+
+                {{-- KPI HEADER --}}
+                <div class="d-flex flex-wrap gap-2 mt-2">
+                    <span class="badge-soft">
+                        <span class="badge-label">Total Shipment</span>
+                        <span class="badge-value ms-1">
+                            {{ number_format($shipments->total(), 0, ',', '.') }}
+                        </span>
+                    </span>
+                    <span class="badge-soft">
+                        <span class="badge-label">Di Halaman Ini</span>
+                        <span class="badge-value ms-1">
+                            {{ $shipments->count() }}
+                        </span>
+                    </span>
+                    <span class="badge-soft">
+                        <span class="badge-label">Total Qty (Halaman Ini)</span>
+                        <span class="badge-value ms-1">
+                            {{ number_format($pageTotalQty, 0, ',', '.') }}
+                        </span>
+                    </span>
+                </div>
             </div>
-            <a href="{{ route('shipments.create') }}" class="btn btn-primary">
+
+            <a href="{{ route('sales.shipments.create') }}" class="btn btn-primary">
                 <i class="bi bi-upc-scan me-1"></i>
                 Shipment Baru
             </a>
         </div>
 
-        {{-- Flash --}}
-        @if (session('status') === 'success')
-            <div class="alert alert-success">
-                {{ session('message') }}
-            </div>
-        @elseif (session('status') === 'error')
-            <div class="alert alert-danger">
-                {{ session('message') }}
-            </div>
-        @endif
+        {{-- CARD LIST --}}
+        <div class="card card-main">
+            <div class="card-body p-0">
 
-        {{-- Filter + summary --}}
-        <div class="card card-main mb-3">
-            <div class="card-body">
-                <form method="GET" action="{{ route('shipments.index') }}" class="mb-3">
-                    <div class="row g-2 align-items-end">
-                        {{-- Date from --}}
-                        <div class="col-md-2">
-                            <label class="form-label small text-uppercase text-muted mb-1">
-                                Dari Tanggal
-                            </label>
-                            <input type="date" name="date_from" class="form-control form-control-sm"
-                                value="{{ $filters['date_from'] ?? '' }}">
-                        </div>
-
-                        {{-- Date to --}}
-                        <div class="col-md-2">
-                            <label class="form-label small text-uppercase text-muted mb-1">
-                                Sampai Tanggal
-                            </label>
-                            <input type="date" name="date_to" class="form-control form-control-sm"
-                                value="{{ $filters['date_to'] ?? '' }}">
-                        </div>
-
-                        {{-- Warehouse --}}
-                        <div class="col-md-2">
-                            <label class="form-label small text-uppercase text-muted mb-1">
-                                Gudang
-                            </label>
-                            <select name="warehouse_id" class="form-select form-select-sm">
-                                <option value="">Semua</option>
-                                @foreach ($warehouses as $wh)
-                                    <option value="{{ $wh->id }}" @selected(($filters['warehouse_id'] ?? null) == $wh->id)>
-                                        {{ $wh->code }}
-                                    </option>
-                                @endforeach
-                            </select>
-                        </div>
-
-                        {{-- Customer --}}
-                        <div class="col-md-2">
-                            <label class="form-label small text-uppercase text-muted mb-1">
-                                Customer
-                            </label>
-                            <select name="customer_id" class="form-select form-select-sm">
-                                <option value="">Semua</option>
-                                @foreach ($customers as $customer)
-                                    <option value="{{ $customer->id }}" @selected(($filters['customer_id'] ?? null) == $customer->id)>
-                                        {{ $customer->name }}
-                                    </option>
-                                @endforeach
-                            </select>
-                        </div>
-
-                        {{-- Store --}}
-                        <div class="col-md-2">
-                            <label class="form-label small text-uppercase text-muted mb-1">
-                                Store
-                            </label>
-                            <select name="store_id" class="form-select form-select-sm">
-                                <option value="">Semua</option>
-                                @foreach ($stores as $store)
-                                    <option value="{{ $store->id }}" @selected(($filters['store_id'] ?? null) == $store->id)>
-                                        {{ $store->name }}
-                                    </option>
-                                @endforeach
-                            </select>
-                        </div>
-
-                        {{-- Search --}}
-                        <div class="col-md-2">
-                            <label class="form-label small text-uppercase text-muted mb-1">
-                                Cari No Shipment
-                            </label>
-                            <div class="input-group input-group-sm">
-                                <input type="text" name="q" class="form-control" placeholder="SHP-..."
-                                    value="{{ $filters['q'] ?? '' }}">
-                                <button class="btn btn-outline-secondary" type="submit">
-                                    <i class="bi bi-search"></i>
-                                </button>
-                            </div>
-                        </div>
+                @if ($shipments->count() === 0)
+                    <div class="p-4 text-center text-muted">
+                        Belum ada shipment. Buat dokumen baru dengan tombol
+                        <span class="fw-semibold">Shipment Baru</span> di kanan atas.
                     </div>
-
-                    <div class="mt-2 d-flex justify-content-between align-items-center">
-                        <div class="small text-muted">
-                            Menampilkan <strong>{{ $shipments->total() }}</strong> shipment
-                            (halaman {{ $shipments->currentPage() }} / {{ $shipments->lastPage() }}).
-                        </div>
-                        <div>
-                            @if (array_filter($filters))
-                                <a href="{{ route('shipments.index') }}" class="btn btn-link btn-sm text-decoration-none">
-                                    Reset filter
-                                </a>
-                            @endif
-                        </div>
-                    </div>
-                </form>
-
-                @php
-                    $pageTotalQty = $shipments->sum('total_items');
-                @endphp
-
-                {{-- Summary --}}
-                <div class="d-flex flex-wrap gap-2 mb-2">
-                    <span class="badge-soft">
-                        <span class="text-muted small">Shipment di halaman ini:</span>
-                        <span class="fw-semibold ms-1">{{ $shipments->count() }}</span>
-                    </span>
-                    <span class="badge-soft">
-                        <span class="text-muted small">Total Qty keluar (halaman ini):</span>
-                        <span class="fw-semibold ms-1">{{ number_format($pageTotalQty, 0, ',', '.') }}</span>
-                    </span>
-                </div>
-
-                {{-- Tabel --}}
-                <div class="table-responsive">
-                    <table class="table table-hover align-middle table-list mb-0">
-                        <thead>
-                            <tr>
-                                <th style="width: 40px;">#</th>
-                                <th style="width: 120px;">Tanggal</th>
-                                <th>No Shipment</th>
-                                <th style="width: 120px;">Gudang</th>
-                                <th>Customer / Store</th>
-                                <th style="width: 120px;" class="text-end">Total Qty</th>
-                                <th style="width: 120px;">Status</th>
-                                <th style="width: 80px;"></th>
-                            </tr>
-                        </thead>
-                        <tbody>
-                            @forelse ($shipments as $shipment)
+                @else
+                    <div class="table-responsive">
+                        <table class="table table-hover align-middle table-list mb-0">
+                            <thead>
                                 <tr>
-                                    <td class="text-muted small">
-                                        {{ ($shipments->currentPage() - 1) * $shipments->perPage() + $loop->iteration }}
-                                    </td>
-                                    <td class="small">
-                                        {{ id_date($shipment->date) }}
-                                    </td>
-                                    <td>
-                                        <div class="shipment-no">
-                                            <a href="{{ route('shipments.show', $shipment) }}">
-                                                {{ $shipment->shipment_no }}
+                                    <th style="width: 40px;">#</th>
+                                    <th style="width: 120px;">Tanggal</th>
+                                    <th>No Shipment</th>
+                                    <th>Store / Channel</th>
+                                    <th class="text-end" style="width: 130px;">Total Qty</th>
+                                    <th style="width: 120px;">Status</th>
+                                    <th style="width: 80px;"></th>
+                                </tr>
+                            </thead>
+                            <tbody>
+                                @foreach ($shipments as $shipment)
+                                    <tr>
+                                        <td class="text-muted small">
+                                            {{ ($shipments->currentPage() - 1) * $shipments->perPage() + $loop->iteration }}
+                                        </td>
+
+                                        <td class="small">
+                                            {{ $shipment->date?->format('d M Y') }}
+                                        </td>
+
+                                        <td>
+                                            <div class="shipment-no">
+                                                <a href="{{ route('sales.shipments.show', $shipment) }}">
+                                                    {{ $shipment->code }}
+                                                </a>
+                                            </div>
+                                        </td>
+
+                                        <td>
+                                            @if ($shipment->store)
+                                                <div class="small fw-semibold">
+                                                    {{ $shipment->store->name }}
+                                                </div>
+                                            @else
+                                                <span class="small text-muted">-</span>
+                                            @endif
+                                        </td>
+
+                                        <td class="text-end">
+                                            <span class="fw-semibold">
+                                                {{ number_format($shipment->total_items ?? 0, 0, ',', '.') }}
+                                            </span>
+                                        </td>
+
+                                        <td>
+                                            @if ($shipment->status === 'draft')
+                                                <span class="badge-status badge-status-draft">
+                                                    Draft
+                                                </span>
+                                            @else
+                                                <span class="badge-status badge-status-submitted">
+                                                    Submitted
+                                                </span>
+                                            @endif
+                                        </td>
+
+                                        <td class="text-end">
+                                            <a href="{{ route('sales.shipments.show', $shipment) }}"
+                                                class="btn btn-sm btn-outline-primary">
+                                                Detail
                                             </a>
-                                        </div>
-                                        <div class="small text-muted">
-                                            Dibuat oleh {{ $shipment->creator?->name ?? '-' }}
-                                        </div>
-                                    </td>
-                                    <td>
-                                        <div class="fw-semibold small">
-                                            {{ $shipment->warehouse?->code ?? '-' }}
-                                        </div>
-                                        <div class="small text-muted">
-                                            {{ $shipment->warehouse?->name ?? '' }}
-                                        </div>
-                                    </td>
-                                    <td>
-                                        @if ($shipment->customer)
-                                            <div class="small fw-semibold">
-                                                {{ $shipment->customer->name }}
-                                            </div>
-                                        @endif
-                                        @if ($shipment->store)
-                                            <div class="small text-muted">
-                                                Channel: {{ $shipment->store->name }}
-                                            </div>
-                                        @endif
-                                        @if (!$shipment->customer && !$shipment->store)
-                                            <span class="text-muted small">-</span>
-                                        @endif
-                                    </td>
-                                    <td class="text-end">
-                                        <span class="fw-semibold">
-                                            {{ number_format($shipment->total_items, 0, ',', '.') }}
-                                        </span>
-                                    </td>
-                                    <td>
-                                        @if ($shipment->status === 'draft')
-                                            <span class="badge-status badge-status-draft">
-                                                Draft
-                                            </span>
-                                        @else
-                                            <span class="badge-status badge-status-submitted">
-                                                Submitted
-                                            </span>
-                                        @endif
-                                    </td>
-                                    <td class="text-end">
-                                        <a href="{{ route('shipments.show', $shipment) }}"
-                                            class="btn btn-sm btn-outline-primary">
-                                            Detail
-                                        </a>
-                                    </td>
-                                </tr>
-                            @empty
-                                <tr>
-                                    <td colspan="8" class="text-center text-muted py-4">
-                                        Belum ada shipment. Buat baru dengan tombol
-                                        <span class="fw-semibold">Shipment Baru</span> di atas.
-                                    </td>
-                                </tr>
-                            @endforelse
-                        </tbody>
-                    </table>
-                </div>
+                                        </td>
+                                    </tr>
+                                @endforeach
+                            </tbody>
+                        </table>
+                    </div>
 
-                {{-- Pagination --}}
-                <div class="mt-3">
-                    {{ $shipments->links() }}
-                </div>
+                    {{-- PAGINATION --}}
+                    <div class="p-3">
+                        {{ $shipments->links() }}
+                    </div>
+                @endif
+
             </div>
         </div>
     </div>

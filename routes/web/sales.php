@@ -16,12 +16,12 @@ Route::middleware(['web', 'auth'])->group(function () {
          *  INVOICES
          * =========================
          */
-        Route::post('invoices/{invoice}/post', [SalesInvoiceController::class, 'post'])
-            ->name('invoices.post');
 
-        // ⭐ NEW: Buat invoice dari Shipment
         Route::get('invoices/create-from-shipment/{shipment}', [SalesInvoiceController::class, 'createFromShipment'])
             ->name('invoices.create_from_shipment');
+        Route::post('invoices/{invoice}/post', [SalesInvoiceController::class, 'post'])
+            ->name('invoices.post');
+        // ⭐ NEW: Buat invoice dari Shipment
 
         Route::resource('invoices', SalesInvoiceController::class);
 

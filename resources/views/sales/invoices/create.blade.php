@@ -1,17 +1,55 @@
 @extends('layouts.app')
 
-@section('title')
-    @if ($sourceShipment)
-        Buat Invoice dari Shipment {{ $sourceShipment->shipment_no }}
-    @else
-        Buat Invoice Penjualan
-    @endif
-@endsection
+@php
+    // Context judul
+    if (!empty($sourceShipment)) {
+        $pageTitle = 'Buat Invoice dari Shipment ' . $sourceShipment->shipment_no;
+        $pageMeta = 'BUAT INVOICE DARI SHIPMENT';
+    } else {
+        $pageTitle = 'Buat Invoice Penjualan';
+        $pageMeta = 'INVOICE PENJUALAN BARU';
+    }
+
+    // Default values (datang dari controller atau old())
+    $defaultDate = old('date', $defaultDate ?? now()->toDateString());
+    $defaultWarehouseId = old('warehouse_id', $defaultWarehouseId ?? null);
+    $defaultStoreId = old('store_id', $defaultStoreId ?? null);
+
+    // Cari WH-RTS (kalau ada) dari list gudang yang dikirim controller
+    $whRts = null;
+    if (isset($warehouses)) {
+        if ($warehouses instanceof \Illuminate\Support\Collection) {
+            $whRts = $warehouses->firstWhere('code', 'WH-RTS');
+        } else {
+            foreach ($warehouses as $wh) {
+                if ($wh->code === 'WH-RTS') {
+                    $whRts = $wh;
+                    break;
+                }
+            }
+        }
+    }
+
+    // Initial lines (prefilledLines dari controller atau 1 baris kosong)
+    $initialLines = old('items', $prefilledLines ?? []);
+    if (empty($initialLines)) {
+        $initialLines = [
+            [
+                'item_id' => null,
+                'qty' => 1,
+                'unit_price' => null,
+                'line_discount' => 0,
+            ],
+        ];
+    }
+@endphp
+
+@section('title', $pageTitle)
 
 @push('head')
     <style>
         .page-wrap {
-            max-width: 1100px;
+            max-width: 1150px;
             margin-inline: auto;
             padding: .75rem .75rem 3.5rem;
         }
@@ -101,53 +139,76 @@
         .lines-wrapper {
             max-height: 420px;
             overflow-y: auto;
+            overscroll-behavior: contain;
+            scrollbar-width: thin;
+            scrollbar-color: rgba(148, 163, 184, 0.7) transparent;
+        }
+
+        .lines-wrapper::-webkit-scrollbar {
+            width: 6px;
+        }
+
+        .lines-wrapper::-webkit-scrollbar-thumb {
+            background: rgba(148, 163, 184, 0.7);
+            border-radius: 999px;
+        }
+
+        /* Biar feel invoice: angka rata kanan dan tabular */
+        .num-cell {
+            text-align: right;
+            font-variant-numeric: tabular-nums;
         }
     </style>
 @endpush
 
 @section('content')
-    @php
-        $defaultDate = old('date', $defaultDate ?? now()->toDateString());
-        $defaultWarehouseId = old('warehouse_id', $defaultWarehouseId ?? null);
-        $defaultCustomerId = old('customer_id', $defaultCustomerId ?? null);
-        $defaultStoreId = old('store_id', $defaultStoreId ?? null);
-
-        $initialLines = old('items', $prefilledLines ?? []);
-        if (empty($initialLines)) {
-            $initialLines = [
-                [
-                    'item_id' => null,
-                    'qty' => 1,
-                    'unit_price' => null,
-                    'line_discount' => 0,
-                ],
-            ];
-        }
-    @endphp
-
     <div class="page-wrap">
-        {{-- HEADER --}}
-        <div class="d-flex justify-content-between align-items-center mb-3">
+        {{-- HEADER ATAS --}}
+        <div class="d-flex justify-content-between align-items-start mb-3">
             <div>
                 <div class="meta-label mb-1">
-                    @if ($sourceShipment)
-                        BUAT INVOICE DARI SHIPMENT
-                    @else
-                        BUAT INVOICE PENJUALAN
-                    @endif
+                    {{ $pageMeta }}
                 </div>
                 <h1 class="h4 mb-1">
-                    @if ($sourceShipment)
+                    @if (!empty($sourceShipment))
                         Shipment {{ $sourceShipment->shipment_no }}
                     @else
                         Invoice Baru
                     @endif
                 </h1>
-                @if ($sourceShipment)
-                    <div class="small text-muted">
-                        Tanggal shipment: {{ id_date($sourceShipment->date) }} •
-                        Gudang: {{ $sourceShipment->warehouse?->code ?? '-' }} •
-                        Store: {{ $sourceShipment->store?->name ?? '-' }}
+
+                @if (!empty($sourceShipment))
+                    {{-- Header info: Tanggal, Store, Status --}}
+                    <div class="d-flex flex-wrap gap-2 small mt-2">
+                        <div>
+                            <span class="text-muted">Tanggal:</span>
+                            <span class="fw-semibold">{{ id_date($sourceShipment->date) }}</span>
+                        </div>
+                        <div>
+                            <span class="text-muted">Store:</span>
+                            <span class="fw-semibold">{{ $sourceShipment->store?->name ?? '-' }}</span>
+                        </div>
+                        <div>
+                            <span class="text-muted">Status Shipment:</span>
+                            @php
+                                $shipStatus = $sourceShipment->status ?? 'draft';
+                            @endphp
+                            @if ($shipStatus === 'posted')
+                                <span
+                                    class="badge bg-success-subtle text-success border border-success-subtle rounded-pill px-2 py-1">
+                                    Posted
+                                </span>
+                            @else
+                                <span
+                                    class="badge bg-secondary-subtle text-secondary border border-secondary-subtle rounded-pill px-2 py-1">
+                                    Draft
+                                </span>
+                            @endif
+                        </div>
+                    </div>
+                @else
+                    <div class="small text-muted mt-1">
+                        Isi data invoice penjualan, bisa mode <strong>unpriced</strong> (harga kosong dulu).
                     </div>
                 @endif
             </div>
@@ -174,90 +235,162 @@
         {{-- FORM --}}
         <form action="{{ route('sales.invoices.store') }}" method="POST">
             @csrf
+            @if (!empty($sourceShipment))
+                <input type="hidden" name="source_shipment_id" value="{{ $sourceShipment->id }}">
+            @endif
 
+
+            {{-- INFO UTAMA (Tanggal, Gudang, Toko/Channel) --}}
             <div class="card card-main mb-3">
                 <div class="card-body">
-                    <div class="meta-label mb-2">Info Utama</div>
+                    <div class="d-flex justify-content-between align-items-center mb-3">
+                        <div class="meta-label mb-0">
+                            Info Utama
+                        </div>
+
+                        <div class="summary-pill">
+                            Status awal:
+                            <strong class="ms-1">DRAFT / UNPRICED</strong>
+                        </div>
+                    </div>
+
                     <div class="row g-3">
+                        {{-- TANGGAL --}}
                         <div class="col-md-3">
                             <label class="form-label small">Tanggal</label>
                             <input type="date" name="date" class="form-control form-control-sm"
                                 value="{{ $defaultDate }}" required>
                         </div>
 
+                        {{-- GUDANG (WH-RTS kalau ada, locked jika dari shipment) --}}
                         <div class="col-md-3">
                             <label class="form-label small">Gudang</label>
-                            <select name="warehouse_id" class="form-select form-select-sm" required>
-                                <option value="">Pilih gudang...</option>
-                                @foreach ($warehouses as $wh)
-                                    <option value="{{ $wh->id }}" @selected($defaultWarehouseId == $wh->id)>
-                                        {{ $wh->code }} — {{ $wh->name }}
-                                    </option>
-                                @endforeach
-                            </select>
+
+                            @php
+                                // id WH-RTS kalau ada
+                                $whRtsId = $whRts?->id;
+                            @endphp
+
+                            @if (!empty($sourceShipment))
+                                @php
+                                    // LOCK → selalu pakai WH-RTS kalau ketemu, fallback ke shipment->warehouse_id
+                                    $effectiveWarehouseId = $whRtsId ?? ($sourceShipment->warehouse_id ?? null);
+
+                                    $selectedWarehouse = null;
+                                    if ($effectiveWarehouseId) {
+                                        if ($warehouses instanceof \Illuminate\Support\Collection) {
+                                            $selectedWarehouse = $warehouses->firstWhere('id', $effectiveWarehouseId);
+                                        } else {
+                                            foreach ($warehouses as $wh) {
+                                                if ($wh->id == $effectiveWarehouseId) {
+                                                    $selectedWarehouse = $wh;
+                                                    break;
+                                                }
+                                            }
+                                        }
+                                    }
+                                @endphp
+
+                                <div class="form-control form-control-sm bg-body-tertiary" tabindex="-1"
+                                    style="pointer-events: none; opacity: .9;">
+                                    @if ($selectedWarehouse)
+                                        {{ $selectedWarehouse->code }}
+                                    @else
+                                        -
+                                    @endif
+                                </div>
+
+                                <input type="hidden" name="warehouse_id" value="{{ $effectiveWarehouseId }}">
+                            @else
+                                @php
+                                    // Default pilihan = old()/default atau fallback ke WH-RTS
+                                    $selectedWarehouseId = $defaultWarehouseId ?: $whRtsId;
+                                @endphp
+                                <select name="warehouse_id" class="form-select form-select-sm" required>
+                                    <option value="">Pilih gudang...</option>
+                                    @foreach ($warehouses as $wh)
+                                        <option value="{{ $wh->id }}" @selected($selectedWarehouseId == $wh->id)>
+                                            {{ $wh->code }} — {{ $wh->name }}
+                                        </option>
+                                    @endforeach
+                                </select>
+
+                                @if ($whRts)
+                                    <div class="form-text small text-muted">
+                                        Default gudang = WH-RTS. Bisa diubah jika perlu.
+                                    </div>
+                                @endif
+                            @endif
                         </div>
 
-                        <div class="col-md-3">
-                            <label class="form-label small">Customer (opsional)</label>
-                            <select name="customer_id" class="form-select form-select-sm">
-                                <option value="">Tanpa customer</option>
-                                @foreach ($customers as $c)
-                                    <option value="{{ $c->id }}" @selected($defaultCustomerId == $c->id)>
-                                        {{ $c->name }}
-                                    </option>
-                                @endforeach
-                            </select>
-                        </div>
-
-                        <div class="col-md-3">
-                            <label class="form-label small">Store / Channel (opsional)</label>
-                            <select name="store_id" class="form-select form-select-sm">
-                                <option value="">Tanpa store</option>
-                                @foreach ($stores as $s)
-                                    <option value="{{ $s->id }}" @selected($defaultStoreId == $s->id)>
-                                        {{ $s->code }} — {{ $s->name }}
-                                    </option>
-                                @endforeach
-                            </select>
-                        </div>
-
-                        <div class="col-md-3">
-                            <label class="form-label small">Diskon Header (Rp)</label>
-                            <input type="number" step="0.01" min="0" name="header_discount"
-                                class="form-control form-control-sm" value="{{ old('header_discount', 0) }}">
-                        </div>
-
-                        <div class="col-md-3">
-                            <label class="form-label small">PPN (%)</label>
-                            <input type="number" step="0.01" min="0" max="100" name="tax_percent"
-                                class="form-control form-control-sm" value="{{ old('tax_percent', 0) }}">
-                        </div>
-
+                        {{-- TOKO / CHANNEL (LOCKED JIKA DARI SHIPMENT) --}}
                         <div class="col-md-6">
-                            <label class="form-label small">Catatan</label>
-                            <textarea name="remarks" rows="2" class="form-control form-control-sm">{{ old('remarks') }}</textarea>
+                            <label class="form-label small">Toko / Channel</label>
+
+                            @if (!empty($sourceShipment))
+                                @php
+                                    // LOCK: selalu ikut store dari shipment
+                                    $effectiveStoreId = $sourceShipment->store_id ?? null;
+
+                                    $selectedStore = null;
+                                    if ($effectiveStoreId) {
+                                        if ($stores instanceof \Illuminate\Support\Collection) {
+                                            $selectedStore = $stores->firstWhere('id', $effectiveStoreId);
+                                        } else {
+                                            foreach ($stores as $st) {
+                                                if ($st->id == $effectiveStoreId) {
+                                                    $selectedStore = $st;
+                                                    break;
+                                                }
+                                            }
+                                        }
+                                    }
+                                @endphp
+
+                                <div class="form-control form-control-sm bg-body-tertiary" tabindex="-1"
+                                    style="pointer-events: none; opacity: .9;">
+                                    @if ($selectedStore)
+                                        {{ $selectedStore->code }} — {{ $selectedStore->name }}
+                                    @elseif ($sourceShipment->store)
+                                        {{ $sourceShipment->store->code }} — {{ $sourceShipment->store->name }}
+                                    @else
+                                        -
+                                    @endif
+                                </div>
+
+                                {{-- Hidden store_id --}}
+                                <input type="hidden" name="store_id" value="{{ $effectiveStoreId }}">
+                            @else
+                                <select name="store_id" class="form-select form-select-sm">
+                                    <option value="">Tanpa store</option>
+                                    @foreach ($stores as $s)
+                                        <option value="{{ $s->id }}" @selected($defaultStoreId == $s->id)>
+                                            {{ $s->code }} — {{ $s->name }}
+                                        </option>
+                                    @endforeach
+                                </select>
+                            @endif
                         </div>
                     </div>
                 </div>
             </div>
 
-            {{-- LINES --}}
+            {{-- DAFTAR ITEM --}}
             <div class="card card-main">
                 <div class="card-body">
                     <div class="d-flex justify-content-between align-items-center mb-2">
                         <div>
                             <div class="meta-label mb-1">Daftar Item</div>
                             <div class="small text-muted">
-                                @if ($sourceShipment)
-                                    Prefill dari shipment. Ubah qty / harga jika perlu.
-                                @else
-                                    Tambahkan item, qty, dan harga jual.
-                                @endif
+
                             </div>
                         </div>
-                        <button type="button" class="btn btn-outline-primary btn-sm btn-chip" id="btnAddLine">
-                            + Tambah Baris
-                        </button>
+
+                        @if (empty($sourceShipment))
+                            <button type="button" class="btn btn-outline-primary btn-sm btn-chip" id="btnAddLine">
+                                + Tambah Baris
+                            </button>
+                        @endif
                     </div>
 
                     <div class="lines-wrapper">
@@ -265,12 +398,18 @@
                             <table class="table table-sm align-middle table-lines mb-0">
                                 <thead>
                                     <tr>
-                                        <th style="width: 40px;"></th>
+                                        <th style="width: 40px;">#</th>
                                         <th style="width: 260px;">Item</th>
-                                        <th style="width: 80px;">Qty</th>
-                                        <th style="width: 140px;">Harga /pcs</th>
-                                        <th style="width: 120px;">Diskon line</th>
-                                        <th style="width: 140px;" class="text-end">Subtotal</th>
+                                        <th style="width: 100px;" class="num-cell">Qty</th>
+
+                                        @if (!empty($sourceShipment))
+                                            <th style="width: 140px;" class="num-cell">HPP</th>
+                                            <th style="width: 140px;" class="num-cell">Subtotal</th>
+                                        @else
+                                            <th style="width: 140px;">Harga /pcs</th>
+                                            <th style="width: 120px;">Diskon line</th>
+                                            <th style="width: 140px;" class="num-cell">Subtotal</th>
+                                        @endif
                                     </tr>
                                 </thead>
                                 <tbody id="invoice-lines-body" data-next-index="{{ count($initialLines) }}">
@@ -280,15 +419,32 @@
                                             $qtyOld = old("items.$idx.qty", $line['qty'] ?? 1);
                                             $priceOld = old("items.$idx.unit_price", $line['unit_price'] ?? null);
                                             $discOld = old("items.$idx.line_discount", $line['line_discount'] ?? 0);
+
+                                            $itemObj =
+                                                $items instanceof \Illuminate\Support\Collection
+                                                    ? $items->firstWhere('id', $itemIdOld)
+                                                    : null;
+
+                                            $hppValue = $line['hpp'] ?? ($itemObj->hpp_unit ?? 0);
+                                            // subtotal di mode shipment = qty * HPP (display only, non-reaktif)
+                                            $subtotalInitial = $qtyOld * $hppValue;
                                         @endphp
                                         <tr>
+                                            {{-- # / tombol remove --}}
                                             <td class="text-center align-middle">
-                                                <button type="button" class="btn btn-outline-danger btn-sm px-2 py-0"
-                                                    onclick="removeLineRow(this)">×</button>
+                                                @if (empty($sourceShipment))
+                                                    <button type="button" class="btn btn-outline-danger btn-sm px-2 py-0"
+                                                        onclick="removeLineRow(this)">×</button>
+                                                @else
+                                                    {{ $loop->iteration }}
+                                                @endif
                                             </td>
+
+                                            {{-- ITEM --}}
                                             <td>
                                                 <select name="items[{{ $idx }}][item_id]"
-                                                    class="form-select form-select-sm item-select" required>
+                                                    class="form-select form-select-sm item-select"
+                                                    @if (!empty($sourceShipment)) disabled @endif required>
                                                     <option value="">Pilih item...</option>
                                                     @foreach ($items as $item)
                                                         <option value="{{ $item->id }}"
@@ -297,28 +453,61 @@
                                                         </option>
                                                     @endforeach
                                                 </select>
+
+                                                @if (!empty($sourceShipment))
+                                                    {{-- tetap kirim item_id ke backend --}}
+                                                    <input type="hidden" name="items[{{ $idx }}][item_id]"
+                                                        value="{{ $itemIdOld }}">
+                                                @endif
                                             </td>
-                                            <td>
-                                                <input type="number" min="1"
+
+                                            {{-- QTY (desimal angka) --}}
+                                            <td class="num-cell">
+                                                <input type="number" step="0.01" min="0"
                                                     name="items[{{ $idx }}][qty]"
-                                                    class="form-control form-control-sm qty-input"
-                                                    value="{{ $qtyOld }}" required>
+                                                    class="form-control form-control-sm qty-input text-end"
+                                                    value="{{ $qtyOld }}"
+                                                    @if (!empty($sourceShipment)) readonly @endif required>
                                             </td>
-                                            <td>
-                                                <input type="number" step="0.01" min="0"
-                                                    name="items[{{ $idx }}][unit_price]"
-                                                    class="form-control form-control-sm price-input"
-                                                    value="{{ $priceOld }}" required>
-                                            </td>
-                                            <td>
-                                                <input type="number" step="0.01" min="0"
-                                                    name="items[{{ $idx }}][line_discount]"
-                                                    class="form-control form-control-sm discount-input"
-                                                    value="{{ $discOld }}">
-                                            </td>
-                                            <td class="text-end">
-                                                <span class="line-subtotal">0</span>
-                                            </td>
+
+                                            @if (!empty($sourceShipment))
+                                                {{-- HPP (format Rupiah tanpa koma) --}}
+                                                <td class="num-cell">
+                                                    <span class="hpp-display">
+                                                        {{ number_format($hppValue, 0, ',', '.') }}
+                                                    </span>
+                                                    {{-- Hidden raw value jika backend butuh --}}
+                                                    <input type="hidden" name="items[{{ $idx }}][unit_price]"
+                                                        value="{{ $hppValue }}">
+                                                    <input type="hidden"
+                                                        name="items[{{ $idx }}][line_discount]"
+                                                        value="{{ $discOld ?? 0 }}">
+                                                </td>
+
+                                                {{-- SUBTOTAL (Rupiah tanpa koma, tidak reaktif) --}}
+                                                <td class="num-cell">
+                                                    <span class="line-subtotal">
+                                                        {{ number_format($subtotalInitial, 0, ',', '.') }}
+                                                    </span>
+                                                </td>
+                                            @else
+                                                {{-- MODE NORMAL: Harga / Diskon / Subtotal reaktif --}}
+                                                <td>
+                                                    <input type="number" step="0.01" min="0"
+                                                        name="items[{{ $idx }}][unit_price]"
+                                                        class="form-control form-control-sm price-input"
+                                                        value="{{ $priceOld }}">
+                                                </td>
+                                                <td>
+                                                    <input type="number" step="0.01" min="0"
+                                                        name="items[{{ $idx }}][line_discount]"
+                                                        class="form-control form-control-sm discount-input"
+                                                        value="{{ $discOld }}">
+                                                </td>
+                                                <td class="num-cell">
+                                                    <span class="line-subtotal">0</span>
+                                                </td>
+                                            @endif
                                         </tr>
                                     @endforeach
                                 </tbody>
@@ -329,7 +518,7 @@
                     <div class="mt-3 d-flex justify-content-between align-items-center">
                         <div class="small text-muted">
                             Subtotal & PPN akan dihitung ulang saat disimpan.<br>
-                            Margin laba di laporan akan pakai HPP final dari ProductionCostPeriod aktif.
+
                         </div>
                         <button type="submit" class="btn btn-primary btn-chip">
                             Simpan Invoice
@@ -343,19 +532,29 @@
 
 @push('scripts')
     <script>
+        const hasSourceShipment = {{ !empty($sourceShipment) ? 'true' : 'false' }};
+
         function removeLineRow(btn) {
+            if (hasSourceShipment) return; // mode shipment: tidak bisa hapus baris
+
             const tr = btn.closest('tr');
             if (!tr) return;
             const tbody = tr.parentElement;
             tr.remove();
 
-            // Kalau kosong total, tambahkan 1 baris baru kosong
             if (!tbody.querySelector('tr')) {
                 addLineRow();
             }
+
+            recalcSubtotals();
         }
 
         function recalcSubtotals() {
+            if (hasSourceShipment) {
+                // mode shipment: subtotal tidak reaktif di UI
+                return;
+            }
+
             const tbody = document.getElementById('invoice-lines-body');
             if (!tbody) return;
             const rows = tbody.querySelectorAll('tr');
@@ -366,6 +565,7 @@
                 const disc = parseFloat(row.querySelector('.discount-input')?.value || '0');
                 let subtotal = (qty * price) - disc;
                 if (subtotal < 0) subtotal = 0;
+
                 const el = row.querySelector('.line-subtotal');
                 if (el) {
                     el.textContent = new Intl.NumberFormat('id-ID', {
@@ -377,6 +577,8 @@
         }
 
         function addLineRow() {
+            if (hasSourceShipment) return; // mode shipment: tidak bisa tambah baris via UI
+
             const tbody = document.getElementById('invoice-lines-body');
             if (!tbody) return;
 
@@ -397,16 +599,16 @@
             @endforeach
         </select>
     </td>
-    <td>
-        <input type="number" min="1" name="items[${nextIndex}][qty]" class="form-control form-control-sm qty-input" value="1" required>
+    <td class="num-cell">
+        <input type="number" step="0.01" min="0" name="items[${nextIndex}][qty]" class="form-control form-control-sm qty-input text-end" value="1" required>
     </td>
     <td>
-        <input type="number" step="0.01" min="0" name="items[${nextIndex}][unit_price]" class="form-control form-control-sm price-input" value="" required>
+        <input type="number" step="0.01" min="0" name="items[${nextIndex}][unit_price]" class="form-control form-control-sm price-input" value="">
     </td>
     <td>
         <input type="number" step="0.01" min="0" name="items[${nextIndex}][line_discount]" class="form-control form-control-sm discount-input" value="0">
     </td>
-    <td class="text-end">
+    <td class="num-cell">
         <span class="line-subtotal">0</span>
     </td>
 </tr>`;
@@ -418,14 +620,14 @@
 
         document.addEventListener('DOMContentLoaded', function() {
             const btnAdd = document.getElementById('btnAddLine');
-            if (btnAdd) {
+            if (btnAdd && !hasSourceShipment) {
                 btnAdd.addEventListener('click', function() {
                     addLineRow();
                 });
             }
 
             const tbody = document.getElementById('invoice-lines-body');
-            if (tbody) {
+            if (tbody && !hasSourceShipment) {
                 tbody.addEventListener('input', function(e) {
                     if (e.target.matches('.qty-input, .price-input, .discount-input')) {
                         recalcSubtotals();
@@ -433,6 +635,7 @@
                 });
             }
 
+            // Untuk mode normal, hitung awal; untuk shipment, fungsi akan langsung return.
             recalcSubtotals();
         });
     </script>

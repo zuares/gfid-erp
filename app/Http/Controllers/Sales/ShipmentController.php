@@ -36,8 +36,16 @@ class ShipmentController extends Controller
         $whRts = Warehouse::where('code', 'WH-RTS')->first();
 
         $invoice = null;
-        if ($request->filled('invoice_id')) {
-            $invoice = SalesInvoice::with('store')->find($request->invoice_id);
+
+        // Terima dari query ?sales_invoice_id=... (dari "create invoice from shipment")
+        if ($request->filled('sales_invoice_id')) {
+            $invoice = SalesInvoice::with('store')
+                ->find($request->sales_invoice_id);
+        }
+        // Backward compatibility: masih bisa pakai ?invoice_id=...
+        elseif ($request->filled('invoice_id')) {
+            $invoice = SalesInvoice::with('store')
+                ->find($request->invoice_id);
         }
 
         return view('sales.shipments.create', [
@@ -56,8 +64,37 @@ class ShipmentController extends Controller
             'sales_invoice_id' => ['nullable', 'exists:sales_invoices,id'],
         ]);
 
+        // 🔥 Ambil store untuk tentukan prefix kode
+        $store = Store::findOrFail($data['store_id']);
+
+        $storeName = strtoupper(trim($store->name ?? ''));
+        $storeCode = strtoupper(trim($store->code ?? ''));
+        $storeKey = $storeCode . ' ' . $storeName;
+
+        // Default prefix dari kode store (3 huruf pertama)
+        $prefix = 'SHP';
+
+        // Kalau kode store ada, pakai 3 huruf pertama sebagai default
+        if ($storeCode !== '') {
+            // Ambil hanya huruf/angka, lalu potong 3 karakter
+            $cleanCode = preg_replace('/[^A-Z0-9]/', '', $storeCode);
+            if ($cleanCode !== '') {
+                $prefix = substr($cleanCode, 0, 3);
+            }
+        }
+
+        // Override khusus Shopee / TikTok
+        if (str_contains($storeKey, 'SHP') || str_contains($storeKey, 'SHOPEE')) {
+            $prefix = 'SHP';
+        } elseif (str_contains($storeKey, 'TTK') || str_contains($storeKey, 'TIKTOK')) {
+            $prefix = 'TTK';
+        }
+
+        // Generate kode dengan prefix sesuai channel
+        $code = Shipment::generateCode($prefix);
+
         $shipment = Shipment::create([
-            'code' => Shipment::generateCode(),
+            'code' => $code,
             'store_id' => $data['store_id'],
             'sales_invoice_id' => $data['sales_invoice_id'] ?? null,
             'date' => $data['date'],

@@ -36,7 +36,7 @@ class SalesInvoiceController extends Controller
     }
 
     /**
-     * Form create invoice (manual, tidak dari shipment).
+     * Form create invoice biasa.
      */
     public function create()
     {
@@ -55,19 +55,18 @@ class SalesInvoiceController extends Controller
                 return $item;
             });
 
+        // create biasa → tidak ada sourceShipment/prefill
         return view('sales.invoices.create', [
             'customers' => $customers,
             'warehouses' => $warehouses,
             'stores' => $stores,
             'items' => $items,
-
-            // penting untuk blade:
             'sourceShipment' => null,
             'defaultDate' => now()->toDateString(),
             'defaultWarehouseId' => null,
             'defaultCustomerId' => null,
             'defaultStoreId' => null,
-            'prefilledLines' => [], // manual → kosong
+            'prefilledLines' => [],
         ]);
     }
 
@@ -81,11 +80,18 @@ class SalesInvoiceController extends Controller
             'lines.item',
             'store',
             'warehouse',
-            // kalau nanti sudah ada relasi customer() di Shipment, bisa ditambah 'customer'
+            // kalau nanti sudah ada relasi customer() di Shipment, bisa tambahkan 'customer'
         ]);
 
-        $customers = Customer::orderBy('name')->get();
+        // Ambil semua gudang (dipakai di view)
         $warehouses = Warehouse::orderBy('code')->get();
+
+        // Cari WH-RTS untuk dijadikan gudang invoice
+        $whRts = $warehouses instanceof \Illuminate\Support\Collection
+        ? $warehouses->firstWhere('code', 'WH-RTS')
+        : null;
+
+        // Store / Channel list
         $stores = Store::orderBy('code')->get();
 
         // Item FG (tetap dikirim supaya bisa tambah item manual)
@@ -99,8 +105,7 @@ class SalesInvoiceController extends Controller
                 return $item;
             });
 
-        // Prefill lines dari shipment:
-        // pakai qty_scanned kalau ada; fallback ke qty.
+        // Prefill lines dari shipment: pakai qty_scanned kalau ada; fallback ke qty
         $prefilledLines = $shipment->lines
             ->filter(fn($line) => $line->item_id && ($line->qty_scanned ?? $line->qty ?? 0) > 0)
             ->values()
@@ -110,30 +115,36 @@ class SalesInvoiceController extends Controller
                 return [
                     'item_id' => $line->item_id,
                     'qty' => $qty,
-                    'unit_price' => null, // harga isi manual (atau nanti bisa auto dari price list)
+                    'unit_price' => null, // piutang dagang → harga bisa diisi nanti
                     'line_discount' => 0,
                 ];
             })
             ->all();
 
         return view('sales.invoices.create', [
-            'customers' => $customers,
+            // dropdowns
             'warehouses' => $warehouses,
             'stores' => $stores,
             'items' => $items,
 
-            // context shipment buat header & default value form
+            // context dari Shipment
             'sourceShipment' => $shipment,
             'defaultDate' => optional($shipment->date)->toDateString() ?? now()->toDateString(),
-            'defaultWarehouseId' => $shipment->warehouse_id ?? null,
-            'defaultCustomerId' => $shipment->customer_id ?? null, // kalau kolom ini ada
+
+            // 🔥 Gudang invoice = WH-RTS (kalau ada), fallback ke warehouse shipment
+            'defaultWarehouseId' => $whRts?->id ?? ($shipment->warehouse_id ?? null),
+
+            // Store / channel ikut shipment → nanti di blade di-lock (read-only)
             'defaultStoreId' => $shipment->store_id ?? null,
+
+            // Lines prefilled
             'prefilledLines' => $prefilledLines,
         ]);
     }
 
     /**
      * Simpan invoice + line + hitung HPP & margin.
+     * Sekarang support UNPRICED (unit_price boleh kosong).
      */
     public function store(Request $request)
     {
@@ -147,13 +158,15 @@ class SalesInvoiceController extends Controller
 
             'store_id' => ['nullable', 'exists:stores,id'],
 
-            // kalau datang dari Shipment
+            // 🔥 kalau dari Shipment, kirim hidden source_shipment_id
             'source_shipment_id' => ['nullable', 'exists:shipments,id'],
 
             'items' => ['required', 'array', 'min:1'],
             'items.*.item_id' => ['required', 'exists:items,id'],
-            'items.*.qty' => ['required', 'integer', 'min:1'],
-            'items.*.unit_price' => ['required', 'numeric', 'min:1'],
+            // qty boleh desimal (di view tadi pakai step="0.01")
+            'items.*.qty' => ['required', 'numeric', 'min:0.01'],
+            // unit_price boleh kosong → invoice UNPRICED
+            'items.*.unit_price' => ['nullable', 'numeric', 'min:0'],
             'items.*.line_discount' => ['nullable', 'numeric', 'min:0'],
         ]);
 
@@ -162,6 +175,17 @@ class SalesInvoiceController extends Controller
         $invoiceDate = $data['date'];
         $warehouseId = (int) $data['warehouse_id']; // biasanya WH-RTS
         $sourceShipmentId = $data['source_shipment_id'] ?? null;
+
+        // Cek apakah ada minimal satu line yang punya harga > 0
+        $hasAnyPrice = collect($data['items'])->contains(function ($row) {
+            if (!isset($row['unit_price']) || $row['unit_price'] === '' || $row['unit_price'] === null) {
+                return false;
+            }
+            return (float) $row['unit_price'] > 0;
+        });
+
+        // Kalau tidak ada harga sama sekali → status UNPRICED, selain itu DRAFT
+        $initialStatus = $hasAnyPrice ? 'draft' : 'unpriced';
 
         // Sederhana dulu, nanti bisa pakai generator terpisah
         $code = 'INV-' . now()->format('Ymd') . '-' . str_pad(
@@ -179,16 +203,17 @@ class SalesInvoiceController extends Controller
             $invoiceDate,
             $warehouseId,
             $code,
-            $sourceShipmentId
+            $initialStatus,
+            $sourceShipmentId,
         ) {
-            // 1️⃣ Buat header invoice (status draft)
+            // 1️⃣ Buat header invoice
             $invoice = SalesInvoice::create([
                 'code' => $code,
                 'date' => $invoiceDate,
                 'customer_id' => $data['customer_id'] ?? null,
                 'store_id' => $data['store_id'] ?? null,
                 'warehouse_id' => $warehouseId,
-                'status' => 'draft',
+                'status' => $initialStatus, // draft / unpriced
                 'remarks' => $data['remarks'] ?? null,
                 'created_by' => auth()->id(),
                 'tax_percent' => $taxPercent,
@@ -199,8 +224,12 @@ class SalesInvoiceController extends Controller
 
             foreach ($data['items'] as $row) {
                 $itemId = (int) $row['item_id'];
-                $qty = (int) $row['qty'];
-                $unitPrice = (float) $row['unit_price'];
+                $qty = (float) $row['qty']; // boleh desimal
+
+                // kalau kosong/null → anggap 0
+                $unitPriceRaw = $row['unit_price'] ?? null;
+                $unitPrice = $unitPriceRaw !== null && $unitPriceRaw !== '' ? (float) $unitPriceRaw : 0.0;
+
                 $lineDiscount = (float) ($row['line_discount'] ?? 0.0);
 
                 $lineTotal = max(0, ($qty * $unitPrice) - $lineDiscount);
@@ -242,13 +271,13 @@ class SalesInvoiceController extends Controller
                 'grand_total' => $grandTotal,
             ]);
 
-            // 4️⃣ Kalau invoice ini berasal dari Shipment tertentu → link-kan
+            // 4️⃣ Kalau invoice ini dibuat dari Shipment → update shipments.sales_invoice_id
             if ($sourceShipmentId) {
-                Shipment::where('id', $sourceShipmentId)
-                    ->whereNull('sales_invoice_id') // jangan overwrite kalau sudah ada
-                    ->update([
-                        'sales_invoice_id' => $invoice->id,
-                    ]);
+                $shipment = Shipment::find($sourceShipmentId);
+                if ($shipment && !$shipment->sales_invoice_id) {
+                    $shipment->sales_invoice_id = $invoice->id;
+                    $shipment->save();
+                }
             }
 
             return $invoice;
@@ -269,15 +298,178 @@ class SalesInvoiceController extends Controller
             'warehouse',
             'store',
             'lines.item',
-            'shipments', // relasi ke Shipment (hasMany atau hasOneThrough sesuai desainmu)
+            'shipments', // relasi ke Shipment (kalau sudah dibuat: hasMany)
         ]);
 
         return view('sales.invoices.show', compact('invoice'));
     }
 
     /**
+     * Form EDIT: untuk melengkapi harga invoice UNPRICED / revisi harga.
+     */
+    public function edit(SalesInvoice $invoice)
+    {
+        $invoice->load(['lines.item', 'customer', 'store', 'warehouse']);
+
+        $customers = Customer::orderBy('name')->get();
+        $warehouses = Warehouse::orderBy('code')->get();
+        $stores = Store::orderBy('code')->get();
+
+        $items = Item::query()
+            ->where('type', 'finished_good')
+            ->with('activeCostSnapshot')
+            ->orderBy('code')
+            ->get()
+            ->map(function ($item) {
+                $item->hpp_unit = $item->activeCostSnapshot?->unit_cost ?? 0.0;
+                return $item;
+            });
+
+        // siapkan initialLines dari invoice lines
+        $prefilledLines = $invoice->lines->map(function (SalesInvoiceLine $line) {
+            return [
+                'item_id' => $line->item_id,
+                'qty' => $line->qty,
+                'unit_price' => $line->unit_price,
+                'line_discount' => $line->line_discount,
+            ];
+        })->all();
+
+        return view('sales.invoices.edit', [
+            'invoice' => $invoice,
+            'customers' => $customers,
+            'warehouses' => $warehouses,
+            'stores' => $stores,
+            'items' => $items,
+
+            'sourceShipment' => null, // edit invoice biasa
+            'defaultDate' => optional($invoice->date)->toDateString() ?? now()->toDateString(),
+            'defaultWarehouseId' => $invoice->warehouse_id,
+            'defaultCustomerId' => $invoice->customer_id,
+            'defaultStoreId' => $invoice->store_id,
+            'prefilledLines' => $prefilledLines,
+        ]);
+    }
+
+    /**
+     * Update invoice (isi/ubah harga, qty, dsb).
+     * Logic hampir sama dengan store(), tapi mengupdate + hapus ulang lines.
+     */
+    public function update(Request $request, SalesInvoice $invoice)
+    {
+        if ($invoice->status === 'posted') {
+            return back()->with('error', 'Invoice sudah posted, tidak bisa diedit.');
+        }
+
+        $data = $request->validate([
+            'date' => ['required', 'date'],
+            'customer_id' => ['nullable', 'exists:customers,id'],
+            'warehouse_id' => ['required', 'exists:warehouses,id'],
+            'remarks' => ['nullable', 'string'],
+            'tax_percent' => ['nullable', 'numeric', 'min:0', 'max:100'],
+            'header_discount' => ['nullable', 'numeric', 'min:0'],
+            'store_id' => ['nullable', 'exists:stores,id'],
+
+            'items' => ['required', 'array', 'min:1'],
+            'items.*.item_id' => ['required', 'exists:items,id'],
+            'items.*.qty' => ['required', 'integer', 'min:1'],
+            'items.*.unit_price' => ['nullable', 'numeric', 'min:0'],
+            'items.*.line_discount' => ['nullable', 'numeric', 'min:0'],
+        ]);
+
+        $taxPercent = (float) ($data['tax_percent'] ?? 0);
+        $headerDiscount = (float) ($data['header_discount'] ?? 0);
+        $invoiceDate = $data['date'];
+        $warehouseId = (int) $data['warehouse_id'];
+
+        // cek apakah ada harga jual
+        $hasAnyPrice = collect($data['items'])->contains(function ($row) {
+            if (!isset($row['unit_price']) || $row['unit_price'] === '' || $row['unit_price'] === null) {
+                return false;
+            }
+            return (float) $row['unit_price'] > 0;
+        });
+
+        $newStatus = $hasAnyPrice ? 'draft' : 'unpriced';
+
+        DB::transaction(function () use (
+            $invoice,
+            $data,
+            $taxPercent,
+            $headerDiscount,
+            $invoiceDate,
+            $warehouseId,
+            $newStatus
+        ) {
+            // update header basic
+            $invoice->update([
+                'date' => $invoiceDate,
+                'customer_id' => $data['customer_id'] ?? null,
+                'store_id' => $data['store_id'] ?? null,
+                'warehouse_id' => $warehouseId,
+                'status' => $newStatus,
+                'remarks' => $data['remarks'] ?? null,
+                'tax_percent' => $taxPercent,
+            ]);
+
+            // hapus semua lines lama
+            $invoice->lines()->delete();
+
+            // rebuild lines
+            $subtotal = 0.0;
+
+            foreach ($data['items'] as $row) {
+                $itemId = (int) $row['item_id'];
+                $qty = (int) $row['qty'];
+                $unitPriceRaw = $row['unit_price'] ?? null;
+                $unitPrice = $unitPriceRaw !== null && $unitPriceRaw !== '' ? (float) $unitPriceRaw : 0.0;
+                $lineDiscount = (float) ($row['line_discount'] ?? 0.0);
+
+                $lineTotal = max(0, ($qty * $unitPrice) - $lineDiscount);
+                $subtotal += $lineTotal;
+
+                $hppSnapshot = $this->hpp->getActiveFinalHppForItem($itemId, $warehouseId);
+                $hppUnit = $hppSnapshot?->unit_cost ?? 0.0;
+
+                $costTotal = $hppUnit * $qty;
+                $marginTotal = $lineTotal - $costTotal;
+                $marginUnit = $qty > 0 ? $marginTotal / $qty : 0.0;
+
+                SalesInvoiceLine::create([
+                    'sales_invoice_id' => $invoice->id,
+                    'item_id' => $itemId,
+                    'qty' => $qty,
+                    'unit_price' => $unitPrice,
+                    'line_discount' => $lineDiscount,
+                    'line_total' => $lineTotal,
+                    'hpp_unit_snapshot' => $hppUnit,
+                    'margin_unit' => $marginUnit,
+                    'margin_total' => $marginTotal,
+                ]);
+            }
+
+            $discountTotal = min($headerDiscount, $subtotal);
+            $dpp = $subtotal - $discountTotal;
+
+            $taxAmount = $taxPercent > 0 ? round($dpp * $taxPercent / 100, 2) : 0.0;
+            $grandTotal = $dpp + $taxAmount;
+
+            $invoice->update([
+                'subtotal' => $subtotal,
+                'discount_total' => $discountTotal,
+                'tax_amount' => $taxAmount,
+                'grand_total' => $grandTotal,
+            ]);
+        });
+
+        return redirect()
+            ->route('sales.invoices.show', $invoice)
+            ->with('success', "Invoice {$invoice->code} berhasil diperbarui.");
+    }
+
+    /**
      * Posting invoice → hanya lock status.
-     * Stok akan berkurang saat Shipment di-post dari WH-RTS.
+     * Stok akan berkurang saat Shipment di-post.
      */
     public function post(SalesInvoice $invoice)
     {
@@ -289,6 +481,15 @@ class SalesInvoiceController extends Controller
 
         if ($invoice->lines->isEmpty()) {
             return back()->with('error', 'Invoice tidak memiliki item, tidak bisa diposting.');
+        }
+
+        // 🔥 cegah posting kalau masih UNPRICED atau grand_total 0
+        if ($invoice->status === 'unpriced') {
+            return back()->with('error', 'Invoice masih UNPRICED (harga belum diisi). Lengkapi harga sebelum posting.');
+        }
+
+        if (($invoice->grand_total ?? 0) <= 0) {
+            return back()->with('error', 'Grand total invoice 0. Lengkapi harga sebelum posting.');
         }
 
         try {

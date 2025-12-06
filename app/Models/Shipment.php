@@ -23,6 +23,7 @@ class Shipment extends Model
         'submitted_by',
         'posted_at',
         'posted_by',
+        'sales_invoice_id',
     ];
 
     protected $casts = [
@@ -50,20 +51,22 @@ class Shipment extends Model
         return $this->belongsTo(User::class, 'posted_by');
     }
 
-    public static function generateCode(): string
+    public static function generateCode(string $prefix = 'SHP'): string
     {
         $today = now()->format('Ymd');
 
+        // Cari shipment terakhir hari ini dengan prefix yang sama
         $last = static::whereDate('created_at', now()->toDateString())
+            ->where('code', 'like', $prefix . '-' . $today . '-%')
             ->orderByDesc('id')
             ->first();
 
         $seq = 1;
-        if ($last && preg_match('/SHP-' . $today . '-(\d+)/', $last->code, $m)) {
+        if ($last && preg_match('/^' . preg_quote($prefix, '/') . '-' . $today . '-(\d+)$/', $last->code, $m)) {
             $seq = (int) $m[1] + 1;
         }
 
-        return 'SHP-' . $today . '-' . str_pad($seq, 3, '0', STR_PAD_LEFT);
+        return $prefix . '-' . $today . '-' . str_pad($seq, 3, '0', STR_PAD_LEFT);
     }
 
     public function warehouse()

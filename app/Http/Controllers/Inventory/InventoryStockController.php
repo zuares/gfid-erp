@@ -18,57 +18,121 @@ class InventoryStockController extends Controller
     /**
      * STOK PER ITEM (snapshot dari inventory_stocks)
      */
+    // public function items(Request $request)
+    // {
+    //     $warehouses = Warehouse::orderBy('name')->get();
+    //     $items = Item::where('active', 1)
+    //         ->with('category')
+    //         ->orderBy('code')
+    //         ->get();
+
+    //     $warehouseId = $request->input('warehouse_id');
+    //     $itemId = $request->input('item_id');
+    //     $hasBalanceOnly = $request->boolean('has_balance_only', true);
+    //     $search = $request->input('search');
+
+    //     $query = InventoryStock::query()
+    //         ->with(['item.category', 'warehouse']);
+
+    //     if ($warehouseId) {
+    //         $query->where('warehouse_id', $warehouseId);
+    //     }
+
+    //     if ($itemId) {
+    //         $query->where('item_id', $itemId);
+    //     }
+
+    //     if ($hasBalanceOnly) {
+    //         $query->where('qty', '!=', 0);
+    //     }
+
+    //     if ($search) {
+    //         $like = '%' . trim($search) . '%';
+    //         $query->whereHas('item', function ($q) use ($like) {
+    //             $q->where('code', 'like', $like)
+    //                 ->orWhere('name', 'like', $like);
+    //         });
+    //     }
+
+    //     $stocks = $query
+    //         ->orderBy('warehouse_id')
+    //         ->orderBy('item_id')
+    //         ->paginate(50)
+    //         ->withQueryString();
+
+    //     return view('inventory.stocks.items', [
+    //         'stocks' => $stocks,
+    //         'warehouses' => $warehouses,
+    //         'items' => $items,
+    //         'filters' => [
+    //             'warehouse_id' => $warehouseId,
+    //             'item_id' => $itemId,
+    //             'has_balance_only' => $hasBalanceOnly,
+    //             'search' => $search,
+    //         ],
+    //     ]);
+    // }
+
     public function items(Request $request)
     {
-        $warehouses = Warehouse::orderBy('name')->get();
         $items = Item::where('active', 1)
-            ->with('category')
-            ->orderBy('code')
+            ->orderBy('name')
             ->get();
+
+        $warehouses = Warehouse::orderBy('name')->get();
 
         $warehouseId = $request->input('warehouse_id');
         $itemId = $request->input('item_id');
-        $hasBalanceOnly = $request->boolean('has_balance_only', true);
         $search = $request->input('search');
+        $hasBalanceOnly = (bool) $request->boolean('has_balance_only', true);
 
         $query = InventoryStock::query()
-            ->with(['item.category', 'warehouse']);
+            ->join('items', 'items.id', '=', 'inventory_stocks.item_id')
+            ->join('warehouses', 'warehouses.id', '=', 'inventory_stocks.warehouse_id')
+            ->where('items.active', 1);
 
         if ($warehouseId) {
-            $query->where('warehouse_id', $warehouseId);
+            $query->where('inventory_stocks.warehouse_id', $warehouseId);
         }
 
         if ($itemId) {
-            $query->where('item_id', $itemId);
-        }
-
-        if ($hasBalanceOnly) {
-            $query->where('qty', '!=', 0);
+            $query->where('inventory_stocks.item_id', $itemId);
         }
 
         if ($search) {
-            $like = '%' . trim($search) . '%';
-            $query->whereHas('item', function ($q) use ($like) {
-                $q->where('code', 'like', $like)
-                    ->orWhere('name', 'like', $like);
+            $searchLike = '%' . $search . '%';
+            $query->where(function ($q) use ($searchLike) {
+                $q->where('items.code', 'like', $searchLike)
+                    ->orWhere('items.name', 'like', $searchLike);
             });
         }
 
-        $stocks = $query
-            ->orderBy('warehouse_id')
-            ->orderBy('item_id')
-            ->paginate(50)
-            ->withQueryString();
+        $query->selectRaw('
+        inventory_stocks.item_id,
+        items.code AS item_code,
+        items.name AS item_name,
+        SUM(inventory_stocks.qty) AS total_qty,
+        SUM(CASE WHEN warehouses.code = "WH-RTS" THEN inventory_stocks.qty ELSE 0 END) AS fg_qty,
+        SUM(CASE WHEN warehouses.code LIKE "WIP-%" THEN inventory_stocks.qty ELSE 0 END) AS wip_qty
+    ')
+            ->groupBy('inventory_stocks.item_id', 'items.code', 'items.name')
+            ->orderBy('items.code');
+
+        if ($hasBalanceOnly) {
+            $query->havingRaw('SUM(inventory_stocks.qty) <> 0');
+        }
+
+        $stocks = $query->paginate(50)->appends($request->query());
 
         return view('inventory.stocks.items', [
-            'stocks' => $stocks,
-            'warehouses' => $warehouses,
             'items' => $items,
+            'warehouses' => $warehouses,
+            'stocks' => $stocks,
             'filters' => [
                 'warehouse_id' => $warehouseId,
                 'item_id' => $itemId,
-                'has_balance_only' => $hasBalanceOnly,
                 'search' => $search,
+                'has_balance_only' => $hasBalanceOnly,
             ],
         ]);
     }
@@ -138,6 +202,35 @@ class InventoryStockController extends Controller
                 'lot_search' => $lotSearch,
                 'item_search' => $itemSearch,
             ],
+        ]);
+    }
+
+    public function itemLocations(Item $item, Request $request)
+    {
+        $warehouseId = $request->input('warehouse_id');
+
+        $rows = InventoryStock::query()
+            ->join('warehouses', 'warehouses.id', '=', 'inventory_stocks.warehouse_id')
+            ->where('inventory_stocks.item_id', $item->id)
+            ->when($warehouseId, fn($q) => $q->where('inventory_stocks.warehouse_id', $warehouseId))
+            ->selectRaw('
+            warehouses.id,
+            warehouses.code,
+            warehouses.name,
+            SUM(inventory_stocks.qty) AS qty
+        ')
+            ->groupBy('warehouses.id', 'warehouses.code', 'warehouses.name')
+            ->havingRaw('SUM(inventory_stocks.qty) <> 0')
+            ->orderBy('warehouses.code')
+            ->get();
+
+        return response()->json([
+            'item' => [
+                'id' => $item->id,
+                'code' => $item->code,
+                'name' => $item->name,
+            ],
+            'locations' => $rows,
         ]);
     }
 }

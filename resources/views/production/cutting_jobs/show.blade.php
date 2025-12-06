@@ -58,8 +58,8 @@
         }
 
         /* ============================
-               FAB MOBILE KANAN BAWAH
-            ============================ */
+                   FAB MOBILE KANAN BAWAH
+               ============================ */
         @media (max-width: 767.98px) {
             .cutting-fab-mobile {
                 position: fixed;
@@ -138,6 +138,77 @@
                 font-size: .9rem;
             }
         }
+
+        /* ============================
+                   STATUS STEPPER DINAMIS
+               ============================ */
+        .status-stepper {
+            display: flex;
+            align-items: center;
+            gap: .75rem;
+            font-size: .78rem;
+            margin-top: .35rem;
+        }
+
+        .status-step {
+            display: flex;
+            align-items: center;
+            gap: .35rem;
+        }
+
+        .status-dot {
+            width: 18px;
+            height: 18px;
+            border-radius: 999px;
+            border: 2px solid rgba(148, 163, 184, 0.7);
+            background: transparent;
+        }
+
+        .status-dot.active {
+            background: #22c55e33;
+            border-color: #22c55e;
+            box-shadow: 0 0 0 1px #22c55e44;
+        }
+
+        .status-dot.current {
+            background: #2563eb33;
+            border-color: #2563eb;
+            box-shadow: 0 0 0 1px #2563eb55;
+        }
+
+        .status-label {
+            text-transform: uppercase;
+            letter-spacing: .08em;
+            font-size: .72rem;
+            color: #6b7280;
+        }
+
+        .status-label.current {
+            color: #2563eb;
+            font-weight: 600;
+        }
+
+        .status-label.done {
+            color: #16a34a;
+            font-weight: 600;
+        }
+
+        .status-separator {
+            flex: 0 0 26px;
+            height: 1px;
+            background: linear-gradient(to right, rgba(148, 163, 184, 0.7), transparent);
+        }
+
+        @media (max-width: 767.98px) {
+            .status-stepper {
+                flex-wrap: wrap;
+                gap: .4rem .75rem;
+            }
+
+            .status-separator {
+                display: none;
+            }
+        }
     </style>
 @endpush
 
@@ -187,7 +258,7 @@
             }
         }
 
-        // Tentukan status badge
+        // mapping status badge lama
         if ($hasQcCutting) {
             $statusMap = [
                 'qc_done' => ['label' => 'QC CUTTING SELESAI', 'class' => 'info'],
@@ -207,9 +278,27 @@
                     'draft' => 'secondary',
                     'cut' => 'primary',
                     'cut_sent_to_qc' => 'info',
+                    'sent_to_qc' => 'info',
                     'posted' => 'primary',
                 ][$job->status] ?? 'secondary';
         }
+
+        // STEP DINAMIS CUTTING → KIRIM QC → QC CUTTING
+        // step 1: Cutting, step 2: Dikirim ke QC, step 3: QC Selesai
+        $status = $job->status;
+        $stepCurrent = 1;
+
+        if (in_array($status, ['cut', 'cut_sent_to_qc', 'sent_to_qc'])) {
+            $stepCurrent = 2;
+        }
+
+        if ($hasQcCutting || in_array($status, ['qc_done', 'qc_ok', 'qc_mixed', 'qc_reject'])) {
+            $stepCurrent = 3;
+        }
+
+        $step1State = $stepCurrent >= 1 ? ($stepCurrent === 1 ? 'current' : 'done') : '';
+        $step2State = $stepCurrent >= 2 ? ($stepCurrent === 2 ? 'current' : 'done') : '';
+        $step3State = $stepCurrent >= 3 ? ($stepCurrent === 3 ? 'current' : 'done') : '';
     @endphp
 
     <div class="page-wrap">
@@ -226,6 +315,39 @@
                         Lot: {{ $job->lot?->code ?? '-' }} •
                         Gudang: {{ $job->warehouse?->code ?? '-' }}
                     </div>
+
+                    {{-- STATUS STEPPER DINAMIS --}}
+                    <div class="status-stepper">
+                        <div class="status-step">
+                            <div
+                                class="status-dot {{ $step1State === 'current' ? 'current' : ($step1State === 'done' ? 'active' : '') }}">
+                            </div>
+                            <div
+                                class="status-label {{ $step1State === 'current' ? 'current' : ($step1State === 'done' ? 'done' : '') }}">
+                                Cutting
+                            </div>
+                        </div>
+                        <div class="status-separator"></div>
+                        <div class="status-step">
+                            <div
+                                class="status-dot {{ $step2State === 'current' ? 'current' : ($step2State === 'done' ? 'active' : '') }}">
+                            </div>
+                            <div
+                                class="status-label {{ $step2State === 'current' ? 'current' : ($step2State === 'done' ? 'done' : '') }}">
+                                Kirim ke QC
+                            </div>
+                        </div>
+                        <div class="status-separator"></div>
+                        <div class="status-step">
+                            <div
+                                class="status-dot {{ $step3State === 'current' ? 'current' : ($step3State === 'done' ? 'active' : '') }}">
+                            </div>
+                            <div
+                                class="status-label {{ $step3State === 'current' ? 'current' : ($step3State === 'done' ? 'done' : '') }}">
+                                QC Cutting
+                            </div>
+                        </div>
+                    </div>
                 </div>
 
                 <div class="d-flex flex-column align-items-end gap-2">
@@ -238,31 +360,50 @@
                             Kembali
                         </a>
 
-                        @if ($job->status === 'sent_to_qc')
-                            {{-- STATUS: SEDANG MENUNGGU QC --}}
-                            <button class="btn btn-sm btn-warning" disabled>
-                                Menunggu hasil QC…
-                            </button>
-                        @elseif (!$hasQcCutting)
-                            {{-- BELUM QC --}}
-                            <a href="{{ route('production.cutting_jobs.edit', $job) }}"
-                                class="btn btn-sm btn-outline-primary">
-                                Edit Cutting
-                            </a>
+                        {{-- ACTION DINAMIS BERDASARKAN STATUS --}}
+                        @if (!$hasQcCutting)
+                            @if (in_array($job->status, ['draft', 'cut']))
+                                {{-- Belum QC, belum dikirim ke QC --}}
+                                <a href="{{ route('production.cutting_jobs.edit', $job) }}"
+                                    class="btn btn-sm btn-outline-primary">
+                                    Edit Cutting
+                                </a>
 
-                            {{-- Kirim ke QC pakai POST ke send_to_qc --}}
-                            <form action="{{ route('production.cutting_jobs.send_to_qc', $job) }}" method="post"
-                                class="d-inline">
-                                @csrf
-                                <button type="submit" class="btn btn-sm btn-primary">
-                                    Kirim ke QC Cutting
+                                <form action="{{ route('production.cutting_jobs.send_to_qc', $job) }}" method="post"
+                                    class="d-inline">
+                                    @csrf
+                                    <button type="submit" class="btn btn-sm btn-primary">
+                                        Kirim ke QC Cutting
+                                    </button>
+                                </form>
+                            @elseif (in_array($job->status, ['cut_sent_to_qc', 'sent_to_qc']))
+                                {{-- SUDAH DIKIRIM KE QC TAPI BELUM ADA INPUT QC --}}
+                                @if (Route::has('production.qc.cutting.edit'))
+                                    <a href="{{ route('production.qc.cutting.edit', $job) }}"
+                                        class="btn btn-sm btn-primary">
+                                        Input QC Cutting
+                                    </a>
+                                @else
+                                    <button class="btn btn-sm btn-warning" disabled>
+                                        Menunggu hasil QC…
+                                    </button>
+                                @endif
+                            @else
+                                <button class="btn btn-sm btn-warning" disabled>
+                                    Menunggu proses QC…
                                 </button>
-                            </form>
+                            @endif
                         @else
-                            {{-- SUDAH ADA QC --}}
-                            <a href="{{ route('production.cutting_jobs.show', $job) }}" class="btn btn-sm btn-primary">
-                                Hasil QC Cutting
-                            </a>
+                            {{-- SUDAH ADA QC CUTTING --}}
+                            @if (Route::has('production.qc.cutting.edit'))
+                                <a href="{{ route('production.qc.cutting.edit', $job) }}" class="btn btn-sm btn-primary">
+                                    Lihat / Edit QC Cutting
+                                </a>
+                            @else
+                                <button class="btn btn-sm btn-primary" disabled>
+                                    QC Cutting Tersimpan
+                                </button>
+                            @endif
                         @endif
                     </div>
 
@@ -290,7 +431,38 @@
                 {{ $job->warehouse?->code ?? '-' }}
             </div>
 
-            {{-- Satu tombol "Kembali" saja di header mobile --}}
+            {{-- Status stepper versi singkat --}}
+            <div class="status-stepper mb-2">
+                <div class="status-step">
+                    <div
+                        class="status-dot {{ $step1State === 'current' ? 'current' : ($step1State === 'done' ? 'active' : '') }}">
+                    </div>
+                    <div
+                        class="status-label {{ $step1State === 'current' ? 'current' : ($step1State === 'done' ? 'done' : '') }}">
+                        Cutting
+                    </div>
+                </div>
+                <div class="status-step">
+                    <div
+                        class="status-dot {{ $step2State === 'current' ? 'current' : ($step2State === 'done' ? 'active' : '') }}">
+                    </div>
+                    <div
+                        class="status-label {{ $step2State === 'current' ? 'current' : ($step2State === 'done' ? 'done' : '') }}">
+                        Kirim QC
+                    </div>
+                </div>
+                <div class="status-step">
+                    <div
+                        class="status-dot {{ $step3State === 'current' ? 'current' : ($step3State === 'done' ? 'active' : '') }}">
+                    </div>
+                    <div
+                        class="status-label {{ $step3State === 'current' ? 'current' : ($step3State === 'done' ? 'done' : '') }}">
+                        QC Cutting
+                    </div>
+                </div>
+            </div>
+
+            {{-- Tombol kembali saja di header; aksi lain via FAB --}}
             <div class="d-flex gap-2 flex-wrap">
                 <a href="{{ route('production.cutting_jobs.index') }}" class="btn btn-sm btn-outline-secondary flex-fill">
                     Kembali
@@ -374,8 +546,11 @@
                     <div class="col-md-3 col-6">
                         <div class="help mb-1">Total QC (OK / Reject)</div>
                         <div class="mono">
-                            OK: {{ number_format($qcTotalOk, 2, ',', '.') }} /
-                            Reject: {{ number_format($qcTotalReject, 2, ',', '.') }}
+                            OK: {{ number_format($qcTotalOk, 2, ',', '.') }}
+                            /
+                            <span class="{{ $qcTotalReject > 0 ? 'text-danger fw-semibold' : '' }}">
+                                Reject: {{ number_format($qcTotalReject, 2, ',', '.') }}
+                            </span>
                         </div>
                     </div>
                 @endif
@@ -392,7 +567,9 @@
                 <span>{{ number_format($totalUsedFabric, 2, ',', '.') }} Kg kain</span>
                 @if ($hasQcCutting)
                     <span>QC OK {{ number_format($qcTotalOk, 0, ',', '.') }}</span>
-                    <span>Reject {{ number_format($qcTotalReject, 0, ',', '.') }}</span>
+                    <span class="{{ $qcTotalReject > 0 ? 'text-danger fw-semibold' : '' }}">
+                        Reject {{ number_format($qcTotalReject, 0, ',', '.') }}
+                    </span>
                 @endif
             </div>
         </div>
@@ -436,13 +613,17 @@
                             @endphp
 
                             @if ($hasQcCutting)
-                                <tr>
+                                <tr class="{{ ($qc?->qty_reject ?? 0) > 0 ? 'table-danger-subtle' : '' }}">
                                     <td>{{ $row->bundle_no }}</td>
                                     <td>{{ $row->bundle_code }}</td>
                                     <td>{{ $row->finishedItem?->code ?? '-' }}</td>
                                     <td>{{ number_format($row->qty_pcs, 2, ',', '.') }}</td>
-                                    <td>{{ $qc ? number_format($qc->qty_reject ?? 0, 2, ',', '.') : '0,00' }}</td>
-                                    <td>{{ $qc ? number_format($qc->qty_ok ?? 0, 2, ',', '.') : '0,00' }}</td>
+                                    <td class="{{ ($qc?->qty_reject ?? 0) > 0 ? 'text-danger fw-semibold' : '' }}">
+                                        {{ $qc ? number_format($qc->qty_reject ?? 0, 2, ',', '.') : '0,00' }}
+                                    </td>
+                                    <td>
+                                        {{ $qc ? number_format($qc->qty_ok ?? 0, 2, ',', '.') : '0,00' }}
+                                    </td>
                                 </tr>
                             @else
                                 <tr>
@@ -504,11 +685,13 @@
                             @endphp
 
                             @if ($hasQcCutting)
-                                <tr>
+                                <tr class="{{ ($qc?->qty_reject ?? 0) > 0 ? 'table-danger-subtle' : '' }}">
                                     <td>{{ $row->bundle_no }}</td>
                                     <td>{{ $row->finishedItem?->code ?? '-' }}</td>
                                     <td>{{ $qc ? number_format($qc->qty_ok ?? 0, 0, ',', '.') : '0' }}</td>
-                                    <td>{{ $qc ? number_format($qc->qty_reject ?? 0, 0, ',', '.') : '0' }}</td>
+                                    <td class="{{ ($qc?->qty_reject ?? 0) > 0 ? 'text-danger fw-semibold' : '' }}">
+                                        {{ $qc ? number_format($qc->qty_reject ?? 0, 0, ',', '.') : '0' }}
+                                    </td>
                                 </tr>
                             @else
                                 <tr>
@@ -532,35 +715,50 @@
     </div>
 
     {{-- =========================
-         FAB MOBILE: KIRIM QC SAJA
+         FAB MOBILE: AKSI KONTEKSTUAL
     ========================== --}}
     @if (!$hasQcCutting)
         <div class="cutting-fab-mobile d-md-none" id="cuttingFabMobile">
             {{-- Menu yang muncul saat FAB dibuka --}}
             <div class="cutting-fab-menu" id="cuttingFabMenu">
-                @if ($job->status !== 'sent_to_qc')
+                @if (in_array($job->status, ['draft', 'cut']))
                     {{-- Kirim QC (aktif) --}}
                     <form action="{{ route('production.cutting_jobs.send_to_qc', $job) }}" method="post">
                         @csrf
                         <button type="submit" class="btn btn-sm border fab-item-kirim w-100">
                             <i class="bi bi-send"></i>
-                            <span class="cutting-fab-label">Kirim QC</span>
+                            <span class="cutting-fab-label">Kirim ke QC</span>
                         </button>
                     </form>
+                @elseif (in_array($job->status, ['cut_sent_to_qc', 'sent_to_qc']))
+                    {{-- Sudah dikirim, tinggal QC --}}
+                    @if (Route::has('production.qc.cutting.edit'))
+                        <a href="{{ route('production.qc.cutting.edit', $job) }}"
+                            class="btn btn-sm border fab-item-kirim w-100">
+                            <i class="bi bi-clipboard-check"></i>
+                            <span class="cutting-fab-label">Input QC</span>
+                        </a>
+                    @else
+                        <button type="button" class="btn btn-sm border fab-item-kirim w-100" disabled>
+                            <i class="bi bi-hourglass-split"></i>
+                            <span class="cutting-fab-label">Menunggu QC…</span>
+                        </button>
+                    @endif
                 @else
-                    {{-- Sudah dikirim, menunggu QC --}}
                     <button type="button" class="btn btn-sm border fab-item-kirim w-100" disabled>
                         <i class="bi bi-hourglass-split"></i>
-                        <span class="cutting-fab-label">Menunggu QC…</span>
+                        <span class="cutting-fab-label">Proses QC…</span>
                     </button>
                 @endif
             </div>
 
             {{-- Tombol utama kecil seukuran jempol --}}
-            <button type="button" class="cutting-fab-main-btn" id="cuttingFabToggle" aria-label="Kirim QC">
+            <button type="button" class="cutting-fab-main-btn" id="cuttingFabToggle" aria-label="Aksi Cutting Job">
                 <span class="cutting-fab-main-btn-icon">+</span>
             </button>
         </div>
+    @else
+        {{-- Kalau sudah QC, FAB bisa dihilangkan atau diubah nanti kalau perlu --}}
     @endif
 @endsection
 

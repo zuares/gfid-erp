@@ -66,6 +66,78 @@
             letter-spacing: .04em;
         }
 
+        /* STATUS STEPPER (hierarchy status cutting → kirim QC → hasil QC) */
+        .status-stepper {
+            display: flex;
+            align-items: center;
+            gap: .75rem;
+            font-size: .78rem;
+        }
+
+        .status-step {
+            display: flex;
+            align-items: center;
+            gap: .35rem;
+        }
+
+        .status-dot {
+            width: 18px;
+            height: 18px;
+            border-radius: 999px;
+            border: 2px solid rgba(148, 163, 184, 0.7);
+            background: transparent;
+        }
+
+        .status-dot.active {
+            background: #22c55e33;
+            border-color: #22c55e;
+            box-shadow: 0 0 0 1px #22c55e44;
+        }
+
+        .status-dot.current {
+            background: #2563eb33;
+            border-color: #2563eb;
+            box-shadow: 0 0 0 1px #2563eb55;
+        }
+
+        .status-label {
+            text-transform: uppercase;
+            letter-spacing: .08em;
+            font-size: .72rem;
+            color: #6b7280;
+        }
+
+        .status-label.current {
+            color: #2563eb;
+            font-weight: 600;
+        }
+
+        .status-label.done {
+            color: #16a34a;
+            font-weight: 600;
+        }
+
+        .status-separator {
+            flex: 0 0 26px;
+            height: 1px;
+            background: linear-gradient(to right, rgba(148, 163, 184, 0.7), transparent);
+        }
+
+        /* Highlight baris yang ada reject */
+        .row-has-reject {
+            background: rgba(248, 113, 113, 0.03);
+        }
+
+        .row-has-reject .input-reject {
+            border-color: rgba(248, 113, 113, 0.8);
+            background-color: rgba(248, 113, 113, 0.08);
+        }
+
+        .row-has-reject .qc-card-header {
+            border-left: 3px solid rgba(248, 113, 113, 0.7);
+            padding-left: .45rem;
+        }
+
         @media (max-width: 767.98px) {
 
             .page-wrap {
@@ -138,6 +210,15 @@
                 gap: .25rem .4rem;
                 font-size: .78rem;
             }
+
+            .status-stepper {
+                flex-direction: column;
+                align-items: flex-start;
+            }
+
+            .status-separator {
+                width: 22px;
+            }
         }
     </style>
 @endpush
@@ -163,6 +244,20 @@
                 'sent_to_qc' => 'info',
                 'qc_done' => 'success',
             ][$cuttingJob->status] ?? 'secondary';
+
+        // mapping status ke step
+        // step 1: cutting selesai, step 2: dikirim QC, step 3: hasil QC
+        $status = $cuttingJob->status;
+        $stepCurrent = 1;
+        if ($status === 'sent_to_qc') {
+            $stepCurrent = 2;
+        } elseif (in_array($status, ['qc_ok', 'qc_mixed', 'qc_reject', 'qc_done'])) {
+            $stepCurrent = 3;
+        }
+
+        $step1State = $stepCurrent >= 1 ? ($stepCurrent === 1 ? 'current' : 'done') : '';
+        $step2State = $stepCurrent >= 2 ? ($stepCurrent === 2 ? 'current' : 'done') : '';
+        $step3State = $stepCurrent >= 3 ? ($stepCurrent === 3 ? 'current' : 'done') : '';
     @endphp
 
     <div class="page-wrap">
@@ -178,6 +273,39 @@
                     <div class="small-muted">
                         LOT {{ $lot?->code ?? '-' }} • {{ $lot?->item?->code ?? '-' }} •
                         Gudang {{ $warehouse?->code ?? '-' }}
+                    </div>
+
+                    {{-- status stepper: fokus hierarchy proses --}}
+                    <div class="status-stepper mt-2">
+                        <div class="status-step">
+                            <div
+                                class="status-dot {{ $step1State === 'current' ? 'current' : ($step1State === 'done' ? 'active' : '') }}">
+                            </div>
+                            <div
+                                class="status-label {{ $step1State === 'current' ? 'current' : ($step1State === 'done' ? 'done' : '') }}">
+                                Cutting Selesai
+                            </div>
+                        </div>
+                        <div class="status-separator"></div>
+                        <div class="status-step">
+                            <div
+                                class="status-dot {{ $step2State === 'current' ? 'current' : ($step2State === 'done' ? 'active' : '') }}">
+                            </div>
+                            <div
+                                class="status-label {{ $step2State === 'current' ? 'current' : ($step2State === 'done' ? 'done' : '') }}">
+                                Dikirim ke QC
+                            </div>
+                        </div>
+                        <div class="status-separator"></div>
+                        <div class="status-step">
+                            <div
+                                class="status-dot {{ $step3State === 'current' ? 'current' : ($step3State === 'done' ? 'active' : '') }}">
+                            </div>
+                            <div
+                                class="status-label {{ $step3State === 'current' ? 'current' : ($step3State === 'done' ? 'done' : '') }}">
+                                Hasil QC
+                            </div>
+                        </div>
                     </div>
                 </div>
 
@@ -218,7 +346,36 @@
                     </div>
                 </div>
 
-                {{-- Ringkasan kecil (opsional) bisa diisi nanti dari controller --}}
+                {{-- status stepper mobile --}}
+                <div class="status-stepper mt-1">
+                    <div class="status-step">
+                        <div
+                            class="status-dot {{ $step1State === 'current' ? 'current' : ($step1State === 'done' ? 'active' : '') }}">
+                        </div>
+                        <div
+                            class="status-label {{ $step1State === 'current' ? 'current' : ($step1State === 'done' ? 'done' : '') }}">
+                            Cutting
+                        </div>
+                    </div>
+                    <div class="status-step">
+                        <div
+                            class="status-dot {{ $step2State === 'current' ? 'current' : ($step2State === 'done' ? 'active' : '') }}">
+                        </div>
+                        <div
+                            class="status-label {{ $step2State === 'current' ? 'current' : ($step2State === 'done' ? 'done' : '') }}">
+                            Kirim QC
+                        </div>
+                    </div>
+                    <div class="status-step">
+                        <div
+                            class="status-dot {{ $step3State === 'current' ? 'current' : ($step3State === 'done' ? 'active' : '') }}">
+                        </div>
+                        <div
+                            class="status-label {{ $step3State === 'current' ? 'current' : ($step3State === 'done' ? 'done' : '') }}">
+                            Hasil QC
+                        </div>
+                    </div>
+                </div>
             </div>
         </div>
 
@@ -290,10 +447,16 @@
             <div class="card p-3 mb-4">
                 <div class="d-flex justify-content-between align-items-center mb-2">
                     <div class="section-title mb-0">QC per Bundle</div>
-                    {{-- Untuk desktop summary sudah di header QC --}}
+                    {{-- Fokus ke reject --}}
+                    <div class="small-muted">
+                        Isi <strong>Reject</strong> hanya jika ada cacat. Baris dengan reject akan di-highlight.
+                    </div>
                 </div>
 
                 <div class="table-wrap">
+                    @php
+                        $hasAnyReject = false;
+                    @endphp
                     <table class="table table-sm align-middle mono qc-table qc-table-mobile">
                         <thead>
                             <tr>
@@ -320,8 +483,11 @@
                                         $qtyReject = $qtyBundle;
                                     }
                                     $qtyOk = max($qtyBundle - $qtyReject, 0);
+                                    if ($qtyReject > 0) {
+                                        $hasAnyReject = true;
+                                    }
                                 @endphp
-                                <tr>
+                                <tr class="{{ $qtyReject > 0 ? 'row-has-reject' : '' }}">
                                     {{-- cutting_job_bundle_id --}}
                                     <input type="hidden" name="results[{{ $i }}][cutting_job_bundle_id]"
                                         value="{{ $row['cutting_job_bundle_id'] }}">
@@ -419,6 +585,12 @@
                 <div id="qc-warning" class="text-danger small mt-2" style="display:none;">
                     ⚠️ Qty Reject tidak boleh melebihi Qty Cutting. Nilai otomatis dikunci ke batas maksimum.
                 </div>
+
+                @if ($hasAnyReject)
+                    <div class="text-warning small mt-2">
+                        ⚠️ Terdapat bundle dengan reject. Pastikan alasan reject sudah terisi dengan jelas.
+                    </div>
+                @endif
             </div>
 
             {{-- =======================
@@ -491,6 +663,13 @@
 
                 totalOk += ok;
                 totalReject += rej;
+
+                // toggle highlight per-row
+                if (rej > 0) {
+                    tr.classList.add('row-has-reject');
+                } else {
+                    tr.classList.remove('row-has-reject');
+                }
             });
 
             const okText = totalOk.toFixed(2).replace('.', ',');
@@ -514,5 +693,21 @@
 
         // inisialisasi awal
         recalcTotals();
+
+        // FOCAL POINT: kalau ada reject, scroll dan fokus ke input pertama yang > 0
+        window.addEventListener('load', () => {
+            const firstWithReject = Array.from(inputsReject).find(i => {
+                const v = parseFloat(i.value || '0');
+                return !isNaN(v) && v > 0;
+            });
+
+            if (firstWithReject) {
+                firstWithReject.scrollIntoView({
+                    behavior: 'smooth',
+                    block: 'center'
+                });
+                firstWithReject.focus();
+            }
+        });
     </script>
 @endpush
