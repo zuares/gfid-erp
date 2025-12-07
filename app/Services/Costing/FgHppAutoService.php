@@ -34,7 +34,7 @@ class FgHppAutoService
         $dateFrom = Carbon::parse($dateFrom)->toDateString();
         $dateTo = Carbon::parse($dateTo)->toDateString();
 
-        // 1) HPP bahan baku (kain) per pcs → dari Cutting + LotCost + qty_used_fabric
+        // 1) HPP bahan baku (kain) per pcs → dari Cutting + LotCost + qty_used_fabric (multi-LOT)
         $rmUnitCost = $this->calculateRmCostPerUnitFromCutting(
             finishedItemId: $itemId,
             dateFrom: $dateFrom,
@@ -81,16 +81,19 @@ class FgHppAutoService
             $finishingUnitCost,
             $packagingUnitCost,
             $overheadUnitCost,
-            $notes ?: "Auto HPP {$dateFrom} s/d {$dateTo}"// notes
+            $notes ?: "Auto HPP {$dateFrom} s/d {$dateTo}"
         );
     }
 
     /**
-     * Hitung cost bahan baku per pcs:
+     * Hitung cost bahan baku per pcs (MULTI-LOT):
      * - ambil CuttingJobBundle.finished_item_id = FG ini
      * - filter CuttingJob.date di antara periode
-     * - pakai qty_used_fabric + lot avg cost (per gudang RM)
-     * - dibagi total qty OK FG
+     * - pakai qty_used_fabric + lot avg cost (per LOT di gudang RM)
+     * - FG OK pakai qty_qc_ok (kalau ada), fallback ke qty_cutting_ok / qty_pcs
+     * - rumus: Σ (unit_cost_LOT × qty_used_fabric_bundle) / Σ qty_FG_OK
+     *
+     * Ini otomatis multi-LOT karena setiap bundle punya lot_id masing-masing.
      */
     protected function calculateRmCostPerUnitFromCutting(
         int $finishedItemId,
@@ -114,12 +117,14 @@ class FgHppAutoService
         $totalFgOk = 0.0;
 
         foreach ($bundles as $bundle) {
+            // qty kain yg dipakai untuk bundle ini
             $rmQty = (float) ($bundle->qty_used_fabric ?? 0);
             if ($rmQty <= 0) {
                 continue;
             }
 
-            $fgOk = (float) $bundle->qty_cutting_ok;
+            // qty FG OK → utamakan hasil QC Cutting
+            $fgOk = (float) ($bundle->qty_qc_ok ?? $bundle->qty_cutting_ok ?? $bundle->qty_pcs ?? 0);
             if ($fgOk <= 0) {
                 continue;
             }
@@ -139,6 +144,7 @@ class FgHppAutoService
                 continue;
             }
 
+            // unit cost per LOT → sudah moving average per LOT (multi-LOT)
             $lotCost = $this->inventory->getLotMovingAverageUnitCost(
                 warehouseId: $rmWarehouseId,
                 itemId: $rmItemId,
@@ -149,6 +155,7 @@ class FgHppAutoService
                 continue;
             }
 
+            // akumulasi cost dan FG hasil
             $totalRmCost += $lotCost * $rmQty;
             $totalFgOk += $fgOk;
         }
@@ -157,7 +164,8 @@ class FgHppAutoService
             return 0.0;
         }
 
-        return round($totalRmCost / $totalFgOk, 4); // Rupiah per pcs
+        // Rupiah per pcs FG
+        return round($totalRmCost / $totalFgOk, 4);
     }
 
     /**

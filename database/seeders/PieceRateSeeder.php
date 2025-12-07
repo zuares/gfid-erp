@@ -12,7 +12,7 @@ class PieceRateSeeder extends Seeder
         $data = [
             [
                 'module' => 'sewing',
-                'employee_id' => 4,
+                'employee_id' => 6,
                 'item_category_id' => 4,
                 'item_id' => null,
                 'rate_per_pcs' => 5000,
@@ -22,7 +22,7 @@ class PieceRateSeeder extends Seeder
             ],
             [
                 'module' => 'cutting',
-                'employee_id' => 3,
+                'employee_id' => 4,
                 'item_category_id' => 4,
                 'item_id' => null,
                 'rate_per_pcs' => 800,
@@ -32,7 +32,7 @@ class PieceRateSeeder extends Seeder
             ],
             [
                 'module' => 'cutting',
-                'employee_id' => 3,
+                'employee_id' => 4,
                 'item_category_id' => 5,
                 'item_id' => null,
                 'rate_per_pcs' => 1000,
@@ -52,7 +52,7 @@ class PieceRateSeeder extends Seeder
             ],
             [
                 'module' => 'sewing',
-                'employee_id' => 4,
+                'employee_id' => 6,
                 'item_category_id' => 5,
                 'item_id' => null,
                 'rate_per_pcs' => 6000,

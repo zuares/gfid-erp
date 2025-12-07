@@ -35,4 +35,9 @@ class Lot extends Model
         return $this->hasMany(ExternalTransferLine::class);
     }
 
+    public function cuttingJobs()
+    {
+        return $this->hasMany(\App\Models\CuttingJobLot::class);
+    }
+
 }

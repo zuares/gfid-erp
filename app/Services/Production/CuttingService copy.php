@@ -18,10 +18,6 @@ class CuttingService
 
     /**
      * Buat Cutting Job baru.
-     *
-     * Versi MEDIUM (multi-LOT):
-     * - Header job boleh punya lot_id (biasanya LOT pertama).
-     * - LOT utama per bundle diambil dari $row['lot_id'] (bukan lagi $job->lot_id).
      */
     public function create(array $payload): CuttingJob
     {
@@ -38,8 +34,8 @@ class CuttingService
             $job = CuttingJob::create([
                 'code' => $payload['code'],
                 'date' => $payload['date'],
-                'warehouse_id' => $payload['warehouse_id'], // gudang proses cutting (biasanya WH-PRD / RM)
-                'lot_id' => $payload['lot_id'] ?? null, // boleh null, atau LOT pertama dari controller
+                'warehouse_id' => $payload['warehouse_id'], // gudang RM / LOT
+                'lot_id' => $payload['lot_id'],
                 'fabric_item_id' => $payload['fabric_item_id'] ?? null,
                 'notes' => $payload['notes'] ?? null,
                 'status' => 'cut',
@@ -50,17 +46,18 @@ class CuttingService
 
             $operatorId = $payload['operator_id'] ?? null;
 
-            // (opsional) Ambil gudang WIP-CUT kalau nanti mau dipakai
+            // Ambil gudang WIP-CUT untuk di-injek ke bundle sebagai posisi WIP
             $wipCutWarehouseId = Warehouse::where('code', 'WIP-CUT')->value('id');
 
-            // 🔹 PREFETCH: mapping item_id => item_category_id (dipakai untuk isi item_category_id di bundles)
+            // 🔹 PREFETCH: mapping item_id => item_category_id
             $itemCategoryMap = Item::whereIn(
                 'id',
                 collect($bundlesData)
                     ->pluck('finished_item_id')
                     ->filter()
                     ->unique()
-            )->pluck('item_category_id', 'id'); // [item_id => item_category_id]
+            )
+                ->pluck('item_category_id', 'id'); // [item_id => item_category_id]
 
             $running = 1;
             $totalBundles = 0;
@@ -78,33 +75,25 @@ class CuttingService
 
                 $bundleNo = $row['bundle_no'] ?? $running;
                 $qtyUsedFabric = $this->num($row['qty_used_fabric'] ?? 0);
+
                 $finishedItemId = (int) $row['finished_item_id'];
-
-                // ⬇️ per-bundle LOT (INI YANG BERUBAH)
-                $bundleLotId = !empty($row['lot_id']) ? (int) $row['lot_id'] : null;
-
-                // auto-fill kategori dari master item
                 $itemCategoryId = $itemCategoryMap[$finishedItemId] ?? null;
 
-                $bundle = CuttingJobBundle::create([
+                $cuttingJobBunlde = CuttingJobBundle::create([
                     'cutting_job_id' => $job->id,
                     'bundle_code' => $this->generateBundleCode($job, $bundleNo),
                     'bundle_no' => $bundleNo,
-                    'lot_id' => $bundleLotId, // ⬅️ tidak lagi pakai $job->lot_id
+                    'lot_id' => $job->lot_id,
                     'finished_item_id' => $finishedItemId,
-                    'item_category_id' => $itemCategoryId,
+                    'item_category_id' => $itemCategoryId, // ⬅️ INI YANG PENTING
                     'qty_pcs' => $qtyPcs,
                     'qty_used_fabric' => $qtyUsedFabric,
                     'operator_id' => $operatorId,
                     'status' => 'cut',
                     'notes' => $row['notes'] ?? null,
-                    // kalau mau langsung taruh ke WIP-CUT, bisa isi:
-                    // 'wip_warehouse_id' => $wipCutWarehouseId,
-                    // 'wip_qty'          => $qtyPcs,
                     'wip_warehouse_id' => null,
                     'wip_qty' => 0,
                 ]);
-
                 $running++;
                 $totalBundles++;
                 $totalQtyPcs += $qtyPcs;
@@ -116,20 +105,15 @@ class CuttingService
                 'total_qty_pcs' => $totalQtyPcs,
             ]);
 
-            // Di sini nanti kamu bisa lanjutkan mutasi stok per LOT:
-            // - loop $job->bundles
-            // - stockOut per lot_id + qty_used_fabric dari gudang RM
-            // (biarkan dulu kalau memang QC yang trigger mutasi)
+            // … (lanjutan mutasi stok tetap seperti punyamu)
+            // jangan lupa hapus `dd($job);` di atas ya 😉
 
-            return $job->fresh(['bundles']);
+            return $job;
         });
     }
 
     /**
      * Update Cutting Job + bundles.
-     *
-     * - Header: update tanggal, notes, fabric_item_id (warehouse & lot bisa tetap).
-     * - Bundles: lot_id & item_category_id di-update sesuai input terbaru.
      */
     public function update(array $payload, CuttingJob $job): CuttingJob
     {
@@ -137,27 +121,16 @@ class CuttingService
             $bundlesData = $payload['bundles'] ?? [];
             unset($payload['bundles']);
 
-            // update header (kalau kamu mau allow ganti warehouse/lot, tinggal tambah di sini)
+            // update header (tanggal, notes saja; lot & warehouse fix)
             $job->update([
                 'date' => $payload['date'],
                 'notes' => $payload['notes'] ?? null,
                 'fabric_item_id' => $payload['fabric_item_id'] ?? null,
-                // 'warehouse_id' => $payload['warehouse_id'] ?? $job->warehouse_id,
-                // 'lot_id'       => $payload['lot_id'] ?? $job->lot_id,
             ]);
 
             $operatorId = $payload['operator_id'] ?? null;
             $existingIds = $job->bundles()->pluck('id')->all();
             $keepIds = [];
-
-            // 🔹 PREFETCH kategori item untuk update juga
-            $itemCategoryMap = Item::whereIn(
-                'id',
-                collect($bundlesData)
-                    ->pluck('finished_item_id')
-                    ->filter()
-                    ->unique()
-            )->pluck('item_category_id', 'id');
 
             $running = 1;
             $totalBundles = 0;
@@ -175,10 +148,6 @@ class CuttingService
 
                 $bundleNo = $row['bundle_no'] ?? $running;
                 $qtyUsedFabric = $this->num($row['qty_used_fabric'] ?? 0);
-                $finishedItemId = (int) $row['finished_item_id'];
-                $bundleLotId = !empty($row['lot_id']) ? (int) $row['lot_id'] : null;
-
-                $itemCategoryId = $itemCategoryMap[$finishedItemId] ?? null;
 
                 if (!empty($row['id']) && in_array($row['id'], $existingIds)) {
                     // UPDATE
@@ -189,9 +158,7 @@ class CuttingService
                     if ($bundle) {
                         $bundle->update([
                             'bundle_no' => $bundleNo,
-                            'lot_id' => $bundleLotId, // ⬅️ per-bundle LOT
-                            'finished_item_id' => $finishedItemId,
-                            'item_category_id' => $itemCategoryId,
+                            'finished_item_id' => $row['finished_item_id'],
                             'qty_pcs' => $qtyPcs,
                             'qty_used_fabric' => $qtyUsedFabric,
                             'operator_id' => $operatorId,
@@ -205,9 +172,8 @@ class CuttingService
                         'cutting_job_id' => $job->id,
                         'bundle_code' => $this->generateBundleCode($job, $bundleNo),
                         'bundle_no' => $bundleNo,
-                        'lot_id' => $bundleLotId,
-                        'finished_item_id' => $finishedItemId,
-                        'item_category_id' => $itemCategoryId,
+                        'lot_id' => $job->lot_id,
+                        'finished_item_id' => $row['finished_item_id'],
                         'qty_pcs' => $qtyPcs,
                         'qty_used_fabric' => $qtyUsedFabric,
                         'operator_id' => $operatorId,
@@ -232,7 +198,7 @@ class CuttingService
                 }
             }
 
-            // update summary header
+            // update summary
             $job->update([
                 'total_bundles' => $totalBundles,
                 'total_qty_pcs' => $totalQtyPcs,

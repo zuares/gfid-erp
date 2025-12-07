@@ -3,8 +3,10 @@
 namespace App\Services\Costing;
 
 use App\Models\Item;
+use App\Models\ItemCostSnapshot;
 use App\Models\PieceworkPayrollLine;
 use App\Models\ProductionCostPeriod;
+use Carbon\Carbon;
 use Illuminate\Support\Facades\DB;
 
 class ProductionCostService
@@ -14,99 +16,102 @@ class ProductionCostService
     ) {}
 
     /**
-     * Generate costing 1 periode → buat snapshot HPP baru.
+     * Generate costing 1 periode → buat snapshot HPP FINAL baru.
      *
-     * Step:
-     * 1. Ambil semua FG
-     * 2. Hitung RM/unit (dari RM-only snapshot Finishing)
-     * 3. Hitung biaya cutting / sewing / finishing dari payroll
-     * 4. Buat snapshot HPP final (production_cost_period)
-     * 5. Set snapshot ini sebagai aktif (via HppService)
+     * Langkah:
+     * 1. Cari item FG yang relevan (punya produksi / payroll di periode).
+     * 2. Hitung RM/unit (dari RM-only snapshot Finishing via HppService).
+     * 3. Hitung biaya cutting / sewing / finishing dari payroll period yang ter-link.
+     * 4. Buat snapshot HPP final (reference_type = production_cost_period).
+     * 5. Set snapshot ini sebagai aktif (via HppService).
      */
     public function generateFromPayroll(ProductionCostPeriod $period): array
     {
         $results = [];
 
         DB::transaction(function () use ($period, &$results) {
+            $dateFrom = Carbon::parse($period->date_from)->toDateString();
+            $dateTo = Carbon::parse($period->date_to)->toDateString();
+            $snapshotDate = Carbon::parse($period->snapshot_date)->toDateString();
 
-            $dateFrom = $period->date_from->toDateString();
-            $dateTo = $period->date_to->toDateString();
-            $snapshotDate = $period->snapshot_date->toDateString();
+            // 0) Cari item FG relevan (ada finishing OK, atau muncul di payroll periode ini)
+            $itemIds = $this->getRelevantFinishedItemIdsForPeriod($period, $dateFrom, $dateTo);
 
-            // Ambil semua item FG (finished goods)
-            $finishedGoods = Item::where('type', 'finished_good')->get();
+            if (empty($itemIds)) {
+                $period->update([
+                    'status' => 'posted',
+                    'is_active' => true,
+                ]);
+                return;
+            }
+
+            $finishedGoods = Item::query()
+                ->where('type', 'finished_good')
+                ->whereIn('id', $itemIds)
+                ->get();
+
+            $defaultPackagingUnitCost = 0.0;
+            $defaultOverheadUnitCost = 0.0;
 
             foreach ($finishedGoods as $item) {
+                $itemId = $item->id;
 
-                // 1) RM cost per pcs → dari RM-only snapshot Finishing (via HppService)
-                $rmUnitCost = $this->calculateRmCostPerUnit(
-                    itemId: $item->id,
-                    dateFrom: $dateFrom,
-                    dateTo: $dateTo,
-                );
+                $rmUnitCost = $this->calculateRmCostPerUnit($itemId, $dateFrom, $dateTo);
+                $cuttingUnitCost = $this->calculatePayrollCostPerUnit($period->cutting_payroll_period_id, $itemId);
+                $sewingUnitCost = $this->calculatePayrollCostPerUnit($period->sewing_payroll_period_id, $itemId);
+                $finishingUnitCost = $this->calculatePayrollCostPerUnit($period->finishing_payroll_period_id, $itemId);
 
-                // 2) Payroll Cutting / pcs
-                $cuttingUnitCost = $this->calculatePayrollCostPerUnit(
-                    payrollPeriodId: $period->cutting_payroll_period_id,
-                    itemId: $item->id,
-                );
+                $packagingUnitCost = $defaultPackagingUnitCost;
+                $overheadUnitCost = $defaultOverheadUnitCost;
 
-                // 3) Payroll Sewing / pcs
-                $sewingUnitCost = $this->calculatePayrollCostPerUnit(
-                    payrollPeriodId: $period->sewing_payroll_period_id,
-                    itemId: $item->id,
-                );
+                $qtyBasis = $this->getProductionQty($itemId, $dateFrom, $dateTo);
 
-                // 4) Payroll Finishing / pcs (kalau ada)
-                $finishingUnitCost = $this->calculatePayrollCostPerUnit(
-                    payrollPeriodId: $period->finishing_payroll_period_id,
-                    itemId: $item->id,
-                );
-
-                // 5) Packaging + Overhead (sementara 0, bisa diisi nanti)
-                $packagingUnitCost = 0.0;
-                $overheadUnitCost = 0.0;
-
-                // 6) Qty basis = total produksi OK di periode
-                $qtyBasis = $this->getProductionQty(
-                    itemId: $item->id,
-                    dateFrom: $dateFrom,
-                    dateTo: $dateTo,
-                );
-
-                $allCostZero = (
-                    $rmUnitCost == 0.0
-                    && $cuttingUnitCost == 0.0
-                    && $sewingUnitCost == 0.0
-                    && $finishingUnitCost == 0.0
-                    && $packagingUnitCost == 0.0
-                    && $overheadUnitCost == 0.0
-                );
-
-                if ($qtyBasis <= 0 && $allCostZero) {
-                    // Tidak ada data sama sekali → skip snapshot untuk item ini
+                if ($this->isNoCostAndNoQty(
+                    $rmUnitCost,
+                    $cuttingUnitCost,
+                    $sewingUnitCost,
+                    $finishingUnitCost,
+                    $packagingUnitCost,
+                    $overheadUnitCost,
+                    $qtyBasis,
+                )) {
                     continue;
                 }
 
-                // 7) Buat SNAPSHOT HPP FINAL untuk periode ini
-                //    reference_type: production_cost_period
-                //    setActive: true → jadikan HPP final aktif (via HppService)
-                $snapshot = $this->hpp->createSnapshot(
-                    itemId: $item->id,
-                    warehouseId: null, // global DULU, nanti kalau perlu bisa per gudang
-                    snapshotDate: $snapshotDate,
-                    referenceType: 'production_cost_period',
-                    referenceId: $period->id,
-                    qtyBasis: $qtyBasis,
-                    rmUnitCost: $rmUnitCost,
-                    cuttingUnitCost: $cuttingUnitCost,
-                    sewingUnitCost: $sewingUnitCost,
-                    finishingUnitCost: $finishingUnitCost,
-                    packagingUnitCost: $packagingUnitCost,
-                    overheadUnitCost: $overheadUnitCost,
-                    notes: "Auto HPP via ProductionCostPeriod {$period->code}",
-                    setActive: true, // ⬅️ di sinilah HPP final diaktifkan
+                $totalHpp =
+                    $rmUnitCost
+                     + $cuttingUnitCost
+                     + $sewingUnitCost
+                     + $finishingUnitCost
+                     + $packagingUnitCost
+                     + $overheadUnitCost;
+
+                // 7) Upsert SNAPSHOT HPP FINAL untuk periode ini
+                $snapshot = ItemCostSnapshot::updateOrCreate(
+                    [
+                        'item_id' => $itemId,
+                        'warehouse_id' => null,
+                        'reference_type' => 'production_cost_period',
+                        'reference_id' => $period->id,
+                    ],
+                    [
+                        'snapshot_date' => $snapshotDate,
+                        'qty_basis' => $qtyBasis,
+                        'rm_unit_cost' => $rmUnitCost,
+                        'cutting_unit_cost' => $cuttingUnitCost,
+                        'sewing_unit_cost' => $sewingUnitCost,
+                        'finishing_unit_cost' => $finishingUnitCost,
+                        'packaging_unit_cost' => $packagingUnitCost,
+                        'overhead_unit_cost' => $overheadUnitCost,
+                        'unit_cost' => $totalHpp,
+                        'notes' => "Auto HPP via ProductionCostPeriod {$period->code}",
+                        // kalau mau isi created_by saat pertama kali dibuat:
+                        'created_by' => auth()->id(),
+                    ],
                 );
+
+                // Pastikan snapshot ini yang aktif untuk tipe 'production_cost_period'
+                $this->hpp->setActiveSnapshot($snapshot, exclusiveWithinType: true);
 
                 $results[] = [
                     'item_code' => $item->code,
@@ -118,17 +123,11 @@ class ProductionCostService
                     'finishing' => $finishingUnitCost,
                     'packaging' => $packagingUnitCost,
                     'overhead' => $overheadUnitCost,
-                    'total_hpp' => $rmUnitCost
-                     + $cuttingUnitCost
-                     + $sewingUnitCost
-                     + $finishingUnitCost
-                     + $packagingUnitCost
-                     + $overheadUnitCost,
+                    'total_hpp' => $totalHpp,
                     'snapshot_id' => $snapshot->id,
                 ];
             }
 
-            // Tandai periode sebagai posted + aktif
             $period->update([
                 'status' => 'posted',
                 'is_active' => true,
@@ -139,11 +138,77 @@ class ProductionCostService
     }
 
     /**
+     * Helper: cek apakah benar-benar tidak ada cost + tidak ada qty.
+     */
+    protected function isNoCostAndNoQty(
+        float $rm,
+        float $cut,
+        float $sew,
+        float $fin,
+        float $pack,
+        float $oh,
+        float $qtyBasis,
+    ): bool {
+        $noCost = (
+            $rm == 0.0
+            && $cut == 0.0
+            && $sew == 0.0
+            && $fin == 0.0
+            && $pack == 0.0
+            && $oh == 0.0
+        );
+
+        return $noCost && $qtyBasis <= 0.0;
+    }
+
+    /**
+     * Cari item FG relevan:
+     * - Punya produksi di finishing_jobs (qty_ok > 0) dalam range
+     * - ATAU muncul di payroll cutting/sewing/finishing yg di-link ke periode
+     */
+    protected function getRelevantFinishedItemIdsForPeriod(
+        ProductionCostPeriod $period,
+        string $dateFrom,
+        string $dateTo,
+    ): array {
+        // Dari produksi finishing
+        $fromFinishing = DB::table('finishing_job_lines')
+            ->join('finishing_jobs', 'finishing_jobs.id', '=', 'finishing_job_lines.finishing_job_id')
+            ->where('finishing_jobs.status', 'posted')
+            ->whereBetween('finishing_jobs.date', [$dateFrom, $dateTo])
+            ->where('finishing_job_lines.qty_ok', '>', 0)
+            ->pluck('finishing_job_lines.item_id')
+            ->map(fn($id) => (int) $id);
+
+        // Dari payroll (cutting / sewing / finishing) yang sudah dipilih di periode
+        $payrollPeriodIds = array_filter([
+            $period->cutting_payroll_period_id,
+            $period->sewing_payroll_period_id,
+            $period->finishing_payroll_period_id,
+        ]);
+
+        $fromPayroll = collect();
+        if (!empty($payrollPeriodIds)) {
+            $fromPayroll = PieceworkPayrollLine::query()
+                ->whereIn('payroll_period_id', $payrollPeriodIds)
+                ->whereNotNull('item_id')
+                ->pluck('item_id')
+                ->map(fn($id) => (int) $id);
+        }
+
+        return $fromFinishing
+            ->merge($fromPayroll)
+            ->filter()
+            ->unique()
+            ->values()
+            ->all();
+    }
+
+    /**
      * Ambil RM cost/unit dari basis RM-only Finishing (via HppService).
      *
-     * Catatan:
-     * - $dateFrom saat ini belum dipakai, tapi disimpan di signature
-     *   kalau nanti kamu mau bikin logic RM yang tergantung range.
+     * Saat ini: pakai snapshot <= $dateTo.
+     * Kalau nanti mau lebih ketat range [dateFrom, dateTo], logic ada di HppService.
      */
     protected function calculateRmCostPerUnit(int $itemId, string $dateFrom, string $dateTo): float
     {
@@ -175,7 +240,7 @@ class ProductionCostService
         $totalQty = (float) $lines->sum('total_qty_ok');
         $totalAmount = (float) $lines->sum('amount');
 
-        if ($totalQty <= 0) {
+        if ($totalQty <= 0.0) {
             return 0.0;
         }
 

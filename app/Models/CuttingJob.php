@@ -57,4 +57,9 @@ class CuttingJob extends Model
         return $this->hasMany(QcResult::class);
     }
 
+    public function lots()
+    {
+        return $this->hasMany(\App\Models\CuttingJobLot::class);
+    }
+
 }

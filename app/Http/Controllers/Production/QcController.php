@@ -120,6 +120,7 @@ class QcController extends Controller
      */
     public function updateCutting(Request $request, CuttingJob $cuttingJob)
     {
+
         $validated = $request->validate([
             'qc_date' => ['required', 'date'],
             'operator_id' => ['nullable', 'exists:employees,id'],
@@ -133,21 +134,27 @@ class QcController extends Controller
             'results.*.notes' => ['nullable', 'string'],
         ]);
 
-        // fallback operator login
+        // fallback operator → kalau hidden kosong, pakai employee dari user login
         if (empty($validated['operator_id'])) {
-            $validated['operator_id'] = Auth::user()->employee?->id;
+            $validated['operator_id'] = \Illuminate\Support\Facades\Auth::user()->employee?->id;
         }
 
         try {
 
+            // 🔥 SIMPAN QC + MUTASI STOK
             $this->qc->saveCuttingQc($cuttingJob, $validated);
-        } catch (\RuntimeException $e) {
-            return back()->withInput()->with('error', 'QC gagal: ' . $e->getMessage());
+
+        } catch (\Throwable $e) {
+            // Kalau ada error apa pun → balik ke form + tampilin pesan
+            return back()
+                ->withInput()
+                ->with('error', 'QC gagal: ' . $e->getMessage());
         }
 
+        // Update status job → sudah QC
         $cuttingJob->update([
             'status' => 'qc_done',
-            'created_by' => Auth::id(),
+            'updated_by' => \Illuminate\Support\Facades\Auth::id(),
         ]);
 
         return redirect()

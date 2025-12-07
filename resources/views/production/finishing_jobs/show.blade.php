@@ -192,6 +192,93 @@
 
 
         {{-- ===========================
+         HPP RM-ONLY DARI FINISHING INI
+    ============================ --}}
+        <div class="card p-3 mb-3">
+            <div class="d-flex justify-content-between align-items-center mb-2">
+                <div>
+                    <div class="fw-semibold">HPP RM-only dari Finishing ini</div>
+                    <div class="help">
+                        Snapshot otomatis tipe <code>auto_hpp_rm_only_finishing</code> per item FG.
+                    </div>
+                </div>
+
+                @if ($rmSnapshots->isNotEmpty())
+                    <div class="help">
+                        Total snapshot: {{ $rmSnapshots->count() }}
+                    </div>
+                @endif
+            </div>
+
+            @if ($rmSnapshots->isEmpty())
+                <div class="help">
+                    Belum ada snapshot RM-only yang tercatat untuk finishing job ini.
+                    Snapshot akan dibuat otomatis setelah QC Finishing disimpan.
+                </div>
+            @else
+                <div class="table-wrap">
+                    <table class="table table-sm align-middle mono mb-0">
+                        <thead class="table-light">
+                            <tr>
+                                <th style="width: 140px;">Tanggal</th>
+                                <th>Item FG</th>
+                                <th class="text-end" style="width: 120px;">Qty Basis</th>
+                                <th class="text-end" style="width: 140px;">RM/Unit</th>
+                                <th class="text-end" style="width: 160px;">Total RM</th>
+                                <th style="width: 110px;">Status</th>
+                            </tr>
+                        </thead>
+                        <tbody>
+                            @foreach ($rmSnapshots as $snap)
+                                @php
+                                    $rmUnit = (float) $snap->rm_unit_cost;
+                                    $qty = (float) $snap->qty_basis;
+                                    $total = $rmUnit * $qty;
+                                @endphp
+                                <tr>
+                                    <td>
+                                        @if ($snap->snapshot_date instanceof \Illuminate\Support\Carbon)
+                                            {{ $snap->snapshot_date->format('d/m/Y') }}
+                                        @else
+                                            {{ \Illuminate\Support\Carbon::parse($snap->snapshot_date)->format('d/m/Y') }}
+                                        @endif
+                                    </td>
+                                    <td>
+                                        <div>{{ $snap->item?->code ?? 'ITEM ?' }}</div>
+                                        <div class="help">
+                                            {{ $snap->item?->name ?? '' }}
+                                        </div>
+                                    </td>
+                                    <td class="text-end">
+                                        {{ number_format($qty, 2, ',', '.') }}
+                                    </td>
+                                    <td class="text-end">
+                                        {{ number_format($rmUnit, 2, ',', '.') }}
+                                    </td>
+                                    <td class="text-end">
+                                        {{ number_format($total, 2, ',', '.') }}
+                                    </td>
+                                    <td>
+                                        @if ($snap->is_active)
+                                            <span class="badge bg-success-subtle text-success rounded-pill px-2 py-1">
+                                                Aktif
+                                            </span>
+                                        @else
+                                            <span class="badge bg-secondary-subtle text-secondary rounded-pill px-2 py-1">
+                                                Historis
+                                            </span>
+                                        @endif
+                                    </td>
+                                </tr>
+                            @endforeach
+                        </tbody>
+                    </table>
+                </div>
+            @endif
+        </div>
+
+
+        {{-- ===========================
          DETAIL GRID
     ============================ --}}
         <div class="card p-0 mb-4">

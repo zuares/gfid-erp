@@ -10,6 +10,7 @@ use App\Models\FinishingJob;
 use App\Models\FinishingJobLine;
 use App\Models\InventoryMutation;
 use App\Models\Item;
+use App\Models\ItemCostSnapshot;
 use App\Models\SewingPickupLine;
 use App\Models\SewingReturnLine;
 use App\Models\Warehouse;
@@ -420,8 +421,18 @@ class FinishingJobController extends Controller
             'createdBy',
         ]);
 
+        // 🔹 Snapshots RM-only yang terkait finishing job ini
+        $rmSnapshots = ItemCostSnapshot::query()
+            ->with('item') // pastikan relasi item() ada di model ItemCostSnapshot
+            ->where('reference_type', 'auto_hpp_rm_only_finishing')
+            ->where('reference_id', $finishing_job->id)
+            ->orderByDesc('snapshot_date')
+            ->orderByDesc('id')
+            ->get();
+
         return view('production.finishing_jobs.show', [
             'job' => $finishing_job,
+            'rmSnapshots' => $rmSnapshots,
         ]);
     }
 

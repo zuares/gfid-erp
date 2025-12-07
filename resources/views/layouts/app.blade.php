@@ -6,7 +6,6 @@
     <meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=1, user-scalable=no">
     <meta name="csrf-token" content="{{ csrf_token() }}">
 
-
     <title>@yield('title', config('app.name', 'GFID'))</title>
 
     {{-- Bootstrap 5 --}}
@@ -45,7 +44,7 @@
     {{-- THEME + GLOBAL STYLES ASLI MU --}}
     @include('layouts.partials.styles')
     <link rel="stylesheet" href="{{ asset('css/light-minimal.css') }}">
-    <link rel="stylesheet" href="{{ asset('css/dark-high-contrast.css') }}"> <!-- override dark -->
+    <link rel="stylesheet" href="{{ asset('css/dark-high-contrast.css') }}"> {{-- override dark --}}
 
     {{-- ✅ Tambahan: ganjel konten di atas bottom nav khusus mobile --}}
     <style>
@@ -67,10 +66,8 @@
         {{-- NAVBAR --}}
         @include('layouts.partials.navbar')
 
-
         {{-- MOBILE SIDEBAR (drawer) --}}
         @include('layouts.partials.mobile-sidebar')
-
 
         {{-- APP SHELL: sidebar + main --}}
         <div class="app-shell">
@@ -88,7 +85,19 @@
                         </div>
                     @endif
 
-                    @if ($errors->any())
+                    @if (session('error'))
+                        <div class="alert alert-danger mb-3">
+                            {{ session('error') }}
+                        </div>
+                    @endif
+
+                    {{-- Error validasi (pakai ViewErrorBag) --}}
+                    @php
+                        $hasValidationErrors =
+                            $errors instanceof \Illuminate\Support\ViewErrorBag ? $errors->any() : false;
+                    @endphp
+
+                    @if ($hasValidationErrors)
                         <div class="alert alert-danger mb-3">
                             <strong>Terjadi error:</strong>
                             <ul class="mb-0">
@@ -101,10 +110,8 @@
 
                     @yield('content')
                 </div>
-
             </main>
-            {{-- APP FOOTER --}}
-
+            {{-- APP FOOTER (kalau nanti mau ditambah) --}}
         </div>
 
         {{-- BOTTOM NAV MOBILE --}}
@@ -122,6 +129,7 @@
     @include('layouts.partials.theme-script')
 
     @stack('scripts')
+
     <script>
         // Disable double-tap zoom (iOS Safari)
         let lastTouchEnd = 0;

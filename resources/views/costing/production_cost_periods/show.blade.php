@@ -1,303 +1,403 @@
+{{-- resources/views/costing/production_cost_periods/show.blade.php --}}
 @extends('layouts.app')
 
-@section('title', 'Detail Periode HPP Produksi')
+@section('title', 'Costing • Periode HPP ' . $period->code)
 
 @push('head')
     <style>
         .page-wrap {
-            max-width: 1200px;
+            max-width: 1120px;
             margin-inline: auto;
-            padding: .75rem .75rem 3.25rem;
+            padding-bottom: 1rem;
         }
 
-        body[data-theme="light"] .page-wrap {
-            background: radial-gradient(circle at top left,
-                    rgba(59, 130, 246, 0.14) 0,
-                    rgba(129, 140, 248, 0.12) 22%,
-                    #f9fafb 60%);
-        }
-
-        .card-main {
+        .card {
             background: var(--card);
-            border-radius: 14px;
-            border: 1px solid rgba(148, 163, 184, 0.28);
-            box-shadow:
-                0 10px 24px rgba(15, 23, 42, 0.06),
-                0 0 0 1px rgba(15, 23, 42, 0.03);
+            border: 1px solid var(--line);
+            border-radius: 16px;
         }
 
-        .badge-soft {
+        .mono {
+            font-variant-numeric: tabular-nums;
+            font-family: ui-monospace, SFMono-Regular, Menlo, Consolas;
+        }
+
+        .help {
+            color: var(--muted);
+            font-size: .84rem;
+        }
+
+        .badge-status {
             border-radius: 999px;
-            padding: .2rem .7rem;
-            font-size: .75rem;
-            border: 1px solid rgba(148, 163, 184, .6);
-            background: rgba(15, 23, 42, 0.02);
+            padding: .16rem .7rem;
+            font-size: .72rem;
+            font-weight: 600;
+            letter-spacing: .05em;
         }
 
-        .table-sticky thead th {
-            position: sticky;
-            top: 0;
-            z-index: 1;
+        .badge-status-draft {
+            background: rgba(248, 180, 0, .15);
+            color: #92400e;
+        }
+
+        .badge-status-posted {
+            background: rgba(16, 185, 129, .15);
+            color: #0f5132;
+        }
+
+        .badge-status-inactive {
+            background: rgba(148, 163, 184, .18);
+            color: #4b5563;
+        }
+
+        .pill {
+            border-radius: 999px;
+            padding: .18rem .7rem;
+            border: 1px solid var(--line);
+            font-size: .78rem;
+        }
+
+        .table-wrap {
+            overflow-x: auto;
+        }
+
+        @media (max-width: 768px) {
+            .page-wrap {
+                padding-inline: .5rem;
+            }
+
+            .table-wrap {
+                font-size: .85rem;
+            }
         }
     </style>
 @endpush
 
 @section('content')
     @php
-        $fmt = fn($n, $dec = 2) => number_format($n ?? 0, $dec, ',', '.');
+        // ringkasan kecil
+        $itemCount = $snapshots->count();
+        $totalQtyBasis = (float) $snapshots->sum('qty_basis');
+        $avgHpp = $itemCount > 0 ? (float) $snapshots->avg('unit_cost') : 0.0;
+
+        $statusBadgeClass = match ($period->status) {
+            'posted' => 'badge-status-posted',
+            'draft' => 'badge-status-draft',
+            default => 'badge-status-inactive',
+        };
     @endphp
 
     <div class="page-wrap">
-        <div class="d-flex justify-content-between align-items-start mb-3">
-            <div>
-                <h4 class="mb-1">
-                    Periode HPP Produksi: {{ $period->name ?? $period->code }}
-                </h4>
-                <div class="d-flex flex-wrap gap-2 align-items-center small">
-                    <span class="badge-soft">
-                        Kode: {{ $period->code }}
-                    </span>
-                    <span class="badge-soft">
-                        Periode:
-                        {{ optional($period->date_from)->format('d/m/Y') }} –
-                        {{ optional($period->date_to)->format('d/m/Y') }}
-                    </span>
-                    <span class="badge-soft">
-                        Snapshot: {{ optional($period->snapshot_date)->format('d/m/Y') }}
-                    </span>
-                    <span class="badge-soft">
-                        Status: {{ strtoupper($period->status ?? 'draft') }}
-                    </span>
-                    @if ($period->is_active)
-                        <span class="badge-soft text-primary border-primary-subtle">
-                            Aktif
-                        </span>
-                    @endif
-                </div>
-                @if ($period->notes)
-                    <p class="small text-muted mt-2 mb-0">
-                        {!! nl2br(e($period->notes)) !!}
-                    </p>
-                @endif
+
+        {{-- FLASH --}}
+        @if (session('status'))
+            <div class="alert alert-success alert-dismissible fade show mb-3">
+                {{ session('status') }}
+                <button class="btn-close" data-bs-dismiss="alert"></button>
             </div>
+        @endif
 
-            <div class="d-flex flex-column align-items-end gap-2">
-                @if (session('status'))
-                    <div class="alert alert-success py-1 px-2 small mb-0">
-                        {{ session('status') }}
-                    </div>
-                @endif
+        {{-- HEADER PERIODE --}}
+        <div class="card p-3 mb-3">
+            <div class="d-flex justify-content-between align-items-start flex-wrap gap-3">
 
-                <div class="d-flex gap-2">
-                    <a href="{{ route('costing.production_cost_periods.index') }}" class="btn btn-sm btn-outline-secondary">
-                        &larr; Kembali
-                    </a>
-                    <a href="{{ route('costing.production_cost_periods.edit', $period) }}"
-                        class="btn btn-sm btn-outline-primary">
-                        Edit
-                    </a>
-                    <form action="{{ route('costing.production_cost_periods.generate', $period) }}" method="POST"
-                        onsubmit="return confirm('Generate ulang HPP dari payroll untuk periode ini?\nIni akan membuat snapshot baru per item.');">
-                        @csrf
-                        <button type="submit" class="btn btn-sm btn-success">
-                            Re-generate HPP
-                        </button>
-                    </form>
-                </div>
-            </div>
-        </div>
-
-        {{-- Info payroll yang ter-attach --}}
-        <div class="row g-3 mb-3">
-            <div class="col-md-4">
-                <div class="card card-main h-100">
-                    <div class="card-body py-2 px-3">
-                        <div class="small text-muted mb-1">Payroll Cutting</div>
-                        @if ($period->cuttingPayrollPeriod)
-                            <div class="fw-semibold">
-                                {{ $period->cuttingPayrollPeriod->name ?? 'Cutting #' . $period->cuttingPayrollPeriod->id }}
-                            </div>
-                            <div class="small text-muted">
-                                {{ optional($period->cuttingPayrollPeriod->date_from)->format('d/m/Y') }} –
-                                {{ optional($period->cuttingPayrollPeriod->date_to)->format('d/m/Y') }}
-                            </div>
-                        @else
-                            <div class="small text-muted">
-                                Belum di-link ke payroll Cutting.
-                            </div>
-                        @endif
-                    </div>
-                </div>
-            </div>
-
-            <div class="col-md-4">
-                <div class="card card-main h-100">
-                    <div class="card-body py-2 px-3">
-                        <div class="small text-muted mb-1">Payroll Sewing</div>
-                        @if ($period->sewingPayrollPeriod)
-                            <div class="fw-semibold">
-                                {{ $period->sewingPayrollPeriod->name ?? 'Sewing #' . $period->sewingPayrollPeriod->id }}
-                            </div>
-                            <div class="small text-muted">
-                                {{ optional($period->sewingPayrollPeriod->date_from)->format('d/m/Y') }} –
-                                {{ optional($period->sewingPayrollPeriod->date_to)->format('d/m/Y') }}
-                            </div>
-                        @else
-                            <div class="small text-muted">
-                                Belum di-link ke payroll Sewing.
-                            </div>
-                        @endif
-                    </div>
-                </div>
-            </div>
-
-            <div class="col-md-4">
-                <div class="card card-main h-100">
-                    <div class="card-body py-2 px-3">
-                        <div class="small text-muted mb-1">Payroll Finishing</div>
-                        @if ($period->finishingPayrollPeriod)
-                            <div class="fw-semibold">
-                                {{ $period->finishingPayrollPeriod->name ?? 'Finishing #' . $period->finishingPayrollPeriod->id }}
-                            </div>
-                            <div class="small text-muted">
-                                {{ optional($period->finishingPayrollPeriod->date_from)->format('d/m/Y') }} –
-                                {{ optional($period->finishingPayrollPeriod->date_to)->format('d/m/Y') }}
-                            </div>
-                        @else
-                            <div class="small text-muted">
-                                Belum di-link ke payroll Finishing.
-                            </div>
-                        @endif
-                    </div>
-                </div>
-            </div>
-        </div>
-
-        {{-- Tabel snapshot HPP per item --}}
-        <div class="card card-main">
-            <div class="card-header py-2 px-3 d-flex justify-content-between align-items-center">
                 <div>
-                    <strong>Snapshot HPP per Item</strong>
-                    <div class="small text-muted">
-                        Diambil dari <code>item_cost_snapshots</code> dengan reference_type = production_cost_period.
+                    <div class="d-flex align-items-center gap-2 mb-1 flex-wrap">
+                        <h1 class="h5 mb-0">
+                            Periode HPP
+                            <span class="mono">{{ $period->code }}</span>
+                        </h1>
+
+                        <span class="badge-status {{ $statusBadgeClass }}">
+                            {{ strtoupper($period->status ?? 'draft') }}
+                        </span>
+
+                        @if ($period->is_active)
+                            <span class="badge bg-success-subtle text-success rounded-pill px-2 py-1">
+                                Periode Aktif
+                            </span>
+                        @endif
+                    </div>
+
+                    <div class="help">
+                        Nama:
+                        <span class="fw-semibold">{{ $period->name }}</span><br>
+                        Range:
+                        <span class="mono">
+                            {{ \Illuminate\Support\Carbon::parse($period->date_from)->format('d/m/Y') }}
+                            —
+                            {{ \Illuminate\Support\Carbon::parse($period->date_to)->format('d/m/Y') }}
+                        </span>
+                        · Snapshot:
+                        <span class="mono">
+                            {{ \Illuminate\Support\Carbon::parse($period->snapshot_date)->format('d/m/Y') }}
+                        </span>
+                    </div>
+
+                    @if ($period->notes)
+                        <div class="small mt-2">
+                            <span class="fw-semibold">Catatan:</span>
+                            {!! nl2br(e($period->notes)) !!}
+                        </div>
+                    @endif
+                </div>
+
+                <div class="d-flex flex-column align-items-end gap-2">
+
+                    <div class="d-flex gap-2 flex-wrap justify-content-end">
+                        <a href="{{ route('costing.production_cost_periods.index') }}"
+                            class="btn btn-sm btn-outline-secondary">
+                            <i class="bi bi-arrow-left me-1"></i> Kembali
+                        </a>
+
+                        <a href="{{ route('costing.production_cost_periods.edit', $period) }}"
+                            class="btn btn-sm btn-outline-primary">
+                            <i class="bi bi-pencil-square me-1"></i> Edit
+                        </a>
+
+                        <form action="{{ route('costing.production_cost_periods.generate', $period) }}" method="post"
+                            onsubmit="return confirm('Generate ulang HPP final untuk periode ini?\nSnapshot lama dengan reference_type=production_cost_period tetap ada, tapi yang baru akan jadi aktif.');">
+                            @csrf
+                            <button type="submit" class="btn btn-sm btn-primary">
+                                <i class="bi bi-calculator me-1"></i>
+                                Generate HPP Final
+                            </button>
+                        </form>
+                    </div>
+
+                    <div class="help mt-1 text-end">
+                        @if ($period->cuttingPayrollPeriod)
+                            <div>
+                                Cutting:
+                                <span class="mono">
+                                    {{ $period->cuttingPayrollPeriod->code }}
+                                </span>
+                            </div>
+                        @endif
+                        @if ($period->sewingPayrollPeriod)
+                            <div>
+                                Sewing:
+                                <span class="mono">
+                                    {{ $period->sewingPayrollPeriod->code }}
+                                </span>
+                            </div>
+                        @endif
+                        @if ($period->finishingPayrollPeriod)
+                            <div>
+                                Finishing:
+                                <span class="mono">
+                                    {{ $period->finishingPayrollPeriod->code }}
+                                </span>
+                            </div>
+                        @endif
+                    </div>
+
+                </div>
+            </div>
+        </div>
+
+        {{-- SUMMARY KECIL --}}
+        <div class="card p-3 mb-3">
+            <div class="d-flex flex-wrap gap-3 align-items-center justify-content-between">
+
+                <div class="d-flex flex-wrap gap-2">
+                    <div class="pill">
+                        Item HPP:
+                        <span class="mono ms-1">{{ $itemCount }}</span>
+                    </div>
+                    <div class="pill">
+                        Total Qty Basis:
+                        <span class="mono ms-1">
+                            {{ number_format($totalQtyBasis, 2, ',', '.') }}
+                        </span>
+                    </div>
+                    <div class="pill">
+                        Rata-rata HPP/unit:
+                        <span class="mono ms-1">
+                            {{ number_format($avgHpp, 2, ',', '.') }}
+                        </span>
                     </div>
                 </div>
-                <div class="small text-muted">
-                    Total item: {{ $snapshots->count() }}
+
+                <div class="help">
+                    HPP final per item dihitung dari:
+                    RM (snapshot RM-only finishing) +
+                    Cutting +
+                    Sewing +
+                    Finishing +
+                    Packaging +
+                    Overhead.
+                </div>
+            </div>
+        </div>
+
+        {{-- TABEL HPP PER ITEM --}}
+        <div class="card p-0 mb-4">
+            <div class="px-3 pt-3 pb-2 d-flex justify-content-between">
+                <div>
+                    <div class="fw-semibold">Detail HPP per Item</div>
+                    <div class="help">
+                        Berdasarkan snapshot <code>production_cost_period</code> untuk periode ini.
+                    </div>
+                </div>
+
+                <div class="help">
+                    Total baris: {{ $snapshots->count() }}
                 </div>
             </div>
 
-            <div class="table-responsive" style="max-height: 460px;">
-                <table class="table table-sm mb-0 table-sticky align-middle">
-                    <thead class="table-light small">
-                        <tr>
-                            <th>Item</th>
-                            <th class="text-end">Qty Basis</th>
-                            <th class="text-end">RM / unit</th>
-                            <th class="text-end">Cutting / unit</th>
-                            <th class="text-end">Sewing / unit</th>
-                            <th class="text-end">Finishing / unit</th>
-                            <th class="text-end">Packaging</th>
-                            <th class="text-end">Overhead</th>
-                            <th class="text-end">Total HPP / unit</th>
-                            <th class="text-center">Aktif?</th>
-                        </tr>
-                    </thead>
-                    <tbody class="small">
-                        @php
-                            $grandQty = 0;
-                            $grandTotalCost = 0;
-                        @endphp
+            @if ($snapshots->isEmpty())
+                <div class="px-3 pb-3">
+                    <div class="help">
+                        Belum ada snapshot HPP untuk periode ini.
+                        Klik <strong>Generate HPP Final</strong> untuk membuat snapshot dari payroll & RM-only.
+                    </div>
+                </div>
+            @else
+                <div class="table-wrap">
+                    <table class="table table-sm align-middle mono mb-0">
+                        <thead class="table-light">
+                            <tr>
+                                <th style="width: 80px;">Kode</th>
+                                <th>Item</th>
+                                <th class="text-end" style="width: 110px;">Qty Basis</th>
+                                <th class="text-end" style="width: 110px;">RM</th>
+                                <th class="text-end" style="width: 110px;">Cutting</th>
+                                <th class="text-end" style="width: 110px;">Sewing</th>
+                                <th class="text-end" style="width: 110px;">Finishing</th>
+                                <th class="text-end" style="width: 110px;">Packaging</th>
+                                <th class="text-end" style="width: 110px;">Overhead</th>
+                                <th class="text-end" style="width: 120px;">HPP / unit</th>
+                                <th style="width: 90px;">Aktif?</th>
+                            </tr>
+                        </thead>
+                        <tbody>
+                            @foreach ($snapshots as $snap)
+                                @php
+                                    $rm = (float) $snap->rm_unit_cost;
+                                    $cutting = (float) $snap->cutting_unit_cost;
+                                    $sewing = (float) $snap->sewing_unit_cost;
+                                    $finishing = (float) $snap->finishing_unit_cost;
+                                    $packaging = (float) $snap->packaging_unit_cost;
+                                    $overhead = (float) $snap->overhead_unit_cost;
+                                    $hppUnit = (float) $snap->unit_cost;
 
-                        @forelse ($snapshots as $s)
+                                    $qtyBasis = (float) $snap->qty_basis;
+                                @endphp
+                                <tr>
+                                    <td>
+                                        @if ($snap->item)
+                                            @if (Route::has('items.show'))
+                                                <a href="{{ route('items.show', $snap->item_id) }}">
+                                                    {{ $snap->item->code }}
+                                                </a>
+                                            @else
+                                                {{ $snap->item->code }}
+                                            @endif
+                                        @else
+                                            ITEM-{{ $snap->item_id }}
+                                        @endif
+                                    </td>
+                                    <td>
+                                        @if ($snap->item)
+                                            <div class="small fw-semibold">
+                                                {{ $snap->item->name }}
+                                            </div>
+                                            <div class="help">
+                                                {{ $snap->item->color ?? '' }}
+                                            </div>
+                                        @else
+                                            <span class="help">Item tidak ditemukan</span>
+                                        @endif
+                                    </td>
+                                    <td class="text-end">
+                                        {{ number_format($qtyBasis, 2, ',', '.') }}
+                                    </td>
+                                    <td class="text-end">
+                                        {{ number_format($rm, 2, ',', '.') }}
+                                    </td>
+                                    <td class="text-end">
+                                        {{ number_format($cutting, 2, ',', '.') }}
+                                    </td>
+                                    <td class="text-end">
+                                        {{ number_format($sewing, 2, ',', '.') }}
+                                    </td>
+                                    <td class="text-end">
+                                        {{ number_format($finishing, 2, ',', '.') }}
+                                    </td>
+                                    <td class="text-end">
+                                        {{ number_format($packaging, 2, ',', '.') }}
+                                    </td>
+                                    <td class="text-end">
+                                        {{ number_format($overhead, 2, ',', '.') }}
+                                    </td>
+                                    <td class="text-end fw-semibold">
+                                        {{ number_format($hppUnit, 2, ',', '.') }}
+                                    </td>
+                                    <td>
+                                        @if ($snap->is_active)
+                                            <span class="badge bg-success-subtle text-success rounded-pill px-2 py-1">
+                                                Aktif
+                                            </span>
+                                        @else
+                                            <span class="badge bg-secondary-subtle text-secondary rounded-pill px-2 py-1">
+                                                Hist.
+                                            </span>
+                                        @endif
+                                    </td>
+                                </tr>
+                            @endforeach
+                        </tbody>
+                        @if ($snapshots->isNotEmpty())
                             @php
-                                $unitCost =
-                                    $s->unit_cost ??
-                                    $s->rm_unit_cost +
-                                        $s->cutting_unit_cost +
-                                        $s->sewing_unit_cost +
-                                        $s->finishing_unit_cost +
-                                        $s->packaging_unit_cost +
-                                        $s->overhead_unit_cost;
-
-                                $grandQty += $s->qty_basis;
-                                $grandTotalCost += $unitCost * $s->qty_basis;
+                                $sumRm = (float) $snapshots->sum('rm_unit_cost');
+                                $sumCut = (float) $snapshots->sum('cutting_unit_cost');
+                                $sumSew = (float) $snapshots->sum('sewing_unit_cost');
+                                $sumFin = (float) $snapshots->sum('finishing_unit_cost');
+                                $sumPack = (float) $snapshots->sum('packaging_unit_cost');
+                                $sumOh = (float) $snapshots->sum('overhead_unit_cost');
+                                $sumHpp = (float) $snapshots->sum('unit_cost');
+                                $n = max($snapshots->count(), 1);
+                                $avgRm = $sumRm / $n;
+                                $avgCut = $sumCut / $n;
+                                $avgSew = $sumSew / $n;
+                                $avgFin = $sumFin / $n;
+                                $avgPack = $sumPack / $n;
+                                $avgOh = $sumOh / $n;
+                                $avgHppPerRow = $sumHpp / $n;
                             @endphp
-                            <tr>
-                                <td>
-                                    <div class="fw-semibold">
-                                        {{ $s->item->code ?? 'Item #' . $s->item_id }}
-                                    </div>
-                                    <div class="text-muted">
-                                        {{ $s->item->name ?? '-' }}
-                                    </div>
-                                </td>
-                                <td class="text-end">
-                                    {{ $fmt($s->qty_basis, 0) }}
-                                </td>
-                                <td class="text-end">
-                                    {{ $fmt($s->rm_unit_cost ?? 0) }}
-                                </td>
-                                <td class="text-end">
-                                    {{ $fmt($s->cutting_unit_cost ?? 0) }}
-                                </td>
-                                <td class="text-end">
-                                    {{ $fmt($s->sewing_unit_cost ?? 0) }}
-                                </td>
-                                <td class="text-end">
-                                    {{ $fmt($s->finishing_unit_cost ?? 0) }}
-                                </td>
-                                <td class="text-end">
-                                    {{ $fmt($s->packaging_unit_cost ?? 0) }}
-                                </td>
-                                <td class="text-end">
-                                    {{ $fmt($s->overhead_unit_cost ?? 0) }}
-                                </td>
-                                <td class="text-end fw-semibold">
-                                    {{ $fmt($unitCost ?? 0) }}
-                                </td>
-                                <td class="text-center">
-                                    @if ($s->is_active)
-                                        <span class="badge-soft text-success border-success-subtle">
-                                            Ya
-                                        </span>
-                                    @else
-                                        <span class="badge-soft text-muted border-secondary-subtle">
-                                            Tidak
-                                        </span>
-                                    @endif
-                                </td>
-                            </tr>
-                        @empty
-                            <tr>
-                                <td colspan="10" class="text-center text-muted py-3">
-                                    Belum ada snapshot HPP untuk periode ini.
-                                    <br>
-                                    <span class="small">
-                                        Klik tombol <strong>Generate HPP</strong> untuk membuat snapshot.
-                                    </span>
-                                </td>
-                            </tr>
-                        @endforelse
-                    </tbody>
+                            <tfoot>
+                                <tr class="table-light">
+                                    <th colspan="2">RATA-RATA</th>
+                                    <th></th>
+                                    <th class="text-end mono">{{ number_format($avgRm, 2, ',', '.') }}</th>
+                                    <th class="text-end mono">{{ number_format($avgCut, 2, ',', '.') }}</th>
+                                    <th class="text-end mono">{{ number_format($avgSew, 2, ',', '.') }}</th>
+                                    <th class="text-end mono">{{ number_format($avgFin, 2, ',', '.') }}</th>
+                                    <th class="text-end mono">{{ number_format($avgPack, 2, ',', '.') }}</th>
+                                    <th class="text-end mono">{{ number_format($avgOh, 2, ',', '.') }}</th>
+                                    <th class="text-end mono fw-semibold">
+                                        {{ number_format($avgHppPerRow, 2, ',', '.') }}
+                                    </th>
+                                    <th></th>
+                                </tr>
+                            </tfoot>
+                        @endif
+                    </table>
+                </div>
+            @endif
+        </div>
 
-                    @if ($snapshots->isNotEmpty())
-                        <tfoot class="table-light small">
-                            <tr>
-                                <th>Rata-rata tertimbang</th>
-                                <th class="text-end">
-                                    {{ $fmt($grandQty, 0) }}
-                                </th>
-                                <th colspan="6"></th>
-                                <th class="text-end fw-semibold">
-                                    {{ $grandQty > 0 ? $fmt($grandTotalCost / $grandQty) : '0,00' }}
-                                </th>
-                                <th></th>
-                            </tr>
-                        </tfoot>
-                    @endif
-                </table>
-            </div>
+        {{-- FOOTNOTE --}}
+        <div class="help mb-4">
+            Dibuat:
+            <span class="mono">
+                {{ $period->created_at?->format('Y-m-d H:i') }}
+            </span>
+            · Diupdate:
+            <span class="mono">
+                {{ $period->updated_at?->format('Y-m-d H:i') }}
+            </span>
         </div>
     </div>
 @endsection
