@@ -1,13 +1,10 @@
 @php
-    use Illuminate\Support\Carbon;
-
+    // startIndex bisa dikirim dari controller, kalau tidak ada fallback ke firstItem()
     $startIndex = $startIndex ?? (method_exists($receipts, 'firstItem') ? $receipts->firstItem() : 1);
 @endphp
 
 @forelse ($receipts as $receipt)
     @php
-        $date = $receipt->date ? Carbon::parse($receipt->date)->format('d-m-Y') : '-';
-
         $statusClass = match ($receipt->status) {
             'draft' => 'status-badge status-badge-draft',
             'approved' => 'status-badge status-badge-approved',
@@ -26,7 +23,7 @@
 
         {{-- TANGGAL --}}
         <td class="mono">
-            {{ $date }}
+            {{ $receipt->date ? id_date($receipt->date) : '-' }}
         </td>
 
         {{-- KODE (soft badge) --}}

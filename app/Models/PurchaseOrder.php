@@ -95,4 +95,9 @@ class PurchaseOrder extends Model
     {
         return $this->status === 'cancelled';
     }
+
+    public function receipts()
+    {
+        return $this->hasMany(PurchaseReceipt::class, 'purchase_order_id');
+    }
 }

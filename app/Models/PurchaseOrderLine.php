@@ -52,4 +52,17 @@ class PurchaseOrderLine extends Model
         return $this->hasMany(PurchaseReceiveLine::class);
     }
 
+    public function receiptLines()
+    {
+        return $this->hasMany(PurchaseReceiptLine::class, 'purchase_order_line_id');
+    }
+
+    public function draftReceiptLines()
+    {
+        return $this->hasMany(PurchaseReceiptLine::class, 'purchase_order_line_id')
+            ->whereHas('receipt', function ($q) {
+                $q->where('status', 'draft');
+            });
+    }
+
 }

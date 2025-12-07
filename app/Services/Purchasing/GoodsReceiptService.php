@@ -279,6 +279,7 @@ class GoodsReceiptService
      */
     protected function syncLines(PurchaseReceipt $grn, array $linesData): float
     {
+        // Hapus semua line lama dulu (sederhana)
         $grn->lines()->delete();
 
         $subtotal = 0.0;
@@ -292,6 +293,9 @@ class GoodsReceiptService
             $notes = $row['notes'] ?? null;
             $lotId = $row['lot_id'] ?? null;
 
+            // ⬅️⬅️ INI YANG KURANG
+            $poLineId = $row['purchase_order_line_id'] ?? null;
+
             if (!$itemId || $qtyReceived <= 0) {
                 continue;
             }
@@ -301,6 +305,8 @@ class GoodsReceiptService
             /** @var PurchaseReceiptLine $line */
             $line = PurchaseReceiptLine::create([
                 'purchase_receipt_id' => $grn->id,
+                'purchase_order_line_id' => $poLineId, // ⬅️ SIMPAN DI SINI
+
                 'item_id' => $itemId,
                 'lot_id' => $lotId,
                 'qty_received' => $qtyReceived,
@@ -319,7 +325,6 @@ class GoodsReceiptService
 
         return round($subtotal, 2);
     }
-
     /**
      * Hitung subtotal, tax_amount, grand_total dan simpan ke header GRN.
      */
