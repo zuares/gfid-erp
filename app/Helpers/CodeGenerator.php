@@ -2,6 +2,7 @@
 
 namespace App\Helpers;
 
+use Illuminate\Support\Carbon;
 use Illuminate\Support\Facades\DB;
 
 class CodeGenerator
@@ -14,21 +15,31 @@ class CodeGenerator
      *  PO-20251121-001
      *  INV-20251121-002
      *
-     * @param  string $prefix  PO / INV / LOT / TRF / dll
+     * @param  string      $prefix   PO / INV / LOT / TRF / FIN / dll
+     * @param  string|null $forDate  Tanggal bisnis (Y-m-d). Jika null, pakai today().
      * @return string
      *
      * @throws \Throwable
      */
-    public static function generate(string $prefix = 'PO'): string
+    public static function make(string $prefix = 'PO', ?string $forDate = null): string
     {
         $maxAttempts = 5;
 
         for ($attempt = 1; $attempt <= $maxAttempts; $attempt++) {
             try {
-                return DB::transaction(function () use ($prefix) {
+                return DB::transaction(function () use ($prefix, $forDate) {
                     $now = now();
-                    $date = $now->toDateString(); // 2025-11-21
-                    $dateYmd = $now->format('Ymd'); // 20251121
+
+                    // Jika user kasih tanggal (mis: dari form finishing), pakai itu sebagai "tanggal bisnis"
+                    // tapi tetap pakai $now untuk created_at / updated_at.
+                    if ($forDate) {
+                        $dateCarbon = Carbon::parse($forDate);
+                    } else {
+                        $dateCarbon = $now;
+                    }
+
+                    $date = $dateCarbon->toDateString(); // 2025-11-21
+                    $dateYmd = $dateCarbon->format('Ymd'); // 20251121
 
                     // Lock baris running_numbers untuk prefix+date ini
                     $row = DB::table('running_numbers')
@@ -75,5 +86,15 @@ class CodeGenerator
 
         // praktiknya tidak akan sampai sini
         throw new \RuntimeException('Gagal generate kode.');
+    }
+
+    /**
+     * Backward compatible helper.
+     * Sama seperti sebelumnya, tapi sekarang cuma wrapper ke make()
+     * dengan tanggal = hari ini.
+     */
+    public static function generate(string $prefix = 'PO'): string
+    {
+        return static::make($prefix);
     }
 }

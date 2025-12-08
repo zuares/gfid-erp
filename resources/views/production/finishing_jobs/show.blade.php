@@ -1,406 +1,535 @@
-{{-- resources/views/production/finishing_jobs/show.blade.php --}}
 @extends('layouts.app')
 
-@section('title', 'Produksi • Finishing Job ' . $job->code)
+@section('title', 'Produksi • Finishing')
 
 @push('head')
     <style>
-        .page-wrap {
-            max-width: 1100px;
+        .finishing-create-page {
+            min-height: 100vh;
+        }
+
+        .finishing-create-page .page-wrap {
+            max-width: 1150px;
             margin-inline: auto;
-            padding-bottom: 1rem;
+            padding: 1rem 1rem 4rem;
         }
 
-        .card {
+        body[data-theme="light"] .finishing-create-page .page-wrap {
+            background:
+                radial-gradient(circle at top left,
+                    rgba(59, 130, 246, 0.12) 0,
+                    rgba(45, 212, 191, 0.10) 26%,
+                    #f9fafb 60%);
+        }
+
+        body[data-theme="dark"] .finishing-create-page .page-wrap {
+            background:
+                radial-gradient(circle at top left,
+                    rgba(59, 130, 246, 0.25) 0,
+                    rgba(45, 212, 191, 0.15) 26%,
+                    #020617 60%);
+        }
+
+        .finishing-create-page .card-main {
             background: var(--card);
-            border: 1px solid var(--line);
             border-radius: 16px;
+            border: 1px solid rgba(148, 163, 184, 0.35);
+            box-shadow:
+                0 14px 45px rgba(15, 23, 42, 0.22),
+                0 10px 18px rgba(15, 23, 42, 0.18);
         }
 
-        .mono {
-            font-variant-numeric: tabular-nums;
-            font-family: ui-monospace, SFMono-Regular, Menlo, Consolas;
+        .finishing-create-page .card-header-bar {
+            padding: 0.85rem 1.1rem;
+            border-bottom: 1px solid rgba(148, 163, 184, 0.35);
+            display: flex;
+            align-items: center;
+            gap: .75rem;
+            justify-content: space-between;
         }
 
-        .help {
-            color: var(--muted);
-            font-size: .84rem;
+        .finishing-create-page .card-header-title {
+            display: flex;
+            flex-direction: column;
+            gap: .15rem;
         }
 
-        .badge-status {
-            border-radius: 999px;
-            padding: .14rem .6rem;
-            font-size: .7rem;
+        .finishing-create-page .card-header-title h1 {
+            font-size: 1.15rem;
             font-weight: 600;
-            letter-spacing: .05em;
+            letter-spacing: .02em;
+            margin: 0;
+        }
+
+        .finishing-create-page .card-header-subtitle {
+            font-size: .77rem;
+            color: var(--muted-foreground);
+        }
+
+        .finishing-create-page .badge-soft-info {
+            font-size: .7rem;
+            border-radius: 999px;
+            padding: .25rem .55rem;
+            background: rgba(37, 99, 235, 0.08);
+            border: 1px solid rgba(59, 130, 246, 0.25);
+            color: #1d4ed8;
+            display: inline-flex;
+            align-items: center;
+            gap: .25rem;
+        }
+
+        .finishing-create-page .badge-status {
+            font-size: .7rem;
+            border-radius: 999px;
+            padding: .25rem .6rem;
+            display: inline-flex;
+            align-items: center;
+            gap: .25rem;
         }
 
         .badge-status-draft {
-            background: rgba(255, 163, 31, .15);
-            color: #b35a00;
+            background: rgba(251, 191, 36, 0.12);
+            border: 1px solid rgba(245, 158, 11, 0.35);
+            color: #92400e;
         }
 
         .badge-status-posted {
-            background: rgba(16, 185, 129, .15);
-            color: #0f5132;
+            background: rgba(34, 197, 94, 0.10);
+            border: 1px solid rgba(22, 163, 74, 0.35);
+            color: #166534;
         }
 
-        .table-wrap {
-            overflow-x: auto;
+        .badge-status-reject {
+            background: rgba(239, 68, 68, 0.10);
+            border: 1px solid rgba(220, 38, 38, 0.35);
+            color: #b91c1c;
         }
 
-        @media (max-width: 768px) {
-            .page-wrap {
-                padding-inline: .5rem;
+        .finishing-create-page .card-body-main {
+            padding: 1rem 1.1rem 1.1rem;
+        }
+
+        .finishing-create-page .section-title {
+            font-size: .8rem;
+            font-weight: 600;
+            text-transform: uppercase;
+            letter-spacing: .12em;
+            color: var(--muted-foreground);
+            margin-bottom: .45rem;
+        }
+
+        .finishing-create-page .summary-pill {
+            border-radius: 999px;
+            border: 1px dashed rgba(148, 163, 184, 0.7);
+            font-size: .75rem;
+            padding: .3rem .75rem;
+            display: inline-flex;
+            align-items: center;
+            gap: .25rem;
+            background: rgba(15, 23, 42, 0.02);
+        }
+
+        .finishing-create-page .summary-pill strong {
+            font-weight: 600;
+        }
+
+        .finishing-table-wrap {
+            border-radius: 12px;
+            border: 1px solid rgba(148, 163, 184, 0.35);
+            overflow: hidden;
+            background: var(--card);
+        }
+
+        .finishing-table {
+            margin-bottom: 0;
+        }
+
+        .finishing-table thead th {
+            background: rgba(15, 23, 42, 0.03);
+            font-size: .75rem;
+            text-transform: uppercase;
+            letter-spacing: .08em;
+            color: var(--muted-foreground);
+            border-bottom-width: 1px;
+            padding-block: .55rem;
+            white-space: nowrap;
+            position: sticky;
+            top: 0;
+            z-index: 5;
+        }
+
+        .finishing-table tbody td {
+            vertical-align: middle;
+            padding-block: .4rem;
+            font-size: .8rem;
+        }
+
+        .finishing-table tbody tr:nth-child(even) {
+            background: rgba(148, 163, 184, 0.06);
+        }
+
+        .finishing-table tbody tr:hover {
+            background: rgba(59, 130, 246, 0.08);
+        }
+
+        .finishing-create-page .item-label-main {
+            font-weight: 600;
+            font-size: .82rem;
+        }
+
+        .finishing-create-page .item-label-sub {
+            font-size: .72rem;
+            color: var(--muted-foreground);
+        }
+
+        .finishing-create-page .meta-line {
+            font-size: .7rem;
+            color: var(--muted-foreground);
+        }
+
+        .finishing-create-page .wip-badge {
+            display: inline-flex;
+            align-items: center;
+            gap: .3rem;
+            padding: .2rem .5rem;
+            border-radius: 999px;
+            font-size: .72rem;
+            background: rgba(16, 185, 129, 0.08);
+            color: #047857;
+        }
+
+        .finishing-create-page .wip-badge span {
+            font-weight: 600;
+        }
+
+        .qty-ok {
+            color: #16a34a;
+            font-weight: 600;
+        }
+
+        .qty-reject {
+            color: #b91c1c;
+            font-weight: 600;
+        }
+
+        .finishing-create-page .footer-actions {
+            display: flex;
+            justify-content: flex-end;
+            gap: .75rem;
+            margin-top: 1rem;
+            padding-top: .75rem;
+            border-top: 1px dashed rgba(148, 163, 184, 0.55);
+        }
+
+        @media (max-width: 767.98px) {
+            .finishing-table-wrap {
+                border-radius: 10px;
             }
 
-            .table-wrap {
-                font-size: .85rem;
+            .finishing-table thead th {
+                font-size: .68rem;
+                padding-block: .4rem;
+            }
+
+            .finishing-table tbody td {
+                font-size: .72rem;
+                padding-block: .3rem;
+            }
+
+            .finishing-create-page .item-label-main {
+                font-size: .78rem;
+            }
+
+            .finishing-create-page .item-label-sub {
+                font-size: .68rem;
+            }
+
+            .finishing-create-page .meta-line {
+                font-size: .66rem;
+            }
+
+            .finishing-create-page .wip-badge {
+                font-size: .66rem;
+                padding: .18rem .45rem;
+            }
+
+            .finishing-create-page .card-header-bar {
+                flex-direction: column;
+                align-items: flex-start;
+            }
+
+            .finishing-create-page .footer-actions {
+                flex-direction: column-reverse;
+                align-items: stretch;
+            }
+
+            .finishing-create-page .card-header-subtitle {
+                font-size: .72rem;
+            }
+
+            /* Di mobile, hide kolom Operator terpisah – pindah ke bawah item */
+            .col-operator-desktop {
+                display: none;
+            }
+
+            .btn-edit {
+                border-radius: 999px;
+                padding-inline: 1.5rem;
+                box-shadow:
+                    0 10px 25px rgba(34, 197, 94, .35);
+                font-weight: 600;
+                letter-spacing: .03em;
+
+            }
+        }
+
+        @media (min-width: 768px) {
+
+            /* Di desktop, meta-stack mobile disembunyikan */
+            .meta-stack-mobile {
+                display: none;
             }
         }
     </style>
 @endpush
 
 @section('content')
-    <div class="page-wrap">
+    @php
+        $totalLines = $job->lines->count();
+        $totalOk = $job->lines->sum('qty_ok');
+        $totalReject = $job->lines->sum('qty_reject');
+        $hasReject = $totalReject > 0;
+        $isPosted = $job->status === 'posted';
+    @endphp
 
-        {{-- FLASH --}}
-        @if (session('status'))
-            <div class="alert alert-success alert-dismissible fade show mb-3">
-                {{ session('status') }}
-                <button class="btn-close" data-bs-dismiss="alert"></button>
-            </div>
-        @endif
+    <div class="finishing-create-page">
+        <div class="page-wrap">
 
-        {{-- ===========================
-         HEADER
-    ============================ --}}
-        <div class="card p-3 mb-3">
-            <div class="d-flex justify-content-between align-items-start flex-wrap gap-3">
+            {{-- FLASH --}}
+            @if (session('success'))
+                <div class="alert alert-success alert-dismissible fade show mb-3" role="alert">
+                    {{ session('success') }}
+                    <button type="button" class="btn-close" data-bs-dismiss="alert" aria-label="Close"></button>
+                </div>
+            @endif
 
-                <div>
-                    <div class="d-flex align-items-center gap-2 mb-1 flex-wrap">
-                        <h1 class="h5 mb-0">
-                            Finishing Job <span class="mono">{{ $job->code }}</span>
-                        </h1>
+            @if (session('error'))
+                <div class="alert alert-danger alert-dismissible fade show mb-3" role="alert">
+                    {{ session('error') }}
+                    <button type="button" class="btn-close" data-bs-dismiss="alert" aria-label="Close"></button>
+                </div>
+            @endif
 
-                        @if ($job->status === 'posted')
-                            <span class="badge-status badge-status-posted">POSTED</span>
-                        @else
-                            <span class="badge-status badge-status-draft">DRAFT</span>
-                        @endif
-                    </div>
-
-                    <div class="help">
-                        Tanggal:
-                        <span class="mono">
-                            {{ function_exists('id_date') ? id_date($job->date) : $job->date->format('Y-m-d') }}
-                        </span>
-
-                        @if ($job->createdBy)
-                            · Dibuat oleh:
-                            <span class="mono">{{ $job->createdBy->name }}</span>
-                        @endif
-                    </div>
-
-                    @if ($job->notes)
-                        <div class="small mt-2">
-                            <span class="fw-semibold">Catatan:</span>
-                            {!! nl2br(e($job->notes)) !!}
+            <div class="card card-main">
+                {{-- HEADER --}}
+                <div class="card-header-bar">
+                    <div class="card-header-title">
+                        <h1>Finishing</h1>
+                        <div class="card-header-subtitle">
+                            Kode <strong>{{ $job->code }}</strong> ·
+                            {{ $job->date?->format('d M Y') }}
                         </div>
-                    @endif
+                    </div>
+
+                    <div class="d-flex flex-column flex-sm-row gap-2 align-items-sm-center">
+                        {{-- STATUS BADGE --}}
+                        <div class="badge-status {{ $isPosted ? 'badge-status-posted' : 'badge-status-draft' }}">
+                            <i class="bi {{ $isPosted ? 'bi-check-circle' : 'bi-pencil-square' }}"></i>
+                            <span>{{ strtoupper($job->status) }}</span>
+                        </div>
+
+                        @if ($isPosted && !$hasReject)
+                            <div class="badge-soft-info">
+                                <i class="bi bi-lightning-charge"></i>
+                                <span>AUTO-POSTED (0 reject)</span>
+                            </div>
+                        @elseif($hasReject)
+                            <div class="badge-status badge-status-reject">
+                                <i class="bi bi-exclamation-triangle"></i>
+                                <span>HAS REJECT</span>
+                            </div>
+                        @endif
+                    </div>
                 </div>
 
-                {{-- ACTION BUTTONS --}}
-                <div class="d-flex flex-column align-items-end gap-2">
+                <div class="card-body-main">
+                    {{-- RINGKASAN --}}
+                    <div class="mb-3">
+                        <div class="section-title">Ringkasan</div>
+                        <div class="d-flex flex-wrap gap-2 align-items-center">
+                            <div class="summary-pill">
+                                <i class="bi bi-collection"></i>
+                                <span>Lines:</span>
+                                <strong>{{ $totalLines }} baris</strong>
+                            </div>
 
-                    <div class="d-flex gap-2">
+                            <div class="summary-pill">
+                                <i class="bi bi-check2-circle"></i>
+                                <span>Total OK:</span>
+                                <strong>{{ number_format($totalOk, 0, ',', '.') }} pcs</strong>
+                            </div>
+
+                            <div class="summary-pill">
+                                <i class="bi bi-x-octagon"></i>
+                                <span>Total Reject:</span>
+                                <strong>{{ number_format($totalReject, 0, ',', '.') }} pcs</strong>
+                            </div>
+
+                            @if ($job->notes)
+                                <div class="summary-pill">
+                                    <i class="bi bi-journal-text"></i>
+                                    <span>Catatan:</span>
+                                    <strong>{{ $job->notes }}</strong>
+                                </div>
+                            @endif
+                        </div>
+                    </div>
+
+                    {{-- TABEL DETAIL --}}
+                    <div class="finishing-table-wrap mb-2">
+                        <div class="table-responsive">
+                            <table class="table table-sm table-hover align-middle finishing-table mb-0">
+                                <thead>
+                                    <tr>
+                                        <th class="text-center" style="width: 5%;">No</th>
+                                        <th style="width: 45%;">Item</th>
+                                        <th class="text-end" style="width: 16%;">Qty IN</th>
+                                        <th class="text-end" style="width: 12%;">OK</th>
+                                        <th class="text-end" style="width: 12%;">Reject</th>
+                                        <th class="col-operator-desktop" style="width: 15%;">Operator &amp; Reject</th>
+                                    </tr>
+                                </thead>
+                                <tbody>
+                                    @forelse ($job->lines as $idx => $line)
+                                        @php
+                                            $item = $line->item ?? $line->bundle?->item;
+                                            $bundle = $line->bundle;
+                                            $op = $line->sewingOperator;
+                                            $qtyIn = $line->qty_in ?? $line->qty_ok + $line->qty_reject;
+                                        @endphp
+                                        <tr>
+                                            {{-- NO --}}
+                                            <td class="text-center">
+                                                {{ $loop->iteration }}
+                                            </td>
+
+                                            {{-- ITEM + meta stack mobile --}}
+                                            <td>
+                                                <div class="item-label-main">
+                                                    @if ($item)
+                                                        {{ $item->code }} — {{ $item->name }}
+                                                    @else
+                                                        <em>Item tidak ditemukan</em>
+                                                    @endif
+                                                </div>
+
+                                                {{-- META MOBILE (bundle + operator + alasan reject) --}}
+                                                <div class="meta-stack-mobile mt-1">
+                                                    <div class="meta-line">
+                                                        <i class="bi bi-box-seam"></i>
+                                                        Bundle:
+                                                        <strong>{{ $bundle->code ?? ('#' . $bundle->id ?? '-') }}</strong>
+                                                    </div>
+
+                                                    <div class="meta-line">
+                                                        @if ($op)
+                                                            <i class="bi bi-person"></i>
+                                                            {{ $op->code ?? '' }} {{ $op->name }}
+                                                        @else
+                                                            <i class="bi bi-person-dash"></i>
+                                                            Operator Sewing Return
+                                                        @endif
+                                                    </div>
+
+                                                    @if ($line->qty_reject > 0)
+                                                        <div class="meta-line">
+                                                            <i class="bi bi-exclamation-circle text-danger"></i>
+                                                            {{ $line->reject_reason ?? 'Reject' }}
+                                                        </div>
+                                                    @endif
+                                                </div>
+
+                                                {{-- META DESKTOP kecil --}}
+                                                <div class="item-label-sub d-none d-md-block mt-1">
+                                                    <i class="bi bi-box-seam"></i>
+                                                    Bundle:
+                                                    <strong>{{ $bundle->code ?? ('#' . $bundle->id ?? '-') }}</strong>
+                                                </div>
+                                            </td>
+
+                                            {{-- QTY IN --}}
+                                            <td class="text-end">
+                                                <span class="wip-badge">
+                                                    <i class="bi bi-arrow-up-circle"></i>
+                                                    <span>{{ number_format($qtyIn, 0, ',', '.') }}</span>
+                                                    <small>pcs</small>
+                                                </span>
+                                            </td>
+
+                                            {{-- QTY OK --}}
+                                            <td class="text-end">
+                                                <span class="qty-ok">
+                                                    {{ number_format($line->qty_ok, 0, ',', '.') }}
+                                                </span>
+                                            </td>
+
+                                            {{-- QTY REJECT --}}
+                                            <td class="text-end">
+                                                <span class="qty-reject">
+                                                    {{ number_format($line->qty_reject, 0, ',', '.') }}
+                                                </span>
+                                            </td>
+
+                                            {{-- OPERATOR & REJECT (desktop only) --}}
+                                            <td class="col-operator-desktop">
+                                                <div class="item-label-sub mb-1">
+                                                    @if ($op)
+                                                        <i class="bi bi-person"></i>
+                                                        <strong>{{ $op->code ?? '' }} {{ $op->name }}</strong>
+                                                    @else
+                                                        <i class="bi bi-person-dash"></i>
+                                                        <em>Operator Sewing Return</em>
+                                                    @endif
+                                                </div>
+
+                                                @if ($line->qty_reject > 0)
+                                                    <div class="item-label-sub">
+                                                        <i class="bi bi-exclamation-circle text-danger"></i>
+                                                        {{ $line->reject_reason ?? 'Reject' }}
+                                                    </div>
+                                                @endif
+                                            </td>
+                                        </tr>
+                                    @empty
+                                        <tr>
+                                            <td colspan="6" class="text-center py-4 text-muted">
+                                                Tidak ada detail finishing.
+                                            </td>
+                                        </tr>
+                                    @endforelse
+                                </tbody>
+                            </table>
+                        </div>
+                    </div>
+
+                    {{-- FOOTER ACTIONS --}}
+                    <div class="footer-actions">
                         <a href="{{ route('production.finishing_jobs.index') }}" class="btn btn-sm btn-outline-secondary">
-                            <i class="bi bi-arrow-left me-1"></i> Kembali
+                            <i class="bi bi-arrow-left"></i>
+                            <span class="ms-1">Kembali</span>
                         </a>
 
-                        @if ($job->status === 'draft')
+                        @if (!$isPosted)
                             <a href="{{ route('production.finishing_jobs.edit', $job->id) }}"
-                                class="btn btn-sm btn-outline-primary">
-                                <i class="bi bi-pencil-square me-1"></i> Edit Draft
+                                class="btn btn-sm btn-success d-inline-flex align-items-center gap-1 btn-save ">
+                                <i class="bi bi-pencil-square"></i>
+                                <span class="text-white">Edit</span>
                             </a>
                         @endif
                     </div>
-
-                    {{-- POST --}}
-                    @if ($job->status === 'draft')
-                        <form action="{{ route('production.finishing_jobs.post', $job->id) }}" method="post"
-                            onsubmit="return confirm('Posting akan memindahkan stok: WIP-FIN → FG + REJECT.\nLanjutkan?');">
-                            @csrf
-                            <button class="btn btn-sm btn-success mt-1">
-                                <i class="bi bi-check2-circle me-1"></i>
-                                Posting & Update Stok
-                            </button>
-                        </form>
-
-                        {{-- UNPOST --}}
-                    @else
-                        <form action="{{ route('production.finishing_jobs.unpost', $job->id) }}" method="post"
-                            onsubmit="return confirm('Unpost akan membalik stok FG + REJECT → WIP-FIN.\nPastikan stok FG/REJECT masih tersedia.\nLanjutkan?');">
-                            @csrf
-                            <button class="btn btn-sm btn-outline-danger mt-1">
-                                <i class="bi bi-arrow-counterclockwise me-1"></i>
-                                Unpost & Balikkan Stok
-                            </button>
-                        </form>
-
-                        <div class="help mt-1">
-                            Stok sudah dipindahkan ketika posting.
-                        </div>
-                    @endif
-                </div>
-
-            </div>
-        </div>
-
-
-        {{-- ===========================
-         SUMMARY
-    ============================ --}}
-        @php
-            $totalIn = $job->lines->sum('qty_in');
-            $totalOk = $job->lines->sum('qty_ok');
-            $totalReject = $job->lines->sum('qty_reject');
-        @endphp
-
-        <div class="card p-3 mb-3">
-            <div class="row g-3">
-                <div class="col-md-4">
-                    <div class="small text-muted mb-1">Total Qty In</div>
-                    <div class="h5 mono">{{ number_format($totalIn) }}</div>
-                    <div class="help">Masuk proses finishing.</div>
-                </div>
-
-                <div class="col-md-4">
-                    <div class="small text-muted mb-1">Total OK (FG)</div>
-                    <div class="h5 mono text-success">{{ number_format($totalOk) }}</div>
-                    <div class="help">Akan masuk FG saat posting.</div>
-                </div>
-
-                <div class="col-md-4">
-                    <div class="small text-muted mb-1">Total Reject</div>
-                    <div class="h5 mono text-danger">{{ number_format($totalReject) }}</div>
-                    <div class="help">Masuk gudang REJECT.</div>
-                </div>
-            </div>
-        </div>
-
-
-        {{-- ===========================
-         HPP RM-ONLY DARI FINISHING INI
-    ============================ --}}
-        <div class="card p-3 mb-3">
-            <div class="d-flex justify-content-between align-items-center mb-2">
-                <div>
-                    <div class="fw-semibold">HPP RM-only dari Finishing ini</div>
-                    <div class="help">
-                        Snapshot otomatis tipe <code>auto_hpp_rm_only_finishing</code> per item FG.
-                    </div>
-                </div>
-
-                @if ($rmSnapshots->isNotEmpty())
-                    <div class="help">
-                        Total snapshot: {{ $rmSnapshots->count() }}
-                    </div>
-                @endif
-            </div>
-
-            @if ($rmSnapshots->isEmpty())
-                <div class="help">
-                    Belum ada snapshot RM-only yang tercatat untuk finishing job ini.
-                    Snapshot akan dibuat otomatis setelah QC Finishing disimpan.
-                </div>
-            @else
-                <div class="table-wrap">
-                    <table class="table table-sm align-middle mono mb-0">
-                        <thead class="table-light">
-                            <tr>
-                                <th style="width: 140px;">Tanggal</th>
-                                <th>Item FG</th>
-                                <th class="text-end" style="width: 120px;">Qty Basis</th>
-                                <th class="text-end" style="width: 140px;">RM/Unit</th>
-                                <th class="text-end" style="width: 160px;">Total RM</th>
-                                <th style="width: 110px;">Status</th>
-                            </tr>
-                        </thead>
-                        <tbody>
-                            @foreach ($rmSnapshots as $snap)
-                                @php
-                                    $rmUnit = (float) $snap->rm_unit_cost;
-                                    $qty = (float) $snap->qty_basis;
-                                    $total = $rmUnit * $qty;
-                                @endphp
-                                <tr>
-                                    <td>
-                                        @if ($snap->snapshot_date instanceof \Illuminate\Support\Carbon)
-                                            {{ $snap->snapshot_date->format('d/m/Y') }}
-                                        @else
-                                            {{ \Illuminate\Support\Carbon::parse($snap->snapshot_date)->format('d/m/Y') }}
-                                        @endif
-                                    </td>
-                                    <td>
-                                        <div>{{ $snap->item?->code ?? 'ITEM ?' }}</div>
-                                        <div class="help">
-                                            {{ $snap->item?->name ?? '' }}
-                                        </div>
-                                    </td>
-                                    <td class="text-end">
-                                        {{ number_format($qty, 2, ',', '.') }}
-                                    </td>
-                                    <td class="text-end">
-                                        {{ number_format($rmUnit, 2, ',', '.') }}
-                                    </td>
-                                    <td class="text-end">
-                                        {{ number_format($total, 2, ',', '.') }}
-                                    </td>
-                                    <td>
-                                        @if ($snap->is_active)
-                                            <span class="badge bg-success-subtle text-success rounded-pill px-2 py-1">
-                                                Aktif
-                                            </span>
-                                        @else
-                                            <span class="badge bg-secondary-subtle text-secondary rounded-pill px-2 py-1">
-                                                Historis
-                                            </span>
-                                        @endif
-                                    </td>
-                                </tr>
-                            @endforeach
-                        </tbody>
-                    </table>
-                </div>
-            @endif
-        </div>
-
-
-        {{-- ===========================
-         DETAIL GRID
-    ============================ --}}
-        <div class="card p-0 mb-4">
-            <div class="px-3 pt-3 pb-2 d-flex justify-content-between">
-                <div>
-                    <div class="fw-semibold">Detail Bundle</div>
-                    <div class="help">Hasil finishing per bundle.</div>
-                </div>
-
-                <div class="help">
-                    Total baris: {{ $job->lines->count() }}
                 </div>
             </div>
 
-            <div class="table-wrap">
-                <table class="table table-sm align-middle mb-0">
-                    <thead class="table-light">
-                        <tr>
-                            <th>#</th>
-                            <th>Bundle</th>
-                            <th>Item</th>
-                            <th>Operator</th>
-                            <th class="text-end">Qty In</th>
-                            <th class="text-end text-success">OK</th>
-                            <th class="text-end text-danger">Reject</th>
-                            <th>Alasan</th>
-                        </tr>
-                    </thead>
-
-                    <tbody>
-                        @foreach ($job->lines as $i => $line)
-                            @php
-                                $bundle = $line->bundle;
-                                $cutJob = $bundle?->cuttingJob;
-                                $item = $bundle?->finishedItem ?? $line->item; // barang jadi pasti ada
-                            @endphp
-
-                            <tr>
-                                <td class="text-muted small">{{ $i + 1 }}</td>
-
-                                {{-- BUNDLE --}}
-                                <td class="mono">
-                                    @if ($bundle && $cutJob)
-                                        <a href="{{ route('production.cutting_jobs.show', $cutJob->id) }}">
-                                            {{ $bundle->bundle_code }}
-                                        </a>
-                                    @else
-                                        {{ $bundle->bundle_code ?? 'BND-' . $bundle->id }}
-                                    @endif
-                                </td>
-
-                                {{-- ITEM (FINISHED ITEM) --}}
-                                <td>
-                                    @if ($item)
-                                        <div class="small fw-semibold">{{ $item->code }}</div>
-                                        <div class="small text-muted">
-                                            {{ $item->name }} · {{ $item->color }}
-                                        </div>
-                                    @else
-                                        <span class="text-muted small">Item tidak ditemukan</span>
-                                    @endif
-                                </td>
-
-                                {{-- OPERATOR --}}
-                                <td>
-                                    @if ($line->operator)
-                                        <div class="small fw-semibold">
-                                            {{ $line->operator->code }} — {{ $line->operator->name }}
-                                        </div>
-                                    @else
-                                        <span class="text-muted small">-</span>
-                                    @endif
-                                </td>
-
-                                <td class="text-end mono">{{ number_format($line->qty_in) }}</td>
-                                <td class="text-end mono text-success">{{ number_format($line->qty_ok) }}</td>
-                                <td class="text-end mono text-danger">{{ number_format($line->qty_reject) }}</td>
-
-                                {{-- REJECT REASON --}}
-                                <td>
-                                    @if ($line->qty_reject > 0)
-                                        @if ($line->reject_reason)
-                                            <div class="small fw-semibold text-danger">{{ $line->reject_reason }}</div>
-                                        @endif
-                                        @if ($line->reject_notes)
-                                            <div class="small text-muted">{!! nl2br(e($line->reject_notes)) !!}</div>
-                                        @endif
-                                    @else
-                                        <span class="text-muted small">-</span>
-                                    @endif
-                                </td>
-                            </tr>
-                        @endforeach
-                    </tbody>
-
-                    @if ($job->lines->isNotEmpty())
-                        <tfoot>
-                            <tr class="table-light">
-                                <th colspan="4" class="text-end">TOTAL</th>
-                                <th class="text-end mono">{{ number_format($totalIn) }}</th>
-                                <th class="text-end mono text-success">{{ number_format($totalOk) }}</th>
-                                <th class="text-end mono text-danger">{{ number_format($totalReject) }}</th>
-                                <th></th>
-                            </tr>
-                        </tfoot>
-                    @endif
-                </table>
-            </div>
         </div>
-
-
-        {{-- FOOTNOTE --}}
-        <div class="help mb-4">
-            Dibuat:
-            <span class="mono">
-                {{ function_exists('id_datetime') ? id_datetime($job->created_at) : $job->created_at->format('Y-m-d H:i') }}
-            </span>
-            · Diupdate:
-            <span class="mono">
-                {{ function_exists('id_datetime') ? id_datetime($job->updated_at) : $job->updated_at->format('Y-m-d H:i') }}
-            </span>
-        </div>
-
     </div>
 @endsection

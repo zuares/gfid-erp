@@ -36,12 +36,11 @@
         $linesData = [];
     }
 @endphp
-
 @push('head')
     <style>
         /* ============================
-                                           FORM PURCHASE – LAYOUT
-                                        ============================ */
+               FORM PURCHASE – LAYOUT
+            ============================ */
         .po-form-card {
             background: var(--card);
             border-radius: 14px;
@@ -52,7 +51,9 @@
             background: var(--card);
             border-radius: 14px;
             border: 1px solid var(--line);
-            overflow: hidden;
+            /* SEBELUMNYA: overflow: hidden; → ini yang motong dropdown */
+            overflow: visible;
+            /* biar dropdown item-suggest bisa keluar */
         }
 
         .po-lines-table thead th {
@@ -77,9 +78,31 @@
             color: var(--muted);
         }
 
+        /* === BIAR DROPDOWN GA KEPOTONG DI DALAM TABLE === */
+        .po-table-wrapper {
+            -webkit-overflow-scrolling: touch;
+            overflow-x: auto;
+            overflow-y: visible;
+        }
+
+        .po-lines-table td,
+        .po-lines-table th {
+            position: relative;
+            overflow: visible;
+        }
+
+        .item-suggest-wrap {
+            position: relative;
+            overflow: visible;
+        }
+
+        .item-suggest-dropdown {
+            z-index: 5000;
+        }
+
         /* ============================
-                                           MOBILE / TABLET TWEAKS (≤ 992px)
-                                        ============================ */
+               MOBILE / TABLET TWEAKS (≤ 992px)
+            ============================ */
         @media (max-width: 992px) {
             .po-form-card {
                 border-radius: 14px;
@@ -176,7 +199,6 @@
                 margin-bottom: .05rem;
             }
 
-            /* Header kecil: nomor baris */
             .po-col-no {
                 grid-area: header;
                 display: block;
@@ -198,7 +220,6 @@
                 grid-area: price;
             }
 
-            /* Per-line TOTAL di mobile → less emphasis (biar fokus utama ke Subtotal) */
             .po-td-total {
                 grid-area: total;
                 text-align: right;
@@ -223,7 +244,6 @@
                 font-size: .85rem;
             }
 
-            /* Qty & Harga → input center di mobile */
             .po-lines-table tbody .line-qty,
             .po-lines-table tbody .line-price {
                 text-align: center !important;
@@ -236,7 +256,6 @@
                 border-radius: 999px;
             }
 
-            /* FOOTER SUBTOTAL DI MOBILE → FOCAL POINT */
             #po-lines-table tfoot tr {
                 display: block;
             }
@@ -265,19 +284,14 @@
             }
         }
 
-        /* Default desktop: kolom No tetap table-cell */
         @media (min-width: 993px) {
             .po-col-no {
                 width: 5%;
             }
         }
-
-        /* Smooth scroll di HP */
-        .po-table-wrapper {
-            -webkit-overflow-scrolling: touch;
-        }
     </style>
 @endpush
+
 
 {{-- ============================
      HEADER FORM (DATE / SUPPLIER / ONGKIR / STATUS)

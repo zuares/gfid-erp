@@ -14,6 +14,36 @@
     $selectedOperatorId = old('operator_id', $defaultOperatorId);
 @endphp
 
+@push('head')
+    <style>
+        /* Biar dropdown item-suggest bisa "keluar" dari tabel/card tanpa kepotong */
+        .cutting-card {
+            overflow: visible;
+        }
+
+        .cutting-card-body {
+            overflow: visible;
+            position: relative;
+        }
+
+        .bundles-table-wrap {
+            overflow: visible;
+            position: relative;
+        }
+
+        /* Tambah ruang di bawah table supaya dropdown tidak nempel tombol */
+        .cutting-card .bundles-table-wrap {
+            padding-bottom: .5rem;
+        }
+
+        /* Pastikan baris bundle tidak memaksa clipping */
+        .bundles-table {
+            border-collapse: separate;
+            border-spacing: 0;
+        }
+    </style>
+@endpush
+
 <form action="{{ route('production.cutting_jobs.store') }}" method="POST" id="cutting-form">
     @csrf
 
@@ -162,6 +192,7 @@
     {{-- MODAL DIPISAH KE FILE TERSENDIRI --}}
     @include('production.cutting_jobs._modal_confirm')
 </form>
+
 @push('scripts')
     <script>
         document.addEventListener('DOMContentLoaded', function() {
@@ -187,12 +218,10 @@
             const currentLotBalance = document.getElementById('current-lot-balance');
             const btnChangeLots = document.getElementById('btn-change-lots');
 
-            // helper breakpoint: mobile only
             function isMobile() {
                 return window.matchMedia('(max-width: 767.98px)').matches;
             }
 
-            // Build map lotId -> info
             const lotInfoMap = {};
             lotRows.forEach(tr => {
                 const lotId = parseInt(tr.dataset.lotId, 10);
@@ -213,9 +242,7 @@
             function getCheckedLots() {
                 const ids = [];
                 lotCheckboxes.forEach(cb => {
-                    if (cb.checked) {
-                        ids.push(parseInt(cb.value, 10));
-                    }
+                    if (cb.checked) ids.push(parseInt(cb.value, 10));
                 });
                 return ids;
             }
@@ -224,7 +251,6 @@
                 if (!mainContent) return;
                 mainContent.classList.remove('d-none');
 
-                // HANYA di mobile: sembunyikan pick LOT
                 if (isMobile() && pickLotSection) {
                     pickLotSection.classList.add('d-none');
                 }
@@ -233,18 +259,14 @@
             function showPickLotSection() {
                 if (!pickLotSection) return;
 
-                // HANYA di mobile: balik ke step pilih LOT
                 if (isMobile()) {
                     pickLotSection.classList.remove('d-none');
-                    if (mainContent) {
-                        mainContent.classList.add('d-none');
-                    }
+                    if (mainContent) mainContent.classList.add('d-none');
                     pickLotSection.scrollIntoView({
                         behavior: 'smooth',
                         block: 'start'
                     });
                 } else {
-                    // di desktop: cukup scroll ke area LOT, jangan hide form
                     pickLotSection.scrollIntoView({
                         behavior: 'smooth',
                         block: 'start'
@@ -294,9 +316,7 @@
 
                 selects.forEach(select => {
                     const currentVal = parseInt(select.value || '0', 10);
-                    while (select.firstChild) {
-                        select.removeChild(select.firstChild);
-                    }
+                    while (select.firstChild) select.removeChild(select.firstChild);
 
                     const optPlaceholder = document.createElement('option');
                     optPlaceholder.value = '';
@@ -325,9 +345,7 @@
                 const rows = bundlesTbody.querySelectorAll('.bundle-row');
                 rows.forEach((tr, idx) => {
                     const numCell = tr.querySelector('.bundle-index');
-                    if (numCell) {
-                        numCell.textContent = idx + 1;
-                    }
+                    if (numCell) numCell.textContent = idx + 1;
                 });
             }
 
@@ -356,18 +374,14 @@
                         validRowCount++;
 
                         const label = getBundleItemLabel(tr);
-                        if (!itemSummary[label]) {
-                            itemSummary[label] = 0;
-                        }
+                        if (!itemSummary[label]) itemSummary[label] = 0;
                         itemSummary[label] += qty;
                     }
                 });
 
                 const totalBalance = parseFloat(lotBalanceInput.value || '0');
 
-                while (lotSummaryList.firstChild) {
-                    lotSummaryList.removeChild(lotSummaryList.firstChild);
-                }
+                while (lotSummaryList.firstChild) lotSummaryList.removeChild(lotSummaryList.firstChild);
 
                 if (totalBalance <= 0 && totalPcs <= 0) {
                     const li = document.createElement('li');
@@ -403,7 +417,6 @@
                     lotSummaryList.appendChild(li4);
                 }
 
-                // Ringkasan per item jadi (hanya muncul kalau ada data)
                 const labels = Object.keys(itemSummary).filter(label => itemSummary[label] > 0);
                 if (labels.length > 0) {
                     const liHeader = document.createElement('li');
@@ -428,15 +441,19 @@
                 const lotCount = getCheckedLots().length;
                 const balance = parseFloat(lotBalanceInput.value || '0');
 
-                if (currentFabricLabel) {
-                    currentFabricLabel.textContent = fabricText;
-                }
-                if (currentLotCount) {
-                    currentLotCount.textContent = `${lotCount} LOT`;
-                }
-                if (currentLotBalance) {
-                    currentLotBalance.textContent = balance.toFixed(2);
-                }
+                if (currentFabricLabel) currentFabricLabel.textContent = fabricText;
+                if (currentLotCount) currentLotCount.textContent = `${lotCount} LOT`;
+                if (currentLotBalance) currentLotBalance.textContent = balance.toFixed(2);
+            }
+
+            function scrollRowIntoCenter(tr) {
+                if (!tr) return;
+                setTimeout(() => {
+                    tr.scrollIntoView({
+                        behavior: 'smooth',
+                        block: 'center'
+                    });
+                }, 80);
             }
 
             function createBundleRow(autoFocusItem = false) {
@@ -484,23 +501,29 @@
                     window.initItemSuggestInputs(tr);
                 }
 
+                const itemCell = tr.querySelector('td:nth-child(3)');
+                const itemInput = itemCell ? itemCell.querySelector('input[type="text"]') : null;
+                if (itemInput) {
+                    const handleItemFocus = () => scrollRowIntoCenter(tr);
+
+                    itemInput.addEventListener('focus', handleItemFocus);
+                    itemInput.addEventListener('click', handleItemFocus);
+                    itemInput.addEventListener('input', handleItemFocus);
+                }
+
                 updateBundleRowIndices();
                 rebuildLotOptionsForAllRows();
                 recalcLotSummary();
 
-                if (autoFocusItem) {
-                    const itemCell = tr.querySelector('td:nth-child(3)');
-                    const itemInput = itemCell ? itemCell.querySelector('input[type="text"]') : null;
-                    if (itemInput) {
-                        setTimeout(() => {
-                            itemInput.focus();
-                            itemInput.click();
-                        }, 50);
-                    }
+                if (autoFocusItem && itemInput) {
+                    setTimeout(() => {
+                        itemInput.focus();
+                        itemInput.click();
+                        scrollRowIntoCenter(tr);
+                    }, 50);
                 }
             }
 
-            // EVENTS
             fabricSelect?.addEventListener('change', () => {
                 if (lotsLocked) return;
                 filterLotsByFabric();
@@ -558,7 +581,6 @@
                 showMainContent();
             });
 
-            // Tombol "Ubah LOT" di form utama
             btnChangeLots?.addEventListener('click', () => {
                 showPickLotSection();
                 unlockLotSelection();
@@ -568,7 +590,6 @@
                 createBundleRow(true);
             });
 
-            // INIT
             filterLotsByFabric();
             recalcLotBalanceFromCheckedLots();
             createBundleRow(false);

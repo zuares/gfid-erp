@@ -1,811 +1,484 @@
 @extends('layouts.app')
 
-@section('title', 'Produksi • Finishing Job Baru')
+@section('title', 'Produksi • Finishing')
 
 @push('head')
     <style>
-        :root {
-            --card-radius-lg: 16px;
+        .finishing-create-page {
+            min-height: 100vh;
         }
 
-        .page-wrap {
-            max-width: 1100px;
+        .finishing-create-page .page-wrap {
+            max-width: 1150px;
             margin-inline: auto;
-            padding-inline: .9rem;
+            padding: 1rem 1rem 4rem;
         }
 
-        /* Background lembut, selaras dengan WIP-FIN */
-        body[data-theme="light"] .page-wrap {
-            background: radial-gradient(circle at top left,
-                    rgba(129, 140, 248, 0.08) 0,
-                    rgba(45, 212, 191, 0.10) 18%,
-                    #f9fafb 52%,
-                    #f9fafb 100%);
+        body[data-theme="light"] .finishing-create-page .page-wrap {
+            background:
+                radial-gradient(circle at top left,
+                    rgba(59, 130, 246, 0.12) 0,
+                    rgba(45, 212, 191, 0.10) 26%,
+                    #f9fafb 60%);
         }
 
-        .card {
+        body[data-theme="dark"] .finishing-create-page .page-wrap {
+            background:
+                radial-gradient(circle at top left,
+                    rgba(59, 130, 246, 0.25) 0,
+                    rgba(45, 212, 191, 0.15) 26%,
+                    #020617 60%);
+        }
+
+        .finishing-create-page .card-main {
             background: var(--card);
-            border-radius: var(--card-radius-lg);
-            border: 1px solid rgba(148, 163, 184, 0.18);
+            border-radius: 16px;
+            border: 1px solid rgba(148, 163, 184, 0.35);
             box-shadow:
-                0 10px 30px rgba(15, 23, 42, 0.08),
-                0 0 0 1px rgba(15, 23, 42, 0.02);
+                0 14px 45px rgba(15, 23, 42, 0.22),
+                0 10px 18px rgba(15, 23, 42, 0.18);
         }
 
-        .card-section {
-            padding: 1rem 1.1rem;
-        }
-
-        @media (min-width: 768px) {
-            .card-section {
-                padding: 1.1rem 1.4rem;
-            }
-        }
-
-        .mono {
-            font-variant-numeric: tabular-nums;
-            font-family: ui-monospace, SFMono-Regular, Menlo, Consolas;
-        }
-
-        .help {
-            color: var(--muted);
-            font-size: .8rem;
-        }
-
-        .badge-soft {
-            border-radius: 999px;
-            padding: .14rem .5rem;
-            font-size: .7rem;
-        }
-
-        .table-wrap {
-            overflow-x: auto;
-        }
-
-        /* ===== HEADER PAGE ===== */
-        .header-row {
+        .finishing-create-page .card-header-bar {
+            padding: 0.85rem 1.1rem;
+            border-bottom: 1px solid rgba(148, 163, 184, 0.35);
             display: flex;
             align-items: center;
-            justify-content: space-between;
             gap: .75rem;
-            flex-wrap: wrap;
+            justify-content: space-between;
         }
 
-        .header-left {
-            display: flex;
-            align-items: center;
-            gap: .7rem;
-        }
-
-        .header-title-block {
+        .finishing-create-page .card-header-title {
             display: flex;
             flex-direction: column;
-            gap: .1rem;
+            gap: .15rem;
         }
 
-        .header-title-block h1 {
-            font-size: 1.06rem;
-            font-weight: 700;
+        .finishing-create-page .card-header-title h1 {
+            font-size: 1.15rem;
+            font-weight: 600;
+            letter-spacing: .02em;
+            margin: 0;
         }
 
-        .header-subtitle {
-            font-size: .8rem;
-            color: var(--muted);
+        .finishing-create-page .card-header-subtitle {
+            font-size: .77rem;
+            color: var(--muted-foreground);
         }
 
-        .header-icon {
-            width: 40px;
-            height: 40px;
+        .finishing-create-page .badge-soft-info {
+            font-size: .7rem;
             border-radius: 999px;
-            display: inline-flex;
-            align-items: center;
-            justify-content: center;
-            background: radial-gradient(circle at 30% 30%,
-                    rgba(45, 212, 191, 0.9),
-                    rgba(129, 140, 248, 0.18));
-            box-shadow:
-                0 0 0 1px rgba(79, 70, 229, 0.40),
-                0 12px 26px rgba(15, 23, 42, 0.32);
-            color: #0f766e;
-        }
-
-        .btn-header-secondary {
-            border-radius: 999px;
-            padding-inline: .7rem;
-            padding-block: .35rem;
-            font-size: .8rem;
-        }
-
-        /* ===== SUMMARY / PILL ===== */
-        .summary-row {
-            display: flex;
-            flex-wrap: wrap;
-            gap: .4rem;
-            align-items: center;
-        }
-
-        .summary-chip {
-            border-radius: 999px;
-            padding: .16rem .7rem;
-            font-size: .74rem;
+            padding: .25rem .55rem;
+            background: rgba(37, 99, 235, 0.08);
+            border: 1px solid rgba(59, 130, 246, 0.25);
+            color: #1d4ed8;
             display: inline-flex;
             align-items: center;
             gap: .25rem;
         }
 
-        .summary-chip-date {
-            background: rgba(148, 163, 184, 0.10);
-            color: #111827;
+        .finishing-create-page .card-body-main {
+            padding: 1rem 1.1rem 1.1rem;
         }
 
-        .summary-chip-src {
-            background: rgba(45, 212, 191, 0.12);
-            color: #0f766e;
-            font-weight: 600;
-        }
-
-        .summary-chip-lines {
-            background: rgba(129, 140, 248, 0.10);
-            color: #4f46e5;
-            font-weight: 600;
-        }
-
-        .pill-label {
-            font-size: .72rem;
-            text-transform: uppercase;
-            letter-spacing: .08em;
-            color: var(--muted);
-        }
-
-        .pill-value {
-            font-size: .86rem;
-        }
-
-        /* ===== TABEL DETAIL ===== */
-        .finishing-line-row td {
-            vertical-align: middle;
-        }
-
-        .qty-pill-balance {
-            border-radius: 999px;
-            padding: .12rem .65rem;
+        .finishing-create-page .section-title {
             font-size: .8rem;
             font-weight: 600;
-            background: rgba(129, 140, 248, 0.11);
-            color: #312e81;
-        }
-
-        .qty-ok-text {
-            font-size: .86rem;
-            font-weight: 600;
-            color: #15803d;
-        }
-
-        .qty-label-small {
-            font-size: .68rem;
             text-transform: uppercase;
-            letter-spacing: .09em;
-            color: var(--muted);
+            letter-spacing: .12em;
+            color: var(--muted-foreground);
+            margin-bottom: .45rem;
         }
 
-        .form-control-sm.mono {
-            font-variant-numeric: tabular-nums;
-        }
-
-        .table thead th {
-            font-size: .76rem;
-            text-transform: uppercase;
-            letter-spacing: .09em;
-            color: var(--muted);
-            border-bottom-color: rgba(148, 163, 184, .4);
-        }
-
-        .badge-lot {
+        .finishing-create-page .summary-pill {
             border-radius: 999px;
-            padding: .04rem .45rem;
-            font-size: .68rem;
-            background: rgba(15, 23, 42, 0.04);
-            color: #4b5563;
-        }
-
-        /* ===== FOKUS: KODE BARANG LEBIH MENONJOL ===== */
-        .item-code-pill {
+            border: 1px dashed rgba(148, 163, 184, 0.7);
+            font-size: .75rem;
+            padding: .3rem .75rem;
             display: inline-flex;
             align-items: center;
-            border-radius: 999px;
-            padding: .18rem .7rem;
-            font-size: .9rem;
-            font-weight: 700;
-            font-family: ui-monospace, SFMono-Regular, Menlo, Consolas;
+            gap: .25rem;
+            background: rgba(15, 23, 42, 0.02);
+        }
+
+        .finishing-create-page .summary-pill strong {
+            font-weight: 600;
+        }
+
+        /* TABLE */
+        .finishing-table-wrap {
+            border-radius: 12px;
+            border: 1px solid rgba(148, 163, 184, 0.35);
+            overflow: hidden;
+            background: var(--card);
+        }
+
+        .finishing-table {
+            margin-bottom: 0;
+        }
+
+        .finishing-table thead th {
+            background: rgba(15, 23, 42, 0.03);
+            font-size: .75rem;
             text-transform: uppercase;
-            letter-spacing: .06em;
-            background: radial-gradient(circle at top left,
-                    rgba(59, 130, 246, 0.14),
-                    rgba(37, 99, 235, 0.04));
-            box-shadow:
-                0 0 0 1px rgba(59, 130, 246, 0.35),
-                0 6px 14px rgba(15, 23, 42, 0.18);
-            color: #1d4ed8;
+            letter-spacing: .08em;
+            color: var(--muted-foreground);
+            border-bottom-width: 1px;
+            padding-block: .55rem;
+            white-space: nowrap;
         }
 
-        body[data-theme="dark"] .item-code-pill {
-            background: radial-gradient(circle at top left,
-                    rgba(59, 130, 246, 0.30),
-                    rgba(15, 23, 42, 0.9));
-            box-shadow:
-                0 0 0 1px rgba(129, 140, 248, 0.7),
-                0 12px 30px rgba(15, 23, 42, 0.9);
-            color: #e0e7ff;
+        .finishing-table tbody td {
+            vertical-align: middle;
+            padding-block: .4rem;
+            font-size: .8rem;
         }
 
-        .item-name-sub {
-            font-size: .78rem;
-            color: var(--muted);
+        .finishing-table tbody tr:nth-child(even) {
+            background: rgba(148, 163, 184, 0.07);
         }
 
-        /* BND & LOT compact badge */
-        .bundle-label {
-            font-size: .7rem;
+        .finishing-create-page .item-label-main {
+            font-weight: 600;
+            font-size: .82rem;
+        }
+
+        .finishing-create-page .item-label-sub {
+            font-size: .72rem;
+            color: var(--muted-foreground);
+        }
+
+        .finishing-create-page .wip-badge {
+            display: inline-flex;
+            align-items: center;
+            gap: .3rem;
+            padding: .2rem .5rem;
             border-radius: 999px;
-            padding: .04rem .5rem;
-            background: rgba(15, 23, 42, 0.04);
-            color: #4b5563;
+            font-size: .72rem;
+            background: rgba(16, 185, 129, 0.08);
+            color: #047857;
         }
 
-        body[data-theme="dark"] .bundle-label {
-            background: rgba(15, 23, 42, 0.6);
-            color: #e5e7eb;
+        .finishing-create-page .wip-badge span {
+            font-weight: 600;
         }
 
-        /* ===== MOBILE ===== */
+        .finishing-create-page .form-control-sm,
+        .finishing-create-page .form-select-sm {
+            font-size: .8rem;
+            padding-block: .25rem;
+        }
+
+        .finishing-create-page .btn-save {
+            border-radius: 999px;
+            padding-inline: 1.5rem;
+            box-shadow:
+                0 10px 25px rgba(34, 197, 94, .35);
+            font-weight: 600;
+            letter-spacing: .03em;
+
+        }
+
+        .finishing-create-page .footer-actions {
+            display: flex;
+            justify-content: flex-end;
+            gap: .75rem;
+            margin-top: 1rem;
+            padding-top: .75rem;
+            border-top: 1px dashed rgba(148, 163, 184, 0.55);
+        }
+
         @media (max-width: 767.98px) {
-            .card {
-                border-radius: 15px;
-                box-shadow:
-                    0 10px 26px rgba(15, 23, 42, 0.10),
-                    0 0 0 1px rgba(15, 23, 42, 0.02);
+            .finishing-table-wrap {
+                border-radius: 10px;
             }
 
-            .card-section {
-                padding: .85rem .9rem;
+            .finishing-table thead th {
+                font-size: .68rem;
+                padding-block: .4rem;
             }
 
-            .page-wrap {
-                padding-bottom: 5rem;
+            .finishing-table tbody td {
+                font-size: .72rem;
+                padding-block: .3rem;
             }
 
-            .header-row {
+            .finishing-create-page .item-label-main {
+                font-size: .78rem;
+            }
+
+            .finishing-create-page .item-label-sub {
+                font-size: .68rem;
+            }
+
+            .finishing-create-page .wip-badge {
+                font-size: .68rem;
+                padding: .18rem .45rem;
+            }
+
+            .finishing-create-page .card-header-bar {
                 flex-direction: column;
+                align-items: flex-start;
+            }
+
+            .finishing-create-page .footer-actions {
+                flex-direction: column-reverse;
                 align-items: stretch;
             }
 
-            .btn-header-secondary {
+            .finishing-create-page .btn-save {
                 width: 100%;
                 justify-content: center;
-            }
-
-            .summary-row {
-                align-items: stretch;
-            }
-
-            .summary-chip {
-                width: 100%;
-                justify-content: space-between;
-            }
-
-            .table-wrap {
-                margin: 0 -.35rem;
-            }
-
-            .table-finishing-lines thead {
-                display: none;
-            }
-
-            .table-finishing-lines tbody tr {
-                display: block;
-                border-radius: 14px;
-                border: 1px solid rgba(148, 163, 184, 0.3);
-                padding: .7rem .7rem .65rem;
-                margin-bottom: .45rem;
-                background: rgba(255, 255, 255, 0.98);
-                box-shadow:
-                    0 8px 20px rgba(15, 23, 42, 0.09),
-                    0 0 0 1px rgba(15, 23, 42, 0.02);
-            }
-
-            body[data-theme="dark"] .table-finishing-lines tbody tr {
-                background: rgba(15, 23, 42, 0.96);
-            }
-
-            .table-finishing-lines tbody tr:last-child {
-                margin-bottom: 0;
-            }
-
-            .table-finishing-lines td {
-                display: block;
-                border-top: none !important;
-                padding: .12rem 0;
-            }
-
-            .line-mobile-header {
-                display: flex;
-                justify-content: space-between;
-                gap: .6rem;
-                margin-bottom: .35rem;
-            }
-
-            .line-mobile-header-left {
-                font-size: .82rem;
-            }
-
-            .line-mobile-item {
-                font-size: .78rem;
-                color: var(--muted);
-            }
-
-            .line-mobile-header-right {
-                text-align: right;
-                min-width: 96px;
-            }
-
-            .line-mobile-qty {
-                font-size: .9rem;
-            }
-
-            .line-mobile-qty-label {
-                font-size: .68rem;
-                text-transform: uppercase;
-                letter-spacing: .09em;
-                color: var(--muted);
-            }
-
-            .mobile-inline-inputs {
-                display: flex;
-                justify-content: space-between;
-                gap: .6rem;
-                margin-top: .25rem;
-            }
-
-            .mobile-inline-inputs>div {
-                flex: 1;
-            }
-
-            .mobile-operator {
-                margin-top: .4rem;
-            }
-
-            .desktop-only {
-                display: none !important;
-            }
-        }
-
-        @media (min-width: 768px) {
-            .mobile-only {
-                display: none !important;
             }
         }
     </style>
 @endpush
 
 @section('content')
-    @php
-        $linesCount = is_array($lines ?? null) ? count($lines) : 0;
-    @endphp
+    <div class="finishing-create-page">
+        <div class="page-wrap">
 
-    <div class="page-wrap py-3 py-md-4">
+            {{-- FLASH & ERROR --}}
+            @if (session('status'))
+                <div class="alert alert-success alert-dismissible fade show mb-3" role="alert">
+                    {{ session('status') }}
+                    <button type="button" class="btn-close" data-bs-dismiss="alert" aria-label="Close"></button>
+                </div>
+            @endif
 
-        {{-- HEADER PAGE --}}
-        <div class="card mb-3">
-            <div class="card-section">
-                <div class="header-row">
-                    <div class="header-left">
-                        <div class="header-icon">
-                            <i class="bi bi-stars"></i>
-                        </div>
-                        <div class="header-title-block">
-                            <h1>Finishing Job Baru</h1>
-                            <div class="header-subtitle">
-                                Proseskan bundles dari gudang <span class="mono">WIP-FIN</span> menjadi barang jadi.
-                            </div>
+            @if ($errors->any())
+                <div class="alert alert-danger alert-dismissible fade show mb-3" role="alert">
+                    <strong>Oops!</strong> Ada beberapa error input. Silakan cek kembali form di bawah.
+                    <button type="button" class="btn-close" data-bs-dismiss="alert" aria-label="Close"></button>
+                </div>
+            @endif
+
+            <div class="card card-main">
+                {{-- HEADER --}}
+                <div class="card-header-bar">
+                    <div class="card-header-title">
+                        <h1>Finishing</h1>
+                        <div class="card-header-subtitle">
+                            Proses hasil jahit per item dari gudang WIP-FIN menjadi barang jadi (WH-PRD) &amp; reject.
                         </div>
                     </div>
 
-                    <div class="d-flex flex-column align-items-end gap-2 desktop-only">
-                        <div class="pill-label mb-1">
-                            Tanggal Finishing
-                        </div>
-                        <div class="d-flex align-items-center gap-2">
-                            <i class="bi bi-calendar4-week text-muted"></i>
-                            <span class="mono">{{ \Carbon\Carbon::parse($date)->format('d/m/Y') }}</span>
+                    <div class="d-flex flex-column flex-sm-row gap-2 align-items-sm-center">
+                        <div class="badge-soft-info">
+                            <i class="bi bi-info-circle"></i>
+                            <span>Input per item, sistem akan pecah otomatis ke bundle.</span>
                         </div>
                     </div>
                 </div>
 
-                {{-- Mobile: tanggal di bawah header --}}
-                <div class="mt-3 mobile-only">
-                    <div class="pill-label mb-1">Tanggal Finishing</div>
-                    <div class="d-inline-flex align-items-center gap-2 px-2 py-1 rounded-pill"
-                        style="background: rgba(148,163,184,.1);">
-                        <i class="bi bi-calendar4-week text-muted"></i>
-                        <span class="mono">{{ \Carbon\Carbon::parse($date)->format('d/m/Y') }}</span>
-                    </div>
-                </div>
-            </div>
-        </div>
+                <form action="{{ route('production.finishing_jobs.store') }}" method="post">
+                    @csrf
 
-        {{-- FORM UTAMA --}}
-        <form action="{{ route('production.finishing_jobs.store') }}" method="POST">
-            @csrf
+                    <div class="card-body-main">
+                        @php
+                            $defaultGlobalOperator = old('operator_global_id') ?? (auth()->user()->employee_id ?? null);
+                            $userRole = auth()->user()->role ?? null;
+                        @endphp
 
-            {{-- CARD: RINGKASAN & SETTING --}}
-            <div class="card mb-3">
-                <div class="card-section">
-                    @if ($errors->any())
-                        <div class="alert alert-danger py-2 px-3 mb-3">
-                            <div class="small fw-semibold mb-1">
-                                <i class="bi bi-exclamation-triangle me-1"></i>
-                                Ada data yang perlu dicek lagi
+                        {{-- HEADER FORM: Tanggal + Operator + Catatan (desktop only, non-operating) --}}
+                        <div class="row g-3 mb-3">
+                            <div class="col-6 col-md-3">
+                                <label class="form-label form-label-sm mb-1">Tanggal</label>
+                                <input type="date" name="date"
+                                    class="form-control form-control-sm @error('date') is-invalid @enderror"
+                                    value="{{ old('date', $date ?? now()->toDateString()) }}">
+                                @error('date')
+                                    <div class="invalid-feedback">{{ $message }}</div>
+                                @enderror
                             </div>
-                            <ul class="mb-0 small ps-3">
-                                @foreach ($errors->all() as $error)
-                                    <li>{{ $error }}</li>
-                                @endforeach
-                            </ul>
+
+                            @if ($userRole !== 'operating')
+                                <div class="col-6 col-md-3">
+                                    <label class="form-label form-label-sm mb-1">Operator jahit</label>
+                                    <select name="operator_global_id" id="operator_global_id"
+                                        class="form-select form-select-sm @error('operator_global_id') is-invalid @enderror">
+                                        <option value="">- pilih operator -</option>
+                                        @foreach ($operators as $op)
+                                            <option value="{{ $op->id }}" @selected((int) $defaultGlobalOperator === (int) $op->id)>
+                                                {{ $op->code ?? $op->id }} — {{ $op->name }}
+                                            </option>
+                                        @endforeach
+                                    </select>
+                                    @error('operator_global_id')
+                                        <div class="invalid-feedback">{{ $message }}</div>
+                                    @enderror
+                                </div>
+
+                                <div class="col-12 col-md-6 d-none d-md-block">
+                                    <label class="form-label form-label-sm mb-1">Catatan</label>
+                                    <textarea name="notes" rows="1" class="form-control form-control-sm @error('notes') is-invalid @enderror"
+                                        placeholder="Contoh: Finishing batch TSHIRT hitam &amp; HOODIE abu.">{{ old('notes') }}</textarea>
+                                    @error('notes')
+                                        <div class="invalid-feedback">{{ $message }}</div>
+                                    @enderror
+                                </div>
+                            @else
+                                {{-- operating: tidak perlu operator_global / notes --}}
+                                <input type="hidden" name="operator_global_id" value="">
+                            @endif
                         </div>
-                    @endif
 
-                    <input type="hidden" name="date" value="{{ $date }}">
+                        {{-- SUMMARY WIP --}}
+                        @php
+                            $grandWip = collect($lines ?? [])->sum('total_wip');
+                        @endphp
+                        <div class="mb-3 d-flex flex-wrap gap-2 align-items-center">
+                            <div class="section-title mb-0">Ringkasan WIP-FIN</div>
 
-                    <div class="summary-row mb-2">
-                        <span class="summary-chip summary-chip-date">
-                            <span class="pill-label">Tanggal</span>
-                            <span class="pill-value mono">
-                                {{ \Carbon\Carbon::parse($date)->format('d/m/Y') }}
-                            </span>
-                        </span>
+                            <div class="summary-pill">
+                                <i class="bi bi-collection"></i>
+                                <span>Total saldo WIP-FIN:</span>
+                                <strong>{{ number_format($grandWip, 0, ',', '.') }} pcs</strong>
+                            </div>
 
-                        <span class="summary-chip summary-chip-src">
-                            <span class="pill-label">Sumber</span>
-                            <span class="pill-value">
-                                Bundles WIP-FIN
-                            </span>
-                        </span>
-
-                        <span class="summary-chip summary-chip-lines">
-                            <span class="pill-label">Baris bundle</span>
-                            <span class="pill-value mono">
-                                {{ $linesCount }} baris
-                            </span>
-                        </span>
-                    </div>
-
-                    <div class="help">
-                        @if ($linesCount > 0)
-                            Qty masuk Finishing bisa disesuaikan per baris. Qty OK dihitung otomatis dari
-                            <span class="mono">Qty Masuk - Reject</span>.
-                        @else
-                            Belum ada bundle terpilih dari WIP-FIN. Kembali ke halaman
-                            <a href="{{ route('production.finishing_jobs.bundles_ready') }}">Bundles WIP-FIN</a>
-                            lalu pilih bundle yang mau diproses.
-                        @endif
-                    </div>
-                </div>
-            </div>
-
-            {{-- CARD: DETAIL BUNDLES --}}
-            <div class="card mb-3">
-                <div class="card-section">
-                    <div class="d-flex justify-content-between align-items-center mb-2">
-                        <div>
-                            <div class="pill-label mb-1">Detail Bundles</div>
-                            <div class="help">
-                                Satu baris = satu bundle dari WIP-FIN. Atur qty masuk & reject jika ada cacat.
+                            <div class="summary-pill">
+                                <i class="bi bi-box-seam"></i>
+                                <span>Total item siap Finishing:</span>
+                                <strong>{{ count($lines ?? []) }} item</strong>
                             </div>
                         </div>
-                        <div class="desktop-only">
-                            <a href="{{ route('production.finishing_jobs.bundles_ready', ['select' => 1]) }}"
-                                class="btn btn-sm btn-outline-secondary d-inline-flex align-items-center gap-1">
-                                <i class="bi bi-layers"></i>
-                                <span>Pilih ulang bundles</span>
-                            </a>
-                        </div>
-                    </div>
 
-                    <div class="mobile-only mb-2">
-                        <a href="{{ route('production.finishing_jobs.bundles_ready', ['select' => 1]) }}"
-                            class="btn btn-sm btn-outline-secondary w-100 d-inline-flex align-items-center justify-content-center gap-1">
-                            <i class="bi bi-layers"></i>
-                            <span>Pilih ulang bundles</span>
-                        </a>
-                    </div>
-
-                    @if ($linesCount === 0)
-                        <div class="text-center text-muted small py-3">
-                            Belum ada baris. Pilih dulu bundles dari halaman WIP-FIN.
-                        </div>
-                    @else
-                        <div class="table-wrap">
-                            <table class="table table-sm align-middle table-finishing-lines mb-0">
-                                <thead>
-                                    <tr>
-                                        <th style="width: 40px;">#</th>
-                                        <th style="width: 240px;">Kode & Item</th>
-                                        <th style="width: 130px;" class="text-end">Saldo WIP-FIN</th>
-                                        <th style="width: 130px;" class="text-end">Qty Masuk</th>
-                                        <th style="width: 130px;" class="text-end">Reject</th>
-                                        <th style="width: 140px;" class="text-end">Qty OK</th>
-                                        <th style="width: 150px;">Opr Jahit</th>
-                                    </tr>
-                                </thead>
-                                <tbody>
-                                    @foreach ($lines as $i => $line)
-                                        @php
-                                            $bundleModel = $bundles->firstWhere('id', $line['bundle_id']);
-                                            $itemLabel = $line['item_label'] ?? '';
-                                            $wipBalance = (float) ($line['wip_balance'] ?? 0);
-
-                                            // default qty_in = wip_balance (kecuali old() override)
-                                            $defaultQtyIn = $wipBalance;
-                                            $qtyIn = (float) old("lines.$i.qty_in", $defaultQtyIn);
-                                            $qtyReject = (float) old("lines.$i.qty_reject", $line['qty_reject'] ?? 0);
-                                            $qtyOk = max($qtyIn - $qtyReject, 0);
-
-                                            $itemCode = $line['item_code'] ?? null;
-                                            $itemName = $itemLabel;
-
-                                            if (!$itemCode && $itemLabel) {
-                                                $parts = preg_split('/\s+—\s+|\s+/', trim($itemLabel), 2);
-                                                $itemCode = $parts[0] ?? '';
-                                                $itemName = $parts[1] ?? $itemLabel;
-                                            }
-
-                                            $operatorName =
-                                                $line['sewing_operator_name'] ?? ($line['operator_name'] ?? null);
-
-                                        @endphp
-
-                                        <tr class="finishing-line-row" data-line-index="{{ $i }}">
-                                            {{-- HIDDEN binding minimal --}}
-                                            <input type="hidden" name="lines[{{ $i }}][bundle_id]"
-                                                value="{{ $line['bundle_id'] }}">
-                                            <input type="hidden" name="lines[{{ $i }}][item_id]"
-                                                value="{{ $line['item_id'] }}">
-                                            <input type="hidden" name="lines[{{ $i }}][wip_balance]"
-                                                value="{{ $wipBalance }}">
-
-                                            {{-- DESKTOP LAYOUT --}}
-                                            <td class="desktop-only">
-                                                <span class="small text-muted">{{ $i + 1 }}</span>
-                                            </td>
-
-                                            <td class="desktop-only">
-                                                <div class="d-flex flex-column gap-1">
-                                                    @if ($itemCode)
-                                                        <div class="item-code-pill">
-                                                            {{ $itemCode }}
-                                                        </div>
-                                                        @if ($itemName && $itemName !== $itemCode)
-                                                            <div class="item-name-sub text-truncate">
-                                                                {{ $itemName }}
-                                                            </div>
-                                                        @endif
-                                                    @else
-                                                        <div class="fw-semibold text-truncate">
-                                                            {{ $itemLabel }}
-                                                        </div>
-                                                    @endif
-
-                                                    <div class="d-flex flex-wrap align-items-center gap-1 mt-1">
-                                                        <span class="bundle-label mono">
-                                                            BND: {{ $bundleModel?->bundle_code ?? '#' . ($i + 1) }}
-                                                        </span>
-
-                                                        @if ($bundleModel?->lot)
-                                                            <span class="badge-lot mono">
-                                                                LOT: {{ $bundleModel->lot->code }}
-                                                            </span>
-                                                        @endif
-                                                    </div>
-                                                </div>
-                                            </td>
-
-                                            <td class="text-end desktop-only">
-                                                <div class="qty-label-small mb-1">WIP-FIN</div>
-                                                <span class="qty-pill-balance mono" data-role="wip-balance-display">
-                                                    {{ number_format($wipBalance, 2, ',', '.') }}
-                                                </span>
-                                            </td>
-
-                                            <td class="text-end desktop-only">
-                                                <div class="qty-label-small mb-1">Masuk Finishing</div>
-                                                <input type="number" step="0.01" min="0"
-                                                    class="form-control form-control-sm text-end mono qty-in-input"
-                                                    name="lines[{{ $i }}][qty_in]"
-                                                    value="{{ old("lines.$i.qty_in", $defaultQtyIn) }}"
-                                                    data-role="qty-in-input">
-                                            </td>
-
-                                            <td class="text-end desktop-only">
-                                                <div class="qty-label-small mb-1">Reject</div>
-                                                <input type="number" step="0.01" min="0"
-                                                    class="form-control form-control-sm text-end mono qty-reject-input"
-                                                    name="lines[{{ $i }}][qty_reject]"
-                                                    value="{{ old("lines.$i.qty_reject", $line['qty_reject'] ?? 0) }}"
-                                                    data-role="qty-reject-input">
-                                            </td>
-
-                                            <td class="text-end desktop-only">
-                                                <div class="qty-label-small mb-1">Qty OK</div>
-                                                <div class="qty-ok-text mono" data-role="qty-ok-display">
-                                                    {{ number_format($qtyOk, 2, ',', '.') }}
-                                                </div>
-                                                <input type="hidden" name="lines[{{ $i }}][qty_ok]"
-                                                    value="{{ $qtyOk }}" data-role="qty-ok-hidden">
-                                            </td>
-
-                                            {{-- Operator jahit (read-only) --}}
-                                            <td class="desktop-only" style="min-width: 150px;">
-                                                <div class="qty-label-small mb-1">Opr Jahit</div>
-                                                @if ($operatorName)
-                                                    <div class="badge-soft mono">
-                                                        {{ $operatorName }}
-                                                    </div>
-                                                @else
-                                                    <span class="text-muted small">-</span>
-                                                @endif
-                                            </td>
-
-                                            {{-- MOBILE CARD VERSION --}}
-                                            <td class="mobile-only" colspan="7">
-                                                <div class="line-mobile-header">
-                                                    <div class="line-mobile-header-left">
-                                                        @if ($itemCode)
-                                                            <div class="item-code-pill mb-1">
-                                                                {{ $itemCode }}
-                                                            </div>
-                                                            @if ($itemName && $itemName !== $itemCode)
-                                                                <div class="line-mobile-item text-truncate">
-                                                                    {{ $itemName }}
-                                                                </div>
-                                                            @endif
-                                                        @else
-                                                            <div class="line-mobile-item text-truncate fw-semibold">
-                                                                {{ $itemLabel }}
-                                                            </div>
-                                                        @endif
-
-                                                        <div class="d-flex flex-wrap gap-1 align-items-center mt-1">
-                                                            <span class="bundle-label mono">
-                                                                BND: {{ $bundleModel?->bundle_code ?? '#' . ($i + 1) }}
-                                                            </span>
-                                                            @if ($bundleModel?->lot)
-                                                                <span class="badge-lot mono">
-                                                                    LOT: {{ $bundleModel->lot->code }}
-                                                                </span>
-                                                            @endif
-                                                        </div>
-
-                                                        @if ($operatorName)
-                                                            <div class="mt-1">
-                                                                <span class="badge-soft mono">
-                                                                    Opr Jahit: {{ $operatorName }}
-                                                                </span>
-                                                            </div>
-                                                        @endif
-                                                    </div>
-
-                                                    <div class="line-mobile-header-right">
-                                                        <div class="line-mobile-qty-label">
-                                                            WIP-FIN
-                                                        </div>
-                                                        <div class="line-mobile-qty mono" data-role="wip-balance-display">
-                                                            {{ number_format($wipBalance, 2, ',', '.') }}
-                                                        </div>
-                                                    </div>
-                                                </div>
-
-                                                <div class="mobile-inline-inputs">
-                                                    <div>
-                                                        <div class="qty-label-small mb-1">Masuk</div>
-                                                        <input type="number" step="0.01" min="0"
-                                                            class="form-control form-control-sm text-end mono qty-in-input"
-                                                            name="lines[{{ $i }}][qty_in]"
-                                                            value="{{ old("lines.$i.qty_in", $defaultQtyIn) }}"
-                                                            data-role="qty-in-input">
-                                                    </div>
-                                                    <div>
-                                                        <div class="qty-label-small mb-1">Reject</div>
-                                                        <input type="number" step="0.01" min="0"
-                                                            class="form-control form-control-sm text-end mono qty-reject-input"
-                                                            name="lines[{{ $i }}][qty_reject]"
-                                                            value="{{ old("lines.$i.qty_reject", $line['qty_reject'] ?? 0) }}"
-                                                            data-role="qty-reject-input">
-                                                    </div>
-                                                    <div>
-                                                        <div class="qty-label-small mb-1">OK</div>
-                                                        <div class="qty-ok-text mono text-end" data-role="qty-ok-display">
-                                                            {{ number_format($qtyOk, 2, ',', '.') }}
-                                                        </div>
-                                                        <input type="hidden" name="lines[{{ $i }}][qty_ok]"
-                                                            value="{{ $qtyOk }}" data-role="qty-ok-hidden">
-                                                    </div>
-                                                </div>
-
-                                                {{-- Tidak ada select operator di mobile --}}
-                                            </td>
+                        {{-- TABEL (DESKTOP + MOBILE) --}}
+                        <div class="finishing-table-wrap mb-2">
+                            <div class="table-responsive">
+                                <table class="table table-sm finishing-table mb-0">
+                                    <thead>
+                                        <tr>
+                                            <th style="width: 6%;" class="text-center">No</th>
+                                            <th style="width: 30%;">Item</th>
+                                            <th style="width: 16%;" class="text-end">Total WIP-FIN</th>
+                                            <th style="width: 16%;" class="text-end">Qty Proses</th>
+                                            <th style="width: 16%;" class="text-end">Qty Reject</th>
+                                            <th style="width: 16%;">Alasan Reject</th>
                                         </tr>
-                                    @endforeach
-                                </tbody>
-                            </table>
+                                    </thead>
+                                    <tbody>
+                                        @forelse ($lines as $idx => $line)
+                                            @php
+                                                $oldLines = old('lines', []);
+                                                $oldLine = $oldLines[$idx] ?? null;
+
+                                                $itemId = $oldLine['item_id'] ?? $line['item_id'];
+                                                $qtyReject = $oldLine['qty_reject'] ?? $line['qty_reject'];
+                                                $rejectReason = $oldLine['reject_reason'] ?? $line['reject_reason'];
+
+                                                $totalWip =
+                                                    $oldLine['total_wip'] ?? ($line['total_wip'] ?? $line['total_wip']);
+
+                                                $qtyIn = $oldLine['qty_in'] ?? ($line['qty_in'] ?? null);
+
+                                                $fullLabel = $line['item_label'];
+                                                $codeOnly = $fullLabel;
+                                                if (strpos($fullLabel, '—') !== false) {
+                                                    [$codePart] = explode('—', $fullLabel, 2);
+                                                    $codeOnly = trim($codePart);
+                                                }
+                                            @endphp
+                                            <tr>
+                                                {{-- NO --}}
+                                                <td class="text-center align-middle">
+                                                    {{ $loop->iteration }}
+                                                </td>
+
+                                                {{-- ITEM LABEL --}}
+                                                <td>
+                                                    <div class="item-label-main">
+                                                        <span class="d-inline d-md-none">{{ $codeOnly }}</span>
+                                                        <span class="d-none d-md-inline">{{ $fullLabel }}</span>
+                                                    </div>
+                                                    <div class="item-label-sub d-none d-md-block">
+                                                        Item ID: {{ $itemId }}
+                                                    </div>
+
+                                                    <input type="hidden" name="lines[{{ $idx }}][item_id]"
+                                                        value="{{ $itemId }}">
+                                                    <input type="hidden" name="lines[{{ $idx }}][total_wip]"
+                                                        value="{{ $totalWip }}">
+                                                </td>
+
+                                                {{-- TOTAL WIP --}}
+                                                <td class="text-end">
+                                                    <span class="wip-badge">
+                                                        <i class="bi bi-arrow-up-circle"></i>
+                                                        <span>{{ number_format($totalWip, 0, ',', '.') }}</span>
+                                                        <small>pcs</small>
+                                                    </span>
+                                                    @error("lines.$idx.item_id")
+                                                        <div class="text-danger small mt-1">{{ $message }}</div>
+                                                    @enderror
+                                                </td>
+
+                                                {{-- QTY PROSES --}}
+                                                <td class="text-end">
+                                                    <x-number-input name="lines[{{ $idx }}][qty_in]"
+                                                        :value="$qtyIn" htmlType="number" inputmode="decimal"
+                                                        size="sm" align="end" :max="$totalWip" />
+                                                    @error("lines.$idx.qty_in")
+                                                        <div class="invalid-feedback d-block text-start">
+                                                            {{ $message }}
+                                                        </div>
+                                                    @enderror
+                                                </td>
+
+                                                {{-- QTY REJECT --}}
+                                                <td class="text-end">
+                                                    <x-number-input name="lines[{{ $idx }}][qty_reject]"
+                                                        :value="$qtyReject" htmlType="number" inputmode="decimal"
+                                                        size="sm" align="end" />
+                                                    @error("lines.$idx.qty_reject")
+                                                        <div class="invalid-feedback d-block text-start">
+                                                            {{ $message }}
+                                                        </div>
+                                                    @enderror
+                                                </td>
+
+                                                {{-- ALASAN REJECT --}}
+                                                <td>
+                                                    <input type="text"
+                                                        name="lines[{{ $idx }}][reject_reason]"
+                                                        class="form-control form-control-sm @error("lines.$idx.reject_reason") is-invalid @enderror"
+                                                        placeholder="Alasan singkat (opsional)"
+                                                        value="{{ $rejectReason }}">
+                                                    @error("lines.$idx.reject_reason")
+                                                        <div class="invalid-feedback">{{ $message }}</div>
+                                                    @enderror
+                                                </td>
+                                            </tr>
+                                        @empty
+                                            <tr>
+                                                <td colspan="6" class="text-center py-4 text-muted">
+                                                    Tidak ada WIP-FIN yang siap finishing.
+                                                </td>
+                                            </tr>
+                                        @endforelse
+                                    </tbody>
+                                </table>
+                            </div>
                         </div>
-                    @endif
-                </div>
+
+                        {{-- FOOTER ACTIONS --}}
+                        <div class="footer-actions">
+                            <a href="{{ route('production.finishing_jobs.index') }}"
+                                class="btn btn-sm btn-outline-secondary">
+                                <i class="bi bi-arrow-left"></i>
+                                <span class="ms-1">Kembali</span>
+                            </a>
+                            <button type="submit"
+                                class="btn btn-sm btn-success d-inline-flex align-items-center gap-1 btn-save">
+                                <i class="bi bi-check2-circle"></i>
+                                <span class="text-white">Simpan</span>
+                            </button>
+                        </div>
+                    </div>
+                </form>
             </div>
 
-            {{-- FOOTER ACTIONS --}}
-            <div class="d-flex justify-content-between align-items-center mb-4">
-                <a href="{{ route('production.finishing_jobs.index') }}"
-                    class="btn btn-outline-secondary btn-sm d-inline-flex align-items-center gap-1">
-                    <i class="bi bi-arrow-left"></i>
-                    <span>Kembali</span>
-                </a>
-
-                <button type="submit" class="btn btn-primary btn-sm d-inline-flex align-items-center gap-2"
-                    @if ($linesCount === 0) disabled @endif>
-                    <i class="bi bi-check2-circle"></i>
-                    <span>Simpan Finishing Job</span>
-                </button>
-            </div>
-        </form>
+        </div>
     </div>
 @endsection
-
-@push('scripts')
-    <script>
-        document.addEventListener('DOMContentLoaded', function() {
-            const rows = document.querySelectorAll('.finishing-line-row');
-
-            rows.forEach(row => {
-                const qtyInInput = row.querySelector('[data-role="qty-in-input"]');
-                const qtyRejectInput = row.querySelector('[data-role="qty-reject-input"]');
-                const qtyOkDisplay = row.querySelector('[data-role="qty-ok-display"]');
-                const qtyOkHidden = row.querySelector('[data-role="qty-ok-hidden"]');
-                const wipBalanceEl = row.querySelector('[data-role="wip-balance-display"]');
-
-                if (!qtyInInput || !qtyRejectInput || !qtyOkDisplay || !qtyOkHidden) {
-                    return;
-                }
-
-                const wipBalance = wipBalanceEl ?
-                    parseFloat((wipBalanceEl.textContent || '0').replace(/\./g, '').replace(',', '.')) ||
-                    0 :
-                    parseFloat(qtyInInput.value || '0') || 0;
-
-                function recalc() {
-                    let qtyIn = parseFloat(qtyInInput.value || '0');
-                    let qtyReject = parseFloat(qtyRejectInput.value || '0');
-
-                    if (qtyIn < 0) qtyIn = 0;
-                    if (qtyReject < 0) qtyReject = 0;
-
-                    if (qtyIn > wipBalance) qtyIn = wipBalance;
-                    if (qtyReject > qtyIn) qtyReject = qtyIn;
-
-                    qtyInInput.value = qtyIn.toFixed(2);
-                    qtyRejectInput.value = qtyReject.toFixed(2);
-
-                    const qtyOk = qtyIn - qtyReject;
-                    qtyOkHidden.value = qtyOk.toFixed(2);
-
-                    const formatted = qtyOk.toFixed(2).replace('.', ',');
-                    qtyOkDisplay.textContent = formatted;
-                }
-
-                qtyInInput.addEventListener('input', recalc);
-                qtyRejectInput.addEventListener('input', recalc);
-
-                recalc();
-            });
-        });
-    </script>
-@endpush

@@ -39,6 +39,11 @@ class FinishingJob extends Model
         return $this->belongsTo(User::class, 'updated_by');
     }
 
+    public function postedBy(): BelongsTo
+    {
+        return $this->belongsTo(User::class, 'posted_by');
+    }
+
     // ====== HELPERS ======
 
     public function isPosted(): bool
@@ -46,14 +51,15 @@ class FinishingJob extends Model
         return $this->status === 'posted';
     }
 
-    public function job()
+    public function bundle(): BelongsTo
     {
-        return $this->belongsTo(FinishingJob::class, 'finishing_job_id');
+        return $this->belongsTo(CuttingJobBundle::class, 'bundle_id');
     }
 
-    public function item()
+    public function sewingOperator(): BelongsTo
     {
-        return $this->belongsTo(Item::class);
+        // FK-nya pakai operator_id
+        return $this->belongsTo(Employee::class, 'operator_id');
     }
 
 }

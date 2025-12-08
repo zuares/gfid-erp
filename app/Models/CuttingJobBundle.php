@@ -5,6 +5,8 @@ namespace App\Models;
 use App\Models\ItemCategory;
 use App\Models\Warehouse;
 use Illuminate\Database\Eloquent\Model;
+use Illuminate\Database\Eloquent\Relations\BelongsTo;
+// ✅ yang benar
 
 class CuttingJobBundle extends Model
 {
@@ -134,6 +136,16 @@ class CuttingJobBundle extends Model
     public function itemCategory()
     {
         return $this->belongsTo(ItemCategory::class, 'item_category_id');
+    }
+
+    public function item(): BelongsTo
+    {
+        // SESUAIKAN nama kolom FK-nya:
+        // kalau di tabel kamu kolomnya `item_id`:
+        return $this->belongsTo(Item::class);
+
+        // kalau ternyata kolomnya `finished_item_id`, pakai ini:
+        // return $this->belongsTo(Item::class, 'finished_item_id');
     }
 
 }

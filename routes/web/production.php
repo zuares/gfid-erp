@@ -172,6 +172,9 @@ Route::middleware(['web', 'auth', 'role:owner,operating'])->group(function () {
 
             Route::get('finishing_jobs/report/per-item/{item}', [FinishingJobController::class, 'reportPerItemDetail'])
                 ->name('finishing_jobs.report_per_item_detail');
+            // AJAX: tambah 1 baris bundle finishing
+            Route::get('finishing_jobs/bundle-row', [FinishingJobController::class, 'bundleRow'])
+                ->name('finishing_jobs.bundle_row');
 
             /*
         |--------------------------------------------------------------------------
