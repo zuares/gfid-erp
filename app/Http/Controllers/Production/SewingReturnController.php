@@ -401,7 +401,7 @@ class SewingReturnController extends Controller
         });
 
         return redirect()
-            ->route('production.sewing_returns.show', $return)
+            ->route('production.sewing_pickups.create', $return)
             ->with('success', 'Sewing Return + mutasi stok berhasil disimpan.');
     }
 

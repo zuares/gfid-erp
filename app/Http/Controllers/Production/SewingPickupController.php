@@ -291,7 +291,7 @@ class SewingPickupController extends Controller
         });
 
         return redirect()
-            ->route('production.sewing_pickups.index')
+            ->route('production.sewing_returns.create')
             ->with('success', 'Sewing pickup berhasil dibuat. Stok sudah dipindahkan dari WIP-CUT ke gudang sewing dengan costing yang mengikuti saldo WIP-CUT.');
     }
 

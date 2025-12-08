@@ -2,23 +2,40 @@
 
 @push('head')
     <style>
+        .lot-picker-wrap {
+            margin-bottom: .75rem;
+        }
+
         .lot-picker-header {
             display: flex;
             flex-direction: column;
-            gap: .35rem;
-            margin-bottom: .9rem;
+            gap: .25rem;
+            margin-bottom: .75rem;
         }
 
         @media (min-width: 576px) {
             .lot-picker-header {
                 flex-direction: row;
-                align-items: center;
                 justify-content: space-between;
+                align-items: flex-end;
             }
         }
 
-        .lot-search-input {
-            max-width: 260px;
+        .lot-picker-title {
+            font-size: .9rem;
+            font-weight: 600;
+            letter-spacing: .03em;
+            text-transform: uppercase;
+        }
+
+        .lot-picker-help {
+            font-size: .8rem;
+        }
+
+        .lot-picker-actions {
+            display: flex;
+            flex-wrap: wrap;
+            gap: .25rem;
         }
 
         .lot-grid {
@@ -38,171 +55,309 @@
             }
         }
 
-        /* Card LOT – minimal & elegan */
         .lot-card-modern {
-            border-radius: 8px;
-            border: 1px solid var(--line);
-            background: color-mix(in srgb, var(--card) 94%, var(--line) 6%);
-            padding: .9rem;
-            transition: border-color .14s ease-out, background-color .14s ease-out;
+            border-radius: 12px;
+            border: 1px solid rgba(148, 163, 184, 0.45);
+            padding: .6rem .7rem .5rem;
+            background: var(--card);
+            cursor: pointer;
+            transition:
+                background-color 0.15s ease,
+                box-shadow 0.15s ease,
+                border-color 0.15s ease,
+                transform 0.06s ease;
         }
 
         .lot-card-modern:hover {
-            border-color: rgba(59, 130, 246, .65);
-            background: color-mix(in srgb, var(--card) 97%, var(--line) 3%);
+            box-shadow:
+                0 10px 26px rgba(15, 23, 42, 0.16),
+                0 0 0 1px rgba(59, 130, 246, 0.3);
+            border-color: rgba(59, 130, 246, 0.5);
+            transform: translateY(-1px);
         }
 
-        .lot-chip {
-            border-radius: 999px;
-            padding: .12rem .6rem;
-            font-size: .7rem;
-            border: 1px solid var(--line);
-            background: transparent;
-        }
-
-        .lot-name {
-            font-size: 1rem;
-            font-weight: 600;
-        }
-
-        .lot-meta {
-            font-size: .78rem;
-            color: var(--muted);
-        }
-
-        /* ------------------------------ */
-        /* 🔥 TOMBOL MINIMALIS (HP)       */
-        /* ------------------------------ */
-
-        .btn-lot-cta {
-            width: 100%;
-            padding: .65rem 0.9rem;
-            /* lebih tipis = lebih elegan */
-            border-radius: 4px;
-            /* ⬅ kotak minimalis */
+        .lot-card-modern .lot-code {
             font-size: .9rem;
-            font-weight: 600;
-
-            /* Style minimal */
-            background: var(--primary);
-            border: 1px solid var(--primary);
-            box-shadow: none;
+            letter-spacing: .03em;
         }
 
-        .btn-lot-cta:hover {
-            background: color-mix(in srgb, var(--primary) 88%, black 12%);
-            border-color: color-mix(in srgb, var(--primary) 88%, black 12%);
+        .lot-card-modern.lot-selected {
+            border-color: rgba(59, 130, 246, 0.9);
+            box-shadow:
+                0 10px 35px rgba(37, 99, 235, 0.25),
+                0 0 0 1px rgba(59, 130, 246, 0.5);
         }
 
-        .lot-empty-card {
-            border-radius: 8px;
-            border: 1px dashed var(--line);
-            padding: 1rem .9rem;
-            text-align: center;
+        /* Ikuti pola lama: JS pakai .lot-row + .lot-hidden */
+        .lot-row.lot-hidden {
+            display: none;
         }
 
-        .lot-qty-label {
-            font-size: .75rem;
-            color: var(--muted);
+        .lot-card-badge {
+            font-size: .68rem;
+            padding: .05rem .45rem;
+            border-radius: 999px;
+            border: 1px solid rgba(148, 163, 184, 0.6);
+            background: rgba(148, 163, 184, 0.12);
         }
 
-        .lot-qty-value {
-            font-size: 1.1rem;
-            font-weight: 600;
+        .mono {
             font-variant-numeric: tabular-nums;
-            font-family: ui-monospace, SFMono-Regular, Menlo, Consolas;
+            font-family: ui-monospace, SFMono-Regular, Menlo, Consolas, "Liberation Mono";
+        }
+
+        .lot-empty-hint {
+            font-size: .8rem;
+            color: var(--muted);
+            margin-top: .35rem;
+        }
+
+        @media (max-width: 767.98px) {
+            .lot-card-modern {
+                padding: .55rem .6rem .45rem;
+            }
+
+            .lot-picker-help {
+                font-size: .78rem;
+            }
+
+            .btn-pill-sm {
+                font-size: .75rem;
+                padding-block: .2rem;
+            }
+
+            /* Footer di mobile: tombol Simpan LOT full width */
+            .lot-picker-footer {
+                flex-direction: column;
+                align-items: stretch;
+                gap: .4rem;
+            }
+
+            .lot-picker-footer .btn-primary {
+                width: 100%;
+                justify-content: center;
+            }
+
+            .lot-picker-footer .small.text-muted {
+                text-align: left;
+            }
         }
     </style>
 @endpush
 
-
-<div class="mb-4">
-
-    {{-- Header + search --}}
+<div class="lot-picker-wrap" id="cutting-pick-lot">
+    {{-- Header + select kain + tombol select all --}}
     <div class="lot-picker-header">
         <div>
-            <h1 class="h5 mb-1">Pilih LOT Kain</h1>
-            <p class="help mb-0">
-                Pilih <strong>LOT yang masih ada sisa</strong> dalam Kg.
+            <div class="lot-picker-title">
+                Pilih LOT Kain
+            </div>
+            <p class="lot-picker-help mb-0">
+                Pilih <strong>item kain</strong> terlebih dahulu, lalu centang LOT yang akan dipakai.
             </p>
         </div>
 
-        @if ($lotStocks->isNotEmpty())
-            <div class="mt-2 mt-sm-0">
-                <input type="search" id="lot-search" class="form-control form-control-sm lot-search-input"
-                    placeholder="Cari LOT / nama kain...">
+        <div class="lot-picker-actions">
+            {{-- Select item kain --}}
+            <select name="fabric_item_id" id="fabric_item_id" class="form-select form-select-sm" style="min-width: 210px;">
+                <option value="">Pilih item kain…</option>
+                @foreach ($fabricItems as $item)
+                    <option value="{{ $item->id }}" @selected(old('fabric_item_id') == $item->id)>
+                        {{ $item->code }} — {{ $item->name }}
+                    </option>
+                @endforeach
+            </select>
+
+            {{-- Tombol select all / clear --}}
+            <div class="d-flex gap-1">
+                <button type="button" class="btn btn-outline-secondary btn-pill-sm" id="btn-select-all-lots" disabled>
+                    Centang semua
+                </button>
+                <button type="button" class="btn btn-outline-secondary btn-pill-sm" id="btn-unselect-all-lots"
+                    disabled>
+                    Hapus centang
+                </button>
             </div>
-        @endif
+        </div>
     </div>
 
-    {{-- List LOT --}}
-    @if ($lotStocks->isEmpty())
-        <div class="lot-empty-card">
-            <div class="mb-1 fw-semibold">Belum ada LOT tersedia</div>
-            <p class="help mb-2">Pastikan stok kain di gudang RM masih ada.</p>
-        </div>
-    @else
-        <div class="lot-grid" id="lot-grid">
+    {{-- Hint di bawah (kondisional) --}}
+    <div id="lot-grid-hint" class="lot-empty-hint">
+        Pilih item kain terlebih dahulu untuk melihat daftar LOT.
+    </div>
 
-            @foreach ($lotStocks as $row)
-                @php
-                    $lot = $row->lot;
-                    $item = $lot?->item;
-                    $warehouse = $row->warehouse;
-                    $qtyKg = (float) $row->qty_balance;
-                @endphp
+    {{-- GRID LOT --}}
+    <div class="lot-grid mt-2 d-none" id="lot-grid">
+        @foreach ($lotStocks as $row)
+            @php
+                $lot = $row->lot;
+                $item = $lot->item;
+                $wh = $row->warehouse;
+            @endphp
 
-                <div class="lot-card lot-card-modern lot-card-item"
-                    data-search="{{ Str::lower(($lot->code ?? '') . ' ' . ($item->name ?? '') . ' ' . ($item->code ?? '')) }}">
-
-                    {{-- Nama kain --}}
-                    <div class="d-flex justify-content-between align-items-start mb-2">
-                        <div>
-                            <div class="lot-name">{{ $item->name }}</div>
-                            <div class="lot-meta">
-                                {{ $item->code }} • LOT {{ $lot->code }}
-                            </div>
+            {{-- .lot-row tetap untuk kompat dengan JS lama --}}
+            <div class="lot-card-modern lot-row lot-card-item" data-lot-id="{{ $row->lot_id }}"
+                data-item-id="{{ $item->id }}" data-balance="{{ $row->qty_balance }}">
+                <div class="d-flex justify-content-between align-items-start gap-2">
+                    <div>
+                        <div class="fw-semibold mono lot-code">
+                            {{ $lot->code }}
                         </div>
-                        <span class="lot-chip">{{ $warehouse->code }}</span>
+                        <div class="small text-muted">
+                            {{ $item->code }}
+                        </div>
+                        @if ($wh?->code)
+                            <div class="small text-muted d-md-none mt-1">
+                                <span class="lot-card-badge">{{ $wh->code }}</span>
+                            </div>
+                        @endif
                     </div>
-
-                    {{-- Sisa KG --}}
-                    <div class="mb-3">
-                        <div class="lot-qty-label">Sisa (Kg)</div>
-                        <div class="lot-qty-value">{{ decimal_id($qtyKg) }} kg</div>
+                    <div class="text-end">
+                        <div class="fw-semibold mono">
+                            {{ number_format($row->qty_balance, 2, ',', '.') }}
+                        </div>
+                        @if ($wh?->code)
+                            <div class="small text-muted d-none d-md-block">
+                                {{ $wh->code }}
+                            </div>
+                        @endif
                     </div>
-
-                    {{-- Tombol full width – minimalis --}}
-                    <a href="{{ route('production.cutting_jobs.create', ['lot_id' => $row->lot_id]) }}"
-                        class="btn btn-primary btn-lot-cta">
-                        Pakai LOT Ini
-                    </a>
-
                 </div>
-            @endforeach
 
+                <div class="d-flex justify-content-between align-items-center mt-2">
+                    <div class="form-check">
+                        <input type="checkbox" class="form-check-input lot-checkbox" name="selected_lots[]"
+                            value="{{ $row->lot_id }}">
+                        <span class="ms-1 small">Pakai LOT ini</span>
+                    </div>
+                </div>
+            </div>
+        @endforeach
+    </div>
+
+    {{-- Footer info + tombol lanjut --}}
+    <div class="d-flex justify-content-between align-items-center mt-3 lot-picker-footer">
+        <div class="small text-muted">
+            Setelah LOT dipilih, lanjutkan isi bundles di bawah.
         </div>
-
-    @endif
-
+        <button type="button" class="btn btn-primary btn-sm btn-pill-sm" id="btn-confirm-lots">
+            Simpan LOT &amp; Lanjut
+        </button>
+    </div>
 </div>
-
 
 @push('scripts')
     <script>
         document.addEventListener('DOMContentLoaded', function() {
-            const input = document.getElementById('lot-search');
-            const cards = document.querySelectorAll('.lot-card-item');
+            const fabricSelect = document.getElementById('fabric_item_id');
+            const lotGrid = document.getElementById('lot-grid');
+            const lotHint = document.getElementById('lot-grid-hint');
+            const lotCards = Array.from(document.querySelectorAll('.lot-card-item'));
+            const btnSelectAll = document.getElementById('btn-select-all-lots');
+            const btnUnselectAll = document.getElementById('btn-unselect-all-lots');
 
-            if (!input) return;
+            function updateButtonsState(hasLots) {
+                if (btnSelectAll) btnSelectAll.disabled = !hasLots;
+                if (btnUnselectAll) btnUnselectAll.disabled = !hasLots;
+            }
 
-            input.addEventListener('input', function(e) {
-                const q = e.target.value.toLowerCase().trim();
-                cards.forEach(card => {
-                    const data = card.getAttribute('data-search');
-                    card.style.display = (!q || data.includes(q)) ? '' : 'none';
+            function applyFilter() {
+                if (!fabricSelect || !lotGrid || !lotHint) return;
+
+                const selectedId = parseInt(fabricSelect.value || '0', 10);
+                let anyShown = false;
+
+                lotCards.forEach(card => {
+                    const itemId = parseInt(card.dataset.itemId || '0', 10);
+                    if (!selectedId || itemId !== selectedId) {
+                        card.classList.add('d-none');
+                    } else {
+                        card.classList.remove('d-none');
+                        anyShown = true;
+                    }
                 });
+
+                if (!selectedId) {
+                    lotGrid.classList.add('d-none');
+                    lotHint.textContent = 'Pilih item kain terlebih dahulu untuk melihat daftar LOT.';
+                    updateButtonsState(false);
+                    return;
+                }
+
+                if (!anyShown) {
+                    lotGrid.classList.add('d-none');
+                    lotHint.textContent = 'Belum ada LOT untuk kain ini. Cek stok di modul GRN / gudang RM.';
+                    updateButtonsState(false);
+                } else {
+                    lotGrid.classList.remove('d-none');
+                    lotHint.textContent = 'Centang LOT yang ingin dipakai untuk Cutting Job.';
+                    updateButtonsState(true);
+                }
+            }
+
+            // Klik card = toggle checkbox + highlight
+            lotCards.forEach(card => {
+                const checkbox = card.querySelector('.lot-checkbox');
+                if (!checkbox) return;
+
+                function syncCardState() {
+                    card.classList.toggle('lot-selected', checkbox.checked);
+                }
+
+                card.addEventListener('click', function(e) {
+                    if (e.target === checkbox) return;
+                    checkbox.checked = !checkbox.checked;
+                    checkbox.dispatchEvent(new Event('change', {
+                        bubbles: true
+                    }));
+                });
+
+                checkbox.addEventListener('change', syncCardState);
+                syncCardState();
             });
+
+            if (btnSelectAll) {
+                btnSelectAll.addEventListener('click', function() {
+                    const selectedId = parseInt(fabricSelect.value || '0', 10);
+                    if (!selectedId) return;
+
+                    lotCards.forEach(card => {
+                        const checkbox = card.querySelector('.lot-checkbox');
+                        const itemId = parseInt(card.dataset.itemId || '0', 10);
+                        if (checkbox && itemId === selectedId && !checkbox.checked) {
+                            checkbox.checked = true;
+                            checkbox.dispatchEvent(new Event('change', {
+                                bubbles: true
+                            }));
+                        }
+                    });
+                });
+            }
+
+            if (btnUnselectAll) {
+                btnUnselectAll.addEventListener('click', function() {
+                    const selectedId = parseInt(fabricSelect.value || '0', 10);
+                    if (!selectedId) return;
+
+                    lotCards.forEach(card => {
+                        const checkbox = card.querySelector('.lot-checkbox');
+                        const itemId = parseInt(card.dataset.itemId || '0', 10);
+                        if (checkbox && itemId === selectedId && checkbox.checked) {
+                            checkbox.checked = false;
+                            checkbox.dispatchEvent(new Event('change', {
+                                bubbles: true
+                            }));
+                        }
+                    });
+                });
+            }
+
+            if (fabricSelect) {
+                fabricSelect.addEventListener('change', applyFilter);
+            }
+
+            // INIT (support old() fabric_item_id)
+            applyFilter();
         });
     </script>
 @endpush

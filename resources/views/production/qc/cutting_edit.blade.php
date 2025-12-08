@@ -5,15 +5,36 @@
 
 @push('head')
     <style>
-        .page-wrap {
+        .qc-cutting-page {
+            min-height: 100vh;
+        }
+
+        .qc-cutting-page .page-wrap {
             max-width: 1080px;
             margin-inline: auto;
+            padding: 1rem 1rem 4rem;
+        }
+
+        body[data-theme="light"] .qc-cutting-page .page-wrap {
+            background: radial-gradient(circle at top left,
+                    rgba(59, 130, 246, 0.12) 0,
+                    rgba(45, 212, 191, 0.10) 26%,
+                    #f9fafb 60%);
+        }
+
+        body[data-theme="dark"] .qc-cutting-page .page-wrap {
+            background: radial-gradient(circle at top left,
+                    rgba(59, 130, 246, 0.20) 0,
+                    rgba(45, 212, 191, 0.18) 30%,
+                    #020617 70%);
         }
 
         .card {
             background: var(--card);
-            border: 1px solid var(--line);
             border-radius: 16px;
+            border: 1px solid rgba(148, 163, 184, 0.35);
+            box-shadow:
+                0 12px 30px rgba(15, 23, 42, 0.20);
         }
 
         .card-soft {
@@ -33,6 +54,7 @@
             border-radius: 999px;
             font-size: .78rem;
             border: 1px solid var(--line);
+            background: rgba(15, 23, 42, 0.01);
         }
 
         .badge-soft {
@@ -138,10 +160,13 @@
             padding-left: .45rem;
         }
 
-        @media (max-width: 767.98px) {
+        .table-wrap {
+            overflow-x: auto;
+        }
 
-            .page-wrap {
-                padding-inline: .35rem;
+        @media (max-width: 767.98px) {
+            .qc-cutting-page .page-wrap {
+                padding-inline: .5rem;
             }
 
             .header-grid {
@@ -150,63 +175,20 @@
                 gap: .5rem;
             }
 
-            .table-wrap {
-                overflow: visible;
-            }
-
             .qc-table-mobile {
-                border-collapse: separate;
-                border-spacing: 0 .5rem;
-            }
-
-            .qc-table-mobile thead {
-                display: none;
-            }
-
-            .qc-table-mobile tbody tr {
-                display: block;
-                background: var(--card);
-                border-radius: 14px;
-                border: 1px solid var(--line);
-                padding: .55rem .7rem .6rem;
-            }
-
-            .qc-table-mobile tbody tr td {
-                display: block;
-                border: 0;
-                padding: .15rem 0;
-            }
-
-            .qc-table-mobile tbody tr td.qc-card-header {
-                padding-bottom: .3rem;
-                margin-bottom: .2rem;
-                border-bottom: 1px dashed var(--line);
-            }
-
-            .qc-table-mobile tbody tr td[data-label]::before {
-                content: attr(data-label);
-                display: block;
-                font-size: .75rem;
-                font-weight: 600;
-                text-transform: uppercase;
-                letter-spacing: .05em;
-                margin-bottom: .05rem;
-            }
-
-            .qc-table-mobile {
-                font-size: .85rem;
-            }
-
-            .qc-table-mobile input.form-control-sm {
                 font-size: .8rem;
-                padding-top: .15rem;
-                padding-bottom: .15rem;
+                white-space: nowrap;
+            }
+
+            .qc-table-mobile th,
+            .qc-table-mobile td {
+                padding: .35rem .4rem;
             }
 
             .qc-summary-inline {
                 display: flex;
                 flex-wrap: wrap;
-                gap: .25rem .4rem;
+                gap: .25rem .6rem;
                 font-size: .78rem;
             }
 
@@ -261,52 +243,122 @@
         $step3State = $stepCurrent >= 3 ? ($stepCurrent === 3 ? 'current' : 'done') : '';
     @endphp
 
-    <div class="page-wrap">
+    <div class="qc-cutting-page">
+        <div class="page-wrap">
 
-        {{-- HEADER JOB --}}
-        <div class="card card-soft p-3 mb-3">
-            <div class="d-none d-md-flex justify-content-between align-items-center gap-3">
-                <div>
-                    <div class="section-title mb-1">QC Cutting</div>
-                    <h1 class="h5 mb-1 mono">{{ $cuttingJob->code }}</h1>
-                    <div class="small-muted">
-                        LOT {{ $lot?->code ?? '-' }} • {{ $lot?->item?->code ?? '-' }} •
-                        Gudang {{ $warehouse?->code ?? '-' }}
+            {{-- HEADER JOB --}}
+            <div class="card card-soft p-3 mb-3">
+                {{-- DESKTOP HEADER --}}
+                <div class="d-none d-md-flex justify-content-between align-items-center gap-3">
+                    <div>
+                        <div class="section-title mb-1">QC Cutting</div>
+                        <h1 class="h5 mb-1 mono">{{ $cuttingJob->code }}</h1>
+                        <div class="small-muted">
+                            LOT {{ $lot?->code ?? '-' }} • {{ $lot?->item?->code ?? '-' }} •
+                            Gudang {{ $warehouse?->code ?? '-' }}
+                        </div>
+
+                        @if ($jobLots->count() > 0)
+                            <div class="mt-1 small-muted">
+                                LOT dipakai:
+                                @foreach ($jobLots as $jl)
+                                    <span class="pill mono">
+                                        {{ $jl->lot?->code ?? 'LOT?' }}
+                                        (rencana {{ number_format($jl->planned_fabric_qty, 2, ',', '.') }})
+                                    </span>
+                                @endforeach
+                            </div>
+                        @endif
+
+                        <div class="status-stepper mt-2">
+                            <div class="status-step">
+                                <div
+                                    class="status-dot {{ $step1State === 'current' ? 'current' : ($step1State === 'done' ? 'active' : '') }}">
+                                </div>
+                                <div
+                                    class="status-label {{ $step1State === 'current' ? 'current' : ($step1State === 'done' ? 'done' : '') }}">
+                                    Cutting Selesai
+                                </div>
+                            </div>
+                            <div class="status-separator"></div>
+                            <div class="status-step">
+                                <div
+                                    class="status-dot {{ $step2State === 'current' ? 'current' : ($step2State === 'done' ? 'active' : '') }}">
+                                </div>
+                                <div
+                                    class="status-label {{ $step2State === 'current' ? 'current' : ($step2State === 'done' ? 'done' : '') }}">
+                                    Dikirim ke QC
+                                </div>
+                            </div>
+                            <div class="status-separator"></div>
+                            <div class="status-step">
+                                <div
+                                    class="status-dot {{ $step3State === 'current' ? 'current' : ($step3State === 'done' ? 'active' : '') }}">
+                                </div>
+                                <div
+                                    class="status-label {{ $step3State === 'current' ? 'current' : ($step3State === 'done' ? 'done' : '') }}">
+                                    Hasil QC
+                                </div>
+                            </div>
+                        </div>
                     </div>
 
-                    @if ($jobLots->count() > 0)
-                        <div class="mt-1 small-muted">
-                            LOT dipakai:
-                            @foreach ($jobLots as $jl)
-                                <span class="pill mono">
-                                    {{ $jl->lot?->code ?? 'LOT?' }}
-                                    (rencana {{ number_format($jl->planned_fabric_qty, 2, ',', '.') }})
-                                </span>
-                            @endforeach
-                        </div>
-                    @endif
+                    <div class="d-flex flex-column align-items-end gap-2">
+                        <span class="badge bg-{{ $statusClass }} px-3 py-2">
+                            {{ strtoupper($cuttingJob->status) }}
+                        </span>
 
-                    <div class="status-stepper mt-2">
+                        <div class="d-flex gap-2">
+                            <a href="{{ route('production.cutting_jobs.show', $cuttingJob) }}"
+                                class="btn btn-sm btn-outline-secondary">
+                                Kembali
+                            </a>
+                        </div>
+                    </div>
+                </div>
+
+                {{-- MOBILE HEADER --}}
+                <div class="d-block d-md-none">
+                    <div class="header-grid align-items-start mb-2">
+                        <div>
+                            <div class="section-title mb-1">QC Cutting</div>
+                            <div class="fw-semibold mono">{{ $cuttingJob->code }}</div>
+                            <div class="small-muted mt-1">
+                                LOT {{ $lot?->code ?? '-' }} • {{ $lot?->item?->code ?? '-' }}
+                            </div>
+                        </div>
+                        <div class="text-end">
+                            <span class="badge bg-{{ $statusClass }} px-2 py-1 mb-2">
+                                {{ strtoupper($cuttingJob->status) }}
+                            </span>
+                            <div>
+                                <a href="{{ route('production.cutting_jobs.show', $cuttingJob) }}"
+                                    class="btn btn-sm btn-outline-secondary">
+                                    Kembali
+                                </a>
+                            </div>
+                        </div>
+                    </div>
+
+                    <div class="status-stepper mt-1">
                         <div class="status-step">
                             <div
                                 class="status-dot {{ $step1State === 'current' ? 'current' : ($step1State === 'done' ? 'active' : '') }}">
                             </div>
                             <div
                                 class="status-label {{ $step1State === 'current' ? 'current' : ($step1State === 'done' ? 'done' : '') }}">
-                                Cutting Selesai
+                                Cutting
                             </div>
                         </div>
-                        <div class="status-separator"></div>
                         <div class="status-step">
                             <div
                                 class="status-dot {{ $step2State === 'current' ? 'current' : ($step2State === 'done' ? 'active' : '') }}">
                             </div>
                             <div
                                 class="status-label {{ $step2State === 'current' ? 'current' : ($step2State === 'done' ? 'done' : '') }}">
-                                Dikirim ke QC
+                                Kirim QC
                             </div>
                         </div>
-                        <div class="status-separator"></div>
                         <div class="status-step">
                             <div
                                 class="status-dot {{ $step3State === 'current' ? 'current' : ($step3State === 'done' ? 'active' : '') }}">
@@ -318,225 +370,213 @@
                         </div>
                     </div>
                 </div>
-
-                <div class="d-flex flex-column align-items-end gap-2">
-                    <span class="badge bg-{{ $statusClass }} px-3 py-2">
-                        {{ strtoupper($cuttingJob->status) }}
-                    </span>
-
-                    <div class="d-flex gap-2">
-                        <a href="{{ route('production.cutting_jobs.show', $cuttingJob) }}"
-                            class="btn btn-sm btn-outline-secondary">
-                            Kembali
-                        </a>
-                    </div>
-                </div>
             </div>
 
-            {{-- MOBILE HEADER --}}
-            <div class="d-block d-md-none">
-                <div class="header-grid align-items-start mb-2">
-                    <div>
-                        <div class="section-title mb-1">QC Cutting</div>
-                        <div class="fw-semibold mono">{{ $cuttingJob->code }}</div>
-                        <div class="small-muted mt-1">
-                            LOT {{ $lot?->code ?? '-' }} • {{ $lot?->item?->code ?? '-' }}
-                        </div>
-                    </div>
-                    <div class="text-end">
-                        <span class="badge bg-{{ $statusClass }} px-2 py-1 mb-2">
-                            {{ strtoupper($cuttingJob->status) }}
-                        </span>
-                        <div>
-                            <a href="{{ route('production.cutting_jobs.show', $cuttingJob) }}"
-                                class="btn btn-sm btn-outline-secondary">
-                                Kembali
-                            </a>
-                        </div>
-                    </div>
-                </div>
+            <form action="{{ route('production.qc.cutting.update', $cuttingJob) }}" method="post">
+                @csrf
+                @method('PUT')
 
-                <div class="status-stepper mt-1">
-                    <div class="status-step">
-                        <div
-                            class="status-dot {{ $step1State === 'current' ? 'current' : ($step1State === 'done' ? 'active' : '') }}">
-                        </div>
-                        <div
-                            class="status-label {{ $step1State === 'current' ? 'current' : ($step1State === 'done' ? 'done' : '') }}">
-                            Cutting
-                        </div>
-                    </div>
-                    <div class="status-step">
-                        <div
-                            class="status-dot {{ $step2State === 'current' ? 'current' : ($step2State === 'done' ? 'active' : '') }}">
-                        </div>
-                        <div
-                            class="status-label {{ $step2State === 'current' ? 'current' : ($step2State === 'done' ? 'done' : '') }}">
-                            Kirim QC
-                        </div>
-                    </div>
-                    <div class="status-step">
-                        <div
-                            class="status-dot {{ $step3State === 'current' ? 'current' : ($step3State === 'done' ? 'active' : '') }}">
-                        </div>
-                        <div
-                            class="status-label {{ $step3State === 'current' ? 'current' : ($step3State === 'done' ? 'done' : '') }}">
-                            Hasil QC
-                        </div>
-                    </div>
-                </div>
-            </div>
-        </div>
-
-        <form action="{{ route('production.qc.cutting.update', $cuttingJob) }}" method="post">
-            @csrf
-            @method('PUT')
-
-            {{-- HEADER QC --}}
-            <div class="card p-3 mb-3">
-                <div class="d-flex justify-content-between align-items-center mb-2">
-                    <div class="section-title mb-0">Header QC</div>
-
-                    <div class="d-none d-md-flex gap-2">
-                        <div class="pill">
-                            <span>Total OK</span>
-                            <span class="mono" id="sum-ok">0,00</span>
-                        </div>
-                        <div class="pill">
-                            <span>Reject</span>
-                            <span class="mono" id="sum-reject">0,00</span>
-                        </div>
-                    </div>
-
-                    <div class="d-block d-md-none qc-summary-inline">
-                        <span>Total OK <span class="mono" id="sum-ok-mobile">0,00</span></span>
-                        <span>Reject <span class="mono" id="sum-reject-mobile">0,00</span></span>
-                    </div>
-                </div>
-
-                <div class="row g-3">
-                    @php
-                        $isErrorBag = $errors instanceof ViewErrorBag;
-                        $qcDateError = $isErrorBag ? $errors->first('qc_date') : null;
-                        $operatorError = $isErrorBag ? $errors->first('operator_id') : null;
-                    @endphp
-
-                    <div class="col-md-3 col-6">
-                        <label class="field-label mb-1">Tanggal QC</label>
-                        <input type="date" name="qc_date" value="{{ old('qc_date', now()->toDateString()) }}"
-                            class="form-control {{ $qcDateError ? 'is-invalid' : '' }}">
-                        @if ($qcDateError)
-                            <div class="invalid-feedback">{{ $qcDateError }}</div>
-                        @endif
-                    </div>
-
-                    <div class="col-md-4 col-12">
-                        <label class="field-label mb-1">Operator QC</label>
-
-                        <input type="hidden" name="operator_id" value="{{ $defaultOperatorId }}">
-
-                        <input type="text" class="form-control {{ $operatorError ? 'is-invalid' : '' }}"
-                            value="{{ $defaultOperatorLabel }}" disabled>
-
-                        @if ($operatorError)
-                            <div class="invalid-feedback d-block">{{ $operatorError }}</div>
-                        @endif
-                    </div>
-
-                    <div class="col-12">
-                        <label class="field-label mb-1">Catatan Umum</label>
-                        <textarea name="notes_global" rows="2" class="form-control"
-                            placeholder="Opsional. Mis: hasil QC cutting lot ini secara umum.">{{ old('notes_global') }}</textarea>
-                    </div>
-                </div>
-            </div>
-
-            {{-- PEMAKAIAN KAIN PER LOT (MULTI-LOT) --}}
-            @if ($jobLots->count() > 0)
+                {{-- 1. HEADER QC --}}
                 <div class="card p-3 mb-3">
                     <div class="d-flex justify-content-between align-items-center mb-2">
-                        <div class="section-title mb-0">Pemakaian Kain per LOT</div>
+                        <div class="section-title mb-0">Header QC</div>
+
+                        {{-- Desktop summary --}}
+                        <div class="d-none d-md-flex gap-2">
+                            <div class="pill">
+                                <span>Total OK</span>
+                                <span class="mono" id="sum-ok">0,00</span>
+                            </div>
+                            <div class="pill">
+                                <span>Reject</span>
+                                <span class="mono" id="sum-reject">0,00</span>
+                            </div>
+                        </div>
+
+                        {{-- Mobile summary (baris terpisah) --}}
+                        <div class="d-block d-md-none text-end">
+                            <div class="small-muted mb-1">Ringkasan QC</div>
+                            <div class="qc-summary-inline justify-content-end">
+                                <span>Total OK <span class="mono" id="sum-ok-mobile">0,00</span></span>
+                                <span>Reject <span class="mono" id="sum-reject-mobile">0,00</span></span>
+                            </div>
+                        </div>
+                    </div>
+
+                    <div class="row g-3">
+                        @php
+                            $isErrorBag = $errors instanceof ViewErrorBag;
+                            $qcDateError = $isErrorBag ? $errors->first('qc_date') : null;
+                            $operatorError = $isErrorBag ? $errors->first('operator_id') : null;
+                        @endphp
+
+                        <div class="col-md-3 col-6">
+                            <label class="field-label mb-1">Tanggal QC</label>
+                            <input type="date" name="qc_date" value="{{ old('qc_date', now()->toDateString()) }}"
+                                class="form-control {{ $qcDateError ? 'is-invalid' : '' }}">
+                            @if ($qcDateError)
+                                <div class="invalid-feedback">{{ $qcDateError }}</div>
+                            @endif
+                        </div>
+
+                        <div class="col-md-4 col-12">
+                            <label class="field-label mb-1">Operator QC</label>
+
+                            <input type="hidden" name="operator_id" value="{{ $defaultOperatorId }}">
+
+                            <input type="text" class="form-control {{ $operatorError ? 'is-invalid' : '' }}"
+                                value="{{ $defaultOperatorLabel }}" disabled>
+
+                            @if ($operatorError)
+                                <div class="invalid-feedback d-block">{{ $operatorError }}</div>
+                            @endif
+                        </div>
+
+                        <div class="col-12">
+                            <label class="field-label mb-1">Catatan Umum</label>
+                            <textarea name="notes_global" rows="2" class="form-control"
+                                placeholder="Opsional. Mis: hasil QC cutting lot ini secara umum.">{{ old('notes_global') }}</textarea>
+                        </div>
+                    </div>
+                </div>
+
+                {{-- 2. QC per bundle (tabel, mobile-friendly) --}}
+                <div class="card p-3 mb-3">
+                    <div class="d-flex justify-content-between align-items-center mb-2">
+                        <div class="section-title mb-0">QC per Bundle</div>
                         <div class="small-muted">
-                            Isi <strong>pemakaian aktual</strong> (hasil QC) per LOT. Jika dikosongkan, sistem akan pakai
-                            angka rencana.
+                            Isi <strong>Reject</strong> hanya jika ada cacat. Baris dengan reject akan di-highlight.
                         </div>
                     </div>
 
                     <div class="table-wrap">
-                        <table class="table table-sm align-middle mono">
+                        @php
+                            $hasAnyReject = false;
+                        @endphp
+                        <table class="table table-sm align-middle mono qc-table qc-table-mobile">
                             <thead>
                                 <tr>
-                                    <th style="width: 150px;">LOT</th>
+                                    <th style="width:70px;">#</th>
                                     <th>Item</th>
-                                    <th class="text-end" style="width: 130px;">Rencana</th>
-                                    <th class="text-end" style="width: 150px;">Dipakai (QC)</th>
-                                    <th class="text-end d-none d-md-table-cell" style="width: 130px;">Estimasi Sisa</th>
+                                    <th class="text-end" style="width:120px;">Cut</th>
+                                    <th class="text-end" style="width:120px;">OK</th>
+                                    <th class="text-center" style="width:120px;">Reject</th>
+                                    <th class="d-none d-md-table-cell" style="width:180px;">Alasan</th>
+                                    <th class="d-none d-md-table-cell" style="width:110px;">Status</th>
+                                    <th class="d-none d-md-table-cell" style="width:160px;">Catatan</th>
                                 </tr>
                             </thead>
                             <tbody>
-                                @foreach ($jobLots as $i => $jobLot)
+                                @foreach ($rows as $i => $row)
                                     @php
-                                        $lotModel = $jobLot->lot;
-                                        $planned = (float) $jobLot->planned_fabric_qty;
-                                        $usedOld = old("lots.$i.used_fabric_qty", $jobLot->used_fabric_qty ?: $planned);
-                                        $used = (float) $usedOld;
-                                        if ($used < 0) {
-                                            $used = 0;
+                                        $qtyBundle = (float) $row['qty_pcs'];
+                                        $qtyRejectOld = old("results.$i.qty_reject", $row['qty_reject'] ?? 0);
+                                        $qtyReject = (float) $qtyRejectOld;
+                                        if ($qtyReject < 0) {
+                                            $qtyReject = 0;
                                         }
-                                        if ($planned > 0 && $used > $planned) {
-                                            $used = $planned;
+                                        if ($qtyReject > $qtyBundle) {
+                                            $qtyReject = $qtyBundle;
                                         }
-                                        $balance = $planned - $used;
+                                        $qtyOk = max($qtyBundle - $qtyReject, 0);
+                                        if ($qtyReject > 0) {
+                                            $hasAnyReject = true;
+                                        }
 
-                                        $fieldUsed = "lots.$i.used_fabric_qty";
-                                        $usedError = $isErrorBag ? $errors->first($fieldUsed) : null;
+                                        $fieldReject = "results.$i.qty_reject";
+                                        $fieldReason = "results.$i.reject_reason";
+                                        $fieldNotes = "results.$i.notes";
+
+                                        $rejectError = $isErrorBag ? $errors->first($fieldReject) : null;
+                                        $reasonError = $isErrorBag ? $errors->first($fieldReason) : null;
+                                        $notesError = $isErrorBag ? $errors->first($fieldNotes) : null;
                                     @endphp
+                                    <tr class="{{ $qtyReject > 0 ? 'row-has-reject' : '' }}">
+                                        <input type="hidden" name="results[{{ $i }}][cutting_job_bundle_id]"
+                                            value="{{ $row['cutting_job_bundle_id'] }}">
 
-                                    <tr>
-                                        {{-- id pivot cutting_job_lots --}}
-                                        <input type="hidden" name="lots[{{ $i }}][id]"
-                                            value="{{ $jobLot->id }}">
+                                        <input type="hidden" name="results[{{ $i }}][qty_ok]"
+                                            class="input-ok-hidden" value="{{ old("results.$i.qty_ok", $qtyOk) }}">
 
-                                        <td>
-                                            <div class="fw-semibold">
-                                                {{ $lotModel?->code ?? 'LOT ?' }}
+                                        <td class="qc-card-header">
+                                            <div class="fw-semibold mono">
+                                                #{{ $row['bundle_no'] ?? '-' }}
                                             </div>
-                                            <div class="small-muted">
-                                                {{ $lotModel?->item?->code ?? '-' }}
+                                            {{-- bundle_code hanya desktop --}}
+                                            <div class="small-muted mono d-none d-md-block">
+                                                {{ $row['bundle_code'] ?? '' }}
                                             </div>
                                         </td>
 
                                         <td>
-                                            <div>{{ $lotModel?->item?->name ?? '-' }}</div>
-                                            <div class="small-muted">
-                                                Gudang {{ $warehouse?->code ?? '-' }}
+                                            {{-- DESKTOP: kode + nama item --}}
+                                            <div class="d-none d-md-block">
+                                                <div class="fw-semibold mono">
+                                                    {{ $row['item_code'] }}
+                                                </div>
+
+                                            </div>
+
+                                            {{-- MOBILE: kode saja --}}
+                                            <div class="d-block d-md-none">
+                                                {{ $row['item_code'] }}
                                             </div>
                                         </td>
 
                                         <td class="text-end">
-                                            {{ number_format($planned, 2, ',', '.') }}
+                                            {{ number_format($qtyBundle, 2, ',', '.') }}
                                         </td>
 
                                         <td class="text-end">
-                                            <input type="number" step="0.01" min="0" inputmode="decimal"
-                                                name="lots[{{ $i }}][used_fabric_qty]"
-                                                class="form-control form-control-sm text-end input-lot-used {{ $usedError ? 'is-invalid' : '' }}"
-                                                value="{{ $used }}" data-planned="{{ $planned }}">
-                                            @if ($usedError)
-                                                <div class="invalid-feedback">{{ $usedError }}</div>
-                                            @endif
-                                            <div class="small-muted d-md-none mt-1">
-                                                Est. sisa:
-                                                <span class="lot-balance-mobile">
-                                                    {{ number_format($balance, 2, ',', '.') }}
-                                                </span>
-                                            </div>
-                                        </td>
-
-                                        <td class="text-end d-none d-md-table-cell">
-                                            <span class="lot-balance-desktop">
-                                                {{ number_format($balance, 2, ',', '.') }}
+                                            <span class="cell-ok">
+                                                {{ number_format(old("results.$i.qty_ok", $qtyOk), 2, ',', '.') }}
                                             </span>
+                                        </td>
+
+                                        <td class="text-center">
+                                            <input type="number" step="1" min="0" inputmode="numeric"
+                                                pattern="\d*" name="results[{{ $i }}][qty_reject]"
+                                                class="form-control form-control-sm text-center input-reject {{ $rejectError ? 'is-invalid' : '' }}"
+                                                value="{{ old("results.$i.qty_reject", $qtyReject) }}"
+                                                data-bundle="{{ $qtyBundle }}">
+                                            @if ($rejectError)
+                                                <div class="invalid-feedback">{{ $rejectError }}</div>
+                                            @endif
+                                        </td>
+
+                                        <td class="d-none d-md-table-cell">
+                                            <input type="text" name="results[{{ $i }}][reject_reason]"
+                                                class="form-control form-control-sm {{ $reasonError ? 'is-invalid' : '' }}"
+                                                value="{{ old("results.$i.reject_reason", $row['reject_reason'] ?? '') }}"
+                                                placeholder="mis: bolong, kotor">
+                                            @if ($reasonError)
+                                                <div class="invalid-feedback">{{ $reasonError }}</div>
+                                            @endif
+                                        </td>
+
+                                        <td class="d-none d-md-table-cell">
+                                            @php
+                                                $st = $row['status'] ?: 'cut';
+                                                $cls =
+                                                    [
+                                                        'cut' => 'secondary',
+                                                        'qc_ok' => 'success',
+                                                        'qc_reject' => 'danger',
+                                                        'qc_mixed' => 'warning',
+                                                    ][$st] ?? 'secondary';
+                                            @endphp
+                                            <span class="badge-soft bg-{{ $cls }}">
+                                                {{ $st }}
+                                            </span>
+                                        </td>
+
+                                        <td class="d-none d-md-table-cell">
+                                            <input type="text" name="results[{{ $i }}][notes]"
+                                                class="form-control form-control-sm {{ $notesError ? 'is-invalid' : '' }}"
+                                                value="{{ old("results.$i.notes", $row['notes'] ?? '') }}">
+                                            @if ($notesError)
+                                                <div class="invalid-feedback">{{ $notesError }}</div>
+                                            @endif
                                         </td>
                                     </tr>
                                 @endforeach
@@ -545,177 +585,152 @@
                     </div>
 
                     @php
-                        $lotsError = $isErrorBag ? $errors->first('lots') : null;
+                        $resultsError = $isErrorBag ? $errors->first('results') : null;
                     @endphp
-                    @if ($lotsError)
-                        <div class="text-danger small mt-2">{{ $lotsError }}</div>
+                    @if ($resultsError)
+                        <div class="text-danger small mt-2">{{ $resultsError }}</div>
                     @endif
 
-                    <div id="lot-warning" class="text-danger small mt-2" style="display:none;">
-                        ⚠️ Pemakaian per LOT tidak boleh melebihi qty rencana. Nilai otomatis dikunci ke batas maksimum.
+                    <div id="qc-warning" class="text-danger small mt-2" style="display:none;">
+                        ⚠️ Qty Reject tidak boleh melebihi Qty Cutting. Nilai otomatis dikunci ke batas maksimum.
                     </div>
-                </div>
-            @endif
 
-            {{-- QC per bundle --}}
-            <div class="card p-3 mb-4">
-                <div class="d-flex justify-content-between align-items-center mb-2">
-                    <div class="section-title mb-0">QC per Bundle</div>
-                    <div class="small-muted">
-                        Isi <strong>Reject</strong> hanya jika ada cacat. Baris dengan reject akan di-highlight.
-                    </div>
+                    @if ($hasAnyReject)
+                        <div class="text-warning small mt-2">
+                            ⚠️ Terdapat bundle dengan reject. Pastikan alasan reject sudah terisi dengan jelas (cek di
+                            desktop jika perlu).
+                        </div>
+                    @endif
                 </div>
 
-                <div class="table-wrap">
-                    @php
-                        $hasAnyReject = false;
-                    @endphp
-                    <table class="table table-sm align-middle mono qc-table qc-table-mobile">
-                        <thead>
-                            <tr>
-                                <th style="width:70px;">Bundle</th>
-                                <th>Item</th>
-                                <th class="text-end" style="width:120px;">Cutting</th>
-                                <th class="text-end" style="width:120px;">OK</th>
-                                <th class="text-end" style="width:120px;">Reject</th>
-                                <th style="width:180px;">Alasan</th>
-                                <th class="d-none d-md-table-cell" style="width:110px;">Status</th>
-                                <th class="d-none d-md-table-cell" style="width:160px;">Catatan</th>
-                            </tr>
-                        </thead>
-                        <tbody>
-                            @foreach ($rows as $i => $row)
-                                @php
-                                    $qtyBundle = (float) $row['qty_pcs'];
-                                    $qtyRejectOld = old("results.$i.qty_reject", $row['qty_reject'] ?? 0);
-                                    $qtyReject = (float) $qtyRejectOld;
-                                    if ($qtyReject < 0) {
-                                        $qtyReject = 0;
-                                    }
-                                    if ($qtyReject > $qtyBundle) {
-                                        $qtyReject = $qtyBundle;
-                                    }
-                                    $qtyOk = max($qtyBundle - $qtyReject, 0);
-                                    if ($qtyReject > 0) {
-                                        $hasAnyReject = true;
-                                    }
+                {{-- 3. PEMAKAIAN KAIN PER LOT (MULTI-LOT) --}}
+                @if ($jobLots->count() > 0)
+                    <div class="card p-3 mb-4">
+                        <div class="d-flex justify-content-between align-items-center mb-2">
+                            <div class="section-title mb-0">Pemakaian Kain per LOT</div>
+                            <div class="small-muted">
+                                Isi <strong>pemakaian aktual</strong> (hasil QC) per LOT. Jika dikosongkan, sistem akan
+                                pakai
+                                angka rencana.
+                            </div>
+                        </div>
 
-                                    $fieldReject = "results.$i.qty_reject";
-                                    $fieldReason = "results.$i.reject_reason";
-                                    $fieldNotes = "results.$i.notes";
-
-                                    $rejectError = $isErrorBag ? $errors->first($fieldReject) : null;
-                                    $reasonError = $isErrorBag ? $errors->first($fieldReason) : null;
-                                    $notesError = $isErrorBag ? $errors->first($fieldNotes) : null;
-                                @endphp
-                                <tr class="{{ $qtyReject > 0 ? 'row-has-reject' : '' }}">
-                                    <input type="hidden" name="results[{{ $i }}][cutting_job_bundle_id]"
-                                        value="{{ $row['cutting_job_bundle_id'] }}">
-
-                                    <input type="hidden" name="results[{{ $i }}][qty_ok]"
-                                        class="input-ok-hidden" value="{{ old("results.$i.qty_ok", $qtyOk) }}">
-
-                                    <td class="qc-card-header" data-label="Bundle">
-                                        <div class="fw-semibold mono">
-                                            #{{ $row['bundle_no'] ?? '-' }}
-                                        </div>
-                                        <div class="small-muted mono">
-                                            {{ $row['bundle_code'] ?? '' }}
-                                        </div>
-                                    </td>
-
-                                    <td data-label="Item">
-                                        <div>{{ $row['item_code'] }}</div>
-                                    </td>
-
-                                    <td data-label="Cutting" class="text-end">
-                                        {{ number_format($qtyBundle, 2, ',', '.') }}
-                                    </td>
-
-                                    <td data-label="OK" class="text-end">
-                                        <span class="cell-ok">
-                                            {{ number_format(old("results.$i.qty_ok", $qtyOk), 2, ',', '.') }}
-                                        </span>
-                                    </td>
-
-                                    <td data-label="Reject" class="text-end">
-                                        <input type="number" step="1" min="0" inputmode="numeric"
-                                            pattern="\d*" name="results[{{ $i }}][qty_reject]"
-                                            class="form-control form-control-sm text-end input-reject {{ $rejectError ? 'is-invalid' : '' }}"
-                                            value="{{ old("results.$i.qty_reject", $qtyReject) }}"
-                                            data-bundle="{{ $qtyBundle }}">
-                                        @if ($rejectError)
-                                            <div class="invalid-feedback">{{ $rejectError }}</div>
-                                        @endif
-                                    </td>
-
-                                    <td data-label="Alasan">
-                                        <input type="text" name="results[{{ $i }}][reject_reason]"
-                                            class="form-control form-control-sm {{ $reasonError ? 'is-invalid' : '' }}"
-                                            value="{{ old("results.$i.reject_reason", $row['reject_reason'] ?? '') }}"
-                                            placeholder="mis: bolong, kotor">
-                                        @if ($reasonError)
-                                            <div class="invalid-feedback">{{ $reasonError }}</div>
-                                        @endif
-                                    </td>
-
-                                    <td data-label="Status" class="d-none d-md-table-cell">
+                        <div class="table-wrap">
+                            <table class="table table-sm align-middle mono">
+                                <thead>
+                                    <tr>
+                                        <th style="width: 150px;">LOT</th>
+                                        <th>Item</th>
+                                        <th class="text-end" style="width: 130px;">Rencana</th>
+                                        <th class="text-end" style="width: 150px;">Dipakai (QC)</th>
+                                        <th class="text-end d-none d-md-table-cell" style="width: 130px;">Estimasi Sisa
+                                        </th>
+                                    </tr>
+                                </thead>
+                                <tbody>
+                                    @foreach ($jobLots as $i => $jobLot)
                                         @php
-                                            $st = $row['status'] ?: 'cut';
-                                            $cls =
-                                                [
-                                                    'cut' => 'secondary',
-                                                    'qc_ok' => 'success',
-                                                    'qc_reject' => 'danger',
-                                                    'qc_mixed' => 'warning',
-                                                ][$st] ?? 'secondary';
+                                            $lotModel = $jobLot->lot;
+                                            $planned = (float) $jobLot->planned_fabric_qty;
+                                            $usedOld = old(
+                                                "lots.$i.used_fabric_qty",
+                                                $jobLot->used_fabric_qty ?: $planned,
+                                            );
+                                            $used = (float) $usedOld;
+                                            if ($used < 0) {
+                                                $used = 0;
+                                            }
+                                            if ($planned > 0 && $used > $planned) {
+                                                $used = $planned;
+                                            }
+                                            $balance = $planned - $used;
+
+                                            $fieldUsed = "lots.$i.used_fabric_qty";
+                                            $usedError = $isErrorBag ? $errors->first($fieldUsed) : null;
                                         @endphp
-                                        <span class="badge-soft bg-{{ $cls }}">
-                                            {{ $st }}
-                                        </span>
-                                    </td>
 
-                                    <td data-label="Catatan" class="d-none d-md-table-cell">
-                                        <input type="text" name="results[{{ $i }}][notes]"
-                                            class="form-control form-control-sm {{ $notesError ? 'is-invalid' : '' }}"
-                                            value="{{ old("results.$i.notes", $row['notes'] ?? '') }}">
-                                        @if ($notesError)
-                                            <div class="invalid-feedback">{{ $notesError }}</div>
-                                        @endif
-                                    </td>
-                                </tr>
-                            @endforeach
-                        </tbody>
-                    </table>
-                </div>
+                                        <tr>
+                                            {{-- id pivot cutting_job_lots --}}
+                                            <input type="hidden" name="lots[{{ $i }}][id]"
+                                                value="{{ $jobLot->id }}">
 
-                @php
-                    $resultsError = $isErrorBag ? $errors->first('results') : null;
-                @endphp
-                @if ($resultsError)
-                    <div class="text-danger small mt-2">{{ $resultsError }}</div>
-                @endif
+                                            <td>
+                                                {{-- Desktop: LOT code + item code; Mobile: hanya item code (LOT code disembunyikan) --}}
+                                                <div class="fw-semibold">
+                                                    <span class="d-none d-md-inline">
+                                                        {{ $lotModel?->code ?? 'LOT ?' }}
+                                                    </span>
+                                                    <span class="d-inline d-md-none">
+                                                        {{ $lotModel?->item?->code ?? '-' }}
+                                                    </span>
+                                                </div>
+                                                <div class="small-muted d-none d-md-block">
+                                                    {{ $lotModel?->item?->code ?? '-' }}
+                                                </div>
+                                            </td>
 
-                <div id="qc-warning" class="text-danger small mt-2" style="display:none;">
-                    ⚠️ Qty Reject tidak boleh melebihi Qty Cutting. Nilai otomatis dikunci ke batas maksimum.
-                </div>
+                                            <td>
+                                                <div>{{ $lotModel?->item?->name ?? '-' }}</div>
+                                                {{-- Info gudang hanya desktop --}}
+                                                <div class="small-muted d-none d-md-block">
+                                                    Gudang {{ $warehouse?->code ?? '-' }}
+                                                </div>
+                                            </td>
 
-                @if ($hasAnyReject)
-                    <div class="text-warning small mt-2">
-                        ⚠️ Terdapat bundle dengan reject. Pastikan alasan reject sudah terisi dengan jelas.
+                                            <td class="text-end">
+                                                {{ number_format($planned, 2, ',', '.') }}
+                                            </td>
+
+                                            <td class="text-end">
+                                                <input type="number" step="0.01" min="0" inputmode="decimal"
+                                                    name="lots[{{ $i }}][used_fabric_qty]"
+                                                    class="form-control form-control-sm text-end input-lot-used {{ $usedError ? 'is-invalid' : '' }}"
+                                                    value="{{ $used }}" data-planned="{{ $planned }}">
+                                                @if ($usedError)
+                                                    <div class="invalid-feedback">{{ $usedError }}</div>
+                                                @endif
+                                                <div class="small-muted d-md-none mt-1">
+                                                    Est. sisa:
+                                                    <span class="lot-balance-mobile">
+                                                        {{ number_format($balance, 2, ',', '.') }}
+                                                    </span>
+                                                </div>
+                                            </td>
+
+                                            <td class="text-end d-none d-md-table-cell">
+                                                <span class="lot-balance-desktop">
+                                                    {{ number_format($balance, 2, ',', '.') }}
+                                                </span>
+                                            </td>
+                                        </tr>
+                                    @endforeach
+                                </tbody>
+                            </table>
+                        </div>
+
+                        @php
+                            $lotsError = $isErrorBag ? $errors->first('lots') : null;
+                        @endphp
+                        @if ($lotsError)
+                            <div class="text-danger small mt-2">{{ $lotsError }}</div>
+                        @endif
+
+                        <div id="lot-warning" class="text-danger small mt-2" style="display:none;">
+                            ⚠️ Pemakaian per LOT tidak boleh melebihi qty rencana. Nilai otomatis dikunci ke batas maksimum.
+                        </div>
                     </div>
                 @endif
-            </div>
 
-            <div class="d-flex justify-content-end mb-5 gap-2">
-                <a href="{{ route('production.cutting_jobs.show', $cuttingJob) }}" class="btn btn-outline-secondary">
-                    Batal
-                </a>
-                <button type="submit" class="btn btn-primary">
-                    Simpan Hasil QC
-                </button>
-            </div>
-        </form>
+                <div class="d-flex justify-content-end mb-5 gap-2">
+                    <a href="{{ route('production.cutting_jobs.show', $cuttingJob) }}" class="btn btn-outline-secondary">
+                        Batal
+                    </a>
+                    <button type="submit" class="btn btn-primary">
+                        Simpan Hasil QC
+                    </button>
+                </div>
+            </form>
+        </div>
     </div>
 @endsection
 
@@ -798,6 +813,14 @@
         inputsReject.forEach(i => {
             attachSelectAllOnFocus(i);
             i.addEventListener('input', recalcTotals);
+
+            // Auto scroll ke tengah layar saat fokus (mobile UX)
+            i.addEventListener('focus', () => {
+                i.scrollIntoView({
+                    behavior: 'smooth',
+                    block: 'center'
+                });
+            });
         });
 
         recalcTotals();

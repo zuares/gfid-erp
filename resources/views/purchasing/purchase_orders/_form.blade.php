@@ -1,4 +1,4 @@
-{{-- resources/views/purchasing/purchase_orders/_form.blade.php --}}
+{{-- resources/views/purchasing/purchase_orders/_blade.php --}}
 @php
     use Illuminate\Support\Carbon;
 
@@ -40,8 +40,8 @@
 @push('head')
     <style>
         /* ============================
-                   FORM PURCHASE – LAYOUT
-                ============================ */
+                                           FORM PURCHASE – LAYOUT
+                                        ============================ */
         .po-form-card {
             background: var(--card);
             border-radius: 14px;
@@ -78,8 +78,8 @@
         }
 
         /* ============================
-                   MOBILE / TABLET TWEAKS (≤ 992px)
-                ============================ */
+                                           MOBILE / TABLET TWEAKS (≤ 992px)
+                                        ============================ */
         @media (max-width: 992px) {
             .po-form-card {
                 border-radius: 14px;
@@ -314,12 +314,17 @@
             {{-- ONGKIR --}}
             <div class="col-6 col-md-3">
                 <label class="form-label">Ongkir (Rp)</label>
-                <input type="text" name="shipping_cost" value="{{ $shippingCostInput }}"
-                    class="form-control text-end @error('shipping_cost') is-invalid @enderror">
+
+                <input type="text" name="shipping_cost" value="{{ $shippingCostInput }}" inputmode="decimal"
+                    class="form-control form-control-sm text-end @error('shipping_cost') is-invalid @enderror"
+                    autocomplete="off">
+
                 @error('shipping_cost')
                     <div class="invalid-feedback">{{ $message }}</div>
                 @enderror
             </div>
+
+
 
             {{-- STATUS (READONLY: select disabled + hidden input) --}}
             <div class="col-6 col-md-3">
@@ -399,8 +404,8 @@
 
                         {{-- Qty --}}
                         <td data-label="Qty" class="po-td-qty">
-                            <input type="text" name="lines[{{ $i }}][qty]" value="{{ $lineQty }}"
-                                class="form-control form-control-sm text-end line-qty">
+                            <x-number-input name="lines[{{ $i }}][qty]" :value="$lineQty" htmlType="text"
+                                inputmode="decimal" size="sm" align="end" class="line-qty" />
                             @error("lines.$i.qty")
                                 <div class="text-danger small">{{ $message }}</div>
                             @enderror
@@ -408,8 +413,8 @@
 
                         {{-- Harga --}}
                         <td data-label="Harga (Rp)" class="po-td-price">
-                            <input type="text" name="lines[{{ $i }}][unit_price]"
-                                value="{{ $linePrice }}" class="form-control form-control-sm text-end line-price">
+                            <x-number-input name="lines[{{ $i }}][unit_price]" :value="$linePrice"
+                                htmlType="text" inputmode="decimal" size="sm" align="end" class="line-price" />
                             @error("lines.$i.unit_price")
                                 <div class="text-danger small">{{ $message }}</div>
                             @enderror
@@ -440,13 +445,13 @@
                         </td>
 
                         <td data-label="Qty" class="po-td-qty">
-                            <input type="text" name="lines[0][qty]"
-                                class="form-control form-control-sm text-end line-qty">
+                            <x-number-input name="lines[0][qty]" htmlType="text" inputmode="decimal" size="sm"
+                                align="end" class="line-qty" />
                         </td>
 
                         <td data-label="Harga (Rp)" class="po-td-price">
-                            <input type="text" name="lines[0][unit_price]"
-                                class="form-control form-control-sm text-end line-price">
+                            <x-number-input name="lines[0][unit_price]" htmlType="text" inputmode="decimal"
+                                size="sm" align="end" class="line-price" />
                         </td>
 
                         <td class="text-end align-middle line-total po-td-total" data-label="Total (Rp)"></td>
@@ -493,6 +498,7 @@
                 value = value.toString().trim();
                 value = value.replace(/\s+/g, '');
 
+                // ada koma → treat sebagai pemisah desimal, titik jadi ribuan
                 if (value.indexOf(',') !== -1) {
                     value = value.replace(/\./g, '');
                     value = value.replace(',', '.');
@@ -500,6 +506,7 @@
                     return isNaN(n) ? 0 : n;
                 }
 
+                // pola 1.000 / 10.000 dst
                 if (/^\d{1,3}(\.\d{3})+$/.test(value)) {
                     value = value.replace(/\./g, '');
                     const n = parseFloat(value);

@@ -110,12 +110,19 @@
             }
 
             .item-suggest-dropdown {
+                position: absolute;
+                /* nempel ke input & ikut scroll */
+                top: calc(100% + 4px);
+                /* tepat di bawah input */
+                left: 0;
+                right: 0;
+
                 background: var(--card, #fff);
                 border: 1px solid var(--line, #e5e7eb);
                 border-radius: 6px;
                 max-height: 220px;
                 overflow-y: auto;
-                z-index: 99999;
+                z-index: 50;
                 box-sizing: border-box;
             }
 
@@ -162,8 +169,9 @@
 
             @media (max-width: 576px) {
                 .item-suggest-dropdown {
-                    border-radius: 8px;
+                    border-radius: 10px;
                     max-height: 50vh;
+                    /* bisa agak tinggi di mobile */
                 }
             }
         </style>
@@ -176,47 +184,67 @@
                 window.initItemSuggestInputs = function(root) {
                     const scope = root || document;
                     const wraps = scope.querySelectorAll('.item-suggest-wrap:not([data-suggest-inited="1"])');
-                    wraps.forEach(wrap => {
+                    wraps.forEach(function(wrap) {
                         setupItemSuggest(wrap);
                         wrap.dataset.suggestInited = '1';
                     });
                 };
 
+                // helper: set inputmode numeric utk kolom Qty (mobile)
+                window.initNumericInputs = function(root) {
+                    const scope = root || document;
+                    const numericInputs = scope.querySelectorAll(
+                        '.bundle-qty, .line-qty, .js-numeric-input'
+                    );
+
+                    numericInputs.forEach(function(el) {
+                        // kalau sudah ada type=number biarkan; kalau text → tetap text tapi keyboard angka
+                        if (!el.hasAttribute('type')) {
+                            el.setAttribute('type', 'text');
+                        }
+                        el.setAttribute('inputmode', 'decimal'); // bisa diganti 'numeric' kalau mau
+                        el.setAttribute('pattern', '[0-9]*');
+                    });
+                };
+
                 window.initItemSuggestInputs();
+                window.initNumericInputs();
 
                 // klik di luar → tutup semua dropdown
                 document.addEventListener('click', function(e) {
                     document
                         .querySelectorAll('.item-suggest-wrap[data-suggest-inited="1"]')
-                        .forEach(wrap => {
+                        .forEach(function(wrap) {
                             const dd = wrap.querySelector('.item-suggest-dropdown');
                             if (dd && !wrap.contains(e.target)) {
                                 dd.style.display = 'none';
                             }
                         });
                 });
-
-                window.addEventListener('scroll', handleGlobalReposition, true);
-                window.addEventListener('resize', handleGlobalReposition);
             });
 
-            function handleGlobalReposition() {
-                document
-                    .querySelectorAll('.item-suggest-wrap[data-suggest-inited="1"]')
-                    .forEach(wrap => {
-                        const dropdown = wrap.querySelector('.item-suggest-dropdown');
-                        const input = wrap.querySelector('.js-item-suggest-input');
-                        if (!dropdown || dropdown.style.display === 'none') return;
-                        positionDropdownFixed(input, dropdown);
-                    });
+            function isMobileViewport() {
+                return window.innerWidth <= 768;
             }
 
-            function positionDropdownFixed(inputEl, dropdownEl) {
-                const rect = inputEl.getBoundingClientRect();
-                dropdownEl.style.position = 'fixed';
-                dropdownEl.style.left = rect.left + 'px';
-                dropdownEl.style.top = (rect.bottom + 4) + 'px';
-                dropdownEl.style.width = rect.width + 'px';
+            // bantu sedikit supaya baris tidak ketutup keyboard (opsional)
+            function scrollIntoViewIfMobile(el) {
+                if (!isMobileViewport()) return;
+
+                const viewportHeight = window.innerHeight || document.documentElement.clientHeight;
+
+                setTimeout(function() {
+                    const rect = el.getBoundingClientRect();
+                    const absoluteTop = rect.top + window.scrollY;
+
+                    // target: elemen di ~20% dari atas viewport
+                    const targetTop = absoluteTop - viewportHeight * 0.2;
+
+                    window.scrollTo({
+                        top: targetTop < 0 ? 0 : targetTop,
+                        behavior: 'smooth',
+                    });
+                }, 250);
             }
 
             function setupItemSuggest(wrap) {
@@ -247,65 +275,72 @@
                     localItems = [];
                 }
 
-                const hideDropdown = () => {
+                const hideDropdown = function() {
                     dropdown.style.display = 'none';
                     activeIndex = -1;
                 };
 
-                const showDropdown = () => {
-                    positionDropdownFixed(input, dropdown);
+                const showDropdown = function() {
                     dropdown.style.display = 'block';
                 };
 
-                const setLoading = () => {
+                const setLoading = function() {
                     dropdown.innerHTML = '<div class="item-suggest-loading">Memuat...</div>';
                     showDropdown();
                 };
 
-                const setEmpty = () => {
+                const setEmpty = function() {
                     dropdown.innerHTML = '<div class="item-suggest-empty">Tidak ada hasil</div>';
                     showDropdown();
                 };
 
-                const setError = () => {
+                const setError = function() {
                     dropdown.innerHTML = '<div class="item-suggest-error">Gagal memuat data</div>';
                     showDropdown();
                 };
 
-                // force = true → abaikan minChars (untuk fokus/klik pertama)
-                function performFetch(q, force = false) {
+                function performFetch(q, force) {
+                    if (force === void 0) force = false;
+
                     if (!force && q.length < minChars) {
                         hideDropdown();
                         return;
                     }
 
-                    let url = `/api/v1/items/suggest?q=${encodeURIComponent(q)}`;
+                    let url = '/api/v1/items/suggest?q=' + encodeURIComponent(q);
 
                     if (type) {
-                        url += `&type=${encodeURIComponent(type)}`;
+                        url += '&type=' + encodeURIComponent(type);
                     }
 
                     if (itemCategoryId) {
-                        url += `&item_category_id=${encodeURIComponent(itemCategoryId)}`;
+                        url += '&item_category_id=' + encodeURIComponent(itemCategoryId);
                     }
 
                     setLoading();
 
                     fetch(url)
-                        .then(res => res.json())
-                        .then(json => {
-                            const items = json?.data ?? [];
-                            if (!items.length) return setEmpty();
+                        .then(function(res) {
+                            return res.json();
+                        })
+                        .then(function(json) {
+                            const items = (json && json.data) ? json.data : [];
+                            if (!items.length) {
+                                setEmpty();
+                                return;
+                            }
                             buildDropdown(items);
                         })
-                        .catch(() => setError());
+                        .catch(function() {
+                            setError();
+                        });
                 }
 
                 function highlightActive() {
                     const options = dropdown.querySelectorAll('.item-suggest-option');
-                    options.forEach((opt, idx) =>
-                        opt.classList.toggle('is-active', idx === activeIndex)
-                    );
+                    options.forEach(function(opt, idx) {
+                        opt.classList.toggle('is-active', idx === activeIndex);
+                    });
                 }
 
                 function moveActive(delta) {
@@ -363,23 +398,51 @@
                             const labelText =
                                 showCategory ?
                                 (categoryName || (categoryId ? '#' + categoryId : '-')) :
-                                catLabel.textContent; // biarkan kalau mini
+                                catLabel.textContent;
                             catLabel.textContent = labelText;
                         }
                     }
 
                     hideDropdown();
 
-                    // 🔥 pindah fokus ke Qty (pcs) di baris yang sama
+                    // 🔁 pindah fokus ke input berikutnya
+                    let nextFocusable = null;
+
+                    // 1) Prioritas: Qty di baris yang sama (bundle-qty / line-qty)
                     const rowEl = wrap.closest('tr');
                     if (rowEl) {
-                        const nextFocusable = rowEl.querySelector('.bundle-qty, .line-qty');
-                        if (nextFocusable) {
-                            setTimeout(() => {
-                                nextFocusable.focus();
-                                nextFocusable.select?.();
-                            }, 0);
+                        nextFocusable = rowEl.querySelector('.bundle-qty, .line-qty');
+                    }
+
+                    // 2) Kalau nggak ketemu → cari input berikutnya di dalam form
+                    if (!nextFocusable) {
+                        const form = input.form || wrap.closest('form');
+                        if (form) {
+                            const focusables = Array.from(
+                                form.querySelectorAll(
+                                    'input:not([type="hidden"]):not([disabled]), ' +
+                                    'select:not([disabled]), textarea:not([disabled]), ' +
+                                    'button:not([disabled])'
+                                )
+                            ).filter(function(el) {
+                                return el.tabIndex !== -1;
+                            });
+
+                            const currentIndex = focusables.indexOf(input);
+                            if (currentIndex !== -1 && currentIndex + 1 < focusables.length) {
+                                nextFocusable = focusables[currentIndex + 1];
+                            }
                         }
+                    }
+
+                    if (nextFocusable) {
+                        setTimeout(function() {
+                            nextFocusable.focus();
+                            if (typeof nextFocusable.select === 'function') {
+                                nextFocusable.select();
+                            }
+                            scrollIntoViewIfMobile(nextFocusable);
+                        }, 0);
                     }
                 }
 
@@ -394,7 +457,7 @@
 
                     lastItems = items;
 
-                    items.forEach(item => {
+                    items.forEach(function(item) {
                         const displayName = item.name ?? item.item_name ?? '';
                         const categoryName = item.item_category_name ??
                             item.item_category ??
@@ -414,27 +477,27 @@
                             }
                             if (showCategory && (categoryName || categoryId)) {
                                 parts.push(
-                                    `<span class="text-muted">${
-                                        categoryName || ('#' + categoryId)
-                                    }</span>`
+                                    '<span class="text-muted">' +
+                                    (categoryName || ('#' + categoryId)) +
+                                    '</span>'
                                 );
                             }
 
                             if (parts.length > 0) {
-                                secondaryLine = `
-                                    <div class="item-suggest-option-name">
-                                        ${parts.join(' • ')}
-                                    </div>
-                                `;
+                                secondaryLine =
+                                    '<div class="item-suggest-option-name">' +
+                                    parts.join(' • ') +
+                                    '</div>';
                             }
                         }
 
-                        btn.innerHTML = `
-                            <div class="item-suggest-option-code">${item.code}</div>
-                            ${secondaryLine}
-                        `;
+                        btn.innerHTML =
+                            '<div class="item-suggest-option-code">' + item.code + '</div>' +
+                            secondaryLine;
 
-                        btn.addEventListener('click', () => selectItem(item));
+                        btn.addEventListener('click', function() {
+                            selectItem(item);
+                        });
                         dropdown.appendChild(btn);
                     });
 
@@ -455,23 +518,24 @@
 
                     if (timer) clearTimeout(timer);
 
-                    timer = setTimeout(() => {
+                    timer = setTimeout(function() {
                         performFetch(q, false);
                     }, 250);
                 });
 
-                // fokus → langsung fetch semua (force = true)
+                // fokus → fetch semua (force = true) + bantu scroll di mobile
                 input.addEventListener('focus', function() {
                     input.select();
                     const q = input.value.trim();
                     performFetch(q, true);
+                    scrollIntoViewIfMobile(input);
                 });
 
                 // keyboard navigation
                 input.addEventListener('keydown', function(e) {
                     const isOpen = dropdown.style.display !== 'none';
 
-                    // TAB → pilih item aktif/pertama + pindah ke Qty
+                    // TAB → pilih item aktif/pertama + pindah ke input selanjutnya
                     if (e.key === 'Tab') {
                         if (isOpen && lastItems.length > 0) {
                             e.preventDefault();
@@ -492,19 +556,20 @@
                         moveActive(-1);
                     } else if (e.key === 'Enter') {
                         e.preventDefault();
-                        selectActive(); // Enter = pilih item + pindah ke Qty
+                        selectActive(); // Enter = pilih item + pindah ke input selanjutnya
                     } else if (e.key === 'Escape') {
                         hideDropdown();
                     }
                 });
 
-                // autofocus: fokus + langsung buka suggest
+                // autofocus: fokus + buka suggest + scroll di mobile
                 if (shouldAutofocus) {
-                    setTimeout(() => {
+                    setTimeout(function() {
                         input.focus();
                         input.select();
                         const q = input.value.trim();
                         performFetch(q, true);
+                        scrollIntoViewIfMobile(input);
                     }, 0);
                 }
             }

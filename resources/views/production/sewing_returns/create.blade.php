@@ -555,7 +555,7 @@
                             <i class="bi bi-clipboard-check"></i>
                         </div>
                         <div class="header-title d-flex flex-column gap-1">
-                            <h1>Sewing Return</h1>
+                            <h1>Halaman Setor Jahit</h1>
                             <div class="header-subtitle">
                                 Catat hasil jahit yang disetor kembali dari operator.
                             </div>
@@ -563,16 +563,12 @@
                     </div>
 
                     <div class="d-flex flex-column flex-md-row gap-2">
-                        <a href="{{ route('production.sewing_returns.index') }}"
-                            class="btn btn-sm btn-header-pill btn-header-muted d-flex align-items-center gap-2">
-                            <i class="bi bi-list-ul"></i>
-                            <span>Daftar Return</span>
-                        </a>
 
-                        <a href="{{ route('production.sewing_pickups.index') }}"
+
+                        <a href="{{ route('production.sewing_pickups.create') }}"
                             class="btn btn-sm btn-header-pill btn-header-accent d-flex align-items-center gap-2">
                             <i class="bi bi-box-seam"></i>
-                            <span>Sewing Pickup</span>
+                            <span>Ambil Jahit</span>
                         </a>
                     </div>
                 </div>

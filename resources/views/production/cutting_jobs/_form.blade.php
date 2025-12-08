@@ -1,784 +1,577 @@
-{{-- resources/views/production/cutting_jobs/partials/_form.blade.php --}}
-{{-- UNIVERSAL FORM UNTUK CUTTING JOB (CREATE / EDIT) --}}
+{{-- resources/views/production/cutting_jobs/_form.blade.php --}}
 
 @php
-    $isEdit = $mode === 'edit';
+    $fabricItems = $lotStocks->map(fn($row) => $row->lot->item)->unique('id')->values();
 
-    /**
-     * LOTS:
-     * - Versi lama: hanya ada $lot + $lotBalance.
-     * - Versi multi-LOT: controller mengirim $lots (Collection<Lot>) + $lotTotalBalance.
-     */
-    $lots =
-        isset($lots) && $lots
-            ? (is_iterable($lots)
-                ? collect($lots)
-                : collect([$lots]))
-            : collect(array_filter([$lot ?? null]));
+    // default warehouse RM RAW MATERIALS
+    $defaultWarehouse =
+        $warehouses->firstWhere('code', 'RM') ??
+        ($warehouses->firstWhere('name', 'RM RAW MATERIALS') ?? $warehouses->first());
+    $selectedWarehouseId = old('warehouse_id', $defaultWarehouse?->id);
 
-    // total saldo kain dari semua LOT (fallback ke 1 LOT lama)
-    $totalLotQty = isset($lotTotalBalance) ? (float) $lotTotalBalance : (isset($lotBalance) ? (float) $lotBalance : 0);
-
-    // kalau masih 0 tapi ada LOT, fallback kasar ke field qty_onhand (kalau ada)
-    if ($totalLotQty <= 0 && $lots->isNotEmpty()) {
-        $totalLotQty = (float) $lots->sum(fn($l) => $l->qty_onhand ?? 0);
-    }
-
-    // supaya JS pakai nama $lotQty
-    $lotQty = $totalLotQty;
-
-    // LOT utama (header) → pakai LOT pertama
-    $primaryLot = $lots->first();
-    $primaryLotId = $isEdit ? $job->lot_id ?? $primaryLot?->id : $primaryLot?->id ?? null;
-
-    // default operator = MRF (kalau create), kalau edit pakai operator bundle pertama
-    $defaultOperatorId = $isEdit
-        ? optional($job->bundles->first())->operator_id
-        : optional($operators->firstWhere('code', 'MRF'))->id;
-
-    // tanggal beli lot utama (fallback ke created_at)
-    $lotPurchaseDate =
-        $primaryLot?->purchased_at ??
-        ($primaryLot?->purchase_date ?? ($primaryLot?->received_at ?? $primaryLot?->created_at));
-    $lotPurchaseDateLabel = $lotPurchaseDate ? $lotPurchaseDate->format('d/m/Y') : '-';
-
-    // informasi kain utama (asumsi semua LOT = kain yang sama)
-    $fabricItem = $primaryLot?->item;
+    // default operator MRF
+    $defaultOperatorId = optional($operators->firstWhere('code', 'MRF'))->id;
+    $selectedOperatorId = old('operator_id', $defaultOperatorId);
 @endphp
 
-<form action="{{ $isEdit ? route('production.cutting_jobs.update', $job) : route('production.cutting_jobs.store') }}"
-    method="post" class="cutting-form-safe-bottom js-cutting-form">
+<form action="{{ route('production.cutting_jobs.store') }}" method="POST" id="cutting-form">
     @csrf
-    @if ($isEdit)
-        @method('PUT')
-    @endif
 
-    {{-- =========================
-         MOBILE: BAR INFO LOT
-    ========================== --}}
-    <div class="lot-bar-mobile d-md-none mb-2">
-        <span class="mono">{{ $lotPurchaseDateLabel }}</span>
-        <span class="mx-1">•</span>
+    {{-- dipakai untuk auto hitung kain pakai di backend --}}
+    <input type="hidden" name="lot_balance" id="lot_balance" value="{{ old('lot_balance', 0) }}">
 
-        @if ($lots->count() > 1)
-            <span class="fw-semibold">{{ $lots->count() }} LOT</span>
-        @else
-            <span class="fw-semibold">{{ $fabricItem?->name ?? '-' }}</span>
-        @endif
+    {{-- CARD: PILIH KAIN & LOT (selalu tampil duluan) --}}
+    @include('production.cutting_jobs._pick_lot')
 
-        <span class="mx-1">•</span>
-        <span class="mono">{{ number_format($lotQty, 2, ',', '.') }} Kg</span>
-    </div>
+    {{-- KONTEN UTAMA: baru muncul setelah LOT disimpan --}}
+    <div id="cutting-main-content" class="cutting-main-content d-none">
 
-    {{-- =========================
-         HIDDEN HEADER FIELD
-    ========================== --}}
-    {{-- gudang kain --}}
-    <input type="hidden" name="warehouse_id" value="{{ $warehouse?->id }}">
-
-    {{-- LOT utama (header) --}}
-    <input type="hidden" name="lot_id" value="{{ $primaryLotId }}">
-
-    {{-- 🔥 multi-LOT: kirim semua LOT yang dipakai sebagai selected_lots[] --}}
-    @foreach ($lots as $l)
-        @if ($l)
-            <input type="hidden" name="selected_lots[]" value="{{ $l->id }}">
-        @endif
-    @endforeach
-
-    {{-- total saldo kain semua LOT (untuk perhitungan server / validasi ringan / UI) --}}
-    <input type="hidden" name="lot_balance" value="{{ $lotQty }}">
-
-    {{-- fabric item (item kain) ikut dikirim ke backend --}}
-    <input type="hidden" name="fabric_item_id"
-        value="{{ old('fabric_item_id', $isEdit ? $job->fabric_item_id : $fabricItem->id ?? null) }}">
-
-    {{-- =========================
-         INFORMASI LOT (DESKTOP)
-    ========================== --}}
-    <div class="card p-3 mb-3 d-none d-md-block">
-        <h2 class="h6 mb-2">
-            @if ($lots->count() > 1)
-                Informasi LOT Kain ({{ $lots->count() }} LOT)
-            @else
-                Informasi Lot Kain
-            @endif
-        </h2>
-        @error('fabric_item_id')
-            <div class="text-danger small mt-1">{{ $message }}</div>
-        @enderror
-
-        {{-- RINGKASAN UTAMA --}}
-        <div class="row g-3 mb-2">
-            <div class="col-md-4">
-                <div class="help mb-1">Tgl Beli (Lot Utama)</div>
-                <div class="mono">{{ $lotPurchaseDateLabel }}</div>
-            </div>
-
-            <div class="col-md-4">
-                <div class="help mb-1">Nama Bahan</div>
-                <div>{{ $fabricItem?->name ?? '-' }}</div>
-            </div>
-
-            <div class="col-md-4">
-                <div class="help mb-1">
-                    @if ($lots->count() > 1)
-                        Total Qty Semua LOT
-                    @else
-                        Qty LOT
-                    @endif
+        {{-- RINGKASAN LOT TERPILIH + TOMBOL UBAH LOT --}}
+        <div class="cutting-card mb-2">
+            <div class="cutting-card-body d-flex justify-content-between align-items-center flex-wrap gap-2">
+                <div class="small">
+                    <div>
+                        <span class="text-muted">Item kain:</span>
+                        <span class="fw-semibold" id="current-fabric-label">-</span>
+                    </div>
+                    <div>
+                        <span class="text-muted">LOT terpilih:</span>
+                        <span class="fw-semibold" id="current-lot-count">0 LOT</span>
+                        <span class="text-muted ms-2">Total kain:</span>
+                        <span class="fw-semibold mono" id="current-lot-balance">0.00</span>
+                    </div>
                 </div>
-                <div class="mono">{{ number_format($lotQty, 2, ',', '.') }} Kg</div>
-            </div>
-        </div>
-
-        {{-- DAFTAR LOT KALAU > 1 --}}
-        @if ($lots->count() > 1)
-            <div class="mt-2">
-                <div class="help mb-1">Daftar LOT</div>
-                <table class="table table-sm table-hover align-middle mono mb-0">
-                    <thead>
-                        <tr>
-                            <th style="width: 40px;">#</th>
-                            <th>LOT</th>
-                            <th>Item</th>
-                            <th class="text-end" style="width: 120px;">Saldo (perkiraan)</th>
-                        </tr>
-                    </thead>
-                    <tbody>
-                        @foreach ($lots as $i => $l)
-                            <tr>
-                                <td>{{ $i + 1 }}</td>
-                                <td>{{ $l->code }}</td>
-                                <td>{{ $l->item?->code ?? '-' }}</td>
-                                <td class="text-end">
-                                    {{ number_format($l->qty_onhand ?? 0, 2, ',', '.') }}
-                                </td>
-                            </tr>
-                        @endforeach
-                    </tbody>
-                </table>
-            </div>
-        @else
-            {{-- Kasus 1 LOT (versi lama) --}}
-            <div class="row g-3">
-                <div class="col-md-4 col-12">
-                    <div class="help mb-1">LOT</div>
-                    <div class="fw-semibold">{{ $primaryLot?->code ?? '-' }}</div>
-                    <div class="small text-muted">{{ $fabricItem?->code ?? '-' }}</div>
-                </div>
-
-                <div class="col-md-4 col-6">
-                    <div class="help mb-1">Gudang</div>
-                    <div class="mono">{{ $warehouse?->code }} — {{ $warehouse?->name }}</div>
-                </div>
-
-                <div class="col-md-4 col-6">
-                    <div class="help mb-1">Saldo LOT (perkiraan)</div>
-                    <div class="mono">{{ number_format($lotQty, 2, ',', '.') }} Kg</div>
-                </div>
-            </div>
-        @endif
-    </div>
-
-    {{-- =========================
-         HEADER JOB
-    ========================== --}}
-    <div class="card p-3 mb-3">
-        <h2 class="h6 mb-2">Header Cutting Job</h2>
-
-        <div class="row g-3">
-            <div class="col-md-3 col-6">
-                <label class="form-label">Tanggal</label>
-                <input type="date" name="date" class="form-control @error('date') is-invalid @enderror"
-                    value="{{ old('date', $isEdit ? $job->date?->format('Y-m-d') : now()->toDateString()) }}">
-                @error('date')
-                    <div class="invalid-feedback">{{ $message }}</div>
-                @enderror
-            </div>
-
-            <div class="col-md-3 col-6">
-                <label class="form-label">Operator Cutting</label>
-                @php
-                    $currentOperatorId = old('operator_id', $defaultOperatorId);
-                @endphp
-                <select name="operator_id" class="form-select @error('operator_id') is-invalid @enderror">
-                    <option value="">Pilih operator cutting…</option>
-                    @foreach ($operators as $op)
-                        <option value="{{ $op->id }}" @selected($currentOperatorId == $op->id)>
-                            {{ $op->code }} — {{ $op->name }}
-                        </option>
-                    @endforeach
-                </select>
-                @error('operator_id')
-                    <div class="invalid-feedback">{{ $message }}</div>
-                @enderror
-            </div>
-
-            <div class="col-12 d-none d-md-block">
-                <label class="form-label">Catatan</label>
-                <textarea name="notes" rows="2" class="form-control">{{ old('notes', $isEdit ? $job->notes : '') }}</textarea>
-            </div>
-        </div>
-    </div>
-
-    {{-- =========================
-         OUTPUT BUNDLES
-    ========================== --}}
-    <div class="card p-3 mb-4">
-        <div class="d-flex flex-column flex-md-row justify-content-between align-items-md-center mb-2">
-            <div class="mb-2 mb-md-0">
-                <h2 class="h6 mb-0">Output Bundles</h2>
-            </div>
-
-            <div class="w-100 w-md-auto d-none d-md-block">
-                <button type="button" class="btn btn-outline-secondary btn-sm" id="add-row-top">
-                    + Tambah baris
+                <button type="button" class="btn btn-outline-secondary btn-sm btn-pill-sm" id="btn-change-lots">
+                    Ubah LOT
                 </button>
             </div>
         </div>
 
-        <div id="bundle-warning" class="text-danger small mb-2" style="display:none;">
-            ⚠️ Total pemakaian kain > total saldo LOT
+        {{-- BARIS KONTROL ATAS: tombol buka modal info job --}}
+        <div class="d-flex justify-content-between align-items-center mb-2">
+            <div class="small text-muted">
+                Step 2: Atur info cutting job & isi bundles.
+            </div>
+            <button type="button" class="btn btn-outline-secondary btn-sm btn-pill-sm" data-bs-toggle="modal"
+                data-bs-target="#cuttingInfoModal">
+                Info Cutting Job
+            </button>
         </div>
 
-        <div class="table-wrap">
-            <table class="table table-sm align-middle mono">
-                <thead>
-                    <tr>
-                        <th style="width:40px;">#</th>
-                        <th>Item Jadi</th>
-                        <th style="width:110px;">Qty (pcs)</th>
-                        <th class="d-none d-md-table-cell">Item Category</th>
-                        <th style="width:120px;" class="d-none d-md-table-cell">Used</th>
-                        <th style="width:40px;" class="d-none d-md-table-cell"></th>
+        {{-- CARD: BUNDLES --}}
+        <div class="cutting-card">
+            <div class="cutting-card-header">
+                <h5>Bundles</h5>
+                <span class="badge-soft">
+                    Step 2: Input baris bundles (LOT & kain pakai auto)
+                </span>
+            </div>
+            <div class="cutting-card-body">
+                <div class="bundles-table-wrap mb-2">
+                    <table class="bundles-table table table-sm" id="bundles-table">
+                        <thead>
+                            <tr>
+                                <th style="width: 40px;">#</th>
+                                <th style="min-width: 120px;" class="bundle-lot-col">LOT</th>
+                                <th style="min-width: 150px;">Item Jadi</th>
+                                <th style="min-width: 90px;" class="text-end">Qty (pcs)</th>
+                                <th style="min-width: 150px;" class="bundle-notes-header">Catatan</th>
+                                <th style="width: 40px;"></th>
+                            </tr>
+                        </thead>
+                        <tbody id="bundle-rows">
+                            {{-- Baris awal (1 row default) akan di-generate oleh JS --}}
+                        </tbody>
+                        <tfoot>
+                            <tr>
+                                <td colspan="6">
+                                    <button type="button" class="btn btn-sm btn-outline-primary btn-pill-sm"
+                                        id="btn-add-row">
+                                        + Tambah Baris
+                                    </button>
+                                </td>
+                            </tr>
+                        </tfoot>
+                    </table>
+                </div>
+
+                {{-- TEMPLATE ROW (hidden) --}}
+                <template id="bundle-row-template">
+                    <tr class="bundle-row">
+                        <td class="bundle-index mono">1</td>
+                        <td class="bundle-lot-col">
+                            {{-- LOT di-auto oleh JS, user tidak perlu pilih manual --}}
+                            <select class="form-select form-select-sm bundle-lot-select"
+                                name="bundles[__INDEX__][lot_id]">
+                                {{-- options diisi via JS berdasarkan LOT tercentang --}}
+                            </select>
+                        </td>
+                        <td>
+                            {{-- ITEM JADI pakai component item-suggest (idName wajib) --}}
+                            <x-item-suggest idName="bundles[__INDEX__][finished_item_id]"
+                                placeholder="- Pilih Item Jadi -" type="finished_good" />
+                        </td>
+                        <td>
+                            <x-number-input name="bundles[__INDEX__][qty_pcs]" step="0.01" min="0"
+                                inputmode="decimal" size="sm" align="end" class="bundle-qty-pcs bundle-qty" />
+                        </td>
+                        <td class="bundle-notes-cell">
+                            <input type="text" class="form-control form-control-sm" name="bundles[__INDEX__][notes]">
+                        </td>
+                        <td class="text-center">
+                            <button type="button" class="btn btn-sm btn-link text-danger btn-remove-row">
+                                &times;
+                            </button>
+                        </td>
                     </tr>
-                </thead>
-                <tbody id="bundle-rows">
-                    @foreach ($rows as $i => $row)
-                        @php
-                            $bundle = is_array($row) ? (object) $row : $row;
-                            $finishedItem = $bundle->finishedItem ?? null;
-
-                            $finishedItemId = data_get($row, 'finished_item_id') ?? ($bundle->finished_item_id ?? null);
-                            $finishedItemCode = data_get($row, 'finished_item_code') ?? ($finishedItem->code ?? '');
-                            $displayLabel = $finishedItemCode;
-
-                            $itemCategoryId =
-                                data_get($row, 'item_category_id') ??
-                                ($bundle->item_category_id ?? optional($finishedItem->category ?? null)->id);
-
-                            $itemCategoryName =
-                                data_get($row, 'item_category_name') ??
-                                optional($bundle->itemCategory ?? ($finishedItem->category ?? null))->name;
-
-                            // lot_id per baris: kalau ada pakai itu, kalau tidak fallback ke primaryLotId
-                            $rowLotId = data_get($row, 'lot_id') ?? ($bundle->lot_id ?? $primaryLotId);
-                        @endphp
-
-                        <tr>
-                            {{-- hidden id bundle (untuk EDIT) --}}
-                            @if (!empty($bundle->id))
-                                <input type="hidden" name="bundles[{{ $i }}][id]"
-                                    value="{{ $bundle->id }}">
-                            @endif
-
-                            {{-- 🔥 hidden LOT ID per bundle (CREATE & EDIT) --}}
-                            <input type="hidden" name="bundles[{{ $i }}][lot_id]"
-                                value="{{ old("bundles.$i.lot_id", $rowLotId) }}">
-
-                            <td data-label="#">
-                                <span class="row-index mono"></span>
-                            </td>
-
-                            <td data-label="Item Jadi">
-                                <x-item-suggest-input :idName="'bundles[' . $i . '][finished_item_id]'" :categoryName="'bundles[' . $i . '][item_category_id]'" :idValue="$finishedItemId"
-                                    :categoryValue="$itemCategoryId" :displayValue="$displayLabel" type="finished_good" :autofocus="!$isEdit && $loop->first" />
-                            </td>
-
-                            <td data-label="Qty (pcs)">
-                                <input type="number" step="1" min="0" inputmode="numeric"
-                                    pattern="\d*" name="bundles[{{ $i }}][qty_pcs]"
-                                    class="form-control form-control-sm text-end bundle-qty"
-                                    value="{{ isset($bundle->qty_pcs) ? (int) $bundle->qty_pcs : '' }}">
-                            </td>
-
-                            <td data-label="Item Category" class="d-none d-md-table-cell">
-                                <span class="bundle-item-category text-muted small">
-                                    {{ $itemCategoryName ?? '-' }}
-                                </span>
-                            </td>
-
-                            <td data-label="Used" class="d-none d-md-table-cell">
-                                <span class="bundle-qty-used help">-</span>
-                            </td>
-
-                            <td data-label="" class="d-none d-md-table-cell">
-                                <button type="button" class="btn btn-sm btn-link text-danger remove-row">×</button>
-                            </td>
-                        </tr>
-                    @endforeach
-                </tbody>
-            </table>
+                </template>
+            </div>
         </div>
 
-        {{-- tombol bawah khusus mobile --}}
-        <div class="mt-2 d-md-none">
-            <button type="button" class="btn btn-outline-secondary w-100 btn-sm" id="add-row-bottom">
-                + Tambah baris
+        {{-- CARD: SUMMARY LOT (desktop only) --}}
+        <div class="cutting-card d-none d-md-block">
+            <div class="cutting-card-header">
+                <h5>Ringkasan Kain & Bundles</h5>
+                <span class="badge-soft">
+                    Info total kain tersedia & estimasi pemakaian
+                </span>
+            </div>
+            <div class="cutting-card-body">
+                <ul class="lot-summary-list" id="lot-summary-list">
+                    <li class="text-muted">
+                        <span>Belum ada pemilihan LOT atau qty bundle.</span>
+                        <span></span>
+                    </li>
+                </ul>
+            </div>
+        </div>
+
+        {{-- ACTIONS --}}
+        <div class="d-flex justify-content-between align-items-center mt-3 cutting-actions">
+            {{-- type="button" karena submit lewat modal --}}
+            <button type="button" class="btn btn-primary btn-sm" id="btn-save-cutting">
+                Pilih Operator
             </button>
-        </div>
 
-        @error('bundles')
-            <div class="text-danger small mt-1">{{ $message }}</div>
-        @enderror
-    </div>
-
-    {{-- SUBMIT DESKTOP --}}
-    <div class="d-none d-md-flex justify-content-end mb-4">
-        <button type="button" class="btn btn-primary js-cutting-submit-trigger">
-            {{ $isEdit ? 'Update Cutting Job' : 'Simpan Cutting Job' }}
-        </button>
-    </div>
-
-    {{-- SUBMIT MOBILE --}}
-    <div class="cutting-submit-mobile-bar d-md-none">
-        <button type="button" class="btn btn-primary cutting-submit-btn js-cutting-submit-trigger" title="Simpan">
-            <i class="bi bi-check2"></i>
-        </button>
-    </div>
-</form>
-
-{{-- =============== MODAL KONFIRMASI & SUMMARY =============== --}}
-<div class="cutting-modal-backdrop" id="cutting-confirm-modal" style="display:none;">
-    <div class="cutting-modal-panel">
-        <div class="cutting-modal-title">Simpan Cutting Job?</div>
-        <div class="cutting-modal-body">
-            Pastikan item dan qty sudah sesuai sebelum disimpan.
-        </div>
-        <div class="cutting-modal-actions">
-            <button type="button" class="btn btn-sm btn-outline-secondary w-100 me-2" data-action="cancel-confirm">
+            <a href="{{ route('production.cutting_jobs.index') }}" class="btn btn-outline-secondary btn-sm">
                 Batal
-            </button>
-            <button type="button" class="btn btn-sm btn-primary w-100" data-action="confirm-save">
-                Lanjut
-            </button>
+            </a>
         </div>
-    </div>
-</div>
+    </div> {{-- /#cutting-main-content --}}
 
-<div class="cutting-modal-backdrop" id="cutting-summary-modal" style="display:none;">
-    <div class="cutting-modal-panel">
-        <div class="cutting-modal-title">Ringkasan Cutting</div>
-        <div class="cutting-modal-body">
-            <div class="small text-muted mb-2">
-                Berikut ringkasan kain yang dipotong dan hasil bundle:
-            </div>
-
-            <ul class="list-unstyled mb-2 small">
-                <li><strong>Total Bundle:</strong> <span id="summary-total-bundle">0</span></li>
-                <li><strong>Total Cutting (pcs):</strong> <span id="summary-total-qty">0</span></li>
-                <li><strong>Estimasi kain terpakai:</strong> <span id="summary-total-used">0,00 Kg</span></li>
-            </ul>
-
-            <div class="small fw-semibold mb-1">
-                Item & Qty:
-            </div>
-            <ul class="list-unstyled small" id="summary-items-list">
-                {{-- akan diisi via JS --}}
-            </ul>
-        </div>
-        <div class="cutting-modal-actions">
-            <button type="button" class="btn btn-sm btn-outline-secondary w-100 me-2"
-                data-action="back-from-summary">
-                Kembali
-            </button>
-            <button type="button" class="btn btn-sm btn-primary w-100" data-action="submit-final">
-                Simpan Sekarang
-            </button>
-        </div>
-    </div>
-</div>
-
-@push('head')
-    <style>
-        .lot-bar-mobile {
-            position: sticky;
-            top: 56px;
-            z-index: 1020;
-            background: var(--card, #fff);
-            border-bottom: 1px solid var(--line, #e5e7eb);
-            padding: .35rem .75rem;
-            font-size: .85rem;
-            display: flex;
-            align-items: center;
-            gap: .25rem;
-            white-space: nowrap;
-            overflow-x: auto;
-        }
-
-        @media (max-width: 767.98px) {
-            .card .d-flex.flex-column.flex-md-row {
-                gap: .5rem;
-            }
-
-            .cutting-form-safe-bottom {
-                padding-bottom: 110px;
-            }
-
-            .cutting-submit-mobile-bar {
-                position: fixed;
-                right: .9rem;
-                bottom: calc(62px + 10px);
-                z-index: 1030;
-            }
-
-            .cutting-submit-btn {
-                width: 52px;
-                height: 52px;
-                border-radius: 999px;
-                display: inline-flex;
-                align-items: center;
-                justify-content: center;
-                box-shadow:
-                    0 8px 18px rgba(0, 0, 0, 0.25),
-                    0 0 0 1px rgba(15, 23, 42, 0.06);
-                padding: 0;
-            }
-
-            .cutting-submit-btn i {
-                font-size: 1.3rem;
-            }
-        }
-
-        .cutting-modal-backdrop {
-            position: fixed;
-            inset: 0;
-            background: rgba(15, 23, 42, 0.45);
-            z-index: 2000;
-            display: flex;
-            align-items: center;
-            justify-content: center;
-            padding: 1.25rem;
-        }
-
-        .cutting-modal-panel {
-            width: 100%;
-            max-width: 420px;
-            background: var(--card, #fff);
-            border-radius: 16px;
-            border: 1px solid var(--line, #e5e7eb);
-            box-shadow:
-                0 20px 45px rgba(15, 23, 42, 0.35),
-                0 0 0 1px rgba(15, 23, 42, 0.05);
-            padding: 1rem 1.1rem .9rem;
-        }
-
-        .cutting-modal-title {
-            font-size: .95rem;
-            font-weight: 600;
-            margin-bottom: .35rem;
-        }
-
-        .cutting-modal-body {
-            font-size: .85rem;
-            margin-bottom: .75rem;
-        }
-
-        .cutting-modal-actions {
-            display: flex;
-            align-items: center;
-            justify-content: flex-end;
-            gap: .5rem;
-        }
-    </style>
-@endpush
-
+    {{-- MODAL DIPISAH KE FILE TERSENDIRI --}}
+    @include('production.cutting_jobs._modal_confirm')
+</form>
 @push('scripts')
     <script>
-        const bundleRows = document.getElementById('bundle-rows');
-        const addRowBtnTop = document.getElementById('add-row-top');
-        const addRowBtnBottom = document.getElementById('add-row-bottom');
+        document.addEventListener('DOMContentLoaded', function() {
+            const lotRows = Array.from(document.querySelectorAll('.lot-row'));
+            const lotCheckboxes = Array.from(document.querySelectorAll('.lot-checkbox'));
+            const fabricSelect = document.getElementById('fabric_item_id');
+            const btnSelectAllLots = document.getElementById('btn-select-all-lots');
+            const btnUnselectAllLots = document.getElementById('btn-unselect-all-lots');
+            const btnConfirmLots = document.getElementById('btn-confirm-lots');
 
-        const rowCountSpan = document.getElementById('bundle-row-count');
-        const perRowSpan = document.getElementById('bundle-per-row');
-        const totalQtySpan = document.getElementById('bundle-total-qty');
-        const totalUsedSpan = document.getElementById('bundle-total-used');
-        const warningEl = document.getElementById('bundle-warning');
+            const bundlesTbody = document.getElementById('bundle-rows');
+            const bundleTemplate = document.getElementById('bundle-row-template');
+            const btnAddRow = document.getElementById('btn-add-row');
+            const lotSummaryList = document.getElementById('lot-summary-list');
+            const lotBalanceInput = document.getElementById('lot_balance');
 
-        // total kain semua LOT
-        const lotQty = @json($lotQty);
+            const mainContent = document.getElementById('cutting-main-content');
+            const pickLotSection = document.getElementById('cutting-pick-lot');
 
-        function attachSelectAllOnFocus(input) {
-            input.addEventListener('focus', function() {
-                setTimeout(() => this.select(), 0);
-            });
-            input.addEventListener('mouseup', function(e) {
-                e.preventDefault();
-            });
-        }
+            // ringkasan LOT di atas form
+            const currentFabricLabel = document.getElementById('current-fabric-label');
+            const currentLotCount = document.getElementById('current-lot-count');
+            const currentLotBalance = document.getElementById('current-lot-balance');
+            const btnChangeLots = document.getElementById('btn-change-lots');
 
-        function renumberRows() {
-            if (!bundleRows) return;
-            const rows = bundleRows.querySelectorAll('tr');
-            rows.forEach((tr, idx) => {
-                const idxSpan = tr.querySelector('.row-index');
-                if (idxSpan) {
-                    idxSpan.textContent = idx + 1;
-                }
-            });
-        }
-
-        function recalcAll() {
-            if (!bundleRows) return;
-
-            const rows = bundleRows.querySelectorAll('tr');
-            const count = rows.length;
-            let totalQtyPcs = 0;
-
-            rows.forEach(tr => {
-                const qtyInput = tr.querySelector('.bundle-qty');
-                if (!qtyInput) return;
-
-                let v = parseInt(qtyInput.value || '0', 10);
-                if (isNaN(v) || v < 0) v = 0;
-                qtyInput.value = v;
-
-                totalQtyPcs += v;
-            });
-
-            const perRow = (count > 0 && lotQty > 0) ? (lotQty / count) : 0;
-            const totalUsed = perRow * count;
-
-            if (rowCountSpan) rowCountSpan.textContent = count;
-            if (perRowSpan) perRowSpan.textContent = perRow ? perRow.toFixed(2).replace('.', ',') : '';
-            if (totalQtySpan) totalQtySpan.textContent = totalQtyPcs.toFixed(2).replace('.', ',');
-            if (totalUsedSpan) totalUsedSpan.textContent = totalUsed ? totalUsed.toFixed(2).replace('.', ',') : '';
-
-            if (warningEl) {
-                warningEl.style.display = (totalUsed > lotQty + 0.000001) ? 'block' : 'none';
+            // helper breakpoint: mobile only
+            function isMobile() {
+                return window.matchMedia('(max-width: 767.98px)').matches;
             }
 
-            rows.forEach(tr => {
-                const usedSpan = tr.querySelector('.bundle-qty-used');
-                if (usedSpan) {
-                    usedSpan.textContent = perRow ? perRow.toFixed(2).replace('.', ',') : '-';
-                }
-            });
-        }
-
-        function attachRowListeners(tr) {
-            const qtyInput = tr.querySelector('.bundle-qty');
-            if (qtyInput) {
-                attachSelectAllOnFocus(qtyInput);
-                qtyInput.addEventListener('input', recalcAll);
-            }
-        }
-
-        function addRow() {
-            if (!bundleRows) return;
-
-            const rows = bundleRows.querySelectorAll('tr');
-            const index = rows.length;
-            if (!rows.length) return;
-
-            const templateRow = rows[0];
-            const newRow = templateRow.cloneNode(true);
-
-            // Bersihkan nilai & id lama
-            newRow.querySelectorAll('input').forEach(input => {
-                const name = input.name || '';
-
-                // id bundle lama tidak dipakai di row baru
-                if (name.endsWith('[id]')) {
-                    input.remove();
-                    return;
-                }
-
-                // lot_id TETAP dipertahankan (biar auto pakai LOT utama / rowLotId awal)
-                if (name.endsWith('[lot_id]')) {
-                    return;
-                }
-
-                if (['hidden', 'text', 'number'].includes(input.type)) {
-                    input.value = '';
-                }
+            // Build map lotId -> info
+            const lotInfoMap = {};
+            lotRows.forEach(tr => {
+                const lotId = parseInt(tr.dataset.lotId, 10);
+                const itemId = parseInt(tr.dataset.itemId, 10);
+                const balance = parseFloat(tr.dataset.balance ?? '0');
+                const code = tr.querySelector('.lot-code')?.textContent?.trim() ?? '';
+                lotInfoMap[lotId] = {
+                    lotId,
+                    itemId,
+                    code,
+                    balance
+                };
             });
 
-            const catLabel = newRow.querySelector('.bundle-item-category');
-            if (catLabel) catLabel.textContent = '-';
+            let bundleIndexCounter = 0;
+            let lotsLocked = false;
 
-            // Update name agar index-nya sesuai
-            newRow.querySelectorAll('input, select, textarea').forEach(el => {
-                if (!el.name) return;
-                el.name = el.name.replace(/bundles\[\d+]/, `bundles[${index}]`);
-            });
-
-            // reset state komponen item-suggest di row baru
-            const wraps = newRow.querySelectorAll('.item-suggest-wrap');
-            wraps.forEach(wrap => {
-                wrap.removeAttribute('data-suggest-inited');
-            });
-
-            bundleRows.appendChild(newRow);
-            attachRowListeners(newRow);
-            renumberRows();
-            recalcAll();
-
-            if (window.initItemSuggestInputs) {
-                window.initItemSuggestInputs();
-            }
-
-            const newSuggestInput = newRow.querySelector('.js-item-suggest-input');
-            if (newSuggestInput) {
-                newSuggestInput.focus();
-                newSuggestInput.select();
-            }
-        }
-
-        // INIT EXISTING ROWS
-        if (bundleRows) {
-            Array.from(bundleRows.querySelectorAll('tr')).forEach(tr => {
-                attachRowListeners(tr);
-            });
-            renumberRows();
-            recalcAll();
-        }
-
-        if (addRowBtnTop) {
-            addRowBtnTop.addEventListener('click', addRow);
-        }
-        if (addRowBtnBottom) {
-            addRowBtnBottom.addEventListener('click', addRow);
-        }
-
-        // Hapus baris
-        document.addEventListener('click', function(e) {
-            if (e.target.classList.contains('remove-row')) {
-                const tr = e.target.closest('tr');
-                if (!tr || !bundleRows) return;
-
-                tr.parentNode.removeChild(tr);
-                renumberRows();
-                recalcAll();
-            }
-        });
-
-        // =========================
-        // LOGIKA MODAL & SUBMIT
-        // =========================
-        const formEl = document.querySelector('.js-cutting-form');
-        const submitTriggers = document.querySelectorAll('.js-cutting-submit-trigger');
-        const confirmModal = document.getElementById('cutting-confirm-modal');
-        const summaryModal = document.getElementById('cutting-summary-modal');
-
-        const summaryTotalBundleEl = document.getElementById('summary-total-bundle');
-        const summaryTotalQtyEl = document.getElementById('summary-total-qty');
-        const summaryTotalUsedEl = document.getElementById('summary-total-used');
-        const summaryItemsListEl = document.getElementById('summary-items-list');
-
-        function openModal(modal) {
-            if (!modal) return;
-            modal.style.display = 'flex';
-        }
-
-        function closeModal(modal) {
-            if (!modal) return;
-            modal.style.display = 'none';
-        }
-
-        function buildSummary() {
-            if (!bundleRows) return;
-
-            const rows = bundleRows.querySelectorAll('tr');
-            const count = rows.length;
-
-            let totalQtyPcs = 0;
-            const items = [];
-
-            rows.forEach(tr => {
-                const qtyInput = tr.querySelector('.bundle-qty');
-                const suggestInput = tr.querySelector('.js-item-suggest-input');
-
-                if (!qtyInput) return;
-
-                let qty = parseInt(qtyInput.value || '0', 10);
-                if (isNaN(qty) || qty <= 0) return;
-
-                const label = (suggestInput && suggestInput.value) ?
-                    suggestInput.value :
-                    '(belum pilih item)';
-                totalQtyPcs += qty;
-
-                items.push({
-                    label,
-                    qty
+            function getCheckedLots() {
+                const ids = [];
+                lotCheckboxes.forEach(cb => {
+                    if (cb.checked) {
+                        ids.push(parseInt(cb.value, 10));
+                    }
                 });
-            });
+                return ids;
+            }
 
-            const perRow = (count > 0 && lotQty > 0) ? (lotQty / count) : 0;
-            const totalUsed = perRow * count;
+            function showMainContent() {
+                if (!mainContent) return;
+                mainContent.classList.remove('d-none');
 
-            summaryTotalBundleEl.textContent = count;
-            summaryTotalQtyEl.textContent = totalQtyPcs.toLocaleString('id-ID');
-            summaryTotalUsedEl.textContent = totalUsed ?
-                totalUsed.toFixed(2).replace('.', ',') + ' Kg' :
-                '0,00 Kg';
+                // HANYA di mobile: sembunyikan pick LOT
+                if (isMobile() && pickLotSection) {
+                    pickLotSection.classList.add('d-none');
+                }
+            }
 
-            summaryItemsListEl.innerHTML = '';
+            function showPickLotSection() {
+                if (!pickLotSection) return;
 
-            if (!items.length) {
-                const li = document.createElement('li');
-                li.className = 'text-muted';
-                li.textContent = 'Belum ada item dengan qty > 0.';
-                summaryItemsListEl.appendChild(li);
-            } else {
-                items.forEach(it => {
+                // HANYA di mobile: balik ke step pilih LOT
+                if (isMobile()) {
+                    pickLotSection.classList.remove('d-none');
+                    if (mainContent) {
+                        mainContent.classList.add('d-none');
+                    }
+                    pickLotSection.scrollIntoView({
+                        behavior: 'smooth',
+                        block: 'start'
+                    });
+                } else {
+                    // di desktop: cukup scroll ke area LOT, jangan hide form
+                    pickLotSection.scrollIntoView({
+                        behavior: 'smooth',
+                        block: 'start'
+                    });
+                }
+            }
+
+            function lockLotSelection() {
+                lotsLocked = true;
+                document.body.classList.add('cutting-lots-locked');
+            }
+
+            function unlockLotSelection() {
+                lotsLocked = false;
+                document.body.classList.remove('cutting-lots-locked');
+            }
+
+            function filterLotsByFabric() {
+                const selectedItemId = parseInt(fabricSelect?.value || '0', 10);
+
+                lotRows.forEach(tr => {
+                    const itemId = parseInt(tr.dataset.itemId, 10);
+                    if (!selectedItemId || itemId === selectedItemId) {
+                        tr.classList.remove('lot-hidden');
+                    } else {
+                        tr.classList.add('lot-hidden');
+                    }
+                });
+            }
+
+            function recalcLotBalanceFromCheckedLots() {
+                let total = 0;
+                lotCheckboxes.forEach(cb => {
+                    if (cb.checked) {
+                        const row = cb.closest('.lot-row');
+                        if (!row) return;
+                        const balance = parseFloat(row.dataset.balance || '0');
+                        total += balance;
+                    }
+                });
+                lotBalanceInput.value = total.toFixed(2);
+            }
+
+            function rebuildLotOptionsForAllRows() {
+                const checkedLotIds = getCheckedLots();
+                const selects = bundlesTbody.querySelectorAll('.bundle-lot-select');
+
+                selects.forEach(select => {
+                    const currentVal = parseInt(select.value || '0', 10);
+                    while (select.firstChild) {
+                        select.removeChild(select.firstChild);
+                    }
+
+                    const optPlaceholder = document.createElement('option');
+                    optPlaceholder.value = '';
+                    optPlaceholder.textContent = checkedLotIds.length ? '- LOT auto -' :
+                        'Tidak ada LOT terpilih';
+                    select.appendChild(optPlaceholder);
+
+                    checkedLotIds.forEach(lotId => {
+                        const info = lotInfoMap[lotId];
+                        if (!info) return;
+                        const opt = document.createElement('option');
+                        opt.value = lotId;
+                        opt.textContent = info.code;
+                        select.appendChild(opt);
+                    });
+
+                    if (checkedLotIds.length > 0 && !currentVal) {
+                        select.value = checkedLotIds[0];
+                    } else if (currentVal && checkedLotIds.includes(currentVal)) {
+                        select.value = currentVal;
+                    }
+                });
+            }
+
+            function updateBundleRowIndices() {
+                const rows = bundlesTbody.querySelectorAll('.bundle-row');
+                rows.forEach((tr, idx) => {
+                    const numCell = tr.querySelector('.bundle-index');
+                    if (numCell) {
+                        numCell.textContent = idx + 1;
+                    }
+                });
+            }
+
+            function getBundleItemLabel(tr) {
+                const itemCell = tr.querySelector('td:nth-child(3)');
+                if (!itemCell) return '(belum pilih item)';
+                const textInput = itemCell.querySelector('input[type="text"]');
+                if (textInput && textInput.value.trim() !== '') {
+                    return textInput.value.trim();
+                }
+                return '(belum pilih item)';
+            }
+
+            function recalcLotSummary() {
+                const rows = bundlesTbody.querySelectorAll('.bundle-row');
+                let totalPcs = 0;
+                let validRowCount = 0;
+                const itemSummary = {};
+
+                rows.forEach(tr => {
+                    const qtyInput = tr.querySelector('.bundle-qty-pcs');
+                    if (!qtyInput) return;
+                    const qty = parseFloat(qtyInput.value || '0');
+                    if (qty > 0) {
+                        totalPcs += qty;
+                        validRowCount++;
+
+                        const label = getBundleItemLabel(tr);
+                        if (!itemSummary[label]) {
+                            itemSummary[label] = 0;
+                        }
+                        itemSummary[label] += qty;
+                    }
+                });
+
+                const totalBalance = parseFloat(lotBalanceInput.value || '0');
+
+                while (lotSummaryList.firstChild) {
+                    lotSummaryList.removeChild(lotSummaryList.firstChild);
+                }
+
+                if (totalBalance <= 0 && totalPcs <= 0) {
                     const li = document.createElement('li');
-                    li.textContent = `${it.label} : ${it.qty.toLocaleString('id-ID')} pcs`;
-                    summaryItemsListEl.appendChild(li);
-                });
-            }
-        }
-
-        submitTriggers.forEach(btn => {
-            btn.addEventListener('click', function() {
-                openModal(confirmModal);
-            });
-        });
-
-        if (confirmModal) {
-            confirmModal.addEventListener('click', function(e) {
-                const action = e.target.getAttribute('data-action');
-                if (!action) return;
-
-                if (action === 'cancel-confirm') {
-                    closeModal(confirmModal);
-                } else if (action === 'confirm-save') {
-                    closeModal(confirmModal);
-                    buildSummary();
-                    openModal(summaryModal);
+                    li.classList.add('text-muted');
+                    li.textContent = 'Belum ada pemilihan LOT atau qty bundle.';
+                    lotSummaryList.appendChild(li);
+                    return;
                 }
-            });
-        }
 
-        if (summaryModal) {
-            summaryModal.addEventListener('click', function(e) {
-                const action = e.target.getAttribute('data-action');
-                if (!action) return;
+                const li1 = document.createElement('li');
+                li1.innerHTML =
+                    `<span>Total kain tersedia (dari LOT):</span><span class="mono">${totalBalance.toFixed(2)}</span>`;
+                lotSummaryList.appendChild(li1);
 
-                if (action === 'back-from-summary') {
-                    closeModal(summaryModal);
-                } else if (action === 'submit-final') {
-                    submitTriggers.forEach(btn => btn.disabled = true);
-                    const finalButtons = summaryModal.querySelectorAll('button');
-                    finalButtons.forEach(btn => btn.disabled = true);
+                const li2 = document.createElement('li');
+                li2.innerHTML =
+                    `<span>Total qty pcs bundles:</span><span class="mono">${totalPcs.toFixed(2)}</span>`;
+                lotSummaryList.appendChild(li2);
 
-                    if (formEl) {
-                        formEl.submit();
+                if (validRowCount > 0) {
+                    const perRow = totalBalance / validRowCount;
+                    const li3 = document.createElement('li');
+                    li3.innerHTML =
+                        `<span>Estimasi kain per baris (bagi rata):</span><span class="mono">${perRow.toFixed(2)}</span>`;
+                    lotSummaryList.appendChild(li3);
+                }
+
+                if (totalPcs > 0 && totalBalance > 0) {
+                    const perPcs = totalBalance / totalPcs;
+                    const li4 = document.createElement('li');
+                    li4.innerHTML =
+                        `<span>Estimasi kain per pcs:</span><span class="mono">${perPcs.toFixed(4)}</span>`;
+                    lotSummaryList.appendChild(li4);
+                }
+
+                // Ringkasan per item jadi (hanya muncul kalau ada data)
+                const labels = Object.keys(itemSummary).filter(label => itemSummary[label] > 0);
+                if (labels.length > 0) {
+                    const liHeader = document.createElement('li');
+                    liHeader.classList.add('mt-1', 'fw-semibold');
+                    liHeader.innerHTML = `<span>Ringkasan per item jadi:</span><span></span>`;
+                    lotSummaryList.appendChild(liHeader);
+
+                    labels.sort((a, b) => a.localeCompare(b));
+                    labels.forEach(label => {
+                        const qty = itemSummary[label];
+                        const liItem = document.createElement('li');
+                        liItem.innerHTML =
+                            `<span class="mono">${label}</span><span class="mono">${qty.toFixed(2)}</span>`;
+                        lotSummaryList.appendChild(liItem);
+                    });
+                }
+            }
+
+            function updateCurrentLotSummary() {
+                const fabricText =
+                    fabricSelect?.options?.[fabricSelect.selectedIndex]?.text?.trim() || '-';
+                const lotCount = getCheckedLots().length;
+                const balance = parseFloat(lotBalanceInput.value || '0');
+
+                if (currentFabricLabel) {
+                    currentFabricLabel.textContent = fabricText;
+                }
+                if (currentLotCount) {
+                    currentLotCount.textContent = `${lotCount} LOT`;
+                }
+                if (currentLotBalance) {
+                    currentLotBalance.textContent = balance.toFixed(2);
+                }
+            }
+
+            function createBundleRow(autoFocusItem = false) {
+                const frag = bundleTemplate.content.cloneNode(true);
+                const tr = frag.querySelector('tr');
+                const idx = bundleIndexCounter++;
+
+                tr.querySelectorAll('[name]').forEach(el => {
+                    const nameAttr = el.getAttribute('name');
+                    if (nameAttr && nameAttr.includes('__INDEX__')) {
+                        el.setAttribute('name', nameAttr.replace('__INDEX__', idx));
+                    }
+                });
+
+                const qtyInput = tr.querySelector('.bundle-qty-pcs');
+                if (qtyInput) {
+                    qtyInput.addEventListener('input', recalcLotSummary);
+                    qtyInput.addEventListener('focus', () => {
+                        setTimeout(() => {
+                            qtyInput.scrollIntoView({
+                                behavior: 'smooth',
+                                block: 'center'
+                            });
+                        }, 100);
+                    });
+                }
+
+                const lotSelect = tr.querySelector('.bundle-lot-select');
+                if (lotSelect) {
+                    lotSelect.addEventListener('change', recalcLotSummary);
+                }
+
+                const btnRemove = tr.querySelector('.btn-remove-row');
+                if (btnRemove) {
+                    btnRemove.addEventListener('click', () => {
+                        tr.remove();
+                        updateBundleRowIndices();
+                        recalcLotSummary();
+                    });
+                }
+
+                bundlesTbody.appendChild(tr);
+
+                if (window.initItemSuggestInputs) {
+                    window.initItemSuggestInputs(tr);
+                }
+
+                updateBundleRowIndices();
+                rebuildLotOptionsForAllRows();
+                recalcLotSummary();
+
+                if (autoFocusItem) {
+                    const itemCell = tr.querySelector('td:nth-child(3)');
+                    const itemInput = itemCell ? itemCell.querySelector('input[type="text"]') : null;
+                    if (itemInput) {
+                        setTimeout(() => {
+                            itemInput.focus();
+                            itemInput.click();
+                        }, 50);
                     }
                 }
+            }
+
+            // EVENTS
+            fabricSelect?.addEventListener('change', () => {
+                if (lotsLocked) return;
+                filterLotsByFabric();
             });
-        }
+
+            lotCheckboxes.forEach(cb => {
+                cb.addEventListener('change', () => {
+                    if (lotsLocked) return;
+                    recalcLotBalanceFromCheckedLots();
+                    recalcLotSummary();
+                });
+            });
+
+            btnSelectAllLots?.addEventListener('click', () => {
+                if (lotsLocked) return;
+                lotCheckboxes.forEach(cb => {
+                    if (!cb.closest('.lot-row')?.classList.contains('lot-hidden')) {
+                        cb.checked = true;
+                    }
+                });
+                recalcLotBalanceFromCheckedLots();
+                recalcLotSummary();
+            });
+
+            btnUnselectAllLots?.addEventListener('click', () => {
+                if (lotsLocked) return;
+                lotCheckboxes.forEach(cb => cb.checked = false);
+                recalcLotBalanceFromCheckedLots();
+                recalcLotSummary();
+            });
+
+            btnConfirmLots?.addEventListener('click', () => {
+                if (lotsLocked) {
+                    showMainContent();
+                    return;
+                }
+
+                if (!fabricSelect || !fabricSelect.value) {
+                    alert('Item kain wajib dipilih terlebih dahulu.');
+                    fabricSelect?.focus();
+                    return;
+                }
+
+                const checked = getCheckedLots();
+                if (checked.length === 0) {
+                    alert('Pilih minimal satu LOT terlebih dahulu.');
+                    return;
+                }
+
+                recalcLotBalanceFromCheckedLots();
+                rebuildLotOptionsForAllRows();
+                recalcLotSummary();
+                lockLotSelection();
+                updateCurrentLotSummary();
+                showMainContent();
+            });
+
+            // Tombol "Ubah LOT" di form utama
+            btnChangeLots?.addEventListener('click', () => {
+                showPickLotSection();
+                unlockLotSelection();
+            });
+
+            btnAddRow?.addEventListener('click', () => {
+                createBundleRow(true);
+            });
+
+            // INIT
+            filterLotsByFabric();
+            recalcLotBalanceFromCheckedLots();
+            createBundleRow(false);
+        });
     </script>
 @endpush

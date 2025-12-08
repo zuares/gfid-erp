@@ -105,6 +105,38 @@
         color: var(--text);
     }
 
+    /* MOBILE LOGOUT BUTTON */
+    .mobile-logout-btn {
+        border: 0;
+        background: transparent;
+        padding: .2rem;
+        display: inline-flex;
+        align-items: center;
+        justify-content: center;
+        color: #ef4444;
+        /* merah nyaman */
+        cursor: pointer;
+    }
+
+    .mobile-logout-btn svg {
+        width: 20px;
+        height: 20px;
+        stroke-width: 2.1;
+        stroke: currentColor;
+        fill: none;
+    }
+
+    .mobile-logout-btn:active {
+        transform: translateY(1px) scale(.96);
+        opacity: .9;
+    }
+
+    @media (min-width: 768px) {
+        .mobile-logout-btn {
+            display: none;
+        }
+    }
+
     /* DESKTOP NAV LINKS */
     .app-navbar .desktop-nav {
         display: none;
@@ -170,16 +202,32 @@
             {{ config('app.name', 'GFID') }}
         </a>
 
-        {{-- RIGHT: mobile cluster (theme + hamburger) + desktop nav --}}
+        {{-- RIGHT: mobile cluster (theme + logout + hamburger) + desktop nav --}}
         <div class="d-flex align-items-center gap-2">
 
-            {{-- THEME TOGGLE (1 tombol untuk mobile & desktop) --}}
+            {{-- THEME TOGGLE --}}
             <button type="button" class="theme-toggle-btn" id="themeToggleBtn">
                 <span class="icon" id="themeToggleIcon">🌙</span>
                 <span class="label muted" id="themeToggleLabel">Mode Gelap</span>
             </button>
 
-            {{-- HAMBURGER: hanya untuk buka mobile sidebar, bukan collapse --}}
+            @auth
+                {{-- MOBILE LOGOUT ICON (hanya mobile) --}}
+                <button type="button" class="mobile-logout-btn d-md-none" id="mobileLogoutBtn" aria-label="Logout">
+                    <svg viewBox="0 0 24 24" xmlns="http://www.w3.org/2000/svg">
+                        <path d="M9 5h-2.5A2.5 2.5 0 0 0 4 7.5v9A2.5 2.5 0 0 0 6.5 19H9" />
+                        <path d="M15 16l3-4-3-4" />
+                        <path d="M18 12H10" />
+                    </svg>
+                </button>
+
+                {{-- form logout khusus mobile (hidden) --}}
+                <form id="mobileLogoutForm" action="{{ route('logout') }}" method="POST" class="d-none">
+                    @csrf
+                </form>
+            @endauth
+
+            {{-- HAMBURGER: buka mobile sidebar --}}
             <button type="button" class="mobile-menu-btn d-md-none" id="mobileSidebarToggle"
                 aria-label="Toggle sidebar">
                 <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-linecap="round"
@@ -192,12 +240,10 @@
 
             {{-- DESKTOP NAVIGATION --}}
             <div class="desktop-nav d-none d-md-flex">
-
-
-                </ul>
+                {{-- (kalau nanti mau tambah link menu lain bisa di sini) --}}
 
                 {{-- RIGHT: auth --}}
-                <ul class="navbar-nav align-items-center">
+                <ul class="navbar-nav align-items-center ms-2">
                     @guest
                         @if (Route::has('login'))
                             <li class="nav-item">
@@ -227,3 +273,18 @@
         </div>
     </div>
 </nav>
+
+<script>
+    document.addEventListener('DOMContentLoaded', function() {
+        const mobileLogoutBtn = document.getElementById('mobileLogoutBtn');
+        const mobileLogoutForm = document.getElementById('mobileLogoutForm');
+
+        if (mobileLogoutBtn && mobileLogoutForm) {
+            mobileLogoutBtn.addEventListener('click', function() {
+                if (confirm('Yakin mau logout?')) {
+                    mobileLogoutForm.submit();
+                }
+            });
+        }
+    });
+</script>
