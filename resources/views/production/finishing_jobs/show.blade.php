@@ -4,202 +4,49 @@
 
 @push('head')
     <style>
+        /* (pakai style yang sama seperti sebelumnya — singkatkan di sini) */
         .finishing-create-page {
             min-height: 100vh;
         }
 
-        .finishing-create-page .page-wrap {
+        .page-wrap {
             max-width: 1150px;
             margin-inline: auto;
             padding: 1rem 1rem 4rem;
         }
 
-        body[data-theme="light"] .finishing-create-page .page-wrap {
-            background:
-                radial-gradient(circle at top left,
-                    rgba(59, 130, 246, 0.12) 0,
-                    rgba(45, 212, 191, 0.10) 26%,
-                    #f9fafb 60%);
-        }
-
-        body[data-theme="dark"] .finishing-create-page .page-wrap {
-            background:
-                radial-gradient(circle at top left,
-                    rgba(59, 130, 246, 0.25) 0,
-                    rgba(45, 212, 191, 0.15) 26%,
-                    #020617 60%);
-        }
-
-        .finishing-create-page .card-main {
+        .card-main {
             background: var(--card);
             border-radius: 16px;
-            border: 1px solid rgba(148, 163, 184, 0.35);
-            box-shadow:
-                0 14px 45px rgba(15, 23, 42, 0.22),
-                0 10px 18px rgba(15, 23, 42, 0.18);
+            padding: 0;
         }
 
-        .finishing-create-page .card-header-bar {
-            padding: 0.85rem 1.1rem;
-            border-bottom: 1px solid rgba(148, 163, 184, 0.35);
+        .card-header-bar {
+            padding: .85rem 1.1rem;
             display: flex;
-            align-items: center;
-            gap: .75rem;
             justify-content: space-between;
+            gap: .75rem;
+            align-items: center;
+            border-bottom: 1px solid rgba(148, 163, 184, .35);
         }
 
-        .finishing-create-page .card-header-title {
-            display: flex;
-            flex-direction: column;
-            gap: .15rem;
-        }
-
-        .finishing-create-page .card-header-title h1 {
-            font-size: 1.15rem;
-            font-weight: 600;
-            letter-spacing: .02em;
-            margin: 0;
-        }
-
-        .finishing-create-page .card-header-subtitle {
-            font-size: .77rem;
-            color: var(--muted-foreground);
-        }
-
-        .finishing-create-page .badge-soft-info {
+        .badge-soft-info {
             font-size: .7rem;
-            border-radius: 999px;
             padding: .25rem .55rem;
-            background: rgba(37, 99, 235, 0.08);
-            border: 1px solid rgba(59, 130, 246, 0.25);
-            color: #1d4ed8;
-            display: inline-flex;
-            align-items: center;
-            gap: .25rem;
-        }
-
-        .finishing-create-page .badge-status {
-            font-size: .7rem;
             border-radius: 999px;
-            padding: .25rem .6rem;
-            display: inline-flex;
-            align-items: center;
-            gap: .25rem;
-        }
-
-        .badge-status-draft {
-            background: rgba(251, 191, 36, 0.12);
-            border: 1px solid rgba(245, 158, 11, 0.35);
-            color: #92400e;
-        }
-
-        .badge-status-posted {
-            background: rgba(34, 197, 94, 0.10);
-            border: 1px solid rgba(22, 163, 74, 0.35);
-            color: #166534;
-        }
-
-        .badge-status-reject {
-            background: rgba(239, 68, 68, 0.10);
-            border: 1px solid rgba(220, 38, 38, 0.35);
-            color: #b91c1c;
-        }
-
-        .finishing-create-page .card-body-main {
-            padding: 1rem 1.1rem 1.1rem;
-        }
-
-        .finishing-create-page .section-title {
-            font-size: .8rem;
-            font-weight: 600;
-            text-transform: uppercase;
-            letter-spacing: .12em;
-            color: var(--muted-foreground);
-            margin-bottom: .45rem;
-        }
-
-        .finishing-create-page .summary-pill {
-            border-radius: 999px;
-            border: 1px dashed rgba(148, 163, 184, 0.7);
-            font-size: .75rem;
-            padding: .3rem .75rem;
-            display: inline-flex;
-            align-items: center;
-            gap: .25rem;
-            background: rgba(15, 23, 42, 0.02);
-        }
-
-        .finishing-create-page .summary-pill strong {
-            font-weight: 600;
-        }
-
-        .finishing-table-wrap {
-            border-radius: 12px;
-            border: 1px solid rgba(148, 163, 184, 0.35);
-            overflow: hidden;
-            background: var(--card);
         }
 
         .finishing-table {
             margin-bottom: 0;
         }
 
-        .finishing-table thead th {
-            background: rgba(15, 23, 42, 0.03);
-            font-size: .75rem;
-            text-transform: uppercase;
-            letter-spacing: .08em;
-            color: var(--muted-foreground);
-            border-bottom-width: 1px;
-            padding-block: .55rem;
-            white-space: nowrap;
-            position: sticky;
-            top: 0;
-            z-index: 5;
-        }
-
-        .finishing-table tbody td {
-            vertical-align: middle;
-            padding-block: .4rem;
-            font-size: .8rem;
-        }
-
-        .finishing-table tbody tr:nth-child(even) {
-            background: rgba(148, 163, 184, 0.06);
-        }
-
-        .finishing-table tbody tr:hover {
-            background: rgba(59, 130, 246, 0.08);
-        }
-
-        .finishing-create-page .item-label-main {
-            font-weight: 600;
-            font-size: .82rem;
-        }
-
-        .finishing-create-page .item-label-sub {
-            font-size: .72rem;
-            color: var(--muted-foreground);
-        }
-
-        .finishing-create-page .meta-line {
-            font-size: .7rem;
-            color: var(--muted-foreground);
-        }
-
-        .finishing-create-page .wip-badge {
+        .wip-badge {
             display: inline-flex;
             align-items: center;
             gap: .3rem;
             padding: .2rem .5rem;
             border-radius: 999px;
             font-size: .72rem;
-            background: rgba(16, 185, 129, 0.08);
-            color: #047857;
-        }
-
-        .finishing-create-page .wip-badge span {
-            font-weight: 600;
         }
 
         .qty-ok {
@@ -212,80 +59,27 @@
             font-weight: 600;
         }
 
-        .finishing-create-page .footer-actions {
-            display: flex;
-            justify-content: flex-end;
-            gap: .75rem;
-            margin-top: 1rem;
-            padding-top: .75rem;
-            border-top: 1px dashed rgba(148, 163, 184, 0.55);
+        .summary-pill {
+            border-radius: 999px;
+            border: 1px dashed rgba(148, 163, 184, .7);
+            padding: .3rem .75rem;
+            display: inline-flex;
+            gap: .25rem;
+            align-items: center;
+            background: rgba(15, 23, 42, .02);
         }
 
         @media (max-width: 767.98px) {
-            .finishing-table-wrap {
-                border-radius: 10px;
-            }
-
-            .finishing-table thead th {
-                font-size: .68rem;
-                padding-block: .4rem;
-            }
-
-            .finishing-table tbody td {
-                font-size: .72rem;
-                padding-block: .3rem;
-            }
-
-            .finishing-create-page .item-label-main {
-                font-size: .78rem;
-            }
-
-            .finishing-create-page .item-label-sub {
-                font-size: .68rem;
-            }
-
-            .finishing-create-page .meta-line {
-                font-size: .66rem;
-            }
-
-            .finishing-create-page .wip-badge {
-                font-size: .66rem;
-                padding: .18rem .45rem;
-            }
-
-            .finishing-create-page .card-header-bar {
-                flex-direction: column;
-                align-items: flex-start;
-            }
-
-            .finishing-create-page .footer-actions {
-                flex-direction: column-reverse;
-                align-items: stretch;
-            }
-
-            .finishing-create-page .card-header-subtitle {
-                font-size: .72rem;
-            }
-
-            /* Di mobile, hide kolom Operator terpisah – pindah ke bawah item */
             .col-operator-desktop {
                 display: none;
             }
 
-            .btn-edit {
-                border-radius: 999px;
-                padding-inline: 1.5rem;
-                box-shadow:
-                    0 10px 25px rgba(34, 197, 94, .35);
-                font-weight: 600;
-                letter-spacing: .03em;
-
+            .meta-stack-mobile {
+                display: block;
             }
         }
 
         @media (min-width: 768px) {
-
-            /* Di desktop, meta-stack mobile disembunyikan */
             .meta-stack-mobile {
                 display: none;
             }
@@ -309,111 +103,107 @@
             @if (session('success'))
                 <div class="alert alert-success alert-dismissible fade show mb-3" role="alert">
                     {{ session('success') }}
-                    <button type="button" class="btn-close" data-bs-dismiss="alert" aria-label="Close"></button>
+                    <button type="button" class="btn-close" data-bs-dismiss="alert"></button>
                 </div>
             @endif
 
             @if (session('error'))
                 <div class="alert alert-danger alert-dismissible fade show mb-3" role="alert">
                     {{ session('error') }}
-                    <button type="button" class="btn-close" data-bs-dismiss="alert" aria-label="Close"></button>
+                    <button type="button" class="btn-close" data-bs-dismiss="alert"></button>
                 </div>
             @endif
 
             <div class="card card-main">
-                {{-- HEADER --}}
                 <div class="card-header-bar">
-                    <div class="card-header-title">
-                        <h1>Finishing</h1>
-                        <div class="card-header-subtitle">
-                            Kode <strong>{{ $job->code }}</strong> ·
-                            {{ $job->date?->format('d M Y') }}
+                    <div>
+                        <h1 style="margin:0; font-size:1.15rem;">Finishing</h1>
+                        <div class="text-muted" style="font-size:.88rem;">
+                            Kode <strong>{{ $job->code }}</strong> · {{ $job->date?->format('d M Y') ?? '-' }}
                         </div>
                     </div>
 
-                    <div class="d-flex flex-column flex-sm-row gap-2 align-items-sm-center">
-                        {{-- STATUS BADGE --}}
+                    <div class="d-flex gap-2 align-items-center">
                         <div class="badge-status {{ $isPosted ? 'badge-status-posted' : 'badge-status-draft' }}">
                             <i class="bi {{ $isPosted ? 'bi-check-circle' : 'bi-pencil-square' }}"></i>
-                            <span>{{ strtoupper($job->status) }}</span>
+                            <span class="ms-1">{{ strtoupper($job->status) }}</span>
                         </div>
 
                         @if ($isPosted && !$hasReject)
                             <div class="badge-soft-info">
                                 <i class="bi bi-lightning-charge"></i>
-                                <span>AUTO-POSTED (0 reject)</span>
+                                <span class="ms-1">AUTO-POSTED (0 reject)</span>
                             </div>
-                        @elseif($hasReject)
+                        @elseif ($hasReject)
                             <div class="badge-status badge-status-reject">
                                 <i class="bi bi-exclamation-triangle"></i>
-                                <span>HAS REJECT</span>
+                                <span class="ms-1">HAS REJECT</span>
                             </div>
                         @endif
                     </div>
                 </div>
 
-                <div class="card-body-main">
+                <div class="card-body-main p-3">
                     {{-- RINGKASAN --}}
-                    <div class="mb-3">
-                        <div class="section-title">Ringkasan</div>
-                        <div class="d-flex flex-wrap gap-2 align-items-center">
-                            <div class="summary-pill">
-                                <i class="bi bi-collection"></i>
-                                <span>Lines:</span>
-                                <strong>{{ $totalLines }} baris</strong>
-                            </div>
+                    <div class="mb-3 d-flex flex-wrap gap-2 align-items-center">
+                        <div class="section-title mb-0">Ringkasan</div>
 
-                            <div class="summary-pill">
-                                <i class="bi bi-check2-circle"></i>
-                                <span>Total OK:</span>
-                                <strong>{{ number_format($totalOk, 0, ',', '.') }} pcs</strong>
-                            </div>
-
-                            <div class="summary-pill">
-                                <i class="bi bi-x-octagon"></i>
-                                <span>Total Reject:</span>
-                                <strong>{{ number_format($totalReject, 0, ',', '.') }} pcs</strong>
-                            </div>
-
-                            @if ($job->notes)
-                                <div class="summary-pill">
-                                    <i class="bi bi-journal-text"></i>
-                                    <span>Catatan:</span>
-                                    <strong>{{ $job->notes }}</strong>
-                                </div>
-                            @endif
+                        <div class="summary-pill">
+                            <i class="bi bi-collection"></i>
+                            <span>Lines:</span>
+                            <strong>{{ $totalLines }} baris</strong>
                         </div>
+
+                        <div class="summary-pill">
+                            <i class="bi bi-check2-circle"></i>
+                            <span>Total OK:</span>
+                            <strong>{{ number_format($totalOk, 0, ',', '.') }} pcs</strong>
+                        </div>
+
+                        <div class="summary-pill">
+                            <i class="bi bi-x-octagon"></i>
+                            <span>Total Reject:</span>
+                            <strong>{{ number_format($totalReject, 0, ',', '.') }} pcs</strong>
+                        </div>
+
+                        @if ($job->notes)
+                            <div class="summary-pill"><i
+                                    class="bi bi-journal-text"></i><strong>{{ $job->notes }}</strong></div>
+                        @endif
                     </div>
 
                     {{-- TABEL DETAIL --}}
-                    <div class="finishing-table-wrap mb-2">
+                    <div class="finishing-table-wrap mb-3">
                         <div class="table-responsive">
                             <table class="table table-sm table-hover align-middle finishing-table mb-0">
                                 <thead>
                                     <tr>
-                                        <th class="text-center" style="width: 5%;">No</th>
-                                        <th style="width: 45%;">Item</th>
-                                        <th class="text-end" style="width: 16%;">Qty IN</th>
-                                        <th class="text-end" style="width: 12%;">OK</th>
-                                        <th class="text-end" style="width: 12%;">Reject</th>
-                                        <th class="col-operator-desktop" style="width: 15%;">Operator &amp; Reject</th>
+                                        <th class="text-center" style="width:5%;">No</th>
+                                        <th style="width:45%;">Item</th>
+                                        <th class="text-end" style="width:12%;">Qty IN</th>
+                                        <th class="text-end" style="width:12%;">OK</th>
+                                        <th class="text-end" style="width:12%;">Reject</th>
+                                        <th class="col-operator-desktop" style="width:15%;">Operator &amp; Reject</th>
                                     </tr>
                                 </thead>
                                 <tbody>
-                                    @forelse ($job->lines as $idx => $line)
+                                    @forelse ($job->lines as $line)
                                         @php
-                                            $item = $line->item ?? $line->bundle?->item;
+                                            // item fallback
+                                            $item =
+                                                $line->item ?? ($line->bundle?->finishedItem ?? $line->bundle?->item);
                                             $bundle = $line->bundle;
-                                            $op = $line->sewingOperator;
-                                            $qtyIn = $line->qty_in ?? $line->qty_ok + $line->qty_reject;
+                                            // sewing operator: prefer relation, fallback to name column, fallback to pickup operator text
+
+                                            $sewingOpModel = $line->sewingOperator ?? null;
+                                            $sewingOpName = $sewingOpModel
+                                                ? ($sewingOpModel->code ?? '') . ' ' . ($sewingOpModel->name ?? '')
+                                                : $line->sewing_operator_name ?? null;
+                                            $qtyIn = $line->qty_in ?? ($line->qty_ok ?? 0) + ($line->qty_reject ?? 0);
                                         @endphp
                                         <tr>
-                                            {{-- NO --}}
-                                            <td class="text-center">
-                                                {{ $loop->iteration }}
-                                            </td>
+                                            <td class="text-center">{{ $loop->iteration }}</td>
 
-                                            {{-- ITEM + meta stack mobile --}}
                                             <td>
                                                 <div class="item-label-main">
                                                     @if ($item)
@@ -423,78 +213,62 @@
                                                     @endif
                                                 </div>
 
-                                                {{-- META MOBILE (bundle + operator + alasan reject) --}}
                                                 <div class="meta-stack-mobile mt-1">
-                                                    <div class="meta-line">
-                                                        <i class="bi bi-box-seam"></i>
-                                                        Bundle:
-                                                        <strong>{{ $bundle->code ?? ('#' . $bundle->id ?? '-') }}</strong>
+                                                    <div class="meta-line"><i class="bi bi-box-seam"></i> Bundle:
+                                                        <strong>{{ $bundle?->code ?? '#' . ($bundle->id ?? '-') }}</strong>
                                                     </div>
 
                                                     <div class="meta-line">
-                                                        @if ($op)
-                                                            <i class="bi bi-person"></i>
-                                                            {{ $op->code ?? '' }} {{ $op->name }}
+                                                        @if ($sewingOpName)
+                                                            <i class="bi bi-person"></i> {{ $sewingOpName }}
                                                         @else
-                                                            <i class="bi bi-person-dash"></i>
-                                                            Operator Sewing Return
+                                                            <i class="bi bi-person-dash"></i> Operator Sewing Return
                                                         @endif
                                                     </div>
 
-                                                    @if ($line->qty_reject > 0)
-                                                        <div class="meta-line">
-                                                            <i class="bi bi-exclamation-circle text-danger"></i>
+                                                    @if ((float) $line->qty_reject > 0)
+                                                        <div class="meta-line text-danger"><i
+                                                                class="bi bi-exclamation-circle"></i>
                                                             {{ $line->reject_reason ?? 'Reject' }}
                                                         </div>
                                                     @endif
                                                 </div>
 
-                                                {{-- META DESKTOP kecil --}}
                                                 <div class="item-label-sub d-none d-md-block mt-1">
-                                                    <i class="bi bi-box-seam"></i>
-                                                    Bundle:
-                                                    <strong>{{ $bundle->code ?? ('#' . $bundle->id ?? '-') }}</strong>
+                                                    <i class="bi bi-box-seam"></i> Bundle:
+                                                    <strong>{{ $bundle?->code ?? '#' . ($bundle->id ?? '-') }}</strong>
                                                 </div>
                                             </td>
 
-                                            {{-- QTY IN --}}
                                             <td class="text-end">
                                                 <span class="wip-badge">
                                                     <i class="bi bi-arrow-up-circle"></i>
                                                     <span>{{ number_format($qtyIn, 0, ',', '.') }}</span>
-                                                    <small>pcs</small>
+                                                    <small> pcs</small>
                                                 </span>
                                             </td>
 
-                                            {{-- QTY OK --}}
-                                            <td class="text-end">
-                                                <span class="qty-ok">
-                                                    {{ number_format($line->qty_ok, 0, ',', '.') }}
-                                                </span>
+                                            <td class="text-end"><span
+                                                    class="qty-ok">{{ number_format($line->qty_ok ?? 0, 0, ',', '.') }}</span>
                                             </td>
 
-                                            {{-- QTY REJECT --}}
-                                            <td class="text-end">
-                                                <span class="qty-reject">
-                                                    {{ number_format($line->qty_reject, 0, ',', '.') }}
-                                                </span>
+                                            <td class="text-end"><span
+                                                    class="qty-reject">{{ number_format($line->qty_reject ?? 0, 0, ',', '.') }}</span>
                                             </td>
 
-                                            {{-- OPERATOR & REJECT (desktop only) --}}
                                             <td class="col-operator-desktop">
                                                 <div class="item-label-sub mb-1">
-                                                    @if ($op)
+                                                    @if ($sewingOpName)
                                                         <i class="bi bi-person"></i>
-                                                        <strong>{{ $op->code ?? '' }} {{ $op->name }}</strong>
+                                                        <strong>{{ $sewingOpName }}</strong>
                                                     @else
-                                                        <i class="bi bi-person-dash"></i>
-                                                        <em>Operator Sewing Return</em>
+                                                        <i class="bi bi-person-dash"></i> <em>Operator Sewing Return</em>
                                                     @endif
                                                 </div>
 
-                                                @if ($line->qty_reject > 0)
-                                                    <div class="item-label-sub">
-                                                        <i class="bi bi-exclamation-circle text-danger"></i>
+                                                @if ((float) $line->qty_reject > 0)
+                                                    <div class="item-label-sub text-danger">
+                                                        <i class="bi bi-exclamation-circle"></i>
                                                         {{ $line->reject_reason ?? 'Reject' }}
                                                     </div>
                                                 @endif
@@ -502,9 +276,8 @@
                                         </tr>
                                     @empty
                                         <tr>
-                                            <td colspan="6" class="text-center py-4 text-muted">
-                                                Tidak ada detail finishing.
-                                            </td>
+                                            <td colspan="6" class="text-center py-4 text-muted">Tidak ada detail
+                                                finishing.</td>
                                         </tr>
                                     @endforelse
                                 </tbody>
@@ -512,19 +285,87 @@
                         </div>
                     </div>
 
+                    {{-- HPP SNAPSHOTS (RM-only) --}}
+                    <div class="mb-3">
+                        <div class="section-title">HPP Snapshots (RM-only)</div>
+                        @if ($rmSnapshots->isNotEmpty())
+                            <div class="table-responsive">
+                                <table class="table table-sm mb-0">
+                                    <thead>
+                                        <tr>
+                                            <th>Tanggal</th>
+                                            <th>Item</th>
+                                            <th class="text-end">Qty Basis</th>
+                                            <th class="text-end">RM/unit</th>
+                                            <th>Catatan</th>
+                                        </tr>
+                                    </thead>
+                                    <tbody>
+                                        @foreach ($rmSnapshots as $s)
+                                            <tr>
+                                                <td>{{ optional($s->snapshot_date)->format('d M Y') ?? $s->snapshot_date }}
+                                                </td>
+                                                <td>{{ optional($s->item)->code ?? $s->item_id }}</td>
+                                                <td class="text-end">
+                                                    {{ number_format($s->qty_basis ?? ($s->qtyBasis ?? 0), 0, ',', '.') }}
+                                                </td>
+                                                <td class="text-end">
+                                                    {{ number_format($s->rm_unit_cost ?? ($s->rmUnitCost ?? 0), 2, ',', '.') }}
+                                                </td>
+                                                <td>{{ $s->notes ?? '' }}</td>
+                                            </tr>
+                                        @endforeach
+                                    </tbody>
+                                </table>
+                            </div>
+                        @else
+                            <div class="text-muted small">Belum ada snapshot HPP untuk finishing ini.</div>
+                        @endif
+                    </div>
+
                     {{-- FOOTER ACTIONS --}}
                     <div class="footer-actions">
                         <a href="{{ route('production.finishing_jobs.index') }}" class="btn btn-sm btn-outline-secondary">
-                            <i class="bi bi-arrow-left"></i>
-                            <span class="ms-1">Kembali</span>
+                            <i class="bi bi-arrow-left"></i> <span class="ms-1">Kembali</span>
                         </a>
 
                         @if (!$isPosted)
                             <a href="{{ route('production.finishing_jobs.edit', $job->id) }}"
-                                class="btn btn-sm btn-success d-inline-flex align-items-center gap-1 btn-save ">
-                                <i class="bi bi-pencil-square"></i>
-                                <span class="text-white">Edit</span>
+                                class="btn btn-sm btn-success ms-2">
+                                <i class="bi bi-pencil-square"></i> Edit
                             </a>
+                        @endif
+
+                        @if (!$isPosted && $hasReject)
+                            @can('forcePost', $job)
+                                <form id="force-post-form"
+                                    action="{{ route('production.finishing_jobs.force_post', $job->id) }}" method="POST"
+                                    class="d-inline-block ms-2"
+                                    onsubmit="return confirm('Post sekarang? Semua reject akan diabaikan. Lanjutkan?')">
+                                    @csrf
+                                    <button id="btn-force-post" type="submit" class="btn btn-sm btn-danger">
+                                        <i class="bi bi-bolt-fill"></i> POST SEKARANG
+                                    </button>
+                                </form>
+                            @else
+                                @php
+                                    $u = Auth::user();
+                                    $allowed = method_exists($u, 'hasRole')
+                                        ? $u->hasRole('owner') || $u->hasRole('admin')
+                                        : in_array($u->role ?? null, ['owner', 'admin']);
+                                @endphp
+                                @if ($allowed)
+                                    <form id="force-post-form"
+                                        action="{{ route('production.finishing_jobs.force_post', $job->id) }}" method="POST"
+                                        class="d-inline-block ms-2"
+                                        onsubmit="return confirm('Post sekarang? Semua reject akan diabaikan. Lanjutkan?')">
+                                        @csrf
+                                        <button id="btn-force-post" type="submit" class="btn btn-sm btn-danger">
+                                            <i class="bi bi-bolt-fill"></i> POST SEKARANG
+                                        </button>
+                                    </form>
+                                @endif
+                            @endcan
                         @endif
                     </div>
                 </div>
@@ -533,3 +374,19 @@
         </div>
     </div>
 @endsection
+
+@push('scripts')
+    <script>
+        document.addEventListener('DOMContentLoaded', function() {
+            const form = document.getElementById('force-post-form');
+            if (!form) return;
+            const btn = document.getElementById('btn-force-post');
+            form.addEventListener('submit', function() {
+                if (btn) {
+                    btn.setAttribute('disabled', 'disabled');
+                    btn.innerHTML = '<i class="bi bi-hourglass-split"></i> Memproses...';
+                }
+            });
+        });
+    </script>
+@endpush

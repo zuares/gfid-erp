@@ -259,6 +259,9 @@
         $totalLines = is_iterable($linesData) ? count($linesData) : 0;
         $totalOk = 0;
         $totalReject = 0;
+
+        // apakah job sudah posted? (jika posted -> nonaktifkan form)
+        $isPosted = (string) ($job->status ?? '') === 'posted';
     @endphp
 
     <div class="finishing-create-page">
@@ -267,6 +270,14 @@
                 <div class="alert alert-danger alert-dismissible fade show mb-3" role="alert">
                     <strong>Oops!</strong> Ada error input. Silakan cek form di bawah.
                     <button type="button" class="btn-close" data-bs-dismiss="alert" aria-label="Close"></button>
+                </div>
+            @endif
+
+            @if ($isPosted)
+                <div class="alert alert-info mb-3">
+                    <i class="bi bi-lock-fill"></i>
+                    Finishing Job ini sudah <strong>POSTED</strong>. Form dinonaktifkan untuk mencegah perubahan data yang
+                    sudah diproses.
                 </div>
             @endif
 
@@ -289,7 +300,8 @@
                     </div>
                 </div>
 
-                <form action="{{ route('production.finishing_jobs.update', $job->id) }}" method="POST">
+                <form action="{{ route('production.finishing_jobs.update', $job->id) }}" method="POST"
+                    @if ($isPosted) onsubmit="return false;" @endif novalidate>
                     @csrf
                     @method('PUT')
 
@@ -300,7 +312,7 @@
                                 <label class="form-label form-label-sm mb-1">Tanggal</label>
                                 <input type="date" name="date"
                                     class="form-control form-control-sm @error('date') is-invalid @enderror"
-                                    value="{{ $dateDefault }}">
+                                    value="{{ $dateDefault }}" @disabled($isPosted)>
                                 @error('date')
                                     <div class="invalid-feedback">{{ $message }}</div>
                                 @enderror
@@ -315,7 +327,7 @@
                             <div class="col-12 col-md-6">
                                 <label class="form-label form-label-sm mb-1">Catatan</label>
                                 <textarea name="notes" rows="1" class="form-control form-control-sm @error('notes') is-invalid @enderror"
-                                    placeholder="Catatan tambahan untuk transaksi ini">{{ old('notes', $job->notes) }}</textarea>
+                                    placeholder="Catatan tambahan untuk transaksi ini" @disabled($isPosted)>{{ old('notes', $job->notes) }}</textarea>
                                 @error('notes')
                                     <div class="invalid-feedback">{{ $message }}</div>
                                 @enderror
@@ -452,7 +464,8 @@
                                                 <td class="text-end">
                                                     <input type="number" name="lines[{{ $idx }}][qty_ok]"
                                                         class="form-control form-control-sm text-end qty-ok-input @error("lines.$idx.qty_ok") is-invalid @enderror"
-                                                        value="{{ $qtyOk }}" min="0" step="1">
+                                                        value="{{ (int) $qtyOk }}" min="0" step="1"
+                                                        inputmode="numeric" pattern="\d*" @disabled($isPosted)>
                                                     @error("lines.$idx.qty_ok")
                                                         <div class="invalid-feedback d-block text-start">
                                                             {{ $message }}
@@ -464,7 +477,8 @@
                                                 <td class="text-end">
                                                     <input type="number" name="lines[{{ $idx }}][qty_reject]"
                                                         class="form-control form-control-sm text-end qty-reject-input @error("lines.$idx.qty_reject") is-invalid @enderror"
-                                                        value="{{ $qtyReject }}" min="0" step="1">
+                                                        value="{{ (int) $qtyReject }}" min="0" step="1"
+                                                        inputmode="numeric" pattern="\d*" @disabled($isPosted)>
                                                     @error("lines.$idx.qty_reject")
                                                         <div class="invalid-feedback d-block text-start">
                                                             {{ $message }}
@@ -477,7 +491,7 @@
                                                     <input type="text" name="lines[{{ $idx }}][reject_reason]"
                                                         class="form-control form-control-sm @error("lines.$idx.reject_reason") is-invalid @enderror"
                                                         placeholder="Alasan singkat (opsional)"
-                                                        value="{{ $rejectReason }}">
+                                                        value="{{ $rejectReason }}" @disabled($isPosted)>
                                                     @error("lines.$idx.reject_reason")
                                                         <div class="invalid-feedback">
                                                             {{ $message }}
@@ -527,11 +541,20 @@
                                 <i class="bi bi-arrow-left"></i>
                                 <span class="ms-1">Batal</span>
                             </a>
-                            <button type="submit"
-                                class="btn btn-sm btn-success d-inline-flex align-items-center gap-1 btn-save">
-                                <i class="bi bi-check2-circle"></i>
-                                <span class="text-white">Simpan Perubahan</span>
-                            </button>
+
+                            @if ($isPosted)
+                                <button type="button"
+                                    class="btn btn-sm btn-secondary d-inline-flex align-items-center gap-1" disabled>
+                                    <i class="bi bi-lock-fill"></i>
+                                    <span>DIPOSTED — Tidak bisa diubah</span>
+                                </button>
+                            @else
+                                <button type="submit"
+                                    class="btn btn-sm btn-success d-inline-flex align-items-center gap-1 btn-save">
+                                    <i class="bi bi-check2-circle"></i>
+                                    <span class="text-white">Simpan Perubahan</span>
+                                </button>
+                            @endif
                         </div>
                     </div>
                 </form>
@@ -540,3 +563,110 @@
         </div>
     </div>
 @endsection
+
+@push('scripts')
+    <script>
+        document.addEventListener('DOMContentLoaded', function() {
+            const isPosted = @json($isPosted);
+
+            // safety: jika posted, disable all interactive controls (double-safety)
+            if (isPosted) {
+                const form = document.querySelector('form');
+                if (form) {
+                    // disable non-link controls
+                    const controls = form.querySelectorAll('input, textarea, select, button');
+                    controls.forEach(c => {
+                        if (c.tagName === 'A') return;
+                        // keep hidden inputs enabled so server receives them
+                        if (c.type && c.type.toLowerCase() === 'hidden') return;
+                        c.setAttribute('disabled', 'disabled');
+                    });
+                }
+            }
+
+            // --- NEW: Block decimals by sanitizing input characters immediately
+            const integerInputs = document.querySelectorAll('input[name*="[qty_ok]"], input[name*="[qty_reject]"]');
+
+            integerInputs.forEach(el => {
+                // sanitize on paste as well
+                el.addEventListener('paste', function(e) {
+                    e.preventDefault();
+                    const text = (e.clipboardData || window.clipboardData).getData('text');
+                    const digits = text.replace(/[^0-9]/g, '');
+                    document.execCommand('insertText', false, digits);
+                });
+
+                el.addEventListener('input', function() {
+                    // keep only digits (remove dots, commas, minus, spaces, letters)
+                    const clean = this.value.replace(/[^0-9]/g, '');
+                    // prevent leading zeros (optional): keep as-is to not surprise user
+                    if (this.value !== clean) {
+                        this.value = clean;
+                    }
+                });
+
+                // optional: prevent wheel changing number on focus (UI annoyance)
+                el.addEventListener('wheel', function(e) {
+                    if (document.activeElement === this) {
+                        e.preventDefault();
+                    }
+                }, {
+                    passive: false
+                });
+            });
+
+            // UX guard: pastikan qty_reject tidak boleh lebih besar dari qty_in
+            const table = document.querySelector('.finishing-table');
+            if (!table) return;
+
+            table.addEventListener('input', function(e) {
+                const el = e.target;
+                if (!el.name) return;
+
+                const match = el.name.match(/lines\[(\d+)\]\[(\w+)\]/);
+                if (!match) return;
+                const idx = match[1];
+                const field = match[2];
+
+                const qtyInEl = document.querySelector(`[name="lines[${idx}][qty_in]"]`);
+                const qtyOkEl = document.querySelector(`[name="lines[${idx}][qty_ok]"]`);
+                const qtyRejectEl = document.querySelector(`[name="lines[${idx}][qty_reject]"]`);
+
+                const qtyIn = parseFloat(qtyInEl?.value || 0);
+                let qtyOk = parseFloat(qtyOkEl?.value || 0);
+                let qtyReject = parseFloat(qtyRejectEl?.value || 0);
+
+                // ensure numeric (NaN -> 0)
+                if (isNaN(qtyOk)) qtyOk = 0;
+                if (isNaN(qtyReject)) qtyReject = 0;
+
+                // don't let OK + REJECT exceed IN
+                if (qtyOk + qtyReject > qtyIn) {
+                    // adjust the field that was changed
+                    if (field === 'qty_ok') {
+                        qtyOk = Math.max(0, qtyIn - qtyReject);
+                        if (qtyOkEl) qtyOkEl.value = Math.floor(qtyOk);
+                    } else if (field === 'qty_reject') {
+                        qtyReject = Math.max(0, qtyIn - qtyOk);
+                        if (qtyRejectEl) qtyRejectEl.value = Math.floor(qtyReject);
+                    } else {
+                        // fallback: clamp both
+                        if (qtyOkEl) qtyOkEl.value = Math.max(0, Math.min(qtyOk, qtyIn));
+                        if (qtyRejectEl) qtyRejectEl.value = Math.max(0, Math.min(qtyReject, qtyIn -
+                        qtyOk));
+                    }
+                }
+
+                // ensure reject <= qty_in
+                if (qtyReject > qtyIn) {
+                    if (qtyRejectEl) qtyRejectEl.value = Math.floor(qtyIn);
+                }
+
+                // ensure ok <= qty_in
+                if (qtyOk > qtyIn) {
+                    if (qtyOkEl) qtyOkEl.value = Math.floor(qtyIn);
+                }
+            });
+        });
+    </script>
+@endpush

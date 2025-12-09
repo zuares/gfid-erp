@@ -154,7 +154,10 @@ Route::middleware(['web', 'auth', 'role:owner,operating'])->group(function () {
         | FINISHING JOBS + REPORTS
         |--------------------------------------------------------------------------
          */
-
+            Route::get('production/finishing_jobs/bundle-row', [FinishingJobController::class, 'bundle_row'])
+                ->name('finishing_jobs.bundle_row');
+            Route::get('production/finishing_jobs/bundle-info', [FinishingJobController::class, 'bundle_info'])
+                ->name('finishing_jobs.bundle_info');
             Route::post('finishing_jobs/{finishing_job}/post', [FinishingJobController::class, 'post'])
                 ->name('finishing_jobs.post');
 
@@ -173,8 +176,10 @@ Route::middleware(['web', 'auth', 'role:owner,operating'])->group(function () {
             Route::get('finishing_jobs/report/per-item/{item}', [FinishingJobController::class, 'reportPerItemDetail'])
                 ->name('finishing_jobs.report_per_item_detail');
             // AJAX: tambah 1 baris bundle finishing
-            Route::get('finishing_jobs/bundle-row', [FinishingJobController::class, 'bundleRow'])
-                ->name('finishing_jobs.bundle_row');
+
+            Route::post('finishing_jobs/{finishingJob}/post',
+                [FinishingJobController::class, 'forcePost']
+            )->name('finishing_jobs.force_post');
 
             /*
         |--------------------------------------------------------------------------

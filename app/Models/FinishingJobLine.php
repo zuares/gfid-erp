@@ -20,6 +20,8 @@ class FinishingJobLine extends Model
         'reject_reason',
         'reject_notes',
         'processed_at',
+        'sewing_operator_id', // new
+        'sewing_operator_name', // new
     ];
 
     protected $casts = [
@@ -47,6 +49,11 @@ class FinishingJobLine extends Model
     public function item(): BelongsTo
     {
         return $this->belongsTo(Item::class, 'item_id');
+    }
+
+    public function sewingOperator()
+    {
+        return $this->belongsTo(\App\Models\User::class, 'operator_sewing_id');
     }
 
 }
