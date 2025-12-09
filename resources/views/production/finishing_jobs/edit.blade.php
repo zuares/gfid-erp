@@ -250,6 +250,9 @@
 
 @section('content')
     @php
+        // fallback dateDefault untuk menghindari Undefined variable
+        $dateDefault = old('date', optional($job->date)->format('Y-m-d') ?? now()->format('Y-m-d'));
+
         $oldLines = old('lines');
         $linesData = $oldLines ?? $lines;
 
@@ -274,7 +277,7 @@
                         <h1>Edit Finishing</h1>
                         <div class="card-header-subtitle">
                             Kode: <strong>{{ $job->code }}</strong> &middot;
-                            Tanggal lama: <strong>{{ $job->date?->format('d M Y') }}</strong>
+                            Tanggal lama: <strong>{{ optional($job->date)->format('d M Y') ?? '-' }}</strong>
                         </div>
                     </div>
 
@@ -297,7 +300,7 @@
                                 <label class="form-label form-label-sm mb-1">Tanggal</label>
                                 <input type="date" name="date"
                                     class="form-control form-control-sm @error('date') is-invalid @enderror"
-                                    value="{{ old('date', $dateDefault) }}">
+                                    value="{{ $dateDefault }}">
                                 @error('date')
                                     <div class="invalid-feedback">{{ $message }}</div>
                                 @enderror
@@ -338,42 +341,57 @@
                                             @php
                                                 $isOld = is_array($line);
 
-                                                $lineId = $isOld ? $line['id'] ?? null : $line->id;
-                                                $bundleId = $isOld ? $line['bundle_id'] ?? null : $line->bundle_id;
-                                                $itemId = $isOld ? $line['item_id'] ?? null : $line->item_id;
+                                                $lineId = $isOld ? $line['id'] ?? null : $line->id ?? null;
+                                                $bundleId = $isOld
+                                                    ? $line['bundle_id'] ?? null
+                                                    : $line->bundle_id ?? null;
+                                                $itemId = $isOld ? $line['item_id'] ?? null : $line->item_id ?? null;
 
-                                                $qtyIn = $isOld
-                                                    ? $line['qty_in'] ??
-                                                        ($line['qty_ok'] ?? 0) + ($line['qty_reject'] ?? 0)
-                                                    : $line->qty_in ?? $line->qty_ok + $line->qty_reject;
+                                                // hitung qty_in dengan aman
+                                                if ($isOld) {
+                                                    $qtyIn =
+                                                        $line['qty_in'] ??
+                                                        (float) ($line['qty_ok'] ?? 0) +
+                                                            (float) ($line['qty_reject'] ?? 0);
+                                                } else {
+                                                    $qtyIn =
+                                                        $line->qty_in ??
+                                                        (float) ($line->qty_ok ?? 0) + (float) ($line->qty_reject ?? 0);
+                                                }
 
                                                 $qtyOk = old(
                                                     "lines.$idx.qty_ok",
-                                                    $isOld ? $line['qty_ok'] ?? 0 : $line->qty_ok,
+                                                    $isOld ? $line['qty_ok'] ?? 0 : $line->qty_ok ?? 0,
                                                 );
                                                 $qtyReject = old(
                                                     "lines.$idx.qty_reject",
-                                                    $isOld ? $line['qty_reject'] ?? 0 : $line->qty_reject,
+                                                    $isOld ? $line['qty_reject'] ?? 0 : $line->qty_reject ?? 0,
                                                 );
                                                 $rejectReason = old(
                                                     "lines.$idx.reject_reason",
-                                                    $isOld ? $line['reject_reason'] ?? null : $line->reject_reason,
+                                                    $isOld ? $line['reject_reason'] ?? '' : $line->reject_reason ?? '',
                                                 );
 
+                                                // ambil model bundle & item secara aman (bila form old, fallback cari model)
                                                 $bundleModel = $isOld
                                                     ? \App\Models\CuttingJobBundle::find($bundleId)
-                                                    : $line->bundle;
+                                                    : $line->bundle ?? null;
 
                                                 $item = $isOld
                                                     ? \App\Models\Item::find($itemId)
-                                                    : $line->item ?? $bundleModel?->item;
+                                                    : $line->item ?? ($bundleModel?->item ?? null);
+
+                                                // label bundle
+                                                $bundleLabel = $bundleModel?->code
+                                                    ? $bundleModel->code
+                                                    : '#' . ($bundleModel?->id ?? '-');
 
                                                 $totalOk += (float) $qtyOk;
                                                 $totalReject += (float) $qtyReject;
                                             @endphp
 
                                             <tr>
-                                                {{-- hidden fields (dalam cell pertama biar valid HTML) --}}
+                                                {{-- hidden fields --}}
                                                 <td class="text-center">
                                                     {{ $loop->iteration }}
 
@@ -391,19 +409,29 @@
                                                 <td>
                                                     <div class="item-label-main">
                                                         @if ($item)
-                                                            {{ $item->code }} — {{ $item->name }}
+                                                            {{-- Mobile: hanya kode item --}}
+                                                            <span class="d-inline d-md-none">
+                                                                {{ $item->code }}
+                                                            </span>
+
+                                                            {{-- Desktop: kode + nama --}}
+                                                            <span class="d-none d-md-inline">
+                                                                {{ $item->code }} — {{ $item->name }}
+                                                            </span>
                                                         @else
                                                             <em>Item tidak ditemukan</em>
                                                         @endif
                                                     </div>
-                                                    <div class="item-label-sub">
-                                                        Item ID: {{ $item->id ?? '-' }}
+
+                                                    {{-- Item ID & Bundle hanya tampil di desktop --}}
+                                                    <div class="item-label-sub d-none d-md-block">
+                                                        Item ID: {{ optional($item)->id ?? '-' }}
                                                     </div>
 
-                                                    <div class="item-label-sub mt-1">
+                                                    <div class="item-label-sub mt-1 d-none d-md-block">
                                                         <i class="bi bi-box-seam"></i>
                                                         Bundle:
-                                                        <strong>{{ $bundleModel->code ?? ('#' . $bundleModel->id ?? '-') }}</strong>
+                                                        <strong>{{ $bundleLabel }}</strong>
                                                     </div>
 
                                                     @error("lines.$idx.bundle_id")

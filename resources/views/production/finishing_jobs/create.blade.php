@@ -177,7 +177,6 @@
                 0 10px 25px rgba(34, 197, 94, .35);
             font-weight: 600;
             letter-spacing: .03em;
-
         }
 
         .finishing-create-page .footer-actions {
@@ -277,8 +276,11 @@
 
                     <div class="card-body-main">
                         @php
+                            // fallback date
+                            $dateDefault = old('date', $date ?? now()->toDateString());
                             $defaultGlobalOperator = old('operator_global_id') ?? (auth()->user()->employee_id ?? null);
                             $userRole = auth()->user()->role ?? null;
+                            $linesOld = old('lines', []);
                         @endphp
 
                         {{-- HEADER FORM: Tanggal + Operator + Catatan (desktop only, non-operating) --}}
@@ -287,7 +289,7 @@
                                 <label class="form-label form-label-sm mb-1">Tanggal</label>
                                 <input type="date" name="date"
                                     class="form-control form-control-sm @error('date') is-invalid @enderror"
-                                    value="{{ old('date', $date ?? now()->toDateString()) }}">
+                                    value="{{ $dateDefault }}">
                                 @error('date')
                                     <div class="invalid-feedback">{{ $message }}</div>
                                 @enderror
@@ -327,6 +329,7 @@
                         {{-- SUMMARY WIP --}}
                         @php
                             $grandWip = collect($lines ?? [])->sum('total_wip');
+                            $itemCount = count($lines ?? []);
                         @endphp
                         <div class="mb-3 d-flex flex-wrap gap-2 align-items-center">
                             <div class="section-title mb-0">Ringkasan WIP-FIN</div>
@@ -340,7 +343,7 @@
                             <div class="summary-pill">
                                 <i class="bi bi-box-seam"></i>
                                 <span>Total item siap Finishing:</span>
-                                <strong>{{ count($lines ?? []) }} item</strong>
+                                <strong>{{ $itemCount }} item</strong>
                             </div>
                         </div>
 
@@ -361,19 +364,18 @@
                                     <tbody>
                                         @forelse ($lines as $idx => $line)
                                             @php
-                                                $oldLines = old('lines', []);
-                                                $oldLine = $oldLines[$idx] ?? null;
+                                                // gunakan old values bila ada
+                                                $oldLine = $linesOld[$idx] ?? [];
 
-                                                $itemId = $oldLine['item_id'] ?? $line['item_id'];
-                                                $qtyReject = $oldLine['qty_reject'] ?? $line['qty_reject'];
-                                                $rejectReason = $oldLine['reject_reason'] ?? $line['reject_reason'];
+                                                $itemId = $oldLine['item_id'] ?? ($line['item_id'] ?? null);
+                                                $totalWip = $oldLine['total_wip'] ?? ($line['total_wip'] ?? 0);
+                                                $qtyIn = $oldLine['qty_in'] ?? ($line['qty_in'] ?? $totalWip);
+                                                $qtyReject = $oldLine['qty_reject'] ?? ($line['qty_reject'] ?? 0);
+                                                $rejectReason =
+                                                    $oldLine['reject_reason'] ?? ($line['reject_reason'] ?? '');
 
-                                                $totalWip =
-                                                    $oldLine['total_wip'] ?? ($line['total_wip'] ?? $line['total_wip']);
-
-                                                $qtyIn = $oldLine['qty_in'] ?? ($line['qty_in'] ?? null);
-
-                                                $fullLabel = $line['item_label'];
+                                                $fullLabel =
+                                                    $line['item_label'] ?? ($line['item_name'] ?? 'Item #' . $itemId);
                                                 $codeOnly = $fullLabel;
                                                 if (strpos($fullLabel, '—') !== false) {
                                                     [$codePart] = explode('—', $fullLabel, 2);
@@ -393,7 +395,7 @@
                                                         <span class="d-none d-md-inline">{{ $fullLabel }}</span>
                                                     </div>
                                                     <div class="item-label-sub d-none d-md-block">
-                                                        Item ID: {{ $itemId }}
+                                                        Item ID: {{ $itemId ?? '-' }}
                                                     </div>
 
                                                     <input type="hidden" name="lines[{{ $idx }}][item_id]"
@@ -414,26 +416,25 @@
                                                     @enderror
                                                 </td>
 
-                                                {{-- QTY PROSES --}}
+                                                {{-- QTY PROSES (input number native) --}}
                                                 <td class="text-end">
-                                                    <x-number-input name="lines[{{ $idx }}][qty_in]"
-                                                        :value="$qtyIn" htmlType="number" inputmode="decimal"
-                                                        size="sm" align="end" :max="$totalWip" />
+                                                    <input type="number" name="lines[{{ $idx }}][qty_in]"
+                                                        class="form-control form-control-sm text-end @error("lines.$idx.qty_in") is-invalid @enderror"
+                                                        value="{{ $qtyIn }}" min="0" step="1"
+                                                        max="{{ $totalWip }}">
                                                     @error("lines.$idx.qty_in")
-                                                        <div class="invalid-feedback d-block text-start">
-                                                            {{ $message }}
+                                                        <div class="invalid-feedback d-block text-start">{{ $message }}
                                                         </div>
                                                     @enderror
                                                 </td>
 
                                                 {{-- QTY REJECT --}}
                                                 <td class="text-end">
-                                                    <x-number-input name="lines[{{ $idx }}][qty_reject]"
-                                                        :value="$qtyReject" htmlType="number" inputmode="decimal"
-                                                        size="sm" align="end" />
+                                                    <input type="number" name="lines[{{ $idx }}][qty_reject]"
+                                                        class="form-control form-control-sm text-end @error("lines.$idx.qty_reject") is-invalid @enderror"
+                                                        value="{{ $qtyReject }}" min="0" step="1">
                                                     @error("lines.$idx.qty_reject")
-                                                        <div class="invalid-feedback d-block text-start">
-                                                            {{ $message }}
+                                                        <div class="invalid-feedback d-block text-start">{{ $message }}
                                                         </div>
                                                     @enderror
                                                 </td>
