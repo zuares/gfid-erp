@@ -103,7 +103,7 @@
                             <tr>
                                 <th style="width: 40px;">#</th>
                                 <th style="min-width: 120px;" class="bundle-lot-col">LOT</th>
-                                <th style="min-width: 150px;">Item Jadi</th>
+                                <th style="min-width: 120px;">Item Jadi</th>
                                 <th style="min-width: 90px;" class="text-end">Qty (pcs)</th>
                                 <th style="min-width: 150px;" class="bundle-notes-header">Catatan</th>
                                 <th style="width: 40px;"></th>
@@ -138,8 +138,8 @@
                         </td>
                         <td>
                             {{-- ITEM JADI pakai component item-suggest (idName wajib) --}}
-                            <x-item-suggest idName="bundles[__INDEX__][finished_item_id]"
-                                placeholder="- Pilih Item Jadi -" type="finished_good" />
+                            <x-item-suggest idName="bundles[__INDEX__][finished_item_id]" placeholder="- Input Item  -"
+                                type="finished_good" :extraParams="['lot_id' => null]" />
                         </td>
                         <td>
                             <x-number-input name="bundles[__INDEX__][qty_pcs]" step="0.01" min="0"
@@ -222,6 +222,7 @@
                 return window.matchMedia('(max-width: 767.98px)').matches;
             }
 
+            // map lot_id -> info
             const lotInfoMap = {};
             lotRows.forEach(tr => {
                 const lotId = parseInt(tr.dataset.lotId, 10);
@@ -310,6 +311,25 @@
                 lotBalanceInput.value = total.toFixed(2);
             }
 
+            // 🔧 helper: update data-extra-params (lot_id) untuk item-suggest di baris tertentu
+            function updateRowItemSuggestExtraParams(tr) {
+                if (!tr) return;
+                const select = tr.querySelector('.bundle-lot-select');
+                const wrap = tr.querySelector('.item-suggest-wrap');
+                if (!wrap) return;
+
+                let extraParams = {};
+                try {
+                    extraParams = JSON.parse(wrap.dataset.extraParams || '{}') || {};
+                } catch (e) {
+                    extraParams = {};
+                }
+
+                const lotId = select ? (select.value || null) : null;
+                extraParams.lot_id = lotId && lotId !== '' ? lotId : null;
+                wrap.dataset.extraParams = JSON.stringify(extraParams);
+            }
+
             function rebuildLotOptionsForAllRows() {
                 const checkedLotIds = getCheckedLots();
                 const selects = bundlesTbody.querySelectorAll('.bundle-lot-select');
@@ -338,6 +358,9 @@
                     } else if (currentVal && checkedLotIds.includes(currentVal)) {
                         select.value = currentVal;
                     }
+
+                    const row = select.closest('.bundle-row');
+                    updateRowItemSuggestExtraParams(row);
                 });
             }
 
@@ -461,6 +484,7 @@
                 const tr = frag.querySelector('tr');
                 const idx = bundleIndexCounter++;
 
+                // adjust nama input
                 tr.querySelectorAll('[name]').forEach(el => {
                     const nameAttr = el.getAttribute('name');
                     if (nameAttr && nameAttr.includes('__INDEX__')) {
@@ -483,7 +507,10 @@
 
                 const lotSelect = tr.querySelector('.bundle-lot-select');
                 if (lotSelect) {
-                    lotSelect.addEventListener('change', recalcLotSummary);
+                    lotSelect.addEventListener('change', () => {
+                        recalcLotSummary();
+                        updateRowItemSuggestExtraParams(tr);
+                    });
                 }
 
                 const btnRemove = tr.querySelector('.btn-remove-row');
@@ -501,6 +528,7 @@
                     window.initItemSuggestInputs(tr);
                 }
 
+                // scroll behavior saat input item difokus
                 const itemCell = tr.querySelector('td:nth-child(3)');
                 const itemInput = itemCell ? itemCell.querySelector('input[type="text"]') : null;
                 if (itemInput) {
@@ -590,6 +618,7 @@
                 createBundleRow(true);
             });
 
+            // init awal
             filterLotsByFabric();
             recalcLotBalanceFromCheckedLots();
             createBundleRow(false);

@@ -13,18 +13,60 @@ class ItemController extends Controller
 {
     /**
      * Helper: apply filter umum untuk Item query.
+     *
+     * - q         : search kode / nama / kategori (multi kata + compact fuzzy)
+     * - type      : single / multi (comma separated)
+     * - item_category_id
+     * - active    : default 1
+     * - lot_id    : filter item yang terkait LOT kain tertentu (Cutting, dll)
      */
     protected function applyCommonFilters($query, Request $request)
     {
-        // 🔎 Search kode / nama
-        if ($search = $request->input('q')) {
-            $query->where(function ($q) use ($search) {
-                $q->where('code', 'like', '%' . $search . '%')
-                    ->orWhere('name', 'like', '%' . $search . '%');
+        // 🔎 Search kode / nama (bisa multi kata + compact code)
+        if ($search = trim($request->input('q', ''))) {
+            // Normalisasi: spasi, dash, slash, underscore → spasi
+            $normalized = preg_replace('/[\s\-\/_]+/', ' ', $search);
+
+            // "CRG BLK" → ["CRG", "BLK"]
+            $tokens = preg_split('/\s+/', $normalized, -1, PREG_SPLIT_NO_EMPTY);
+
+            // Compact string: buang semua non-alnum → "FLC 280-BLK" → "FLC280BLK"
+            $compact = preg_replace('/[^A-Za-z0-9]/', '', $search);
+
+            // Fuzzy pattern: "FLCBLK" → "%F%L%C%B%L%K%"
+            $fuzzyPattern = null;
+            if (strlen($compact) >= 2) {
+                $fuzzyPattern = '%' . implode('%', str_split($compact)) . '%';
+            }
+
+            $query->where(function ($q) use ($tokens, $fuzzyPattern) {
+                // 🔹 Logic lama: AND per token ("CRG BLK" dll)
+                foreach ($tokens as $token) {
+                    $token = trim($token);
+                    if ($token === '') {
+                        continue;
+                    }
+
+                    $q->where(function ($qq) use ($token) {
+                        $like = '%' . $token . '%';
+
+                        $qq->where('code', 'like', $like)
+                            ->orWhere('name', 'like', $like)
+                        // optional: cari juga di nama kategori
+                            ->orWhereHas('category', function ($qc) use ($like) {
+                                $qc->where('name', 'like', $like);
+                            });
+                    });
+                }
+
+                // 🔹 Extra: fuzzy match khusus di code (compact pattern)
+                if ($fuzzyPattern) {
+                    $q->orWhere('code', 'like', $fuzzyPattern);
+                }
             });
         }
 
-        // 🎯 Filter type (single / multi)
+        // 🎯 Filter type (single / multi, comma separated)
         if ($type = $request->input('type')) {
             $types = collect(explode(',', $type))
                 ->map(fn($t) => trim($t))
@@ -39,6 +81,21 @@ class ItemController extends Controller
         // 🎯 Filter kategori
         if ($categoryId = $request->input('item_category_id')) {
             $query->where('item_category_id', $categoryId);
+        }
+
+        // 🎯 Filter berdasarkan LOT (Cutting: item sesuai LOT kain yang dipilih)
+        if ($lotId = $request->input('lot_id')) {
+            // asumsi: tabel lots punya kolom item_id
+            $itemId = DB::table('lots')
+                ->where('id', $lotId)
+                ->value('item_id');
+
+            if ($itemId) {
+                $query->where('items.id', $itemId);
+            } else {
+                // LOT tidak valid → jangan balikin apa-apa
+                $query->whereRaw('1 = 0');
+            }
         }
 
         // ✅ Filter active (default: hanya active=1)
@@ -73,6 +130,13 @@ class ItemController extends Controller
      * GET /api/v1/items
      *
      * Listing lengkap + pagination (lebih berat).
+     *
+     * Query umum:
+     * - q
+     * - type
+     * - item_category_id
+     * - active
+     * - lot_id
      */
     public function index(Request $request)
     {
@@ -104,6 +168,7 @@ class ItemController extends Controller
                 'type' => $request->input('type'),
                 'item_category_id' => $request->input('item_category_id'),
                 'active' => $request->input('active', 1),
+                'lot_id' => $request->input('lot_id'),
             ],
         ]);
     }
@@ -119,6 +184,7 @@ class ItemController extends Controller
      * - item_category_id (opsional)
      * - limit (default 20, max 50)
      * - warehouse_id (opsional, kalau diisi → include on_hand di gudang tsb)
+     * - lot_id (opsional, misal dari halaman Cutting)
      */
     public function suggest(Request $request)
     {

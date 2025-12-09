@@ -29,6 +29,51 @@ class FinishingJobController extends Controller
         protected HppService $hpp,
     ) {}
 
+    public function index(Request $request)
+    {
+        $search = $request->query('search');
+        $status = $request->query('status'); // draft / posted / ''
+        $rejectFlag = $request->query('reject'); // yes / no / ''
+
+        $query = FinishingJob::query()
+            ->withCount('lines as bundle_count')
+            ->withSum('lines as total_ok', 'qty_ok')
+            ->withSum('lines as total_reject', 'qty_reject')
+            ->orderByDesc('date')
+            ->orderByDesc('id');
+
+        // filter search
+        if ($search) {
+            $query->where(function ($q) use ($search) {
+                $q->where('code', 'like', '%' . $search . '%')
+                    ->orWhere('notes', 'like', '%' . $search . '%');
+            });
+        }
+
+        // filter status draft / posted
+        if ($status === 'draft') {
+            $query->whereNull('posted_at');
+        } elseif ($status === 'posted') {
+            $query->whereNotNull('posted_at');
+        }
+
+        // filter reject
+        if ($rejectFlag === 'yes') {
+            $query->having('total_reject', '>', 0);
+        } elseif ($rejectFlag === 'no') {
+            $query->having('total_reject', '=', 0);
+        }
+
+        $finishingJobs = $query->paginate(15)->withQueryString();
+
+        return view('production.finishing_jobs.index', compact(
+            'finishingJobs',
+            'search',
+            'status',
+            'rejectFlag',
+        ));
+    }
+
     /* ============================
      * CREATE
      * ============================ */
@@ -42,6 +87,7 @@ class FinishingJobController extends Controller
 
         // Siapkan daftar operator jahit (sementara semua employee, nanti bisa difilter)
         $operators = Employee::query()
+            ->where('role', 'sewing')
             ->orderBy('name')
             ->get();
 

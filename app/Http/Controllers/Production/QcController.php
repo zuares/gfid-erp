@@ -27,11 +27,14 @@ class QcController extends Controller
             $stage = QcResult::STAGE_CUTTING;
         }
 
+        $user = Auth::user();
+        $userRole = $user->role ?? null;
+
         $records = collect();
 
         switch ($stage) {
             case QcResult::STAGE_CUTTING:
-                $records = CuttingJob::query()
+                $query = CuttingJob::query()
                     ->with([
                         'warehouse',
                         'lot.item',
@@ -40,9 +43,15 @@ class QcController extends Controller
                             $q->where('stage', QcResult::STAGE_CUTTING);
                         },
                     ])
-                    ->where('status', 'sent_to_qc')
                     ->orderByDesc('date')
-                    ->orderByDesc('id')
+                    ->orderByDesc('id');
+
+                // Non-owner: hanya tampilkan yang BELUM QC
+                if ($userRole !== 'owner') {
+                    $query->where('status', 'sent_to_qc');
+                }
+
+                $records = $query
                     ->paginate(20)
                     ->withQueryString();
                 break;
@@ -60,9 +69,14 @@ class QcController extends Controller
                     ->paginate(20)
                     ->withQueryString();
                 break;
+
+            case 'packing':
+                // nanti diisi kalau sudah ada model QC Packing
+                $records = collect();
+                break;
         }
 
-        return view('production.qc.index', compact('stage', 'records'));
+        return view('production.qc.index', compact('stage', 'records', 'userRole'));
     }
 
     /**

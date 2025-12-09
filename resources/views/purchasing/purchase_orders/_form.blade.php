@@ -36,6 +36,7 @@
         $linesData = [];
     }
 @endphp
+
 @push('head')
     <style>
         /* ============================
@@ -292,7 +293,6 @@
     </style>
 @endpush
 
-
 {{-- ============================
      HEADER FORM (DATE / SUPPLIER / ONGKIR / STATUS)
 ============================ --}}
@@ -337,8 +337,6 @@
                     <div class="invalid-feedback">{{ $message }}</div>
                 @enderror
             </div>
-
-
 
             {{-- STATUS (READONLY: select disabled + hidden input) --}}
             <div class="col-6 col-md-3">
@@ -396,7 +394,7 @@
                         $linePriceRaw = $line['unit_price'] ?? '';
                         $lineItemId = $line['item_id'] ?? ($line['item']['id'] ?? null);
 
-                        $lineQty = $lineQtyRaw;
+                        $lineQty = $lineQtyRaw; // biarkan apa adanya (x-number-input yang format)
                         $linePrice = $usingOldLines ? $linePriceRaw : angka($linePriceRaw);
 
                         $itemCode = $line['item']['code'] ?? null;
@@ -418,8 +416,9 @@
 
                         {{-- Qty --}}
                         <td data-label="Qty" class="po-td-qty">
-                            <x-number-input name="lines[{{ $i }}][qty]" :value="$lineQty" htmlType="text"
-                                inputmode="decimal" size="sm" align="end" class="line-qty" />
+                            {{-- QTY desimal --}}
+                            <x-number-input name="lines[{{ $i }}][qty]" :value="$lineQty" mode="decimal"
+                                min="0" decimals="2" placeholder="0.00" class="line-qty js-next-focus" />
                             @error("lines.$i.qty")
                                 <div class="text-danger small">{{ $message }}</div>
                             @enderror
@@ -427,8 +426,9 @@
 
                         {{-- Harga --}}
                         <td data-label="Harga (Rp)" class="po-td-price">
+                            {{-- UNIT PRICE integer --}}
                             <x-number-input name="lines[{{ $i }}][unit_price]" :value="$linePrice"
-                                htmlType="text" inputmode="decimal" size="sm" align="end" class="line-price" />
+                                mode="integer" min="0" placeholder="0" class="line-price js-next-focus" />
                             @error("lines.$i.unit_price")
                                 <div class="text-danger small">{{ $message }}</div>
                             @enderror
@@ -446,7 +446,6 @@
                             </button>
                         </td>
                     </tr>
-
                 @empty
                     {{-- DEFAULT 1 ROW --}}
                     <tr>
@@ -459,13 +458,13 @@
                         </td>
 
                         <td data-label="Qty" class="po-td-qty">
-                            <x-number-input name="lines[0][qty]" htmlType="text" inputmode="decimal" size="sm"
-                                align="end" class="line-qty" />
+                            <x-number-input name="lines[0][qty]" mode="decimal" min="0" decimals="2"
+                                placeholder="0.00" class="line-qty js-next-focus" />
                         </td>
 
                         <td data-label="Harga (Rp)" class="po-td-price">
-                            <x-number-input name="lines[0][unit_price]" htmlType="text" inputmode="decimal"
-                                size="sm" align="end" class="line-price" />
+                            <x-number-input name="lines[0][unit_price]" mode="integer" min="0" placeholder="0"
+                                class="line-price js-next-focus" />
                         </td>
 
                         <td class="text-end align-middle line-total po-td-total" data-label="Total (Rp)"></td>
@@ -538,6 +537,7 @@
                 }).format(isNaN(value) ? 0 : value);
             }
 
+            // khusus untuk shipping_cost (rupiah bulat)
             function formatInputOnBlur(el) {
                 const num = parseNumber(el.value);
                 if (!num) {
@@ -627,6 +627,9 @@
                 if (window.initItemSuggestInputs) {
                     window.initItemSuggestInputs(newRow);
                 }
+                if (window.initNumberInputs) {
+                    window.initNumberInputs(newRow);
+                }
             }
 
             btnAddTop?.addEventListener('click', addNewRow);
@@ -664,6 +667,8 @@
                 }
             });
 
+            // hitung ulang saat qty/harga berubah,
+            // TAPI jangan format tampilan di sini (biar komponen number-input yang pegang)
             tableBody.addEventListener('input', function(e) {
                 if (
                     e.target.classList.contains('line-qty') ||
@@ -673,25 +678,21 @@
                 }
             });
 
-            tableBody.addEventListener('blur', function(e) {
-                if (
-                    e.target.classList.contains('line-qty') ||
-                    e.target.classList.contains('line-price')
-                ) {
-                    formatInputOnBlur(e.target);
-                }
-            }, true);
-
+            // shipping cost saja yang diformat rupiah bulat
             if (shippingInput) {
                 shippingInput.addEventListener('blur', function() {
                     formatInputOnBlur(shippingInput);
                 });
             }
 
+            // init awal
             recalcAll();
 
             if (window.initItemSuggestInputs) {
                 window.initItemSuggestInputs();
+            }
+            if (window.initNumberInputs) {
+                window.initNumberInputs();
             }
         });
     </script>

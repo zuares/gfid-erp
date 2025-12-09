@@ -39,9 +39,18 @@
      */
     'displayMode' => 'code-name',
 
-    // toggle elemen di dropdown
+    // toggle elemen di dropdown (desktop)
     'showName' => true,
     'showCategory' => true,
+
+    /**
+     * extraParams:
+     * array param tambahan yang akan dikirim ke API suggest/index.
+     * Contoh:
+     *   ['lot_id' => $lotId]
+     *   ['warehouse_id' => $warehouseId, 'type' => 'material']
+     */
+    'extraParams' => [],
 ])
 
 @php
@@ -71,7 +80,7 @@
 <div class="item-suggest-wrap" data-type="{{ $type }}" data-item-category-id="{{ $itemCategoryId }}"
     data-min-chars="{{ $minChars }}" data-autofocus="{{ $autofocus ? '1' : '0' }}"
     data-display-mode="{{ $displayMode }}" data-show-name="{{ $showName ? '1' : '0' }}"
-    data-show-category="{{ $showCategory ? '1' : '0' }}">
+    data-show-category="{{ $showCategory ? '1' : '0' }}" data-extra-params='@json($extraParams)'>
 
     <input type="text" value="{{ $displayValue }}" autocomplete="off"
         class="form-control form-control-sm js-item-suggest-input" placeholder="{{ $placeholder }}"
@@ -139,7 +148,6 @@
         <script>
             document.addEventListener("DOMContentLoaded", function() {
                 window.initItemSuggestInputs = function(scope = document) {
-                    // pakai nama yang sama dengan di _blade: data-suggest-inited
                     scope.querySelectorAll('.item-suggest-wrap:not([data-suggest-inited])').forEach(wrap => {
                         setupItemSuggest(wrap);
                         wrap.dataset.suggestInited = "1";
@@ -148,7 +156,6 @@
 
                 window.initItemSuggestInputs();
             });
-
 
             function positionDropdown(input, dropdown) {
                 const rect = input.getBoundingClientRect();
@@ -164,6 +171,11 @@
                 dropdown.style.maxHeight = Math.max(80, Math.min(desired, spaceBelow)) + "px";
             }
 
+            function isMobileViewport() {
+                // breakpoint sederhana: max-width 768px
+                return window.matchMedia("(max-width: 768px)").matches;
+            }
+
             function setupItemSuggest(wrap) {
                 const input = wrap.querySelector('.js-item-suggest-input');
                 const hiddenId = wrap.querySelector('.js-item-suggest-id');
@@ -172,19 +184,39 @@
 
                 dropdown.classList.add('list-group');
 
-                const minChars = parseInt(wrap.dataset.minChars);
+                const minChars = parseInt(wrap.dataset.minChars || "1", 10);
                 const displayMode = wrap.dataset.displayMode;
                 const showName = wrap.dataset.showName === "1";
                 const showCategory = wrap.dataset.showCategory === "1";
 
-                // ⬇️ baca filter dari data-attribute
+                // baca filter dari data-attribute
                 const type = wrap.dataset.type || null;
                 const itemCategoryId = wrap.dataset.itemCategoryId || null;
-                // ⬆️
+
+                // extra params (lot_id, warehouse_id, dll)
+                let extraParams = {};
+                try {
+                    extraParams = JSON.parse(wrap.dataset.extraParams || '{}') || {};
+                } catch (e) {
+                    extraParams = {};
+                }
+
+                // ✅ Fallback: items yang sudah dikirim dari server (Purchase, dll)
+                let initialItems = [];
+                try {
+                    const raw = input.getAttribute('data-items') || '[]';
+                    initialItems = JSON.parse(raw);
+                } catch (e) {
+                    initialItems = [];
+                }
 
                 let timer = null;
                 let lastItems = [];
                 let activeIndex = -1;
+
+                function isDropdownVisible() {
+                    return dropdown.style.display !== "none";
+                }
 
                 function show() {
                     dropdown.style.display = "block";
@@ -194,6 +226,35 @@
                 function hide() {
                     dropdown.style.display = "none";
                     activeIndex = -1;
+                    updateActiveClass();
+                }
+
+                function updateActiveClass() {
+                    const options = dropdown.querySelectorAll('.item-suggest-option');
+                    options.forEach((opt, i) => {
+                        opt.classList.toggle('is-active', i === activeIndex);
+                    });
+
+                    if (activeIndex >= 0 && activeIndex < options.length) {
+                        options[activeIndex].scrollIntoView({
+                            block: 'nearest'
+                        });
+                    }
+                }
+
+                function moveActive(delta) {
+                    const options = dropdown.querySelectorAll('.item-suggest-option');
+                    if (!options.length) return;
+
+                    if (activeIndex === -1) {
+                        activeIndex = delta > 0 ? 0 : options.length - 1;
+                    } else {
+                        activeIndex += delta;
+                        if (activeIndex < 0) activeIndex = options.length - 1;
+                        if (activeIndex >= options.length) activeIndex = 0;
+                    }
+
+                    updateActiveClass();
                 }
 
                 function buildDropdown(items) {
@@ -205,23 +266,32 @@
                         return;
                     }
 
-                    // LIMIT MAKSIMAL 2 ITEM
-                    items = items.slice(0, 2);
+                    // 🔢 LIMIT MAKSIMAL 4 ITEM DI DROPDOWN
+                    items = items.slice(0, 4);
                     lastItems = items;
+                    activeIndex = -1;
 
-                    items.forEach((item, idx) => {
+                    const mobile = isMobileViewport();
+
+                    items.forEach((item) => {
                         const btn = document.createElement("button");
                         btn.type = "button";
                         btn.className = "item-suggest-option list-group-item list-group-item-action";
 
                         let html = `<div class='item-suggest-option-code'>${item.code}</div>`;
 
-                        const sub = [];
-                        if (showName && item.name) sub.push(item.name);
-                        if (showCategory && item.item_category_name) sub.push(item.item_category_name);
+                        // 🔹 Desktop: boleh tampil nama + kategori
+                        // 🔹 Mobile: HANYA kode barang saja (tanpa nama & kategori)
+                        if (!mobile) {
+                            const sub = [];
+                            if (showName && item.name) sub.push(item.name);
+                            if (showCategory && (item.item_category_name || item.item_category)) {
+                                sub.push(item.item_category_name || item.item_category);
+                            }
 
-                        if (sub.length) {
-                            html += `<div class='item-suggest-option-name'>${sub.join(" • ")}</div>`;
+                            if (sub.length) {
+                                html += `<div class='item-suggest-option-name'>${sub.join(" • ")}</div>`;
+                            }
                         }
 
                         btn.innerHTML = html;
@@ -230,13 +300,23 @@
                         dropdown.appendChild(btn);
                     });
 
+                    updateActiveClass();
                     show();
                 }
 
                 function selectItem(item) {
-                    let text = item.code;
-                    if (displayMode === "code-name" && item.name) {
-                        text += " — " + item.name;
+                    const mobile = isMobileViewport();
+                    let text;
+
+                    // 📱 MOBILE: paksa selalu hanya kode
+                    if (mobile) {
+                        text = item.code;
+                    } else {
+                        // 💻 DESKTOP: ikut displayMode (code / code-name)
+                        text = item.code;
+                        if (displayMode === "code-name" && item.name) {
+                            text += " — " + item.name;
+                        }
                     }
 
                     input.value = text;
@@ -253,8 +333,29 @@
                     }
                 }
 
+                function selectActiveOrFirst() {
+                    if (!lastItems.length) return;
+
+                    let idx = activeIndex;
+                    if (idx < 0 || idx >= lastItems.length) {
+                        idx = 0;
+                    }
+                    const item = lastItems[idx];
+                    if (item) {
+                        selectItem(item);
+                    }
+                }
+
                 function fetchData(q, force) {
-                    if (!force && q.length < minChars) {
+                    q = q || '';
+
+                    // ✅ Kalau belum cukup karakter & ada initialItems dari server → pakai itu
+                    if (!force && q.length < minChars && initialItems.length) {
+                        buildDropdown(initialItems);
+                        return;
+                    }
+
+                    if (!force && q.length < minChars && !initialItems.length) {
                         hide();
                         return;
                     }
@@ -268,14 +369,38 @@
                     if (type) params.set('type', type);
                     if (itemCategoryId) params.set('item_category_id', itemCategoryId);
 
+                    // 🔁 inject extraParams (lot_id, warehouse_id, dll)
+                    if (extraParams && typeof extraParams === 'object') {
+                        Object.keys(extraParams).forEach((key) => {
+                            const value = extraParams[key];
+                            if (value !== null && value !== undefined && value !== '') {
+                                params.set(key, value);
+                            }
+                        });
+                    }
+
                     const url = `/api/v1/items/suggest?` + params.toString();
 
                     fetch(url)
                         .then(r => r.json())
-                        .then(json => buildDropdown(json.data || []))
+                        .then(json => {
+                            const data = json.data || [];
+
+                            // kalau API kosong tapi ada initialItems → fallback
+                            if (!data.length && initialItems.length) {
+                                buildDropdown(initialItems);
+                            } else {
+                                buildDropdown(data);
+                            }
+                        })
                         .catch(() => {
-                            dropdown.innerHTML = `<div class='p-2 text-danger'>Gagal memuat</div>`;
-                            show();
+                            // kalau error, fallback ke initialItems kalau ada
+                            if (initialItems.length) {
+                                buildDropdown(initialItems);
+                            } else {
+                                dropdown.innerHTML = `<div class='p-2 text-danger'>Gagal memuat</div>`;
+                                show();
+                            }
                         });
                 }
 
@@ -287,7 +412,48 @@
 
                 input.addEventListener("focus", () => {
                     input.select();
-                    fetchData(input.value.trim(), true);
+
+                    // saat focus: kalau ada initialItems & belum ketik apa-apa → pakai initialItems
+                    if (initialItems.length && input.value.trim() === '') {
+                        buildDropdown(initialItems);
+                    } else {
+                        fetchData(input.value.trim(), true);
+                    }
+                });
+
+                // 🔥 Keyboard navigation: Arrow Up/Down + Enter + Tab + ESC
+                input.addEventListener("keydown", (e) => {
+                    const key = e.key;
+
+                    if (key === "ArrowDown") {
+                        e.preventDefault();
+
+                        if (!isDropdownVisible()) {
+                            fetchData(input.value.trim(), true);
+                        } else {
+                            moveActive(1);
+                        }
+                    } else if (key === "ArrowUp") {
+                        e.preventDefault();
+
+                        if (!isDropdownVisible()) {
+                            fetchData(input.value.trim(), true);
+                        } else {
+                            moveActive(-1);
+                        }
+                    } else if (key === "Enter") {
+                        if (isDropdownVisible()) {
+                            e.preventDefault();
+                            selectActiveOrFirst();
+                        }
+                    } else if (key === "Tab") {
+                        if (isDropdownVisible()) {
+                            e.preventDefault();
+                            selectActiveOrFirst();
+                        }
+                    } else if (key === "Escape") {
+                        hide();
+                    }
                 });
 
                 // kalau butuh autofocus
@@ -295,7 +461,12 @@
                     setTimeout(() => {
                         input.focus();
                         input.select();
-                        fetchData("", true);
+
+                        if (initialItems.length) {
+                            buildDropdown(initialItems);
+                        } else {
+                            fetchData("", true);
+                        }
                     }, 150);
                 }
 
@@ -303,6 +474,12 @@
                 document.addEventListener("click", (e) => {
                     if (!wrap.contains(e.target)) {
                         hide();
+                    }
+                });
+
+                window.addEventListener('resize', () => {
+                    if (isDropdownVisible()) {
+                        positionDropdown(input, dropdown);
                     }
                 });
             }

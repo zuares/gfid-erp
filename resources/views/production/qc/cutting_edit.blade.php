@@ -33,8 +33,7 @@
             background: var(--card);
             border-radius: 16px;
             border: 1px solid rgba(148, 163, 184, 0.35);
-            box-shadow:
-                0 12px 30px rgba(15, 23, 42, 0.20);
+            box-shadow: 0 12px 30px rgba(15, 23, 42, 0.20);
         }
 
         .card-soft {
@@ -164,15 +163,13 @@
             overflow-x: auto;
         }
 
+        .lot-usage-table tbody tr {
+            background: #ffffff;
+        }
+
         @media (max-width: 767.98px) {
             .qc-cutting-page .page-wrap {
                 padding-inline: .5rem;
-            }
-
-            .header-grid {
-                display: grid;
-                grid-template-columns: minmax(0, 1.8fr) minmax(0, 1.3fr);
-                gap: .5rem;
             }
 
             .qc-table-mobile {
@@ -193,12 +190,23 @@
             }
 
             .status-stepper {
-                flex-direction: column;
-                align-items: flex-start;
+                flex-wrap: wrap;
+                gap: .4rem .75rem;
             }
 
             .status-separator {
-                width: 22px;
+                display: none;
+            }
+
+            /* LOT usage table putih di mobile juga */
+            .lot-usage-table tbody tr {
+                background: #ffffff;
+            }
+
+            .lot-usage-table .input-lot-used[readonly] {
+                background: #f3f4f6;
+                border-color: rgba(148, 163, 184, 0.9);
+                cursor: default;
             }
         }
     </style>
@@ -206,8 +214,6 @@
 
 @section('content')
     @php
-        use Illuminate\Support\ViewErrorBag;
-
         $lot = $cuttingJob->lot;
         $warehouse = $cuttingJob->warehouse;
 
@@ -218,6 +224,15 @@
         $defaultOperatorLabel = $loginOperator
             ? ($loginOperator->code ?? 'OP') . ' — ' . ($loginOperator->name ?? 'Operator')
             : 'User login';
+
+        // role user login
+        $userRole = auth()->user()->role ?? null;
+
+        // untuk cek error bag
+        $isErrorBag = $errors instanceof \Illuminate\Support\ViewErrorBag;
+
+        // default tanggal QC (kalau ada field di model, bisa ganti di sini)
+        $defaultQcDate = old('qc_date', optional($cuttingJob->qc_date ?? ($cuttingJob->date ?? now()))->toDateString());
 
         $statusClass =
             [
@@ -248,7 +263,7 @@
 
             {{-- HEADER JOB --}}
             <div class="card card-soft p-3 mb-3">
-                {{-- DESKTOP HEADER --}}
+                {{-- HEADER DESKTOP --}}
                 <div class="d-none d-md-flex justify-content-between align-items-center gap-3">
                     <div>
                         <div class="section-title mb-1">QC Cutting</div>
@@ -270,6 +285,7 @@
                             </div>
                         @endif
 
+                        {{-- STEP CUTTING → KIRIM QC → HASIL QC --}}
                         <div class="status-stepper mt-2">
                             <div class="status-step">
                                 <div
@@ -317,30 +333,29 @@
                     </div>
                 </div>
 
-                {{-- MOBILE HEADER --}}
+                {{-- HEADER MOBILE --}}
                 <div class="d-block d-md-none">
-                    <div class="header-grid align-items-start mb-2">
+                    {{-- Baris utama: judul + kode + badge --}}
+                    <div class="d-flex justify-content-between align-items-center mb-1">
                         <div>
-                            <div class="section-title mb-1">QC Cutting</div>
+                            <div class="small text-muted">QC Cutting</div>
                             <div class="fw-semibold mono">{{ $cuttingJob->code }}</div>
-                            <div class="small-muted mt-1">
-                                LOT {{ $lot?->code ?? '-' }} • {{ $lot?->item?->code ?? '-' }}
-                            </div>
                         </div>
-                        <div class="text-end">
-                            <span class="badge bg-{{ $statusClass }} px-2 py-1 mb-2">
-                                {{ strtoupper($cuttingJob->status) }}
-                            </span>
-                            <div>
-                                <a href="{{ route('production.cutting_jobs.show', $cuttingJob) }}"
-                                    class="btn btn-sm btn-outline-secondary">
-                                    Kembali
-                                </a>
-                            </div>
-                        </div>
+                        <span class="badge bg-{{ $statusClass }} px-2 py-1">
+                            {{ strtoupper($cuttingJob->status) }}
+                        </span>
                     </div>
 
-                    <div class="status-stepper mt-1">
+                    {{-- Info LOT & gudang satu baris --}}
+                    <div class="small-muted mb-2">
+                        LOT {{ $lot?->code ?? '-' }} • {{ $lot?->item?->code ?? '-' }}
+                        @if ($warehouse)
+                            • Gudang {{ $warehouse->code }}
+                        @endif
+                    </div>
+
+                    {{-- Stepper inline --}}
+                    <div class="status-stepper mb-2">
                         <div class="status-step">
                             <div
                                 class="status-dot {{ $step1State === 'current' ? 'current' : ($step1State === 'done' ? 'active' : '') }}">
@@ -369,6 +384,14 @@
                             </div>
                         </div>
                     </div>
+
+                    {{-- Tombol kembali full width --}}
+                    <div class="d-flex gap-2">
+                        <a href="{{ route('production.cutting_jobs.show', $cuttingJob) }}"
+                            class="btn btn-sm btn-outline-secondary flex-fill">
+                            Kembali
+                        </a>
+                    </div>
                 </div>
             </div>
 
@@ -376,77 +399,80 @@
                 @csrf
                 @method('PUT')
 
-                {{-- 1. HEADER QC --}}
-                <div class="card p-3 mb-3">
-                    <div class="d-flex justify-content-between align-items-center mb-2">
-                        <div class="section-title mb-0">Header QC</div>
+                {{-- Kalau role operating/produksi: tetap kirim tanggal & operator via hidden --}}
+                @if (in_array($userRole, ['operating', 'produksi']))
+                    <input type="hidden" name="qc_date" value="{{ $defaultQcDate }}">
+                    <input type="hidden" name="operator_id" value="{{ $defaultOperatorId }}">
+                    <input type="hidden" name="notes_global" value="{{ old('notes_global') }}">
+                @endif
 
-                        {{-- Desktop summary --}}
-                        <div class="d-none d-md-flex gap-2">
-                            <div class="pill">
-                                <span>Total OK</span>
-                                <span class="mono" id="sum-ok">0,00</span>
+                {{-- 1. HEADER QC (disembunyikan untuk role operating & produksi) --}}
+                @if (!in_array($userRole, ['operating', 'produksi']))
+                    <div class="card p-3 mb-3">
+                        <div class="d-flex justify-content-between align-items-center mb-2">
+                            <div class="section-title mb-0">Header QC</div>
+
+                            {{-- Desktop summary --}}
+                            <div class="d-none d-md-flex gap-2">
+                                <div class="pill">
+                                    <span>Total OK</span>
+                                    <span class="mono" id="sum-ok">0</span>
+                                </div>
+                                <div class="pill">
+                                    <span>Reject</span>
+                                    <span class="mono" id="sum-reject">0</span>
+                                </div>
                             </div>
-                            <div class="pill">
-                                <span>Reject</span>
-                                <span class="mono" id="sum-reject">0,00</span>
+
+                            {{-- Mobile summary inline --}}
+                            <div class="d-block d-md-none text-end">
+                                <div class="qc-summary-inline justify-content-end">
+                                    <span>Total OK <span class="mono" id="sum-ok-mobile">0</span></span>
+                                    <span>Reject <span class="mono" id="sum-reject-mobile">0</span></span>
+                                </div>
                             </div>
                         </div>
 
-                        {{-- Mobile summary (baris terpisah) --}}
-                        <div class="d-block d-md-none text-end">
-                            <div class="small-muted mb-1">Ringkasan QC</div>
-                            <div class="qc-summary-inline justify-content-end">
-                                <span>Total OK <span class="mono" id="sum-ok-mobile">0,00</span></span>
-                                <span>Reject <span class="mono" id="sum-reject-mobile">0,00</span></span>
+                        <div class="row g-3">
+                            @php
+                                $qcDateError = $isErrorBag ? $errors->first('qc_date') : null;
+                                $operatorError = $isErrorBag ? $errors->first('operator_id') : null;
+                            @endphp
+
+                            <div class="col-md-3 col-6">
+                                <label class="field-label mb-1">Tanggal QC</label>
+                                <input type="date" name="qc_date" value="{{ $defaultQcDate }}"
+                                    class="form-control {{ $qcDateError ? 'is-invalid' : '' }}">
+                                @if ($qcDateError)
+                                    <div class="invalid-feedback">{{ $qcDateError }}</div>
+                                @endif
+                            </div>
+
+                            <div class="col-md-4 col-12">
+                                <label class="field-label mb-1">Operator QC</label>
+
+                                <input type="hidden" name="operator_id" value="{{ $defaultOperatorId }}">
+
+                                <input type="text" class="form-control {{ $operatorError ? 'is-invalid' : '' }}"
+                                    value="{{ $defaultOperatorLabel }}" disabled>
+
+                                @if ($operatorError)
+                                    <div class="invalid-feedback d-block">{{ $operatorError }}</div>
+                                @endif
+                            </div>
+
+                            <div class="col-12">
+                                <label class="field-label mb-1">Catatan Umum</label>
+                                <textarea name="notes_global" rows="2" class="form-control" placeholder="Opsional.">{{ old('notes_global') }}</textarea>
                             </div>
                         </div>
                     </div>
+                @endif
 
-                    <div class="row g-3">
-                        @php
-                            $isErrorBag = $errors instanceof ViewErrorBag;
-                            $qcDateError = $isErrorBag ? $errors->first('qc_date') : null;
-                            $operatorError = $isErrorBag ? $errors->first('operator_id') : null;
-                        @endphp
-
-                        <div class="col-md-3 col-6">
-                            <label class="field-label mb-1">Tanggal QC</label>
-                            <input type="date" name="qc_date" value="{{ old('qc_date', now()->toDateString()) }}"
-                                class="form-control {{ $qcDateError ? 'is-invalid' : '' }}">
-                            @if ($qcDateError)
-                                <div class="invalid-feedback">{{ $qcDateError }}</div>
-                            @endif
-                        </div>
-
-                        <div class="col-md-4 col-12">
-                            <label class="field-label mb-1">Operator QC</label>
-
-                            <input type="hidden" name="operator_id" value="{{ $defaultOperatorId }}">
-
-                            <input type="text" class="form-control {{ $operatorError ? 'is-invalid' : '' }}"
-                                value="{{ $defaultOperatorLabel }}" disabled>
-
-                            @if ($operatorError)
-                                <div class="invalid-feedback d-block">{{ $operatorError }}</div>
-                            @endif
-                        </div>
-
-                        <div class="col-12">
-                            <label class="field-label mb-1">Catatan Umum</label>
-                            <textarea name="notes_global" rows="2" class="form-control"
-                                placeholder="Opsional. Mis: hasil QC cutting lot ini secara umum.">{{ old('notes_global') }}</textarea>
-                        </div>
-                    </div>
-                </div>
-
-                {{-- 2. QC per bundle (tabel, mobile-friendly) --}}
+                {{-- 2. QC per bundle --}}
                 <div class="card p-3 mb-3">
                     <div class="d-flex justify-content-between align-items-center mb-2">
                         <div class="section-title mb-0">QC per Bundle</div>
-                        <div class="small-muted">
-                            Isi <strong>Reject</strong> hanya jika ada cacat. Baris dengan reject akan di-highlight.
-                        </div>
                     </div>
 
                     <div class="table-wrap">
@@ -456,7 +482,7 @@
                         <table class="table table-sm align-middle mono qc-table qc-table-mobile">
                             <thead>
                                 <tr>
-                                    <th style="width:70px;">#</th>
+                                    <th style="width:80px;">No</th>
                                     <th>Item</th>
                                     <th class="text-end" style="width:120px;">Cut</th>
                                     <th class="text-end" style="width:120px;">OK</th>
@@ -500,39 +526,38 @@
 
                                         <td class="qc-card-header">
                                             <div class="fw-semibold mono">
-                                                #{{ $row['bundle_no'] ?? '-' }}
+                                                #{{ $i + 1 }}
                                             </div>
-                                            {{-- bundle_code hanya desktop --}}
                                             <div class="small-muted mono d-none d-md-block">
-                                                {{ $row['bundle_code'] ?? '' }}
+                                                Bundle #{{ $row['bundle_no'] ?? '-' }}
+                                                {{ $row['bundle_code'] ? '· ' . $row['bundle_code'] : '' }}
                                             </div>
                                         </td>
 
                                         <td>
-                                            {{-- DESKTOP: kode + nama item --}}
                                             <div class="d-none d-md-block">
                                                 <div class="fw-semibold mono">
                                                     {{ $row['item_code'] }}
                                                 </div>
-
                                             </div>
-
-                                            {{-- MOBILE: kode saja --}}
                                             <div class="d-block d-md-none">
                                                 {{ $row['item_code'] }}
                                             </div>
                                         </td>
 
+                                        {{-- CUT integer --}}
                                         <td class="text-end">
-                                            {{ number_format($qtyBundle, 2, ',', '.') }}
+                                            {{ number_format($qtyBundle, 0, ',', '.') }}
                                         </td>
 
+                                        {{-- OK integer --}}
                                         <td class="text-end">
                                             <span class="cell-ok">
-                                                {{ number_format(old("results.$i.qty_ok", $qtyOk), 2, ',', '.') }}
+                                                {{ number_format(old("results.$i.qty_ok", $qtyOk), 0, ',', '.') }}
                                             </span>
                                         </td>
 
+                                        {{-- REJECT: input number integer --}}
                                         <td class="text-center">
                                             <input type="number" step="1" min="0" inputmode="numeric"
                                                 pattern="\d*" name="results[{{ $i }}][qty_reject]"
@@ -608,19 +633,14 @@
                     <div class="card p-3 mb-4">
                         <div class="d-flex justify-content-between align-items-center mb-2">
                             <div class="section-title mb-0">Pemakaian Kain per LOT</div>
-                            <div class="small-muted">
-                                Isi <strong>pemakaian aktual</strong> (hasil QC) per LOT. Jika dikosongkan, sistem akan
-                                pakai
-                                angka rencana.
-                            </div>
                         </div>
 
                         <div class="table-wrap">
-                            <table class="table table-sm align-middle mono">
+                            <table class="table table-sm align-middle mono lot-usage-table">
                                 <thead>
                                     <tr>
                                         <th style="width: 150px;">LOT</th>
-                                        <th>Item</th>
+                                        <th class="d-none d-md-table-cell">Item</th>
                                         <th class="text-end" style="width: 130px;">Rencana</th>
                                         <th class="text-end" style="width: 150px;">Dipakai (QC)</th>
                                         <th class="text-end d-none d-md-table-cell" style="width: 130px;">Estimasi Sisa
@@ -650,29 +670,21 @@
                                         @endphp
 
                                         <tr>
-                                            {{-- id pivot cutting_job_lots --}}
                                             <input type="hidden" name="lots[{{ $i }}][id]"
                                                 value="{{ $jobLot->id }}">
 
                                             <td>
-                                                {{-- Desktop: LOT code + item code; Mobile: hanya item code (LOT code disembunyikan) --}}
                                                 <div class="fw-semibold">
-                                                    <span class="d-none d-md-inline">
-                                                        {{ $lotModel?->code ?? 'LOT ?' }}
-                                                    </span>
-                                                    <span class="d-inline d-md-none">
-                                                        {{ $lotModel?->item?->code ?? '-' }}
-                                                    </span>
+                                                    {{ $lotModel?->code ?? 'LOT ?' }}
                                                 </div>
                                                 <div class="small-muted d-none d-md-block">
                                                     {{ $lotModel?->item?->code ?? '-' }}
                                                 </div>
                                             </td>
 
-                                            <td>
+                                            <td class="d-none d-md-table-cell">
                                                 <div>{{ $lotModel?->item?->name ?? '-' }}</div>
-                                                {{-- Info gudang hanya desktop --}}
-                                                <div class="small-muted d-none d-md-block">
+                                                <div class="small-muted">
                                                     Gudang {{ $warehouse?->code ?? '-' }}
                                                 </div>
                                             </td>
@@ -682,19 +694,13 @@
                                             </td>
 
                                             <td class="text-end">
-                                                <input type="number" step="0.01" min="0" inputmode="decimal"
-                                                    name="lots[{{ $i }}][used_fabric_qty]"
+                                                <x-number-input name="lots[{{ $i }}][used_fabric_qty]"
+                                                    mode="decimal" :value="$used" decimals="2" min="0"
                                                     class="form-control form-control-sm text-end input-lot-used {{ $usedError ? 'is-invalid' : '' }}"
-                                                    value="{{ $used }}" data-planned="{{ $planned }}">
+                                                    data-planned="{{ $planned }}" />
                                                 @if ($usedError)
                                                     <div class="invalid-feedback">{{ $usedError }}</div>
                                                 @endif
-                                                <div class="small-muted d-md-none mt-1">
-                                                    Est. sisa:
-                                                    <span class="lot-balance-mobile">
-                                                        {{ number_format($balance, 2, ',', '.') }}
-                                                    </span>
-                                                </div>
                                             </td>
 
                                             <td class="text-end d-none d-md-table-cell">
@@ -721,13 +727,27 @@
                     </div>
                 @endif
 
-                <div class="d-flex justify-content-end mb-5 gap-2">
+                {{-- ACTIONS DESKTOP --}}
+                <div class="d-none d-md-flex justify-content-end mb-5 gap-2">
                     <a href="{{ route('production.cutting_jobs.show', $cuttingJob) }}" class="btn btn-outline-secondary">
                         Batal
                     </a>
                     <button type="submit" class="btn btn-primary">
                         Simpan Hasil QC
                     </button>
+                </div>
+
+                {{-- ACTIONS MOBILE --}}
+                <div class="d-block d-md-none mb-5">
+                    <div class="d-grid gap-2">
+                        <a href="{{ route('production.cutting_jobs.show', $cuttingJob) }}"
+                            class="btn btn-outline-secondary w-100">
+                            Batal
+                        </a>
+                        <button type="submit" class="btn btn-primary w-100">
+                            Simpan Hasil QC
+                        </button>
+                    </div>
                 </div>
             </form>
         </div>
@@ -736,153 +756,154 @@
 
 @push('scripts')
     <script>
-        const inputsReject = document.querySelectorAll('.input-reject');
-        const sumOkSpan = document.getElementById('sum-ok');
-        const sumRejectSpan = document.getElementById('sum-reject');
+        document.addEventListener('DOMContentLoaded', function() {
+            const inputsReject = document.querySelectorAll('.input-reject');
+            const sumOkSpan = document.getElementById('sum-ok');
+            const sumRejectSpan = document.getElementById('sum-reject');
+            const sumOkMobileSpan = document.getElementById('sum-ok-mobile');
+            const sumRejectMobileSpan = document.getElementById('sum-reject-mobile');
+            const warningEl = document.getElementById('qc-warning');
 
-        const sumOkMobileSpan = document.getElementById('sum-ok-mobile');
-        const sumRejectMobileSpan = document.getElementById('sum-reject-mobile');
+            function attachSelectAllOnFocus(input) {
+                input.addEventListener('focus', function() {
+                    setTimeout(() => this.select(), 0);
+                });
 
-        const warningEl = document.getElementById('qc-warning');
-
-        function attachSelectAllOnFocus(input) {
-            input.addEventListener('focus', function() {
-                setTimeout(() => this.select(), 0);
-            });
-
-            input.addEventListener('mouseup', function(e) {
-                e.preventDefault();
-            });
-        }
-
-        function recalcTotals() {
-            let totalOk = 0;
-            let totalReject = 0;
-            let anyOver = false;
-
-            inputsReject.forEach(rejInput => {
-                const tr = rejInput.closest('tr');
-                const okHidden = tr.querySelector('.input-ok-hidden');
-                const okCell = tr.querySelector('.cell-ok');
-                const maxBundle = parseFloat(rejInput.dataset.bundle || '0') || 0;
-
-                let rej = parseFloat(rejInput.value || '0');
-                if (isNaN(rej) || rej < 0) rej = 0;
-
-                if (rej > maxBundle) {
-                    rej = maxBundle;
-                    anyOver = true;
-                }
-
-                rejInput.value = rej;
-
-                const ok = maxBundle - rej;
-
-                if (okHidden) {
-                    okHidden.value = ok;
-                }
-
-                if (okCell) {
-                    okCell.textContent = ok.toFixed(2).replace('.', ',');
-                }
-
-                totalOk += ok;
-                totalReject += rej;
-
-                if (rej > 0) {
-                    tr.classList.add('row-has-reject');
-                } else {
-                    tr.classList.remove('row-has-reject');
-                }
-            });
-
-            const okText = totalOk.toFixed(2).replace('.', ',');
-            const rejText = totalReject.toFixed(2).replace('.', ',');
-
-            if (sumOkSpan) sumOkSpan.textContent = okText;
-            if (sumRejectSpan) sumRejectSpan.textContent = rejText;
-
-            if (sumOkMobileSpan) sumOkMobileSpan.textContent = okText;
-            if (sumRejectMobileSpan) sumRejectMobileSpan.textContent = rejText;
-
-            if (warningEl) {
-                warningEl.style.display = anyOver ? 'block' : 'none';
+                input.addEventListener('mouseup', function(e) {
+                    e.preventDefault();
+                });
             }
-        }
 
-        inputsReject.forEach(i => {
-            attachSelectAllOnFocus(i);
-            i.addEventListener('input', recalcTotals);
+            function formatInt(num) {
+                return num.toLocaleString('id-ID');
+            }
 
-            // Auto scroll ke tengah layar saat fokus (mobile UX)
-            i.addEventListener('focus', () => {
-                i.scrollIntoView({
-                    behavior: 'smooth',
-                    block: 'center'
+            function recalcTotals() {
+                let totalOk = 0;
+                let totalReject = 0;
+                let anyOver = false;
+
+                inputsReject.forEach(rejInput => {
+                    const tr = rejInput.closest('tr');
+                    const okHidden = tr.querySelector('.input-ok-hidden');
+                    const okCell = tr.querySelector('.cell-ok');
+                    const maxBundle = parseFloat(rejInput.dataset.bundle || '0') || 0;
+
+                    let rej = parseFloat(rejInput.value || '0');
+                    if (isNaN(rej) || rej < 0) rej = 0;
+
+                    if (rej > maxBundle) {
+                        rej = maxBundle;
+                        anyOver = true;
+                        rejInput.value = rej;
+                    }
+
+                    const ok = maxBundle - rej;
+
+                    if (okHidden) okHidden.value = ok;
+                    if (okCell) okCell.textContent = formatInt(Math.round(ok));
+
+                    totalOk += ok;
+                    totalReject += rej;
+
+                    if (rej > 0) {
+                        tr.classList.add('row-has-reject');
+                    } else {
+                        tr.classList.remove('row-has-reject');
+                    }
+                });
+
+                const okInt = Math.round(totalOk);
+                const rejInt = Math.round(totalReject);
+
+                if (sumOkSpan) sumOkSpan.textContent = formatInt(okInt);
+                if (sumRejectSpan) sumRejectSpan.textContent = formatInt(rejInt);
+                if (sumOkMobileSpan) sumOkMobileSpan.textContent = formatInt(okInt);
+                if (sumRejectMobileSpan) sumRejectMobileSpan.textContent = formatInt(rejInt);
+
+                if (warningEl) {
+                    warningEl.style.display = anyOver ? 'block' : 'none';
+                }
+            }
+
+            inputsReject.forEach(i => {
+                attachSelectAllOnFocus(i);
+                i.addEventListener('input', recalcTotals);
+
+                i.addEventListener('focus', () => {
+                    i.scrollIntoView({
+                        behavior: 'smooth',
+                        block: 'center'
+                    });
                 });
             });
-        });
 
-        recalcTotals();
+            recalcTotals();
 
-        window.addEventListener('load', () => {
-            const firstWithReject = Array.from(inputsReject).find(i => {
-                const v = parseFloat(i.value || '0');
-                return !isNaN(v) && v > 0;
+            window.addEventListener('load', () => {
+                const firstWithReject = Array.from(inputsReject).find(i => {
+                    const v = parseFloat(i.value || '0');
+                    return !isNaN(v) && v > 0;
+                });
+
+                if (firstWithReject) {
+                    firstWithReject.scrollIntoView({
+                        behavior: 'smooth',
+                        block: 'center'
+                    });
+                    firstWithReject.focus();
+                }
             });
 
-            if (firstWithReject) {
-                firstWithReject.scrollIntoView({
-                    behavior: 'smooth',
-                    block: 'center'
+            // ====== MULTI-LOT: PEMAKAIAN KAIN PER LOT ======
+            const lotInputs = document.querySelectorAll('.input-lot-used');
+            const lotWarningEl = document.getElementById('lot-warning');
+
+            function recalcLotBalances() {
+                let anyOver = false;
+
+                lotInputs.forEach(input => {
+                    const planned = parseFloat(input.dataset.planned || '0') || 0;
+                    let used = parseFloat(input.value || '0');
+                    if (isNaN(used) || used < 0) used = 0;
+
+                    if (planned > 0 && used > planned) {
+                        used = planned;
+                        anyOver = true;
+                        input.value = used;
+                    }
+
+                    const balance = planned - used;
+
+                    const tr = input.closest('tr');
+                    if (!tr) return;
+
+                    const balDesktop = tr.querySelector('.lot-balance-desktop');
+
+                    const text = balance.toFixed(2).replace('.', ',');
+
+                    if (balDesktop) balDesktop.textContent = text;
                 });
-                firstWithReject.focus();
+
+                if (lotWarningEl) {
+                    lotWarningEl.style.display = anyOver ? 'block' : 'none';
+                }
             }
-        });
-
-        // ====== MULTI-LOT: PEMAKAIAN KAIN PER LOT ======
-        const lotInputs = document.querySelectorAll('.input-lot-used');
-        const lotWarningEl = document.getElementById('lot-warning');
-
-        function recalcLotBalances() {
-            let anyOver = false;
 
             lotInputs.forEach(input => {
-                const planned = parseFloat(input.dataset.planned || '0') || 0;
-                let used = parseFloat(input.value || '0');
-                if (isNaN(used) || used < 0) used = 0;
-
-                if (planned > 0 && used > planned) {
-                    used = planned;
-                    anyOver = true;
-                }
-
-                input.value = used;
-
-                const balance = planned - used;
-
-                const tr = input.closest('tr');
-                if (!tr) return;
-
-                const balDesktop = tr.querySelector('.lot-balance-desktop');
-                const balMobile = tr.querySelector('.lot-balance-mobile');
-
-                const text = balance.toFixed(2).replace('.', ',');
-
-                if (balDesktop) balDesktop.textContent = text;
-                if (balMobile) balMobile.textContent = text;
+                attachSelectAllOnFocus(input);
+                input.addEventListener('input', recalcLotBalances);
             });
 
-            if (lotWarningEl) {
-                lotWarningEl.style.display = anyOver ? 'block' : 'none';
+            recalcLotBalances();
+
+            // Di mobile: Dipakai (QC) per LOT dibuat readonly
+            const isMobile = window.matchMedia('(max-width: 767.98px)').matches;
+            if (isMobile) {
+                lotInputs.forEach(input => {
+                    input.readOnly = true;
+                });
             }
-        }
-
-        lotInputs.forEach(input => {
-            attachSelectAllOnFocus(input);
-            input.addEventListener('input', recalcLotBalances);
         });
-
-        recalcLotBalances();
     </script>
 @endpush

@@ -116,7 +116,8 @@
 
         {{-- BOTTOM NAV MOBILE --}}
         @auth
-            @include('layouts.partials.mobile-bottom-nav')
+            {{-- Bottom nav hanya muncul di mobile --}}
+            <x-mobile-bottom-nav />
         @endauth
     </div>
 

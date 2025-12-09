@@ -31,29 +31,8 @@
                     </div>
                 </div>
 
-                {{-- DETAIL BUNDLES (FOCAL POINT DI MOBILE) --}}
-                <div class="mb-3 cutting-modal-section cutting-modal-section-bundles">
-                    <div class="small fw-semibold mb-1">Detail Bundles</div>
-                    <div class="table-responsive mb-2">
-                        <table class="table table-sm mb-0">
-                            <thead>
-                                <tr>
-                                    <th style="width: 40px;">#</th>
-                                    <th>Item (kode)</th>
-                                    <th class="text-end">Qty (pcs)</th>
-                                </tr>
-                            </thead>
-                            <tbody id="summary-bundle-rows">
-                                <tr>
-                                    <td colspan="3" class="text-muted small">
-                                        Belum ada qty bundle yang diisi.
-                                    </td>
-                                </tr>
-                            </tbody>
-                        </table>
-                    </div>
-
-                    {{-- RINGKASAN JUMLAH PER ITEM --}}
+                {{-- RINGKASAN JUMLAH PER ITEM (DIBUAT DI ATAS, SETELAH OPERATOR) --}}
+                <div class="mb-3 cutting-modal-section cutting-modal-section-agg">
                     <div class="small fw-semibold mb-1">Ringkasan per Item</div>
                     <div class="table-responsive">
                         <table class="table table-sm mb-0">
@@ -67,6 +46,29 @@
                                 <tr>
                                     <td colspan="2" class="text-muted small">
                                         Belum ada data.
+                                    </td>
+                                </tr>
+                            </tbody>
+                        </table>
+                    </div>
+                </div>
+
+                {{-- DETAIL BUNDLES --}}
+                <div class="mb-3 cutting-modal-section cutting-modal-section-bundles">
+                    <div class="small fw-semibold mb-1">Detail Bundles</div>
+                    <div class="table-responsive mb-0">
+                        <table class="table table-sm mb-0">
+                            <thead>
+                                <tr>
+                                    <th style="width: 40px;">#</th>
+                                    <th>Item (kode)</th>
+                                    <th class="text-end">Qty (pcs)</th>
+                                </tr>
+                            </thead>
+                            <tbody id="summary-bundle-rows">
+                                <tr>
+                                    <td colspan="3" class="text-muted small">
+                                        Belum ada qty bundle yang diisi.
                                     </td>
                                 </tr>
                             </tbody>
@@ -159,8 +161,8 @@
         }
 
         /* ============================================================
-               MOBILE MODAL IMPROVEMENTS — CLEAN VERSION
-               ============================================================ */
+                   MOBILE MODAL IMPROVEMENTS — CLEAN VERSION
+                   ============================================================ */
         @media (max-width: 767.98px) {
 
             /* Modal tidak full lebar + dinaikkan sedikit dari bawah */
@@ -207,7 +209,7 @@
                 order: 1;
             }
 
-            .cutting-modal-section-bundles {
+            .cutting-modal-section-agg {
                 order: 2;
                 border-radius: 12px;
                 border: 1px solid rgba(148, 163, 184, 0.4);
@@ -215,12 +217,20 @@
                 padding: .5rem .6rem;
             }
 
-            .cutting-modal-section-summary {
+            .cutting-modal-section-bundles {
                 order: 3;
+                border-radius: 12px;
+                border: 1px solid rgba(148, 163, 184, 0.4);
+                background: var(--card, #fff);
+                padding: .5rem .6rem;
+            }
+
+            .cutting-modal-section-summary {
+                order: 4;
             }
 
             .cutting-modal-section-meta {
-                order: 4;
+                order: 5;
             }
 
             /* Sembunyikan field Catatan di mobile */

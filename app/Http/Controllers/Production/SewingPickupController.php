@@ -295,4 +295,105 @@ class SewingPickupController extends Controller
             ->with('success', 'Sewing pickup berhasil dibuat. Stok sudah dipindahkan dari WIP-CUT ke gudang sewing dengan costing yang mengikuti saldo WIP-CUT.');
     }
 
+    public function ajaxReadyBundles(Request $request)
+    {
+        $q = trim((string) $request->get('q', ''));
+        $color = trim((string) $request->get('color', ''));
+        $size = trim((string) $request->get('size', ''));
+        $minReady = $request->get('min_ready');
+        $maxReady = $request->get('max_ready');
+
+        $bundlesQuery = CuttingJobBundle::query()
+            ->with([
+                'finishedItem',
+                'cuttingJob.lot.item',
+                'qcResults',
+            ]);
+
+        // SEARCH TEXT
+        if ($q !== '') {
+            $term = '%' . $q . '%';
+
+            $bundlesQuery->where(function ($qq) use ($term) {
+                $qq->where('bundle_code', 'like', $term)
+                    ->orWhereHas('finishedItem', function ($q2) use ($term) {
+                        $q2->where('code', 'like', $term)
+                            ->orWhere('name', 'like', $term);
+                    })
+                    ->orWhereHas('cuttingJob.lot', function ($q2) use ($term) {
+                        $q2->where('code', 'like', $term);
+                    })
+                    ->orWhereHas('cuttingJob.lot.item', function ($q2) use ($term) {
+                        $q2->where('code', 'like', $term)
+                            ->orWhere('name', 'like', $term);
+                    });
+            });
+        }
+
+        // FILTER WARNA
+        if ($color !== '') {
+            $bundlesQuery->whereHas('finishedItem', function ($q2) use ($color) {
+                // TODO: sesuaikan field warna (misal color_code / color_short / dsb)
+                $q2->where('color_code', $color);
+            });
+        }
+
+        // FILTER UKURAN
+        if ($size !== '') {
+            $bundlesQuery->whereHas('finishedItem', function ($q2) use ($size) {
+                // TODO: sesuaikan field ukuran (misal size_code / size / dsb)
+                $q2->where('size_code', $size);
+            });
+        }
+
+        $bundles = $bundlesQuery
+            ->orderBy('id')
+            ->get();
+
+        // Hitung qty ready & filter min/max ready di level Collection
+        $minReadyF = is_null($minReady) || $minReady === '' ? null : (float) $minReady;
+        $maxReadyF = is_null($maxReady) || $maxReady === '' ? null : (float) $maxReady;
+
+        $displayBundles = $bundles->filter(function (CuttingJobBundle $b) use ($minReadyF, $maxReadyF) {
+            $qtyOk = (float) ($b->qty_cutting_ok ?? 0);
+            $qtyRemain = (float) ($b->qty_remaining_for_sewing ?? ($qtyOk ?: $b->qty_pcs));
+
+            if ($qtyRemain <= 0) {
+                return false;
+            }
+
+            if (!is_null($minReadyF) && $qtyRemain < $minReadyF) {
+                return false;
+            }
+
+            if (!is_null($maxReadyF) && $qtyRemain > $maxReadyF) {
+                return false;
+            }
+
+            // simpan untuk dipakai di view
+            $b->computed_qty_remain = $qtyRemain;
+
+            return true;
+        })->values();
+
+        $totalBundlesReady = $displayBundles->count();
+        $totalQtyReady = $displayBundles->sum(function ($b) {
+            return (float) ($b->computed_qty_remain ?? 0);
+        });
+
+        // render ulang baris tabel
+        $html = view('production.sewing_pickups._bundle_picker_rows', [
+            'displayBundles' => $displayBundles,
+            'oldLines' => [], // AJAX tidak pakai old() form
+            'preselectedBundleId' => null, // AJAX filter murni
+        ])->render();
+
+        return response()->json([
+            'html' => $html,
+            'total_bundles' => $totalBundlesReady,
+            'total_ready' => $totalQtyReady,
+            'total_ready_formatted' => number_format($totalQtyReady, 2, ',', '.'),
+        ]);
+    }
+
 }

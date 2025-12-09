@@ -58,88 +58,6 @@
         }
 
         /* ============================
-                   FAB MOBILE KANAN BAWAH
-               ============================ */
-        @media (max-width: 767.98px) {
-            .cutting-fab-mobile {
-                position: fixed;
-                right: 1rem;
-                /* 62px = tinggi mobile-bottom-nav, + 14px jarak */
-                bottom: calc(62px + 14px);
-                z-index: 1040;
-            }
-
-            .cutting-fab-main-btn {
-                width: 48px;
-                height: 48px;
-                border-radius: 999px;
-                border: none;
-                outline: none;
-                display: flex;
-                align-items: center;
-                justify-content: center;
-                background: var(--primary, #0d6efd);
-                color: #fff;
-                box-shadow: 0 10px 25px rgba(15, 23, 42, 0.35);
-                font-size: 1.4rem;
-                line-height: 1;
-            }
-
-            .cutting-fab-main-btn-icon {
-                display: inline-block;
-                transform: translateY(-1px);
-                transition: transform .18s ease;
-            }
-
-            .cutting-fab-mobile.is-open .cutting-fab-main-btn-icon {
-                transform: rotate(45deg);
-            }
-
-            .cutting-fab-menu {
-                position: absolute;
-                right: 0;
-                bottom: 58px;
-                min-width: 140px;
-                padding: .35rem;
-                border-radius: 12px;
-                background: color-mix(in srgb, var(--card) 94%, transparent 6%);
-                border: 1px solid var(--line);
-                box-shadow: 0 12px 30px rgba(15, 23, 42, 0.45);
-                opacity: 0;
-                transform: translateY(6px);
-                pointer-events: none;
-                transition: opacity .16s ease, transform .16s ease;
-            }
-
-            .cutting-fab-mobile.is-open .cutting-fab-menu {
-                opacity: 1;
-                transform: translateY(0);
-                pointer-events: auto;
-            }
-
-            .cutting-fab-menu .btn {
-                border-radius: 999px;
-                font-size: .8rem;
-                display: flex;
-                align-items: center;
-                gap: .35rem;
-                padding-inline: .7rem;
-            }
-
-            .cutting-fab-label {
-                white-space: nowrap;
-            }
-
-            .fab-item-kirim {
-                background: var(--card);
-            }
-
-            .fab-item-kirim i {
-                font-size: .9rem;
-            }
-        }
-
-        /* ============================
                    STATUS STEPPER DINAMIS
                ============================ */
         .status-stepper {
@@ -207,6 +125,45 @@
 
             .status-separator {
                 display: none;
+            }
+        }
+
+        /* ============================
+                   DESKTOP ACTIONS STYLING
+               ============================ */
+        .cutting-actions-desktop .btn {
+            border-radius: 999px;
+        }
+
+        .cutting-actions-desktop .btn-primary {
+            background: linear-gradient(135deg, #2563eb, #1d4ed8);
+            border: none;
+            box-shadow: 0 10px 24px rgba(37, 99, 235, 0.35);
+        }
+
+        .cutting-actions-desktop .btn-primary:hover {
+            filter: brightness(1.03);
+        }
+
+        .cutting-actions-desktop .btn-outline-primary {
+            border-color: rgba(37, 99, 235, 0.45);
+            color: #2563eb;
+        }
+
+        .cutting-actions-desktop .btn-outline-primary:hover {
+            background: rgba(37, 99, 235, 0.06);
+        }
+
+        .cutting-actions-desktop .btn-outline-secondary {
+            border-color: rgba(148, 163, 184, 0.7);
+        }
+
+        /* ============================
+                   MOBILE ACTIONS BAWAH
+               ============================ */
+        @media (max-width: 767.98px) {
+            .cutting-mobile-actions .btn {
+                border-radius: 999px;
             }
         }
     </style>
@@ -355,7 +312,7 @@
                         {{ $statusLabel }}
                     </span>
 
-                    <div class="d-flex gap-2">
+                    <div class="d-flex gap-2 cutting-actions-desktop">
                         <a href="{{ route('production.cutting_jobs.index') }}" class="btn btn-sm btn-outline-secondary">
                             Kembali
                         </a>
@@ -462,7 +419,7 @@
                 </div>
             </div>
 
-            {{-- Tombol kembali saja di header; aksi lain via FAB --}}
+            {{-- Tombol kembali di header --}}
             <div class="d-flex gap-2 flex-wrap">
                 <a href="{{ route('production.cutting_jobs.index') }}" class="btn btn-sm btn-outline-secondary flex-fill">
                     Kembali
@@ -712,76 +669,49 @@
             </div>
         </div>
 
-    </div>
-
-    {{-- =========================
-         FAB MOBILE: AKSI KONTEKSTUAL
-    ========================== --}}
-    @if (!$hasQcCutting)
-        <div class="cutting-fab-mobile d-md-none" id="cuttingFabMobile">
-            {{-- Menu yang muncul saat FAB dibuka --}}
-            <div class="cutting-fab-menu" id="cuttingFabMenu">
-                @if (in_array($job->status, ['draft', 'cut']))
-                    {{-- Kirim QC (aktif) --}}
-                    <form action="{{ route('production.cutting_jobs.send_to_qc', $job) }}" method="post">
-                        @csrf
-                        <button type="submit" class="btn btn-sm border fab-item-kirim w-100">
-                            <i class="bi bi-send"></i>
-                            <span class="cutting-fab-label">Kirim ke QC</span>
-                        </button>
-                    </form>
-                @elseif (in_array($job->status, ['cut_sent_to_qc', 'sent_to_qc']))
-                    {{-- Sudah dikirim, tinggal QC --}}
-                    @if (Route::has('production.qc.cutting.edit'))
-                        <a href="{{ route('production.qc.cutting.edit', $job) }}"
-                            class="btn btn-sm border fab-item-kirim w-100">
-                            <i class="bi bi-clipboard-check"></i>
-                            <span class="cutting-fab-label">Input QC</span>
+        {{-- =========================
+             MOBILE: AKSI DI BAGIAN BAWAH
+        ========================== --}}
+        @if (!$hasQcCutting)
+            <div class="card p-3 mb-4 d-block d-md-none cutting-mobile-actions">
+                <div class="d-grid gap-2">
+                    @if (in_array($job->status, ['draft', 'cut']))
+                        {{-- Edit Cutting (opsional di mobile) --}}
+                        <a href="{{ route('production.cutting_jobs.edit', $job) }}"
+                            class="btn btn-sm btn-outline-primary w-100">
+                            Edit Cutting
                         </a>
+
+                        {{-- Tombol utama: Kirim ke QC Cutting (inline-block penuh lebar) --}}
+                        <form action="{{ route('production.cutting_jobs.send_to_qc', $job) }}" method="post">
+                            @csrf
+                            <button type="submit" class="btn btn-sm btn-primary w-100">
+                                Kirim ke QC Cutting
+                            </button>
+                        </form>
+                    @elseif (in_array($job->status, ['cut_sent_to_qc', 'sent_to_qc']))
+                        @if (Route::has('production.qc.cutting.edit'))
+                            <a href="{{ route('production.qc.cutting.edit', $job) }}"
+                                class="btn btn-sm btn-primary w-100">
+                                Input QC Cutting
+                            </a>
+                        @else
+                            <button type="button" class="btn btn-sm btn-warning w-100" disabled>
+                                Menunggu hasil QC…
+                            </button>
+                        @endif
                     @else
-                        <button type="button" class="btn btn-sm border fab-item-kirim w-100" disabled>
-                            <i class="bi bi-hourglass-split"></i>
-                            <span class="cutting-fab-label">Menunggu QC…</span>
+                        <button type="button" class="btn btn-sm btn-warning w-100" disabled>
+                            Menunggu proses QC…
                         </button>
                     @endif
-                @else
-                    <button type="button" class="btn btn-sm border fab-item-kirim w-100" disabled>
-                        <i class="bi bi-hourglass-split"></i>
-                        <span class="cutting-fab-label">Proses QC…</span>
-                    </button>
-                @endif
+                </div>
             </div>
+        @endif
 
-            {{-- Tombol utama kecil seukuran jempol --}}
-            <button type="button" class="cutting-fab-main-btn" id="cuttingFabToggle" aria-label="Aksi Cutting Job">
-                <span class="cutting-fab-main-btn-icon">+</span>
-            </button>
-        </div>
-    @else
-        {{-- Kalau sudah QC, FAB bisa dihilangkan atau diubah nanti kalau perlu --}}
-    @endif
+    </div>
 @endsection
 
 @push('scripts')
-    <script>
-        document.addEventListener('DOMContentLoaded', function() {
-            const fab = document.getElementById('cuttingFabMobile');
-            const fabToggle = document.getElementById('cuttingFabToggle');
-
-            if (!fab || !fabToggle) return;
-
-            fabToggle.addEventListener('click', function(e) {
-                e.stopPropagation();
-                fab.classList.toggle('is-open');
-            });
-
-            // Klik di luar → tutup menu
-            document.addEventListener('click', function(e) {
-                if (!fab.classList.contains('is-open')) return;
-                if (!fab.contains(e.target)) {
-                    fab.classList.remove('is-open');
-                }
-            });
-        });
-    </script>
+    {{-- Tidak perlu JS khusus untuk aksi mobile, tombol langsung submit --}}
 @endpush

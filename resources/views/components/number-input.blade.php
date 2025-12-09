@@ -1,167 +1,184 @@
 @props([
-    // name wajib
     'name',
-
-    // optional
-    'id' => null,
     'value' => null,
 
-    // HTML type: "number" atau "text"
-    'htmlType' => null, // kita tentukan default di php block agar bisa override saat name mengandung 'qty'
+    // 'integer' atau 'decimal'
+    'mode' => 'decimal',
 
-    'step' => null, // default ditentukan di php block
-    'min' => '0',
+    'placeholder' => '',
+    'min' => null,
     'max' => null,
 
-    // "numeric" → keyboard angka tanpa koma, "decimal" → angka + koma/titik
-    'inputmode' => null, // default ditentukan di php block
+    // jumlah decimal saat blur
+    'decimals' => 2,
 
-    // ukuran Bootstrap: sm / md / lg
-    'size' => 'sm',
-
-    // alignment: start / center / end
-    'align' => 'end',
-
-    // tambahan class custom
-    'class' => '',
+    // auto focus
+    'autofocus' => false,
 ])
 
 @php
-    // ====== defaults based on name (auto-detect qty) ======
-    $lowerName = strtolower($name ?? '');
-    $isQty = str_contains($lowerName, 'qty'); // deteksi 'qty' di nama
+    use Illuminate\Support\Str;
 
-    // jika user tidak eksplisit set htmlType/inputmode/step, kita set default cerdas
-    if (is_null($htmlType)) {
-        $htmlType = $isQty ? 'number' : 'number';
-        // note: default tetap 'number' to keep numeric behavior; if you need text (formatted) pass htmlType='text'
-    }
+    $id = $attributes->get('id') ?? 'num-' . Str::random(6);
+    $inputmode = $mode === 'integer' ? 'numeric' : 'decimal';
 
-    if (is_null($inputmode)) {
-        $inputmode = $isQty ? 'numeric' : 'decimal';
-    }
-
-    if (is_null($step)) {
-        $step = $isQty ? '1' : '0.01';
-    }
-
-    $inputId = $id ?? str_replace(['[', ']'], '_', $name); // id aman dari [] array
-    $sizeClass = $size ? 'form-control-' . $size : '';
-    $alignClass = $align ? 'text-' . $align : '';
-
-    // Ensure attributes for numeric fields
-    $stepAttr = e($step);
-    $minAttr = is_null($min) ? null : e($min);
-    $maxAttr = is_null($max) ? null : e($max);
-
-    // value handling: prefer raw (not pre-formatted) if passed as numeric via :value
-    $valueAttr = old($name, $value);
+    $rawValue = old($name, $value);
 @endphp
 
-<input
-    id="{{ $inputId }}"
-    name="{{ $name }}"
-    type="{{ $htmlType }}"
-    @if ($htmlType === 'number')
-        step="{{ $stepAttr }}"
-        min="{{ $minAttr }}"
-        @if (!is_null($max)) max="{{ $maxAttr }}" @endif
-    @endif
-
-    inputmode="{{ $inputmode }}"
-    @if ($inputmode === 'numeric') pattern="[0-9]*" @endif
-
-    autocomplete="off"
-    class="form-control {{ $sizeClass }} {{ $alignClass }} gfid-number-input {{ $class }}"
-    value="{{ $valueAttr }}"
-/>
+<input type="text" name="{{ $name }}" id="{{ $id }}" value="{{ $rawValue }}"
+    inputmode="{{ $inputmode }}" autocomplete="off" pattern="{{ $mode === 'integer' ? '\d*' : '[0-9]*[.,]?[0-9]*' }}"
+    data-number-mode="{{ $mode }}" data-min="{{ $min !== null ? $min : '' }}"
+    data-max="{{ $max !== null ? $max : '' }}" data-decimals="{{ $decimals }}"
+    data-autofocus="{{ $autofocus ? '1' : '0' }}"
+    class="form-control form-control-sm number-input js-number-input {{ $attributes->get('class') }}"
+    placeholder="{{ $placeholder }}" />
 
 @once
+    @push('head')
+        <style>
+            /* Desktop: kanan */
+            .number-input {
+                text-align: right;
+            }
+
+            /* Mobile: tengah + anti zoom */
+            @media (max-width: 768px) {
+                .number-input {
+                    text-align: center;
+                    font-size: 16px;
+                    padding-top: .5rem;
+                    padding-bottom: .5rem;
+                }
+            }
+        </style>
+    @endpush
+
+
     @push('scripts')
         <script>
-            (function () {
-                // ---------- UX helpers: auto-select on focus / click ----------
-                document.addEventListener('focus', function (e) {
-                    const el = e.target;
-                    if (!el.classList || !el.classList.contains('gfid-number-input')) return;
-                    setTimeout(function () {
-                        try { el.select(); } catch (_) {}
-                    }, 0);
-                }, true);
+            document.addEventListener('DOMContentLoaded', () => initNumberInputs());
 
-                document.addEventListener('click', function (e) {
-                    const el = e.target.closest ? e.target.closest('.gfid-number-input') : null;
-                    if (!el) return;
-                    if (document.activeElement === el) {
-                        setTimeout(function () {
-                            try { el.select(); } catch (_) {}
-                        }, 0);
+            function initNumberInputs(scope = document) {
+                scope.querySelectorAll('.js-number-input:not([data-number-inited])')
+                    .forEach(input => {
+                        setupNumberInput(input);
+                        input.dataset.numberInited = "1";
+                    });
+            }
+
+            function setupNumberInput(input) {
+                const mode = input.dataset.numberMode || 'decimal';
+                const min = input.dataset.min !== '' ? parseFloat(input.dataset.min) : null;
+                const max = input.dataset.max !== '' ? parseFloat(input.dataset.max) : null;
+                const decimals = parseInt(input.dataset.decimals || '2');
+
+                /* -----------------------------
+                 * INPUT FILTER (realtime)
+                 * ----------------------------- */
+                input.addEventListener('input', () => {
+                    let v = input.value;
+
+                    if (mode === 'integer') {
+                        v = v.replace(/[^\d]/g, '');
+                    } else {
+                        v = v.replace(/,/g, '.'); // koma → titik
+                        v = v.replace(/[^0-9.]/g, ''); // angka + titik
+
+                        const parts = v.split('.');
+                        if (parts.length > 2) {
+                            v = parts[0] + '.' + parts.slice(1).join('');
+                        }
+                    }
+
+                    input.value = v;
+                });
+
+                /* -----------------------------
+                 * SELECT ALL + SCROLL
+                 * ----------------------------- */
+                function scrollToCenter() {
+                    setTimeout(() => {
+                        try {
+                            input.scrollIntoView({
+                                block: 'center',
+                                behavior: 'smooth'
+                            });
+                        } catch (e) {
+                            const r = input.getBoundingClientRect();
+                            window.scrollTo({
+                                top: window.pageYOffset + r.top - 150,
+                                behavior: 'smooth'
+                            });
+                        }
+                    }, 120);
+                }
+
+                function selectAllIfFilled() {
+                    if (input.value.length > 0) input.select();
+                }
+
+                input.addEventListener('focus', () => {
+                    selectAllIfFilled();
+                    scrollToCenter();
+                });
+
+                input.addEventListener('click', () => selectAllIfFilled());
+
+                /* -----------------------------
+                 * FORMAT & VALIDATE ON BLUR
+                 * ----------------------------- */
+                input.addEventListener('blur', () => {
+                    let v = input.value.trim();
+                    if (v === '') return;
+
+                    v = v.replace(/,/g, '.');
+
+                    // Pastikan hanya 1 titik
+                    const parts = v.split('.');
+                    if (parts.length > 2) {
+                        v = parts[0] + '.' + parts.slice(1).join('');
+                    }
+
+                    let num =
+                        mode === 'integer' ?
+                        parseInt(v, 10) :
+                        parseFloat(v);
+
+                    // Jika parse gagal (misalnya user ketik 25,,87)
+                    if (isNaN(num)) {
+                        if (parts.length >= 2) {
+                            num = Number(parts[0] + "." + parts[1]);
+                        }
+                    }
+
+                    if (isNaN(num)) {
+                        input.value = '';
+                        return;
+                    }
+
+                    // batas min/max
+                    if (min !== null && num < min) num = min;
+                    if (max !== null && num > max) num = max;
+
+                    if (mode === 'integer') {
+                        input.value = String(num);
+                    } else {
+                        // JANGAN BULATKAN SALAH — pakai fixed decimals
+                        input.value = Number(num).toFixed(decimals);
                     }
                 });
 
-                // ---------- Sanitization before submit ----------
-                // Applies to all forms on page; if you want to restrict, add an attribute to form (eg. data-sanitize-number="true")
-                document.querySelectorAll('form').forEach(function (form) {
-                    // guard: don't attach multiple listeners if script re-run
-                    if (form.__gfid_number_sanitizer_attached) return;
-                    form.__gfid_number_sanitizer_attached = true;
-
-                    form.addEventListener('submit', function () {
-                        form.querySelectorAll('.gfid-number-input').forEach(function (inp) {
-                            if (!inp) return;
-                            let v = inp.value ?? '';
-                            v = String(v).trim();
-
-                            // If empty, set to '0' (so DB get numeric)
-                            if (v === '') {
-                                inp.value = '0';
-                                return;
-                            }
-
-                            // Remove spaces
-                            v = v.replace(/\s+/g, '');
-
-                            // Remove thousand separators commonly '.' (e.g. "1.234.567" -> "1234567")
-                            // and also remove any non-digit except comma and dot
-                            // First remove dots (common thousand separator)
-                            v = v.replace(/[.]/g, '');
-
-                            // Replace comma with dot for decimal normalization
-                            v = v.replace(/,/g, '.');
-
-                            // If field name contains 'qty' => treat as integer: strip decimal part
-                            const name = (inp.getAttribute('name') || '').toLowerCase();
-                            const step = inp.getAttribute('step') || '';
-                            const inputmode = (inp.getAttribute('inputmode') || '').toLowerCase();
-
-                            const looksLikeQty = name.includes('qty') || step === '1' || inputmode === 'numeric';
-
-                            if (looksLikeQty) {
-                                // if there is decimal dot, take left part only
-                                if (v.indexOf('.') !== -1) {
-                                    v = v.split('.')[0];
-                                }
-                                // keep only digits (remove any non-digit leftover)
-                                v = v.replace(/\D+/g, '');
-                                if (v === '') v = '0';
-                                inp.value = v;
-                            } else {
-                                // For decimal-capable fields: keep numeric form with dot as decimal separator
-                                // Remove all characters except digits and dot and minus
-                                // Allow at most one dot
-                                let cleaned = v.replace(/[^0-9.\-]/g, '');
-                                const parts = cleaned.split('.');
-                                if (parts.length > 2) {
-                                    // join extras as decimal tail
-                                    cleaned = parts.shift() + '.' + parts.join('');
-                                }
-                                if (cleaned === '' || cleaned === '.' || cleaned === '-' ) cleaned = '0';
-                                inp.value = cleaned;
-                            }
-                        });
-                    });
-                });
-            })();
+                /* -----------------------------
+                 * AUTO FOCUS (optional)
+                 * ----------------------------- */
+                if (input.dataset.autofocus === '1') {
+                    setTimeout(() => {
+                        input.focus();
+                        selectAllIfFilled();
+                        scrollToCenter();
+                    }, 200);
+                }
+            }
         </script>
     @endpush
 @endonce

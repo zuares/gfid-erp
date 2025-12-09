@@ -89,7 +89,13 @@ class PurchaseOrderController extends Controller
         $order->shipping_cost = 0;
 
         $suppliers = Supplier::orderBy('name')->get();
-        $items = Item::where('active', 1)->orderBy('name')->get();
+        $items = Item::query()
+            ->where('active', 1)
+            ->where('type', 'material')
+            ->with('category')
+            ->orderBy('name')
+            ->limit(100)
+            ->get();
 
         // lines kosong untuk form awal
         $lines = collect();

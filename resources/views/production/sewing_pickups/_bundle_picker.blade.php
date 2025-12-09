@@ -2,39 +2,40 @@
 
 @push('head')
     <style>
-        :root {
-            --card-radius-lg: 16px;
+        .sewing-pickup-bundle-picker {
+            /* wrapper khusus partial ini */
         }
 
-        .page-wrap {
-            max-width: 1100px;
-            margin-inline: auto;
-            padding-inline: .9rem;
-        }
-
-        /* background lembut */
-        body[data-theme="light"] .page-wrap {
-            background: linear-gradient(to bottom,
-                    #f4f5fb 0,
-                    #f7f8fc 30%,
-                    #f9fafb 100%);
-        }
-
-        .card {
+        .sewing-pickup-bundle-picker-card {
             background: var(--card);
-            border-radius: var(--card-radius-lg);
+            border-radius: 16px;
             border: 1px solid rgba(148, 163, 184, 0.18);
             box-shadow:
                 0 10px 30px rgba(15, 23, 42, 0.08),
                 0 0 0 1px rgba(15, 23, 42, 0.02);
         }
 
-        .card-section {
+        /* light mode: samakan dengan card putih di create */
+        body[data-theme="light"] .sewing-pickup-bundle-picker-card {
+            background: #ffffff;
+        }
+
+        body[data-theme="dark"] .sewing-pickup-bundle-picker-card {
+            border-color: rgba(51, 65, 85, 0.9);
+            box-shadow:
+                0 10px 30px rgba(0, 0, 0, 0.8),
+                0 0 0 1px rgba(15, 23, 42, 0.9);
+        }
+
+        .sewing-pickup-bundle-picker-card .card-section {
             padding: 1rem 1.1rem;
+            display: flex;
+            flex-direction: column;
+            gap: .6rem;
         }
 
         @media (min-width: 768px) {
-            .card-section {
+            .sewing-pickup-bundle-picker-card .card-section {
                 padding: 1.1rem 1.4rem;
             }
         }
@@ -42,11 +43,6 @@
         .mono {
             font-variant-numeric: tabular-nums;
             font-family: ui-monospace, SFMono-Regular, Menlo, Consolas;
-        }
-
-        .help {
-            color: var(--muted);
-            font-size: .84rem;
         }
 
         .badge-soft {
@@ -59,97 +55,7 @@
             overflow-x: auto;
         }
 
-        /* ====== HEADER PAGE ====== */
-        .header-row {
-            display: flex;
-            align-items: center;
-            justify-content: space-between;
-            gap: .75rem;
-            flex-wrap: wrap;
-        }
-
-        .header-title {
-            display: flex;
-            flex-direction: column;
-            gap: .1rem;
-        }
-
-        .header-title h1 {
-            font-size: 1.05rem;
-            font-weight: 700;
-        }
-
-        .header-subtitle {
-            font-size: .8rem;
-            color: var(--muted);
-        }
-
-        .btn-header-secondary {
-            border-radius: 999px;
-            padding-inline: .7rem;
-            padding-block: .35rem;
-            font-size: .8rem;
-        }
-
-        .field-block {
-            display: flex;
-            flex-direction: column;
-            gap: .2rem;
-        }
-
-        .field-label {
-            font-size: .72rem;
-            text-transform: uppercase;
-            letter-spacing: .08em;
-            font-weight: 600;
-            color: var(--muted);
-        }
-
-        .field-input-sm {
-            font-size: .86rem;
-        }
-
-        .field-static {
-            display: inline-flex;
-            align-items: center;
-            gap: .4rem;
-            padding: .42rem .85rem;
-            border-radius: 999px;
-            background: rgba(248, 250, 252, 0.96);
-            border: 1px solid rgba(148, 163, 184, 0.45);
-            font-size: .82rem;
-            max-width: 100%;
-        }
-
-        .field-static .code {
-            font-weight: 600;
-            font-family: ui-monospace, SFMono-Regular, Menlo, Consolas;
-        }
-
-        .field-static .name {
-            color: var(--muted);
-            font-size: .8rem;
-            white-space: nowrap;
-            text-overflow: ellipsis;
-            overflow: hidden;
-        }
-
-        .summary-chip {
-            border-radius: 999px;
-            padding: .16rem .7rem;
-            font-size: .74rem;
-            background: rgba(148, 163, 184, 0.10);
-        }
-
-        .summary-selected {
-            font-size: .78rem;
-            color: var(--muted);
-            display: flex;
-            flex-wrap: wrap;
-            gap: .35rem;
-            align-items: center;
-        }
-
+        /* ====== HEADER / RINGKASAN ====== */
         .filter-header {
             display: flex;
             flex-wrap: wrap;
@@ -176,10 +82,32 @@
             font-weight: 700;
         }
 
-        /* ========= SEARCH & COLOR FILTER SECTION ========= */
+        .summary-inline {
+            font-size: .78rem;
+            color: var(--muted);
+            display: flex;
+            flex-wrap: wrap;
+            gap: .35rem;
+            align-items: baseline;
+        }
+
+        .summary-inline-label {
+            font-weight: 600;
+            color: #4b5563;
+        }
+
+        body[data-theme="dark"] .summary-inline-label {
+            color: #e5e7eb;
+        }
+
+        .summary-inline-dot {
+            opacity: .7;
+        }
+
+        /* ========= SEARCH + FILTER SECTION ========= */
         .search-filter-section {
-            margin-top: .75rem;
-            margin-bottom: .5rem;
+            margin-top: .2rem;
+            margin-bottom: .4rem;
             display: flex;
             flex-direction: column;
             gap: .35rem;
@@ -189,7 +117,7 @@
             display: flex;
             flex-wrap: wrap;
             gap: .4rem .75rem;
-            align-items: center;
+            align-items: flex-end;
             justify-content: space-between;
         }
 
@@ -199,6 +127,59 @@
             color: var(--muted);
             text-transform: uppercase;
             letter-spacing: .08em;
+        }
+
+        .search-left {
+            display: flex;
+            flex-direction: column;
+            gap: .35rem;
+        }
+
+        .item-code-select-wrap {
+            max-width: 260px;
+            position: relative;
+        }
+
+        .item-code-select-wrap .form-select {
+            font-size: .8rem;
+            font-weight: 600;
+            border-radius: .45rem;
+            border-color: rgba(37, 99, 235, 0.35);
+            background-color: var(--card);
+            box-shadow:
+                0 0 0 0 rgba(191, 219, 254, 0),
+                0 0 0 0 rgba(37, 99, 235, 0);
+            transition: box-shadow .2s ease, border-color .2s ease, background-color .2s ease;
+        }
+
+        .item-code-select-wrap .form-select:focus {
+            border-color: rgba(37, 99, 235, 0.7);
+            box-shadow:
+                0 0 0 1px rgba(191, 219, 254, 0.85),
+                0 4px 10px rgba(37, 99, 235, 0.15);
+        }
+
+        body[data-theme="dark"] .item-code-select-wrap .form-select {
+            background-color: rgba(15, 23, 42, 0.96);
+            border-color: rgba(129, 140, 248, 0.7);
+        }
+
+        @keyframes select-soft-pulse {
+            0% {
+                box-shadow:
+                    0 0 0 1px rgba(191, 219, 254, 0.9),
+                    0 6px 14px rgba(37, 99, 235, 0.25);
+            }
+
+            100% {
+                box-shadow:
+                    0 0 0 1px rgba(191, 219, 254, 0.5),
+                    0 3px 8px rgba(37, 99, 235, 0.14);
+            }
+        }
+
+        .item-code-select-wrap.focal-pulse .form-select {
+            animation: select-soft-pulse .6s ease-out 2;
         }
 
         .search-input-wrap {
@@ -217,93 +198,12 @@
             font-size: .8rem;
         }
 
-        .color-filter-row {
-            display: flex;
-            flex-wrap: wrap;
-            gap: .25rem;
-        }
-
-        .color-filter-chip {
-            border-radius: 999px;
-            border: 1px solid rgba(148, 163, 184, 0.7);
-            padding: .14rem .52rem;
-            font-size: .7rem;
-            font-weight: 600;
-            text-transform: uppercase;
-            background: rgba(248, 250, 252, 0.95);
-            color: #4b5563;
-            cursor: pointer;
-            user-select: none;
-            display: inline-flex;
-            align-items: center;
-            gap: .16rem;
-            transition:
-                background-color .15s ease,
-                border-color .15s ease,
-                color .15s ease,
-                box-shadow .15s ease,
-                transform .08s ease;
-        }
-
-        .color-filter-chip:hover {
-            border-color: rgba(59, 130, 246, .7);
-            color: #1d4ed8;
-            box-shadow:
-                0 2px 6px rgba(15, 23, 42, 0.12);
-            transform: translateY(-1px);
-        }
-
-        .color-filter-chip.is-active {
-            background: linear-gradient(135deg, #0d6efd 0%, #2563eb 60%, #1d4ed8 100%);
-            border-color: rgba(37, 99, 235, 1);
-            color: #f9fafb;
-            box-shadow:
-                0 4px 10px rgba(37, 99, 235, .45);
-        }
-
-        .color-filter-chip .dot {
-            width: 8px;
-            height: 8px;
-            border-radius: 999px;
-            opacity: .85;
-        }
-
-        .dot-blk {
-            background: #111827;
-        }
-
-        .dot-nvy {
-            background: #1e3a8a;
-        }
-
-        .dot-mst {
-            background: #d97706;
-        }
-
-        .dot-abt {
-            background: #4b5563;
-        }
-
-        .dot-wht {
-            background: #e5e7eb;
-            box-shadow: 0 0 0 1px rgba(55, 65, 81, .45) inset;
-        }
-
-        .dot-bbl {
-            background: #60a5fa;
-        }
-
         .selection-toggle-row {
             display: flex;
-            justify-content: space-between;
+            justify-content: flex-end;
             align-items: center;
             font-size: .78rem;
             color: var(--muted);
-            margin-top: .2rem;
-        }
-
-        .selection-toggle-left {
-            font-size: .74rem;
         }
 
         .selection-toggle-right {
@@ -330,29 +230,23 @@
             border-top-color: rgba(148, 163, 184, 0.25) !important;
         }
 
-        /* BUNDLE CARD STATE (desktop & mobile) */
-        .bundle-card {
+        .bundle-card-row {
             border-radius: 14px;
             border: 1px solid rgba(148, 163, 184, 0.35);
             background: rgba(255, 255, 255, 0.96);
             box-shadow:
                 0 6px 16px rgba(15, 23, 42, 0.10),
                 0 0 0 1px rgba(15, 23, 42, 0.02);
-            transition:
-                background-color .18s ease,
-                box-shadow .18s ease,
-                border-color .18s ease,
-                transform .1s ease;
         }
 
-        .bundle-card:hover {
+        .bundle-card-row:hover {
             transform: translateY(-1px);
             box-shadow:
                 0 10px 24px rgba(15, 23, 42, 0.14),
                 0 0 0 1px rgba(148, 163, 184, 0.25);
         }
 
-        body[data-theme="dark"] .bundle-card {
+        body[data-theme="dark"] .bundle-card-row {
             background: rgba(15, 23, 42, 0.96);
             border-color: rgba(51, 65, 85, 0.9);
             box-shadow:
@@ -360,34 +254,29 @@
                 0 0 0 1px rgba(30, 64, 175, 0.6);
         }
 
-        /* STATE: TERPILIH */
-        .bundle-card.is-selected {
-            border-color: rgba(59, 130, 246, 0.95);
+        .bundle-card-row.is-selected {
+            border-color: rgba(59, 130, 246, 0.85);
             box-shadow:
-                0 0 0 2px rgba(191, 219, 254, 0.98),
-                0 16px 32px rgba(37, 99, 235, 0.22);
+                0 0 0 1px rgba(191, 219, 254, 0.9),
+                0 14px 26px rgba(37, 99, 235, 0.18);
             background: radial-gradient(circle at top left,
-                    rgba(59, 130, 246, 0.16) 0,
-                    rgba(255, 255, 255, 0.98) 50%);
+                    rgba(59, 130, 246, 0.08) 0,
+                    rgba(255, 255, 255, 0.98) 55%);
             transform: translateY(-1px);
         }
 
-        body[data-theme="dark"] .bundle-card.is-selected {
+        body[data-theme="dark"] .bundle-card-row.is-selected {
             background: radial-gradient(circle at top left,
-                    rgba(37, 99, 235, 0.45) 0,
+                    rgba(37, 99, 235, 0.3) 0,
                     rgba(15, 23, 42, 0.96) 55%);
-            border-color: rgba(147, 197, 253, 0.95);
+            border-color: rgba(147, 197, 253, 0.9);
             box-shadow:
-                0 0 0 2px rgba(59, 130, 246, 0.9),
-                0 20px 36px rgba(15, 23, 42, 0.85);
-        }
-
-        .bundle-card.is-selected:hover {
-            transform: translateY(-2px);
+                0 0 0 1px rgba(59, 130, 246, 0.8),
+                0 18px 32px rgba(15, 23, 42, 0.9);
         }
 
         .row-empty {
-            box-shadow: inset 3px 0 0 rgba(148, 163, 184, .35);
+            box-shadow: inset 3px 0 0 rgba(148, 163, 184, .3);
         }
 
         .row-picked {
@@ -416,33 +305,72 @@
             box-shadow: 0 0 0 1px rgba(37, 99, 235, .4);
         }
 
+        .qty-input.border-warning {
+            border-color: #eab308 !important;
+        }
+
+        /* FLOATING ACTION (MOBILE): SUBMIT SHORTCUT */
+        .bundle-actions-fab {
+            position: fixed;
+            right: .9rem;
+            bottom: 7.2rem;
+            z-index: 40;
+            display: none;
+        }
+
+        .bundle-submit-fab {
+            border-radius: 999px;
+            border: none;
+            padding: .4rem 1rem;
+            font-size: .82rem;
+            font-weight: 600;
+            background: linear-gradient(135deg, #0d6efd 0%, #2563eb 60%, #1d4ed8 100%);
+            color: #f9fafb;
+            box-shadow:
+                0 12px 24px rgba(15, 23, 42, .35),
+                0 0 0 1px rgba(191, 219, 254, .9);
+            display: inline-flex;
+            align-items: center;
+            gap: .35rem;
+        }
+
+        .bundle-submit-fab:disabled {
+            opacity: .6;
+            cursor: not-allowed;
+            box-shadow:
+                0 6px 16px rgba(15, 23, 42, .25),
+                0 0 0 1px rgba(148, 163, 184, .7);
+        }
+
         /* ============ MOBILE (<= 767.98px) ============ */
         @media (max-width: 767.98px) {
 
-            .page-wrap {
-                padding-bottom: 7.5rem;
-                overflow-x: hidden;
+            .sewing-pickup-bundle-picker-card .card-section {
+                padding: .85rem .9rem;
+                gap: .5rem;
             }
 
-            body.keyboard-open .page-wrap {
-                padding-bottom: 13rem;
-            }
-
-            .table-wrap {
-                overflow-x: visible;
+            .filter-header {
+                order: 0;
             }
 
             .search-filter-section {
-                margin-top: .9rem;
-                margin-bottom: .7rem;
+                order: 1;
+            }
+
+            .table-wrap {
+                order: 2;
+                overflow-x: visible;
             }
 
             .search-filter-top {
                 flex-direction: column;
                 align-items: stretch;
+                gap: .6rem;
             }
 
-            .search-input-wrap {
+            .search-input-wrap,
+            .item-code-select-wrap {
                 max-width: 100%;
             }
 
@@ -465,12 +393,16 @@
                 border: 1px solid rgba(148, 163, 184, 0.3);
                 padding: .7rem .8rem .75rem;
                 margin-bottom: .45rem;
-                background: rgba(255, 255, 255, 0.96);
+                background: #ffffff;
                 cursor: pointer;
                 box-shadow:
                     0 8px 24px rgba(15, 23, 42, 0.10),
                     0 0 0 1px rgba(15, 23, 42, 0.02);
                 overflow: hidden;
+            }
+
+            body[data-theme="dark"] .table-sewing-pickup tbody tr {
+                background: rgba(15, 23, 42, 0.96);
             }
 
             .table-sewing-pickup tbody tr:last-child {
@@ -489,27 +421,6 @@
 
             .td-desktop-only {
                 display: none !important;
-            }
-
-            .card {
-                border-radius: 15px;
-                box-shadow:
-                    0 10px 26px rgba(15, 23, 42, 0.10),
-                    0 0 0 1px rgba(15, 23, 42, 0.02);
-            }
-
-            .card-section {
-                padding: .85rem .9rem;
-            }
-
-            .header-row {
-                flex-direction: column;
-                align-items: stretch;
-            }
-
-            .btn-header-secondary {
-                width: 100%;
-                justify-content: center;
             }
 
             .mobile-row-header {
@@ -595,11 +506,6 @@
                 display: inline-block;
             }
 
-            .mobile-check-wrap,
-            .mobile-row-meta-bundle {
-                display: none !important;
-            }
-
             .mobile-row-meta {
                 font-size: .74rem;
                 color: var(--muted);
@@ -655,54 +561,12 @@
                 box-shadow: 0 0 0 2px rgba(37, 99, 235, .3) !important;
             }
 
-            .form-footer {
-                position: fixed;
-                right: .9rem;
-                bottom: 4.2rem;
-                left: auto;
-                z-index: 30;
-                display: inline-flex !important;
-                flex-direction: row-reverse;
-                align-items: center !important;
-                gap: .45rem;
-                margin: 0;
-                padding: 0;
-                background: transparent;
-                border: none;
-            }
-
-            .form-footer .btn {
-                width: auto;
-                border-radius: 999px;
-                padding-inline: .9rem;
-                padding-block: .35rem;
-                box-shadow:
-                    0 10px 20px rgba(15, 23, 42, .25),
-                    0 3px 8px rgba(15, 23, 42, .2);
-            }
-
-            .form-footer .btn-primary {
-                font-weight: 600;
-                background: linear-gradient(135deg, #0d6efd 0%, #2563eb 60%, #1d4ed8 100%);
-                border: none;
-                display: inline-flex;
-                align-items: center;
-                gap: .35rem;
-            }
-
-            .form-footer .btn-outline-secondary {
-                font-size: .78rem;
-                padding-inline: .7rem;
-                padding-block: .3rem;
-                background: rgba(248, 250, 252, 0.96);
-                border-color: rgba(148, 163, 184, .7);
-                display: inline-flex;
-                align-items: center;
-                gap: .25rem;
-            }
-
             .gudang-section {
                 display: none !important;
+            }
+
+            .bundle-actions-fab {
+                display: flex;
             }
         }
 
@@ -710,352 +574,334 @@
             .td-mobile-extra {
                 display: none !important;
             }
+
+            .bundle-actions-fab {
+                display: none !important;
+            }
         }
     </style>
 @endpush
 
-<div class="card mb-3">
-    <div class="card-section">
-        @php
-            $oldLines = old('lines', []);
-            $preselectedBundleId = request('bundle_id');
+@php
+    $oldLines = old('lines', []);
+    $preselectedBundleId = request('bundle_id');
 
-            $displayBundles = $preselectedBundleId ? $bundles->where('id', (int) $preselectedBundleId) : $bundles;
+    $displayBundles = $preselectedBundleId ? $bundles->where('id', (int) $preselectedBundleId) : $bundles;
 
-            $displayBundles = $displayBundles
-                ->filter(function ($b) {
-                    $qtyOk = (float) ($b->qty_cutting_ok ?? 0);
-                    $qtyRemain = (float) ($b->qty_remaining_for_sewing ?? $qtyOk);
-                    return $qtyRemain > 0;
-                })
-                ->values();
+    $displayBundles = $displayBundles
+        ->filter(function ($b) {
+            $qtyOk = (float) ($b->qty_cutting_ok ?? 0);
+            $qtyRemain = (float) ($b->qty_remaining_for_sewing ?? $qtyOk);
+            return $qtyRemain > 0;
+        })
+        ->values();
 
-            $totalBundlesReady = $displayBundles->count();
-            $totalQtyReady = $displayBundles->sum(function ($b) {
-                $qtyOk = (float) ($b->qty_cutting_ok ?? 0);
-                return (float) ($b->qty_remaining_for_sewing ?? $qtyOk);
-            });
-        @endphp
+    $totalBundlesReady = $displayBundles->count();
+    $totalQtyReady = $displayBundles->sum(function ($b) {
+        $qtyOk = (float) ($b->qty_cutting_ok ?? 0);
+        return (float) ($b->qty_remaining_for_sewing ?? $qtyOk);
+    });
 
-        {{-- HEADER --}}
-        <div class="filter-header mb-2">
-            <div class="filter-header-left">
-                <div class="filter-header-left-title">
-                    <i class="bi bi-funnel text-muted"></i>
-                    <h2>Pilih bundles yang mau dijahit</h2>
-                </div>
-                <div class="summary-selected">
-                    <span class="summary-chip">
-                        <span id="summary-selected-bundles">0</span> bundle dipilih
-                    </span>
-                    <span class="summary-chip">
-                        Total pickup: <span id="summary-selected-qty">0,00</span> pcs
-                    </span>
-                    <span class="summary-chip">
-                        Ready: {{ number_format($totalQtyReady, 2, ',', '.') }} pcs
-                    </span>
-                    <span class="summary-chip d-none d-md-inline">
-                        Total bundle ready: {{ $totalBundlesReady }}
-                    </span>
-                </div>
-            </div>
-        </div>
+    $itemCodes = $displayBundles->pluck('finishedItem.code')->filter()->unique()->sort()->values();
+@endphp
 
-        {{-- SEARCH + FILTER WARNA --}}
-        <div class="search-filter-section">
-            <div class="search-filter-top">
-                <div>
-                    <div class="search-label">
-                        Cari Bundles
+<div class="sewing-pickup-bundle-picker mb-3">
+    <div class="card sewing-pickup-bundle-picker-card">
+        <div class="card-section">
+
+            {{-- HEADER + SUMMARY --}}
+            <div class="filter-header">
+                <div class="filter-header-left">
+                    <div class="filter-header-left-title">
+                        <i class="bi bi-funnel text-muted"></i>
+                        <h2>Daftar ambil jahit</h2>
                     </div>
 
+                    <div class="summary-inline">
+                        <span class="summary-inline-label">Dipilih:</span>
+                        <span id="summary-selected-bundles">0</span>
+
+                        <span class="summary-inline-dot">•</span>
+
+                        <span class="summary-inline-label">Pickup:</span>
+                        <span><span id="summary-selected-qty">0,00</span> pcs</span>
+
+                        <span class="summary-inline-dot d-none d-md-inline">•</span>
+
+                        <span class="summary-inline-label d-none d-md-inline">Ready:</span>
+                        <span class="d-none d-md-inline">
+                            {{ number_format($totalQtyReady, 2, ',', '.') }} pcs
+                        </span>
+                    </div>
                 </div>
-                <div class="input-group input-group-sm search-input-wrap">
-                    <span class="input-group-text border-end-0 bg-white">
-                        <i class="bi bi-search text-muted"></i>
-                    </span>
-                    <input type="text" id="bundle-filter-input"
-                        class="form-control form-control-sm border-start-0 text-uppercase"
-                        placeholder="Masukan Kode Barang.. " autocomplete="off">
+
+                {{-- DESKTOP: toggle hanya baris yang ada pickup --}}
+                <div class="selection-toggle-row d-none d-md-flex">
+                    <div class="selection-toggle-right">
+                        <label class="form-check-label" for="toggle-only-picked">
+                            Tampilkan hanya baris dengan pickup
+                        </label>
+                        <input type="checkbox" class="form-check-input" id="toggle-only-picked">
+                    </div>
+                </div>
+            </div>
+
+            {{-- FILTER (select kode barang + search) --}}
+            <div class="search-filter-section">
+                <div class="search-filter-top">
+                    <div class="search-left">
+                        <div class="search-label">
+                            Cari bundles
+                        </div>
+
+                        <div class="item-code-select-wrap" id="item-code-select-wrap">
+                            <select id="item-code-select" class="form-select form-select-sm">
+                                <option value="">Semua kode barang</option>
+                                @foreach ($itemCodes as $code)
+                                    <option value="{{ $code }}">{{ $code }}</option>
+                                @endforeach
+                            </select>
+                        </div>
+                    </div>
+
+                    <div class="input-group input-group-sm search-input-wrap">
+                        <span class="input-group-text border-end-0 bg-white">
+                            <i class="bi bi-search text-muted"></i>
+                        </span>
+                        <input type="text" id="bundle-filter-input"
+                            class="form-control form-control-sm border-start-0 text-uppercase"
+                            placeholder="Kode / bundle / lot.." autocomplete="off">
+                    </div>
                 </div>
             </div>
 
-            <div class="color-filter-row mt-1">
-                <button type="button" class="color-filter-chip" data-color="">
-                    Semua
-                </button>
-                <button type="button" class="color-filter-chip" data-color="BLK">
-                    <span class="dot dot-blk"></span> BLK
-                </button>
-                <button type="button" class="color-filter-chip" data-color="NVY">
-                    <span class="dot dot-nvy"></span> NVY
-                </button>
-                <button type="button" class="color-filter-chip" data-color="MST">
-                    <span class="dot dot-mst"></span> MST
-                </button>
-                <button type="button" class="color-filter-chip" data-color="ABT">
-                    <span class="dot dot-abt"></span> ABT
-                </button>
-                <button type="button" class="color-filter-chip" data-color="WHT">
-                    <span class="dot dot-wht"></span> WHT
-                </button>
-                <button type="button" class="color-filter-chip" data-color="BBL">
-                    <span class="dot dot-bbl"></span> BBL
-                </button>
-            </div>
-
-            <div class="selection-toggle-row">
-                <div class="selection-toggle-left">
-                    Filter aktif:
-                    <span id="active-color-label" class="fw-semibold">Semua warna</span>
+            @error('lines')
+                <div class="alert alert-danger py-1 small mb-2">
+                    {{ $message }}
                 </div>
-                <div class="selection-toggle-right">
-                    <label class="form-check-label" for="toggle-only-picked">
-                        Tampilkan hanya bundle yang sudah diambil
-                    </label>
-                    <input type="checkbox" class="form-check-input" id="toggle-only-picked">
-                </div>
-            </div>
-        </div>
+            @enderror
 
-        @error('lines')
-            <div class="alert alert-danger py-1 small mb-2">
-                {{ $message }}
-            </div>
-        @enderror
+            {{-- LIST BUNDLES --}}
+            <div class="table-wrap">
+                <table class="table table-sm align-middle mono table-sewing-pickup mb-0">
+                    <thead>
+                        <tr>
+                            <th style="width: 40px;" class="text-center">#</th>
+                            <th style="width: 130px;">Bundle</th>
+                            <th style="width: 160px;">Item Jadi</th>
+                            <th style="width: 140px;">Lot</th>
+                            <th style="width: 110px;" class="text-end">Cutting</th>
+                            <th style="width: 110px;" class="text-end">Ready</th>
+                            <th style="width: 130px;" class="text-end">Pickup</th>
+                            <th style="width: 80px;"></th>
+                        </tr>
+                    </thead>
+                    <tbody>
+                        @forelse ($displayBundles as $idx => $b)
+                            @php
+                                $qc = $b->qcResults
+                                    ? $b->qcResults->where('stage', 'cutting')->sortByDesc('qc_date')->first()
+                                    : null;
 
-        <div class="table-wrap">
-            <table class="table table-sm align-middle mono table-sewing-pickup mb-0">
-                <thead>
-                    <tr>
-                        <th style="width: 40px;" class="text-center">#</th>
-                        <th style="width: 130px;">Bundle</th>
-                        <th style="width: 160px;">Item Jadi</th>
-                        <th style="width: 140px;">Lot</th>
-                        <th style="width: 110px;" class="text-end">Cutting</th>
-                        <th style="width: 110px;" class="text-end">Ready</th>
-                        <th style="width: 130px;" class="text-end">Pickup</th>
-                        <th style="width: 80px;"></th>
-                    </tr>
-                </thead>
-                <tbody>
-                    @forelse ($displayBundles as $idx => $b)
-                        @php
-                            $qc = $b->qcResults
-                                ? $b->qcResults->where('stage', 'cutting')->sortByDesc('qc_date')->first()
-                                : null;
+                                $oldLine = $oldLines[$idx] ?? null;
 
-                            $oldLine = $oldLines[$idx] ?? null;
+                                $qtyOk = (float) ($b->qty_cutting_ok ?? ($qc?->qty_ok ?? $b->qty_pcs));
+                                $qtyRemain = (float) ($b->qty_remaining_for_sewing ?? $qtyOk);
 
-                            $qtyOk = (float) ($b->qty_cutting_ok ?? ($qc?->qty_ok ?? $b->qty_pcs));
-                            $qtyRemain = (float) ($b->qty_remaining_for_sewing ?? $qtyOk);
+                                if ($qtyRemain <= 0) {
+                                    continue;
+                                }
 
-                            if ($qtyRemain <= 0) {
-                                continue;
-                            }
+                                $defaultQtyPickup = $oldLine['qty_bundle'] ?? null;
 
-                            $defaultQtyPickup = $oldLine['qty_bundle'] ?? null;
+                                if ($defaultQtyPickup === null && $preselectedBundleId == $b->id) {
+                                    $defaultQtyPickup = $qtyRemain;
+                                }
 
-                            if ($defaultQtyPickup === null && $preselectedBundleId == $b->id) {
-                                $defaultQtyPickup = $qtyRemain;
-                            }
+                                $oldQtyName = 'lines.' . $idx . '.qty_bundle';
 
-                            $oldQtyName = 'lines.' . $idx . '.qty_bundle';
+                                $cutDateObj =
+                                    $b->cuttingJob?->cutting_date ??
+                                    ($b->cuttingJob?->cut_date ?? $b->cuttingJob?->created_at);
+                                $cutDateLabel = $cutDateObj ? $cutDateObj->format('d/m/Y') : '-';
 
-                            $cutDateObj =
-                                $b->cuttingJob?->cutting_date ??
-                                ($b->cuttingJob?->cut_date ?? $b->cuttingJob?->created_at);
-                            $cutDateLabel = $cutDateObj ? $cutDateObj->format('d/m/Y') : '-';
+                                $lotCode = $b->cuttingJob?->lot?->code;
+                            @endphp
 
-                            $lotCode = $b->cuttingJob?->lot?->code;
-                        @endphp
+                            <tr class="bundle-row bundle-card-row row-empty" data-row-index="{{ $idx }}"
+                                data-qty-ready="{{ $qtyRemain }}" data-bundle-code="{{ $b->bundle_code }}"
+                                data-item-code="{{ $b->finishedItem?->code }}"
+                                data-item-name="{{ $b->finishedItem?->name }}" data-lot-code="{{ $lotCode }}">
 
-                        <tr class="bundle-row bundle-card row-empty" data-row-index="{{ $idx }}"
-                            data-qty-ready="{{ $qtyRemain }}" data-bundle-code="{{ $b->bundle_code }}"
-                            data-item-code="{{ $b->finishedItem?->code }}"
-                            data-item-name="{{ $b->finishedItem?->name }}" data-lot-code="{{ $lotCode }}">
+                                <td class="d-none">
+                                    <input type="hidden" name="lines[{{ $idx }}][bundle_id]"
+                                        value="{{ $b->id }}">
+                                </td>
 
-                            <td class="d-none">
-                                <input type="hidden" name="lines[{{ $idx }}][bundle_id]"
-                                    value="{{ $b->id }}">
-                            </td>
+                                {{-- DESKTOP --}}
+                                <td class="d-none d-md-table-cell td-desktop-only text-center">
+                                    <div class="d-inline-flex align-items-center gap-1">
+                                        <input type="checkbox" class="form-check-input row-check"
+                                            data-row-index="{{ $idx }}">
+                                        <span class="small text-muted">{{ $loop->iteration }}</span>
+                                    </div>
+                                </td>
 
-                            {{-- DESKTOP --}}
-                            <td class="d-none d-md-table-cell td-desktop-only text-center">
-                                <div class="d-inline-flex align-items-center gap-1">
-                                    <input type="checkbox" class="form-check-input row-check"
-                                        data-row-index="{{ $idx }}">
-                                    <span class="small text-muted">{{ $loop->iteration }}</span>
-                                </div>
-                            </td>
+                                <td class="d-none d-md-table-cell td-desktop-only">
+                                    <span class="fw-semibold">{{ $b->bundle_code }}</span>
+                                </td>
 
-                            <td class="d-none d-md-table-cell td-desktop-only">
-                                <span class="fw-semibold">{{ $b->bundle_code }}</span>
-                            </td>
-
-                            <td class="d-none d-md-table-cell td-desktop-only">
-                                <span class="fw-bold">
-                                    {{ $b->finishedItem?->code ?? '-' }}
-                                </span>
-                                <div class="small text-muted">
-                                    {{ $b->finishedItem?->name ?? '' }}
-                                </div>
-                            </td>
-
-                            <td class="d-none d-md-table-cell td-desktop-only">
-                                {{ $b->cuttingJob?->lot?->item?->code ?? '-' }}
-                                @if ($b->cuttingJob?->lot)
-                                    <span class="badge-soft bg-light border text-muted ms-1">
-                                        {{ $b->cuttingJob->lot->code }}
+                                <td class="d-none d-md-table-cell td-desktop-only">
+                                    <span class="fw-bold">
+                                        {{ $b->finishedItem?->code ?? '-' }}
                                     </span>
-                                @endif
-                            </td>
-
-                            <td class="d-none d-md-table-cell td-desktop-only text-end">
-                                {{ number_format($b->qty_pcs, 2, ',', '.') }}
-                            </td>
-
-                            <td class="d-none d-md-table-cell td-desktop-only text-end">
-                                <span class="qty-ready-pill">
-                                    {{ number_format($qtyRemain, 2, ',', '.') }}
-                                </span>
-                            </td>
-
-                            <td class="d-none d-md-table-cell td-desktop-only text-end">
-                                <input type="number" step="0.01" min="0" inputmode="decimal"
-                                    name="lines[{{ $idx }}][qty_bundle]"
-                                    class="form-control form-control-sm text-end qty-input @error($oldQtyName) is-invalid @enderror"
-                                    value="{{ old($oldQtyName, $defaultQtyPickup) }}">
-                                @error($oldQtyName)
-                                    <div class="invalid-feedback">{{ $message }}</div>
-                                @enderror
-                            </td>
-
-                            <td class="d-none d-md-table-cell td-desktop-only text-end">
-                                <button type="button" class="btn btn-outline-primary btn-sm py-0 px-2 btn-pick"
-                                    data-row-index="{{ $idx }}">
-                                    Pick
-                                </button>
-                            </td>
-
-                            {{-- MOBILE CARD --}}
-                            <td class="td-mobile-extra" colspan="8">
-                                <div class="mobile-row-header">
-                                    <div class="mobile-row-header-left">
-                                        <div class="mobile-row-header-topline">
-                                            <span class="row-index">#{{ $loop->iteration }}</span>
-                                            <span class="item-code mono">
-                                                {{ $b->finishedItem?->code ?? '-' }}
-                                            </span>
-                                        </div>
-                                        @if ($b->finishedItem?->name)
-                                            <div class="item-name text-truncate">
-                                                {{ $b->finishedItem?->name }}
-                                            </div>
-                                        @endif
+                                    <div class="small text-muted">
+                                        {{ $b->finishedItem?->name ?? '' }}
                                     </div>
-                                    <div class="mobile-row-header-right">
-                                        <div class="qty-ready-label">Qty Ready</div>
-                                        <div class="qty-ready-value">
-                                            <span class="qty-ready-pill">
-                                                {{ number_format($qtyRemain, 2, ',', '.') }}
-                                            </span>
-                                        </div>
+                                </td>
 
-                                        <div class="mobile-row-footer-left mt-1">
-                                            <div class="pickup-label">
-                                                Pickup (maks {{ number_format($qtyRemain, 2, ',', '.') }})
-                                            </div>
-                                            <input type="number" step="0.01" min="0" inputmode="decimal"
-                                                class="form-control form-control-sm qty-input @error($oldQtyName) is-invalid @enderror"
-                                                value="{{ old($oldQtyName, $defaultQtyPickup) }}"
-                                                placeholder="Masukkan ambil jahit">
-                                            @error($oldQtyName)
-                                                <div class="invalid-feedback">
-                                                    {{ $message }}</div>
-                                            @enderror
-                                        </div>
+                                <td class="d-none d-md-table-cell td-desktop-only">
+                                    {{ $b->cuttingJob?->lot?->item?->code ?? '-' }}
+                                    @if ($b->cuttingJob?->lot)
+                                        <span class="badge-soft bg-light border text-muted ms-1">
+                                            {{ $b->cuttingJob->lot->code }}
+                                        </span>
+                                    @endif
+                                </td>
 
-                                        <div class="mobile-check-wrap">
-                                            <input type="checkbox" class="form-check-input row-check"
-                                                data-row-index="{{ $idx }}">
-                                        </div>
-                                    </div>
-                                </div>
+                                <td class="d-none d-md-table-cell td-desktop-only text-end">
+                                    {{ number_format($b->qty_pcs, 2, ',', '.') }}
+                                </td>
 
-                                <div class="mobile-row-meta-bundle">
-                                    <div class="mobile-row-meta-left">
-                                        <div class="mobile-row-meta-label">Bundle</div>
-                                        <div class="mobile-row-meta-value">
-                                            <span class="mono">{{ $b->bundle_code }}</span>
-                                        </div>
-                                    </div>
-                                    <div class="mobile-row-meta-left text-end">
-                                        <div class="mobile-row-meta-label">Lot</div>
-                                        <div class="mobile-row-meta-value">
-                                            @if ($b->cuttingJob?->lot)
-                                                <span class="mono">{{ $b->cuttingJob->lot->code }}</span>
-                                                <span class="text-muted small">
-                                                    ({{ $b->cuttingJob->lot->item?->code }})
+                                <td class="d-none d-md-table-cell td-desktop-only text-end">
+                                    <span class="qty-ready-pill">
+                                        {{ number_format($qtyRemain, 2, ',', '.') }}
+                                    </span>
+                                </td>
+
+                                <td class="d-none d-md-table-cell td-desktop-only text-end">
+                                    <input type="number" step="0.01" min="0" inputmode="decimal"
+                                        name="lines[{{ $idx }}][qty_bundle]"
+                                        class="form-control form-control-sm text-end qty-input @error($oldQtyName) is-invalid @enderror"
+                                        value="{{ old($oldQtyName, $defaultQtyPickup) }}">
+                                    @error($oldQtyName)
+                                        <div class="invalid-feedback">{{ $message }}</div>
+                                    @enderror
+                                </td>
+
+                                <td class="d-none d-md-table-cell td-desktop-only text-end">
+                                    <button type="button" class="btn btn-outline-primary btn-sm py-0 px-2 btn-pick"
+                                        data-row-index="{{ $idx }}">
+                                        Max
+                                    </button>
+                                </td>
+
+                                {{-- MOBILE CARD --}}
+                                <td class="td-mobile-extra" colspan="8">
+                                    <div class="mobile-row-header">
+                                        <div class="mobile-row-header-left">
+                                            <div class="mobile-row-header-topline">
+                                                <span class="row-index">#{{ $loop->iteration }}</span>
+                                                <span class="item-code mono">
+                                                    {{ $b->finishedItem?->code ?? '-' }}
                                                 </span>
-                                            @else
-                                                <span class="text-muted">-</span>
+                                            </div>
+                                            @if ($b->finishedItem?->name)
+                                                <div class="item-name text-truncate">
+                                                    {{ $b->finishedItem?->name }}
+                                                </div>
                                             @endif
                                         </div>
-                                    </div>
-                                </div>
+                                        <div class="mobile-row-header-right">
+                                            <div class="qty-ready-label">Qty Ready</div>
+                                            <div class="qty-ready-value">
+                                                <span class="qty-ready-pill">
+                                                    {{ number_format($qtyRemain, 2, ',', '.') }}
+                                                </span>
+                                            </div>
 
-                                <div class="mobile-row-meta">
-                                    <div class="mobile-row-meta-left">
-                                        <div class="mobile-row-meta-label">Tgl Cutting</div>
-                                        <div class="mobile-row-meta-value">
-                                            {{ $cutDateLabel }}
+                                            <div class="mobile-row-footer-left mt-1">
+                                                <div class="pickup-label">
+                                                    Pickup (maks {{ number_format($qtyRemain, 2, ',', '.') }})
+                                                </div>
+                                                <input type="number" step="0.01" min="0"
+                                                    inputmode="decimal"
+                                                    class="form-control form-control-sm qty-input @error($oldQtyName) is-invalid @enderror"
+                                                    value="{{ old($oldQtyName, $defaultQtyPickup) }}"
+                                                    placeholder="Isi pickup">
+                                                @error($oldQtyName)
+                                                    <div class="invalid-feedback">
+                                                        {{ $message }}</div>
+                                                @enderror
+                                            </div>
                                         </div>
                                     </div>
-                                    <div class="mobile-row-meta-left text-end">
-                                        <div class="mobile-row-meta-label">Cutting</div>
-                                        <div class="mobile-row-meta-value">
-                                            {{ number_format($b->qty_pcs, 2, ',', '.') }} pcs
+
+                                    {{-- MOBILE META: hanya tgl cutting & qty cutting (bundle/lot disembunyikan) --}}
+                                    <div class="mobile-row-meta">
+                                        <div class="mobile-row-meta-left">
+                                            <div class="mobile-row-meta-label">Tgl Cutting</div>
+                                            <div class="mobile-row-meta-value">
+                                                {{ $cutDateLabel }}
+                                            </div>
+                                        </div>
+                                        <div class="mobile-row-meta-left text-end">
+                                            <div class="mobile-row-meta-label">Cutting</div>
+                                            <div class="mobile-row-meta-value">
+                                                {{ number_format($b->qty_pcs, 2, ',', '.') }} pcs
+                                            </div>
                                         </div>
                                     </div>
-                                </div>
-                            </td>
-                        </tr>
-                    @empty
-                        <tr>
-                            <td colspan="8" class="text-center text-muted small py-3">
-                                Belum ada bundle hasil QC Cutting dengan qty ready
-                                &gt; 0.
-                            </td>
-                        </tr>
-                    @endforelse
-                </tbody>
-            </table>
+                                </td>
+                            </tr>
+                        @empty
+                            <tr>
+                                <td colspan="8" class="text-center text-muted small py-3">
+                                    Belum ada bundle hasil QC Cutting dengan qty ready &gt; 0.
+                                </td>
+                            </tr>
+                        @endforelse
+                    </tbody>
+                </table>
+            </div>
+
         </div>
-
     </div>
+</div>
+
+{{-- FLOATING ACTION (MOBILE): SUBMIT SHORTCUT --}}
+<div class="bundle-actions-fab d-md-none" aria-label="Aksi sewing pickup">
+    <button type="button" id="bundle-submit-shortcut" class="bundle-submit-fab">
+        <span class="bi bi-person-check"></span>
+        <span class="text-white">Pilih Penjahit</span>
+    </button>
 </div>
 
 @push('scripts')
     <script>
         document.addEventListener('DOMContentLoaded', function() {
-            const rows = document.querySelectorAll('.bundle-row');
-            const rowsArr = Array.from(rows);
+            const rowsArr = Array.from(document.querySelectorAll('.bundle-row'));
+
             const summaryBundlesSpan = document.getElementById('summary-selected-bundles');
             const summaryQtySpan = document.getElementById('summary-selected-qty');
             const searchInput = document.getElementById('bundle-filter-input');
-            const colorChips = document.querySelectorAll('.color-filter-chip');
-            const activeColorLabel = document.getElementById('active-color-label');
             const toggleOnlyPicked = document.getElementById('toggle-only-picked');
+            const itemCodeSelect = document.getElementById('item-code-select');
+            const itemCodeSelectWrap = document.getElementById('item-code-select-wrap');
 
             const submitBtn = document.getElementById('btn-submit-main');
             const submitLabel = document.getElementById('btn-submit-label');
+            const submitShortcutBtn = document.getElementById('bundle-submit-shortcut');
 
-            let activeColor = ''; // BLK / NVY / MST / ABT / WHT / BBL
-            let showOnlyPicked = false;
+            let state = {
+                activeItemCode: '',
+                showOnlyPickedDesktop: false,
+            };
+
             let searchTimer = null;
 
-            // formatter
+            const isMobile = () => window.innerWidth < 768;
+
             let nf;
             try {
                 nf = new Intl.NumberFormat('id-ID', {
@@ -1068,150 +914,136 @@
                 };
             }
 
-            function setKeyboardOpen(isOpen) {
-                if (isOpen) {
-                    document.body.classList.add('keyboard-open');
-                } else {
-                    document.body.classList.remove('keyboard-open');
-                }
-            }
-
-            function normalizeText(value) {
-                return (value || '').toString().trim().toUpperCase();
-            }
+            const normalizeText = v => (v || '').toString().trim().toUpperCase();
 
             function rowHasPickup(row) {
-                const qtyInputs = row.querySelectorAll('input.qty-input');
-                if (!qtyInputs.length) return false;
-                const current = parseFloat(qtyInputs[0].value || '0');
+                const input = row.querySelector('input.qty-input');
+                const current = parseFloat(input?.value || '0');
                 return current > 0;
             }
 
-            function applyRowVisibility() {
-                const term = normalizeText(searchInput ? searchInput.value : '');
-                const color = normalizeText(activeColor);
+            function clampToReady(input, row) {
+                if (!row) return;
+                const max = parseFloat(row.dataset.qtyReady || '0') || 0;
+                let val = parseFloat(input.value || '0') || 0;
 
-                rowsArr.forEach(function(row) {
+                if (val > max) {
+                    val = max;
+                    input.value = max > 0 ? max : '';
+                    input.classList.add('border-warning');
+                    setTimeout(() => input.classList.remove('border-warning'), 400);
+                }
+
+                if (val < 0) {
+                    input.value = '';
+                }
+            }
+
+            function applyRowVisibility() {
+                const term = normalizeText(searchInput?.value || '');
+                const itemCodeFilter = normalizeText(state.activeItemCode);
+
+                rowsArr.forEach(row => {
                     const bundle = normalizeText(row.dataset.bundleCode);
                     const itemCode = normalizeText(row.dataset.itemCode);
                     const itemName = normalizeText(row.dataset.itemName);
                     const lotCode = normalizeText(row.dataset.lotCode);
 
                     const haystack = [bundle, itemCode, itemName, lotCode].join(' ');
-
                     const matchSearch = !term || haystack.includes(term);
-                    const matchColor = !color || haystack.includes(color);
+                    const matchItemCode = !itemCodeFilter || itemCode === itemCodeFilter;
+                    const inCart = rowHasPickup(row);
 
-                    const pickedOk = !showOnlyPicked || rowHasPickup(row);
+                    let visible = matchSearch && matchItemCode;
 
-                    row.style.display = (matchSearch && matchColor && pickedOk) ? '' : 'none';
+                    if (!isMobile()) {
+                        const pickedOk = !state.showOnlyPickedDesktop || inCart;
+                        visible = visible && pickedOk;
+                    }
+
+                    row.style.display = visible ? '' : 'none';
                 });
             }
 
-            function updateSubmitButtonState(pickedBundles, totalPickupQty) {
-                if (!submitBtn || !submitLabel) return;
-
+            function updateSubmitButtons(pickedBundles, totalPickupQty) {
                 const canSubmit = pickedBundles > 0 && totalPickupQty > 0;
 
-                submitBtn.disabled = !canSubmit;
-                submitLabel.textContent = canSubmit ? 'Pilih Penjahit' : 'Belum Ambil';
+                if (submitBtn && submitLabel) {
+                    submitBtn.disabled = !canSubmit;
+                    submitLabel.textContent = canSubmit ? 'Pilih Penjahit' : 'Belum Ambil';
+                }
+
+                if (submitShortcutBtn) {
+                    submitShortcutBtn.disabled = !canSubmit;
+                }
             }
 
-            function updateGlobalSummary() {
-                if (!summaryBundlesSpan || !summaryQtySpan) return;
-
+            function recalcSummaryAndUI() {
                 let pickedBundles = 0;
                 let totalPickupQty = 0;
 
-                rowsArr.forEach(function(row) {
-                    const qtyInputs = row.querySelectorAll('input.qty-input');
-                    if (!qtyInputs.length) return;
-
-                    const current = parseFloat(qtyInputs[0].value || '0');
+                rowsArr.forEach(row => {
+                    const input = row.querySelector('input.qty-input');
+                    if (!input) return;
+                    const current = parseFloat(input.value || '0');
                     if (current > 0) {
-                        pickedBundles += 1;
+                        pickedBundles++;
                         totalPickupQty += current;
                     }
                 });
 
-                summaryBundlesSpan.textContent = pickedBundles.toString();
-                summaryQtySpan.textContent = nf.format(totalPickupQty);
+                if (summaryBundlesSpan) summaryBundlesSpan.textContent = pickedBundles.toString();
+                if (summaryQtySpan) summaryQtySpan.textContent = nf.format(totalPickupQty);
 
-                updateSubmitButtonState(pickedBundles, totalPickupQty);
+                updateSubmitButtons(pickedBundles, totalPickupQty);
                 applyRowVisibility();
             }
 
-            // ========== COLOR FILTER HANDLING ==========
-            function updateActiveColorLabel() {
-                if (!activeColorLabel) return;
-
-                if (!activeColor) {
-                    activeColorLabel.textContent = 'Semua warna';
-                    return;
-                }
-
-                activeColorLabel.textContent = 'Hanya warna ' + activeColor;
-            }
-
-            function setActiveColor(color) {
-                activeColor = color || '';
-
-                colorChips.forEach(chip => {
-                    const chipColor = normalizeText(chip.dataset.color || '');
-                    const isActive = chipColor === normalizeText(activeColor);
-
-                    if (!activeColor && chipColor === '') {
-                        chip.classList.add('is-active');
-                    } else if (isActive) {
-                        chip.classList.add('is-active');
-                    } else {
-                        chip.classList.remove('is-active');
-                    }
-                });
-
-                updateActiveColorLabel();
+            // DESKTOP toggle only picked
+            toggleOnlyPicked?.addEventListener('change', function() {
+                state.showOnlyPickedDesktop = !!this.checked;
                 applyRowVisibility();
-            }
-
-            colorChips.forEach(chip => {
-                chip.addEventListener('click', function() {
-                    const clickedColor = normalizeText(this.dataset.color || '');
-                    if (clickedColor && clickedColor === normalizeText(activeColor)) {
-                        setActiveColor('');
-                    } else {
-                        setActiveColor(clickedColor);
-                    }
-                });
             });
 
-            // set awal: "Semua" aktif
-            setActiveColor('');
-
-            // ========== TOGGLE ONLY PICKED ==========
-            if (toggleOnlyPicked) {
-                toggleOnlyPicked.addEventListener('change', function() {
-                    showOnlyPicked = !!this.checked;
-                    applyRowVisibility();
+            // SUBMIT SHORTCUT
+            if (submitShortcutBtn && submitBtn) {
+                submitShortcutBtn.addEventListener('click', function(e) {
+                    e.preventDefault();
+                    if (!this.disabled) submitBtn.click();
                 });
             }
 
-            // ========== SEARCH HANDLING ==========
-            if (searchInput) {
-                searchInput.addEventListener('input', function() {
-                    // force uppercase visual
-                    const cursorPos = this.selectionStart;
-                    this.value = this.value.toUpperCase();
-                    this.setSelectionRange(cursorPos, cursorPos);
+            // FILTER KODE BARANG
+            itemCodeSelect?.addEventListener('change', function() {
+                state.activeItemCode = this.value || '';
+                recalcSummaryAndUI();
+            });
 
-                    clearTimeout(searchTimer);
-                    searchTimer = setTimeout(() => {
-                        applyRowVisibility();
-                    }, 120);
-                });
+            // FOCAL POINT SELECT di mobile (ringan, tanpa teks panduan)
+            if (isMobile() && itemCodeSelectWrap) {
+                setTimeout(() => {
+                    itemCodeSelectWrap.classList.add('focal-pulse');
+                    setTimeout(
+                        () => itemCodeSelectWrap.classList.remove('focal-pulse'),
+                        1200
+                    );
+                }, 250);
             }
 
-            // ========== PER-ROW BEHAVIOR ==========
-            rowsArr.forEach(function(row) {
+            // SEARCH
+            searchInput?.addEventListener('input', function() {
+                const cursorPos = this.selectionStart;
+                this.value = this.value.toUpperCase();
+                this.setSelectionRange(cursorPos, cursorPos);
+
+                clearTimeout(searchTimer);
+                searchTimer = setTimeout(() => {
+                    recalcSummaryAndUI();
+                }, 120);
+            });
+
+            // PER-ROW BEHAVIOR
+            rowsArr.forEach(row => {
                 const qtyReady = parseFloat(row.dataset.qtyReady || '0');
                 const qtyInputs = row.querySelectorAll('input.qty-input');
                 const pickButtons = row.querySelectorAll('.btn-pick');
@@ -1220,60 +1052,35 @@
                 if (!qtyInputs.length) return;
 
                 const desktopInput = qtyInputs[0];
-                const mobileInput = qtyInputs.length > 1 ? qtyInputs[1] : null;
+                const mobileInput = qtyInputs[1] || null;
 
-                function getCurrentQty() {
-                    return parseFloat(desktopInput.value || '0');
-                }
-
-                function isPicked() {
-                    return getCurrentQty() > 0;
-                }
+                const getCurrentQty = () => parseFloat(desktopInput.value || '0');
+                const isPicked = () => getCurrentQty() > 0;
 
                 function syncInputsFromDesktop() {
-                    const val = desktopInput.value;
-                    if (mobileInput) {
-                        mobileInput.value = val;
-                    }
+                    if (mobileInput) mobileInput.value = desktopInput.value;
                 }
 
                 function syncDesktopFromMobile() {
-                    if (!mobileInput) return;
-                    desktopInput.value = mobileInput.value;
+                    if (mobileInput) desktopInput.value = mobileInput.value;
                 }
 
                 function updateVisual() {
                     const picked = isPicked();
+                    rowChecks.forEach(chk => chk.checked = picked);
 
-                    rowChecks.forEach(function(chk) {
-                        chk.checked = picked;
-                    });
-
-                    if (picked) {
-                        row.classList.add('row-picked', 'is-selected');
-                        row.classList.remove('row-empty');
-                    } else {
-                        row.classList.remove('row-picked', 'is-selected');
-                        row.classList.add('row-empty');
-                    }
+                    row.classList.toggle('row-picked', picked);
+                    row.classList.toggle('is-selected', picked);
+                    row.classList.toggle('row-empty', !picked);
                 }
 
                 function applyFromState(picked) {
-                    const scrollTop = window.pageYOffset || document.documentElement.scrollTop;
                     const nextQty = picked ? qtyReady : 0;
-
                     desktopInput.value = nextQty > 0 ? nextQty : '';
-                    if (mobileInput) {
-                        mobileInput.value = desktopInput.value;
-                    }
+                    if (mobileInput) mobileInput.value = desktopInput.value;
 
                     updateVisual();
-                    updateGlobalSummary();
-
-                    window.scrollTo({
-                        top: scrollTop,
-                        behavior: 'auto'
-                    });
+                    recalcSummaryAndUI();
                 }
 
                 function togglePicked() {
@@ -1282,16 +1089,11 @@
                 }
 
                 row.addEventListener('click', function(e) {
-                    if (
-                        e.target.tagName === 'INPUT' ||
-                        e.target.closest('button')
-                    ) {
-                        return;
-                    }
+                    if (e.target.tagName === 'INPUT' || e.target.closest('button')) return;
                     togglePicked();
                 });
 
-                pickButtons.forEach(function(btn) {
+                pickButtons.forEach(btn => {
                     btn.addEventListener('click', function(e) {
                         e.preventDefault();
                         e.stopPropagation();
@@ -1299,10 +1101,10 @@
                     });
                 });
 
-                rowChecks.forEach(function(chk) {
+                rowChecks.forEach(chk => {
                     chk.addEventListener('change', function(e) {
                         e.stopPropagation();
-                        applyFromState(chk.checked);
+                        applyFromState(this.checked);
                     });
                 });
 
@@ -1313,24 +1115,24 @@
 
                 desktopInput.addEventListener('blur', function() {
                     this.classList.remove('qty-input-active');
+                    clampToReady(this, row);
                     syncInputsFromDesktop();
                     updateVisual();
-                    updateGlobalSummary();
+                    recalcSummaryAndUI();
                 });
 
                 desktopInput.addEventListener('input', function() {
                     syncInputsFromDesktop();
                     updateVisual();
-                    updateGlobalSummary();
+                    recalcSummaryAndUI();
                 });
 
                 if (mobileInput) {
                     mobileInput.addEventListener('focus', function() {
                         this.select();
                         this.classList.add('qty-input-active');
-                        setKeyboardOpen(true);
 
-                        if (window.innerWidth < 768) {
+                        if (isMobile()) {
                             const inputEl = this;
                             setTimeout(function() {
                                 try {
@@ -1339,51 +1141,51 @@
                                         block: 'center',
                                         inline: 'nearest'
                                     });
-                                } catch (e) {
-                                    const rect = inputEl.getBoundingClientRect();
-                                    const absoluteTop = rect.top + window.pageYOffset - 140;
-                                    window.scrollTo({
-                                        top: absoluteTop,
-                                        behavior: 'smooth'
-                                    });
-                                }
+                                } catch (e) {}
                             }, 180);
                         }
                     });
 
                     mobileInput.addEventListener('blur', function() {
                         this.classList.remove('qty-input-active');
-                        setKeyboardOpen(false);
+                        clampToReady(this, row);
                         syncDesktopFromMobile();
                         updateVisual();
-                        updateGlobalSummary();
+                        recalcSummaryAndUI();
                     });
 
                     mobileInput.addEventListener('input', function() {
                         syncDesktopFromMobile();
                         updateVisual();
-                        updateGlobalSummary();
+                        recalcSummaryAndUI();
                     });
                 }
 
+                // inisialisasi awal (kalau ada old value)
+                clampToReady(desktopInput, row);
                 syncInputsFromDesktop();
                 updateVisual();
             });
 
-            const allQtyInputs = document.querySelectorAll('input.qty-input');
-            allQtyInputs.forEach(function(inp) {
-                inp.addEventListener('focus', function() {
-                    if (window.innerWidth < 768) {
-                        setKeyboardOpen(true);
-                    }
-                });
-                inp.addEventListener('blur', function() {
-                    setKeyboardOpen(false);
-                });
-            });
+            // Auto fokus ke search di desktop
+            if (!isMobile() && searchInput) {
+                searchInput.focus();
+            }
 
-            updateGlobalSummary();
-            applyRowVisibility();
+            // Scroll ke input pertama yang error (kalau ada)
+            const firstInvalid = document.querySelector('.qty-input.is-invalid');
+            if (firstInvalid) {
+                setTimeout(() => {
+                    firstInvalid.scrollIntoView({
+                        behavior: 'smooth',
+                        block: 'center'
+                    });
+                    firstInvalid.focus();
+                }, 200);
+            }
+
+            // INIT
+            recalcSummaryAndUI();
         });
     </script>
 @endpush

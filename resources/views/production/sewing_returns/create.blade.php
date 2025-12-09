@@ -563,8 +563,6 @@
                     </div>
 
                     <div class="d-flex flex-column flex-md-row gap-2">
-
-
                         <a href="{{ route('production.sewing_pickups.create') }}"
                             class="btn btn-sm btn-header-pill btn-header-accent d-flex align-items-center gap-2">
                             <i class="bi bi-box-seam"></i>
@@ -672,9 +670,7 @@
                             </div>
                             <h2>Daftar ambilan jahit yang perlu disetor</h2>
                         </div>
-                        <div class="return-summary-sub">
-                            Tap kartu sekali = <strong>OK = semua sisa</strong>, Reject = 0. Tap lagi = reset.
-                        </div>
+                        {{-- petunjuk tap card dihilangkan --}}
                         <div class="summary-badges-row">
                             <span class="summary-pill">
                                 <span id="summary-row-filled">0</span> baris terisi
@@ -983,12 +979,7 @@
 
                     <hr class="my-2">
 
-                    <div class="mb-1">
-                        <div class="text-muted small">
-                            Cek kembali riwayat setor jahit per kode barang:
-                        </div>
-                    </div>
-
+                    {{-- langsung summary, tanpa teks petunjuk --}}
                     <div id="confirm-return-summary" class="small pt-1"></div>
                 </div>
                 <div class="modal-footer py-2">

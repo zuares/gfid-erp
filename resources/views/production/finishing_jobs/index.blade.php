@@ -1,363 +1,453 @@
 {{-- resources/views/production/finishing_jobs/index.blade.php --}}
 @extends('layouts.app')
 
-@section('title', 'Produksi • Finishing Jobs')
+@section('title', 'Produksi • Finishing')
 
 @push('head')
     <style>
-        .page-wrap {
+        :root {
+            --fin-card-radius: 16px;
+            --fin-border: rgba(148, 163, 184, 0.28);
+            --fin-muted: #6b7280;
+            --fin-accent: #16a34a;
+            /* hijau */
+            --fin-accent-soft: #bbf7d0;
+            /* hijau muda */
+            --fin-pink-soft: #ffe4ef;
+            /* pink muda */
+            --fin-bg-light-1: #f5fdf8;
+            --fin-bg-light-2: #fdf2ff;
+            --fin-bg-light-3: #ffffff;
+        }
+
+        .finishing-index-page {
+            min-height: 100vh;
+        }
+
+        .finishing-index-page .page-wrap {
             max-width: 1100px;
             margin-inline: auto;
-            padding-block: .75rem 1.5rem;
+            padding: 1rem 1rem 3.5rem;
         }
 
-        .card {
+        /* LIGHT MODE: hijau + pink lembut seperti finishing create */
+        body[data-theme="light"] .finishing-index-page .page-wrap {
+            background:
+                radial-gradient(circle at top left,
+                    rgba(34, 197, 94, 0.16) 0,
+                    rgba(244, 114, 182, 0.12) 28%,
+                    var(--fin-bg-light-2) 52%,
+                    var(--fin-bg-light-3) 100%);
+        }
+
+        /* DARK MODE: tetap ada aksen hijau/pink tapi lebih gelap */
+        body[data-theme="dark"] .finishing-index-page .page-wrap {
+            background:
+                radial-gradient(circle at top left,
+                    rgba(34, 197, 94, 0.22) 0,
+                    rgba(244, 114, 182, 0.20) 26%,
+                    #020617 65%);
+        }
+
+        /* CARD BASE */
+        .fin-card {
             background: var(--card);
-            border: 1px solid var(--line);
-            border-radius: 16px;
+            border-radius: var(--fin-card-radius);
+            border: 1px solid var(--fin-border);
+            box-shadow:
+                0 14px 35px rgba(15, 23, 42, 0.10),
+                0 0 0 1px rgba(15, 23, 42, 0.04);
         }
 
-        .mono {
-            font-variant-numeric: tabular-nums;
-            font-family: ui-monospace, SFMono-Regular, Menlo, Consolas;
+        body[data-theme="dark"] .fin-card {
+            border-color: rgba(51, 65, 85, 0.8);
+            box-shadow:
+                0 14px 40px rgba(0, 0, 0, 0.75),
+                0 0 0 1px rgba(15, 23, 42, 0.9);
         }
 
-        .help {
-            color: var(--muted);
-            font-size: .84rem;
-        }
-
-        .page-header {
-            display: flex;
-            align-items: center;
-            justify-content: space-between;
-            gap: 1rem;
-            flex-wrap: wrap;
-        }
-
-        .page-title-wrap {
-            display: flex;
-            align-items: center;
-            gap: .8rem;
-        }
-
-        .page-icon {
-            width: 38px;
-            height: 38px;
-            border-radius: 999px;
-            display: inline-flex;
-            align-items: center;
-            justify-content: center;
-            background: color-mix(in srgb, var(--primary, #0d6efd) 10%, var(--card) 90%);
-            border: 1px solid color-mix(in srgb, var(--primary, #0d6efd) 30%, var(--line) 70%);
-        }
-
-        .page-title {
-            margin: 0;
-            font-size: 1.05rem;
+        .fin-card-header {
+            padding: .9rem 1.1rem;
+            border-bottom: 1px solid rgba(148, 163, 184, 0.25);
             font-weight: 600;
-        }
-
-        .page-subtitle {
-            font-size: .82rem;
-            color: var(--muted);
-        }
-
-        .badge-status {
-            border-radius: 999px;
-            padding: .12rem .6rem;
-            font-size: .7rem;
+            font-size: .78rem;
+            letter-spacing: .09em;
+            color: var(--fin-muted);
             text-transform: uppercase;
-            letter-spacing: .05em;
         }
 
-        .badge-status-draft {
-            background: color-mix(in srgb, var(--card) 85%, orange 15%);
-            color: #b35a00;
+        .fin-card-body {
+            padding: 1rem 1.1rem 1.1rem;
         }
 
-        .badge-status-posted {
-            background: color-mix(in srgb, var(--card) 85%, seagreen 15%);
+        /* BADGE */
+        .fin-badge {
+            display: inline-block;
+            padding: .15rem .65rem;
+            font-size: .72rem;
+            font-weight: 600;
+            text-transform: uppercase;
+            border-radius: 999px;
+            letter-spacing: .04em;
+        }
+
+        .fin-badge-draft {
+            background: rgba(251, 191, 36, 0.12);
+            border: 1px solid rgba(251, 191, 36, 0.6);
+            color: #92400e;
+        }
+
+        .fin-badge-posted {
+            background: rgba(34, 197, 94, 0.14);
+            /* hijau */
+            border: 1px solid rgba(34, 197, 94, 0.7);
             color: #166534;
         }
 
-        .table-wrap {
-            overflow-x: auto;
+        .fin-badge-reject {
+            background: rgba(244, 114, 182, 0.18);
+            /* pink */
+            border: 1px solid rgba(244, 114, 182, 0.75);
+            color: #9d174d;
         }
 
-        .row-clickable {
-            cursor: pointer;
-            transition: background-color .12s ease, box-shadow .12s ease;
+        /* FILTER LABEL */
+        .fin-filter-label {
+            font-size: .78rem;
+            font-weight: 600;
+            text-transform: uppercase;
+            letter-spacing: .09em;
+            color: var(--fin-muted);
         }
 
-        .row-clickable:hover {
-            background: color-mix(in srgb, var(--card) 85%, var(--line) 15%);
+        body[data-theme="dark"] .fin-filter-label {
+            color: #e5e7eb;
         }
 
-        @media (max-width: 767.98px) {
-            .page-wrap {
-                padding-inline: .65rem;
+        /* FOCAL CARD - MOBILE LIST */
+        .fin-row {
+            border-radius: 16px;
+            padding: .9rem .95rem;
+            background: var(--card);
+            border: 1px solid rgba(148, 163, 184, 0.18);
+            box-shadow:
+                0 10px 26px rgba(15, 23, 42, 0.12),
+                0 0 0 1px rgba(15, 23, 42, 0.03);
+            transition: transform .16s ease,
+                box-shadow .16s ease,
+                border-color .16s ease,
+                background .16s ease;
+        }
+
+        .fin-row+.fin-row {
+            margin-top: .6rem;
+        }
+
+        .fin-row:hover {
+            transform: translateY(-1px);
+            box-shadow:
+                0 16px 36px rgba(15, 23, 42, 0.20),
+                0 0 0 1px rgba(22, 163, 74, 0.35);
+            border-color: rgba(22, 163, 74, 0.65);
+            background: linear-gradient(to bottom right,
+                    rgba(34, 197, 94, 0.05),
+                    rgba(244, 114, 182, 0.05));
+        }
+
+        .fin-code {
+            font-weight: 600;
+            font-size: .94rem;
+            letter-spacing: .03em;
+        }
+
+        .fin-meta {
+            font-size: .78rem;
+            color: var(--fin-muted);
+        }
+
+        body[data-theme="dark"] .fin-meta {
+            color: #9ca3af;
+        }
+
+        .fin-stat {
+            font-size: .8rem;
+        }
+
+        .fin-stat span {
+            font-weight: 600;
+        }
+
+        /* TABLE DESKTOP */
+        table.fin-table {
+            font-size: .85rem;
+        }
+
+        table.fin-table thead th {
+            border: none;
+            font-size: .74rem;
+            text-transform: uppercase;
+            letter-spacing: .08em;
+            color: var(--fin-muted);
+            font-weight: 600;
+            padding-top: .3rem;
+            padding-bottom: .6rem;
+        }
+
+        table.fin-table tbody td {
+            border-top: 1px solid rgba(148, 163, 184, 0.12);
+            padding-block: .55rem;
+            vertical-align: middle;
+        }
+
+        /* MOBILE TWEAKS */
+        @media (max-width: 768px) {
+            .finishing-index-page .page-wrap {
+                padding-inline: .8rem;
             }
 
-            .table-wrap {
-                font-size: .85rem;
+            .fin-card-body {
+                padding-inline: .85rem;
+                padding-bottom: .95rem;
             }
 
-            /* Mobile: jadikan list card */
-            .table-main {
-                display: none;
+            .fin-row {
+                padding-inline: .85rem;
             }
 
-            .list-mobile {
-                display: flex;
-                flex-direction: column;
-                gap: .6rem;
-            }
-
-            .job-card {
-                border-radius: 14px;
-                border: 1px solid var(--line);
-                padding: .6rem .75rem;
-                background: var(--card);
-            }
-
-            .job-card-header {
-                display: flex;
-                justify-content: space-between;
-                gap: .4rem;
-                align-items: center;
-                margin-bottom: .15rem;
-            }
-
-            .job-card-title {
+            .fin-code {
                 font-size: .9rem;
-                font-weight: 600;
-            }
-
-            .job-card-meta {
-                font-size: .8rem;
-                color: var(--muted);
-            }
-
-            .job-card-footer {
-                display: flex;
-                justify-content: space-between;
-                align-items: center;
-                margin-top: .25rem;
-                font-size: .8rem;
-            }
-        }
-
-        @media (min-width: 768px) {
-            .list-mobile {
-                display: none;
             }
         }
     </style>
 @endpush
 
 @section('content')
-    <div class="page-wrap">
+    <div class="finishing-index-page">
+        <div class="page-wrap">
 
-        {{-- FLASH MESSAGE --}}
-        @if (session('status'))
-            <div class="alert alert-success alert-dismissible fade show mb-3" role="alert">
-                {{ session('status') }}
-                <button type="button" class="btn-close" data-bs-dismiss="alert" aria-label="Close"></button>
-            </div>
-        @endif
-
-        {{-- HEADER --}}
-        <div class="card p-3 mb-3">
-            <div class="page-header">
-                <div class="page-title-wrap">
-                    <div class="page-icon">
-                        <i class="bi bi-scissors"></i>
-                    </div>
-                    <div>
-                        <h1 class="page-title">Finishing Jobs</h1>
-                        <div class="page-subtitle">
-                            Daftar proses finishing dari WIP-FIN menjadi barang jadi (FG) + reject.
-                        </div>
-                    </div>
-                </div>
-
-                <div class="d-flex gap-2">
-                    <a href="{{ route('production.finishing_jobs.create') }}" class="btn btn-sm btn-primary">
-                        <i class="bi bi-plus-lg me-1"></i> Finishing Job Baru
-                    </a>
-                </div>
-            </div>
-        </div>
-
-        {{-- FILTERS --}}
-        <div class="card p-3 mb-3">
-            <form method="get" class="row g-2 g-md-3 align-items-end">
-                <div class="col-6 col-md-3">
-                    <label class="form-label small mb-1">Dari tanggal</label>
-                    <input type="date" name="date_from" class="form-control form-control-sm" value="{{ $dateFrom }}">
-                </div>
-                <div class="col-6 col-md-3">
-                    <label class="form-label small mb-1">Sampai tanggal</label>
-                    <input type="date" name="date_to" class="form-control form-control-sm" value="{{ $dateTo }}">
-                </div>
-                <div class="col-6 col-md-2">
-                    <label class="form-label small mb-1">Status</label>
-                    <select name="status" class="form-select form-select-sm">
-                        <option value="">Semua</option>
-                        <option value="draft" @selected($status === 'draft')>Draft</option>
-                        <option value="posted" @selected($status === 'posted')>Posted</option>
-                    </select>
-                </div>
-                <div class="col-6 col-md-3">
-                    <label class="form-label small mb-1">Cari</label>
-                    <input type="text" name="search" class="form-control form-control-sm"
-                        placeholder="Cari kode / catatan" value="{{ $search }}">
-                </div>
-                <div class="col-12 col-md-1 d-flex justify-content-end gap-2 mt-2 mt-md-0">
-                    <a href="{{ route('production.finishing_jobs.index') }}" class="btn btn-sm btn-outline-secondary">
-                        Reset
-                    </a>
-                    <button type="submit" class="btn btn-sm btn-primary">
-                        Tampil
-                    </button>
-                </div>
-            </form>
-        </div>
-
-        {{-- TABLE DESKTOP --}}
-        <div class="card p-0 mb-4">
-            <div class="px-3 pt-3 pb-2 d-flex justify-content-between align-items-center">
+            {{-- HEADER --}}
+            <div class="d-flex justify-content-between align-items-start mb-3">
                 <div>
-                    <div class="fw-semibold">Daftar Finishing Jobs</div>
-                    <div class="help">
-                        Klik baris untuk lihat detail & posting (kalau masih draft).
+                    <h1 class="h5 mb-1 fw-semibold">
+                        Finishing Jobs
+                    </h1>
+                    <div class="text-muted small">
+                        Rekap pekerjaan finishing per bundle • fokus status draft / posted & reject
                     </div>
                 </div>
-                <div class="help">
-                    Total: {{ $jobs->total() }} job
-                </div>
+
+                {{-- DESKTOP: tombol + --}}
+                <a href="{{ route('production.finishing_jobs.create') }}"
+                    class="btn btn-success btn-sm d-none d-md-inline-flex align-items-center">
+                    <i class="bi bi-plus-circle me-1"></i>
+                    Finishing Baru
+                </a>
             </div>
 
-            <div class="table-wrap table-main">
-                <table class="table table-sm align-middle mb-0">
-                    <thead class="table-light">
-                        <tr>
-                            <th style="width: 1%;">#</th>
-                            <th>Kode</th>
-                            <th>Tanggal</th>
-                            <th>Created By</th>
-                            <th class="text-center">Lines</th>
-                            <th class="text-end">Total In</th>
-                            <th class="text-end text-success">Total OK</th>
-                            <th class="text-end text-danger">Total Reject</th>
-                            <th>Status</th>
-                        </tr>
-                    </thead>
-                    <tbody>
-                        @forelse($jobs as $i => $job)
-                            @php
-                                $totalIn = $job->lines->sum('qty_in');
-                                $totalOk = $job->lines->sum('qty_ok');
-                                $totalReject = $job->lines->sum('qty_reject');
-                            @endphp
-                            <tr class="row-clickable"
-                                onclick="window.location='{{ route('production.finishing_jobs.show', $job) }}'">
-                                <td class="text-muted small">
-                                    {{ $jobs->firstItem() + $i }}
-                                </td>
-                                <td class="mono">
-                                    {{ $job->code }}
-                                </td>
-                                <td class="mono">
-                                    {{ function_exists('id_date') ? id_date($job->date) : $job->date->format('Y-m-d') }}
-                                </td>
-                                <td class="small">
-                                    {{ $job->createdBy->name ?? '-' }}
-                                </td>
-                                <td class="text-center mono">
-                                    {{ $job->lines_count }}
-                                </td>
-                                <td class="text-end mono">
-                                    {{ number_format($totalIn) }}
-                                </td>
-                                <td class="text-end mono text-success">
-                                    {{ number_format($totalOk) }}
-                                </td>
-                                <td class="text-end mono text-danger">
-                                    {{ number_format($totalReject) }}
-                                </td>
-                                <td>
-                                    @if ($job->status === 'posted')
-                                        <span class="badge-status badge-status-posted">POSTED</span>
-                                    @else
-                                        <span class="badge-status badge-status-draft">DRAFT</span>
-                                    @endif
-                                </td>
-                            </tr>
-                        @empty
-                            <tr>
-                                <td colspan="9" class="text-center text-muted py-4">
-                                    Belum ada Finishing Job.
-                                </td>
-                            </tr>
-                        @endforelse
-                    </tbody>
-                </table>
-            </div>
-
-            {{-- LIST MOBILE --}}
-            <div class="list-mobile px-3 pb-3">
-                @forelse($jobs as $job)
-                    @php
-                        $totalIn = $job->lines->sum('qty_in');
-                        $totalOk = $job->lines->sum('qty_ok');
-                        $totalReject = $job->lines->sum('qty_reject');
-                    @endphp
-                    <a href="{{ route('production.finishing_jobs.show', $job) }}" class="text-decoration-none text-reset">
-                        <div class="job-card">
-                            <div class="job-card-header">
-                                <div class="job-card-title mono">
-                                    {{ $job->code }}
-                                </div>
-                                <div>
-                                    @if ($job->status === 'posted')
-                                        <span class="badge-status badge-status-posted">POSTED</span>
-                                    @else
-                                        <span class="badge-status badge-status-draft">DRAFT</span>
-                                    @endif
-                                </div>
-                            </div>
-                            <div class="job-card-meta">
-                                {{ function_exists('id_date') ? id_date($job->date) : $job->date->format('Y-m-d') }}
-                                · {{ $job->createdBy->name ?? 'Unknown' }}
-                            </div>
-                            <div class="job-card-footer">
-                                <div>
-                                    <span class="mono">{{ $job->lines_count }}</span> baris
-                                </div>
-                                <div class="text-end">
-                                    <div class="mono small">
-                                        In: {{ number_format($totalIn) }} ·
-                                        <span class="text-success">OK: {{ number_format($totalOk) }}</span> ·
-                                        <span class="text-danger">RJ: {{ number_format($totalReject) }}</span>
-                                    </div>
-                                </div>
-                            </div>
-                        </div>
-                    </a>
-                @empty
-                    <div class="text-center text-muted py-3">
-                        Belum ada Finishing Job.
-                    </div>
-                @endforelse
-            </div>
-
-            @if ($jobs->hasPages())
-                <div class="px-3 py-2 border-top">
-                    {{ $jobs->links() }}
+            {{-- FLASH --}}
+            @if (session('status'))
+                <div class="alert alert-success alert-dismissible fade show mb-3" role="alert">
+                    {{ session('status') }}
+                    <button type="button" class="btn-close" data-bs-dismiss="alert" aria-label="Close"></button>
                 </div>
             @endif
+
+            {{-- FILTER CARD --}}
+            <div class="fin-card mb-3">
+                <div class="fin-card-header d-flex justify-content-between align-items-center">
+                    <span class="fin-filter-label">Filter</span>
+
+                    @if ($search || $status || $rejectFlag)
+                        <a href="{{ route('production.finishing_jobs.index') }}"
+                            class="small text-muted text-decoration-none">
+                            Reset
+                        </a>
+                    @endif
+                </div>
+                <div class="fin-card-body">
+                    <form method="GET" action="{{ route('production.finishing_jobs.index') }}" class="row g-2 g-md-3">
+                        <div class="col-12 col-md-5">
+                            <label class="form-label small mb-1">Cari (kode / catatan)</label>
+                            <input type="text" name="search" value="{{ $search }}"
+                                class="form-control form-control-sm" placeholder="FIN-... atau catatan">
+                        </div>
+
+                        <div class="col-6 col-md-3">
+                            <label class="form-label small mb-1">Status</label>
+                            <select name="status" class="form-select form-select-sm">
+                                <option value="">Semua</option>
+                                <option value="draft" {{ $status === 'draft' ? 'selected' : '' }}>Draft</option>
+                                <option value="posted" {{ $status === 'posted' ? 'selected' : '' }}>Posted</option>
+                            </select>
+                        </div>
+
+                        <div class="col-6 col-md-2">
+                            <label class="form-label small mb-1">Reject</label>
+                            <select name="reject" class="form-select form-select-sm">
+                                <option value="">Semua</option>
+                                <option value="yes" {{ $rejectFlag === 'yes' ? 'selected' : '' }}>Ada reject</option>
+                                <option value="no" {{ $rejectFlag === 'no' ? 'selected' : '' }}>Tanpa reject</option>
+                            </select>
+                        </div>
+
+                        <div class="col-12 col-md-2 d-flex align-items-end">
+                            <button type="submit" class="btn btn-success btn-sm w-100">
+                                <i class="bi bi-search me-1"></i> Terapkan
+                            </button>
+                        </div>
+                    </form>
+                </div>
+            </div>
+
+            {{-- MOBILE: tombol + --}}
+            <div class="d-md-none mb-3">
+                <a href="{{ route('production.finishing_jobs.create') }}" class="btn btn-success btn-sm w-100">
+                    <i class="bi bi-plus-circle me-1"></i> Finishing Baru
+                </a>
+            </div>
+
+            {{-- LIST CARD --}}
+            <div class="fin-card">
+                <div class="fin-card-header d-flex justify-content-between align-items-center">
+                    <span class="fin-filter-label">Daftar Finishing</span>
+                    <span class="small text-muted">{{ $finishingJobs->total() }} data</span>
+                </div>
+
+                <div class="fin-card-body">
+                    @if ($finishingJobs->isEmpty())
+                        <div class="text-center text-muted small py-4">
+                            Belum ada data finishing.
+                        </div>
+                    @else
+                        {{-- MOBILE: focal card style --}}
+                        <div class="d-md-none">
+                            @foreach ($finishingJobs as $job)
+                                @php
+                                    $isPosted = !is_null($job->posted_at);
+                                    $hasReject = ($job->total_reject ?? 0) > 0;
+                                @endphp
+
+                                <a href="{{ route('production.finishing_jobs.show', $job) }}"
+                                    class="text-decoration-none text-reset">
+                                    <div class="fin-row">
+                                        <div class="d-flex justify-content-between align-items-start mb-1">
+                                            <div>
+                                                <div class="fin-code mb-1">
+                                                    {{ $job->code }}
+                                                </div>
+                                                <div class="fin-meta">
+                                                    {{ optional($job->date)->format('d M Y') ?? '-' }}
+                                                </div>
+                                            </div>
+                                            <div class="text-end">
+                                                <div class="mb-1">
+                                                    <span
+                                                        class="fin-badge {{ $isPosted ? 'fin-badge-posted' : 'fin-badge-draft' }}">
+                                                        {{ $isPosted ? 'Posted' : 'Draft' }}
+                                                    </span>
+                                                </div>
+                                                @if ($hasReject)
+                                                    <div>
+                                                        <span class="fin-badge fin-badge-reject">
+                                                            Has Reject
+                                                        </span>
+                                                    </div>
+                                                @endif
+                                            </div>
+                                        </div>
+
+                                        <div class="d-flex justify-content-between align-items-center mt-1">
+                                            <div class="fin-stat">
+                                                Bundle: <span>{{ $job->bundle_count ?? 0 }}</span>
+                                            </div>
+                                            <div class="fin-stat text-end">
+                                                OK: <span>{{ $job->total_ok ?? 0 }}</span>
+                                                &nbsp;•&nbsp;
+                                                R: <span>{{ $job->total_reject ?? 0 }}</span>
+                                            </div>
+                                        </div>
+
+                                        @if ($job->notes)
+                                            <div class="fin-meta mt-2 text-truncate">
+                                                {{ $job->notes }}
+                                            </div>
+                                        @endif
+                                    </div>
+                                </a>
+                            @endforeach
+                        </div>
+
+                        {{-- DESKTOP: tabel --}}
+                        <div class="d-none d-md-block">
+                            <div class="table-responsive">
+                                <table class="table fin-table align-middle mb-0">
+                                    <thead>
+                                        <tr>
+                                            <th style="width: 12%">Tanggal</th>
+                                            <th style="width: 16%">Kode</th>
+                                            <th style="width: 18%">Status</th>
+                                            <th style="width: 15%" class="text-end">Bundle</th>
+                                            <th style="width: 20%" class="text-end">Qty OK / Reject</th>
+                                            <th>Catatan</th>
+                                        </tr>
+                                    </thead>
+                                    <tbody>
+                                        @foreach ($finishingJobs as $job)
+                                            @php
+                                                $isPosted = !is_null($job->posted_at);
+                                                $hasReject = ($job->total_reject ?? 0) > 0;
+                                            @endphp
+                                            <tr>
+                                                <td>
+                                                    {{ optional($job->date)->format('d M Y') ?? '-' }}
+                                                </td>
+                                                <td>
+                                                    <a href="{{ route('production.finishing_jobs.show', $job) }}"
+                                                        class="text-decoration-none fin-code">
+                                                        {{ $job->code }}
+                                                    </a>
+                                                </td>
+                                                <td>
+                                                    <div class="d-flex flex-wrap gap-1">
+                                                        <span
+                                                            class="fin-badge {{ $isPosted ? 'fin-badge-posted' : 'fin-badge-draft' }}">
+                                                            {{ $isPosted ? 'Posted' : 'Draft' }}
+                                                        </span>
+                                                        @if ($hasReject)
+                                                            <span class="fin-badge fin-badge-reject">
+                                                                Has Reject
+                                                            </span>
+                                                        @endif
+                                                    </div>
+                                                </td>
+                                                <td class="text-end">
+                                                    <span class="fw-semibold">{{ $job->bundle_count ?? 0 }}</span>
+                                                </td>
+                                                <td class="text-end small">
+                                                    OK:
+                                                    <span class="fw-semibold">{{ $job->total_ok ?? 0 }}</span>
+                                                    &nbsp;/&nbsp;
+                                                    R:
+                                                    <span
+                                                        class="fw-semibold text-danger">{{ $job->total_reject ?? 0 }}</span>
+                                                </td>
+                                                <td class="small text-muted">
+                                                    {{ $job->notes }}
+                                                </td>
+                                            </tr>
+                                        @endforeach
+                                    </tbody>
+                                </table>
+                            </div>
+
+                            <div class="mt-3">
+                                {{ $finishingJobs->links() }}
+                            </div>
+                        </div>
+                    @endif
+                </div>
+            </div>
+
         </div>
     </div>
 @endsection
