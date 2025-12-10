@@ -11,12 +11,11 @@ class ProductionCostPeriodSeeder extends Seeder
 {
     public function run(): void
     {
-        // Cek kalau sudah ada data, jangan dobel-dobel
+        // Kalau sudah ada data, jangan seed lagi
         if (ProductionCostPeriod::count() > 0) {
             return;
         }
 
-        // Cari payroll period cutting & sewing paling akhir (opsional, aman kalau null)
         $cuttingPeriod = PieceworkPayrollPeriod::query()
             ->where('module', 'cutting')
             ->orderByDesc('date_to')
@@ -45,7 +44,7 @@ class ProductionCostPeriodSeeder extends Seeder
             'status' => 'draft',
             'is_active' => false,
             'notes' => 'Contoh periode costing awal, nanti dipakai generate HPP dari payroll.',
-            'created_by' => 1, // boleh diganti Auth::id() kalau di seeder pakai context khusus
+            'created_by' => 1,
         ]);
     }
 }

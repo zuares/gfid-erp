@@ -14,20 +14,18 @@ use Illuminate\Support\Facades\DB;
 
 class InventoryTransferDemoSeeder extends Seeder
 {
-    /**
-     * Seed contoh transfer stok antar gudang
-     * - Buat gudang RM, CUT, WIP-SEW (kalau belum ada)
-     * - Buat item FLC280BLK & FLC280NVY (kalau belum ada)
-     * - Tambah stok awal di RM (stockIn)
-     * - Buat 2 dokumen transfer multi-item:
-     *   1) RM -> CUT (2 item)
-     *   2) CUT -> WIP-SEW (1 item)
-     * - Semua mutasi stok via InventoryService (inventory_mutations terisi)
-     */
     public function run(): void
     {
         /** @var InventoryService $inventory */
         $inventory = app(InventoryService::class);
+
+        // Kalau sudah pernah buat transfer dengan notes khusus, skip seeder ini
+        $alreadySeeded = InventoryTransfer::where('notes', 'Seeder transfer bahan ke cutting')->exists();
+
+        if ($alreadySeeded) {
+            echo "\n[InventoryTransferDemoSeeder] Sudah pernah dijalankan, skip.\n";
+            return;
+        }
 
         DB::transaction(function () use ($inventory) {
 
@@ -39,7 +37,8 @@ class InventoryTransferDemoSeeder extends Seeder
                 ['code' => 'RM'],
                 [
                     'name' => 'Raw Material',
-                    'type' => 'raw', // sesuaikan dengan struktur tabel kamu
+                    'type' => 'raw',
+                    'active' => 1,
                 ]
             );
 
@@ -48,6 +47,7 @@ class InventoryTransferDemoSeeder extends Seeder
                 [
                     'name' => 'Cutting Room',
                     'type' => 'production',
+                    'active' => 1,
                 ]
             );
 
@@ -56,11 +56,11 @@ class InventoryTransferDemoSeeder extends Seeder
                 [
                     'name' => 'WIP Sewing',
                     'type' => 'production',
+                    'active' => 1,
                 ]
             );
 
             // 2. ITEM
-            // sesuaikan kolom (unit/type/item_category_id) dengan tabel items kamu
             $i1 = Item::firstOrCreate(
                 ['code' => 'FLC280BLK'],
                 [
@@ -84,13 +84,12 @@ class InventoryTransferDemoSeeder extends Seeder
             );
 
             // 3. STOK AWAL DI GUDANG RM
-            // Supaya saat transfer RM -> CUT tidak kena error "stok tidak mencukupi"
             $openingDate = now()->subDays(3)->toDateString();
 
             $inventory->stockIn(
                 warehouseId: $g1->id,
                 itemId: $i1->id,
-                qty: 100, // 100 kg Black
+                qty: 100,
                 date: $openingDate,
                 sourceType: 'opening_balance',
                 sourceId: null,
@@ -100,14 +99,14 @@ class InventoryTransferDemoSeeder extends Seeder
             $inventory->stockIn(
                 warehouseId: $g1->id,
                 itemId: $i2->id,
-                qty: 100, // 100 kg Navy
+                qty: 100,
                 date: $openingDate,
                 sourceType: 'opening_balance',
                 sourceId: null,
                 notes: 'Saldo awal seeder FLC280NVY'
             );
 
-            // 4. TRANSFER #1 — RM → CUT (multi-item)
+            // 4. TRANSFER #1 — RM → CUT
             $t1Date = now()->subDays(2)->toDateString();
 
             /** @var InventoryTransfer $t1 */
@@ -134,7 +133,6 @@ class InventoryTransferDemoSeeder extends Seeder
             ];
 
             foreach ($lines1 as $ln) {
-
                 /** @var InventoryTransferLine $line */
                 $line = InventoryTransferLine::create([
                     'inventory_transfer_id' => $t1->id,
@@ -143,7 +141,6 @@ class InventoryTransferDemoSeeder extends Seeder
                     'notes' => $ln['notes'],
                 ]);
 
-                // Mutasi stok (OUT RM, IN CUT) via InventoryService
                 $inventory->transfer(
                     fromWarehouseId: $t1->from_warehouse_id,
                     toWarehouseId: $t1->to_warehouse_id,
@@ -157,7 +154,7 @@ class InventoryTransferDemoSeeder extends Seeder
                 );
             }
 
-            // 5. TRANSFER #2 — CUT → WIP-SEW (hasil cutting masuk ke WIP sewing)
+            // 5. TRANSFER #2 — CUT → WIP-SEW
             $t2Date = now()->subDay()->toDateString();
 
             /** @var InventoryTransfer $t2 */

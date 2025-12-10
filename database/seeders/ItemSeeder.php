@@ -34,7 +34,6 @@ class ItemSeeder extends Seeder
                     'K3ABT', 'K3BBL', 'K3BLK', 'K3MST', 'K3NVY', 'K3WHT',
                     'K5ABT', 'K5BBL', 'K5BLK', 'K5MST', 'K5NVY', 'K5WHT',
                     'K7ABT', 'K7BBL', 'K7BLK', 'K7MST', 'K7NVY', 'K7WHT',
-                    // tambahan
                     'K1BBL', 'K2BBL', 'K2WHT',
                 ],
             ],
@@ -62,14 +61,14 @@ class ItemSeeder extends Seeder
                     'T2ABT', 'T2BLK', 'T2MST', 'T2NVY',
                 ],
             ],
-            'MAT' => [ // Bahan baku
+            'MAT' => [
                 'name' => 'Bahan Baku',
                 'items' => [
                     'FLC280BLK', 'FLC280NVY', 'FLC280MST', 'FLC280ABT', 'FLC280WHT', 'FLC280BBL',
                     'RIB280BLK', 'RIB280NVY', 'RIB280MST', 'RIB280ABT', 'RIB280WHT', 'RIB280BBL',
                 ],
             ],
-            'BPU' => [ // Bahan pendukung
+            'BPU' => [
                 'name' => 'Bahan Pendukung',
                 'items' => [
                     'TLKADDS', 'KRT4CM', 'BNGJHT',
@@ -77,7 +76,6 @@ class ItemSeeder extends Seeder
             ],
         ];
 
-        // kategori yang dianggap finished_good
         $finishedGoodCategories = ['CRG', 'LJR', 'SJR', 'LCG', 'SHT', 'TJR'];
 
         foreach ($data as $catCode => $config) {
@@ -112,7 +110,6 @@ class ItemSeeder extends Seeder
 
     private function generateName(string $catCode, string $code): string
     {
-        // warna mapping
         $colors = [
             'BLK' => 'Black',
             'MST' => 'Mustard',
@@ -123,7 +120,6 @@ class ItemSeeder extends Seeder
             'RDM' => 'Red Maroon',
         ];
 
-        // kategori nama depan
         $prefix = [
             'CRG' => 'Cargo',
             'LJR' => 'Jaket',
@@ -133,7 +129,6 @@ class ItemSeeder extends Seeder
             'TJR' => 'T-Shirt',
         ];
 
-        // Jika kategori BPU → manual nama
         $manual = [
             'TLKADDS' => 'Tali Karet Adidas',
             'KRT4CM' => 'Karet 4 CM',
@@ -144,9 +139,7 @@ class ItemSeeder extends Seeder
             return $manual[$code];
         }
 
-        // Jika MAT (bahan baku) → Fleece / Rib
         if (str_starts_with($code, 'FLC')) {
-            // FLC280BLK → Fleece 280 Black
             $gram = substr($code, 3, 3);
             $clr = substr($code, 6);
             return 'Fleece ' . $gram . ' ' . ($colors[$clr] ?? $clr);
@@ -158,10 +151,8 @@ class ItemSeeder extends Seeder
             return 'Rib ' . $gram . ' ' . ($colors[$clr] ?? $clr);
         }
 
-        // Kategori produk (general)
         $catName = $prefix[$catCode] ?? $catCode;
 
-        // Pisahkan model & warna (ex: C5BLK → C5 + BLK)
         preg_match('/([A-Za-z0-9]+?)([A-Z]{3})$/', $code, $m);
 
         $model = $m[1] ?? $code;

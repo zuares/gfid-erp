@@ -72,6 +72,21 @@ class PieceRateSeeder extends Seeder
             ],
         ];
 
-        PieceRate::insert($data);
+        foreach ($data as $row) {
+            PieceRate::updateOrCreate(
+                [
+                    'module' => $row['module'],
+                    'employee_id' => $row['employee_id'],
+                    'item_category_id' => $row['item_category_id'],
+                    'item_id' => $row['item_id'],
+                    'effective_from' => $row['effective_from'],
+                    'effective_to' => $row['effective_to'],
+                ],
+                [
+                    'rate_per_pcs' => $row['rate_per_pcs'],
+                    'notes' => $row['notes'],
+                ]
+            );
+        }
     }
 }

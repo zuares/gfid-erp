@@ -11,14 +11,11 @@ class UserEmployeeSeeder extends Seeder
 {
     public function run(): void
     {
-        // ============================
-        //  EMPLOYEE DATA
-        // ============================
         $employees = [
             [
                 'code' => 'OWN',
                 'name' => 'Owner',
-                'role' => 'owner', // ✅ masuk enum
+                'role' => 'owner',
                 'active' => 1,
                 'phone' => '081200000001',
                 'address' => 'Alamat Owner',
@@ -26,7 +23,7 @@ class UserEmployeeSeeder extends Seeder
             [
                 'code' => 'NTA',
                 'name' => 'Neng Nita',
-                'role' => 'admin', // ✅ ganti dari "fullfilment" → "admin"
+                'role' => 'admin',
                 'active' => 1,
                 'phone' => '081200000002',
                 'address' => 'Alamat Admin / Fulfillment',
@@ -34,7 +31,7 @@ class UserEmployeeSeeder extends Seeder
             [
                 'code' => 'ANG',
                 'name' => 'Angga',
-                'role' => 'operating', // ✅ ganti dari "production" → "operating"
+                'role' => 'operating',
                 'active' => 1,
                 'phone' => '081200000002',
                 'address' => 'Alamat Angga (Gudang Produksi)',
@@ -42,7 +39,7 @@ class UserEmployeeSeeder extends Seeder
             [
                 'code' => 'MRF',
                 'name' => 'Mang Arip',
-                'role' => 'cutting', // ✅ enum
+                'role' => 'cutting',
                 'active' => 1,
                 'phone' => '081200000003',
                 'address' => 'Operator Cutting',
@@ -50,7 +47,7 @@ class UserEmployeeSeeder extends Seeder
             [
                 'code' => 'BBI',
                 'name' => 'Bi rini',
-                'role' => 'sewing', // ✅ enum
+                'role' => 'sewing',
                 'active' => 1,
                 'phone' => '081200000004',
                 'address' => 'Operator Sewing',
@@ -74,30 +71,43 @@ class UserEmployeeSeeder extends Seeder
         ];
 
         foreach ($employees as $emp) {
-            $employee = Employee::create($emp);
+            // EMPLOYEE
+            $employee = Employee::updateOrCreate(
+                ['code' => $emp['code']],
+                [
+                    'name' => $emp['name'],
+                    'role' => $emp['role'],
+                    'active' => $emp['active'],
+                    'phone' => $emp['phone'],
+                    'address' => $emp['address'],
+                ]
+            );
 
-            // ============================
-            //  TENTUKAN SIAPA YANG PUNYA LOGIN
-            // ============================
-            // Hanya owner + admin + operating yang dibuat user
+            // ROLE LOGIN
             $loginRole = match ($employee->role) {
                 'owner' => 'owner',
-                'admin' => 'admin', // Nita → akses fulfillment / sales / packing
-                'operating' => 'operating', // Angga → akses production / inventory
-                default => null, // sewing, cutting, other → tidak dibuat user
+                'admin' => 'admin',
+                'operating' => 'operating',
+                default => null,
             };
 
             if (!$loginRole) {
-                continue; // skip bikin user
+                continue;
             }
 
-            User::create([
-                'employee_id' => $employee->id,
-                'employee_code' => $employee->code,
-                'name' => $employee->name,
-                'role' => $loginRole, // pastikan schema users.role juga support ini
-                'password' => Hash::make('123'), // default password
-            ]);
+            // USER
+            User::updateOrCreate(
+                [
+                    'employee_code' => $employee->code,
+                ],
+                [
+                    'employee_id' => $employee->id,
+                    'name' => $employee->name,
+                    'role' => $loginRole,
+                    // kalau user sudah ada, biarin password lama (jangan reset)
+                    'password' => User::where('employee_code', $employee->code)->value('password') ?? Hash::make('123'),
+                ]
+            );
         }
     }
 }

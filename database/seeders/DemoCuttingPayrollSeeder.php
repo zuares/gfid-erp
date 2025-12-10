@@ -7,7 +7,6 @@ use App\Models\CuttingJobBundle;
 use App\Models\Employee;
 use App\Models\Item;
 use App\Models\ItemCategory;
-use App\Models\Lot; // ⬅️ TAMBAH INI
 use App\Models\Warehouse;
 use Carbon\Carbon;
 use Illuminate\Database\Seeder;
@@ -19,10 +18,12 @@ class DemoCuttingPayrollSeeder extends Seeder
         $today = Carbon::today();
 
         // 1. EMPLOYEE (operator cutting)
-        $mrf = Employee::firstOrCreate(
+        $mrf = Employee::updateOrCreate(
             ['code' => 'MRF'],
             [
                 'name' => 'Operator Cutting MRF',
+                'role' => 'cutting',
+                'active' => 1,
                 'default_piece_rate' => 400,
             ]
         );
@@ -42,8 +43,6 @@ class DemoCuttingPayrollSeeder extends Seeder
                 'name' => 'Kaos Hitam Lengan Pendek',
                 'item_category_id' => $kaosCategory->id,
                 'type' => 'finished_good',
-                // HAPUS is_active kalau kolomnya nggak ada
-                // 'is_active' => true,
             ]
         );
 
@@ -53,17 +52,16 @@ class DemoCuttingPayrollSeeder extends Seeder
                 'name' => 'Kaos Putih Lengan Pendek',
                 'item_category_id' => $kaosCategory->id,
                 'type' => 'finished_good',
-                // 'is_active' => true,
             ]
         );
 
-        // 4. WAREHOUSE untuk cutting job (WAJIB karena warehouse_id NOT NULL)
-        // Sesuaikan: kalau kamu sudah punya warehouse kode 'CUT' atau 'G-CUT', pakai itu
+        // 4. WAREHOUSE untuk cutting job
         $cuttingWarehouse = Warehouse::firstOrCreate(
-            ['code' => 'CUT-DEMO'], // bebas, yang penting ada id-nya
+            ['code' => 'CUT-DEMO'],
             [
                 'name' => 'Gudang Cutting Demo',
-                'type' => 'cutting', // kalau tabelmu punya kolom type, kalau tidak, hapus
+                'type' => 'cutting',
+                'active' => 1,
             ]
         );
 
@@ -75,11 +73,7 @@ class DemoCuttingPayrollSeeder extends Seeder
                 'status' => 'done',
                 'operator_id' => $mrf->id,
                 'warehouse_id' => $cuttingWarehouse->id,
-                'lot_id' => 1,
-                // 'item_category_id' => 3,
-                // ⬅️ INI YANG WAJIB
-                // kalau cutting_jobs punya kolom lain yang NOT NULL (lot_id, lot_code, dsb)
-                // tambahkan juga di sini
+                'lot_id' => 1, // sesuaikan kalau nanti pakai lot beneran
             ]
         );
 

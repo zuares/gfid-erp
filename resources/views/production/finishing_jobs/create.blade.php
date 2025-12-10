@@ -1029,7 +1029,7 @@
 
                     if (qtyInEl) qtyInEl.value = qtyIn === 0 ? '' : String(qtyIn);
                     if (qtyRejectEl) qtyRejectEl.value = String(
-                    qtyReject); // reject tidak boleh kosong → minimal "0"
+                        qtyReject); // reject tidak boleh kosong → minimal "0"
 
                     updateSaveButtonState();
                     computeSummary();
