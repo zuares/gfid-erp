@@ -114,6 +114,12 @@
 @endpush
 
 @section('content')
+    @php
+        // Ambil dari old() dulu, kalau tidak ada pakai nilai dari controller, default periodic
+        /** @var string|null $mode */
+        $mode = old('type', $mode ?? 'periodic');
+    @endphp
+
     <div class="page-wrap">
         <div class="card card-gfid">
             <div class="card-header">
@@ -132,10 +138,43 @@
                 </div>
             </div>
 
+
             <form action="{{ route('inventory.stock_opnames.store') }}" method="POST" class="card-body">
                 @csrf
 
                 <div class="row g-3">
+                    {{-- Mode: Periodik / Opening --}}
+                    <div class="col-12">
+                        <div class="field-label">
+                            Mode Opname <span class="required">*</span>
+                        </div>
+                        <div class="d-flex flex-wrap gap-3" style="font-size: .82rem;">
+                            <label class="d-inline-flex align-items-center gap-2">
+                                <input type="radio" name="type" value="periodic"
+                                    {{ $mode === 'periodic' ? 'checked' : '' }}>
+                                <span>
+                                    Periodik
+                                    <span class="text-muted d-block" style="font-size: .75rem;">
+                                        Cek stok berjalan, sistem generate daftar item dari stok gudang.
+                                    </span>
+                                </span>
+                            </label>
+                            <label class="d-inline-flex align-items-center gap-2">
+                                <input type="radio" name="type" value="opening"
+                                    {{ $mode === 'opening' ? 'checked' : '' }}>
+                                <span>
+                                    Opening Balance
+                                    <span class="text-muted d-block" style="font-size: .75rem;">
+                                        Set saldo awal: kamu isi manual stok awal + HPP per item.
+                                    </span>
+                                </span>
+                            </label>
+                        </div>
+                        @error('type')
+                            <div class="error-text">{{ $message }}</div>
+                        @enderror
+                    </div>
+
                     {{-- Gudang --}}
                     <div class="col-12">
                         <div class="field-label">
@@ -185,15 +224,17 @@
                         <div class="field-label">Pengisian item</div>
                         <div class="form-check">
                             <input type="checkbox" name="auto_generate_lines" value="1" id="auto_generate_lines"
-                                class="form-check-input" {{ old('auto_generate_lines', true) ? 'checked' : '' }}>
+                                class="form-check-input"
+                                {{ old('auto_generate_lines', $mode === 'periodic') ? 'checked' : '' }}>
                             <label class="form-check-label" for="auto_generate_lines" style="font-size: .8rem;">
-                                Generate daftar item otomatis dari stok sistem gudang ini.
+                                Generate daftar item otomatis dari stok sistem gudang ini
+                                <span class="text-muted">(hanya berlaku untuk mode <strong>Periodik</strong>).</span>
                             </label>
                         </div>
                         <div class="field-hint">
-                            Stok sistem akan diambil sebagai <span class="mono">Qty Sistem</span> dengan 2 angka desimal
-                            (contoh: <span class="mono">12.50</span>). Di halaman counting, kamu bisa isi
-                            <span class="mono">Qty Fisik</span> dengan format angka yang sama.
+                            Mode <strong>Periodik</strong>: stok sistem akan diambil sebagai
+                            <span class="mono">Qty Sistem</span> dengan 2 angka desimal.
+                            Mode <strong>Opening</strong>: daftar item kosong, kamu isi manual stok awal &amp; HPP.
                         </div>
                     </div>
                 </div>
@@ -201,9 +242,8 @@
                 <div class="d-flex justify-content-between align-items-center mt-3 flex-wrap gap-2">
                     <div>
                         <small class="text-muted">
-                            Setelah sesi dibuat, masuk ke halaman <strong>Input Fisik</strong> untuk mengisi hasil hitung di
-                            gudang. Nilai stok akan ditampilkan dengan <strong>2 digit desimal</strong> supaya rapi dan
-                            konsisten.
+                            Setelah sesi dibuat, masuk ke halaman <strong>Input Fisik</strong> untuk mengisi hasil hitung
+                            (atau saldo awal). Untuk mode Opening, tersedia kolom <strong>HPP / Unit</strong>.
                         </small>
                     </div>
                     <div class="d-flex align-items-center gap-2">

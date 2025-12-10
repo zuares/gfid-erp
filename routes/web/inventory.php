@@ -63,14 +63,26 @@ Route::middleware(['web', 'auth', 'role:owner,operating'])->group(function () {
             Route::prefix('stock-opnames')
                 ->name('stock_opnames.')
                 ->group(function () {
+                    Route::get('/{stockOpname}/edit', [StockOpnameController::class, 'edit'])->name('edit');
                     Route::get('/', [StockOpnameController::class, 'index'])->name('index');
                     Route::get('/create', [StockOpnameController::class, 'create'])->name('create');
                     Route::post('/', [StockOpnameController::class, 'store'])->name('store');
                     Route::get('/{stockOpname}', [StockOpnameController::class, 'show'])->name('show');
-                    Route::get('/{stockOpname}/edit', [StockOpnameController::class, 'edit'])->name('edit');
+
                     Route::put('/{stockOpname}', [StockOpnameController::class, 'update'])->name('update');
                     Route::post('/{stockOpname}/finalize', [StockOpnameController::class, 'finalize'])
                         ->name('finalize');
+                    Route::post('/{stockOpname}/lines', [StockOpnameController::class, 'addLine'])
+                        ->name('lines.store');
+                    Route::delete('/{stockOpname}/lines/{line}', [StockOpnameController::class, 'deleteLine'])
+                        ->name('lines.destroy');
+                    Route::post(
+                        '/{stockOpname}/reset-lines',
+                        [StockOpnameController::class, 'resetLines']
+                    )->name('reset_lines');
+                    Route::post('/{stockOpname}/reset-all-lines',
+                        [StockOpnameController::class, 'resetAllLines']
+                    )->name('reset_all_lines');
                 });
 
             // ================== INVENTORY ADJUSTMENTS ==================

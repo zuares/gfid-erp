@@ -1,56 +1,50 @@
+{{-- resources/views/inventory/stock_opnames/edit.blade.php --}}
 @extends('layouts.app')
 
-@section('title', 'Counting Stock Opname • ' . $opname->code)
+@section('title', 'Stock Opname • ' . $opname->code)
 
 @push('head')
     <style>
-        .page-wrap {
-            max-width: 1100px;
-            margin-inline: auto;
-            padding: .75rem .75rem 4rem;
+        :root {
+            --so-card-radius: 14px;
+            --so-border: rgba(148, 163, 184, 0.30);
+            --so-muted: #6b7280;
         }
 
-        body[data-theme="light"] .page-wrap {
-            background: radial-gradient(circle at top left,
-                    rgba(59, 130, 246, 0.14) 0,
-                    rgba(45, 212, 191, 0.10) 26%,
-                    #f9fafb 60%);
+        .so-page {
+            min-height: 100vh;
+        }
+
+        .so-page .page-wrap {
+            max-width: 1000px;
+            margin-inline: auto;
+            padding: 1rem .85rem 3rem;
+        }
+
+        body[data-theme="light"] .so-page .page-wrap {
+            background:
+                radial-gradient(circle at top left,
+                    rgba(59, 130, 246, 0.10) 0,
+                    rgba(148, 163, 184, 0.08) 30%,
+                    #f9fafb 70%);
+        }
+
+        body[data-theme="dark"] .so-page .page-wrap {
+            background:
+                radial-gradient(circle at top left,
+                    rgba(59, 130, 246, 0.26) 0,
+                    rgba(15, 23, 42, 1) 55%);
         }
 
         .card-main {
             background: var(--card);
-            border-radius: 14px;
-            border: 1px solid rgba(148, 163, 184, 0.30);
-            box-shadow:
-                0 10px 26px rgba(15, 23, 42, 0.06),
-                0 0 0 1px rgba(15, 23, 42, 0.03);
+            border-radius: var(--so-card-radius);
+            border: 1px solid var(--so-border);
         }
 
-        .badge-status {
-            font-size: .7rem;
-            padding: .18rem .5rem;
-            border-radius: 999px;
-            font-weight: 600;
-        }
-
-        .badge-status--draft {
-            background: rgba(148, 163, 184, 0.2);
-            color: #475569;
-        }
-
-        .badge-status--counting {
-            background: rgba(59, 130, 246, 0.16);
-            color: #1d4ed8;
-        }
-
-        .badge-status--reviewed {
-            background: rgba(234, 179, 8, 0.18);
-            color: #854d0e;
-        }
-
-        .badge-status--finalized {
-            background: rgba(22, 163, 74, 0.18);
-            color: #15803d;
+        .page-subtitle {
+            font-size: .82rem;
+            color: var(--so-muted);
         }
 
         .pill-label {
@@ -62,13 +56,48 @@
 
         .text-mono {
             font-variant-numeric: tabular-nums;
+            font-family: ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, "Liberation Mono", "Courier New",
+                monospace;
+        }
+
+        .badge-status {
+            font-size: .72rem;
+            padding: .16rem .6rem;
+            border-radius: 999px;
+            font-weight: 600;
+        }
+
+        .badge-status--draft {
+            background: rgba(148, 163, 184, .16);
+            color: #475569;
+        }
+
+        .badge-status--counting {
+            background: rgba(59, 130, 246, .18);
+            color: #1d4ed8;
+        }
+
+        .badge-status--reviewed {
+            background: rgba(234, 179, 8, .20);
+            color: #854d0e;
+        }
+
+        .badge-status--finalized {
+            background: rgba(22, 163, 74, .20);
+            color: #15803d;
         }
 
         .table-wrap {
             margin-top: .75rem;
-            border-radius: 12px;
-            border: 1px solid rgba(148, 163, 184, .24);
+            border-radius: 10px;
+            border: 1px solid rgba(148, 163, 184, .25);
             overflow: hidden;
+            background: rgba(248, 250, 252, .9);
+        }
+
+        body[data-theme="dark"] .table-wrap {
+            background: rgba(15, 23, 42, 0.92);
+            border-color: rgba(51, 65, 85, .9);
         }
 
         .table thead th {
@@ -79,6 +108,16 @@
             background: rgba(15, 23, 42, 0.02);
         }
 
+        body[data-theme="dark"] .table thead th {
+            background: rgba(15, 23, 42, 0.8);
+            color: #e5e7eb;
+        }
+
+        .table tbody td {
+            vertical-align: middle;
+            font-size: .82rem;
+        }
+
         .diff-plus {
             color: #16a34a;
         }
@@ -87,56 +126,102 @@
             color: #dc2626;
         }
 
-        .autosave-indicator {
-            font-size: .75rem;
-            color: #64748b;
+        /* kolom yang disembunyikan di mobile */
+        .col-mobile-hide {
+            /* default: terlihat di desktop */
         }
 
-        .autosave-indicator span {
-            display: inline-flex;
+        .mobile-hide-inline {
+            /* default: terlihat di desktop */
+        }
+
+        .btn-mobile-full {
+            /* default desktop: biasa saja */
+        }
+
+        .btn-mobile-icon-delete {
+            /* default desktop: biasa saja */
+        }
+
+        /* MINI MODAL DUPLIKAT ITEM */
+        .duplicate-modal-backdrop {
+            position: fixed;
+            inset: 0;
+            background: rgba(15, 23, 42, 0.55);
+            display: none;
             align-items: center;
-            gap: .25rem;
+            justify-content: center;
+            z-index: 1050;
         }
 
-        .autosave-dot {
-            width: 7px;
-            height: 7px;
-            border-radius: 999px;
-            background: #22c55e;
+        .duplicate-modal {
+            background: var(--card, #fff);
+            border-radius: 12px;
+            border: 1px solid rgba(148, 163, 184, 0.35);
+            padding: .9rem .95rem;
+            max-width: 360px;
+            width: 100%;
+            box-shadow:
+                0 18px 40px rgba(15, 23, 42, 0.35),
+                0 0 0 1px rgba(15, 23, 42, 0.18);
+        }
+
+        .duplicate-modal-title {
+            font-size: .95rem;
+            font-weight: 600;
+            margin-bottom: .4rem;
+        }
+
+        .duplicate-modal-body {
+            font-size: .8rem;
+            color: #475569;
+        }
+
+        .duplicate-modal-body .label {
+            font-size: .74rem;
+            text-transform: uppercase;
+            letter-spacing: .06em;
+            color: #94a3b8;
+        }
+
+        .duplicate-modal-body .value {
+            font-family: ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, "Liberation Mono", "Courier New",
+                monospace;
+            font-size: .82rem;
+        }
+
+        .duplicate-modal-actions {
+            margin-top: .7rem;
+            display: flex;
+            gap: .5rem;
+            flex-wrap: wrap;
         }
 
         @media (max-width: 767.98px) {
-            .page-wrap {
-                padding-inline: .5rem;
+            .so-page .page-wrap {
+                padding-inline: .6rem;
             }
 
-            .table thead {
-                display: none;
+            /* hanya tampilkan kolom: #, Item (kode), Qty Fisik, Selisih */
+            .col-mobile-hide {
+                display: none !important;
             }
 
-            .table tbody tr {
-                display: block;
-                border-bottom: 1px solid rgba(148, 163, 184, .25);
-                padding: .35rem .75rem;
+            .mobile-hide-inline {
+                display: none !important;
             }
 
-            .table tbody tr:last-child {
-                border-bottom: none;
+            .table-wrap {
+                overflow-x: auto;
             }
 
-            .table tbody td {
-                display: flex;
-                justify-content: space-between;
-                gap: .75rem;
-                padding: .15rem 0;
-                border-top: none;
-                font-size: .85rem;
+            .btn-mobile-full {
+                display: inline-block;
+                width: 100%;
             }
 
-            .table tbody td::before {
-                content: attr(data-label);
-                font-weight: 500;
-                color: #64748b;
+            .btn-mobile-icon-delete {
+                padding-inline: .4rem;
             }
         }
     </style>
@@ -144,434 +229,632 @@
 
 @section('content')
     @php
-        // Kalau sudah reviewed/finalized, input dibuat readonly
         $isReadonly = in_array($opname->status, ['reviewed', 'finalized']);
+        $isOpening = $opname->type === 'opening';
+
+        // Urutkan baris: paling baru (id terbesar) di atas
+        $lines = $opname->lines->sortByDesc('id')->values();
     @endphp
 
-    <div class="page-wrap">
-        <div class="d-flex justify-content-between align-items-center mb-3">
-            <div>
-                <a href="{{ route('inventory.stock_opnames.show', $opname) }}" class="btn btn-sm btn-link px-0 mb-1">
-                    ← Kembali ke detail
-                </a>
-                <h1 class="h5 mb-1">
-                    Counting Stock Opname • {{ $opname->code }}
-                </h1>
-                <p class="text-muted mb-0" style="font-size: .86rem;">
-                    @if ($isReadonly)
-                        Dokumen ini sudah {{ $opname->status === 'finalized' ? 'difinalkan' : 'direview' }}.
-                        Data ditampilkan hanya untuk review.
-                    @else
-                        Input hasil hitung fisik per item. Draft akan otomatis tersimpan di browser.
-                    @endif
-                </p>
-            </div>
-            <div class="text-end">
-                @php
-                    $statusClass = match ($opname->status) {
-                        'draft' => 'badge-status badge-status--draft',
-                        'counting' => 'badge-status badge-status--counting',
-                        'reviewed' => 'badge-status badge-status--reviewed',
-                        'finalized' => 'badge-status badge-status--finalized',
-                        default => 'badge-status badge-status--draft',
-                    };
-                @endphp
-
-                <div class="mb-1">
+    <div class="so-page">
+        <div class="page-wrap">
+            {{-- HEADER --}}
+            <div class="d-flex justify-content-between align-items-center mb-3 flex-wrap gap-2">
+                <div>
+                    <a href="{{ route('inventory.stock_opnames.show', $opname) }}" class="btn btn-link btn-sm px-0 mb-1">
+                        ← Kembali ke detail
+                    </a>
+                    <h1 class="h5 mb-1">
+                        Stock Opname • {{ $opname->code }}
+                    </h1>
+                    <p class="page-subtitle mb-0">
+                        @if ($isReadonly)
+                            Dokumen ini sudah {{ $opname->status === 'finalized' ? 'difinalkan' : 'direview' }}.
+                        @else
+                            @if ($isOpening)
+                                Mode saldo awal: Qty &amp; HPP di tabel hanya tampilan. Ubah lewat form di atas.
+                            @else
+                                Isi hasil hitung fisik per item, lalu simpan.
+                            @endif
+                        @endif
+                    </p>
+                </div>
+                <div class="text-end">
+                    @php
+                        $statusClass = match ($opname->status) {
+                            'draft' => 'badge-status badge-status--draft',
+                            'counting' => 'badge-status badge-status--counting',
+                            'reviewed' => 'badge-status badge-status--reviewed',
+                            'finalized' => 'badge-status badge-status--finalized',
+                            default => 'badge-status badge-status--draft',
+                        };
+                    @endphp
                     <span class="{{ $statusClass }}">{{ ucfirst($opname->status) }}</span>
                 </div>
-                @unless ($isReadonly)
-                    <div class="autosave-indicator">
-                        <span id="autosave-status">
-                            <span class="autosave-dot"></span>
-                            Draft aktif (local)
-                        </span>
-                    </div>
-                @endunless
             </div>
-        </div>
 
-        <form action="{{ route('inventory.stock_opnames.update', $opname) }}" method="POST" id="opname-form">
-            @csrf
-            @method('PUT')
-
-            <div class="card card-main mb-3">
-                <div class="card-body">
-                    <div class="row g-3">
-                        <div class="col-md-4">
-                            <div class="pill-label mb-1">Kode Dokumen</div>
-                            <div class="fw-semibold text-mono">
-                                {{ $opname->code }}
-                            </div>
-
-                            <div class="pill-label mt-3 mb-1">Tanggal Opname</div>
-                            <div>
-                                {{ $opname->date?->format('d M Y') ?? '-' }}
+            {{-- FORM TAMBAH ITEM (OPENING MODE, SIMPLE + AJAX) --}}
+            @if ($isOpening && !$isReadonly)
+                <div class="card card-main mb-3">
+                    <div class="card-body">
+                        <div class="mb-2">
+                            <div class="pill-label mb-1">Tambah item saldo awal</div>
+                            <div style="font-size:.8rem;color:#6b7280;">
+                                Flow: ketik item → Tab ke Qty → Enter untuk simpan → fokus kembali ke item.
+                                Jika item sudah ada, akan muncul konfirmasi sebelum update baris lama.
                             </div>
                         </div>
 
-                        <div class="col-md-4">
-                            <div class="pill-label mb-1">Gudang</div>
-                            <div class="fw-semibold">
-                                {{ $opname->warehouse?->code ?? '-' }}
-                            </div>
-                            <div class="text-muted" style="font-size: .86rem;">
-                                {{ $opname->warehouse?->name }}
-                            </div>
-                        </div>
+                        <form id="opening-add-form" action="{{ route('inventory.stock_opnames.lines.store', $opname) }}"
+                            method="POST" class="row g-2 align-items-end">
+                            @csrf
 
-                        <div class="col-md-4">
-                            <div class="pill-label mb-1">Catatan (opsional)</div>
-                            <textarea name="notes" class="form-control form-control-sm" rows="3"
-                                placeholder="Catatan tambahan untuk sesi opname ini (misal: shift, area rak, dsb)"
-                                @if ($isReadonly) readonly @endif>{{ old('notes', $opname->notes) }}</textarea>
-                        </div>
+                            {{-- Item (pakai item-suggest) --}}
+                            <div class="col-md-4" id="opening-item-suggest">
+                                <label class="pill-label mb-1">Item</label>
+                                <x-item-suggest idName="item_id" :idValue="old('item_id')" :displayValue="''"
+                                    placeholder="Kode / nama barang" />
+                            </div>
+
+                            {{-- Qty Fisik --}}
+                            <div class="col-6 col-md-2">
+                                <label class="pill-label mb-1">Qty Fisik</label>
+                                <x-number-input name="physical_qty" :value="old('physical_qty')" mode="integer" min="0"
+                                    class="text-end js-opening-qty" />
+                            </div>
+
+                            {{-- HPP / Unit --}}
+                            <div class="col-6 col-md-2">
+                                <label class="pill-label mb-1">HPP / Unit</label>
+                                <x-number-input name="unit_cost" :value="old('unit_cost')" mode="decimal" :decimals="2"
+                                    min="0" class="text-end" />
+                            </div>
+
+                            {{-- Catatan --}}
+                            <div class="col-md-3">
+                                <label class="pill-label mb-1">Catatan</label>
+                                <input type="text" name="notes" value="{{ old('notes') }}"
+                                    class="form-control form-control-sm">
+                            </div>
+
+                            {{-- Hidden flag untuk update existing row --}}
+                            <input type="hidden" name="update_existing" value="0">
+
+                            {{-- Tombol submit --}}
+                            <div class="col-md-1 d-grid">
+                                <button type="submit" class="btn btn-sm btn-primary btn-mobile-full">
+                                    + Tambah
+                                </button>
+                            </div>
+
+                            @if ($errors->has('item_id') || $errors->has('physical_qty') || $errors->has('unit_cost'))
+                                <div class="col-12 mt-1">
+                                    @error('item_id')
+                                        <div class="text-danger small">{{ $message }}</div>
+                                    @enderror
+                                    @error('physical_qty')
+                                        <div class="text-danger small">{{ $message }}</div>
+                                    @enderror
+                                    @error('unit_cost')
+                                        <div class="text-danger small">{{ $message }}</div>
+                                    @enderror
+                                </div>
+                            @endif
+                        </form>
                     </div>
+                </div>
+            @endif
 
-                    <div class="d-flex justify-content-between align-items-center mt-3">
-                        <div>
-                            @unless ($isReadonly)
-                                <button type="submit" class="btn btn-sm btn-primary">
+            {{-- FORM UPDATE UTAMA (HEADER + TABEL) --}}
+            <form action="{{ route('inventory.stock_opnames.update', $opname) }}" method="POST">
+                @csrf
+                @method('PUT')
+
+                {{-- META DOKUMEN --}}
+                <div class="card card-main mb-3">
+                    <div class="card-body">
+                        <div class="row g-3">
+                            <div class="col-md-4">
+                                <div class="pill-label mb-1">Kode Dokumen</div>
+                                <div class="text-mono fw-semibold">{{ $opname->code }}</div>
+
+                                <div class="pill-label mt-3 mb-1">Tanggal Opname</div>
+                                <div style="font-size:.85rem;">
+                                    {{ $opname->date?->format('d M Y') ?? '-' }}
+                                </div>
+                            </div>
+                            <div class="col-md-4">
+                                <div class="pill-label mb-1">Gudang</div>
+                                <div class="fw-semibold">
+                                    {{ $opname->warehouse?->code ?? '-' }}
+                                </div>
+                                <div style="font-size:.85rem;color:#6b7280;">
+                                    {{ $opname->warehouse?->name }}
+                                </div>
+                            </div>
+                            <div class="col-md-4">
+                                <div class="pill-label mb-1">Catatan</div>
+                                <textarea name="notes" class="form-control form-control-sm" rows="3" placeholder="Catatan tambahan…"
+                                    @if ($isReadonly) readonly @endif>{{ old('notes', $opname->notes) }}</textarea>
+                            </div>
+                        </div>
+
+                        @if (!$isReadonly)
+                            <div class="mt-3 d-flex gap-2 flex-wrap">
+                                <button type="submit" class="btn btn-sm btn-primary btn-mobile-full">
                                     Simpan Perubahan
                                 </button>
-
                                 @if (in_array($opname->status, ['draft', 'counting']))
                                     <button type="submit" name="mark_reviewed" value="1"
-                                        class="btn btn-sm btn-outline-primary ms-1" id="btn-mark-reviewed">
+                                        class="btn btn-sm btn-outline-primary btn-mobile-full">
                                         Simpan &amp; Tandai Selesai Counting
                                     </button>
                                 @endif
-                            @endunless
-                        </div>
-                        <div class="d-flex gap-2">
-                            @unless ($isReadonly)
-                                <button type="button" class="btn btn-sm btn-outline-secondary" id="btn-clear-draft">
-                                    Hapus Draft Browser
-                                </button>
-                            @endunless
-                        </div>
+                            </div>
+                        @endif
                     </div>
                 </div>
-            </div>
 
-            <div class="card card-main">
-                <div class="card-body">
-                    <div class="d-flex justify-content-between align-items-center mb-1">
-                        <div>
-                            <h2 class="h6 mb-0">
-                                Input Qty Fisik Per Item
-                            </h2>
-                            <div class="text-muted" style="font-size: .78rem;">
-                                Gunakan titik untuk desimal (contoh: <span class="text-mono">12.50</span>).
-                                Saat kolom Qty Fisik diklik, nilai lama akan otomatis terblok supaya mudah diganti.
+                {{-- TABEL ITEM --}}
+                @php
+                    $totalLines = $lines->count();
+                    $countedLines = $lines->whereNotNull('physical_qty')->count();
+                @endphp
+
+                <div class="card card-main">
+                    <div class="card-body">
+                        <div class="d-flex justify-content-between align-items-center mb-1 flex-wrap gap-2">
+                            <div>
+                                <div class="pill-label mb-1">
+                                    @if ($isOpening)
+                                        Saldo awal per item
+                                    @else
+                                        Hasil hitung fisik per item
+                                    @endif
+                                </div>
+                                <div style="font-size:.78rem;color:#6b7280;">
+                                    @if ($isOpening)
+                                        Angka Qty &amp; HPP di tabel hanya tampilan (2 digit desimal).
+                                        Ubah via form tambah di atas.
+                                    @else
+                                        Isi Qty Fisik per item, selisih akan dihitung saat update.
+                                    @endif
+                                </div>
+                            </div>
+                            <div style="font-size:.8rem;color:#6b7280;">
+                                {{ $countedLines }} / {{ $totalLines }} item sudah terisi Qty fisik
                             </div>
                         </div>
-                        @php
-                            $totalLines = $opname->lines->count();
-                            $countedLines = $opname->lines->whereNotNull('physical_qty')->count();
-                        @endphp
-                        <div class="text-muted" style="font-size: .8rem;">
-                            <span id="counted-summary">
-                                {{ $countedLines }} / {{ $totalLines }} item sudah diisi
-                            </span>
-                        </div>
-                    </div>
 
-                    <div class="table-wrap">
-                        <table class="table table-sm mb-0 align-middle" id="lines-table">
-                            <thead>
-                                <tr>
-                                    <th style="width: 40px;">#</th>
-                                    <th>Item</th>
-                                    <th class="text-end">Qty Sistem</th>
-                                    <th class="text-end" style="width: 140px;">Qty Fisik</th>
-                                    <th class="text-end">Selisih</th>
-                                    <th>Catatan</th>
-                                </tr>
-                            </thead>
-                            <tbody>
-                                @foreach ($opname->lines as $index => $line)
-                                    @php
-                                        // pakai accessor di model: getDifferenceAttribute()
-                                        $diff = $line->difference;
-                                        $hasPhysical = !is_null($line->physical_qty);
-                                        $diffDisplay =
-                                            $diff > 0 ? '+' . number_format($diff, 2) : number_format($diff, 2);
-                                        $diffClass = $diff > 0 ? 'diff-plus' : ($diff < 0 ? 'diff-minus' : '');
-                                        $inputNamePrefix = "lines[{$line->id}]";
-                                    @endphp
-                                    <tr data-line-id="{{ $line->id }}">
-                                        <td data-label="#">
-                                            {{ $index + 1 }}
-                                        </td>
-                                        <td data-label="Item">
-                                            <div class="fw-semibold">
-                                                {{ $line->item?->code ?? '-' }}
-                                            </div>
-                                            <div class="text-muted" style="font-size: .82rem;">
-                                                {{ $line->item?->name ?? '' }}
-                                            </div>
-                                        </td>
-                                        <td data-label="Qty sistem" class="text-end text-mono">
-                                            <span class="system-qty" data-system-qty="{{ $line->system_qty }}">
-                                                {{ number_format($line->system_qty, 2) }}
-                                            </span>
-                                            <input type="hidden" name="{{ $inputNamePrefix }}[system_qty]"
-                                                value="{{ $line->system_qty }}">
-                                        </td>
-                                        <td data-label="Qty fisik" class="text-end">
-                                            <input type="number" name="{{ $inputNamePrefix }}[physical_qty]"
-                                                class="form-control form-control-sm text-end physical-input" step="0.01"
-                                                min="0" autocomplete="off" data-line-id="{{ $line->id }}"
-                                                value="{{ old($inputNamePrefix . '.physical_qty', $line->physical_qty) }}"
-                                                @if ($isReadonly) readonly @endif>
-                                        </td>
-                                        <td data-label="Selisih" class="text-end text-mono">
-                                            <span class="diff-display {{ $diffClass }}">
-                                                @if ($hasPhysical)
-                                                    {{ $diffDisplay }}
-                                                @else
-                                                    -
-                                                @endif
-                                            </span>
-                                            <input type="hidden" name="{{ $inputNamePrefix }}[difference_qty]"
-                                                class="diff-input" value="{{ $hasPhysical ? $diff : '' }}">
-                                        </td>
-                                        <td data-label="Catatan">
-                                            <input type="text" name="{{ $inputNamePrefix }}[notes]"
-                                                class="form-control form-control-sm note-input"
-                                                value="{{ old($inputNamePrefix . '.notes', $line->notes) }}"
-                                                @if ($isReadonly) readonly @endif>
-                                        </td>
+                        {{-- TOMBOL RESET QTY & HPP (soft reset) --}}
+                        @if ($isOpening && !$isReadonly && $lines->count() > 0)
+                            <div class="mb-2 d-flex justify-content-between align-items-center flex-wrap gap-2">
+                                <div style="font-size:.78rem;color:#6b7280;">
+                                    Reset hanya mengosongkan Qty Fisik &amp; HPP semua baris, daftar item tetap ada.
+                                </div>
+                                <form action="{{ route('inventory.stock_opnames.reset_lines', $opname) }}" method="POST"
+                                    onsubmit="return confirm('Reset Qty Fisik dan HPP semua baris untuk sesi opname ini?\n\nDaftar item tetap dipertahankan. Lanjutkan?');">
+                                    @csrf
+                                    <button type="submit" class="btn btn-sm btn-outline-warning btn-mobile-full">
+                                        Reset Qty &amp; HPP Semua Baris
+                                    </button>
+                                </form>
+                            </div>
+                        @endif
+
+                        <div class="table-wrap mt-2" id="opname-lines-table"
+                            data-delete-url-template="{{ route('inventory.stock_opnames.lines.destroy', ['stockOpname' => $opname, 'line' => '__LINE_ID__']) }}">
+                            <table class="table table-sm mb-0 align-middle">
+                                <thead>
+                                    <tr>
+                                        <th style="width:40px;">#</th>
+                                        <th>Item</th>
+                                        <th class="text-end col-mobile-hide">Qty Sistem</th>
+                                        <th class="text-end" style="width:140px;">Qty Fisik</th>
+                                        <th class="text-end">Selisih</th>
+                                        @if ($isOpening)
+                                            <th class="text-end col-mobile-hide" style="width:140px;">HPP / Unit</th>
+                                        @endif
+                                        <th class="col-mobile-hide">Catatan</th>
+                                        @if ($isOpening && !$isReadonly)
+                                            <th class="text-end col-mobile-hide" style="width:70px;">Aksi</th>
+                                        @endif
                                     </tr>
-                                @endforeach
-                            </tbody>
-                        </table>
-                    </div>
+                                </thead>
+                                <tbody>
+                                    @foreach ($lines as $index => $line)
+                                        @php
+                                            $diff = $line->difference;
+                                            $hasPhysical = !is_null($line->physical_qty);
+                                            $diffDisplay =
+                                                $diff > 0 ? '+' . number_format($diff, 2) : number_format($diff, 2);
+                                            $diffClass = $diff > 0 ? 'diff-plus' : ($diff < 0 ? 'diff-minus' : '');
+                                            $inputNamePrefix = "lines[{$line->id}]";
+                                        @endphp
+                                        <tr data-item-id="{{ $line->item_id }}"
+                                            data-existing-qty="{{ (float) ($line->physical_qty ?? 0) }}"
+                                            data-existing-hpp="{{ (float) ($line->unit_cost ?? 0) }}"
+                                            data-item-code="{{ $line->item?->code }}"
+                                            data-item-name="{{ $line->item?->name }}">
+                                            <td data-label="#">
+                                                {{ $index + 1 }}
+                                            </td>
+                                            <td data-label="Item">
+                                                <div class="fw-semibold text-mono">
+                                                    {{ $line->item?->code ?? '-' }}
+                                                </div>
+                                                <div class="mobile-hide-inline" style="font-size:.82rem;color:#6b7280;">
+                                                    {{ $line->item?->name ?? '' }}
+                                                </div>
+                                            </td>
+                                            <td data-label="Qty sistem" class="text-end text-mono col-mobile-hide">
+                                                {{ number_format((float) $line->system_qty, 2) }}
+                                            </td>
 
-                    @unless ($isReadonly)
-                        <div class="mt-2 text-muted" style="font-size: .78rem;">
-                            Draft Qty Fisik disimpan otomatis di browser (localStorage) setiap kali Anda mengubah nilai.
-                            Jangan lupa klik <strong>Simpan Perubahan</strong> untuk commit ke server.
+                                            {{-- Qty fisik --}}
+                                            <td data-label="Qty fisik" class="text-end text-mono">
+                                                @if ($isOpening)
+                                                    @if (!is_null($line->physical_qty))
+                                                        {{ number_format((float) $line->physical_qty, 2) }}
+                                                    @else
+                                                        <span class="text-muted">-</span>
+                                                    @endif
+                                                @else
+                                                    {{-- mode periodik: tetap bisa input --}}
+                                                    <x-number-input :name="$inputNamePrefix . '[physical_qty]'" :value="old(
+                                                        $inputNamePrefix . '.physical_qty',
+                                                        $line->physical_qty,
+                                                    )" mode="decimal"
+                                                        :decimals="2" min="0" class="text-end" />
+                                                @endif
+                                            </td>
+
+                                            {{-- Selisih --}}
+                                            <td data-label="Selisih" class="text-end text-mono">
+                                                @if ($hasPhysical)
+                                                    <span class="{{ $diffClass }}">{{ $diffDisplay }}</span>
+                                                @else
+                                                    <span class="text-muted">-</span>
+                                                @endif
+                                            </td>
+
+                                            {{-- HPP / Unit (hanya opening, read-only) --}}
+                                            @if ($isOpening)
+                                                <td data-label="HPP / Unit" class="text-end text-mono col-mobile-hide">
+                                                    @if (!is_null($line->unit_cost))
+                                                        {{ number_format((float) $line->unit_cost, 2) }}
+                                                    @else
+                                                        <span class="text-muted">-</span>
+                                                    @endif
+                                                </td>
+                                            @endif
+
+                                            {{-- Catatan --}}
+                                            <td data-label="Catatan" class="col-mobile-hide">
+                                                <input type="text" name="{{ $inputNamePrefix }}[notes]"
+                                                    class="form-control form-control-sm"
+                                                    value="{{ old($inputNamePrefix . '.notes', $line->notes) }}"
+                                                    @if ($isReadonly) readonly @endif>
+                                            </td>
+
+                                            {{-- Aksi (hapus) --}}
+                                            @if ($isOpening && !$isReadonly)
+                                                <td data-label="Aksi" class="text-end col-mobile-hide">
+                                                    <button type="button"
+                                                        class="btn btn-sm btn-outline-danger js-delete-line btn-mobile-icon-delete">
+                                                        <span class="d-none d-md-inline">Hapus</span>
+                                                        <span class="d-inline d-md-none">✕</span>
+                                                    </button>
+                                                </td>
+                                            @endif
+                                        </tr>
+                                    @endforeach
+                                </tbody>
+                            </table>
                         </div>
-                    @endunless
+
+                    </div>
+                </div>
+            </form>
+        </div>
+    </div>
+
+    {{-- MINI MODAL KONFIRMASI DUPLIKAT ITEM --}}
+    <div class="duplicate-modal-backdrop" id="duplicate-modal">
+        <div class="duplicate-modal">
+            <div class="duplicate-modal-title">
+                Item sudah ada di daftar opname
+            </div>
+            <div class="duplicate-modal-body">
+                <div class="mb-2">
+                    <div class="label">Item</div>
+                    <div class="value" id="dup-item-label">-</div>
+                </div>
+                <div class="row g-2">
+                    <div class="col-6">
+                        <div class="label">Qty lama</div>
+                        <div class="value" id="dup-old-qty">-</div>
+                    </div>
+                    <div class="col-6">
+                        <div class="label">Qty baru</div>
+                        <div class="value" id="dup-new-qty">-</div>
+                    </div>
+                    <div class="col-6 mt-2">
+                        <div class="label">HPP lama</div>
+                        <div class="value" id="dup-old-hpp">-</div>
+                    </div>
+                    <div class="col-6 mt-2">
+                        <div class="label">HPP baru</div>
+                        <div class="value" id="dup-new-hpp">-</div>
+                    </div>
+                </div>
+                <div class="mt-2" style="font-size:.78rem;color:#6b7280;">
+                    Lanjutkan untuk <strong>mengganti Qty &amp; HPP baris lama</strong> dengan nilai baru.
                 </div>
             </div>
-        </form>
+            <div class="duplicate-modal-actions">
+                <button type="button" class="btn btn-sm btn-primary" id="dup-confirm-update">
+                    Update baris lama
+                </button>
+                <button type="button" class="btn btn-sm btn-outline-secondary" id="dup-cancel">
+                    Batal
+                </button>
+            </div>
+        </div>
     </div>
 @endsection
 
 @push('scripts')
     <script>
-        (function() {
-            const isReadonly = @json($isReadonly);
-            const opnameId = @json($opname->id);
-            const STORAGE_KEY = 'stock_opname_draft_' + opnameId;
-            const form = document.getElementById('opname-form');
-            const autosaveStatusEl = document.getElementById('autosave-status');
-            const clearDraftBtn = document.getElementById('btn-clear-draft');
-            const countedSummaryEl = document.getElementById('counted-summary');
-            const markReviewedBtn = document.getElementById('btn-mark-reviewed');
+        document.addEventListener('DOMContentLoaded', function() {
+            initOpeningAddAjax();
+            initDeleteLineAjax();
+        });
 
-            if (isReadonly) {
-                // Mode readonly: tidak perlu autosave / draft
+        function getCsrfToken() {
+            const meta = document.querySelector('meta[name="csrf-token"]');
+            if (meta) return meta.getAttribute('content');
+            const input = document.querySelector('input[name="_token"]');
+            if (input) return input.value;
+            return '';
+        }
+
+        function initOpeningAddAjax() {
+            const addForm = document.getElementById('opening-add-form');
+            if (!addForm) return;
+
+            const itemInput = document.querySelector('#opening-item-suggest .js-item-suggest-input');
+            const qtyInput = addForm.querySelector('.js-opening-qty');
+            const updateExistingInput = addForm.querySelector('input[name="update_existing"]');
+
+            // Fokus awal ke item
+            if (itemInput) {
+                itemInput.focus();
+                itemInput.select();
+            }
+
+            // Kumpulkan item_id yang sudah ada di tabel
+            const existingIds = new Set();
+            document.querySelectorAll('tr[data-item-id]').forEach(tr => {
+                const id = tr.getAttribute('data-item-id');
+                if (id) existingIds.add(id);
+            });
+
+            // Enter di Qty Fisik => submit via AJAX
+            if (qtyInput) {
+                qtyInput.addEventListener('keydown', function(e) {
+                    if (e.key === 'Enter') {
+                        e.preventDefault();
+                        submitOpeningFormAjax(addForm, existingIds, updateExistingInput, itemInput, false);
+                    }
+                });
+            }
+
+            // Klik tombol Tambah => juga AJAX
+            addForm.addEventListener('submit', function(e) {
+                e.preventDefault();
+                submitOpeningFormAjax(addForm, existingIds, updateExistingInput, itemInput, false);
+            });
+        }
+
+        function submitOpeningFormAjax(addForm, existingIds, updateExistingInput, itemInput, skipDuplicateCheck) {
+            const itemIdField = addForm.querySelector('input[name="item_id"]');
+            if (!itemIdField || !itemIdField.value) {
+                alert('Pilih item terlebih dahulu.');
+                if (itemInput) {
+                    itemInput.focus();
+                }
                 return;
             }
 
-            function loadDraft() {
-                try {
-                    const raw = localStorage.getItem(STORAGE_KEY);
-                    if (!raw) return;
+            const itemId = itemIdField.value;
 
-                    const draft = JSON.parse(raw);
-                    if (!draft || typeof draft !== 'object') return;
+            // ambil value baru dari form
+            const qtyInput = addForm.querySelector('input[name="physical_qty"]');
+            const hppInput = addForm.querySelector('input[name="unit_cost"]');
+            const newQty = qtyInput ? qtyInput.value : '';
+            const newHpp = hppInput ? hppInput.value : '';
 
-                    const inputs = document.querySelectorAll('.physical-input');
-                    inputs.forEach((input) => {
-                        const lineId = input.dataset.lineId;
-                        if (draft[lineId] && draft[lineId].physical_qty !== undefined) {
-                            input.value = draft[lineId].physical_qty;
-                        }
-                    });
-
-                    const noteInputs = document.querySelectorAll('.note-input');
-                    noteInputs.forEach((input) => {
-                        const name = input.getAttribute('name');
-                        const match = name.match(/lines\[(\d+)]\[notes]/);
-                        if (!match) return;
-                        const lineId = match[1];
-                        if (draft[lineId] && draft[lineId].notes !== undefined) {
-                            input.value = draft[lineId].notes;
-                        }
-                    });
-
-                } catch (e) {
-                    console.warn('Gagal load draft opname:', e);
-                }
-            }
-
-            function recalcLine(lineId) {
-                const row = document.querySelector('tr[data-line-id="' + lineId + '"]');
-                if (!row) return;
-
-                const systemSpan = row.querySelector('.system-qty');
-                const systemQty = parseFloat(systemSpan?.dataset.systemQty ?? '0') || 0;
-                const physicalInput = row.querySelector('.physical-input');
-                const diffDisplay = row.querySelector('.diff-display');
-                const diffInput = row.querySelector('.diff-input');
-
-                const physical = parseFloat(physicalInput.value);
-                if (isNaN(physical)) {
-                    diffDisplay.textContent = '-';
-                    diffDisplay.classList.remove('diff-plus', 'diff-minus');
-                    diffInput.value = '';
-                    return;
-                }
-
-                const diff = physical - systemQty;
-                diffInput.value = diff.toFixed(2);
-
-                let displayText = diff.toFixed(2);
-                if (diff > 0) {
-                    displayText = '+' + displayText;
-                }
-
-                diffDisplay.textContent = displayText;
-                diffDisplay.classList.remove('diff-plus', 'diff-minus');
-                if (diff > 0) {
-                    diffDisplay.classList.add('diff-plus');
-                } else if (diff < 0) {
-                    diffDisplay.classList.add('diff-minus');
-                }
-            }
-
-            function updateCountedSummary() {
-                const inputs = document.querySelectorAll('.physical-input');
-                let total = 0;
-                let filled = 0;
-
-                inputs.forEach((input) => {
-                    total++;
-                    if (input.value !== '' && !isNaN(parseFloat(input.value))) {
-                        filled++;
-                    }
+            // Cek duplikat → gunakan modal mini
+            if (!skipDuplicateCheck && existingIds.has(itemId)) {
+                openDuplicateModal({
+                    itemId,
+                    newQty,
+                    newHpp,
+                    addForm,
+                    existingIds,
+                    updateExistingInput,
+                    itemInput
                 });
-
-                if (countedSummaryEl) {
-                    countedSummaryEl.textContent = filled + ' / ' + total + ' item sudah diisi';
-                }
+                return;
             }
 
-            function saveDraft() {
-                try {
-                    const draft = {};
-                    const physicalInputs = document.querySelectorAll('.physical-input');
-                    physicalInputs.forEach((input) => {
-                        const lineId = input.dataset.lineId;
-                        if (!draft[lineId]) draft[lineId] = {};
-                        draft[lineId].physical_qty = input.value;
-                    });
+            const formData = new FormData(addForm);
 
-                    const noteInputs = document.querySelectorAll('.note-input');
-                    noteInputs.forEach((input) => {
-                        const name = input.getAttribute('name');
-                        const match = name.match(/lines\[(\d+)]\[notes]/);
-                        if (!match) return;
-                        const lineId = match[1];
-                        if (!draft[lineId]) draft[lineId] = {};
-                        draft[lineId].notes = input.value;
-                    });
-
-                    localStorage.setItem(STORAGE_KEY, JSON.stringify(draft));
-
-                    if (autosaveStatusEl) {
-                        autosaveStatusEl.innerHTML =
-                            '<span><span class="autosave-dot"></span>Draft tersimpan (local)</span>';
+            fetch(addForm.action, {
+                    method: 'POST',
+                    headers: {
+                        'X-CSRF-TOKEN': getCsrfToken(),
+                        'X-Requested-With': 'XMLHttpRequest',
+                        'Accept': 'application/json',
+                    },
+                    body: formData,
+                })
+                .then(async (response) => {
+                    if (!response.ok) {
+                        let msg = 'Gagal menyimpan item.';
+                        try {
+                            const data = await response.json();
+                            if (data?.message) {
+                                msg = data.message;
+                            } else if (data?.errors) {
+                                const firstKey = Object.keys(data.errors)[0];
+                                msg = data.errors[firstKey][0] ?? msg;
+                            }
+                        } catch (e) {}
+                        alert(msg);
+                        return null;
                     }
-                } catch (e) {
-                    console.warn('Gagal simpan draft opname:', e);
-                    if (autosaveStatusEl) {
-                        autosaveStatusEl.textContent = 'Draft tidak dapat disimpan (localStorage error)';
+                    return response.json();
+                })
+                .then((data) => {
+                    if (!data) return;
+                    if (data.status === 'ok') {
+                        // Reload supaya tabel & summary ke-refresh
+                        window.location.reload();
+                    } else {
+                        alert(data.message || 'Gagal menyimpan item.');
                     }
-                }
+                })
+                .catch(() => {
+                    alert('Terjadi kesalahan saat menyimpan item.');
+                });
+        }
+
+        function openDuplicateModal(ctx) {
+            const {
+                itemId,
+                newQty,
+                newHpp,
+                addForm,
+                existingIds,
+                updateExistingInput,
+                itemInput
+            } = ctx;
+
+            const backdrop = document.getElementById('duplicate-modal');
+            if (!backdrop) return;
+
+            const row = document.querySelector('tr[data-item-id="' + itemId + '"]');
+            let itemLabel = 'Item ID ' + itemId;
+            let oldQty = '-';
+            let oldHpp = '-';
+
+            if (row) {
+                const code = row.dataset.itemCode || '';
+                const name = row.dataset.itemName || '';
+                itemLabel = code + (name ? ' — ' + name : '');
+                oldQty = row.dataset.existingQty ?? '-';
+                oldHpp = row.dataset.existingHpp ?? '-';
             }
 
-            function setupListeners() {
-                const physicalInputs = document.querySelectorAll('.physical-input');
-                physicalInputs.forEach((input) => {
-                    // auto-select isi saat fokus, supaya gampang overwrite
-                    input.addEventListener('focus', function() {
-                        // delay sedikit biar aman di mobile/iOS
-                        const el = this;
-                        setTimeout(function() {
-                            el.select();
-                        }, 10);
-                    });
+            const numOrDash = (v) => {
+                if (v === '' || v === null || typeof v === 'undefined') return '-';
+                const n = parseFloat(String(v).replace(',', '.'));
+                if (isNaN(n)) return v;
+                return n.toFixed(2);
+            };
 
-                    input.addEventListener('input', function() {
-                        const lineId = this.dataset.lineId;
-                        recalcLine(lineId);
-                        updateCountedSummary();
-                        saveDraft();
-                    });
-                });
+            document.getElementById('dup-item-label').textContent = itemLabel;
+            document.getElementById('dup-old-qty').textContent = numOrDash(oldQty);
+            document.getElementById('dup-old-hpp').textContent = numOrDash(oldHpp);
+            document.getElementById('dup-new-qty').textContent = numOrDash(newQty);
+            document.getElementById('dup-new-hpp').textContent = numOrDash(newHpp);
 
-                const noteInputs = document.querySelectorAll('.note-input');
-                noteInputs.forEach((input) => {
-                    input.addEventListener('input', function() {
-                        saveDraft();
-                    });
-                });
+            backdrop.style.display = 'flex';
 
-                if (clearDraftBtn) {
-                    clearDraftBtn.addEventListener('click', function() {
-                        if (!confirm('Hapus draft yang tersimpan di browser untuk sesi opname ini?')) {
-                            return;
-                        }
-                        localStorage.removeItem(STORAGE_KEY);
+            const confirmBtn = document.getElementById('dup-confirm-update');
+            const cancelBtn = document.getElementById('dup-cancel');
 
-                        const physicalInputs = document.querySelectorAll('.physical-input');
-                        physicalInputs.forEach((input) => {
-                            input.value = '';
-                        });
-
-                        const diffDisplays = document.querySelectorAll('.diff-display');
-                        const diffInputs = document.querySelectorAll('.diff-input');
-                        diffDisplays.forEach((el) => {
-                            el.textContent = '-';
-                            el.classList.remove('diff-plus', 'diff-minus');
-                        });
-                        diffInputs.forEach((el) => {
-                            el.value = '';
-                        });
-
-                        updateCountedSummary();
-
-                        if (autosaveStatusEl) {
-                            autosaveStatusEl.textContent = 'Draft dihapus dari browser';
-                        }
-                    });
-                }
-
-                // Kalau user klik "Simpan & Tandai Selesai Counting" → hapus draft lokal
-                if (markReviewedBtn) {
-                    markReviewedBtn.addEventListener('click', function() {
-                        localStorage.removeItem(STORAGE_KEY);
-                    });
-                }
-
-                // Submit biasa: biarkan draft tetap ada (jaga-jaga)
+            function closeModal() {
+                backdrop.style.display = 'none';
+                confirmBtn.removeEventListener('click', onConfirm);
+                cancelBtn.removeEventListener('click', onCancel);
             }
 
-            // Init
-            loadDraft();
-            document.querySelectorAll('.physical-input').forEach((input) => {
-                if (input.value !== '') {
-                    recalcLine(input.dataset.lineId);
+            function onConfirm() {
+                if (updateExistingInput) {
+                    updateExistingInput.value = '1';
                 }
+                closeModal();
+                // submit lagi tapi skip cek duplikat
+                submitOpeningFormAjax(addForm, existingIds, updateExistingInput, itemInput, true);
+            }
+
+            function onCancel() {
+                closeModal();
+            }
+
+            confirmBtn.addEventListener('click', onConfirm);
+            cancelBtn.addEventListener('click', onCancel);
+        }
+
+        function initDeleteLineAjax() {
+            const tableWrap = document.getElementById('opname-lines-table');
+            if (!tableWrap) return;
+
+            const urlTemplate = tableWrap.dataset.deleteUrlTemplate;
+            if (!urlTemplate) return;
+
+            tableWrap.querySelectorAll('.js-delete-line').forEach(btn => {
+                btn.addEventListener('click', function() {
+                    const lineId = this.dataset.lineId || this.closest('tr')?.dataset.lineId;
+                    if (!lineId) return;
+
+                    if (!confirm('Hapus baris ini dari sesi opname?')) {
+                        return;
+                    }
+
+                    const url = urlTemplate.replace('__LINE_ID__', lineId);
+
+                    fetch(url, {
+                            method: 'POST',
+                            headers: {
+                                'X-CSRF-TOKEN': getCsrfToken(),
+                                'X-Requested-With'
+                                X: 'XMLHttpRequest',
+                                'Accept': 'application/json',
+                            },
+                            body: new URLSearchParams({
+                                '_method': 'DELETE',
+                            }),
+                        })
+                        .then(async (response) => {
+                            if (!response.ok) {
+                                let msg = 'Gagal menghapus item.';
+                                try {
+                                    const data = await response.json();
+                                    if (data?.message) msg = data.message;
+                                } catch (e) {}
+                                alert(msg);
+                                return null;
+                            }
+                            return response.json();
+                        })
+                        .then((data) => {
+                            if (!data) return;
+                            if (data.status === 'ok') {
+                                const tr = btn.closest('tr');
+                                if (tr) tr.remove();
+                            } else {
+                                alert(data.message || 'Gagal menghapus item.');
+                            }
+                        })
+                        .catch(() => {
+                            alert('Terjadi kesalahan saat menghapus item.');
+                        });
+                });
             });
-            updateCountedSummary();
-            setupListeners();
-        })();
+        }
     </script>
 @endpush
