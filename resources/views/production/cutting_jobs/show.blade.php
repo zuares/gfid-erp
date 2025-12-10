@@ -58,8 +58,8 @@
         }
 
         /* ============================
-                   STATUS STEPPER DINAMIS
-               ============================ */
+                       STATUS STEPPER DINAMIS
+                   ============================ */
         .status-stepper {
             display: flex;
             align-items: center;
@@ -129,8 +129,8 @@
         }
 
         /* ============================
-                   DESKTOP ACTIONS STYLING
-               ============================ */
+                       DESKTOP ACTIONS STYLING
+                   ============================ */
         .cutting-actions-desktop .btn {
             border-radius: 999px;
         }
@@ -159,11 +159,118 @@
         }
 
         /* ============================
-                   MOBILE ACTIONS BAWAH
-               ============================ */
+                       MOBILE ACTIONS BAWAH
+                   ============================ */
         @media (max-width: 767.98px) {
             .cutting-mobile-actions .btn {
                 border-radius: 999px;
+            }
+        }
+
+        /* ============================
+                       BUNDLE INFO PILLS
+                   ============================ */
+        .bundle-info-pill {
+            font-size: .72rem;
+            font-weight: 700;
+            border-radius: 999px;
+            padding: .16rem .55rem .18rem;
+            box-shadow:
+                0 1px 2px rgba(0, 0, 0, .08),
+                inset 0 0 0 1px rgba(148, 163, 184, .25);
+            background: var(--card);
+            letter-spacing: .18px;
+        }
+
+        body[data-theme="dark"] .bundle-info-pill {
+            background: rgba(15, 23, 42, 0.96);
+            border-color: rgba(59, 130, 246, 0.35);
+        }
+
+        .pill-primary {
+            color: #2563eb;
+        }
+
+        .pill-warning {
+            color: #d97706;
+        }
+
+        .pill-success {
+            color: #059669;
+        }
+
+        .bundle-info-wrap {
+            display: inline-flex;
+            flex-wrap: wrap;
+            gap: .25rem;
+        }
+
+        @media (max-width: 767.98px) {
+            .bundle-info-mobile {
+                font-size: .72rem;
+                color: var(--muted);
+            }
+        }
+
+        /* ============================
+                       BUNDLE PROGRESS BAR
+                   ============================ */
+        .bundle-progress {
+            margin-top: .18rem;
+        }
+
+        .bundle-progress-bar {
+            position: relative;
+            width: 100%;
+            max-width: 220px;
+            height: 6px;
+            border-radius: 999px;
+            background: rgba(148, 163, 184, 0.35);
+            overflow: hidden;
+        }
+
+        .bp-picked,
+        .bp-ready {
+            position: absolute;
+            top: 0;
+            bottom: 0;
+            left: 0;
+        }
+
+        .bp-picked {
+            background: linear-gradient(to right, #facc15, #eab308);
+            opacity: .85;
+        }
+
+        .bp-ready {
+            background: linear-gradient(to right, #22c55e, #16a34a);
+            opacity: .95;
+        }
+
+        .bundle-progress-legend {
+            font-size: .68rem;
+            color: var(--muted);
+        }
+
+        .legend-box {
+            display: inline-block;
+            width: 10px;
+            height: 6px;
+            border-radius: 999px;
+            margin-right: .2rem;
+        }
+
+        .legend-picked {
+            background: #eab308;
+        }
+
+        .legend-ready {
+            background: #16a34a;
+        }
+
+        @media (max-width: 767.98px) {
+            .bundle-progress-bar {
+                max-width: 100%;
             }
         }
     </style>
@@ -548,6 +655,7 @@
                                 <th style="width:110px;">Cutting (Qty)</th>
                                 <th style="width:110px;">Cutting (Reject)</th>
                                 <th style="width:110px;">Cutting (Ok)</th>
+                                <th style="width:260px;">WIP / Sewing</th>
                             </tr>
                         @else
                             <tr>
@@ -556,7 +664,7 @@
                                 <th style="width:160px;">Item Jadi</th>
                                 <th style="width:110px;">Qty (pcs)</th>
                                 <th style="width:140px;">Qty Used Fabric</th>
-                                <th style="width:140px;">Operator Cutting</th>
+                                <th style="width:260px;">WIP / Sewing</th>
                             </tr>
                         @endif
                     </thead>
@@ -566,6 +674,32 @@
                                 $qc = null;
                                 if ($hasQcCutting) {
                                     $qc = $row->qcResults->where('stage', 'cutting')->sortByDesc('qc_date')->first();
+                                }
+
+                                $wip = (float) ($row->wip_qty ?? 0);
+                                $picked = (float) ($row->sewing_picked_qty ?? 0);
+
+                                // gunakan accessor kalau ada, fallback ke qc/qty_pcs
+                                $qtyOkAccessor = $row->qty_cutting_ok ?? null;
+                                if ($qtyOkAccessor === null) {
+                                    $qtyOkAccessor = $qc?->qty_ok ?? ($row->qty_pcs ?? 0);
+                                }
+                                $qtyOk = (float) $qtyOkAccessor;
+
+                                $readyAccessor = $row->qty_ready_for_sewing ?? null;
+                                if ($readyAccessor === null) {
+                                    $readyAccessor = max(0, min($qtyOk, $wip) - $picked);
+                                }
+                                $ready = (float) $readyAccessor;
+
+                                $basis = max($qtyOk, $wip, $picked, $ready);
+
+                                if ($basis <= 0) {
+                                    $pickedPercent = 0;
+                                    $readyPercent = 0;
+                                } else {
+                                    $pickedPercent = max(0, min(100, ($picked / $basis) * 100));
+                                    $readyPercent = max(0, min(100, ($ready / $basis) * 100));
                                 }
                             @endphp
 
@@ -581,6 +715,40 @@
                                     <td>
                                         {{ $qc ? number_format($qc->qty_ok ?? 0, 2, ',', '.') : '0,00' }}
                                     </td>
+                                    <td>
+                                        <div class="bundle-info-wrap mb-1">
+                                            <span class="bundle-info-pill pill-primary">
+                                                WIP {{ number_format($wip, 2, ',', '.') }}
+                                            </span>
+                                            <span class="bundle-info-pill pill-warning">
+                                                Picked {{ number_format($picked, 2, ',', '.') }}
+                                            </span>
+                                            <span class="bundle-info-pill pill-success">
+                                                Ready {{ number_format($ready, 2, ',', '.') }}
+                                            </span>
+                                        </div>
+
+                                        @if ($basis > 0)
+                                            <div class="bundle-progress">
+                                                <div class="bundle-progress-bar">
+                                                    <div class="bp-picked"
+                                                        style="width: {{ number_format($pickedPercent, 2, '.', '') }}%;">
+                                                    </div>
+                                                    <div class="bp-ready"
+                                                        style="width: {{ number_format($readyPercent, 2, '.', '') }}%;">
+                                                    </div>
+                                                </div>
+                                                <div class="bundle-progress-legend mt-1">
+                                                    <span class="me-2">
+                                                        <span class="legend-box legend-picked"></span>Picked
+                                                    </span>
+                                                    <span>
+                                                        <span class="legend-box legend-ready"></span>Ready
+                                                    </span>
+                                                </div>
+                                            </div>
+                                        @endif
+                                    </td>
                                 </tr>
                             @else
                                 <tr>
@@ -590,13 +758,44 @@
                                     <td>{{ number_format($row->qty_pcs, 2, ',', '.') }}</td>
                                     <td>{{ number_format($row->qty_used_fabric ?? 0, 2, ',', '.') }}</td>
                                     <td>
-                                        {{ $row->operator?->code ? $row->operator->code . ' — ' . $row->operator->name : '-' }}
+                                        <div class="bundle-info-wrap mb-1">
+                                            <span class="bundle-info-pill pill-primary">
+                                                WIP {{ number_format($wip, 2, ',', '.') }}
+                                            </span>
+                                            <span class="bundle-info-pill pill-warning">
+                                                Picked {{ number_format($picked, 2, ',', '.') }}
+                                            </span>
+                                            <span class="bundle-info-pill pill-success">
+                                                Ready {{ number_format($ready, 2, ',', '.') }}
+                                            </span>
+                                        </div>
+
+                                        @if ($basis > 0)
+                                            <div class="bundle-progress">
+                                                <div class="bundle-progress-bar">
+                                                    <div class="bp-picked"
+                                                        style="width: {{ number_format($pickedPercent, 2, '.', '') }}%;">
+                                                    </div>
+                                                    <div class="bp-ready"
+                                                        style="width: {{ number_format($readyPercent, 2, '.', '') }}%;">
+                                                    </div>
+                                                </div>
+                                                <div class="bundle-progress-legend mt-1">
+                                                    <span class="me-2">
+                                                        <span class="legend-box legend-picked"></span>Picked
+                                                    </span>
+                                                    <span>
+                                                        <span class="legend-box legend-ready"></span>Ready
+                                                    </span>
+                                                </div>
+                                            </div>
+                                        @endif
                                     </td>
                                 </tr>
                             @endif
                         @empty
                             <tr>
-                                <td colspan="{{ $hasQcCutting ? 6 : 6 }}" class="text-center text-muted small">
+                                <td colspan="{{ $hasQcCutting ? 7 : 6 }}" class="text-center text-muted small">
                                     Belum ada data bundle.
                                 </td>
                             </tr>
@@ -639,12 +838,56 @@
                                 if ($hasQcCutting) {
                                     $qc = $row->qcResults->where('stage', 'cutting')->sortByDesc('qc_date')->first();
                                 }
+
+                                $wipM = (float) ($row->wip_qty ?? 0);
+                                $pickedM = (float) ($row->sewing_picked_qty ?? 0);
+
+                                $qtyOkAccM = $row->qty_cutting_ok ?? null;
+                                if ($qtyOkAccM === null) {
+                                    $qtyOkAccM = $qc?->qty_ok ?? ($row->qty_pcs ?? 0);
+                                }
+                                $qtyOkM = (float) $qtyOkAccM;
+
+                                $readyAccM = $row->qty_ready_for_sewing ?? null;
+                                if ($readyAccM === null) {
+                                    $readyAccM = max(0, min($qtyOkM, $wipM) - $pickedM);
+                                }
+                                $readyM = (float) $readyAccM;
+
+                                $basisM = max($qtyOkM, $wipM, $pickedM, $readyM);
+
+                                if ($basisM <= 0) {
+                                    $pickedPercentM = 0;
+                                    $readyPercentM = 0;
+                                } else {
+                                    $pickedPercentM = max(0, min(100, ($pickedM / $basisM) * 100));
+                                    $readyPercentM = max(0, min(100, ($readyM / $basisM) * 100));
+                                }
                             @endphp
 
                             @if ($hasQcCutting)
                                 <tr class="{{ ($qc?->qty_reject ?? 0) > 0 ? 'table-danger-subtle' : '' }}">
                                     <td>{{ $row->bundle_no }}</td>
-                                    <td>{{ $row->finishedItem?->code ?? '-' }}</td>
+                                    <td>
+                                        {{ $row->finishedItem?->code ?? '-' }}
+                                        <div class="bundle-info-mobile mt-1">
+                                            WIP {{ number_format($wipM, 0, ',', '.') }}
+                                            • Pick {{ number_format($pickedM, 0, ',', '.') }}
+                                            • Ready {{ number_format($readyM, 0, ',', '.') }}
+                                        </div>
+                                        @if ($basisM > 0)
+                                            <div class="bundle-progress mt-1">
+                                                <div class="bundle-progress-bar">
+                                                    <div class="bp-picked"
+                                                        style="width: {{ number_format($pickedPercentM, 2, '.', '') }}%;">
+                                                    </div>
+                                                    <div class="bp-ready"
+                                                        style="width: {{ number_format($readyPercentM, 2, '.', '') }}%;">
+                                                    </div>
+                                                </div>
+                                            </div>
+                                        @endif
+                                    </td>
                                     <td>{{ $qc ? number_format($qc->qty_ok ?? 0, 0, ',', '.') : '0' }}</td>
                                     <td class="{{ ($qc?->qty_reject ?? 0) > 0 ? 'text-danger fw-semibold' : '' }}">
                                         {{ $qc ? number_format($qc->qty_reject ?? 0, 0, ',', '.') : '0' }}
@@ -653,7 +896,26 @@
                             @else
                                 <tr>
                                     <td>{{ $row->bundle_no }}</td>
-                                    <td>{{ $row->finishedItem?->code ?? '-' }}</td>
+                                    <td>
+                                        {{ $row->finishedItem?->code ?? '-' }}
+                                        <div class="bundle-info-mobile mt-1">
+                                            WIP {{ number_format($wipM, 0, ',', '.') }}
+                                            • Pick {{ number_format($pickedM, 0, ',', '.') }}
+                                            • Ready {{ number_format($readyM, 0, ',', '.') }}
+                                        </div>
+                                        @if ($basisM > 0)
+                                            <div class="bundle-progress mt-1">
+                                                <div class="bundle-progress-bar">
+                                                    <div class="bp-picked"
+                                                        style="width: {{ number_format($pickedPercentM, 2, '.', '') }}%;">
+                                                    </div>
+                                                    <div class="bp-ready"
+                                                        style="width: {{ number_format($readyPercentM, 2, '.', '') }}%;">
+                                                    </div>
+                                                </div>
+                                            </div>
+                                        @endif
+                                    </td>
                                     <td>{{ number_format($row->qty_pcs, 0, ',', '.') }}</td>
                                 </tr>
                             @endif
@@ -713,5 +975,5 @@
 @endsection
 
 @push('scripts')
-    {{-- Tidak perlu JS khusus untuk aksi mobile, tombol langsung submit --}}
+    {{-- Tidak perlu JS khusus --}}
 @endpush

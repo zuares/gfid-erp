@@ -2,6 +2,7 @@
 
 namespace App\Console\Commands;
 
+use App\Support\SqlitePath;
 use Illuminate\Console\Command;
 use Illuminate\Support\Facades\File;
 
@@ -12,10 +13,10 @@ class RestoreDatabase extends Command
 
     public function handle(): int
     {
-        $backupDir = storage_path('backups');
+        $backupDir = SqlitePath::backupDir();
 
         if (!File::exists($backupDir)) {
-            $this->error("Folder backup tidak ditemukan: $backupDir");
+            $this->error("Folder backup tidak ditemukan: {$backupDir}");
             return self::FAILURE;
         }
 
@@ -35,11 +36,11 @@ class RestoreDatabase extends Command
         $this->info("📦 File backup terbaru:");
         $this->info("→ " . $latest->getFilename());
 
-        $dbPath = database_path('database.sqlite');
+        $dbPath = SqlitePath::current();
 
         // Safety backup sebelum overwrite
         if (File::exists($dbPath)) {
-            $safety = storage_path('backups/before_restore_' . now()->format('Ymd_His') . '.sqlite');
+            $safety = $backupDir . '/before_restore_' . now()->format('Ymd_His') . '.sqlite';
             File::copy($dbPath, $safety);
             $this->info("✔ Database saat ini disimpan sebagai: " . basename($safety));
         }
@@ -47,7 +48,7 @@ class RestoreDatabase extends Command
         // Restore (overwrite)
         File::copy($latest->getRealPath(), $dbPath);
 
-        $this->info("🎉 Database berhasil direstore!");
+        $this->info("🎉 Database berhasil direstore ke: {$dbPath}");
         $this->call('optimize:clear');
 
         return self::SUCCESS;

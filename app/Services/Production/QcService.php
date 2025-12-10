@@ -4,7 +4,6 @@ namespace App\Services\Production;
 
 use App\Models\CuttingJob;
 use App\Models\CuttingJobBundle;
-use App\Models\CuttingJobLot;
 use App\Models\FinishingJob;
 use App\Models\QcResult;
 use App\Models\SewingJob;
@@ -33,60 +32,11 @@ class QcService
             $operatorId = $payload['operator_id'] ?? null;
             $rows = $payload['results'] ?? [];
 
-            $rmWarehouseId = $job->warehouse_id;
-            $wipCutWarehouseId = Warehouse::where('code', 'WIP-CUT')->value('id');
-
-            if (!$rmWarehouseId || !$wipCutWarehouseId) {
-                throw new \RuntimeException('Warehouse RM atau WIP-CUT belum dikonfigurasi.');
-            }
-
             /** @var \Illuminate\Support\Collection<int, CuttingJobBundle> $bundleMap */
             $bundleMap = $job->bundles()->get()->keyBy('id');
 
-            $totalOkByFinishedItem = []; // [finished_item_id => total qty ok]
             $hasAnyOk = false;
-
-            // ===================================================
-            // 0) UPDATE used_fabric_qty PER cutting_job_lot (JIKA
-            //     DIKIRIM DARI FORM QC)
-            // payload['lots'][] contoh:
-            // [
-            //   'id'              => cutting_job_lot_id,
-            //   'used_fabric_qty' => '12.5',
-            // ]
-            // ===================================================
-            $lotsPayload = $payload['lots'] ?? null;
-            if (is_array($lotsPayload) && !empty($lotsPayload)) {
-                $jobLotsMap = $job->lots()->get()->keyBy('id');
-
-                foreach ($lotsPayload as $lotRow) {
-                    $jobLotId = (int) ($lotRow['id'] ?? $lotRow['cutting_job_lot_id'] ?? 0);
-                    if ($jobLotId <= 0) {
-                        continue;
-                    }
-
-                    /** @var CuttingJobLot|null $jobLot */
-                    $jobLot = $jobLotsMap->get($jobLotId);
-                    if (!$jobLot) {
-                        continue;
-                    }
-
-                    $usedQty = $this->num($lotRow['used_fabric_qty'] ?? $lotRow['qty_used'] ?? 0);
-                    dd($usedQty);
-                    if ($usedQty < 0) {
-                        $usedQty = 0;
-                    }
-
-                    // Kalau 0, biarkan saja (nanti fallback ke planned_fabric_qty)
-                    if ($usedQty > 0) {
-                        $jobLot->used_fabric_qty = $usedQty;
-                        $jobLot->save();
-                    }
-                }
-
-                // refresh relasi
-                $job->load('lots.lot');
-            }
+            $totalOkByFinishedItem = []; // [finished_item_id => total qty ok] (kalau suatu saat mau dipakai HPP / report)
 
             // ===========================
             // 1) PROCESS QC PER BUNDLE
@@ -111,11 +61,11 @@ class QcService
                 if ($qtyOk < 0) {
                     $qtyOk = 0;
                 }
-
                 if ($qtyReject < 0) {
                     $qtyReject = 0;
                 }
 
+                // Jaga-jaga biar tidak lebih dari qty bundle
                 if ($qtyOk + $qtyReject > $bundleQty) {
                     $diff = ($qtyOk + $qtyReject) - $bundleQty;
 
@@ -128,6 +78,7 @@ class QcService
 
                 $status = $this->resolveBundleStatus($qtyOk, $qtyReject, $bundleQty);
 
+                // Simpan ke qc_results
                 QcResult::updateOrCreate(
                     [
                         'stage' => QcResult::STAGE_CUTTING,
@@ -145,6 +96,7 @@ class QcService
                     ],
                 );
 
+                // Update ke bundle
                 $bundle->qty_qc_ok = $qtyOk;
                 $bundle->qty_qc_reject = $qtyReject;
                 $bundle->status = $status;
@@ -158,130 +110,15 @@ class QcService
                 }
             }
 
+            // Di pattern baru:
+            // - RM OUT sudah dilakukan di CuttingService::create() (consumeFabricFromLots)
+            // - WIP-CUT IN akan dilakukan terpisah (di CuttingService::createWipFromCuttingQc)
+            //   setelah QC selesai, dipanggil dari controller.
+            // Jadi di sini TIDAK ADA lagi mutasi stok.
+
             if (!$hasAnyOk) {
-                // Tidak ada qty OK → tidak usah mutasi stok
+                // Tidak ada qty OK → tidak akan dibuat WIP nantinya, tapi tidak error.
                 return;
-            }
-
-            // ===========================
-            // 2) MULTI-LOT RM → WIP-CUT
-            // ===========================
-
-            // Ambil semua LOT yang terdaftar di cutting_job_lots
-            $jobLots = CuttingJobLot::query()
-                ->with('lot')
-                ->where('cutting_job_id', $job->id)
-                ->get();
-
-            if ($jobLots->isEmpty()) {
-                // fallback: kalau belum pakai pivot, pakai header lot_id
-                $singleLot = $job->lot;
-                if (!$singleLot) {
-                    throw new \RuntimeException("Cutting job {$job->code} tidak punya LOT terhubung.");
-                }
-
-                // bikin object "virtual" mirip CuttingJobLot
-                $virtual = new CuttingJobLot();
-                $virtual->lot_id = $singleLot->id;
-                $virtual->planned_fabric_qty = 0; // tidak tahu rencana → treat 0
-                $virtual->used_fabric_qty = 0;
-                $virtual->setRelation('lot', $singleLot);
-
-                $jobLots = collect([$virtual]);
-            }
-
-            $totalOkAll = array_sum($totalOkByFinishedItem);
-            $totalRmCost = 0.0;
-            $totalRmQty = 0.0;
-
-            // 2.a OUT dari semua LOT kain yang dipakai job ini
-            foreach ($jobLots as $jobLot) {
-                $lot = $jobLot->lot;
-                if (!$lot) {
-                    continue;
-                }
-
-                $lotId = $lot->id;
-                $itemId = $lot->item_id;
-
-                // qty yang dipakai job ini:
-                // pakai used_fabric_qty jika > 0, kalau tidak fallback planned_fabric_qty
-                $qtyUsed = (float) ($jobLot->used_fabric_qty ?? 0);
-                if ($qtyUsed <= 0) {
-                    $qtyUsed = (float) ($jobLot->planned_fabric_qty ?? 0);
-                }
-
-                if ($qtyUsed <= 0) {
-                    continue;
-                }
-
-                // cek saldo LOT di gudang RM
-                $saldoLot = $this->inventory->getLotBalance($rmWarehouseId, $itemId, $lotId);
-                if ($saldoLot <= 0) {
-                    continue;
-                }
-
-                // jaga-jaga: jangan OUT lebih besar dari saldo
-                $qtyForOut = min($qtyUsed, $saldoLot);
-
-                // ambil avg cost per unit untuk LOT ini
-                $unitCostLot = $this->inventory->getLotMovingAverageUnitCost(
-                    warehouseId: $rmWarehouseId,
-                    itemId: $itemId,
-                    lotId: $lotId,
-                );
-
-                if ($unitCostLot === null) {
-                    $unitCostLot = 0.0;
-                }
-
-                $lineCost = $unitCostLot * $qtyForOut;
-
-                // akumulasi total cost & qty
-                $totalRmQty += $qtyForOut;
-                $totalRmCost += $lineCost;
-
-                // Stock OUT kain dari gudang RM per LOT
-                $this->inventory->stockOut(
-                    warehouseId: $rmWarehouseId,
-                    itemId: $itemId,
-                    qty: $qtyForOut,
-                    date: $qcDate,
-                    sourceType: 'cutting_qc_out',
-                    sourceId: $job->id,
-                    notes: "QC Cutting OUT {$qtyForOut} kain LOT {$lot->code} untuk job {$job->code}",
-                    allowNegative: false,
-                    lotId: $lotId,
-                    // unit_cost pakai LotCost/moving average internal
-                );
-            }
-
-            if ($totalRmQty <= 0 || $totalRmCost <= 0 || $totalOkAll <= 0) {
-                // tidak ada kain yang benar-benar keluar → STOP di sini
-                return;
-            }
-
-            // HPP RM per pcs FG (weighted average across LOT)
-            $rmUnitCostPerPcs = $totalRmCost / $totalOkAll;
-
-            // 2.b IN WIP-CUT untuk tiap finished_item
-            foreach ($totalOkByFinishedItem as $finishedItemId => $qtyOkItem) {
-                if ($qtyOkItem <= 0) {
-                    continue;
-                }
-
-                $this->inventory->stockIn(
-                    warehouseId: $wipCutWarehouseId,
-                    itemId: $finishedItemId,
-                    qty: $qtyOkItem,
-                    date: $qcDate,
-                    sourceType: 'cutting_qc_in',
-                    sourceId: $job->id,
-                    notes: "QC Cutting IN WIP-CUT {$qtyOkItem} pcs untuk job {$job->code}",
-                    lotId: null,
-                    unitCost: $rmUnitCostPerPcs,
-                    affectLotCost: false,
-                );
             }
         });
     }
@@ -495,7 +332,22 @@ class QcService
             /** @var \Illuminate\Support\Collection<int, CuttingJobBundle> $bundleMap */
             $bundleMap = $job->bundles()->get()->keyBy('id');
 
-            $totalOkByItem = []; // [finished_item_id => total qty OK finishing]
+            // ===========================
+            // 0) WAREHOUSE SETUP
+            // ===========================
+            $wipFinWarehouseId = Warehouse::where('code', 'WIP-FIN')->value('id');
+            $fgWarehouseId = Warehouse::where('code', 'FG')->value('id'); // gudang FG
+            $rejFinWarehouseId = Warehouse::where('code', 'REJ-FIN')->value('id'); // gudang reject finishing
+
+            if (!$wipFinWarehouseId || !$fgWarehouseId || !$rejFinWarehouseId) {
+                throw new \RuntimeException(
+                    'Warehouse WIP-FIN / FG / REJ-FIN belum dikonfigurasi di master gudang.'
+                );
+            }
+
+            $totalProcessedByItem = []; // [item_id => (OK + Reject)]
+            $totalOkByItem = []; // [item_id => total OK]
+            $totalRejectByItem = []; // [item_id => total Reject]
             $hasAnyMovement = false;
 
             foreach ($rows as $row) {
@@ -511,6 +363,7 @@ class QcService
                     continue;
                 }
 
+                // base qty finishing dari hasil sewing ok
                 $bundleQty = (float) ($bundle->qty_sewing_ok ?? 0);
 
                 $qtyOk = (float) ($row['qty_ok'] ?? 0);
@@ -537,6 +390,7 @@ class QcService
                 $rejectReason = $row['reject_reason'] ?? null;
                 $notes = $row['notes'] ?? null;
 
+                // SIMPAN QC (stage finishing)
                 $this->upsertBundleQc(
                     stage: QcResult::STAGE_FINISHING,
                     bundle: $bundle,
@@ -552,27 +406,117 @@ class QcService
                     finishingJobId: $job->id,
                 );
 
-                // akumulasi qty OK per item untuk HPP RM-only
-                if ($bundle->finished_item_id && $qtyOk > 0) {
+                // update info finishing di bundle (opsional tapi enak buat reporting)
+                $bundle->qty_finishing_ok = $qtyOk;
+                $bundle->qty_finishing_reject = $qtyReject;
+                $bundle->status = $status;
+                $bundle->save();
+
+                // Akumulasi untuk mutasi stok
+                if ($bundle->finished_item_id) {
                     $itemId = $bundle->finished_item_id;
+                    $processedQty = $qtyOk + $qtyReject;
 
-                    $totalOkByItem[$itemId] =
-                        ($totalOkByItem[$itemId] ?? 0) + $qtyOk;
+                    if ($processedQty > 0) {
+                        $totalProcessedByItem[$itemId] =
+                            ($totalProcessedByItem[$itemId] ?? 0) + $processedQty;
+                        $hasAnyMovement = true;
+                    }
 
-                    $hasAnyMovement = true;
+                    if ($qtyOk > 0) {
+                        $totalOkByItem[$itemId] =
+                            ($totalOkByItem[$itemId] ?? 0) + $qtyOk;
+                    }
+
+                    if ($qtyReject > 0) {
+                        $totalRejectByItem[$itemId] =
+                            ($totalRejectByItem[$itemId] ?? 0) + $qtyReject;
+                    }
                 }
             }
 
             if (!$hasAnyMovement) {
+                // tidak ada qty yang bergerak → langsung create HPP RM-only dan selesai
+                $this->finishingRmHpp->createRmOnlySnapshotsFromFinishing($job, $totalOkByItem);
                 return;
             }
 
-            // TODO:
-            // - OUT dari WIP-FIN
-            // - IN ke FG (OK) + REJ-FIN (reject)
-            //   (bisa kamu lengkapi nanti, tidak mengganggu HPP RM-only)
+            // ===========================
+            // 1) INVENTORY MOVEMENT
+            //    OUT: WIP-FIN
+            //    IN : FG (OK)
+            //    IN : REJ-FIN (Reject finishing)
+            // ===========================
+            $unitCostWipFinPerItem = [];
+            foreach (array_keys($totalProcessedByItem) as $itemId) {
+                $unit = $this->inventory->getItemIncomingUnitCost($wipFinWarehouseId, $itemId);
+                $unitCostWipFinPerItem[$itemId] = $unit > 0 ? $unit : null;
+            }
 
-            // 💥 AUTO HPP RM-only per FinishingJob (MULTI-LOT)
+            $movementDate = $qcDate;
+
+            // 1.a OUT dari WIP-FIN (OK + Reject)
+            foreach ($totalProcessedByItem as $itemId => $qtyProcessed) {
+                if ($qtyProcessed <= 0) {
+                    continue;
+                }
+
+                $this->inventory->stockOut(
+                    warehouseId: $wipFinWarehouseId,
+                    itemId: $itemId,
+                    qty: $qtyProcessed,
+                    date: $movementDate,
+                    sourceType: 'finishing_qc_out',
+                    sourceId: $job->id,
+                    notes: "QC Finishing OUT {$qtyProcessed} pcs dari WIP-FIN untuk job {$job->code}",
+                    allowNegative: false,
+                    lotId: null, // WIP tidak pakai LOT
+                    unitCostOverride: $unitCostWipFinPerItem[$itemId] ?? null,
+                    affectLotCost: false,
+                );
+            }
+
+            // 1.b IN ke FG (OK)
+            foreach ($totalOkByItem as $itemId => $qtyOkItem) {
+                if ($qtyOkItem <= 0) {
+                    continue;
+                }
+
+                $this->inventory->stockIn(
+                    warehouseId: $fgWarehouseId,
+                    itemId: $itemId,
+                    qty: $qtyOkItem,
+                    date: $movementDate,
+                    sourceType: 'finishing_qc_in_fg',
+                    sourceId: $job->id,
+                    notes: "QC Finishing IN FG {$qtyOkItem} pcs dari job {$job->code}",
+                    lotId: null,
+                    unitCost: $unitCostWipFinPerItem[$itemId] ?? null,
+                    affectLotCost: false,
+                );
+            }
+
+            // 1.c IN ke REJ-FIN (Reject finishing)
+            foreach ($totalRejectByItem as $itemId => $qtyRejectItem) {
+                if ($qtyRejectItem <= 0) {
+                    continue;
+                }
+
+                $this->inventory->stockIn(
+                    warehouseId: $rejFinWarehouseId,
+                    itemId: $itemId,
+                    qty: $qtyRejectItem,
+                    date: $movementDate,
+                    sourceType: 'finishing_qc_reject',
+                    sourceId: $job->id,
+                    notes: "QC Finishing REJECT {$qtyRejectItem} pcs dari job {$job->code}",
+                    lotId: null,
+                    unitCost: $unitCostWipFinPerItem[$itemId] ?? null,
+                    affectLotCost: false,
+                );
+            }
+
+            // 💥 AUTO HPP RM-only per FinishingJob (MULTI-LOT) — tetap jalan seperti sebelumnya
             $this->finishingRmHpp->createRmOnlySnapshotsFromFinishing($job, $totalOkByItem);
         });
     }

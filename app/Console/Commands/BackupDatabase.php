@@ -12,7 +12,7 @@ class BackupDatabase extends Command
 
     public function handle(): int
     {
-        $dbPath = database_path('database.sqlite');
+        $dbPath = config('database.connections.sqlite.database') ?? database_path('database.sqlite');
         $backupDir = storage_path('backups');
 
         if (!File::exists($dbPath)) {

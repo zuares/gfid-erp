@@ -40,4 +40,31 @@ class SewingPickupLine extends Model
         return $this->belongsTo(Employee::class, 'operator_id');
     }
 
+    public function getReturnedQtyAttribute()
+    {
+        return (float) ($this->sewingReturnLines()->sum('qty_ok') +
+            $this->sewingReturnLines()->sum('qty_reject'));
+    }
+
+    public function getStatusLabelAttribute()
+    {
+        $picked = (float) $this->qty_bundle;
+        $returned = (float) $this->returned_qty;
+
+        if ($returned <= 0) {
+            return 'belum';
+        }
+
+        if ($returned < $picked) {
+            return 'parsial';
+        }
+
+        return 'penuh'; // sudah disetor penuh
+    }
+
+    public function sewingReturnLines()
+    {
+        return $this->hasMany(\App\Models\SewingReturnLine::class, 'sewing_pickup_line_id');
+    }
+
 }

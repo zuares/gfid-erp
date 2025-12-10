@@ -6,6 +6,7 @@ use App\Http\Controllers\Controller;
 use App\Models\CuttingJob;
 use App\Models\QcResult;
 use App\Models\SewingReturn;
+use App\Services\Production\CuttingService;
 use App\Services\Production\QcService;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Auth;
@@ -14,6 +15,7 @@ class QcController extends Controller
 {
     public function __construct(
         protected QcService $qc,
+        protected CuttingService $cutting,
     ) {}
 
     /**
@@ -136,13 +138,11 @@ class QcController extends Controller
      */
     public function updateCutting(Request $request, CuttingJob $cuttingJob)
     {
-
         $validated = $request->validate([
             'qc_date' => ['required', 'date'],
             'operator_id' => ['nullable', 'exists:employees,id'],
 
             'results' => ['required', 'array', 'min:1'],
-
             'results.*.cutting_job_bundle_id' => ['required', 'exists:cutting_job_bundles,id'],
             'results.*.qty_ok' => ['nullable', 'numeric', 'min:0'],
             'results.*.qty_reject' => ['nullable', 'numeric', 'min:0'],
@@ -156,18 +156,23 @@ class QcController extends Controller
         }
 
         try {
-
-            // 🔥 SIMPAN QC + MUTASI STOK
+            // 1️⃣ SIMPAN QC (tanpa mutasi stok)
             $this->qc->saveCuttingQc($cuttingJob, $validated);
 
+            // 2️⃣ BUAT WIP-CUT dari hasil QC
+            //    (method ini ada di CuttingService versi yang tadi kita bikin)
+            $this->cutting->createWipFromCuttingQc(
+                job: $cuttingJob->fresh('bundles'),
+                qcDate: $validated['qc_date'],
+            );
+
         } catch (\Throwable $e) {
-            // Kalau ada error apa pun → balik ke form + tampilin pesan
             return back()
                 ->withInput()
                 ->with('error', 'QC gagal: ' . $e->getMessage());
         }
 
-        // Update status job → sudah QC
+        // 3️⃣ Update status job → sudah QC
         $cuttingJob->update([
             'status' => 'qc_done',
             'updated_by' => \Illuminate\Support\Facades\Auth::id(),
@@ -175,6 +180,7 @@ class QcController extends Controller
 
         return redirect()
             ->route('production.cutting_jobs.show', $cuttingJob)
-            ->with('success', 'QC Cutting berhasil disimpan.');
+            ->with('success', 'QC Cutting berhasil disimpan & WIP-CUT sudah dibuat.');
     }
+
 }

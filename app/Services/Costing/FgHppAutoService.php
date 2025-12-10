@@ -95,7 +95,27 @@ class FgHppAutoService
      *
      * Ini otomatis multi-LOT karena setiap bundle punya lot_id masing-masing.
      */
-    protected function calculateRmCostPerUnitFromCutting(
+    /**
+     * Hitung cost bahan baku per pcs (MULTI-LOT):
+     * - ambil CuttingJobBundle.finished_item_id = FG ini
+     * - filter CuttingJob.date di antara periode
+     * - pakai qty_used_fabric + lot avg cost (per LOT di gudang RM)
+     * - FG OK pakai qty_qc_ok (kalau ada > 0), fallback ke qty_cutting_ok / qty_pcs
+     * - rumus: Σ (unit_cost_LOT × qty_used_fabric_bundle) / Σ qty_FG_OK
+     *
+     * Ini otomatis multi-LOT karena setiap bundle punya lot_id masing-masing.
+     */
+    /**
+     * Hitung cost bahan baku per pcs (MULTI-LOT):
+     * - ambil CuttingJobBundle.finished_item_id = FG ini
+     * - filter CuttingJob.date di antara periode
+     * - pakai qty_used_fabric + lot avg cost (per LOT di gudang RM)
+     * - FG OK pakai qty_qc_ok (kalau ada > 0), fallback ke qty_cutting_ok / qty_pcs
+     * - rumus: Σ (unit_cost_LOT × qty_used_fabric_bundle) / Σ qty_FG_OK
+     *
+     * Ini otomatis multi-LOT karena setiap bundle punya lot_id masing-masing.
+     */
+    public function calculateRmCostPerUnitFromCutting(
         int $finishedItemId,
         string $dateFrom,
         string $dateTo,
@@ -123,8 +143,19 @@ class FgHppAutoService
                 continue;
             }
 
-            // qty FG OK → utamakan hasil QC Cutting
-            $fgOk = (float) ($bundle->qty_qc_ok ?? $bundle->qty_cutting_ok ?? $bundle->qty_pcs ?? 0);
+            // 🔁 FG OK: prioritas qty_qc_ok > qty_cutting_ok > qty_pcs
+            $qtyQcOk = (float) ($bundle->qty_qc_ok ?? 0);
+            $qtyCuttingOk = (float) ($bundle->qty_cutting_ok ?? 0);
+            $qtyPcs = (float) ($bundle->qty_pcs ?? 0);
+
+            if ($qtyQcOk > 0) {
+                $fgOk = $qtyQcOk;
+            } elseif ($qtyCuttingOk > 0) {
+                $fgOk = $qtyCuttingOk;
+            } else {
+                $fgOk = $qtyPcs; // fallback terakhir
+            }
+
             if ($fgOk <= 0) {
                 continue;
             }

@@ -15,7 +15,6 @@
                 0 0 0 1px rgba(15, 23, 42, 0.02);
         }
 
-        /* light mode: samakan dengan card putih di create */
         body[data-theme="light"] .sewing-pickup-bundle-picker-card {
             background: #ffffff;
         }
@@ -581,26 +580,24 @@
         }
     </style>
 @endpush
-
 @php
     $oldLines = old('lines', []);
     $preselectedBundleId = request('bundle_id');
 
+    // filter dulu kalau ada bundle_id spesifik
     $displayBundles = $preselectedBundleId ? $bundles->where('id', (int) $preselectedBundleId) : $bundles;
 
+    // hanya bundle dengan qty_ready_for_sewing > 0
     $displayBundles = $displayBundles
-        ->filter(function ($b) {
-            $qtyOk = (float) ($b->qty_cutting_ok ?? 0);
-            $qtyRemain = (float) ($b->qty_remaining_for_sewing ?? $qtyOk);
-            return $qtyRemain > 0;
+        ->map(function ($b) {
+            $b->computed_qty_ready = (float) $b->qty_ready_for_sewing;
+            return $b;
         })
+        ->filter(fn($b) => $b->computed_qty_ready > 0)
         ->values();
 
     $totalBundlesReady = $displayBundles->count();
-    $totalQtyReady = $displayBundles->sum(function ($b) {
-        $qtyOk = (float) ($b->qty_cutting_ok ?? 0);
-        return (float) ($b->qty_remaining_for_sewing ?? $qtyOk);
-    });
+    $totalQtyReady = $displayBundles->sum(fn($b) => (float) $b->computed_qty_ready);
 
     $itemCodes = $displayBundles->pluck('finishedItem.code')->filter()->unique()->sort()->values();
 @endphp
@@ -705,8 +702,8 @@
 
                                 $oldLine = $oldLines[$idx] ?? null;
 
-                                $qtyOk = (float) ($b->qty_cutting_ok ?? ($qc?->qty_ok ?? $b->qty_pcs));
-                                $qtyRemain = (float) ($b->qty_remaining_for_sewing ?? $qtyOk);
+                                // sekarang ambil dari accessor / computed
+                                $qtyRemain = (float) ($b->computed_qty_ready ?? $b->qty_ready_for_sewing);
 
                                 if ($qtyRemain <= 0) {
                                     continue;
@@ -837,7 +834,7 @@
                                         </div>
                                     </div>
 
-                                    {{-- MOBILE META: hanya tgl cutting & qty cutting (bundle/lot disembunyikan) --}}
+                                    {{-- MOBILE META: tgl cutting & qty cutting --}}
                                     <div class="mobile-row-meta">
                                         <div class="mobile-row-meta-left">
                                             <div class="mobile-row-meta-label">Tgl Cutting</div>
@@ -1019,7 +1016,7 @@
                 recalcSummaryAndUI();
             });
 
-            // FOCAL POINT SELECT di mobile (ringan, tanpa teks panduan)
+            // FOCAL POINT SELECT di mobile
             if (isMobile() && itemCodeSelectWrap) {
                 setTimeout(() => {
                     itemCodeSelectWrap.classList.add('focal-pulse');
