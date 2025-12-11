@@ -222,6 +222,9 @@
 @php
     $userRole = auth()->user()->role ?? null;
 
+    // ROLE OPERATOR LAPANGAN (menu super ringkas)
+    $isOperatorRole = in_array($userRole, ['sewing', 'cutting']);
+
     // Flag open mirroring desktop
     $poOpen = request()->routeIs('purchasing.purchase_orders.*');
     $grnOpen = request()->routeIs('purchasing.purchase_receipts.*');
@@ -309,10 +312,11 @@
             @auth
 
                 {{-- ============================
-                     MODE OPERATING ONLY ACCESS
-                     (Cutting Create, Sewing Pickup Create, Sewing Return Create, Finishing Create)
+                     MODE OPERATOR LAPANGAN ONLY
+                     (role: sewing / cutting)
+                     Shortcut: Cutting Create, Sewing Pickup Create, Sewing Return Create, Finishing Create
                  ============================ --}}
-                @if ($userRole === 'operating')
+                @if ($isOperatorRole)
                     {{-- DASHBOARD (boleh, biar tetap ada landing) --}}
                     <li>
                         <a href="{{ route('dashboard') }}"
@@ -361,8 +365,8 @@
                     </li>
                 @else
                     {{-- ============================
-                     OWNER / ADMIN MENU LENGKAP
-                 ============================ --}}
+                         OWNER / ADMIN / OPERATING MENU LENGKAP
+                     ============================ --}}
 
                     {{-- DASHBOARD --}}
                     <li>
@@ -373,7 +377,7 @@
                         </a>
                     </li>
 
-                    {{-- MASTER DATA (boleh semua yang login) --}}
+                    {{-- MASTER DATA (boleh semua yang login non-operator) --}}
                     <div class="mobile-sidebar-section-label">Master Data</div>
 
                     <li class="mb-1">
@@ -544,106 +548,102 @@
                         </li>
                     @endif
 
-                    {{-- INVENTORY (owner + operating + admin) --}}
+                    {{-- INVENTORY (owner + admin + operating) --}}
                     @if (in_array($userRole, ['owner', 'admin', 'operating']))
                         <div class="mobile-sidebar-section-label">Inventory</div>
 
-                        {{-- Inventory internal & external (owner + operating) --}}
-                        @if (in_array($userRole, ['owner', 'operating']))
-                            {{-- Inventory internal --}}
-                            <li class="mb-1">
-                                <button class="mobile-sidebar-link mobile-sidebar-toggle {{ $invOpen ? 'is-open' : '' }}"
-                                    type="button" data-bs-toggle="collapse" data-bs-target="#navInventoryMobile"
-                                    aria-expanded="{{ $invOpen ? 'true' : 'false' }}" aria-controls="navInventoryMobile">
+                        {{-- Inventory internal: stocks, stock card, stock opnames, transfers, adjustments --}}
+                        <li class="mb-1">
+                            <button class="mobile-sidebar-link mobile-sidebar-toggle {{ $invOpen ? 'is-open' : '' }}"
+                                type="button" data-bs-toggle="collapse" data-bs-target="#navInventoryMobile"
+                                aria-expanded="{{ $invOpen ? 'true' : 'false' }}" aria-controls="navInventoryMobile">
+                                <span class="icon">📦</span>
+                                <span>Inventory</span>
+                                <span class="chevron">▸</span>
+                            </button>
+
+                            <div class="collapse {{ $invOpen ? 'show' : '' }}" id="navInventoryMobile">
+                                <a href="{{ route('inventory.stocks.items') }}"
+                                    class="mobile-sidebar-link mobile-sidebar-link-sub {{ request()->routeIs('inventory.stocks.items') ? 'active' : '' }}">
                                     <span class="icon">📦</span>
-                                    <span>Inventory</span>
-                                    <span class="chevron">▸</span>
-                                </button>
+                                    <span>Stok per Item</span>
+                                </a>
 
-                                <div class="collapse {{ $invOpen ? 'show' : '' }}" id="navInventoryMobile">
-                                    <a href="{{ route('inventory.stocks.items') }}"
-                                        class="mobile-sidebar-link mobile-sidebar-link-sub {{ request()->routeIs('inventory.stocks.items') ? 'active' : '' }}">
-                                        <span class="icon">📦</span>
-                                        <span>Stok per Item</span>
-                                    </a>
+                                <a href="{{ route('inventory.stocks.lots') }}"
+                                    class="mobile-sidebar-link mobile-sidebar-link-sub {{ request()->routeIs('inventory.stocks.lots') ? 'active' : '' }}">
+                                    <span class="icon">🎫</span>
+                                    <span>Stok per LOT</span>
+                                </a>
 
-                                    <a href="{{ route('inventory.stocks.lots') }}"
-                                        class="mobile-sidebar-link mobile-sidebar-link-sub {{ request()->routeIs('inventory.stocks.lots') ? 'active' : '' }}">
-                                        <span class="icon">🎫</span>
-                                        <span>Stok per LOT</span>
-                                    </a>
+                                <a href="{{ route('inventory.stock_card.index') }}"
+                                    class="mobile-sidebar-link mobile-sidebar-link-sub {{ request()->routeIs('inventory.stock_card.index') ? 'active' : '' }}">
+                                    <span class="icon">📋</span>
+                                    <span>Kartu Stok</span>
+                                </a>
 
-                                    <a href="{{ route('inventory.stock_card.index') }}"
-                                        class="mobile-sidebar-link mobile-sidebar-link-sub {{ request()->routeIs('inventory.stock_card.index') ? 'active' : '' }}">
-                                        <span class="icon">📋</span>
-                                        <span>Kartu Stok</span>
-                                    </a>
+                                <a href="{{ route('inventory.transfers.index') }}"
+                                    class="mobile-sidebar-link mobile-sidebar-link-sub {{ request()->routeIs('inventory.transfers.index') ? 'active' : '' }}">
+                                    <span class="icon">🔁</span>
+                                    <span>Daftar Transfer</span>
+                                </a>
 
-                                    <a href="{{ route('inventory.transfers.index') }}"
-                                        class="mobile-sidebar-link mobile-sidebar-link-sub {{ request()->routeIs('inventory.transfers.index') ? 'active' : '' }}">
-                                        <span class="icon">🔁</span>
-                                        <span>Daftar Transfer</span>
-                                    </a>
+                                <a href="{{ route('inventory.transfers.create') }}"
+                                    class="mobile-sidebar-link mobile-sidebar-link-sub {{ request()->routeIs('inventory.transfers.create') ? 'active' : '' }}">
+                                    <span class="icon">➕</span>
+                                    <span>Transfer Baru</span>
+                                </a>
 
-                                    <a href="{{ route('inventory.transfers.create') }}"
-                                        class="mobile-sidebar-link mobile-sidebar-link-sub {{ request()->routeIs('inventory.transfers.create') ? 'active' : '' }}">
-                                        <span class="icon">➕</span>
-                                        <span>Transfer Baru</span>
-                                    </a>
+                                <a href="{{ route('inventory.stock_opnames.index') }}"
+                                    class="mobile-sidebar-link mobile-sidebar-link-sub {{ request()->routeIs('inventory.stock_opnames.index') ? 'active' : '' }}">
+                                    <span class="icon">📊</span>
+                                    <span>Daftar Stock Opname</span>
+                                </a>
 
-                                    <a href="{{ route('inventory.stock_opnames.index') }}"
-                                        class="mobile-sidebar-link mobile-sidebar-link-sub {{ request()->routeIs('inventory.stock_opnames.index') ? 'active' : '' }}">
-                                        <span class="icon">📊</span>
-                                        <span>Daftar Stock Opname</span>
-                                    </a>
+                                <a href="{{ route('inventory.stock_opnames.create') }}"
+                                    class="mobile-sidebar-link mobile-sidebar-link-sub {{ request()->routeIs('inventory.stock_opnames.create') ? 'active' : '' }}">
+                                    <span class="icon">＋</span>
+                                    <span>Stock Opname Baru</span>
+                                </a>
 
-                                    <a href="{{ route('inventory.stock_opnames.create') }}"
-                                        class="mobile-sidebar-link mobile-sidebar-link-sub {{ request()->routeIs('inventory.stock_opnames.create') ? 'active' : '' }}">
-                                        <span class="icon">＋</span>
-                                        <span>Stock Opname Baru</span>
-                                    </a>
+                                <a href="{{ route('inventory.adjustments.index') }}"
+                                    class="mobile-sidebar-link mobile-sidebar-link-sub {{ request()->routeIs('inventory.adjustments.index') ? 'active' : '' }}">
+                                    <span class="icon">⚖️</span>
+                                    <span>Daftar Adjustment</span>
+                                </a>
 
-                                    <a href="{{ route('inventory.adjustments.index') }}"
-                                        class="mobile-sidebar-link mobile-sidebar-link-sub {{ request()->routeIs('inventory.adjustments.index') ? 'active' : '' }}">
-                                        <span class="icon">⚖️</span>
-                                        <span>Daftar Adjustment</span>
-                                    </a>
+                                <a href="{{ route('inventory.adjustments.manual.create') }}"
+                                    class="mobile-sidebar-link mobile-sidebar-link-sub {{ request()->routeIs('inventory.adjustments.manual.create') ? 'active' : '' }}">
+                                    <span class="icon">✏️</span>
+                                    <span>Manual Adjustment</span>
+                                </a>
+                            </div>
+                        </li>
 
-                                    <a href="{{ route('inventory.adjustments.manual.create') }}"
-                                        class="mobile-sidebar-link mobile-sidebar-link-sub {{ request()->routeIs('inventory.adjustments.manual.create') ? 'active' : '' }}">
-                                        <span class="icon">✏️</span>
-                                        <span>Manual Adjustment</span>
-                                    </a>
-                                </div>
-                            </li>
+                        {{-- External Transfers --}}
+                        <li class="mb-1">
+                            <button class="mobile-sidebar-link mobile-sidebar-toggle {{ $extInvOpen ? 'is-open' : '' }}"
+                                type="button" data-bs-toggle="collapse" data-bs-target="#navInventoryExternalMobile"
+                                aria-expanded="{{ $extInvOpen ? 'true' : 'false' }}"
+                                aria-controls="navInventoryExternalMobile">
+                                <span class="icon">🚚</span>
+                                <span>External Transfers</span>
+                                <span class="chevron">▸</span>
+                            </button>
 
-                            {{-- External Transfers --}}
-                            <li class="mb-1">
-                                <button
-                                    class="mobile-sidebar-link mobile-sidebar-toggle {{ $extInvOpen ? 'is-open' : '' }}"
-                                    type="button" data-bs-toggle="collapse" data-bs-target="#navInventoryExternalMobile"
-                                    aria-expanded="{{ $extInvOpen ? 'true' : 'false' }}"
-                                    aria-controls="navInventoryExternalMobile">
-                                    <span class="icon">🚚</span>
-                                    <span>External Transfers</span>
-                                    <span class="chevron">▸</span>
-                                </button>
+                            <div class="collapse {{ $extInvOpen ? 'show' : '' }}" id="navInventoryExternalMobile">
+                                <a href="{{ route('inventory.external_transfers.index') }}"
+                                    class="mobile-sidebar-link mobile-sidebar-link-sub {{ request()->routeIs('inventory.external_transfers.index') ? 'active' : '' }}">
+                                    <span class="icon">≡</span>
+                                    <span>Daftar External TF</span>
+                                </a>
 
-                                <div class="collapse {{ $extInvOpen ? 'show' : '' }}" id="navInventoryExternalMobile">
-                                    <a href="{{ route('inventory.external_transfers.index') }}"
-                                        class="mobile-sidebar-link mobile-sidebar-link-sub {{ request()->routeIs('inventory.external_transfers.index') ? 'active' : '' }}">
-                                        <span class="icon">≡</span>
-                                        <span>Daftar External TF</span>
-                                    </a>
-
-                                    <a href="{{ route('inventory.external_transfers.create') }}"
-                                        class="mobile-sidebar-link mobile-sidebar-link-sub {{ request()->routeIs('inventory.external_transfers.create') ? 'active' : '' }}">
-                                        <span class="icon">➕</span>
-                                        <span>External TF Baru</span>
-                                    </a>
-                                </div>
-                            </li>
-                        @endif
+                                <a href="{{ route('inventory.external_transfers.create') }}"
+                                    class="mobile-sidebar-link mobile-sidebar-link-sub {{ request()->routeIs('inventory.external_transfers.create') ? 'active' : '' }}">
+                                    <span class="icon">➕</span>
+                                    <span>External TF Baru</span>
+                                </a>
+                            </div>
+                        </li>
 
                         {{-- Stock Requests (RTS & PRD) --}}
                         <li class="mb-1">
@@ -1047,7 +1047,7 @@
                             </div>
                         </li>
                     @endif {{-- end owner --}}
-                @endif {{-- end non-operating --}}
+                @endif {{-- end non-operator --}}
             @endauth
         </ul>
     </div>

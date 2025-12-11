@@ -1,13 +1,14 @@
+{{-- resources/views/inventory/rts_stock_requests/show.blade.php --}}
 @extends('layouts.app')
 
-@section('title', 'RTS • Detail Stock Request ' . $stockRequest->code)
+@section('title', 'Stock Request RTS • ' . $stockRequest->code)
 
 @push('head')
     <style>
         .page-wrap {
             max-width: 1100px;
             margin-inline: auto;
-            padding: .75rem .75rem 4rem;
+            padding: .75rem .75rem 3rem;
         }
 
         body[data-theme="light"] .page-wrap {
@@ -22,13 +23,13 @@
             border-radius: 14px;
             border: 1px solid rgba(148, 163, 184, 0.22);
             box-shadow:
-                0 10px 28px rgba(15, 23, 42, 0.08),
+                0 8px 24px rgba(15, 23, 42, 0.06),
                 0 0 0 1px rgba(15, 23, 42, 0.02);
         }
 
         .card-header {
-            padding: .9rem 1.25rem .75rem;
-            border-bottom: 1px solid rgba(148, 163, 184, 0.28);
+            padding: 1rem 1.25rem .75rem;
+            border-bottom: 1px solid rgba(148, 163, 184, 0.25);
         }
 
         .card-body {
@@ -39,106 +40,67 @@
             font-size: .9rem;
             font-weight: 600;
             text-transform: uppercase;
-            letter-spacing: .08em;
+            letter-spacing: .06em;
             color: rgba(100, 116, 139, 1);
-        }
-
-        .meta-grid {
-            display: grid;
-            grid-template-columns: repeat(12, minmax(0, 1fr));
-            gap: .5rem 1rem;
-            margin-top: .6rem;
-        }
-
-        .meta-item {
-            font-size: .8rem;
-            color: rgba(71, 85, 105, 1);
-        }
-
-        .meta-label {
-            font-size: .72rem;
-            text-transform: uppercase;
-            letter-spacing: .08em;
-            color: rgba(148, 163, 184, 1);
-        }
-
-        .meta-value {
-            margin-top: .15rem;
-            font-weight: 500;
         }
 
         .badge-status {
             display: inline-flex;
             align-items: center;
-            gap: .25rem;
-            padding: .12rem .6rem;
+            gap: .4rem;
             border-radius: 999px;
-            font-size: .72rem;
+            padding: .2rem .7rem;
+            font-size: .78rem;
             font-weight: 500;
         }
 
-        .badge-submitted {
+        .badge-status span {
+            font-variant-numeric: tabular-nums;
+        }
+
+        .badge-status.pending {
             background: rgba(59, 130, 246, 0.12);
             color: rgba(30, 64, 175, 1);
         }
 
-        .badge-partial {
-            background: rgba(234, 179, 8, 0.14);
+        .badge-status.partial {
+            background: rgba(234, 179, 8, 0.12);
             color: rgba(133, 77, 14, 1);
         }
 
-        .badge-completed {
-            background: rgba(22, 163, 74, 0.14);
-            color: rgba(21, 128, 61, 1);
+        .badge-status.completed {
+            background: rgba(34, 197, 94, 0.12);
+            color: rgba(22, 101, 52, 1);
         }
 
-        .badge-draft {
-            background: rgba(148, 163, 184, 0.18);
-            color: rgba(71, 85, 105, 1);
-        }
-
-        .chip-warehouse {
+        .badge-warehouse {
             display: inline-flex;
             align-items: center;
-            gap: .25rem;
-            padding: .15rem .6rem;
+            gap: .35rem;
+            padding: .15rem .5rem;
             border-radius: 999px;
-            border: 1px solid rgba(148, 163, 184, 0.7);
             font-size: .75rem;
+            border: 1px solid rgba(148, 163, 184, 0.55);
+            background: color-mix(in srgb, var(--card) 80%, rgba(59, 130, 246, .12));
         }
 
-        .chip-warehouse span.code {
+        .badge-warehouse span.code {
             font-weight: 600;
             font-variant-numeric: tabular-nums;
         }
 
-        .chip-user {
-            display: inline-flex;
-            align-items: center;
-            gap: .25rem;
-            border-radius: 999px;
-            padding: .12rem .55rem;
-            font-size: .75rem;
-            border: 1px solid rgba(148, 163, 184, 0.6);
-        }
-
-        .chip-user-icon {
-            width: 18px;
-            height: 18px;
-            border-radius: 999px;
-            background: rgba(59, 130, 246, 0.12);
-            display: inline-flex;
-            align-items: center;
-            justify-content: center;
-            font-size: .7rem;
-        }
-
         .mono {
             font-variant-numeric: tabular-nums;
+            font-family: ui-monospace, SFMono-Regular, Menlo, Consolas, "Liberation Mono";
+        }
+
+        .help-text {
+            font-size: .75rem;
+            color: rgba(148, 163, 184, 1);
         }
 
         .table-wrap {
-            margin-top: .9rem;
+            margin-top: .75rem;
             border-radius: 12px;
             border: 1px solid rgba(148, 163, 184, 0.35);
             overflow: hidden;
@@ -147,7 +109,7 @@
         .table {
             width: 100%;
             border-collapse: collapse;
-            font-size: .8rem;
+            font-size: .82rem;
         }
 
         .table thead {
@@ -158,90 +120,87 @@
         .table td {
             padding: .45rem .6rem;
             border-bottom: 1px solid rgba(148, 163, 184, 0.25);
-            vertical-align: middle;
+            vertical-align: top;
         }
 
         .table th {
             text-align: left;
             font-weight: 600;
-            font-size: .76rem;
+            font-size: .78rem;
             text-transform: uppercase;
             letter-spacing: .06em;
             color: rgba(100, 116, 139, 1);
         }
 
-        .table td:last-child {
-            text-align: right;
-        }
-
-        .row-partial {
-            background: rgba(254, 243, 199, 0.40);
-        }
-
-        .row-completed {
-            background: rgba(240, 253, 244, 0.65);
-        }
-
-        .text-soft {
-            font-size: .75rem;
-            color: rgba(148, 163, 184, 1);
-        }
-
-        .summary-row {
-            margin-top: .75rem;
-            display: flex;
-            flex-wrap: wrap;
-            justify-content: space-between;
-            gap: .5rem;
-            font-size: .8rem;
-        }
-
-        .summary-box {
-            padding: .4rem .7rem;
-            border-radius: 10px;
-            border: 1px solid rgba(148, 163, 184, 0.4);
-            background: color-mix(in srgb, var(--card) 90%, rgba(59, 130, 246, 0.05));
-        }
-
-        .actions-row {
-            margin-top: .9rem;
-            display: flex;
-            justify-content: space-between;
-            align-items: center;
-            gap: .75rem;
-            flex-wrap: wrap;
-        }
-
-        .btn {
+        .badge-over {
             display: inline-flex;
             align-items: center;
-            justify-content: center;
             gap: .3rem;
             border-radius: 999px;
-            border: 1px solid transparent;
+            padding: .15rem .6rem;
+            font-size: .75rem;
+            background: rgba(248, 250, 252, 0.9);
+            color: rgba(124, 45, 18, 1);
+            border: 1px dashed rgba(248, 113, 113, 0.7);
+        }
+
+        .badge-over-dot {
+            width: 8px;
+            height: 8px;
+            border-radius: 999px;
+            background: rgba(248, 113, 113, 1);
+        }
+
+        .line-notes {
+            font-size: .75rem;
+            color: rgba(100, 116, 139, 1);
+            margin-top: .2rem;
+        }
+
+        .back-link {
+            display: inline-flex;
+            align-items: center;
+            gap: .35rem;
             font-size: .8rem;
+            color: rgba(100, 116, 139, 1);
+            text-decoration: none;
+            margin-bottom: .35rem;
+        }
+
+        .back-link:hover {
+            color: rgba(30, 64, 175, 1);
+        }
+
+        .btn-edit-today {
+            display: inline-flex;
+            align-items: center;
+            gap: .35rem;
+            padding: .3rem .85rem;
+            border-radius: 999px;
+            font-size: .8rem;
+            text-decoration: none;
+            border: 1px solid rgba(45, 212, 191, 0.8);
+            background: rgba(45, 212, 191, 0.16);
+            color: rgba(15, 118, 110, 1);
+            box-shadow: 0 10px 25px rgba(15, 118, 110, 0.28);
             font-weight: 500;
-            padding: .35rem .9rem;
-            cursor: pointer;
-            background: rgba(37, 99, 235, 1);
-            color: white;
         }
 
-        .btn-outline {
-            background: transparent;
-            border-color: rgba(148, 163, 184, 0.9);
-            color: rgba(51, 65, 85, 1);
-        }
-
-        .btn-ghost {
-            background: transparent;
-            border-color: transparent;
-            color: rgba(148, 163, 184, 1);
+        .btn-edit-today:hover {
+            background: rgba(45, 212, 191, 0.24);
         }
 
         @media (max-width: 768px) {
-            .meta-grid {
-                grid-template-columns: repeat(1, minmax(0, 1fr));
+            .page-wrap {
+                padding-inline: .5rem;
+            }
+
+            .card-header {
+                padding-inline: .9rem;
+            }
+
+            .card-body {
+                padding-inline: .9rem;
             }
 
             .table-wrap {
@@ -250,101 +209,133 @@
             }
 
             .table {
-                min-width: 880px;
+                min-width: 780px;
             }
 
-            .actions-row {
-                flex-direction: column-reverse;
-                align-items: stretch;
+            .btn-edit-today {
+                box-shadow: none;
             }
         }
     </style>
 @endpush
 
 @section('content')
-    @php
-        $status = $stockRequest->status;
-        $statusClass = match ($status) {
-            'submitted' => 'badge-submitted',
-            'partial' => 'badge-partial',
-            'completed' => 'badge-completed',
-            'draft' => 'badge-draft',
-            default => 'badge-draft',
-        };
-
-        $totalRequested = (float) $stockRequest->lines->sum('qty_request');
-        $totalIssued = (float) $stockRequest->lines->sum('qty_issued');
-        $totalOutstanding = max($totalRequested - $totalIssued, 0);
-    @endphp
-
     <div class="page-wrap">
+        <div class="mb-2 flex items-center justify-between gap-2">
+            <a href="{{ route('rts.stock-requests.index') }}#today" class="back-link">
+                ← Kembali ke daftar RTS
+            </a>
+        </div>
+
         <div class="card">
             <div class="card-header">
-                <div class="flex items-center justify-between gap-2">
+                <div class="flex items-start justify-between gap-3">
                     <div>
-                        <div class="section-title">RTS • Detail Stock Request</div>
+                        <div class="section-title">Stock Request • RTS ➝ PRD</div>
                         <div class="mt-1 text-sm text-slate-700 dark:text-slate-200">
-                            No. Dokumen:
-                            <span class="font-semibold mono">{{ $stockRequest->code }}</span>
+                            <span class="mono font-semibold">{{ $stockRequest->code }}</span>
+                            <span class="mx-1">•</span>
+                            <span>{{ $stockRequest->date?->format('d M Y') }}</span>
                         </div>
-                    </div>
-                    <div class="flex flex-col items-end gap-1">
-                        <span class="badge-status {{ $statusClass }}">
-                            Status: {{ ucfirst($status) }}
-                        </span>
-                        <div class="text-soft">
-                            Tanggal: {{ \Illuminate\Support\Carbon::parse($stockRequest->date)->format('d M Y') }}
-                        </div>
-                    </div>
-                </div>
-
-                {{-- Meta --}}
-                <div class="meta-grid">
-                    <div class="meta-item" style="grid-column: span 4 / span 4;">
-                        <div class="meta-label">Gudang Asal (PRD)</div>
-                        <div class="meta-value">
-                            <span class="chip-warehouse">
-                                <span class="code">{{ $stockRequest->sourceWarehouse->code ?? '-' }}</span>
-                                <span>{{ $stockRequest->sourceWarehouse->name ?? '-' }}</span>
-                            </span>
+                        <div class="mt-1 help-text">
+                            {{ $stockRequest->requestedBy?->name ?? '—' }}
+                            ·
+                            <span class="mono">{{ $stockRequest->created_at?->format('d M Y H:i') ?? '—' }}</span>
                         </div>
                     </div>
 
-                    <div class="meta-item" style="grid-column: span 4 / span 4;">
-                        <div class="meta-label">Gudang Tujuan (RTS)</div>
-                        <div class="meta-value">
-                            <span class="chip-warehouse">
-                                <span class="code">{{ $stockRequest->destinationWarehouse->code ?? '-' }}</span>
-                                <span>{{ $stockRequest->destinationWarehouse->name ?? '-' }}</span>
-                            </span>
-                        </div>
-                    </div>
+                    <div class="flex flex-col items-end gap-2">
+                        @if ($stockRequest->date && $stockRequest->date->isToday())
+                            <a href="{{ route('rts.stock-requests.create', ['date' => $stockRequest->date->toDateString()]) }}"
+                                class="btn-edit-today">
+                                ✏️ Ubah permintaan hari ini
+                            </a>
+                        @endif
 
-                    <div class="meta-item" style="grid-column: span 4 / span 4;">
-                        <div class="meta-label">Dibuat oleh</div>
-                        <div class="meta-value">
-                            <span class="chip-user">
-                                <span class="chip-user-icon">👤</span>
-                                <span>{{ $stockRequest->requestedBy->name ?? '—' }}</span>
-                            </span>
-                        </div>
-                    </div>
+                        @php
+                            $status = $stockRequest->status;
+                            $statusLabel = match ($status) {
+                                'submitted' => 'Menunggu PRD',
+                                'partial' => 'Sebagian keluar',
+                                'completed' => 'Selesai',
+                                default => ucfirst($status ?? 'Draft'),
+                            };
 
-                    <div class="meta-item" style="grid-column: span 12 / span 12;">
-                        <div class="meta-label">Catatan</div>
-                        <div class="meta-value">
-                            {{ $stockRequest->notes ?: '—' }}
+                            // total sisa semua line (display, tanpa negatif)
+                            $totalRemaining = $stockRequest->lines->sum(function ($line) {
+                                $req = (float) ($line->qty_request ?? 0);
+                                $issued = $line->qty_issued !== null ? (float) $line->qty_issued : 0;
+                                $diff = $req - $issued;
+                                return $diff > 0 ? $diff : 0;
+                            });
+                        @endphp
+
+                        <div
+                            class="badge-status
+                            {{ $status === 'completed' ? 'completed' : '' }}
+                            {{ $status === 'partial' ? 'partial' : '' }}
+                            {{ in_array($status, ['submitted', 'draft', null], true) ? 'pending' : '' }}">
+                            <span class="inline-block w-2 h-2 rounded-full"
+                                style="background:
+                                    {{ $status === 'completed'
+                                        ? 'rgba(34,197,94,1)'
+                                        : ($status === 'partial'
+                                            ? 'rgba(234,179,8,1)'
+                                            : 'rgba(59,130,246,1)') }};
+                                "></span>
+                            <span>{{ $statusLabel }}</span>
                         </div>
+
+                        <div class="flex items-center gap-1 mt-1">
+                            <div class="badge-warehouse">
+                                <span class="code">{{ $stockRequest->sourceWarehouse?->code }}</span>
+                                <span>{{ $stockRequest->sourceWarehouse?->name }}</span>
+                            </div>
+                            <span style="font-size:.9rem; opacity:.7;">↓</span>
+                            <div class="badge-warehouse">
+                                <span class="code">{{ $stockRequest->destinationWarehouse?->code }}</span>
+                                <span>{{ $stockRequest->destinationWarehouse?->name }}</span>
+                            </div>
+                        </div>
+
+                        @if ($totalRemaining > 0)
+                            <div class="mt-1 text-xs text-rose-600 mono">
+                                Sisa total: {{ $totalRemaining }} pcs
+                            </div>
+                        @else
+                            <div class="mt-1 text-xs text-emerald-600 mono">
+                                Permintaan terpenuhi
+                            </div>
+                        @endif
                     </div>
                 </div>
             </div>
 
             <div class="card-body">
-                <div class="section-title" style="margin-bottom:.35rem;">Detail Item</div>
-                <div class="text-soft" style="margin-bottom:.4rem;">
-                    RTS hanya bisa melihat status terkini:
-                    <strong>diminta</strong>, <strong>terkirim</strong> dari PRD ke RTS,
-                    dan <strong>outstanding</strong> (kalau dokumen masih partial).
+                @if ($stockRequest->notes)
+                    <div class="mb-3">
+                        <div class="text-xs font-semibold uppercase tracking-[.18em] text-slate-500 mb-1">
+                            Catatan
+                        </div>
+                        <div class="text-sm text-slate-800 dark:text-slate-100 whitespace-pre-line">
+                            {{ $stockRequest->notes }}
+                        </div>
+                    </div>
+                @endif
+
+                {{-- SUMMARY OVER-REQUEST (singkat) --}}
+                @if (!empty($summary['has_over_request']))
+                    <div class="mb-3 text-xs text-amber-700 bg-amber-50 border border-amber-200 rounded-lg px-3 py-2">
+                        {{ $summary['over_lines_count'] }} baris over-request ·
+                        selisih {{ $summary['over_qty_total'] }} pcs dibanding stok PRD (snapshot).
+                    </div>
+                @endif
+
+                <div class="flex items-center justify-between gap-2 mb-2">
+                    <div class="section-title">Detail Item</div>
+                    <div class="help-text">
+                        Sisa = Request - Keluar PRD
+                    </div>
                 </div>
 
                 <div class="table-wrap">
@@ -352,120 +343,113 @@
                         <thead>
                             <tr>
                                 <th style="width: 32px;">#</th>
-                                <th style="width: 34%;">Item</th>
-                                <th style="width: 14%;">Diminta</th>
-                                <th style="width: 14%;">Stok Snapshot PRD</th>
-                                <th style="width: 14%;">Terkirim ke RTS</th>
-                                <th style="width: 14%;">Outstanding</th>
+                                <th>Item FG</th>
+                                <th style="width: 14%;">Qty Request</th>
+                                <th style="width: 18%;">Qty Keluar PRD</th>
+                                <th style="width: 16%;">Sisa</th>
+                                <th style="width: 18%;">Stok PRD (snapshot)</th>
                             </tr>
                         </thead>
                         <tbody>
-                            @foreach ($stockRequest->lines as $index => $line)
+                            @forelse ($stockRequest->lines as $index => $line)
                                 @php
-                                    $requested = (float) $line->qty_request;
-                                    $snapshot = (float) $line->stock_snapshot_at_request;
-                                    $issued = (float) ($line->qty_issued ?? 0);
-                                    $outstanding = max($requested - $issued, 0);
+                                    $qtyRequest = (float) ($line->qty_request ?? 0);
+                                    $snapshot =
+                                        $line->stock_snapshot_at_request !== null
+                                            ? (float) $line->stock_snapshot_at_request
+                                            : null;
+                                    $qtyIssued = $line->qty_issued !== null ? (float) $line->qty_issued : null;
+                                    $isOverRequest = $snapshot !== null && $qtyRequest > $snapshot;
 
-                                    $rowClass = '';
-                                    if ($issued > 0 && $outstanding == 0) {
-                                        $rowClass = 'row-completed';
-                                    } elseif ($outstanding > 0 && in_array($status, ['submitted', 'partial'])) {
-                                        $rowClass = 'row-partial';
-                                    }
+                                    // Sisa = request - issued (kalau belum ada issue, pakai request)
+                                    $diff = $qtyIssued !== null ? $qtyRequest - $qtyIssued : $qtyRequest;
+                                    $displayDiff = $diff < 0 ? 0 : $diff;
                                 @endphp
-                                <tr class="{{ $rowClass }}">
-                                    <td class="mono">
+                                <tr>
+                                    <td class="mono align-top">
                                         {{ $index + 1 }}
                                     </td>
                                     <td>
                                         <div class="font-semibold text-sm">
-                                            {{ $line->item->code ?? '' }} — {{ $line->item->name ?? '' }}
+                                            {{ $line->item?->code ?? '—' }}
+                                            <span class="text-slate-500">—</span>
+                                            {{ $line->item?->name ?? '—' }}
                                         </div>
-                                        @if (!empty($line->notes))
-                                            <div class="text-soft">
-                                                Catatan: {{ $line->notes }}
+
+                                        @if ($line->notes)
+                                            <div class="line-notes">
+                                                {{ $line->notes }}
+                                            </div>
+                                        @endif
+
+                                        @if ($isOverRequest)
+                                            <div class="mt-1">
+                                                <span class="badge-over"
+                                                    title="Qty request lebih besar dari stok snapshot saat request">
+                                                    <span class="badge-over-dot"></span>
+                                                    Over-request
+                                                    <span class="mono">
+                                                        ({{ $qtyRequest }} &gt; {{ $snapshot }})
+                                                    </span>
+                                                </span>
                                             </div>
                                         @endif
                                     </td>
-                                    <td class="mono">
-                                        {{ number_format($requested, 0) }} pcs
+
+                                    {{-- Qty Request --}}
+                                    <td class="mono align-top">
+                                        {{ $qtyRequest }}
+                                        <span class="text-slate-400 text-[.7rem]">pcs</span>
                                     </td>
-                                    <td class="mono">
-                                        {{ number_format($snapshot, 0) }} pcs
+
+                                    {{-- Qty Keluar PRD --}}
+                                    <td class="mono align-top">
+                                        @if ($qtyIssued !== null)
+                                            {{ $qtyIssued }}
+                                            <span class="text-slate-400 text-[.7rem]">pcs</span>
+                                        @else
+                                            <span class="text-slate-400">—</span>
+                                        @endif
                                     </td>
-                                    <td class="mono">
-                                        {{ number_format($issued, 0) }} pcs
+
+                                    {{-- Sisa (Req - Keluar) --}}
+                                    <td class="mono align-top">
+                                        <span
+                                            class="{{ $displayDiff > 0 ? 'text-rose-600 font-semibold' : 'text-emerald-600' }}">
+                                            {{ $displayDiff }}
+                                        </span>
+                                        <span class="text-slate-400 text-[.7rem]">pcs</span>
                                     </td>
-                                    <td>
-                                        <div class="mono">
-                                            {{ number_format($outstanding, 0) }} pcs
-                                        </div>
-                                        @if ($outstanding > 0 && in_array($status, ['submitted', 'partial']))
-                                            <div class="text-soft">
-                                                Menunggu proses dari PRD
-                                            </div>
-                                        @elseif($outstanding === 0 && $issued > 0)
-                                            <div class="text-soft">
-                                                Terpenuhi
-                                            </div>
+
+                                    {{-- Stok PRD snapshot --}}
+                                    <td class="mono align-top">
+                                        @if ($snapshot !== null)
+                                            {{ $snapshot }}
+                                            <span class="text-slate-400 text-[.7rem]">pcs</span>
+                                        @else
+                                            <span class="text-slate-400">—</span>
                                         @endif
                                     </td>
                                 </tr>
-                            @endforeach
+                            @empty
+                                <tr>
+                                    <td colspan="6" class="text-center text-sm text-slate-500 py-4">
+                                        Tidak ada detail item.
+                                    </td>
+                                </tr>
+                            @endforelse
                         </tbody>
                     </table>
                 </div>
 
-                {{-- Summary --}}
-                <div class="summary-row">
-                    <div class="summary-box">
-                        <div class="meta-label">Total Diminta</div>
-                        <div class="meta-value mono">
-                            {{ number_format($totalRequested, 0) }} pcs
-                        </div>
-                    </div>
-                    <div class="summary-box">
-                        <div class="meta-label">Total Sudah Dikirim ke RTS</div>
-                        <div class="meta-value mono">
-                            {{ number_format($totalIssued, 0) }} pcs
-                        </div>
-                    </div>
-                    <div class="summary-box">
-                        <div class="meta-label">Total Outstanding</div>
-                        <div class="meta-value mono">
-                            {{ number_format($totalOutstanding, 0) }} pcs
-                        </div>
+                <div class="mt-3 flex items-center justify-between text-xs text-slate-500">
+                    <div>
+                        Terakhir update:
+                        <span class="mono">
+                            {{ $stockRequest->updated_at?->format('d M Y H:i') ?? '—' }}
+                        </span>
                     </div>
                 </div>
-
-                {{-- Actions --}}
-                <div class="actions-row">
-                    <div class="text-soft">
-                        Status dokumen:
-                        <strong>{{ ucfirst($status) }}</strong>.
-                        @if ($status === 'submitted')
-                            Menunggu diproses oleh Gudang Produksi.
-                        @elseif($status === 'partial')
-                            Sebagian item sudah dikirim, masih ada outstanding.
-                        @elseif($status === 'completed')
-                            Semua item sudah dipenuhi oleh Gudang Produksi.
-                        @endif
-                    </div>
-                    <div class="flex items-center gap-2">
-                        <a href="{{ route('rts.stock-requests.index') }}" class="btn-ghost">
-                            ← Kembali ke daftar
-                        </a>
-
-                        @if (Route::has('prd.stock-requests.edit'))
-                            <a href="{{ route('prd.stock-requests.edit', $stockRequest) }}" class="btn-outline">
-                                Lihat status di PRD
-                            </a>
-                        @endif
-
-                    </div>
-                </div>
-
             </div>
         </div>
     </div>

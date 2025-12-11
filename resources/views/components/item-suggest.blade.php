@@ -82,7 +82,7 @@
     data-display-mode="{{ $displayMode }}" data-show-name="{{ $showName ? '1' : '0' }}"
     data-show-category="{{ $showCategory ? '1' : '0' }}" data-extra-params='@json($extraParams)'>
 
-    <input type="text" value="{{ $displayValue }}" autocomplete="off"
+    <input type="text" value="{{ strtoupper($displayValue) }}" autocomplete="off"
         class="form-control form-control-sm js-item-suggest-input" placeholder="{{ $placeholder }}"
         data-items='@json($jsItems)' id="{{ $uid }}">
 
@@ -120,7 +120,7 @@
                 border-radius: 6px;
                 max-height: 200px;
                 overflow-y: auto;
-                z-index: 5000;
+                z-index: 1000;
             }
 
             .item-suggest-option {
@@ -201,7 +201,7 @@
                     extraParams = {};
                 }
 
-                // ✅ Fallback: items yang sudah dikirim dari server (Purchase, dll)
+                // ✅ Fallback: items yang sudah dikirim dari server
                 let initialItems = [];
                 try {
                     const raw = input.getAttribute('data-items') || '[]';
@@ -209,6 +209,13 @@
                 } catch (e) {
                     initialItems = [];
                 }
+
+                // 🔤 selalu paksa uppercase di awal (kalau ada nilai awal)
+                if (input.value) {
+                    input.value = input.value.toUpperCase();
+                }
+
+                const forceUppercase = true;
 
                 let timer = null;
                 let lastItems = [];
@@ -278,7 +285,7 @@
                         btn.type = "button";
                         btn.className = "item-suggest-option list-group-item list-group-item-action";
 
-                        let html = `<div class='item-suggest-option-code'>${item.code}</div>`;
+                        let html = `<div class='item-suggest-option-code'>${(item.code || '').toUpperCase()}</div>`;
 
                         // 🔹 Desktop: boleh tampil nama + kategori
                         // 🔹 Mobile: HANYA kode barang saja (tanpa nama & kategori)
@@ -310,18 +317,28 @@
 
                     // 📱 MOBILE: paksa selalu hanya kode
                     if (mobile) {
-                        text = item.code;
+                        text = item.code || '';
                     } else {
                         // 💻 DESKTOP: ikut displayMode (code / code-name)
-                        text = item.code;
+                        text = item.code || '';
                         if (displayMode === "code-name" && item.name) {
                             text += " — " + item.name;
                         }
                     }
 
+                    // 🆙 paksa uppercase untuk tampilan di input
+                    if (forceUppercase && text) {
+                        text = text.toUpperCase();
+                    }
+
                     input.value = text;
                     hiddenId.value = item.id;
                     if (hiddenCat) hiddenCat.value = item.item_category_id;
+
+                    // 🔔 penting: beri sinyal ke luar kalau item_id berubah
+                    hiddenId.dispatchEvent(new Event('change', {
+                        bubbles: true
+                    }));
 
                     hide();
 
@@ -405,12 +422,29 @@
                 }
 
                 input.addEventListener("input", () => {
-                    const q = input.value.trim();
+                    // 🔤 paksa uppercase saat user mengetik
+                    if (forceUppercase && input.value) {
+                        const start = input.selectionStart;
+                        const end = input.selectionEnd;
+                        const upper = input.value.toUpperCase();
+                        if (upper !== input.value) {
+                            input.value = upper;
+                            if (start !== null && end !== null) {
+                                input.setSelectionRange(start, end);
+                            }
+                        }
+                    }
+
+                    const q = (input.value || '').trim();
                     clearTimeout(timer);
                     timer = setTimeout(() => fetchData(q, false), 200);
                 });
 
                 input.addEventListener("focus", () => {
+                    if (forceUppercase && input.value) {
+                        input.value = input.value.toUpperCase();
+                    }
+
                     input.select();
 
                     // saat focus: kalau ada initialItems & belum ketik apa-apa → pakai initialItems

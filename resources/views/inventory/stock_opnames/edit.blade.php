@@ -126,103 +126,44 @@
             color: #dc2626;
         }
 
-        /* kolom yang disembunyikan di mobile */
-        .col-mobile-hide {
-            /* default: terlihat di desktop */
-        }
-
-        .mobile-hide-inline {
-            /* default: terlihat di desktop */
-        }
-
-        .btn-mobile-full {
-            /* default desktop: biasa saja */
-        }
-
-        .btn-mobile-icon-delete {
-            /* default desktop: biasa saja */
-        }
-
-        /* MINI MODAL DUPLIKAT ITEM */
-        .duplicate-modal-backdrop {
-            position: fixed;
-            inset: 0;
-            background: rgba(15, 23, 42, 0.55);
-            display: none;
-            align-items: center;
-            justify-content: center;
-            z-index: 1050;
-        }
-
-        .duplicate-modal {
-            background: var(--card, #fff);
-            border-radius: 12px;
-            border: 1px solid rgba(148, 163, 184, 0.35);
-            padding: .9rem .95rem;
-            max-width: 360px;
-            width: 100%;
-            box-shadow:
-                0 18px 40px rgba(15, 23, 42, 0.35),
-                0 0 0 1px rgba(15, 23, 42, 0.18);
-        }
-
-        .duplicate-modal-title {
-            font-size: .95rem;
-            font-weight: 600;
-            margin-bottom: .4rem;
-        }
-
-        .duplicate-modal-body {
-            font-size: .8rem;
-            color: #475569;
-        }
-
-        .duplicate-modal-body .label {
-            font-size: .74rem;
-            text-transform: uppercase;
-            letter-spacing: .06em;
-            color: #94a3b8;
-        }
-
-        .duplicate-modal-body .value {
-            font-family: ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, "Liberation Mono", "Courier New",
-                monospace;
-            font-size: .82rem;
-        }
-
-        .duplicate-modal-actions {
-            margin-top: .7rem;
-            display: flex;
-            gap: .5rem;
-            flex-wrap: wrap;
-        }
-
         @media (max-width: 767.98px) {
             .so-page .page-wrap {
                 padding-inline: .6rem;
             }
 
-            /* hanya tampilkan kolom: #, Item (kode), Qty Fisik, Selisih */
-            .col-mobile-hide {
-                display: none !important;
+            .table thead {
+                display: none;
             }
 
-            .mobile-hide-inline {
-                display: none !important;
+            .table tbody tr {
+                display: block;
+                border-bottom: 1px solid rgba(148, 163, 184, .25);
+                padding: .4rem .7rem;
             }
 
-            .table-wrap {
-                overflow-x: auto;
+            .table tbody td {
+                display: flex;
+                justify-content: space-between;
+                gap: .75rem;
+                padding: .12rem 0;
+                border-top: none;
             }
 
-            .btn-mobile-full {
-                display: inline-block;
-                width: 100%;
+            .table tbody td::before {
+                content: attr(data-label);
+                font-weight: 500;
+                color: #64748b;
             }
+        }
 
-            .btn-mobile-icon-delete {
-                padding-inline: .4rem;
-            }
+        /* Mini modal duplikat item */
+        .dup-meta {
+            font-size: .78rem;
+            color: #6b7280;
+        }
+
+        .dup-meta .text-mono {
+            font-size: .8rem;
         }
     </style>
 @endpush
@@ -231,9 +172,6 @@
     @php
         $isReadonly = in_array($opname->status, ['reviewed', 'finalized']);
         $isOpening = $opname->type === 'opening';
-
-        // Urutkan baris: paling baru (id terbesar) di atas
-        $lines = $opname->lines->sortByDesc('id')->values();
     @endphp
 
     <div class="so-page">
@@ -252,7 +190,8 @@
                             Dokumen ini sudah {{ $opname->status === 'finalized' ? 'difinalkan' : 'direview' }}.
                         @else
                             @if ($isOpening)
-                                Mode saldo awal: Qty &amp; HPP di tabel hanya tampilan. Ubah lewat form di atas.
+                                Mode saldo awal: isi <span class="text-mono">Qty Fisik</span> dan
+                                <span class="text-mono">HPP / Unit</span>.
                             @else
                                 Isi hasil hitung fisik per item, lalu simpan.
                             @endif
@@ -280,8 +219,8 @@
                         <div class="mb-2">
                             <div class="pill-label mb-1">Tambah item saldo awal</div>
                             <div style="font-size:.8rem;color:#6b7280;">
-                                Flow: ketik item → Tab ke Qty → Enter untuk simpan → fokus kembali ke item.
-                                Jika item sudah ada, akan muncul konfirmasi sebelum update baris lama.
+                                Flow: ketik item → Tab (ambil suggest pertama) → isi Qty → Enter untuk simpan → fokus
+                                kembali ke item.
                             </div>
                         </div>
 
@@ -289,18 +228,18 @@
                             method="POST" class="row g-2 align-items-end">
                             @csrf
 
-                            {{-- Item (pakai item-suggest) --}}
+                            {{-- Item (pakai item-suggest versi terbaru) --}}
                             <div class="col-md-4" id="opening-item-suggest">
                                 <label class="pill-label mb-1">Item</label>
                                 <x-item-suggest idName="item_id" :idValue="old('item_id')" :displayValue="''"
-                                    placeholder="Kode / nama barang" />
+                                    placeholder="Kode / nama barang" :autofocus="true" :autoSelectFirst="true" />
                             </div>
 
                             {{-- Qty Fisik --}}
                             <div class="col-6 col-md-2">
                                 <label class="pill-label mb-1">Qty Fisik</label>
                                 <x-number-input name="physical_qty" :value="old('physical_qty')" mode="integer" min="0"
-                                    class="text-end js-opening-qty" />
+                                    class="text-end js-opening-qty js-next-focus" />
                             </div>
 
                             {{-- HPP / Unit --}}
@@ -322,7 +261,7 @@
 
                             {{-- Tombol submit --}}
                             <div class="col-md-1 d-grid">
-                                <button type="submit" class="btn btn-sm btn-primary btn-mobile-full">
+                                <button type="submit" class="btn btn-sm btn-primary">
                                     + Tambah
                                 </button>
                             </div>
@@ -381,12 +320,12 @@
 
                         @if (!$isReadonly)
                             <div class="mt-3 d-flex gap-2 flex-wrap">
-                                <button type="submit" class="btn btn-sm btn-primary btn-mobile-full">
+                                <button type="submit" class="btn btn-sm btn-primary">
                                     Simpan Perubahan
                                 </button>
                                 @if (in_array($opname->status, ['draft', 'counting']))
                                     <button type="submit" name="mark_reviewed" value="1"
-                                        class="btn btn-sm btn-outline-primary btn-mobile-full">
+                                        class="btn btn-sm btn-outline-primary">
                                         Simpan &amp; Tandai Selesai Counting
                                     </button>
                                 @endif
@@ -397,8 +336,8 @@
 
                 {{-- TABEL ITEM --}}
                 @php
-                    $totalLines = $lines->count();
-                    $countedLines = $lines->whereNotNull('physical_qty')->count();
+                    $totalLines = $opname->lines->count();
+                    $countedLines = $opname->lines->whereNotNull('physical_qty')->count();
                 @endphp
 
                 <div class="card card-main">
@@ -413,12 +352,7 @@
                                     @endif
                                 </div>
                                 <div style="font-size:.78rem;color:#6b7280;">
-                                    @if ($isOpening)
-                                        Angka Qty &amp; HPP di tabel hanya tampilan (2 digit desimal).
-                                        Ubah via form tambah di atas.
-                                    @else
-                                        Isi Qty Fisik per item, selisih akan dihitung saat update.
-                                    @endif
+                                    Isi Qty fisik (dan HPP jika opening). Selisih dihitung saat disimpan.
                                 </div>
                             </div>
                             <div style="font-size:.8rem;color:#6b7280;">
@@ -427,7 +361,7 @@
                         </div>
 
                         {{-- TOMBOL RESET QTY & HPP (soft reset) --}}
-                        @if ($isOpening && !$isReadonly && $lines->count() > 0)
+                        @if ($isOpening && !$isReadonly && $opname->lines->count() > 0)
                             <div class="mb-2 d-flex justify-content-between align-items-center flex-wrap gap-2">
                                 <div style="font-size:.78rem;color:#6b7280;">
                                     Reset hanya mengosongkan Qty Fisik &amp; HPP semua baris, daftar item tetap ada.
@@ -435,7 +369,7 @@
                                 <form action="{{ route('inventory.stock_opnames.reset_lines', $opname) }}" method="POST"
                                     onsubmit="return confirm('Reset Qty Fisik dan HPP semua baris untuk sesi opname ini?\n\nDaftar item tetap dipertahankan. Lanjutkan?');">
                                     @csrf
-                                    <button type="submit" class="btn btn-sm btn-outline-warning btn-mobile-full">
+                                    <button type="submit" class="btn btn-sm btn-outline-warning">
                                         Reset Qty &amp; HPP Semua Baris
                                     </button>
                                 </form>
@@ -449,20 +383,20 @@
                                     <tr>
                                         <th style="width:40px;">#</th>
                                         <th>Item</th>
-                                        <th class="text-end col-mobile-hide">Qty Sistem</th>
+                                        <th class="text-end">Qty Sistem</th>
                                         <th class="text-end" style="width:140px;">Qty Fisik</th>
                                         <th class="text-end">Selisih</th>
                                         @if ($isOpening)
-                                            <th class="text-end col-mobile-hide" style="width:140px;">HPP / Unit</th>
+                                            <th class="text-end" style="width:140px;">HPP / Unit</th>
                                         @endif
-                                        <th class="col-mobile-hide">Catatan</th>
+                                        <th>Catatan</th>
                                         @if ($isOpening && !$isReadonly)
-                                            <th class="text-end col-mobile-hide" style="width:70px;">Aksi</th>
+                                            <th class="text-end" style="width:70px;">Aksi</th>
                                         @endif
                                     </tr>
                                 </thead>
                                 <tbody>
-                                    @foreach ($lines as $index => $line)
+                                    @foreach ($opname->lines as $index => $line)
                                         @php
                                             $diff = $line->difference;
                                             $hasPhysical = !is_null($line->physical_qty);
@@ -470,46 +404,54 @@
                                                 $diff > 0 ? '+' . number_format($diff, 2) : number_format($diff, 2);
                                             $diffClass = $diff > 0 ? 'diff-plus' : ($diff < 0 ? 'diff-minus' : '');
                                             $inputNamePrefix = "lines[{$line->id}]";
+
+                                            // Raw value aman untuk dikirim ke server (tanpa thousand separator)
+                                            $rawSystemQty = $line->system_qty ?? 0;
+
+                                            $rawPhysical = old($inputNamePrefix . '.physical_qty', $line->physical_qty);
+                                            $hasPhysicalValue = $rawPhysical !== null && $rawPhysical !== '';
+                                            if ($hasPhysicalValue) {
+                                                $rawPhysical = (float) $rawPhysical;
+                                            }
+
+                                            $rawUnitCost = old($inputNamePrefix . '.unit_cost', $line->unit_cost);
+                                            $hasUnitCostValue = $rawUnitCost !== null && $rawUnitCost !== '';
+                                            if ($hasUnitCostValue) {
+                                                $rawUnitCost = (float) $rawUnitCost;
+                                            }
                                         @endphp
                                         <tr data-item-id="{{ $line->item_id }}"
-                                            data-existing-qty="{{ (float) ($line->physical_qty ?? 0) }}"
-                                            data-existing-hpp="{{ (float) ($line->unit_cost ?? 0) }}"
                                             data-item-code="{{ $line->item?->code }}"
-                                            data-item-name="{{ $line->item?->name }}">
+                                            data-item-name="{{ $line->item?->name }}"
+                                            data-physical-qty="{{ $hasPhysicalValue ? $rawPhysical : '' }}">
                                             <td data-label="#">
                                                 {{ $index + 1 }}
                                             </td>
                                             <td data-label="Item">
-                                                <div class="fw-semibold text-mono">
+                                                <div class="fw-semibold">
                                                     {{ $line->item?->code ?? '-' }}
                                                 </div>
-                                                <div class="mobile-hide-inline" style="font-size:.82rem;color:#6b7280;">
+                                                <div style="font-size:.82rem;color:#6b7280;">
                                                     {{ $line->item?->name ?? '' }}
                                                 </div>
                                             </td>
-                                            <td data-label="Qty sistem" class="text-end text-mono col-mobile-hide">
-                                                {{ number_format((float) $line->system_qty, 2) }}
+                                            <td data-label="Qty sistem" class="text-end text-mono">
+                                                {{ number_format($rawSystemQty, 2) }}
+                                                <input type="hidden" name="{{ $inputNamePrefix }}[system_qty]"
+                                                    value="{{ $rawSystemQty }}">
                                             </td>
-
-                                            {{-- Qty fisik --}}
-                                            <td data-label="Qty fisik" class="text-end text-mono">
-                                                @if ($isOpening)
-                                                    @if (!is_null($line->physical_qty))
-                                                        {{ number_format((float) $line->physical_qty, 2) }}
-                                                    @else
-                                                        <span class="text-muted">-</span>
-                                                    @endif
+                                            <td data-label="Qty fisik" class="text-end">
+                                                @if ($hasPhysicalValue)
+                                                    <span class="text-mono">
+                                                        {{ number_format($rawPhysical, 2) }}
+                                                    </span>
+                                                    <input type="hidden" name="{{ $inputNamePrefix }}[physical_qty]"
+                                                        value="{{ $rawPhysical }}">
                                                 @else
-                                                    {{-- mode periodik: tetap bisa input --}}
-                                                    <x-number-input :name="$inputNamePrefix . '[physical_qty]'" :value="old(
-                                                        $inputNamePrefix . '.physical_qty',
-                                                        $line->physical_qty,
-                                                    )" mode="decimal"
-                                                        :decimals="2" min="0" class="text-end" />
+                                                    <span class="text-muted">-</span>
+                                                    {{-- tidak kirim field jika belum ada qty fisik --}}
                                                 @endif
                                             </td>
-
-                                            {{-- Selisih --}}
                                             <td data-label="Selisih" class="text-end text-mono">
                                                 @if ($hasPhysical)
                                                     <span class="{{ $diffClass }}">{{ $diffDisplay }}</span>
@@ -517,33 +459,32 @@
                                                     <span class="text-muted">-</span>
                                                 @endif
                                             </td>
-
-                                            {{-- HPP / Unit (hanya opening, read-only) --}}
                                             @if ($isOpening)
-                                                <td data-label="HPP / Unit" class="text-end text-mono col-mobile-hide">
-                                                    @if (!is_null($line->unit_cost))
-                                                        {{ number_format((float) $line->unit_cost, 2) }}
+                                                <td data-label="HPP / Unit" class="text-end">
+                                                    @if ($hasUnitCostValue)
+                                                        <span class="text-mono">
+                                                            {{ number_format($rawUnitCost, 2) }}
+                                                        </span>
+                                                        <input type="hidden" name="{{ $inputNamePrefix }}[unit_cost]"
+                                                            value="{{ $rawUnitCost }}">
                                                     @else
                                                         <span class="text-muted">-</span>
+                                                        {{-- tidak kirim field jika belum ada HPP --}}
                                                     @endif
                                                 </td>
                                             @endif
-
-                                            {{-- Catatan --}}
-                                            <td data-label="Catatan" class="col-mobile-hide">
+                                            <td data-label="Catatan">
                                                 <input type="text" name="{{ $inputNamePrefix }}[notes]"
                                                     class="form-control form-control-sm"
                                                     value="{{ old($inputNamePrefix . '.notes', $line->notes) }}"
                                                     @if ($isReadonly) readonly @endif>
                                             </td>
-
-                                            {{-- Aksi (hapus) --}}
                                             @if ($isOpening && !$isReadonly)
-                                                <td data-label="Aksi" class="text-end col-mobile-hide">
+                                                <td data-label="Aksi" class="text-end">
                                                     <button type="button"
-                                                        class="btn btn-sm btn-outline-danger js-delete-line btn-mobile-icon-delete">
-                                                        <span class="d-none d-md-inline">Hapus</span>
-                                                        <span class="d-inline d-md-none">✕</span>
+                                                        class="btn btn-sm btn-outline-danger js-delete-line"
+                                                        data-line-id="{{ $line->id }}">
+                                                        Hapus
                                                     </button>
                                                 </td>
                                             @endif
@@ -559,46 +500,49 @@
         </div>
     </div>
 
-    {{-- MINI MODAL KONFIRMASI DUPLIKAT ITEM --}}
-    <div class="duplicate-modal-backdrop" id="duplicate-modal">
-        <div class="duplicate-modal">
-            <div class="duplicate-modal-title">
-                Item sudah ada di daftar opname
-            </div>
-            <div class="duplicate-modal-body">
-                <div class="mb-2">
-                    <div class="label">Item</div>
-                    <div class="value" id="dup-item-label">-</div>
+    {{-- MINI MODAL: KONFIRMASI DUPLIKAT ITEM --}}
+    <div class="modal fade" id="duplicateItemModal" tabindex="-1" aria-labelledby="duplicateItemModalLabel"
+        aria-hidden="true">
+        <div class="modal-dialog modal-sm modal-dialog-centered">
+            <div class="modal-content">
+                <div class="modal-header py-2">
+                    <h6 class="modal-title" id="duplicateItemModalLabel">Item sudah ada di opname</h6>
+                    <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Tutup"></button>
                 </div>
-                <div class="row g-2">
-                    <div class="col-6">
-                        <div class="label">Qty lama</div>
-                        <div class="value" id="dup-old-qty">-</div>
+                <div class="modal-body">
+                    <div class="mb-1">
+                        <div class="fw-semibold" id="dupItemLabel">Item</div>
+                        <div class="dup-meta">
+                            Akan <span class="fw-semibold">mengganti</span> Qty &amp; HPP baris yang sudah ada untuk item
+                            ini.
+                        </div>
                     </div>
-                    <div class="col-6">
-                        <div class="label">Qty baru</div>
-                        <div class="value" id="dup-new-qty">-</div>
+
+                    <div class="dup-meta mt-2">
+                        <div class="d-flex justify-content-between">
+                            <span>Qty lama</span>
+                            <span class="text-mono" id="dupQtyOld">0</span>
+                        </div>
+                        <div class="d-flex justify-content-between">
+                            <span>Qty baru</span>
+                            <span class="text-mono" id="dupQtyNew">0</span>
+                        </div>
+                        <div class="d-flex justify-content-between">
+                            <span>Perubahan</span>
+                            <span class="text-mono" id="dupQtyDiff">0</span>
+                        </div>
                     </div>
-                    <div class="col-6 mt-2">
-                        <div class="label">HPP lama</div>
-                        <div class="value" id="dup-old-hpp">-</div>
-                    </div>
-                    <div class="col-6 mt-2">
-                        <div class="label">HPP baru</div>
-                        <div class="value" id="dup-new-hpp">-</div>
+
+                    <div class="alert alert-warning mt-3 mb-1 py-1 px-2" style="font-size:.78rem;">
+                        Lanjutkan untuk <strong>update baris existing</strong> di tabel saldo awal.
                     </div>
                 </div>
-                <div class="mt-2" style="font-size:.78rem;color:#6b7280;">
-                    Lanjutkan untuk <strong>mengganti Qty &amp; HPP baris lama</strong> dengan nilai baru.
+                <div class="modal-footer py-2">
+                    <button type="button" class="btn btn-sm btn-light" data-bs-dismiss="modal">Batal</button>
+                    <button type="button" class="btn btn-sm btn-primary" data-duplicate-confirm="1">
+                        Lanjutkan update
+                    </button>
                 </div>
-            </div>
-            <div class="duplicate-modal-actions">
-                <button type="button" class="btn btn-sm btn-primary" id="dup-confirm-update">
-                    Update baris lama
-                </button>
-                <button type="button" class="btn btn-sm btn-outline-secondary" id="dup-cancel">
-                    Batal
-                </button>
             </div>
         </div>
     </div>
@@ -606,10 +550,41 @@
 
 @push('scripts')
     <script>
+        let duplicateItemModalInstance = null;
+        let pendingOpeningSubmit = null;
+
         document.addEventListener('DOMContentLoaded', function() {
+            initDuplicateItemModal();
             initOpeningAddAjax();
             initDeleteLineAjax();
         });
+
+        function initDuplicateItemModal() {
+            const modalEl = document.getElementById('duplicateItemModal');
+            if (!modalEl || !window.bootstrap) return;
+
+            duplicateItemModalInstance = new bootstrap.Modal(modalEl);
+
+            const confirmBtn = modalEl.querySelector('[data-duplicate-confirm]');
+            if (confirmBtn) {
+                confirmBtn.addEventListener('click', function() {
+                    if (!pendingOpeningSubmit) return;
+
+                    const {
+                        addForm,
+                        updateExistingInput
+                    } = pendingOpeningSubmit;
+
+                    if (updateExistingInput) {
+                        updateExistingInput.value = '1';
+                    }
+
+                    performOpeningAjaxSubmit(addForm);
+                    pendingOpeningSubmit = null;
+                    duplicateItemModalInstance.hide();
+                });
+            }
+        }
 
         function getCsrfToken() {
             const meta = document.querySelector('meta[name="csrf-token"]');
@@ -617,6 +592,14 @@
             const input = document.querySelector('input[name="_token"]');
             if (input) return input.value;
             return '';
+        }
+
+        function formatNumberForDisplay(num) {
+            const n = Number(num) || 0;
+            return new Intl.NumberFormat('id-ID', {
+                minimumFractionDigits: 0,
+                maximumFractionDigits: 2
+            }).format(n);
         }
 
         function initOpeningAddAjax() {
@@ -627,7 +610,7 @@
             const qtyInput = addForm.querySelector('.js-opening-qty');
             const updateExistingInput = addForm.querySelector('input[name="update_existing"]');
 
-            // Fokus awal ke item
+            // Fokus awal ke item (backup)
             if (itemInput) {
                 itemInput.focus();
                 itemInput.select();
@@ -645,7 +628,7 @@
                 qtyInput.addEventListener('keydown', function(e) {
                     if (e.key === 'Enter') {
                         e.preventDefault();
-                        submitOpeningFormAjax(addForm, existingIds, updateExistingInput, itemInput, false);
+                        submitOpeningFormAjax(addForm, existingIds, updateExistingInput, itemInput);
                     }
                 });
             }
@@ -653,11 +636,11 @@
             // Klik tombol Tambah => juga AJAX
             addForm.addEventListener('submit', function(e) {
                 e.preventDefault();
-                submitOpeningFormAjax(addForm, existingIds, updateExistingInput, itemInput, false);
+                submitOpeningFormAjax(addForm, existingIds, updateExistingInput, itemInput);
             });
         }
 
-        function submitOpeningFormAjax(addForm, existingIds, updateExistingInput, itemInput, skipDuplicateCheck) {
+        function submitOpeningFormAjax(addForm, existingIds, updateExistingInput, itemInput) {
             const itemIdField = addForm.querySelector('input[name="item_id"]');
             if (!itemIdField || !itemIdField.value) {
                 alert('Pilih item terlebih dahulu.');
@@ -669,26 +652,80 @@
 
             const itemId = itemIdField.value;
 
-            // ambil value baru dari form
-            const qtyInput = addForm.querySelector('input[name="physical_qty"]');
-            const hppInput = addForm.querySelector('input[name="unit_cost"]');
-            const newQty = qtyInput ? qtyInput.value : '';
-            const newHpp = hppInput ? hppInput.value : '';
-
-            // Cek duplikat → gunakan modal mini
-            if (!skipDuplicateCheck && existingIds.has(itemId)) {
-                openDuplicateModal({
-                    itemId,
-                    newQty,
-                    newHpp,
-                    addForm,
-                    existingIds,
-                    updateExistingInput,
-                    itemInput
-                });
+            // ✅ CEK QTY FISIK WAJIB DIISI
+            const qtyField = addForm.querySelector('input[name="physical_qty"]');
+            if (!qtyField || qtyField.value.trim() === '') {
+                alert('Isi Qty Fisik terlebih dahulu.');
+                if (qtyField) {
+                    qtyField.focus();
+                    qtyField.select && qtyField.select();
+                }
                 return;
             }
 
+            const newQtyValue = qtyField.value;
+
+            // Jika item sudah ada di tabel → tampilkan mini modal konfirmasi
+            if (existingIds.has(itemId)) {
+                // Kalau modal bootstrap tersedia, pakai modal
+                if (duplicateItemModalInstance) {
+                    const row = document.querySelector('tr[data-item-id="' + itemId + '"]');
+                    const oldQty = row ? parseFloat(row.getAttribute('data-physical-qty') || '0') : 0;
+                    const newQty = parseFloat(newQtyValue || '0');
+
+                    const diff = newQty - oldQty;
+
+                    const code = row ? (row.getAttribute('data-item-code') || '') : '';
+                    const name = row ? (row.getAttribute('data-item-name') || '') : '';
+
+                    const labelEl = document.getElementById('dupItemLabel');
+                    const qtyOldEl = document.getElementById('dupQtyOld');
+                    const qtyNewEl = document.getElementById('dupQtyNew');
+                    const qtyDiffEl = document.getElementById('dupQtyDiff');
+
+                    if (labelEl) {
+                        labelEl.textContent = (code ? code : 'Item') + (name ? ' — ' + name : '');
+                    }
+                    if (qtyOldEl) qtyOldEl.textContent = formatNumberForDisplay(oldQty);
+                    if (qtyNewEl) qtyNewEl.textContent = formatNumberForDisplay(newQty);
+                    if (qtyDiffEl) {
+                        const prefix = diff > 0 ? '+' : '';
+                        qtyDiffEl.textContent = prefix + formatNumberForDisplay(diff);
+                    }
+
+                    pendingOpeningSubmit = {
+                        addForm,
+                        updateExistingInput
+                    };
+
+                    duplicateItemModalInstance.show();
+                    return;
+                } else {
+                    // Fallback: confirm biasa kalau bootstrap modal nggak tersedia
+                    const ok = confirm(
+                        'Item ini sudah ada di daftar opname.\n\n' +
+                        'Apakah Anda ingin mengupdate baris yang sudah ada (Qty / HPP akan diganti)?'
+                    );
+                    if (!ok) {
+                        return;
+                    }
+                    if (updateExistingInput) {
+                        updateExistingInput.value = '1';
+                    }
+                }
+            } else {
+                // Item baru
+                if (updateExistingInput) {
+                    updateExistingInput.value = '0';
+                }
+            }
+
+            // Lanjut submit AJAX normal
+            performOpeningAjaxSubmit(addForm);
+        }
+
+
+        function performOpeningAjaxSubmit(addForm) {
             const formData = new FormData(addForm);
 
             fetch(addForm.action, {
@@ -720,7 +757,7 @@
                 .then((data) => {
                     if (!data) return;
                     if (data.status === 'ok') {
-                        // Reload supaya tabel & summary ke-refresh
+                        // Simple: reload supaya tabel & summary ke-refresh
                         window.location.reload();
                     } else {
                         alert(data.message || 'Gagal menyimpan item.');
@@ -729,74 +766,6 @@
                 .catch(() => {
                     alert('Terjadi kesalahan saat menyimpan item.');
                 });
-        }
-
-        function openDuplicateModal(ctx) {
-            const {
-                itemId,
-                newQty,
-                newHpp,
-                addForm,
-                existingIds,
-                updateExistingInput,
-                itemInput
-            } = ctx;
-
-            const backdrop = document.getElementById('duplicate-modal');
-            if (!backdrop) return;
-
-            const row = document.querySelector('tr[data-item-id="' + itemId + '"]');
-            let itemLabel = 'Item ID ' + itemId;
-            let oldQty = '-';
-            let oldHpp = '-';
-
-            if (row) {
-                const code = row.dataset.itemCode || '';
-                const name = row.dataset.itemName || '';
-                itemLabel = code + (name ? ' — ' + name : '');
-                oldQty = row.dataset.existingQty ?? '-';
-                oldHpp = row.dataset.existingHpp ?? '-';
-            }
-
-            const numOrDash = (v) => {
-                if (v === '' || v === null || typeof v === 'undefined') return '-';
-                const n = parseFloat(String(v).replace(',', '.'));
-                if (isNaN(n)) return v;
-                return n.toFixed(2);
-            };
-
-            document.getElementById('dup-item-label').textContent = itemLabel;
-            document.getElementById('dup-old-qty').textContent = numOrDash(oldQty);
-            document.getElementById('dup-old-hpp').textContent = numOrDash(oldHpp);
-            document.getElementById('dup-new-qty').textContent = numOrDash(newQty);
-            document.getElementById('dup-new-hpp').textContent = numOrDash(newHpp);
-
-            backdrop.style.display = 'flex';
-
-            const confirmBtn = document.getElementById('dup-confirm-update');
-            const cancelBtn = document.getElementById('dup-cancel');
-
-            function closeModal() {
-                backdrop.style.display = 'none';
-                confirmBtn.removeEventListener('click', onConfirm);
-                cancelBtn.removeEventListener('click', onCancel);
-            }
-
-            function onConfirm() {
-                if (updateExistingInput) {
-                    updateExistingInput.value = '1';
-                }
-                closeModal();
-                // submit lagi tapi skip cek duplikat
-                submitOpeningFormAjax(addForm, existingIds, updateExistingInput, itemInput, true);
-            }
-
-            function onCancel() {
-                closeModal();
-            }
-
-            confirmBtn.addEventListener('click', onConfirm);
-            cancelBtn.addEventListener('click', onCancel);
         }
 
         function initDeleteLineAjax() {
@@ -808,7 +777,7 @@
 
             tableWrap.querySelectorAll('.js-delete-line').forEach(btn => {
                 btn.addEventListener('click', function() {
-                    const lineId = this.dataset.lineId || this.closest('tr')?.dataset.lineId;
+                    const lineId = this.dataset.lineId;
                     if (!lineId) return;
 
                     if (!confirm('Hapus baris ini dari sesi opname?')) {
@@ -821,8 +790,7 @@
                             method: 'POST',
                             headers: {
                                 'X-CSRF-TOKEN': getCsrfToken(),
-                                'X-Requested-With'
-                                X: 'XMLHttpRequest',
+                                'X-Requested-With': 'XMLHttpRequest',
                                 'Accept': 'application/json',
                             },
                             body: new URLSearchParams({

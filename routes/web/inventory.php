@@ -15,8 +15,8 @@ use App\Http\Controllers\Inventory\TransferController;
 // ======================================================================
 
 // ========================= INVENTORY MAIN =========================
-// Hanya owner + operating (gudang produksi) yang boleh main inventory internal
-Route::middleware(['web', 'auth', 'role:owner,operating'])->group(function () {
+// owner + admin + operating (gudang produksi & admin) boleh akses inventory internal
+Route::middleware(['web', 'auth', 'role:owner,admin,operating'])->group(function () {
 
     /*
     |--------------------------------------------------------------------------
@@ -113,7 +113,7 @@ Route::middleware(['web', 'auth', 'role:owner,operating'])->group(function () {
     /*
     |--------------------------------------------------------------------------
     | PRD STOCK REQUESTS (Proses permintaan stok di gudang produksi)
-    | → owner + operating
+    | → owner + admin + operating (karena sudah di middleware atas)
     |--------------------------------------------------------------------------
      */
     Route::prefix('prd/stock-requests')
@@ -123,6 +123,7 @@ Route::middleware(['web', 'auth', 'role:owner,operating'])->group(function () {
             Route::get('/{stockRequest}/process', [RtsStockRequestProcessController::class, 'edit'])->name('edit');
             Route::post('/{stockRequest}/process', [RtsStockRequestProcessController::class, 'update'])->name('update');
             Route::get('/{stockRequest}', [RtsStockRequestProcessController::class, 'show'])->name('show');
+
         });
 });
 
@@ -134,9 +135,14 @@ Route::middleware(['web', 'auth', 'role:owner,admin'])->group(function () {
         ->name('rts.stock-requests.')
         ->group(function () {
             Route::get('/', [RtsStockRequestController::class, 'index'])->name('index');
+            // 🔹 QUICK TODAY HARUS DI ATAS {stockRequest}
+            Route::get('/today', [RtsStockRequestController::class, 'quickToday'])
+                ->name('today');
+
             Route::get('/create', [RtsStockRequestController::class, 'create'])->name('create');
             Route::post('/', [RtsStockRequestController::class, 'store'])->name('store');
-            Route::get('/{stockRequest}', [RtsStockRequestController::class, 'show'])->name('show');
+            Route::get('/{stockRequest}',
+                [RtsStockRequestController::class, 'show'])->name('show');
         });
 });
 

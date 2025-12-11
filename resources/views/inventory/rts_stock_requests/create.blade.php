@@ -1,20 +1,29 @@
+{{-- resources/views/inventory/rts_stock_requests/create.blade.php --}}
 @extends('layouts.app')
 
-@section('title', 'Stock Request • Gudang Packing (RTS)')
+@section('title', 'RTS • Permintaan Stok')
 
 @push('head')
     <style>
+        :root {
+            --rts-main: rgba(45, 212, 191, 1);
+            --rts-main-strong: rgba(15, 118, 110, 1);
+            --rts-main-soft: rgba(45, 212, 191, 0.14);
+        }
+
         .page-wrap {
             max-width: 1100px;
             margin-inline: auto;
             padding: .75rem .75rem 4rem;
+            position: relative;
+            z-index: 0;
         }
 
         body[data-theme="light"] .page-wrap {
             background: radial-gradient(circle at top left,
-                    rgba(59, 130, 246, 0.10) 0,
-                    rgba(45, 212, 191, 0.08) 26%,
-                    #f9fafb 60%);
+                    rgba(59, 130, 246, 0.08) 0,
+                    rgba(45, 212, 191, 0.1) 28%,
+                    #f9fafb 70%);
         }
 
         .card {
@@ -24,6 +33,8 @@
             box-shadow:
                 0 8px 24px rgba(15, 23, 42, 0.06),
                 0 0 0 1px rgba(15, 23, 42, 0.02);
+            position: relative;
+            z-index: 1;
         }
 
         .card-header {
@@ -33,6 +44,16 @@
 
         .card-body {
             padding: .75rem 1.25rem 1rem;
+        }
+
+        .page-title {
+            font-size: 1.05rem;
+            font-weight: 600;
+        }
+
+        .page-subtitle {
+            font-size: .85rem;
+            color: rgba(100, 116, 139, 1);
         }
 
         .section-title {
@@ -51,7 +72,7 @@
             border-radius: 999px;
             font-size: .75rem;
             border: 1px solid rgba(148, 163, 184, 0.55);
-            background: color-mix(in srgb, var(--card) 80%, rgba(59, 130, 246, .12));
+            background: color-mix(in srgb, var(--card) 80%, var(--rts-main-soft));
         }
 
         .badge-warehouse span.code {
@@ -113,7 +134,8 @@
             margin-top: .75rem;
             border-radius: 12px;
             border: 1px solid rgba(148, 163, 184, 0.35);
-            overflow: hidden;
+            position: relative;
+            overflow: visible;
         }
 
         .table {
@@ -155,6 +177,7 @@
             font-size: .75rem;
             border: 1px dashed rgba(148, 163, 184, 0.8);
             color: rgba(15, 23, 42, 0.8);
+            white-space: nowrap;
         }
 
         .stock-pill .label {
@@ -176,8 +199,12 @@
             font-weight: 500;
             padding: .35rem .9rem;
             cursor: pointer;
-            background: rgba(37, 99, 235, 1);
+            background: var(--rts-main-strong);
             color: white;
+        }
+
+        .btn:hover {
+            background: rgba(4, 120, 87, 1);
         }
 
         .btn-outline {
@@ -222,8 +249,8 @@
             border-radius: 999px;
             padding: .15rem .6rem;
             font-size: .75rem;
-            background: rgba(59, 130, 246, 0.12);
-            color: rgba(30, 64, 175, 1);
+            background: var(--rts-main-soft);
+            color: var(--rts-main-strong);
         }
 
         .remove-row-btn {
@@ -234,53 +261,62 @@
             color: rgba(248, 113, 113, 1);
         }
 
-        /* Modal stok summary sederhana */
-        .modal-backdrop {
+        /* ========= MODAL SUMMARY STOK (KHUSUS RTS) ========= */
+
+        .rts-modal-backdrop {
             position: fixed;
             inset: 0;
-            background: rgba(15, 23, 42, .35);
+            background: rgba(15, 23, 42, 0.55);
             display: none;
             align-items: center;
             justify-content: center;
-            z-index: 50;
+            z-index: 3000;
+            padding: 1rem;
         }
 
-        .modal-backdrop.show {
+        .rts-modal-backdrop.show {
             display: flex;
         }
 
-        .modal {
+        .rts-modal-panel {
             background: var(--card);
-            border-radius: 16px;
-            border: 1px solid rgba(148, 163, 184, .4);
+            border-radius: 18px;
+            border: 1px solid rgba(148, 163, 184, .45);
             box-shadow:
-                0 18px 45px rgba(15, 23, 42, 0.35),
+                0 22px 50px rgba(15, 23, 42, 0.40),
                 0 0 0 1px rgba(15, 23, 42, 0.05);
             max-width: 520px;
             width: 100%;
-            padding: 1rem 1.1rem 1rem;
+            max-height: 80vh;
+            display: flex;
+            flex-direction: column;
+            overflow: hidden;
+            transform: translateY(8px);
+            opacity: 0;
+            transition: opacity .18s ease-out, transform .18s ease-out;
         }
 
-        .modal-header {
+        .rts-modal-backdrop.show .rts-modal-panel {
+            opacity: 1;
+            transform: translateY(0);
+        }
+
+        .rts-modal-header {
             display: flex;
             justify-content: space-between;
             align-items: center;
             gap: .5rem;
-            margin-bottom: .4rem;
+            padding: .75rem .9rem .5rem;
+            border-bottom: 1px solid rgba(148, 163, 184, 0.4);
         }
 
-        .modal-header h3 {
+        .rts-modal-header h3 {
             font-size: .95rem;
             font-weight: 600;
+            margin: 0;
         }
 
-        .modal-body {
-            max-height: 360px;
-            overflow-y: auto;
-            font-size: .8rem;
-        }
-
-        .modal-close {
+        .rts-modal-close {
             border-radius: 999px;
             border: 1px solid transparent;
             width: 28px;
@@ -288,19 +324,39 @@
             display: inline-flex;
             align-items: center;
             justify-content: center;
-            font-size: 1rem;
+            font-size: 1.1rem;
             cursor: pointer;
             background: transparent;
             color: rgba(148, 163, 184, 1);
         }
 
-        .modal-close:hover {
+        .rts-modal-close:hover {
             background: rgba(148, 163, 184, 0.16);
+        }
+
+        .rts-modal-body {
+            padding: .4rem .9rem .8rem;
+            font-size: .8rem;
+            max-height: calc(80vh - 48px);
+            overflow-y: auto;
+        }
+
+        .rts-modal-body .item-label {
+            font-size: .78rem;
+            color: rgba(100, 116, 139, 1);
+            margin-bottom: .15rem;
+        }
+
+        .rts-modal-body .item-name {
+            font-size: .9rem;
+            font-weight: 600;
+            margin-bottom: .4rem;
         }
 
         .summary-table {
             width: 100%;
             border-collapse: collapse;
+            font-size: .8rem;
         }
 
         .summary-table th,
@@ -325,10 +381,22 @@
             .table-wrap {
                 border-radius: 10px;
                 overflow-x: auto;
+                overflow-y: visible;
             }
 
             .table {
                 min-width: 700px;
+            }
+
+            .rts-modal-backdrop {
+                align-items: flex-start;
+                padding: 4rem 1rem 1.5rem;
+            }
+
+            .rts-modal-panel {
+                width: 100%;
+                max-width: 100%;
+                border-radius: 18px 18px 14px 14px;
             }
         }
     </style>
@@ -340,18 +408,24 @@
             <div class="card-header">
                 <div class="flex items-center justify-between gap-2">
                     <div>
-                        <div class="section-title">Stock Request • RTS ➝ PRD</div>
-                        <div class="mt-1 text-sm text-slate-700 dark:text-slate-200">
-                            Permintaan stok dari <strong>Gudang Produksi</strong> ke
-                            <strong>Gudang Packing Online (RTS)</strong>.
+                        <div class="page-title">RTS • Permintaan Stok</div>
+                        <div class="page-subtitle mt-1">
+                            Permintaan barang dari Gudang Produksi ke Gudang RTS.
                         </div>
+                        @if (isset($prefillRequest))
+                            <div class="mt-1 text-xs text-amber-700">
+                                Mengedit permintaan tanggal
+                                <span class="mono">{{ $prefillRequest->date?->format('d M Y') }}</span>
+                                (data lama sudah diisi ulang di bawah).
+                            </div>
+                        @endif
                     </div>
                     <div class="hidden sm:flex flex-col items-end gap-1">
                         <div class="badge-warehouse">
                             <span class="code">{{ $prdWarehouse->code }}</span>
                             <span>{{ $prdWarehouse->name }}</span>
                         </div>
-                        <div style="font-size:.9rem; opacity:.7;">↓</div>
+                        <div style="font-size:.9rem; opacity:.7;">→</div>
                         <div class="badge-warehouse">
                             <span class="code">{{ $rtsWarehouse->code }}</span>
                             <span>{{ $rtsWarehouse->name }}</span>
@@ -370,7 +444,7 @@
                             <label for="date">Tanggal</label>
                             <input type="date" id="date" name="date"
                                 class="form-control @error('date') input-error @enderror"
-                                value="{{ old('date', now()->toDateString()) }}">
+                                value="{{ old('date', $prefillDate ?? now()->toDateString()) }}">
                             @error('date')
                                 <div class="text-error">{{ $message }}</div>
                             @enderror
@@ -394,7 +468,7 @@
                         <div class="form-group" style="grid-column: span 12 / span 12;">
                             <label for="notes">Catatan (opsional)</label>
                             <textarea id="notes" name="notes" class="form-control"
-                                placeholder="Contoh: Replenish stok FG untuk flash sale / promo...">{{ old('notes') }}</textarea>
+                                placeholder="Contoh: isi stok untuk promo, flash sale, dsb.">{{ old('notes', isset($prefillRequest) ? $prefillRequest->notes : '') }}</textarea>
                         </div>
                     </div>
 
@@ -403,7 +477,7 @@
                         <div class="flex items-center justify-between gap-2">
                             <div class="section-title">Detail Item</div>
                             <span class="badge-info">
-                                Pilih Finished Goods yang tersedia di Gudang Produksi.
+                                Pilih FG dari gudang produksi. Boleh request lebih besar dari stok live PRD.
                             </span>
                         </div>
 
@@ -420,29 +494,55 @@
                                 </thead>
                                 <tbody id="lines-body">
                                     @php
-                                        $oldLines = old('lines', [['item_id' => null, 'qty_request' => null]]);
+                                        use App\Models\Item;
+
+                                        // Satu sumber kebenaran:
+                                        // - kalau ada old('lines') → pakai itu
+                                        // - kalau tidak, pakai prefillLines dari controller (kalau ada)
+                                        // - fallback: 1 baris kosong
+                                        $formLines = old(
+                                            'lines',
+                                            $prefillLines ?? [['item_id' => null, 'qty_request' => null]],
+                                        );
                                     @endphp
 
-                                    @foreach ($oldLines as $i => $oldLine)
+                                    @foreach ($formLines as $i => $lineData)
+                                        @php
+                                            $itemId = $lineData['item_id'] ?? null;
+
+                                            // 1️⃣ coba cari di finishedGoodsItems (mungkin cuma item stok > 0)
+                                            $selectedItem = $itemId
+                                                ? $finishedGoodsItems->firstWhere('id', $itemId)
+                                                : null;
+
+                                            // 2️⃣ fallback: kalau tidak ketemu tapi ada item_id → ambil dari DB
+                                            if (!$selectedItem && $itemId) {
+                                                $selectedItem = Item::select('id', 'code', 'name')->find($itemId);
+                                            }
+
+                                            // 3️⃣ teks yang ditampilkan di input
+                                            $displayValue = $selectedItem
+                                                ? trim(
+                                                    ($selectedItem->code ?? '') . ' — ' . ($selectedItem->name ?? ''),
+                                                )
+                                                : '';
+                                        @endphp
+
                                         <tr class="line-row" data-row-index="{{ $i }}">
                                             <td class="mono align-top">
                                                 <span class="row-number">{{ $i + 1 }}</span>
                                             </td>
+
+                                            {{-- ITEM FG pakai x-item-suggest --}}
                                             <td>
-                                                <select name="lines[{{ $i }}][item_id]"
-                                                    class="form-control item-select" data-row-index="{{ $i }}">
-                                                    <option value="">— Pilih item —</option>
-                                                    @foreach ($finishedGoodsItems as $item)
-                                                        <option value="{{ $item->id }}"
-                                                            {{ (string) $item->id === (string) ($oldLine['item_id'] ?? '') ? 'selected' : '' }}>
-                                                            {{ $item->code ?? '' }} — {{ $item->name }}
-                                                        </option>
-                                                    @endforeach
-                                                </select>
-                                                @error("lines.$i.item_id")
+                                                <x-item-suggest :id-name="'lines[' . $i . '][item_id]'" :items="$finishedGoodsItems" type="finished_good"
+                                                    :extra-params="['warehouse_id' => $prdWarehouse->id]" placeholder="Kode / nama FG" :display-value="$displayValue"
+                                                    :id-value="(string) ($itemId ?? '')" />
+                                                @error('lines.' . $i . '.item_id')
                                                     <div class="text-error">{{ $message }}</div>
                                                 @enderror
                                             </td>
+
                                             <td>
                                                 <div class="flex items-center gap-2">
                                                     <div class="stock-pill">
@@ -451,23 +551,20 @@
                                                         <span class="label">pcs</span>
                                                     </div>
                                                     <button type="button" class="btn-ghost btn-icon btn-show-summary"
-                                                        title="Lihat stok di semua gudang"
+                                                        title="Lihat stok item ini di semua gudang"
                                                         data-row-index="{{ $i }}">
                                                         🔍
                                                     </button>
-                                                </div>
-                                                <div class="help-text">
-                                                    Stok live saat ini, bukan stok saat request disimpan.
                                                 </div>
                                             </td>
                                             <td>
                                                 <input type="number" min="0" step="1"
                                                     name="lines[{{ $i }}][qty_request]"
-                                                    class="form-control qty-input @error("lines.$i.qty_request") input-error @enderror"
+                                                    class="form-control js-next-focus qty-input @error('lines.' . $i . '.qty_request') input-error @enderror"
                                                     data-row-index="{{ $i }}"
-                                                    value="{{ $oldLine['qty_request'] ?? '' }}">
+                                                    value="{{ $lineData['qty_request'] ?? '' }}">
                                                 <div class="text-error qty-warning" style="display:none;"></div>
-                                                @error("lines.$i.qty_request")
+                                                @error('lines.' . $i . '.qty_request')
                                                     <div class="text-error">{{ $message }}</div>
                                                 @enderror
                                             </td>
@@ -501,15 +598,17 @@
         </div>
 
         {{-- Modal summary stok semua gudang --}}
-        <div class="modal-backdrop" id="stock-summary-backdrop">
-            <div class="modal">
-                <div class="modal-header">
+        <div class="rts-modal-backdrop" id="stock-summary-backdrop">
+            <div class="rts-modal-panel">
+                <div class="rts-modal-header">
                     <h3>Summary Stok per Gudang</h3>
-                    <button type="button" class="modal-close" id="stock-summary-close">×</button>
+                    <button type="button" class="rts-modal-close" id="stock-summary-close">×</button>
                 </div>
-                <div class="modal-body">
+                <div class="rts-modal-body">
                     <div id="stock-summary-content">
-                        <div class="help-text">Pilih item terlebih dahulu, lalu klik ikon 🔍 di baris.</div>
+                        <div class="help-text">
+                            Klik ikon 🔍 di baris item untuk lihat posisi stok di semua gudang.
+                        </div>
                     </div>
                 </div>
             </div>
@@ -517,363 +616,396 @@
     </div>
 @endsection
 
+@php
+    // Template x-item-suggest untuk baris baru (index diganti "__INDEX__" nanti di JS)
+    $itemSuggestTemplate = view('components.item-suggest', [
+        'idName' => 'lines[__INDEX__][item_id]',
+        'items' => $finishedGoodsItems,
+        'type' => 'finished_good',
+        'extraParams' => ['warehouse_id' => $prdWarehouse->id],
+        'placeholder' => 'Kode / nama FG',
+        'displayValue' => '',
+        'idValue' => '',
+    ])->render();
+@endphp
 @push('scripts')
     <script>
-        (function() {
-            const finishedGoods = @json(
-                $finishedGoodsItems->map(function ($item) {
-                    return [
-                        'id' => $item->id,
-                        'label' => trim(($item->code ?? '') . ' — ' . $item->name),
-                    ];
-                }));
+        document.addEventListener('DOMContentLoaded', function() {
+            (function() {
+                const sourceWarehouseId = {{ $prdWarehouse->id }};
+                const availableUrl = @json(route('api.stock.available'));
+                const summaryUrl = @json(route('api.stock.summary'));
+                const itemSuggestTemplate = @json($itemSuggestTemplate);
 
-            const sourceWarehouseId = {{ $prdWarehouse->id }};
-            const availableUrl = @json(route('api.stock.available'));
-            const summaryUrl = @json(route('api.stock.summary'));
-
-            const linesBody = document.getElementById('lines-body');
-            const addLineBtn = document.getElementById('add-line-btn');
-
-            let currentIndex = (function() {
-                const lastRow = linesBody.querySelector('tr.line-row:last-child');
-                return lastRow ? parseInt(lastRow.getAttribute('data-row-index')) + 1 : 0;
-            })();
-
-            function createLineRow(index) {
-                const tr = document.createElement('tr');
-                tr.classList.add('line-row');
-                tr.setAttribute('data-row-index', index);
-
-                tr.innerHTML = `
-                    <td class="mono align-top">
-                        <span class="row-number">${index + 1}</span>
-                    </td>
-                    <td>
-                        <select name="lines[${index}][item_id]"
-                                class="form-control item-select"
-                                data-row-index="${index}">
-                            <option value="">— Pilih item —</option>
-                            ${finishedGoods.map(it =>
-                                `<option value="${it.id}">${it.label}</option>`
-                            ).join('')}
-                        </select>
-                    </td>
-                    <td>
-                        <div class="flex items-center gap-2">
-                            <div class="stock-pill">
-                                <span class="label">Stok PRD:</span>
-                                <span class="value mono stock-display" data-available="0">-</span>
-                                <span class="label">pcs</span>
-                            </div>
-                            <button type="button"
-                                    class="btn-ghost btn-icon btn-show-summary"
-                                    title="Lihat stok di semua gudang"
-                                    data-row-index="${index}">
-                                🔍
-                            </button>
-                        </div>
-                        <div class="help-text">
-                            Stok live saat ini, bukan stok saat request disimpan.
-                        </div>
-                    </td>
-                    <td>
-                        <input type="number"
-                               min="0"
-                               step="1"
-                               name="lines[${index}][qty_request]"
-                               class="form-control qty-input"
-                               data-row-index="${index}">
-                        <div class="text-error qty-warning" style="display:none;"></div>
-                    </td>
-                    <td class="text-right">
-                        <button type="button"
-                                class="btn-ghost remove-row-btn"
-                                data-row-index="${index}"
-                                title="Hapus baris">
-                            ✕
-                        </button>
-                    </td>
-                `;
-
-                return tr;
-            }
-
-            function renumberRows() {
-                const rows = linesBody.querySelectorAll('tr.line-row');
-                rows.forEach((row, idx) => {
-                    row.querySelector('.row-number').textContent = idx + 1;
-                });
-            }
-
-            function handleAddLine() {
-                const row = createLineRow(currentIndex++);
-                linesBody.appendChild(row);
-            }
-
-            function findRowByIndex(rowIndex) {
-                return linesBody.querySelector(`tr.line-row[data-row-index="${rowIndex}"]`);
-            }
-
-            async function fetchAvailableStock(rowIndex) {
-                const row = findRowByIndex(rowIndex);
-                if (!row) return;
-
-                const select = row.querySelector('.item-select');
-                const itemId = select.value;
-                const stockSpan = row.querySelector('.stock-display');
-                const warningEl = row.querySelector('.qty-warning');
-                const qtyInput = row.querySelector('.qty-input');
-
-                if (!itemId) {
-                    stockSpan.textContent = '-';
-                    stockSpan.dataset.available = '0';
-                    if (warningEl) {
-                        warningEl.style.display = 'none';
-                    }
-                    qtyInput && qtyInput.classList.remove('input-error');
-                    return;
-                }
-
-                stockSpan.textContent = '…';
-                stockSpan.dataset.available = '0';
-                if (warningEl) {
-                    warningEl.style.display = 'none';
-                }
-                qtyInput && qtyInput.classList.remove('input-error');
-
-                try {
-                    const url = new URL(availableUrl, window.location.origin);
-                    url.searchParams.set('warehouse_id', String(sourceWarehouseId));
-                    url.searchParams.set('item_id', String(itemId));
-
-                    const res = await fetch(url.toString(), {
-                        headers: {
-                            'Accept': 'application/json'
-                        }
-                    });
-
-                    if (!res.ok) {
-                        throw new Error('Gagal mengambil stok');
-                    }
-
-                    const data = await res.json();
-                    const available = typeof data.available === 'number' ?
-                        data.available :
-                        parseFloat(data.available || 0);
-
-                    stockSpan.textContent = isNaN(available) ? '-' : available;
-                    stockSpan.dataset.available = String(available);
-
-                    // Re-check qty warning
-                    if (qtyInput && qtyInput.value) {
-                        validateQtyAgainstStock(qtyInput, available);
-                    }
-
-                } catch (e) {
-                    stockSpan.textContent = 'ERR';
-                    stockSpan.dataset.available = '0';
-                    if (warningEl) {
-                        warningEl.style.display = 'block';
-                        warningEl.textContent = 'Gagal mengambil stok, coba lagi.';
-                    }
-                }
-            }
-
-            function validateQtyAgainstStock(inputEl, available) {
-                const row = inputEl.closest('tr.line-row');
-                if (!row) return;
-
-                const warningEl = row.querySelector('.qty-warning');
-                const value = parseFloat(inputEl.value || '0');
-                const avail = typeof available === 'number' ?
-                    available :
-                    parseFloat(row.querySelector('.stock-display')?.dataset.available || '0');
-
-                if (!value || isNaN(value)) {
-                    inputEl.classList.remove('input-error');
-                    if (warningEl) warningEl.style.display = 'none';
-                    return;
-                }
-
-                if (value > avail && avail > 0) {
-                    inputEl.classList.add('input-error');
-                    if (warningEl) {
-                        warningEl.style.display = 'block';
-                        warningEl.textContent =
-                            `Qty melebihi stok Gudang Produksi (stok sekarang: ${avail}).` +
-                            ` Sistem tetap akan cek ulang saat disimpan.`;
-                    }
-                } else if (value > 0 && avail === 0) {
-                    inputEl.classList.add('input-error');
-                    if (warningEl) {
-                        warningEl.style.display = 'block';
-                        warningEl.textContent =
-                            'Stok Gudang Produksi terdeteksi 0. Pastikan stok sudah masuk PRD.';
-                    }
-                } else {
-                    inputEl.classList.remove('input-error');
-                    if (warningEl) warningEl.style.display = 'none';
-                }
-            }
-
-            async function showStockSummary(rowIndex) {
-                const row = findRowByIndex(rowIndex);
-                if (!row) return;
-
-                const select = row.querySelector('.item-select');
-                const itemId = select.value;
-
-                if (!itemId) {
-                    alert('Pilih item terlebih dahulu.');
-                    return;
-                }
+                const linesBody = document.getElementById('lines-body');
+                const addLineBtn = document.getElementById('add-line-btn');
 
                 const backdrop = document.getElementById('stock-summary-backdrop');
-                const content = document.getElementById('stock-summary-content');
+                const closeBtn = document.getElementById('stock-summary-close');
+                const summaryContent = document.getElementById('stock-summary-content');
 
-                backdrop.classList.add('show');
-                content.innerHTML = '<div class="help-text">Mengambil data stok...</div>';
+                if (!linesBody) {
+                    console.error('RTS Stock Request: #lines-body tidak ditemukan');
+                    return;
+                }
 
-                try {
-                    const url = new URL(summaryUrl, window.location.origin);
-                    url.searchParams.set('item_id', String(itemId));
+                let currentIndex = (function() {
+                    const lastRow = linesBody.querySelector('tr.line-row:last-child');
+                    return lastRow ? parseInt(lastRow.getAttribute('data-row-index')) + 1 : 0;
+                })();
 
-                    const res = await fetch(url.toString(), {
-                        headers: {
-                            'Accept': 'application/json'
-                        }
-                    });
+                function createLineRow(index) {
+                    const tr = document.createElement('tr');
+                    tr.classList.add('line-row');
+                    tr.setAttribute('data-row-index', index);
 
-                    if (!res.ok) {
-                        throw new Error('Gagal mengambil summary stok');
+                    const itemSuggestHtml = itemSuggestTemplate.replace(/__INDEX__/g, index);
+
+                    tr.innerHTML = `
+                        <td class="mono align-top">
+                            <span class="row-number">${index + 1}</span>
+                        </td>
+                        <td>
+                            ${itemSuggestHtml}
+                        </td>
+                        <td>
+                            <div class="flex items-center gap-2">
+                                <div class="stock-pill">
+                                    <span class="label">Stok PRD:</span>
+                                    <span class="value mono stock-display" data-available="0">-</span>
+                                    <span class="label">pcs</span>
+                                </div>
+                                <button type="button"
+                                        class="btn-ghost btn-icon btn-show-summary"
+                                        title="Lihat stok item ini di semua gudang"
+                                        data-row-index="${index}">
+                                    🔍
+                                </button>
+                            </div>
+                        </td>
+                        <td>
+                            <input type="number"
+                                   min="0"
+                                   step="1"
+                                   name="lines[${index}][qty_request]"
+                                   class="form-control qty-input js-next-focus"
+                                   data-row-index="${index}">
+                            <div class="text-error qty-warning" style="display:none;"></div>
+                        </td>
+                        <td class="text-right">
+                            <button type="button"
+                                    class="btn-ghost remove-row-btn"
+                                    data-row-index="${index}"
+                                    title="Hapus baris">
+                                ✕
+                            </button>
+                        </td>
+                    `;
+
+                    if (window.initItemSuggestInputs) {
+                        window.initItemSuggestInputs(tr);
                     }
 
-                    const data = await res.json();
-                    const item = data.item || {};
-                    const warehouses = data.warehouses || [];
+                    return tr;
+                }
 
-                    if (!warehouses.length) {
-                        content.innerHTML = `
+                function renumberRows() {
+                    const rows = linesBody.querySelectorAll('tr.line-row');
+                    rows.forEach((row, idx) => {
+                        const num = row.querySelector('.row-number');
+                        if (num) num.textContent = idx + 1;
+                    });
+                }
+
+                function handleAddLine() {
+                    const row = createLineRow(currentIndex++);
+                    linesBody.appendChild(row);
+                }
+
+                function findRowByIndex(rowIndex) {
+                    return linesBody.querySelector(`tr.line-row[data-row-index="${rowIndex}"]`);
+                }
+
+                async function fetchAvailableStock(rowIndex) {
+                    const row = findRowByIndex(rowIndex);
+                    if (!row) return;
+
+                    const hiddenId = row.querySelector('.js-item-suggest-id');
+                    const itemId = hiddenId ? hiddenId.value : '';
+
+                    const stockSpan = row.querySelector('.stock-display');
+                    const warningEl = row.querySelector('.qty-warning');
+                    const qtyInput = row.querySelector('.qty-input');
+
+                    if (!stockSpan) return;
+
+                    if (!itemId) {
+                        stockSpan.textContent = '-';
+                        stockSpan.dataset.available = '0';
+                        if (warningEl) warningEl.style.display = 'none';
+                        qtyInput && qtyInput.classList.remove('input-error');
+                        return;
+                    }
+
+                    stockSpan.textContent = '…';
+                    stockSpan.dataset.available = '0';
+                    if (warningEl) warningEl.style.display = 'none';
+                    qtyInput && qtyInput.classList.remove('input-error');
+
+                    try {
+                        const url = new URL(availableUrl, window.location.origin);
+                        url.searchParams.set('warehouse_id', String(sourceWarehouseId));
+                        url.searchParams.set('item_id', String(itemId));
+
+                        const res = await fetch(url.toString(), {
+                            headers: {
+                                'Accept': 'application/json'
+                            }
+                        });
+
+                        if (!res.ok) {
+                            throw new Error('Gagal mengambil stok');
+                        }
+
+                        const data = await res.json();
+                        const available = typeof data.available === 'number' ?
+                            data.available :
+                            parseFloat(data.available || 0);
+
+                        stockSpan.textContent = isNaN(available) ? '-' : available;
+                        stockSpan.dataset.available = String(available);
+
+                        if (qtyInput && qtyInput.value) {
+                            validateQtyAgainstStock(qtyInput, available);
+                        }
+
+                    } catch (e) {
+                        console.error(e);
+                        stockSpan.textContent = 'ERR';
+                        stockSpan.dataset.available = '0';
+                        if (warningEl) {
+                            warningEl.style.display = 'block';
+                            warningEl.textContent = 'Gagal mengambil stok, coba lagi.';
+                        }
+                    }
+                }
+
+                // Sekarang hanya info, tidak kasih error merah
+                function validateQtyAgainstStock(inputEl, available) {
+                    const row = inputEl.closest('tr.line-row');
+                    if (!row) return;
+
+                    const warningEl = row.querySelector('.qty-warning');
+                    const stockSpan = row.querySelector('.stock-display');
+
+                    const value = parseFloat(inputEl.value || '0');
+                    const avail = typeof available === 'number' ?
+                        available :
+                        parseFloat(stockSpan?.dataset.available || '0');
+
+                    inputEl.classList.remove('input-error');
+                    if (warningEl) {
+                        warningEl.style.display = 'none';
+                        warningEl.textContent = '';
+                    }
+                }
+
+                async function showStockSummary(rowIndex) {
+                    if (!backdrop || !summaryContent) return;
+
+                    const row = findRowByIndex(rowIndex);
+                    let itemId = '';
+
+                    if (row) {
+                        const hiddenId = row.querySelector('.js-item-suggest-id');
+                        itemId = hiddenId ? hiddenId.value : '';
+                    }
+
+                    backdrop.classList.add('show');
+
+                    if (!itemId) {
+                        summaryContent.innerHTML = `
                             <div class="help-text">
-                                Tidak ada data stok yang tercatat untuk item ini.
+                                Pilih item dulu di baris ini, lalu klik ikon 🔍 lagi.
                             </div>
                         `;
                         return;
                     }
 
-                    const rowsHtml = warehouses.map(w => `
-                        <tr>
-                            <td class="mono">${w.code ?? ''}</td>
-                            <td>${w.name ?? ''}</td>
-                            <td class="mono">${w.on_hand ?? 0}</td>
-                            <td class="mono">${w.reserved ?? 0}</td>
-                            <td class="mono">${w.available ?? 0}</td>
-                        </tr>
-                    `).join('');
+                    summaryContent.innerHTML = '<div class="help-text">Mengambil data stok...</div>';
 
-                    content.innerHTML = `
-                        <div class="mb-2">
-                            <div style="font-size:.78rem; color:rgba(100,116,139,1);">Item</div>
-                            <div style="font-size:.88rem; font-weight:600;">
-                                ${(item.code ?? '')} ${(item.name ? '— ' + item.name : '')}
-                            </div>
-                        </div>
-                        <table class="summary-table">
-                            <thead>
-                                <tr>
-                                    <th>Kode</th>
-                                    <th>Gudang</th>
-                                    <th>On Hand</th>
-                                    <th>Reserved</th>
-                                    <th>Available</th>
-                                </tr>
-                            </thead>
-                            <tbody>
-                                ${rowsHtml}
-                            </tbody>
-                        </table>
-                    `;
-                } catch (e) {
-                    content.innerHTML = `
-                        <div class="text-error">
-                            Gagal mengambil data summary stok. Coba lagi beberapa saat.
-                        </div>
-                    `;
-                }
-            }
+                    try {
+                        const url = new URL(summaryUrl, window.location.origin);
+                        url.searchParams.set('item_id', String(itemId));
 
-            function attachGlobalListeners() {
-                // Tambah baris
-                addLineBtn?.addEventListener('click', handleAddLine);
-
-                // Delegasi event untuk body table
-                linesBody.addEventListener('change', function(e) {
-                    const target = e.target;
-
-                    if (target.classList.contains('item-select')) {
-                        const rowIndex = target.getAttribute('data-row-index');
-                        fetchAvailableStock(rowIndex);
-                    }
-
-                    if (target.classList.contains('qty-input')) {
-                        validateQtyAgainstStock(target);
-                    }
-                });
-
-                linesBody.addEventListener('click', function(e) {
-                    const target = e.target;
-
-                    if (target.classList.contains('remove-row-btn')) {
-                        const rowIndex = target.getAttribute('data-row-index');
-                        const row = findRowByIndex(rowIndex);
-                        if (row) {
-                            if (linesBody.querySelectorAll('tr.line-row').length <= 1) {
-                                // jangan sampai semua baris dihapus
-                                row.querySelector('.item-select').value = '';
-                                row.querySelector('.qty-input').value = '';
-                                const stockSpan = row.querySelector('.stock-display');
-                                stockSpan.textContent = '-';
-                                stockSpan.dataset.available = '0';
-                                const warn = row.querySelector('.qty-warning');
-                                if (warn) warn.style.display = 'none';
-                                return;
+                        const res = await fetch(url.toString(), {
+                            headers: {
+                                'Accept': 'application/json'
                             }
-                            row.remove();
-                            renumberRows();
+                        });
+
+                        if (!res.ok) {
+                            throw new Error('Gagal mengambil summary stok');
                         }
+
+                        const data = await res.json();
+                        const item = data.item || {};
+                        const warehouses = Array.isArray(data.warehouses) ? data.warehouses : [];
+
+                        if (!warehouses.length) {
+                            summaryContent.innerHTML = `
+                                <div class="help-text">
+                                    Belum ada data stok untuk item ini.
+                                </div>
+                            `;
+                            return;
+                        }
+
+                        const itemLabel = (item.code || item.name) ?
+                            `${item.code ?? ''} ${item.name ? '— ' + item.name : ''}` :
+                            `Item ID: ${itemId}`;
+
+                        const rowsHtml = warehouses.map(w => `
+                            <tr>
+                                <td class="mono">${w.code ?? ''}</td>
+                                <td>${w.name ?? ''}</td>
+                                <td class="mono">${w.on_hand ?? 0}</td>
+                                <td class="mono">${w.reserved ?? 0}</td>
+                                <td class="mono">${w.available ?? 0}</td>
+                            </tr>
+                        `).join('');
+
+                        summaryContent.innerHTML = `
+                            <div class="item-label">Item</div>
+                            <div class="item-name">${itemLabel}</div>
+                            <table class="summary-table">
+                                <thead>
+                                    <tr>
+                                        <th>Kode</th>
+                                        <th>Gudang</th>
+                                        <th>On Hand</th>
+                                        <th>Reserved</th>
+                                        <th>Available</th>
+                                    </tr>
+                                </thead>
+                                <tbody>
+                                    ${rowsHtml}
+                                </tbody>
+                            </table>
+                        `;
+                    } catch (e) {
+                        console.error(e);
+                        summaryContent.innerHTML = `
+                            <div class="text-error">
+                                Gagal mengambil summary stok. Coba lagi beberapa saat.
+                            </div>
+                        `;
                     }
+                }
 
-                    if (target.classList.contains('btn-show-summary')) {
-                        const rowIndex = target.getAttribute('data-row-index');
-                        showStockSummary(rowIndex);
-                    }
-                });
+                function attachGlobalListeners() {
+                    addLineBtn?.addEventListener('click', handleAddLine);
 
-                // Modal summary
-                const backdrop = document.getElementById('stock-summary-backdrop');
-                const closeBtn = document.getElementById('stock-summary-close');
+                    // Change events (item & qty)
+                    linesBody.addEventListener('change', function(e) {
+                        const target = e.target;
 
-                closeBtn?.addEventListener('click', () => {
-                    backdrop.classList.remove('show');
-                });
+                        if (target.classList.contains('js-item-suggest-id')) {
+                            const row = target.closest('tr.line-row');
+                            if (row) {
+                                const rowIndex = row.getAttribute('data-row-index');
+                                fetchAvailableStock(rowIndex);
+                            }
+                        }
 
-                backdrop?.addEventListener('click', (e) => {
-                    if (e.target === backdrop) {
-                        backdrop.classList.remove('show');
-                    }
-                });
+                        if (target.classList.contains('qty-input')) {
+                            validateQtyAgainstStock(target);
+                        }
+                    });
 
-                // Auto-fetch stok untuk baris yang sudah punya item (old input)
-                const existingSelects = linesBody.querySelectorAll('.item-select');
-                existingSelects.forEach(select => {
-                    if (select.value) {
-                        fetchAvailableStock(select.getAttribute('data-row-index'));
-                    }
-                });
-            }
+                    // Click events (hapus baris, summary stok)
+                    linesBody.addEventListener('click', function(e) {
+                        const removeBtn = e.target.closest('.remove-row-btn');
+                        const summaryBtn = e.target.closest('.btn-show-summary');
 
-            attachGlobalListeners();
-        })();
+                        if (removeBtn) {
+                            const rowIndex = removeBtn.getAttribute('data-row-index');
+                            const row = findRowByIndex(rowIndex);
+                            if (row) {
+                                if (linesBody.querySelectorAll('tr.line-row').length <= 1) {
+                                    // Kalau cuma 1 baris, jangan dihapus, cukup clear
+                                    const wrap = row.querySelector('.item-suggest-wrap');
+                                    if (wrap) {
+                                        const input = wrap.querySelector('.js-item-suggest-input');
+                                        const hiddenId = wrap.querySelector('.js-item-suggest-id');
+                                        const hiddenCat = wrap.querySelector(
+                                            '.js-item-suggest-category');
+
+                                        if (input) input.value = '';
+                                        if (hiddenId) hiddenId.value = '';
+                                        if (hiddenCat) hiddenCat.value = '';
+                                    }
+
+                                    const qtyInput = row.querySelector('.qty-input');
+                                    if (qtyInput) qtyInput.value = '';
+
+                                    const stockSpan = row.querySelector('.stock-display');
+                                    if (stockSpan) {
+                                        stockSpan.textContent = '-';
+                                        stockSpan.dataset.available = '0';
+                                    }
+
+                                    const warn = row.querySelector('.qty-warning');
+                                    if (warn) warn.style.display = 'none';
+
+                                    return;
+                                }
+
+                                row.remove();
+                                renumberRows();
+                            }
+                        }
+
+                        if (summaryBtn) {
+                            const rowIndex = summaryBtn.getAttribute('data-row-index');
+                            showStockSummary(rowIndex);
+                        }
+                    });
+
+                    // Modal close (klik X / klik backdrop)
+                    closeBtn?.addEventListener('click', () => {
+                        backdrop?.classList.remove('show');
+                    });
+
+                    backdrop?.addEventListener('click', (e) => {
+                        if (e.target === backdrop) {
+                            backdrop.classList.remove('show');
+                        }
+                    });
+                }
+
+                // 🔹 1) Pasang semua listener dulu
+                attachGlobalListeners();
+
+                // 🔹 2) Init item-suggest untuk seluruh tbody
+                if (window.initItemSuggestInputs) {
+                    window.initItemSuggestInputs(linesBody);
+                }
+
+                // 🔹 3) Fetch stok untuk semua baris yang sudah punya item (old()/prefill)
+                (function initExistingStocks() {
+                    const existingHiddenIds = linesBody.querySelectorAll('.js-item-suggest-id');
+                    existingHiddenIds.forEach(hidden => {
+                        if (hidden.value) {
+                            const row = hidden.closest('tr.line-row');
+                            if (row) {
+                                const rowIndex = row.getAttribute('data-row-index');
+                                fetchAvailableStock(rowIndex);
+                            }
+                        }
+                    });
+                })();
+            })();
+        });
     </script>
 @endpush

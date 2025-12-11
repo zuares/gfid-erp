@@ -36,7 +36,7 @@ class RtsStockRequestController extends Controller
 
         switch ($period) {
             case 'week':
-                $dateFrom = Carbon::now()->startOfWeek(); // Senin
+                $dateFrom = Carbon::now()->startOfWeek();
                 $dateTo = Carbon::now()->endOfWeek();
                 break;
 
@@ -57,26 +57,26 @@ class RtsStockRequestController extends Controller
                 break;
         }
 
-        // Helper closure untuk apply filter tanggal ke query manapun
         $applyDateFilter = function ($query) use ($dateFrom, $dateTo) {
             if ($dateFrom && $dateTo) {
                 $query->whereBetween('date', [
-                    $dateFrom->copy()->startOfDay(), // 00:00:00
-                    $dateTo->copy()->endOfDay(), // 23:59:59
+                    $dateFrom->copy()->startOfDay(),
+                    $dateTo->copy()->endOfDay(),
                 ]);
             }
+
             return $query;
         };
 
         // ========== BASE QUERY: hanya RTS Replenish ==========
         $baseQuery = StockRequest::rtsReplenish()
-            ->with(['sourceWarehouse', 'destinationWarehouse'])
+            ->with(['sourceWarehouse', 'destinationWarehouse', 'lines.item', 'requestedBy'])
             ->withSum('lines as total_requested_qty', 'qty_request')
             ->withSum('lines as total_issued_qty', 'qty_issued');
 
         $baseQuery = $applyDateFilter($baseQuery);
 
-        // ========== DASHBOARD STATS (ikut period juga) ==========
+        // ========== DASHBOARD STATS ==========
         $statsBase = StockRequest::rtsReplenish();
         $statsBase = $applyDateFilter($statsBase);
 
@@ -88,7 +88,6 @@ class RtsStockRequestController extends Controller
         ];
         $stats['pending'] = $stats['submitted'] + $stats['partial'];
 
-        // Outstanding qty (request - issued) untuk semua dokumen dalam period
         $outstandingQty = (clone $statsBase)
             ->withSum('lines as total_requested_qty', 'qty_request')
             ->withSum('lines as total_issued_qty', 'qty_issued')
@@ -96,6 +95,7 @@ class RtsStockRequestController extends Controller
             ->sum(function ($req) {
                 $reqQty = (float) ($req->total_requested_qty ?? 0);
                 $issuedQty = (float) ($req->total_issued_qty ?? 0);
+
                 return max($reqQty - $issuedQty, 0);
             });
 
@@ -116,13 +116,11 @@ class RtsStockRequestController extends Controller
                 break;
 
             case 'pending':
-                // Pending = submitted + partial
                 $listQuery->whereIn('status', ['submitted', 'partial']);
                 break;
 
             case 'all':
             default:
-                // tidak filter status
                 $statusFilter = 'all';
                 break;
         }
@@ -144,16 +142,49 @@ class RtsStockRequestController extends Controller
 
     /**
      * Form buat Stock Request dari RTS ke PRD.
+     * RTS boleh request item meskipun stok di WH-PRD sedang 0 / kurang.
      */
-    public function create(): View
+
+    public function create(Request $request): View
     {
         $prdWarehouse = Warehouse::where('code', 'WH-PRD')->firstOrFail();
         $rtsWarehouse = Warehouse::where('code', 'WH-RTS')->firstOrFail();
 
-        // Item yang saldo stok > 0 di WH-PRD
+        // ====== TARGET TANGGAL (UNTUK PREFILL) ======
+        $dateParam = $request->input('date');
+        $targetDate = $dateParam
+        ? Carbon::parse($dateParam)->startOfDay()
+        : Carbon::today()->startOfDay();
+
+        // Cari dokumen RTS hari itu (WH-PRD → WH-RTS)
+        $prefillRequest = StockRequest::rtsReplenish()
+            ->whereDate('date', $targetDate->toDateString())
+            ->where('source_warehouse_id', $prdWarehouse->id)
+            ->where('destination_warehouse_id', $rtsWarehouse->id)
+            ->with(['lines'])
+            ->orderByDesc('id')
+            ->first();
+
+        $prefillDate = $targetDate->toDateString();
+        $prefillLines = null;
+
+        if ($prefillRequest) {
+            // Pakai tanggal dokumen (kalau beda)
+            $prefillDate = $prefillRequest->date?->toDateString() ?? $prefillDate;
+
+            // Prefill baris: item + qty_request (+ notes kalau nanti mau dipakai)
+            $prefillLines = $prefillRequest->lines->map(function ($line) {
+                return [
+                    'item_id' => $line->item_id,
+                    'qty_request' => $line->qty_request,
+                    // 'notes'    => $line->notes, // kalau mau tambahin kolom catatan di form
+                ];
+            })->toArray();
+        }
+
+        // Fallback item list dari WH-PRD (tetap sama)
         $finishedGoodsItems = Item::whereHas('inventoryStocks', function ($q) use ($prdWarehouse) {
-            $q->where('warehouse_id', $prdWarehouse->id)
-                ->where('qty', '>', 0); // atau qty_available
+            $q->where('warehouse_id', $prdWarehouse->id);
         })
             ->orderBy('name')
             ->get();
@@ -162,11 +193,21 @@ class RtsStockRequestController extends Controller
             'prdWarehouse' => $prdWarehouse,
             'rtsWarehouse' => $rtsWarehouse,
             'finishedGoodsItems' => $finishedGoodsItems,
+            // data prefill
+            'prefillDate' => $prefillDate,
+            'prefillLines' => $prefillLines,
+            'prefillRequest' => $prefillRequest,
         ]);
     }
 
     /**
-     * Simpan Stock Request dari RTS.
+     * Simpan / UPDATE Stock Request dari RTS untuk TANGGAL yang sama.
+     *
+     * ✅ RTS boleh request melebihi stok PRD (backend TIDAK memblokir),
+     *    sistem hanya menyimpan snapshot stok untuk referensi.
+     * ✅ Jika sudah ada dokumen RTS hari itu (kombinasi WH-PRD → WH-RTS, status submitted/partial),
+     *    MAKA dokumen tersebut DIOVERWRITE isinya dengan data baru dari form.
+     *    (code tidak berubah, hanya lines & notes yang di-update).
      */
     public function store(Request $request): RedirectResponse
     {
@@ -185,48 +226,69 @@ class RtsStockRequestController extends Controller
             'lines.*.qty_request.required' => 'Isi qty untuk setiap baris.',
         ]);
 
+        $date = Carbon::parse($validated['date'])->startOfDay();
         $sourceWarehouseId = (int) $validated['source_warehouse_id'];
+        $destinationWarehouseId = (int) $validated['destination_warehouse_id'];
 
-        // Validasi stok di backend per item
-        $lineErrors = [];
-        foreach ($validated['lines'] as $index => $line) {
-            $itemId = (int) $line['item_id'];
-            $qtyRequest = (float) $line['qty_request'];
+        $stockRequest = null;
+        $wasUpdated = false;
 
-            $available = $this->inventory->getAvailableStock($sourceWarehouseId, $itemId);
+        DB::transaction(function () use (
+            &$stockRequest,
+            &$wasUpdated,
+            $validated,
+            $date,
+            $sourceWarehouseId,
+            $destinationWarehouseId
+        ) {
+            // 🔍 Cek apakah sudah ada dokumen RTS di tanggal yang sama
+            $existing = StockRequest::rtsReplenish()
+                ->whereDate('date', $date)
+                ->where('source_warehouse_id', $sourceWarehouseId)
+                ->where('destination_warehouse_id', $destinationWarehouseId)
+                ->whereIn('status', ['submitted', 'partial']) // yang masih jalan
+                ->lockForUpdate()
+                ->latest('id')
+                ->first();
 
-            if ($qtyRequest > $available) {
-                $lineErrors["lines.$index.qty_request"] =
-                    "Qty melebihi stok di gudang asal (stok saat ini: {$available}).";
+            if ($existing) {
+                // 📌 MODE UPDATE: pakai dokumen lama, ganti isinya.
+                $wasUpdated = true;
+                $stockRequest = $existing;
+
+                // Update header seperlunya (date & notes)
+                $stockRequest->date = $date;
+                // kalau notes baru diisi, replace; kalau kosong, biarkan notes lama
+                if (array_key_exists('notes', $validated)) {
+                    $stockRequest->notes = $validated['notes'] ?? null;
+                }
+                $stockRequest->save();
+
+                // Hapus semua lines lama → diganti full dari input baru
+                $stockRequest->lines()->delete();
+            } else {
+                // 🆕 MODE CREATE BARU
+                $wasUpdated = false;
+                $code = $this->generateCodeForDate($date);
+
+                $stockRequest = StockRequest::create([
+                    'code' => $code,
+                    'date' => $date,
+                    'purpose' => 'rts_replenish',
+                    'source_warehouse_id' => $sourceWarehouseId,
+                    'destination_warehouse_id' => $destinationWarehouseId,
+                    'status' => 'submitted', // langsung submit ke PRD
+                    'requested_by_user_id' => Auth::id(),
+                    'notes' => $validated['notes'] ?? null,
+                ]);
             }
-        }
 
-        if (!empty($lineErrors)) {
-            return back()
-                ->withErrors($lineErrors)
-                ->withInput();
-        }
-
-        // Generate kode dokumen sederhana: SR-YYYYMMDD-###
-        $date = Carbon::parse($validated['date']);
-        $code = $this->generateCodeForDate($date);
-
-        DB::transaction(function () use ($validated, $date, $code, $sourceWarehouseId) {
-            $stockRequest = StockRequest::create([
-                'code' => $code,
-                'date' => $date,
-                'purpose' => 'rts_replenish',
-                'source_warehouse_id' => $validated['source_warehouse_id'],
-                'destination_warehouse_id' => $validated['destination_warehouse_id'],
-                'status' => 'submitted', // langsung submit ke PRD
-                'requested_by_user_id' => Auth::id(),
-                'notes' => $validated['notes'] ?? null,
-            ]);
-
+            // 🔁 Tulis ulang semua lines berdasarkan input terbaru
             foreach ($validated['lines'] as $i => $lineData) {
                 $itemId = (int) $lineData['item_id'];
                 $qtyRequest = (float) $lineData['qty_request'];
 
+                // Snapshot stok saat request (bisa dipakai buat analisa over-request)
                 $available = $this->inventory->getAvailableStock($sourceWarehouseId, $itemId);
 
                 StockRequestLine::create([
@@ -241,9 +303,15 @@ class RtsStockRequestController extends Controller
             }
         });
 
+        // 🔁 Redirect ke SHOW dokumen yang sama (baik baru ataupun update)
         return redirect()
-            ->route('rts.stock-requests.index')
-            ->with('status', 'Stock Request berhasil dibuat dan dikirim ke Gudang Produksi.');
+            ->route('rts.stock-requests.show', $stockRequest)
+            ->with(
+                'status',
+                $wasUpdated
+                ? 'Permintaan stok RTS untuk hari ini berhasil diperbarui.'
+                : 'Stock Request berhasil dibuat dan dikirim ke Gudang Produksi.'
+            );
     }
 
     /**
@@ -260,10 +328,82 @@ class RtsStockRequestController extends Controller
             'requestedBy',
         ]);
 
-        // 🔧 FIX: jangan compact('request') — variabelnya adalah $stockRequest
+        $lines = $stockRequest->lines;
+
+        // Summary dasar
+        $totalLines = $lines->count();
+        $totalRequestedQty = $lines->sum(function ($line) {
+            return (float) ($line->qty_request ?? 0);
+        });
+        $totalSnapshotQty = $lines->whereNotNull('stock_snapshot_at_request')->sum(function ($line) {
+            return (float) ($line->stock_snapshot_at_request ?? 0);
+        });
+        $totalIssuedQty = $lines->whereNotNull('qty_issued')->sum(function ($line) {
+            return (float) ($line->qty_issued ?? 0);
+        });
+
+        // Summary over-request
+        $overLinesCount = 0;
+        $overQtyTotal = 0.0;
+
+        foreach ($lines as $line) {
+            $qtyRequest = (float) ($line->qty_request ?? 0);
+            $snapshot = $line->stock_snapshot_at_request !== null
+            ? (float) $line->stock_snapshot_at_request
+            : null;
+
+            if ($snapshot !== null && $qtyRequest > $snapshot) {
+                $overLinesCount++;
+                $overQtyTotal += max($qtyRequest - $snapshot, 0);
+            }
+        }
+
+        $summary = [
+            'total_lines' => $totalLines,
+            'total_requested_qty' => $totalRequestedQty,
+            'total_snapshot_qty' => $totalSnapshotQty,
+            'total_issued_qty' => $totalIssuedQty,
+            'over_lines_count' => $overLinesCount,
+            'over_qty_total' => $overQtyTotal,
+            'has_over_request' => $overLinesCount > 0,
+        ];
+
         return view('inventory.rts_stock_requests.show', [
             'stockRequest' => $stockRequest,
+            'summary' => $summary,
         ]);
+    }
+
+    /**
+     * QUICK TODAY:
+     * - Kalau sudah ada RTS hari ini (status submitted/partial) → lompat ke show.
+     * - Kalau belum ada → lompat ke create.
+     */
+    public function quickToday(): RedirectResponse
+    {
+        $today = Carbon::today()->toDateString();
+
+        $prdWarehouse = Warehouse::where('code', 'WH-PRD')->first();
+        $rtsWarehouse = Warehouse::where('code', 'WH-RTS')->first();
+
+        $query = StockRequest::rtsReplenish()
+            ->whereDate('date', $today);
+
+        if ($prdWarehouse && $rtsWarehouse) {
+            $query->where('source_warehouse_id', $prdWarehouse->id)
+                ->where('destination_warehouse_id', $rtsWarehouse->id);
+        }
+
+        $todayRequest = $query
+            ->whereIn('status', ['submitted', 'partial'])
+            ->orderByDesc('id')
+            ->first();
+
+        if ($todayRequest) {
+            return redirect()->route('rts.stock-requests.show', $todayRequest);
+        }
+
+        return redirect()->route('rts.stock-requests.create');
     }
 
     /**

@@ -66,12 +66,19 @@ class StockOpnameService
 
     /**
      * Finalize 1 dokumen Stock Opname:
-     * - Buat InventoryAdjustment
-     * - Buat InventoryAdjustmentLine per selisih
-     * - Koreksi stok real lewat InventoryService::adjustTo()
-     * - Update status opname → finalized
+     *
+     * - opening:
+     *   - Buat saldo awal ke inventory (adjustTo per item)
+     *   - Set HPP global sementara ke items.base_unit_cost dari unit_cost line
+     *   - TIDAK bikin InventoryAdjustment terpisah → return null
+     *
+     * - periodic:
+     *   - Buat InventoryAdjustment
+     *   - Buat InventoryAdjustmentLine per selisih
+     *   - Koreksi stok real lewat InventoryService::adjustTo()
+     *   - Update status opname → finalized
      */
-    public function finalize(StockOpname $opname, ?string $reason = null, ?string $notes = null): InventoryAdjustment
+    public function finalize(StockOpname $opname, ?string $reason = null, ?string $notes = null): ?InventoryAdjustment
     {
         if ($opname->status === 'finalized') {
             throw new \RuntimeException('Stock Opname sudah difinalkan.');
@@ -81,6 +88,34 @@ class StockOpnameService
             $user = Auth::user();
 
             $opname->loadMissing(['warehouse', 'lines.item']);
+
+            // ============================
+            // CABANG: OPENING BALANCE
+            // ============================
+            if ($opname->type === 'opening') {
+                // 1️⃣ Terapkan saldo awal ke inventory (per item)
+                $this->applyOpeningMovements(
+                    opname: $opname,
+                    reason: $reason,
+                    notes: $notes
+                );
+
+                // 2️⃣ Set HPP global sementara dari unit_cost di line
+                $this->applyOpeningBaseUnitCosts($opname);
+
+                // 3️⃣ Update status dokumen
+                $opname->status = 'finalized';
+                $opname->finalized_by = $user?->id;
+                $opname->finalized_at = now();
+                $opname->save();
+
+                // Opening tidak menghasilkan dokumen InventoryAdjustment terpisah
+                return null;
+            }
+
+            // ============================
+            // CABANG: PERIODIC (LOGIC LAMA)
+            // ============================
 
             // Header Inventory Adjustment
             $adjustment = new InventoryAdjustment();
@@ -154,6 +189,80 @@ class StockOpnameService
 
             return $adjustment;
         });
+    }
+
+    /**
+     * Opening:
+     * Terapkan saldo awal ke inventory.
+     * - SourceType: StockOpname::class
+     * - SourceId  : id dokumen SO opening
+     * - newQty    : physical_qty per item
+     */
+    protected function applyOpeningMovements(StockOpname $opname, ?string $reason, ?string $notes): void
+    {
+        $date = $opname->date ?? now()->toDateString();
+        $reasonText = $reason ?: ('Saldo awal dari stock opname opening ' . $opname->code);
+        $notesText = $notes;
+
+        foreach ($opname->lines as $line) {
+            // Kalau belum ada qty fisik → skip (nggak usah dibuat stok)
+            if ($line->physical_qty === null) {
+                continue;
+            }
+
+            $physicalQty = (float) $line->physical_qty;
+
+            // Untuk opening, biasanya kita mau set langsung ke qty fisik tersebut
+            $this->inventory->adjustTo(
+                warehouseId: $opname->warehouse_id,
+                itemId: $line->item_id,
+                newQty: $physicalQty,
+                date: $date,
+                sourceType: StockOpname::class,
+                sourceId: $opname->id,
+                notes: $reasonText,
+                lotId: null,
+            );
+        }
+    }
+
+    /**
+     * Opening:
+     * Set HPP global sementara (items.base_unit_cost) dari unit_cost di line.
+     *
+     * Catatan:
+     * - Hanya update kalau:
+     *   - physical_qty > 0
+     *   - unit_cost > 0
+     * - Sekarang pakai "last opening wins".
+     *   Kalau mau hanya isi kalau belum pernah di-set, tinggal aktifkan versi 2 di bawah.
+     */
+    protected function applyOpeningBaseUnitCosts(StockOpname $opname): void
+    {
+        foreach ($opname->lines as $line) {
+            $qty = (float) ($line->physical_qty ?? 0);
+            $unitCost = (float) ($line->unit_cost ?? 0);
+
+            if ($qty <= 0 || $unitCost <= 0) {
+                continue;
+            }
+
+            if (!$line->item) {
+                continue;
+            }
+
+            $item = $line->item;
+
+            // Versi 1: selalu overwrite (last opening wins)
+            $item->base_unit_cost = $unitCost;
+
+            // Versi 2 (opsional): hanya isi kalau belum pernah di-set
+            // if (is_null($item->base_unit_cost) || $item->base_unit_cost <= 0) {
+            //     $item->base_unit_cost = $unitCost;
+            // }
+
+            $item->save();
+        }
     }
 
     /**

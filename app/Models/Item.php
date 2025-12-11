@@ -23,6 +23,8 @@ class Item extends Model
         'consumption_cutting', // ⭐ NEW
 
         'consumption_cutting_basis_qty', // ⭐ NEW
+        'base_unit_cost', //⭐ NEW
+
     ];
 
     protected $casts = [
@@ -30,7 +32,8 @@ class Item extends Model
         'hpp' => 'decimal:2',
         'active' => 'boolean',
         'consumption_cutting' => 'decimal:2', // ⭐ NEW
-        'consumption_cutting_basis_qty' => 'decimal:4', // ⭐ NEW
+        'consumption_cutting' => 'decimal:2', // ⭐ NEW
+        'base_unit_cost' => 'decimal:2', // ⭐ NEW
     ];
 
     /* ==========================
@@ -129,6 +132,15 @@ class Item extends Model
     public function shipmentLines()
     {
         return $this->hasMany(ShipmentLine::class);
+    }
+
+    /**
+     * HPP global sementara.
+     * Nanti kalau modul HPP sudah jadi, logic di sini bisa diganti ambil dari snapshot dsb.
+     */
+    public function getEffectiveUnitCostAttribute(): float
+    {
+        return (float) ($this->base_unit_cost ?? 0);
     }
 
 }
