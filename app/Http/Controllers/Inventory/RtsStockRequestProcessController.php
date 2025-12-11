@@ -67,7 +67,7 @@ class RtsStockRequestProcessController extends Controller
 
         // ========== BASE QUERY: hanya RTS Replenish ==========
         $baseQuery = StockRequest::rtsReplenish()
-            ->with(['destinationWarehouse']) // RTS (yang minta)
+            ->with(['destinationWarehouse', 'sourceWarehouse'])
             ->withSum('lines as total_requested_qty', 'qty_request')
             ->withSum('lines as total_issued_qty', 'qty_issued');
 
@@ -145,23 +145,40 @@ class RtsStockRequestProcessController extends Controller
 
         $stockRequest->load(['lines.item', 'sourceWarehouse', 'destinationWarehouse', 'requestedBy']);
 
+        // histori movement kalau sudah ada mutasi (mungkin nanti dipakai)
+        $movementHistory = InventoryMutation::with(['item', 'warehouse'])
+            ->where('source_type', 'stock_request')
+            ->where('source_id', $stockRequest->id)
+            ->orderBy('date')
+            ->orderBy('id')
+            ->get();
+
         return view('inventory.prd_stock_requests.show', [
             'stockRequest' => $stockRequest,
+            'movementHistory' => $movementHistory,
         ]);
     }
 
     /**
-     * Halaman proses 1 dokumen: PRD cek stok & isi qty_issued.
+     * Halaman PRD isi rencana Qty Kirim (belum mutasi stok).
      */
     public function edit(StockRequest $stockRequest): View
     {
         abort_unless($stockRequest->purpose === 'rts_replenish', 404);
 
+        // ⬅️ tambah guard status
+        // abort_if($stockRequest->status === 'completed', 404);
+        // atau kalau mau lebih soft:
+        if ($stockRequest->status === 'completed') {
+            return redirect()
+                ->route('prd.stock-requests.show', $stockRequest)
+                ->with('status', 'Dokumen sudah selesai, rencana kirim tidak bisa diubah lagi.');
+        }
+
         $stockRequest->load(['lines.item', 'sourceWarehouse', 'destinationWarehouse']);
 
         $sourceWarehouseId = $stockRequest->source_warehouse_id;
 
-        // live stock per line
         $liveStocks = [];
         foreach ($stockRequest->lines as $line) {
             $liveStocks[$line->id] = $this->inventory->getAvailableStock(
@@ -170,18 +187,11 @@ class RtsStockRequestProcessController extends Controller
             );
         }
 
-        // default qty issued
         $defaultQtyIssued = [];
         foreach ($stockRequest->lines as $line) {
-            $requested = (float) $line->qty_request;
-            $available = (float) ($liveStocks[$line->id] ?? 0);
-
-            $defaultQtyIssued[$line->id] = $requested > 0
-            ? min($requested, $available)
-            : 0;
+            $defaultQtyIssued[$line->id] = (float) $line->qty_issued;
         }
 
-        // 🔹 histori movement
         $movementHistory = InventoryMutation::with(['item', 'warehouse'])
             ->where('source_type', 'stock_request')
             ->where('source_id', $stockRequest->id)
@@ -196,10 +206,12 @@ class RtsStockRequestProcessController extends Controller
             'movementHistory' => $movementHistory,
         ]);
     }
+
     /**
-     * Proses permintaan: gerakkan stok PRD -> RTS.
+     * Simpan rencana Qty Kirim dari PRD (boleh > outstanding & > stok, TANPA mutasi).
+     * RTS nanti yang konfirmasi fisik & trigger mutasi stok.
      */
-    public function update(Request $request, StockRequest $stockRequest): RedirectResponse
+    public function confirm(Request $request, StockRequest $stockRequest): RedirectResponse
     {
         abort_unless($stockRequest->purpose === 'rts_replenish', 404);
 
@@ -210,98 +222,32 @@ class RtsStockRequestProcessController extends Controller
             'lines.*.qty_issued' => ['nullable', 'numeric', 'gte:0'],
         ]);
 
-        $sourceWarehouseId = $stockRequest->source_warehouse_id;
-        $destinationWarehouseId = $stockRequest->destination_warehouse_id;
-
         $linesInput = $validated['lines'];
 
-        // Validasi stok live: qty_issued tidak boleh > stok sekarang
-        $lineErrors = [];
-        foreach ($stockRequest->lines as $line) {
-            $input = $linesInput[$line->id] ?? [];
-            $qtyIssued = isset($input['qty_issued'])
-            ? (float) $input['qty_issued']
-            : 0.0;
-
-            if ($qtyIssued <= 0) {
-                continue;
-            }
-
-            $available = $this->inventory->getAvailableStock($sourceWarehouseId, $line->item_id);
-
-            if ($qtyIssued > $available) {
-                $lineErrors["lines.{$line->id}.qty_issued"] =
-                    "Qty kirim melebihi stok gudang produksi (stok saat ini: {$available}).";
-            }
-        }
-
-        if (!empty($lineErrors)) {
-            return back()
-                ->withErrors($lineErrors)
-                ->withInput();
-        }
-
-        DB::transaction(function () use (
-            $stockRequest,
-            $sourceWarehouseId,
-            $destinationWarehouseId,
-            $linesInput
-        ) {
-            $anyIssued = false;
-            $allFullyIssued = true;
-
+        DB::transaction(function () use ($stockRequest, $linesInput) {
             foreach ($stockRequest->lines as $line) {
                 $input = $linesInput[$line->id] ?? [];
+
                 $qtyIssued = isset($input['qty_issued'])
                 ? (float) $input['qty_issued']
                 : 0.0;
 
-                // Tidak mengirim apa-apa di baris ini
-                if ($qtyIssued <= 0) {
-                    $allFullyIssued = false;
-                    continue;
-                }
-
-                $anyIssued = true;
-
-                // Gerakkan stok: OUT PRD -> IN RTS
-                $this->inventory->move(
-                    $line->item_id,
-                    $sourceWarehouseId,
-                    $destinationWarehouseId,
-                    $qtyIssued,
-                    referenceType: 'stock_request',
-                    referenceId: $stockRequest->id,
-                    notes: 'RTS replenishment'
-                );
-
-                // Simpan qty_issued
+                // 🔹 Simpan apa adanya, boleh > request / > stok
                 $line->qty_issued = $qtyIssued;
                 $line->save();
-
-                // Cek apakah fully issued
-                if ($qtyIssued < (float) $line->qty_request) {
-                    $allFullyIssued = false;
-                }
             }
 
-            // Update status header
-            if (!$anyIssued) {
-                // tidak ada yang dikirim, status tetap
-                return;
-            }
-
-            if ($allFullyIssued) {
-                $stockRequest->status = 'completed';
-            } else {
-                $stockRequest->status = 'partial';
-            }
-
-            $stockRequest->save();
+            // 🔹 Untuk tahap ini kita TIDAK mengubah status & TIDAK mutasi stok.
+            // Status bisa tetap 'submitted' sampai RTS konfirmasi fisik & mutasi stok.
         });
 
         return redirect()
-            ->route('prd.stock-requests.index')
-            ->with('status', 'Stock Request berhasil diproses. Stok sudah dipindahkan PRD → RTS.');
+            ->route('prd.stock-requests.edit', $stockRequest)
+            ->with('status', 'Rencana Qty Kirim sudah disimpan. RTS bisa konfirmasi jumlah fisik sebelum stok dipindahkan.');
     }
+
+    /**
+     * Kalau nanti kamu butuh tahap akhir (setelah RTS konfirmasi fisik) untuk mutasi stok,
+     * bisa tambahkan method lain di sini, misalnya finalize(), yang baru panggil InventoryService::move().
+     */
 }

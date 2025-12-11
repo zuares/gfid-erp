@@ -4,7 +4,11 @@ namespace App\Http\Controllers\Master;
 
 use App\Http\Controllers\Controller;
 use App\Models\Item;
+use App\Models\ItemCategory;
+use App\Models\ItemCostSnapshot;
 use Illuminate\Http\Request;
+use Illuminate\Support\Carbon;
+use Illuminate\Support\Facades\Auth;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Validation\Rule;
 
@@ -13,7 +17,13 @@ class ItemController extends Controller
     public function index(Request $request)
     {
         $query = Item::query()
-            ->withCount('barcodes'); // <— ini penting
+            ->withCount('barcodes')
+            ->with(['costSnapshots' => function ($q) {
+                $q->active()
+                    ->orderByDesc('snapshot_date')
+                    ->orderByDesc('id')
+                    ->limit(1);
+            }]);
 
         if ($search = $request->input('q')) {
             $query->where(function ($q) use ($search) {
@@ -35,11 +45,7 @@ class ItemController extends Controller
             ->paginate(25)
             ->withQueryString();
 
-        // kalau kamu punya ItemCategory:
-        // $categories = ItemCategory::orderBy('name')->get();
-        // return view('items.index', compact('items', 'categories'));
-
-        return view('items.index', compact('items'));
+        return view('master.items.index', compact('items'));
     }
 
     public function create()
@@ -47,10 +53,81 @@ class ItemController extends Controller
         $item = null;
 
         // kalau kamu punya list kategori, lempar juga ke view:
-        // $categories = ItemCategory::orderBy('name')->get();
-        // return view('items.create', compact('item', 'categories'));
+        $categories = ItemCategory::orderBy('name')->get();
+        return view('master.items.create', compact('item', 'categories'));
 
-        return view('items.create', compact('item'));
+    }
+
+    public function show(Item $item)
+    {
+        $item->load('barcodes');
+
+        // snapshot HPP aktif (kalau ada)
+        $activeSnapshot = ItemCostSnapshot::getActiveForItem($item->id, null);
+
+        return view('master.items.show', [
+            'item' => $item,
+            'activeSnapshot' => $activeSnapshot,
+        ]);
+    }
+
+    /**
+     * Form set / edit HPP sementara dari Master Item.
+     */
+    public function editHppTemp(Item $item)
+    {
+        // snapshot aktif kalau ada
+        $snapshot = ItemCostSnapshot::getActiveForItem($item->id, null);
+
+        return view('master.items.hpp_temp', [
+            'item' => $item,
+            'snapshot' => $snapshot,
+        ]);
+    }
+
+    /**
+     * Simpan HPP sementara (buat snapshot baru dan matikan snapshot lama).
+     */
+    public function storeHppTemp(Request $request, Item $item)
+    {
+        $validated = $request->validate([
+            'unit_cost' => ['required', 'numeric', 'min:0'],
+            'notes' => ['nullable', 'string', 'max:255'],
+        ]);
+
+        $now = Carbon::now();
+
+        DB::transaction(function () use ($item, $validated, $now) {
+
+            // Nonaktifkan snapshot aktif sebelumnya
+            ItemCostSnapshot::where('item_id', $item->id)
+                ->active()
+                ->update(['is_active' => 0]);
+
+            // Buat snapshot baru sebagai HPP sementara dari master
+            ItemCostSnapshot::create([
+                'item_id' => $item->id,
+                'warehouse_id' => null, // global HPP
+                'snapshot_date' => $now->toDateString(),
+                'reference_type' => 'master_temp',
+                'reference_id' => null,
+                'qty_basis' => 0,
+                'rm_unit_cost' => $validated['unit_cost'], // sementara samakan
+                'cutting_unit_cost' => 0,
+                'sewing_unit_cost' => 0,
+                'finishing_unit_cost' => 0,
+                'packaging_unit_cost' => 0,
+                'overhead_unit_cost' => 0,
+                'unit_cost' => $validated['unit_cost'],
+                'notes' => $validated['notes'] ?? 'HPP sementara dari Master Item',
+                'is_active' => 1,
+                'created_by' => Auth::id(),
+            ]);
+        });
+
+        return redirect()
+            ->route('master.items.edit', $item)
+            ->with('success', 'HPP sementara item berhasil disimpan.');
     }
 
     public function store(Request $request)
@@ -72,7 +149,7 @@ class ItemController extends Controller
         });
 
         return redirect()
-            ->route('items.edit', $item)
+            ->route('master.items.edit', $item)
             ->with('success', 'Item baru berhasil dibuat beserta barcode-nya.');
     }
 
@@ -81,10 +158,10 @@ class ItemController extends Controller
         $item->load('barcodes');
 
         // kalau ada kategori:
-        // $categories = ItemCategory::orderBy('name')->get();
-        // return view('items.edit', compact('item', 'categories'));
+        $categories = ItemCategory::orderBy('name')->get();
+        return view('master.items.edit', compact('item', 'categories'));
 
-        return view('items.edit', compact('item'));
+        return view('master.items.edit', compact('item'));
     }
 
     public function update(Request $request, Item $item)
@@ -106,7 +183,7 @@ class ItemController extends Controller
         });
 
         return redirect()
-            ->route('items.edit', $item)
+            ->route('master.items.edit', $item)
             ->with('success', 'Item & barcode berhasil diperbarui.');
     }
 
@@ -115,7 +192,7 @@ class ItemController extends Controller
         $item->delete();
 
         return redirect()
-            ->route('items.index')
+            ->route('master.items.index')
             ->with('success', 'Item berhasil dihapus.');
     }
 

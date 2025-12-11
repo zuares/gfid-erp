@@ -2,8 +2,12 @@
 
 namespace App\Models;
 
+use App\Models\ItemBarcode;
 use Illuminate\Database\Eloquent\Factories\HasFactory;
 use Illuminate\Database\Eloquent\Model;
+use Illuminate\Database\Eloquent\Relations\HasMany;
+
+// sesuaikan dengan nama model barcode kamu
 
 class Item extends Model
 {
@@ -141,6 +145,31 @@ class Item extends Model
     public function getEffectiveUnitCostAttribute(): float
     {
         return (float) ($this->base_unit_cost ?? 0);
+    }
+
+    public function costSnapshots()
+    {
+        return $this->hasMany(ItemCostSnapshot::class);
+    }
+
+    /**
+     * HPP aktif (unit_cost) untuk item ini, global (tanpa filter gudang).
+     * Dipakai untuk tampilan cepat di Master Item.
+     */
+    public function getActiveUnitCostAttribute(): float
+    {
+        $snapshot = $this->costSnapshots()
+            ->active() // scopeActive di ItemCostSnapshot
+            ->orderByDesc('snapshot_date')
+            ->orderByDesc('id')
+            ->first();
+
+        return $snapshot?->unit_cost ?? 0;
+    }
+
+    public function barcodes(): HasMany
+    {
+        return $this->hasMany(ItemBarcode::class);
     }
 
 }

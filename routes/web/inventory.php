@@ -123,6 +123,9 @@ Route::middleware(['web', 'auth', 'role:owner,admin,operating'])->group(function
             Route::get('/{stockRequest}/process', [RtsStockRequestProcessController::class, 'edit'])->name('edit');
             Route::post('/{stockRequest}/process', [RtsStockRequestProcessController::class, 'update'])->name('update');
             Route::get('/{stockRequest}', [RtsStockRequestProcessController::class, 'show'])->name('show');
+            Route::post('/{stockRequest}/process/confirm',
+                [RtsStockRequestProcessController::class, 'confirm']
+            )->name('confirm');
 
         });
 });
@@ -143,6 +146,9 @@ Route::middleware(['web', 'auth', 'role:owner,admin'])->group(function () {
             Route::post('/', [RtsStockRequestController::class, 'store'])->name('store');
             Route::get('/{stockRequest}',
                 [RtsStockRequestController::class, 'show'])->name('show');
+            // 🔹 BARU: form konfirmasi fisik + finalize
+            Route::get('/{stockRequest}/confirm', [RtsStockRequestController::class, 'confirmReceive'])->name('confirm');
+            Route::post('/{stockRequest}/finalize', [RtsStockRequestController::class, 'finalize'])->name('finalize');
         });
 });
 

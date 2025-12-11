@@ -107,4 +107,16 @@ class ItemCostSnapshot extends Model
                 ->orWhere('warehouse_id', $warehouseId);
         });
     }
+
+    public static function getActiveForItem(int $itemId, ?int $warehouseId = null): ?self
+    {
+        return static::query()
+            ->where('item_id', $itemId)
+            ->active()
+            ->forWarehouseOrGlobal($warehouseId)
+            ->orderByDesc('snapshot_date')
+            ->orderByDesc('id')
+            ->first();
+    }
+
 }

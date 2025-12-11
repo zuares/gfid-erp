@@ -639,4 +639,11 @@ class InventoryService
             affectLotCost: $affectLotCost,
         );
     }
+
+    public function getActiveUnitCost(Item $item, ?int $warehouseId = null): float
+    {
+        $snapshot = ItemCostSnapshot::getActiveForItem($item->id, $warehouseId);
+
+        return $snapshot?->unit_cost ?? 0.0;
+    }
 }

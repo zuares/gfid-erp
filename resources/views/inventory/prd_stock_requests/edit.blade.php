@@ -1,512 +1,302 @@
+{{-- resources/views/inventory/prd_stock_requests/edit.blade.php --}}
 @extends('layouts.app')
 
-@section('title', 'PRD • Proses Permintaan RTS ' . $stockRequest->code)
+@section('title', 'Proses Permintaan RTS • ' . $stockRequest->code)
 
 @push('head')
     <style>
-        .page-wrap {
+        :root {
+            --rts-main: rgba(45, 212, 191, 1);
+            --rts-main-strong: rgba(15, 118, 110, 1);
+            --rts-main-soft: rgba(45, 212, 191, 0.14);
+        }
+
+        .rts-edit-page {
+            min-height: 100vh;
+        }
+
+        .rts-edit-page .page-wrap {
             max-width: 1100px;
             margin-inline: auto;
-            padding: .75rem .75rem 4rem;
+            padding: 1.4rem 1.1rem 4rem;
         }
 
-        body[data-theme="light"] .page-wrap {
-            background: radial-gradient(circle at top left,
-                    rgba(129, 140, 248, 0.16) 0,
-                    rgba(45, 212, 191, 0.08) 26%,
-                    #f9fafb 60%);
+        body[data-theme="light"] .rts-edit-page .page-wrap {
+            background:
+                radial-gradient(circle at top left,
+                    rgba(59, 130, 246, 0.08) 0,
+                    rgba(45, 212, 191, 0.1) 28%,
+                    #f9fafb 70%);
         }
 
-        .card {
+        .card-main {
             background: var(--card);
-            border-radius: 14px;
-            border: 1px solid rgba(148, 163, 184, 0.22);
-            box-shadow:
-                0 10px 28px rgba(15, 23, 42, 0.08),
-                0 0 0 1px rgba(15, 23, 42, 0.02);
+            border-radius: 10px;
+            border: 1px solid rgba(148, 163, 184, 0.26);
         }
 
-        .card-header {
-            padding: .9rem 1.25rem .75rem;
-            border-bottom: 1px solid rgba(148, 163, 184, 0.28);
+        .card-main .card-body {
+            padding: 1.25rem 1.35rem;
         }
 
-        .card-body {
-            padding: .75rem 1.25rem 1rem;
-        }
-
-        .section-title {
-            font-size: .9rem;
+        .page-title {
+            font-size: 1.18rem;
             font-weight: 600;
-            text-transform: uppercase;
-            letter-spacing: .08em;
+            margin-bottom: .25rem;
+        }
+
+        .page-subtitle {
+            font-size: .87rem;
             color: rgba(100, 116, 139, 1);
+            margin-top: .25rem;
         }
 
-        .meta-grid {
-            display: grid;
-            grid-template-columns: repeat(12, minmax(0, 1fr));
-            gap: .5rem 1rem;
-            margin-top: .6rem;
-        }
-
-        .meta-item {
-            font-size: .8rem;
-            color: rgba(71, 85, 105, 1);
-        }
-
-        .meta-label {
-            font-size: .72rem;
+        .step-chip {
+            display: inline-flex;
+            align-items: center;
+            gap: .35rem;
+            padding: .18rem .6rem;
+            border-radius: 999px;
+            font-size: .74rem;
             text-transform: uppercase;
-            letter-spacing: .08em;
-            color: rgba(148, 163, 184, 1);
+            letter-spacing: .12em;
+            background: rgba(15, 23, 42, 0.02);
+            color: #6b7280;
         }
 
-        .meta-value {
-            margin-top: .15rem;
-            font-weight: 500;
-        }
-
-        .badge-status {
-            display: inline-flex;
-            align-items: center;
-            gap: .25rem;
-            padding: .12rem .6rem;
-            border-radius: 999px;
-            font-size: .72rem;
-            font-weight: 500;
-        }
-
-        .badge-submitted {
-            background: rgba(59, 130, 246, 0.12);
-            color: rgba(30, 64, 175, 1);
-        }
-
-        .badge-partial {
-            background: rgba(234, 179, 8, 0.14);
-            color: rgba(133, 77, 14, 1);
-        }
-
-        .badge-completed {
-            background: rgba(22, 163, 74, 0.14);
-            color: rgba(21, 128, 61, 1);
-        }
-
-        .badge-draft {
-            background: rgba(148, 163, 184, 0.18);
-            color: rgba(71, 85, 105, 1);
-        }
-
-        .chip-warehouse {
-            display: inline-flex;
-            align-items: center;
-            gap: .25rem;
-            padding: .15rem .6rem;
-            border-radius: 999px;
-            border: 1px solid rgba(148, 163, 184, 0.7);
-            font-size: .75rem;
-        }
-
-        .chip-warehouse span.code {
-            font-weight: 600;
+        .mono {
+            font-family: ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, "Liberation Mono", "Courier New",
+                monospace;
             font-variant-numeric: tabular-nums;
         }
 
+        .muted {
+            color: rgba(148, 163, 184, 1);
+            font-size: .78rem;
+        }
+
+        .pill-label {
+            font-size: .72rem;
+            text-transform: uppercase;
+            letter-spacing: .08em;
+            color: #94a3b8;
+        }
+
+        .code-badge {
+            display: inline-flex;
+            align-items: center;
+            gap: .3rem;
+            border-radius: 999px;
+            padding: .14rem .6rem;
+            font-size: .8rem;
+            background: rgba(15, 23, 42, 0.03);
+            border: 1px solid rgba(148, 163, 184, 0.45);
+        }
+
+        .code-badge .dot {
+            width: 6px;
+            height: 6px;
+            border-radius: 999px;
+            background: var(--rts-main-strong);
+        }
+
+        .badge-status {
+            padding: .14rem .55rem;
+            border-radius: 999px;
+            font-size: .72rem;
+            font-weight: 500;
+            display: inline-flex;
+            align-items: center;
+            line-height: 1.2;
+        }
+
+        .badge-status.submitted {
+            background: rgba(59, 130, 246, .10);
+            color: rgba(30, 64, 175, 1);
+        }
+
+        .badge-status.partial {
+            background: rgba(234, 179, 8, .12);
+            color: rgba(133, 77, 14, 1);
+        }
+
+        .badge-status.completed {
+            background: rgba(22, 163, 74, .12);
+            color: rgba(22, 101, 52, 1);
+        }
+
+        .badge-status.draft {
+            background: rgba(148, 163, 184, 0.18);
+            color: #475569;
+        }
+
+        .summary-pill {
+            display: inline-flex;
+            align-items: center;
+            gap: .35rem;
+            padding: .28rem .75rem;
+            border-radius: 999px;
+            border: 1px solid rgba(148, 163, 184, .5);
+            font-size: .78rem;
+            background: rgba(15, 23, 42, 0.02);
+        }
+
+        .summary-pill strong {
+            font-weight: 600;
+        }
+
+        .summary-pill--sisa {
+            border-color: var(--rts-main-strong);
+            background: var(--rts-main-soft);
+            color: var(--rts-main-strong);
+        }
+
         .table-wrap {
-            margin-top: .9rem;
+            margin-top: 1rem;
             border-radius: 12px;
-            border: 1px solid rgba(148, 163, 184, 0.35);
+            border: 1px solid rgba(148, 163, 184, .28);
             overflow: hidden;
         }
 
         .table {
             width: 100%;
             border-collapse: collapse;
-            font-size: .8rem;
-        }
-
-        .table thead {
-            background: color-mix(in srgb, var(--card) 80%, rgba(15, 23, 42, 0.06));
+            font-size: .82rem;
         }
 
         .table th,
         .table td {
-            padding: .45rem .6rem;
-            border-bottom: 1px solid rgba(148, 163, 184, 0.25);
+            padding: .42rem .55rem;
+            border-bottom: 1px solid rgba(148, 163, 184, .22);
             vertical-align: middle;
         }
 
-        .table th {
-            text-align: left;
-            font-weight: 600;
-            font-size: .76rem;
+        .table thead {
+            background: rgba(15, 23, 42, 0.035);
+        }
+
+        .table thead th {
+            font-size: .74rem;
             text-transform: uppercase;
-            letter-spacing: .06em;
-            color: rgba(100, 116, 139, 1);
+            letter-spacing: .07em;
+            color: #6b7280;
         }
 
-        .table td:last-child {
-            text-align: right;
+        .row-number {
+            font-weight: 600;
+            color: #64748b;
         }
 
-        .mono {
+        .qty-text {
             font-variant-numeric: tabular-nums;
         }
 
-        .form-control {
-            border-radius: .6rem;
-            border: 1px solid rgba(148, 163, 184, 0.7);
-            padding: .32rem .55rem;
+        .line-item-name {
             font-size: .8rem;
-            background: var(--background);
+            color: #6b7280;
         }
 
-        .input-error {
-            border-color: #ef4444 !important;
-            box-shadow: 0 0 0 1px rgba(239, 68, 68, .16);
+        .qty-available {
+            color: #0f766e;
         }
 
-        .text-error {
-            color: #ef4444;
-            font-size: .73rem;
-            margin-top: .1rem;
-        }
-
-        .text-soft {
-            font-size: .75rem;
-            color: rgba(148, 163, 184, 1);
-        }
-
-        .row-soft {
-            background: rgba(240, 253, 244, 0.9);
-        }
-
-        .row-outstanding {
-            background: rgba(254, 243, 199, 0.45);
-        }
-
-        .qty-warning {
-            font-size: .72rem;
-            color: #b45309;
-            margin-top: .1rem;
-        }
-
-        .summary-row {
-            margin-top: .75rem;
-            display: flex;
-            flex-wrap: wrap;
-            justify-content: space-between;
-            gap: .5rem;
-            font-size: .8rem;
-        }
-
-        .summary-box {
-            padding: .4rem .7rem;
-            border-radius: 10px;
-            border: 1px solid rgba(148, 163, 184, 0.4);
-            background: color-mix(in srgb, var(--card) 90%, rgba(59, 130, 246, 0.05));
-        }
-
-        .btn {
-            display: inline-flex;
-            align-items: center;
-            justify-content: center;
-            gap: .3rem;
-            border-radius: 999px;
-            border: 1px solid transparent;
-            font-size: .8rem;
-            font-weight: 500;
-            padding: .35rem .9rem;
-            cursor: pointer;
-            background: rgba(37, 99, 235, 1);
-            color: white;
-        }
-
-        .btn-outline {
-            background: transparent;
-            border-color: rgba(148, 163, 184, 0.9);
-            color: rgba(51, 65, 85, 1);
-        }
-
-        .btn-ghost {
-            background: transparent;
-            border-color: transparent;
-            color: rgba(148, 163, 184, 1);
-        }
-
-        .btn-sm {
-            padding: .25rem .7rem;
+        .error-text {
             font-size: .76rem;
+            color: #dc2626;
+            margin-top: .1rem;
         }
 
-        .btn[disabled] {
-            opacity: .5;
-            cursor: not-allowed;
-        }
-
-        .actions-row {
-            margin-top: .9rem;
-            display: flex;
-            justify-content: space-between;
-            align-items: center;
-            gap: .75rem;
-            flex-wrap: wrap;
-        }
-
-        /* ALERT BOXES */
-        .alert {
-            padding: .75rem 1rem;
-            border-radius: 12px;
-            font-size: .82rem;
-            margin-bottom: 1rem;
-            display: flex;
-            align-items: flex-start;
-            gap: .6rem;
-        }
-
-        .alert-icon {
-            width: 22px;
-            height: 22px;
-            display: flex;
-            align-items: center;
-            justify-content: center;
-            border-radius: 999px;
-            font-size: .7rem;
-            font-weight: 700;
-        }
-
-        .alert-success {
-            background: rgba(22, 163, 74, 0.12);
-            border: 1px solid rgba(22, 163, 74, 0.20);
-            color: rgba(21, 128, 61, 1);
-        }
-
-        .alert-success .alert-icon {
-            background: rgba(22, 163, 74, 0.25);
-        }
-
-        .alert-warning {
-            background: rgba(234, 179, 8, 0.12);
-            border: 1px solid rgba(234, 179, 8, 0.35);
-            color: rgba(133, 77, 14, 1);
-        }
-
-        .alert-warning .alert-icon {
-            background: rgba(234, 179, 8, 0.28);
-        }
-
-        /* MINI TIMELINE */
-        .timeline {
-            display: flex;
-            align-items: center;
-            gap: .5rem;
-            margin-top: .75rem;
-            font-size: .75rem;
-        }
-
-        .timeline-step {
-            display: flex;
-            align-items: center;
-            gap: .3rem;
-        }
-
-        .timeline-circle {
-            width: 16px;
-            height: 16px;
-            border-radius: 999px;
-            border: 2px solid rgba(148, 163, 184, 0.8);
-            background: var(--card);
-            display: flex;
-            align-items: center;
-            justify-content: center;
-            font-size: .6rem;
-        }
-
-        .timeline-label {
-            color: rgba(148, 163, 184, 1);
-        }
-
-        .timeline-step-active .timeline-circle {
-            border-color: rgba(59, 130, 246, 1);
-            background: rgba(59, 130, 246, 0.12);
-            color: rgba(37, 99, 235, 1);
-        }
-
-        .timeline-step-done .timeline-circle {
-            border-color: rgba(22, 163, 74, 1);
-            background: rgba(22, 163, 74, 0.16);
-            color: rgba(22, 163, 74, 1);
-        }
-
-        .timeline-step-active .timeline-label {
-            color: rgba(51, 65, 85, 1);
-            font-weight: 600;
-        }
-
-        .timeline-step-done .timeline-label {
-            color: rgba(21, 128, 61, 1);
-            font-weight: 600;
-        }
-
-        .timeline-connector {
-            flex: 1;
-            height: 2px;
-            background: linear-gradient(to right,
-                    rgba(148, 163, 184, 0.6),
-                    rgba(148, 163, 184, 0.2));
-        }
-
-        /* BADGE LINE STATUS */
-        .badge-line-status {
-            display: inline-flex;
-            align-items: center;
-            justify-content: flex-end;
-            gap: .25rem;
-            border-radius: 999px;
-            padding: .12rem .55rem;
-            font-size: .72rem;
-            font-weight: 500;
-            margin-top: .15rem;
-        }
-
-        .badge-line-completed {
-            background: rgba(22, 163, 74, 0.16);
-            color: rgba(21, 128, 61, 1);
-        }
-
-        .badge-line-outstanding {
-            background: rgba(234, 179, 8, 0.14);
-            color: rgba(133, 77, 14, 1);
-        }
-
-        /* FILTER TOGGLE */
-        .filter-bar {
-            margin-bottom: .5rem;
-            display: flex;
-            justify-content: flex-end;
-            align-items: center;
-            gap: .5rem;
-            flex-wrap: wrap;
-        }
-
-        .filter-toggle {
+        .btn-primary-rts {
             display: inline-flex;
             align-items: center;
             gap: .35rem;
-            font-size: .78rem;
-            color: rgba(71, 85, 105, 1);
-            cursor: pointer;
-        }
-
-        .filter-toggle input[type="checkbox"] {
-            width: 14px;
-            height: 14px;
-            border-radius: 4px;
-            border: 1px solid rgba(148, 163, 184, 0.9);
-            accent-color: #f59e0b;
-            cursor: pointer;
-        }
-
-        /* HISTORY PANEL */
-        .history-panel {
-            margin-top: 1.25rem;
-            padding-top: .85rem;
-            border-top: 1px dashed rgba(148, 163, 184, 0.6);
-        }
-
-        .history-header {
-            display: flex;
-            justify-content: space-between;
-            align-items: baseline;
-            gap: .5rem;
-        }
-
-        .history-title {
-            font-size: .85rem;
+            padding: .42rem 1rem;
+            border-radius: 999px;
+            border: none;
+            background: var(--rts-main-strong);
+            color: #e0f2f1;
+            font-size: .82rem;
             font-weight: 600;
-            letter-spacing: .06em;
-            text-transform: uppercase;
-            color: rgba(100, 116, 139, 1);
         }
 
-        .history-pill {
+        .btn-primary-rts:hover {
+            filter: brightness(0.97);
+            color: #ecfdf5;
+        }
+
+        .btn-outline-rts {
             display: inline-flex;
             align-items: center;
-            gap: .25rem;
+            gap: .3rem;
+            padding: .38rem .9rem;
             border-radius: 999px;
-            padding: .12rem .55rem;
-            font-size: .72rem;
-            background: rgba(15, 23, 42, 0.03);
-            color: rgba(100, 116, 139, 1);
-            border: 1px solid rgba(148, 163, 184, 0.45);
+            border: 1px solid rgba(148, 163, 184, 0.8);
+            background: transparent;
+            color: #0f172a;
+            font-size: .8rem;
+            font-weight: 500;
         }
 
-        .history-table-wrap {
-            margin-top: .55rem;
-            border-radius: 10px;
-            border: 1px solid rgba(148, 163, 184, 0.35);
-            overflow: hidden;
+        .btn-outline-rts:hover {
+            text-decoration: none;
+            filter: brightness(0.98);
         }
 
-        .history-table {
-            width: 100%;
-            border-collapse: collapse;
+        .hint {
             font-size: .78rem;
+            color: #94a3b8;
         }
 
-        .history-table thead {
-            background: color-mix(in srgb, var(--card) 80%, rgba(15, 23, 42, 0.05));
+        .hint-soft {
+            font-size: .78rem;
+            color: #64748b;
         }
 
-        .history-table th,
-        .history-table td {
-            padding: .4rem .55rem;
-            border-bottom: 1px solid rgba(148, 163, 184, 0.25);
-        }
-
-        .history-table th {
-            text-align: left;
-            font-weight: 600;
-            font-size: .74rem;
-            text-transform: uppercase;
-            letter-spacing: .06em;
-            color: rgba(100, 116, 139, 1);
-        }
-
-        .history-note {
-            max-width: 260px;
-            white-space: nowrap;
-            overflow: hidden;
-            text-overflow: ellipsis;
-        }
-
-        @media (max-width: 768px) {
-            .meta-grid {
-                grid-template-columns: repeat(1, minmax(0, 1fr));
+        @media (max-width: 767.98px) {
+            .rts-edit-page .page-wrap {
+                padding-inline: .85rem;
             }
 
-            .table-wrap {
-                border-radius: 10px;
-                overflow-x: auto;
-            }
-
-            .table {
-                min-width: 720px;
-            }
-
-            /* compact mode: hide some columns di mobile */
-            .col-snapshot,
-            .col-stock-now {
+            .table thead {
                 display: none;
             }
 
-            .actions-row {
-                flex-direction: column-reverse;
-                align-items: stretch;
+            .table tbody tr {
+                display: block;
+                border-bottom: 1px solid rgba(148, 163, 184, .28);
+                padding: .65rem .35rem;
             }
 
-            .history-table {
-                min-width: 640px;
+            .table tbody tr:last-child {
+                border-bottom: none;
+            }
+
+            .table tbody td {
+                display: flex;
+                justify-content: space-between;
+                gap: .6rem;
+                padding: .22rem 0;
+                border-top: none;
+                font-size: .85rem;
+            }
+
+            .table tbody td::before {
+                content: attr(data-label);
+                font-weight: 500;
+                color: #64748b;
+                flex: 0 0 42%;
+                max-width: 52%;
+            }
+
+            .td-row-number {
+                justify-content: flex-start;
+                gap: .35rem;
+            }
+
+            .td-row-number::before {
+                content: '#';
+                flex: 0 0 auto;
+                color: #94a3b8;
             }
         }
     </style>
@@ -515,539 +305,317 @@
 @section('content')
     @php
         $status = $stockRequest->status;
-        $statusClass = match ($status) {
-            'submitted' => 'badge-submitted',
-            'partial' => 'badge-partial',
-            'completed' => 'badge-completed',
-            'draft' => 'badge-draft',
-            default => 'badge-draft',
+        $statusLabel = match ($status) {
+            'submitted' => 'Menunggu diproses PRD',
+            'partial' => 'Sebagian sudah dikirim',
+            'completed' => 'Selesai',
+            default => ucfirst($status),
         };
-        $isCompleted = $status === 'completed';
-        $isPartial = $status === 'partial';
 
-        $timelineStep = match ($status) {
-            'submitted' => 1,
-            'partial' => 2,
-            'completed' => 3,
-            default => 1,
-        };
+        $totalRequested = (float) ($stockRequest->total_requested_qty ?? $stockRequest->lines->sum('qty_request'));
+        $totalIssued = (float) ($stockRequest->total_issued_qty ?? $stockRequest->lines->sum('qty_issued'));
+        $totalOutstanding = max($totalRequested - $totalIssued, 0);
     @endphp
 
-    <div class="page-wrap">
-        <div class="card">
-            <div class="card-header">
-                <div class="flex items-center justify-between gap-2">
-                    <div>
-                        <div class="section-title">PRD • Proses Permintaan RTS</div>
-                        <div class="mt-1 text-sm text-slate-700 dark:text-slate-200">
-                            No. Dokumen:
-                            <span class="font-semibold mono">{{ $stockRequest->code }}</span>
-                        </div>
+    <div class="rts-edit-page">
+        <div class="page-wrap">
+
+            <div class="d-flex justify-content-between align-items-start mb-3 flex-wrap gap-2">
+                <div>
+                    <div class="step-chip mb-1">
+                        <span>Langkah 1 dari 2</span>
+                        <span>•</span>
+                        <span>PRD isi rencana kirim</span>
                     </div>
-                    <div class="flex flex-col items-end gap-1">
-                        <span class="badge-status {{ $statusClass }}">
-                            Status: {{ ucfirst($status) }}
+
+                    <a href="{{ route('prd.stock-requests.index') }}" class="btn btn-link btn-sm px-0 mb-1">
+                        ← Kembali ke daftar
+                    </a>
+
+                    <div class="page-title">
+                        Proses Permintaan RTS
+                    </div>
+                    <div class="page-subtitle">
+                        Tentukan rencana Qty yang akan dikirim dari Gudang Produksi ke Gudang RTS.
+                        Stok baru benar-benar pindah setelah RTS konfirmasi fisik.
+                    </div>
+                </div>
+                <div class="text-end">
+                    <div class="mb-2">
+                        <span class="badge-status {{ $status }}">
+                            {{ $statusLabel }}
                         </span>
-                        <div class="text-soft">
-                            Tanggal: {{ \Illuminate\Support\Carbon::parse($stockRequest->date)->format('d M Y') }}
-                        </div>
+                    </div>
+                    <div class="code-badge">
+                        <span class="dot"></span>
+                        <span class="mono">{{ $stockRequest->code }}</span>
                     </div>
                 </div>
+            </div>
 
-                {{-- Mini Timeline --}}
-                <div class="timeline">
-                    <div
-                        class="timeline-step {{ $timelineStep === 1 ? 'timeline-step-active' : ($timelineStep > 1 ? 'timeline-step-done' : '') }}">
-                        <div class="timeline-circle">
-                            @if ($timelineStep > 1)
-                                ✓
-                            @else
-                                1
-                            @endif
+            <div class="card-main mb-3">
+                <div class="card-body">
+                    <div class="row g-3">
+                        <div class="col-md-4">
+                            <div class="pill-label mb-1">Tanggal & Gudang</div>
+                            <div class="mb-1">
+                                <span class="mono">
+                                    {{ $stockRequest->date?->format('d M Y') ?? '-' }}
+                                </span>
+                            </div>
+                            <div style="font-size:.84rem;">
+                                {{ $stockRequest->sourceWarehouse?->name ?? '-' }} →
+                                <span class="muted">
+                                    {{ $stockRequest->destinationWarehouse?->name ?? '-' }}
+                                </span>
+                            </div>
                         </div>
-                        <div class="timeline-label">Requested</div>
-                    </div>
-
-                    <div class="timeline-connector"></div>
-
-                    <div
-                        class="timeline-step {{ $timelineStep === 2 ? 'timeline-step-active' : ($timelineStep > 2 ? 'timeline-step-done' : '') }}">
-                        <div class="timeline-circle">
-                            @if ($timelineStep > 2)
-                                ✓
-                            @else
-                                2
-                            @endif
+                        <div class="col-md-4">
+                            <div class="pill-label mb-1">Ringkasan Qty</div>
+                            <div class="d-flex flex-wrap gap-2">
+                                <div class="summary-pill">
+                                    <span>Diminta</span>
+                                    <strong class="mono">{{ (int) $totalRequested }}</strong>
+                                </div>
+                                <div class="summary-pill">
+                                    <span>Rencana kirim</span>
+                                    <strong class="mono">{{ (int) $totalIssued }}</strong>
+                                </div>
+                                <div class="summary-pill summary-pill--sisa">
+                                    <span>Sisa permintaan</span>
+                                    <strong class="mono">{{ (int) $totalOutstanding }}</strong>
+                                </div>
+                            </div>
                         </div>
-                        <div class="timeline-label">Partial</div>
-                    </div>
-
-                    <div class="timeline-connector"></div>
-
-                    <div class="timeline-step {{ $timelineStep === 3 ? 'timeline-step-active' : '' }}">
-                        <div class="timeline-circle">
-                            3
-                        </div>
-                        <div class="timeline-label">Completed</div>
-                    </div>
-                </div>
-
-                {{-- Meta --}}
-                <div class="meta-grid">
-                    <div class="meta-item" style="grid-column: span 4 / span 4;">
-                        <div class="meta-label">Gudang Asal (PRD)</div>
-                        <div class="meta-value">
-                            <span class="chip-warehouse">
-                                <span class="code">{{ $stockRequest->sourceWarehouse->code ?? '-' }}</span>
-                                <span>{{ $stockRequest->sourceWarehouse->name ?? '-' }}</span>
-                            </span>
+                        <div class="col-md-4">
+                            <div class="pill-label mb-1">Catatan permintaan</div>
+                            <div style="font-size:.82rem;">
+                                @if ($stockRequest->notes)
+                                    {!! nl2br(e($stockRequest->notes)) !!}
+                                @else
+                                    <span class="muted">Tidak ada catatan.</span>
+                                @endif
+                            </div>
                         </div>
                     </div>
-                    <div class="meta-item" style="grid-column: span 4 / span 4;">
-                        <div class="meta-label">Gudang Tujuan (RTS)</div>
-                        <div class="meta-value">
-                            <span class="chip-warehouse">
-                                <span class="code">{{ $stockRequest->destinationWarehouse->code ?? '-' }}</span>
-                                <span>{{ $stockRequest->destinationWarehouse->name ?? '-' }}</span>
-                            </span>
+
+                    <div class="mt-3 d-flex justify-content-between align-items-center flex-wrap gap-2">
+                        <div class="hint">
+                            Di kolom <strong>Qty Kirim</strong>, isi rencana Qty yang akan dikirim.
+                            RTS akan konfirmasi Qty fisik saat barang diterima.
                         </div>
-                    </div>
-                    <div class="meta-item" style="grid-column: span 4 / span 4;">
-                        <div class="meta-label">Catatan Request</div>
-                        <div class="meta-value">
-                            {{ $stockRequest->notes ?: '—' }}
+                        <div class="d-flex gap-2">
+                            <a href="{{ route('prd.stock-requests.show', $stockRequest) }}" class="btn-outline-rts">
+                                Lihat detail dokumen
+                            </a>
                         </div>
                     </div>
                 </div>
             </div>
 
-            <form method="POST" action="{{ route('prd.stock-requests.update', $stockRequest) }}">
+            <form action="{{ route('prd.stock-requests.confirm', $stockRequest) }}" method="POST" novalidate>
                 @csrf
 
-                <div class="card-body">
-                    {{-- ALERTS --}}
-                    @if ($isCompleted)
-                        <div class="alert alert-success">
-                            <div class="alert-icon">✓</div>
-                            <div>
-                                <strong>Dokumen sudah <u>COMPLETED</u>.</strong>
-                                <br>
-                                Semua item sudah dikirim ke RTS. Tidak bisa melakukan perubahan Qty Kirim lagi.
-                                Halaman ini hanya untuk melihat detail final.
+                <div class="card-main">
+                    <div class="card-body">
+                        <div class="d-flex justify-content-between align-items-center flex-wrap gap-2 mb-1">
+                            <div class="pill-label">
+                                Daftar item permintaan
+                            </div>
+                            <div class="hint-soft">
+                                Stok PRD di kolom hijau hanya untuk informasi.
+                                Sistem tidak membatasi Qty Kirim terhadap stok atau Outstanding.
                             </div>
                         </div>
-                    @elseif ($isPartial)
-                        <div class="alert alert-warning">
-                            <div class="alert-icon">!</div>
-                            <div>
-                                <strong>Dokumen dalam status <u>PARTIAL</u>.</strong>
-                                <br>
-                                Sebagian item sudah dikirim ke RTS, masih ada item yang outstanding.
-                                Silakan isi Qty Kirim untuk melanjutkan pengiriman sisa kebutuhan.
-                            </div>
-                        </div>
-                    @endif
 
-                    <div class="section-title" style="margin-bottom:.35rem;">Detail Item</div>
-                    <div class="text-soft" style="margin-bottom:.4rem;">
-                        Isi kolom <strong>Qty Kirim</strong> untuk mengeluarkan stok dari PRD menuju RTS.
-                        Sistem akan otomatis membuat movement PRD → RTS.
-                    </div>
-
-                    {{-- Filter & shortcut --}}
-                    <div class="filter-bar">
-                        <label class="filter-toggle">
-                            <input type="checkbox" id="filter-outstanding">
-                            <span>Tampilkan hanya baris <strong>outstanding</strong></span>
-                        </label>
-
-                        @unless ($isCompleted)
-                            <button type="button" class="btn-outline btn-sm" id="auto-fill-qty">
-                                Set Qty Kirim Otomatis
-                            </button>
-                        @endunless
-                    </div>
-
-                    <div class="table-wrap">
-                        <table class="table">
-                            <thead>
-                                <tr>
-                                    <th style="width: 32px;">#</th>
-                                    <th style="width: 30%;">Item</th>
-                                    <th style="width: 12%;">Diminta</th>
-                                    <th class="col-snapshot" style="width: 14%;">Stok Snapshot</th>
-                                    <th class="col-stock-now" style="width: 14%;">Stok Sekarang</th>
-                                    <th style="width: 14%;">Qty Kirim</th>
-                                    <th style="width: 16%;">Outstanding / Status</th>
-                                </tr>
-                            </thead>
-                            <tbody>
-                                @foreach ($stockRequest->lines as $index => $line)
-                                    @php
-                                        $lineId = $line->id;
-                                        $requested = (float) $line->qty_request;
-                                        $snapshot = (float) $line->stock_snapshot_at_request;
-                                        $live = (float) ($liveStocks[$lineId] ?? 0);
-                                        $issued = (float) ($line->qty_issued ?? 0);
-                                        $defaultIssued = $defaultQtyIssued[$lineId] ?? 0;
-                                        $oldIssued = old("lines.$lineId.qty_issued");
-
-                                        // VALUE INPUT:
-                                        // - kalau ada old() -> pakai old
-                                        // - kalau completed -> pakai issued (readonly)
-                                        // - kalau partial -> pakai defaultIssued
-                                        // - kalau submitted pertama kali -> kosong (biar tombol auto-fill kepakai)
-                                        if ($oldIssued !== null) {
-                                            $valueIssued = $oldIssued;
-                                        } elseif ($isCompleted) {
-                                            $valueIssued = $issued;
-                                        } elseif ($isPartial) {
-                                            $valueIssued = $defaultIssued;
-                                        } else {
-                                            $valueIssued = '';
-                                        }
-
-                                        $outstanding = max($requested - $issued, 0);
-
-                                        $rowClass = '';
-                                        if ($outstanding > 0 && in_array($status, ['submitted', 'partial'])) {
-                                            $rowClass = 'row-outstanding';
-                                        } elseif ($issued > 0 && $outstanding == 0) {
-                                            $rowClass = 'row-soft';
-                                        }
-
-                                        $lineCompleted = $issued > 0 && $outstanding <= 0;
-                                    @endphp
-                                    <tr class="{{ $rowClass }}" data-line-id="{{ $lineId }}"
-                                        data-requested="{{ $requested }}" data-live="{{ $live }}"
-                                        data-outstanding="{{ $outstanding }}">
-                                        <td class="mono">
-                                            {{ $index + 1 }}
-                                        </td>
-                                        <td>
-                                            <div class="font-semibold text-sm">
-                                                {{ $line->item->code ?? '' }} — {{ $line->item->name ?? '' }}
-                                            </div>
-                                            <div class="text-soft">
-                                                Line ID: {{ $lineId }}
-                                            </div>
-                                        </td>
-                                        <td>
-                                            <div class="mono">
-                                                {{ number_format($requested, 0) }} pcs
-                                            </div>
-                                        </td>
-                                        <td class="col-snapshot">
-                                            <div class="mono">
-                                                {{ number_format($snapshot, 0) }} pcs
-                                            </div>
-                                            <div class="text-soft">
-                                                Stok saat request dibuat
-                                            </div>
-                                        </td>
-                                        <td class="col-stock-now">
-                                            <div class="mono live-stock-display">
-                                                {{ number_format($live, 0) }} pcs
-                                            </div>
-                                            <div class="text-soft">
-                                                Stok live PRD
-                                            </div>
-                                        </td>
-                                        <td>
-                                            <input type="number" min="0" step="1"
-                                                name="lines[{{ $lineId }}][qty_issued]"
-                                                class="form-control qty-issued-input @error("lines.$lineId.qty_issued") input-error @enderror"
-                                                value="{{ $valueIssued }}" {{ $isCompleted ? 'readonly' : '' }}>
-                                            @error("lines.$lineId.qty_issued")
-                                                <div class="text-error">{{ $message }}</div>
-                                            @enderror
-                                            <div class="qty-warning" style="display:none;"></div>
-                                        </td>
-                                        <td>
-                                            <div class="mono">
-                                                {{ number_format($outstanding, 0) }} pcs
-                                            </div>
-                                            <div class="text-soft">
-                                                Sisa setelah kirim
-                                            </div>
-
-                                            @if ($lineCompleted)
-                                                <div class="badge-line-status badge-line-completed">
-                                                    ✓ Completed
-                                                </div>
-                                            @elseif ($requested > 0)
-                                                <div class="badge-line-status badge-line-outstanding">
-                                                    • Outstanding
-                                                </div>
-                                            @endif
-                                        </td>
+                        <div class="table-wrap">
+                            <table class="table align-middle mb-0">
+                                <thead>
+                                    <tr>
+                                        <th style="width: 50px;">#</th>
+                                        <th>Item</th>
+                                        <th class="text-end" style="width: 90px;">Diminta</th>
+                                        <th class="text-end" style="width: 100px;">Outstanding</th>
+                                        <th class="text-end" style="width: 110px;">Stok PRD</th>
+                                        <th class="text-end" style="width: 130px;">Qty Kirim (rencana)</th>
                                     </tr>
-                                @endforeach
-                            </tbody>
-                        </table>
-                    </div>
+                                </thead>
+                                <tbody>
+                                    @foreach ($stockRequest->lines as $index => $line)
+                                        @php
+                                            $lineId = $line->id;
+                                            $requested = (float) $line->qty_request;
+                                            $issued = (float) $line->qty_issued;
+                                            $outstanding = max($requested - $issued, 0);
+                                            $available = (float) ($liveStocks[$lineId] ?? 0);
 
-                    @php
-                        $totalRequested = (float) $stockRequest->lines->sum('qty_request');
-                        $totalIssued = (float) $stockRequest->lines->sum('qty_issued');
-                        $totalOutstanding = max($totalRequested - $totalIssued, 0);
-                    @endphp
+                                            $inputName = "lines[{$lineId}][qty_issued]";
 
-                    <div class="summary-row">
-                        <div class="summary-box">
-                            <div class="meta-label">Total Diminta</div>
-                            <div class="meta-value mono">
-                                {{ number_format($totalRequested, 0) }} pcs
-                            </div>
-                        </div>
-                        <div class="summary-box">
-                            <div class="meta-label">Total Sudah Dikirim</div>
-                            <div class="meta-value mono">
-                                {{ number_format($totalIssued, 0) }} pcs
-                            </div>
-                        </div>
-                        <div class="summary-box">
-                            <div class="meta-label">Outstanding Setelah Proses Terakhir</div>
-                            <div class="meta-value mono">
-                                {{ number_format($totalOutstanding, 0) }} pcs
-                            </div>
-                        </div>
-                    </div>
+                                            // Pertama kali kosong; kalau ada error, pakai old()
+                                            $inputValue = old($inputName, null);
 
-                    <div class="actions-row">
-                        <div class="text-soft">
-                            Catatan:
-                            <br>
-                            • Qty kirim tidak boleh melebihi stok PRD saat ini.
-                            <br>
-                            • Dokumen akan menjadi <strong>partial</strong> jika ada item yang belum terpenuhi penuh.
-                        </div>
-                        <div class="flex items-center gap-2">
-                            <a href="{{ route('prd.stock-requests.index') }}" class="btn-ghost">
-                                ← Kembali ke daftar
-                            </a>
+                                            $errorKey = "lines.{$lineId}.qty_issued";
+                                        @endphp
 
-                            @if (!$isCompleted)
-                                <button type="submit" class="btn">
-                                    Proses & Kirim ke RTS
-                                </button>
-                            @endif
-                        </div>
-                    </div>
-
-                    {{-- PANEL HISTORI MOVEMENT --}}
-                    @php
-                        $history = $movementHistory ?? collect();
-                    @endphp
-
-                    <div class="history-panel">
-                        <div class="history-header">
-                            <div class="history-title">
-                                Histori Movement Stok (Audit)
-                            </div>
-                            <div class="history-pill">
-                                {{ $history->count() }} movement
-                            </div>
-                        </div>
-
-                        @if ($history->isEmpty())
-                            <div class="text-soft" style="margin-top:.35rem;">
-                                Belum ada movement yang tercatat untuk dokumen ini.
-                                Stok PRD → RTS baru akan muncul di sini setelah kamu melakukan proses pengiriman.
-                            </div>
-                        @else
-                            <div class="text-soft" style="margin-top:.25rem;">
-                                Riwayat pergerakan stok yang tercatat dengan referensi dokumen ini (PRD ↔ RTS).
-                            </div>
-
-                            <div class="history-table-wrap">
-                                <table class="history-table">
-                                    <thead>
                                         <tr>
-                                            <th style="width: 40px;">#</th>
-                                            <th style="width: 18%;">Tanggal & Jam</th>
-                                            <th style="width: 14%;">Gudang</th>
-                                            <th style="width: 24%;">Item</th>
-                                            <th style="width: 10%;">Arah</th>
-                                            <th style="width: 12%;">Qty</th>
-                                            <th>Catatan</th>
+                                            <td class="td-row-number row-number" data-label="#">
+                                                {{ $index + 1 }}
+                                            </td>
+
+                                            <td data-label="Item">
+                                                <div class="fw-semibold">
+                                                    {{ $line->item?->code ?? '-' }}
+                                                </div>
+                                                <div class="line-item-name">
+                                                    {{ $line->item?->name ?? '' }}
+                                                </div>
+                                            </td>
+
+                                            <td class="text-end" data-label="Diminta">
+                                                <span class="mono qty-text">
+                                                    {{ (int) $requested }}
+                                                </span>
+                                            </td>
+
+                                            <td class="text-end" data-label="Outstanding">
+                                                <span class="mono qty-text">
+                                                    {{ (int) $outstanding }}
+                                                </span>
+                                            </td>
+
+                                            <td class="text-end" data-label="Stok PRD">
+                                                <span class="mono qty-text qty-available">
+                                                    {{ (int) $available }}
+                                                </span>
+                                            </td>
+
+                                            <td class="text-end" data-label="Qty kirim (rencana)">
+                                                <x-number-input name="{{ $inputName }}" :value="$inputValue" mode="integer"
+                                                    min="0" class="text-end mono js-qty-issued" />
+
+                                                @error($errorKey)
+                                                    <div class="error-text">
+                                                        {{ $message }}
+                                                    </div>
+                                                @enderror
+                                            </td>
                                         </tr>
-                                    </thead>
-                                    <tbody>
-                                        @foreach ($history as $idx => $mv)
-                                            @php
-                                                $ts = $mv->date ?? ($mv->created_at ?? null);
-                                                $warehouse = $mv->warehouse ?? null;
-                                                $item = $mv->item ?? null;
-                                                $dir = strtolower($mv->direction ?? '');
-                                                $qty = (float) ($mv->qty_change ?? 0);
-                                            @endphp
-                                            <tr>
-                                                <td class="mono">{{ $idx + 1 }}</td>
-                                                <td class="mono">
-                                                    @if ($ts)
-                                                        {{ \Illuminate\Support\Carbon::parse($ts)->format('d M Y H:i') }}
-                                                    @else
-                                                        —
-                                                    @endif
-                                                </td>
-                                                <td>
-                                                    @if ($warehouse)
-                                                        <div class="mono">
-                                                            {{ $warehouse->code ?? '-' }}
-                                                        </div>
-                                                        <div class="text-soft">
-                                                            {{ $warehouse->name ?? '' }}
-                                                        </div>
-                                                    @else
-                                                        —
-                                                    @endif
-                                                </td>
-                                                <td>
-                                                    @if ($item)
-                                                        <div class="mono">
-                                                            {{ $item->code ?? '' }}
-                                                        </div>
-                                                        <div class="text-soft">
-                                                            {{ $item->name ?? '' }}
-                                                        </div>
-                                                    @else
-                                                        —
-                                                    @endif
-                                                </td>
-                                                <td>
-                                                    @if ($dir === 'out')
-                                                        <span class="badge-line-status badge-line-outstanding">
-                                                            OUT
-                                                        </span>
-                                                    @elseif ($dir === 'in')
-                                                        <span class="badge-line-status badge-line-completed">
-                                                            IN
-                                                        </span>
-                                                    @else
-                                                        <span class="text-soft">-</span>
-                                                    @endif
-                                                </td>
-                                                <td class="mono">
-                                                    {{ number_format(abs($qty), 0) }} pcs
-                                                </td>
-                                                <td>
-                                                    <span class="history-note">
-                                                        {{ $mv->notes ?: '—' }}
-                                                    </span>
-                                                </td>
-                                            </tr>
-                                        @endforeach
-                                    </tbody>
-                                </table>
+                                    @endforeach
+                                </tbody>
+                            </table>
+                        </div>
+
+                        <div class="mt-3 d-flex justify-content-between align-items-center flex-wrap gap-2">
+                            <div class="hint">
+                                Baris dengan <strong>Qty Kirim = 0</strong> dianggap tidak ada rencana kirim untuk item
+                                tersebut.
                             </div>
-                        @endif
+                            <div class="d-flex gap-2">
+                                <button type="submit" class="btn-primary-rts">
+                                    <span>✔ Simpan rencana Qty Kirim</span>
+                                </button>
+                            </div>
+                        </div>
                     </div>
-                    {{-- END PANEL HISTORI --}}
                 </div>
             </form>
+
+            @if ($movementHistory->count() > 0)
+                <div class="card-main mt-3">
+                    <div class="card-body">
+                        <div class="pill-label mb-1">
+                            Histori mutasi terkait dokumen ini
+                        </div>
+                        <div class="hint mb-2">
+                            Ringkasan pergerakan stok yang sudah pernah dibuat dari dokumen ini (setelah RTS
+                            konfirmasi fisik).
+                        </div>
+
+                        <div class="table-wrap">
+                            <table class="table mb-0">
+                                <thead>
+                                    <tr>
+                                        <th style="width: 110px;">Tanggal</th>
+                                        <th>Item</th>
+                                        <th class="text-end" style="width: 100px;">Qty</th>
+                                        <th style="width: 120px;">Gudang</th>
+                                    </tr>
+                                </thead>
+                                <tbody>
+                                    @foreach ($movementHistory as $mv)
+                                        <tr>
+                                            <td class="mono">
+                                                {{ $mv->date?->format('d M Y') ?? '-' }}<br>
+                                                <span class="muted">{{ $mv->created_at?->format('H:i') }}</span>
+                                            </td>
+                                            <td>
+                                                <div class="fw-semibold">
+                                                    {{ $mv->item?->code ?? '-' }}
+                                                </div>
+                                                <div class="line-item-name">
+                                                    {{ $mv->item?->name ?? '' }}
+                                                </div>
+                                            </td>
+                                            <td class="text-end mono">
+                                                {{ (int) $mv->qty }}
+                                            </td>
+                                            <td>
+                                                {{ $mv->warehouse?->code ?? '-' }}<br>
+                                                <span class="muted">
+                                                    {{ $mv->warehouse?->name ?? '' }}
+                                                </span>
+                                            </td>
+                                        </tr>
+                                    @endforeach
+                                </tbody>
+                            </table>
+                        </div>
+
+                    </div>
+                </div>
+            @endif
+
         </div>
     </div>
 @endsection
 
 @push('scripts')
     <script>
-        (function() {
-            const rows = document.querySelectorAll('tr[data-line-id]');
-            const filterCheckbox = document.getElementById('filter-outstanding');
-            const autoFillBtn = document.getElementById('auto-fill-qty');
+        document.addEventListener('DOMContentLoaded', function() {
+            const inputs = Array.from(document.querySelectorAll('.js-qty-issued'));
 
-            function validateRow(row) {
-                const requested = parseFloat(row.dataset.requested || '0');
-                const live = parseFloat(row.dataset.live || '0');
-                const input = row.querySelector('.qty-issued-input');
-                const warningEl = row.querySelector('.qty-warning');
-
-                if (!input || !warningEl) return;
-
-                const val = parseFloat(input.value || '0');
-
-                if (!val || val <= 0) {
-                    input.classList.remove('input-error');
-                    warningEl.style.display = 'none';
-                    warningEl.textContent = '';
-                    return;
-                }
-
-                let msgs = [];
-
-                if (val > requested) {
-                    msgs.push('Qty kirim melebihi qty diminta (' + requested + ' pcs).');
-                }
-
-                if (val > live) {
-                    msgs.push('Qty kirim melebihi stok live PRD (' + live + ' pcs).');
-                }
-
-                if (msgs.length) {
-                    input.classList.add('input-error');
-                    warningEl.style.display = 'block';
-                    warningEl.textContent = msgs.join(' ');
-                } else {
-                    input.classList.remove('input-error');
-                    warningEl.style.display = 'none';
-                    warningEl.textContent = '';
-                }
-            }
-
-            function applyOutstandingFilter() {
-                if (!filterCheckbox) return;
-                const onlyOutstanding = filterCheckbox.checked;
-
-                rows.forEach(row => {
-                    const out = parseFloat(row.dataset.outstanding || '0');
-
-                    if (onlyOutstanding && out <= 0) {
-                        row.style.display = 'none';
-                    } else {
-                        row.style.display = '';
-                    }
+            inputs.forEach((input, index) => {
+                input.addEventListener('focus', function() {
+                    setTimeout(() => {
+                        this.select();
+                    }, 10);
                 });
-            }
 
-            function autoFillAll() {
-                rows.forEach(row => {
-                    const out = parseFloat(row.dataset.outstanding || '0');
-                    const live = parseFloat(row.dataset.live || '0');
-                    const input = row.querySelector('.qty-issued-input');
+                input.addEventListener('keydown', function(e) {
+                    const currentIndex = inputs.indexOf(this);
 
-                    if (!input) return;
-
-                    // Kalau tidak outstanding, atau stok live 0 → kosongkan
-                    if (out <= 0 || live <= 0) {
-                        input.value = '';
-                        validateRow(row);
-                        return;
+                    if (e.key === 'Enter' || e.key === 'ArrowDown') {
+                        e.preventDefault();
+                        const next = inputs[currentIndex + 1];
+                        if (next) {
+                            next.focus();
+                        }
                     }
 
-                    const qty = Math.min(out, live);
-
-                    input.value = qty;
-                    validateRow(row);
+                    if (e.key === 'ArrowUp') {
+                        e.preventDefault();
+                        const prev = inputs[currentIndex - 1];
+                        if (prev) {
+                            prev.focus();
+                        }
+                    }
                 });
-            }
-
-            rows.forEach(row => {
-                const input = row.querySelector('.qty-issued-input');
-                if (!input) return;
-
-                input.addEventListener('input', () => validateRow(row));
-                validateRow(row);
             });
 
-            if (filterCheckbox) {
-                filterCheckbox.addEventListener('change', applyOutstandingFilter);
-                applyOutstandingFilter();
+            if (inputs.length > 0) {
+                inputs[0].focus();
+                inputs[0].select();
             }
-
-            if (autoFillBtn) {
-                autoFillBtn.addEventListener('click', autoFillAll);
-            }
-        })();
+        });
     </script>
 @endpush

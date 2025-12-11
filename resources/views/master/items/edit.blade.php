@@ -5,11 +5,11 @@
 @section('content')
     <div class="page-wrap">
 
-        <form action="{{ route('items.update', $item) }}" method="POST">
+        <form action="{{ route('master.items.update', $item) }}" method="POST">
             @csrf
             @method('PUT')
 
-            @include('items._form')
+            @include('master.items._form')
 
         </form>
 

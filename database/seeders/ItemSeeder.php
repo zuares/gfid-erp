@@ -4,7 +4,9 @@ namespace Database\Seeders;
 
 use App\Models\Item;
 use App\Models\ItemCategory;
+use App\Models\ItemCostSnapshot;
 use Illuminate\Database\Seeder;
+use Illuminate\Support\Carbon;
 
 class ItemSeeder extends Seeder
 {
@@ -92,7 +94,8 @@ class ItemSeeder extends Seeder
                 ? 'finished_good'
                 : 'material';
 
-                Item::firstOrCreate(
+                /** @var \App\Models\Item $item */
+                $item = Item::firstOrCreate(
                     ['code' => $code],
                     [
                         'name' => $this->generateName($catCode, $code),
@@ -104,6 +107,43 @@ class ItemSeeder extends Seeder
                         'active' => 1,
                     ]
                 );
+
+                // Hitung HPP default berdasarkan pola kode item
+                $hpp = $this->guessHppFromCode($code);
+
+                // Hanya terapkan untuk finished good & kalau ada rule HPP
+                if ($type === 'finished_good' && $hpp !== null) {
+                    // Update kolom hpp di items **hanya jika** masih 0/null
+                    if (empty($item->hpp) || $item->hpp == 0) {
+                        $item->hpp = $hpp;
+                        $item->save();
+                    }
+
+                    // Buat snapshot HPP hanya kalau belum ada snapshot aktif
+                    $hasActiveSnapshot = ItemCostSnapshot::where('item_id', $item->id)
+                        ->where('is_active', 1)
+                        ->exists();
+
+                    if (!$hasActiveSnapshot) {
+                        ItemCostSnapshot::create([
+                            'item_id' => $item->id,
+                            'warehouse_id' => null, // global HPP (tidak spesifik gudang)
+                            'snapshot_date' => Carbon::today()->toDateString(),
+                            'reference_type' => 'seed',
+                            'reference_id' => null,
+                            'qty_basis' => 1,
+                            'rm_unit_cost' => 0,
+                            'cutting_unit_cost' => 0,
+                            'sewing_unit_cost' => 0,
+                            'finishing_unit_cost' => 0,
+                            'packaging_unit_cost' => 0,
+                            'overhead_unit_cost' => 0,
+                            'unit_cost' => $hpp,
+                            'notes' => 'Initial HPP seed from ItemSeeder',
+                            'is_active' => 1,
+                        ]);
+                    }
+                }
             }
         }
     }
@@ -160,5 +200,74 @@ class ItemSeeder extends Seeder
         $colorName = $colors[$clr] ?? $clr;
 
         return "{$catName} {$model} {$colorName}";
+    }
+
+    /**
+     * Hitung HPP default berdasarkan pola kode.
+     *
+     * Aturan:
+     * - K1,K2,K3,K5,K7        → 30.000
+     * - J3,J5,J7              → 45.000
+     * - L1,L2                 → 35.000
+     * - C3,C5,C7              → 35.000
+     * - T1,T2                 → 30.000
+     * - S2RDM,S3RDM,S4RDM     → 6.700 (per pcs)
+     * - S5RDM                 → 8.400 (per pcs)
+     *   - Jika suffix "-3"    → HPP × 3
+     *   - Jika suffix "-6"    → HPP × 6
+     */
+    private function guessHppFromCode(string $code): ?int
+    {
+        $c = strtoupper($code);
+        $base = null;
+
+        $prefix2 = substr($c, 0, 2); // contoh: K1, J3, L1, C5, T1, T2
+
+        // Jogger K1,K2,K3,K5,K7 → 30.000
+        if (in_array($prefix2, ['K1', 'K2', 'K3', 'K5', 'K7'], true)) {
+            $base = 30000;
+        }
+
+        // Jaket J3,J5,J7 → 45.000
+        if (in_array($prefix2, ['J3', 'J5', 'J7'], true)) {
+            $base = 45000;
+        }
+
+        // Legging L1,L2 → 35.000
+        if (in_array($prefix2, ['L1', 'L2'], true)) {
+            $base = 35000;
+        }
+
+        // Cargo C3,C5,C7 → 35.000
+        if (in_array($prefix2, ['C3', 'C5', 'C7'], true)) {
+            $base = 35000;
+        }
+
+        // T-Shirt T1,T2 → 30.000
+        if (in_array($prefix2, ['T1', 'T2'], true)) {
+            $base = 30000;
+        }
+
+        // Short RDM:
+        // - S2RDM,S3RDM,S4RDM → 6.700
+        // - S5RDM             → 8.400
+        if (preg_match('/^S[2-4]RDM/i', $c)) {
+            $base = 6700;
+        } elseif (preg_match('/^S5RDM/i', $c)) {
+            $base = 8400;
+        }
+
+        if ($base === null) {
+            return null;
+        }
+
+        // Bundle handling: ...-6 / ...-3 → dikali 6 / 3
+        if (str_ends_with($c, '-6')) {
+            $base *= 6;
+        } elseif (str_ends_with($c, '-3')) {
+            $base *= 3;
+        }
+
+        return $base;
     }
 }

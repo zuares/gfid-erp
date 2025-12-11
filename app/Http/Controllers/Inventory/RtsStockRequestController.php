@@ -14,6 +14,9 @@ use Illuminate\Http\RedirectResponse;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Auth;
 use Illuminate\Support\Facades\DB;
+use Illuminate\Validation\ValidationException;
+
+// ⬅️ tambahkan di atas controller
 
 class RtsStockRequestController extends Controller
 {
@@ -144,7 +147,6 @@ class RtsStockRequestController extends Controller
      * Form buat Stock Request dari RTS ke PRD.
      * RTS boleh request item meskipun stok di WH-PRD sedang 0 / kurang.
      */
-
     public function create(Request $request): View
     {
         $prdWarehouse = Warehouse::where('code', 'WH-PRD')->firstOrFail();
@@ -156,7 +158,8 @@ class RtsStockRequestController extends Controller
         ? Carbon::parse($dateParam)->startOfDay()
         : Carbon::today()->startOfDay();
 
-        // Cari dokumen RTS hari itu (WH-PRD → WH-RTS)
+        // Cari DOKUMEN RTS hari itu (WH-PRD → WH-RTS)
+        // Boleh status apapun (submitted / partial / completed), hanya untuk PREFILL.
         $prefillRequest = StockRequest::rtsReplenish()
             ->whereDate('date', $targetDate->toDateString())
             ->where('source_warehouse_id', $prdWarehouse->id)
@@ -167,17 +170,23 @@ class RtsStockRequestController extends Controller
 
         $prefillDate = $targetDate->toDateString();
         $prefillLines = null;
+        $prefillStatus = null;
+        $prefillFromCompleted = false;
 
         if ($prefillRequest) {
             // Pakai tanggal dokumen (kalau beda)
             $prefillDate = $prefillRequest->date?->toDateString() ?? $prefillDate;
+            $prefillStatus = $prefillRequest->status;
+
+            // Flag: kalau permintaan lama SUDAH SELESAI → prefill untuk permintaan baru
+            $prefillFromCompleted = $prefillRequest->status === 'completed';
 
             // Prefill baris: item + qty_request (+ notes kalau nanti mau dipakai)
             $prefillLines = $prefillRequest->lines->map(function ($line) {
                 return [
                     'item_id' => $line->item_id,
                     'qty_request' => $line->qty_request,
-                    // 'notes'    => $line->notes, // kalau mau tambahin kolom catatan di form
+                    // 'notes'    => $line->notes,
                 ];
             })->toArray();
         }
@@ -197,17 +206,20 @@ class RtsStockRequestController extends Controller
             'prefillDate' => $prefillDate,
             'prefillLines' => $prefillLines,
             'prefillRequest' => $prefillRequest,
+            'prefillStatus' => $prefillStatus,
+            'prefillFromCompleted' => $prefillFromCompleted, // <-- buat teks info di Blade
         ]);
     }
-
     /**
      * Simpan / UPDATE Stock Request dari RTS untuk TANGGAL yang sama.
      *
      * ✅ RTS boleh request melebihi stok PRD (backend TIDAK memblokir),
      *    sistem hanya menyimpan snapshot stok untuk referensi.
-     * ✅ Jika sudah ada dokumen RTS hari itu (kombinasi WH-PRD → WH-RTS, status submitted/partial),
-     *    MAKA dokumen tersebut DIOVERWRITE isinya dengan data baru dari form.
+     * ✅ Jika sudah ada dokumen RTS hari itu (kombinasi WH-PRD → WH-RTS) dengan status "submitted",
+     *    MAKA dokumen tersebut DIOVERWRITE isinya dengan data baru dari form
      *    (code tidak berubah, hanya lines & notes yang di-update).
+     * ✅ Jika dokumen hari itu statusnya sudah "partial" atau "completed",
+     *    sistem TIDAK mengubah dokumen lama, tapi membuat dokumen BARU dengan kode baru.
      */
     public function store(Request $request): RedirectResponse
     {
@@ -241,12 +253,12 @@ class RtsStockRequestController extends Controller
             $sourceWarehouseId,
             $destinationWarehouseId
         ) {
-            // 🔍 Cek apakah sudah ada dokumen RTS di tanggal yang sama
+            // 🔍 HANYA cari existing "submitted" untuk di-OVERWRITE
             $existing = StockRequest::rtsReplenish()
                 ->whereDate('date', $date)
                 ->where('source_warehouse_id', $sourceWarehouseId)
                 ->where('destination_warehouse_id', $destinationWarehouseId)
-                ->whereIn('status', ['submitted', 'partial']) // yang masih jalan
+                ->where('status', 'submitted')
                 ->lockForUpdate()
                 ->latest('id')
                 ->first();
@@ -258,7 +270,6 @@ class RtsStockRequestController extends Controller
 
                 // Update header seperlunya (date & notes)
                 $stockRequest->date = $date;
-                // kalau notes baru diisi, replace; kalau kosong, biarkan notes lama
                 if (array_key_exists('notes', $validated)) {
                     $stockRequest->notes = $validated['notes'] ?? null;
                 }
@@ -297,20 +308,19 @@ class RtsStockRequestController extends Controller
                     'item_id' => $itemId,
                     'qty_request' => $qtyRequest,
                     'stock_snapshot_at_request' => $available,
-                    'qty_issued' => null,
+                    'qty_issued' => null, // final akan diisi saat RTS finalize
                     'notes' => $lineData['notes'] ?? null,
                 ]);
             }
         });
 
-        // 🔁 Redirect ke SHOW dokumen yang sama (baik baru ataupun update)
         return redirect()
             ->route('rts.stock-requests.show', $stockRequest)
             ->with(
                 'status',
                 $wasUpdated
-                ? 'Permintaan stok RTS untuk hari ini berhasil diperbarui.'
-                : 'Stock Request berhasil dibuat dan dikirim ke Gudang Produksi.'
+                ? 'Permintaan stok RTS untuk hari ini berhasil diperbarui (dokumen masih dalam status submitted).'
+                : 'Stock Request baru berhasil dibuat dan dikirim ke Gudang Produksi.'
             );
     }
 
@@ -372,6 +382,167 @@ class RtsStockRequestController extends Controller
             'stockRequest' => $stockRequest,
             'summary' => $summary,
         ]);
+    }
+
+    /**
+     * FORM KONFIRMASI FISIK DI RTS
+     * - RTS melihat: qty diminta, rencana kirim PRD (qty_issued dari PRD),
+     *   dan mengisi qty fisik yang benar-benar diterima.
+     */
+    public function confirmReceive(StockRequest $stockRequest): View
+    {
+        abort_unless($stockRequest->purpose === 'rts_replenish', 404);
+        abort_if(!in_array($stockRequest->status, ['submitted', 'partial']), 404);
+
+        $stockRequest->load(['lines.item', 'sourceWarehouse', 'destinationWarehouse']);
+
+        $sourceWarehouseId = $stockRequest->source_warehouse_id;
+
+        // Stok live PRD per item (info saja)
+        $liveStocks = [];
+        foreach ($stockRequest->lines as $line) {
+            $liveStocks[$line->id] = $this->inventory->getAvailableStock(
+                $sourceWarehouseId,
+                $line->item_id
+            );
+        }
+
+        // Summary
+        $totalRequested = (float) $stockRequest->lines->sum('qty_request');
+        $totalPlanned = (float) $stockRequest->lines->sum(function ($line) {
+            return (float) ($line->qty_issued ?? 0);
+        });
+
+        return view('inventory.rts_stock_requests.confirm', [
+            'stockRequest' => $stockRequest,
+            'liveStocks' => $liveStocks,
+            'totalRequested' => $totalRequested,
+            'totalPlanned' => $totalPlanned,
+        ]);
+    }
+
+    /**
+     * FINALIZE: RTS konfirmasi fisik → baru mutasi stok PRD → RTS.
+     *
+     * - Boleh input qty_received berapapun (boleh > request, boleh > stok live),
+     *   validasi stok minus (kalau ada) ditangani di InventoryService::move().
+     * - Kita set qty_issued = qty_received (final).
+     * - Status:
+     *      - submitted : belum ada baris yang diterima
+     *      - partial   : ada yang diterima, tapi masih ada outstanding
+     *      - completed : semua permintaan terpenuhi (outstanding total = 0)
+     */
+    public function finalize(Request $request, StockRequest $stockRequest): RedirectResponse
+    {
+        abort_unless($stockRequest->purpose === 'rts_replenish', 404);
+        abort_if(!in_array($stockRequest->status, ['submitted', 'partial']), 404);
+
+        $validated = $request->validate([
+            'lines' => ['required', 'array'],
+            'lines.*.qty_received' => ['nullable', 'numeric', 'gte:0'],
+        ]);
+
+        $sourceWarehouseId = $stockRequest->source_warehouse_id;
+        $destinationWarehouseId = $stockRequest->destination_warehouse_id;
+        $linesInput = $validated['lines'] ?? [];
+
+        $anyReceived = false;
+
+        DB::transaction(function () use (
+            &$anyReceived,
+            $stockRequest,
+            $sourceWarehouseId,
+            $destinationWarehouseId,
+            $linesInput
+        ) {
+            $stockRequest->load('lines');
+
+            foreach ($stockRequest->lines as $line) {
+                $lineId = $line->id;
+                $input = $linesInput[$lineId] ?? null;
+
+                $qtyReceived = 0.0;
+                if ($input !== null && isset($input['qty_received'])) {
+                    $qtyReceived = (float) $input['qty_received'];
+                }
+
+                // Kalau user tidak isi / isi 0 → lewati baris ini
+                if ($qtyReceived <= 0) {
+                    continue;
+                }
+
+                $anyReceived = true;
+
+                try {
+                    // 🧠 IZINKAN STOK MINUS DI WH-PRD, mutasi pakai tanggal dokumen RTS
+                    $this->inventory->move(
+                        $line->item_id,
+                        $sourceWarehouseId,
+                        $destinationWarehouseId,
+                        $qtyReceived,
+                        referenceType: 'stock_request',
+                        referenceId: $stockRequest->id,
+                        notes: 'RTS receive confirmation',
+                        date: $stockRequest->date ?? now(),
+                        allowNegative: true, // ⬅️ stok WH-PRD boleh minus
+                    );
+                } catch (\RuntimeException $e) {
+                    // Error stok (kalau someday allowNegative = false atau case lain)
+                    throw ValidationException::withMessages([
+                        'stock' => $e->getMessage(),
+                    ]);
+                }
+
+                // 🔁 Kunci angka kirim: qty_issued = qty_received (angka final)
+                $line->qty_issued = $qtyReceived;
+                $line->save();
+            }
+
+            if (!$anyReceived) {
+                // Tidak ada baris yang diisi → jangan ubah status apa pun
+                return;
+            }
+
+            // Hitung ulang status dokumen
+            $stockRequest->load('lines');
+
+            $totalIssued = 0.0;
+            $anyOutstanding = false;
+
+            foreach ($stockRequest->lines as $line) {
+                $reqQty = (float) ($line->qty_request ?? 0);
+                $issuedQty = (float) ($line->qty_issued ?? 0);
+
+                $totalIssued += $issuedQty;
+
+                $outstanding = max($reqQty - $issuedQty, 0);
+                if ($outstanding > 0) {
+                    $anyOutstanding = true;
+                }
+            }
+
+            if ($totalIssued <= 0) {
+                $stockRequest->status = 'submitted'; // secara logika harusnya jarang kejadian
+            } elseif ($anyOutstanding) {
+                $stockRequest->status = 'partial';
+            } else {
+                $stockRequest->status = 'completed';
+            }
+
+            $stockRequest->save();
+        });
+
+        if (!$anyReceived) {
+            return back()
+                ->with('warning', 'Tidak ada Qty fisik yang diisi. Isi minimal satu baris untuk memproses mutasi.');
+        }
+
+        return redirect()
+            ->route('rts.stock-requests.show', $stockRequest)
+            ->with(
+                'status',
+                'Konfirmasi fisik berhasil. Stok PRD → RTS sudah dimutasi sesuai qty fisik (stok PRD bisa minus jika kirim lebih besar).'
+            );
     }
 
     /**

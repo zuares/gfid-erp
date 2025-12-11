@@ -56,6 +56,12 @@
             color: rgba(100, 116, 139, 1);
         }
 
+        .page-flow-note {
+            font-size: .78rem;
+            color: rgba(148, 163, 184, 1);
+            margin-top: .2rem;
+        }
+
         .section-title {
             font-size: .9rem;
             font-weight: 600;
@@ -253,6 +259,28 @@
             color: var(--rts-main-strong);
         }
 
+        .badge-warning-soft {
+            display: inline-flex;
+            align-items: center;
+            gap: .35rem;
+            border-radius: .9rem;
+            padding: .25rem .6rem;
+            font-size: .75rem;
+            background: rgba(251, 191, 36, .15);
+            color: rgba(133, 77, 14, 1);
+        }
+
+        .badge-info-soft {
+            display: inline-flex;
+            align-items: center;
+            gap: .35rem;
+            border-radius: .9rem;
+            padding: .25rem .6rem;
+            font-size: .75rem;
+            background: rgba(59, 130, 246, .08);
+            color: rgba(30, 64, 175, 1);
+        }
+
         .remove-row-btn {
             color: rgba(148, 163, 184, 1);
         }
@@ -260,8 +288,6 @@
         .remove-row-btn:hover {
             color: rgba(248, 113, 113, 1);
         }
-
-        /* ========= MODAL SUMMARY STOK (KHUSUS RTS) ========= */
 
         .rts-modal-backdrop {
             position: fixed;
@@ -403,6 +429,27 @@
 @endpush
 
 @section('content')
+    @php
+        // fallback kalau controller belum kirim (biar aman)
+        $prefillStatus = $prefillStatus ?? ($prefillRequest->status ?? null);
+        $prefillFromCompleted = $prefillFromCompleted ?? $prefillStatus === 'completed';
+
+        // CONTROL NILAI DEFAULT
+        if ($prefillFromCompleted) {
+            // 🎯 Kasus: permintaan sebelumnya sudah SELESAI
+            // → Form benar-benar baru, tanpa old() dan tanpa prefillLines
+            $dateValue = now()->toDateString();
+            $notesValue = '';
+            $formLines = [['item_id' => null, 'qty_request' => null]];
+        } else {
+            // Kasus normal: pakai old() / prefill
+            $dateValue = old('date', $prefillDate ?? now()->toDateString());
+            $notesValue = old('notes', isset($prefillRequest) ? $prefillRequest->notes : '');
+
+            $formLines = old('lines', $prefillLines ?? [['item_id' => null, 'qty_request' => null]]);
+        }
+    @endphp
+
     <div class="page-wrap">
         <div class="card">
             <div class="card-header">
@@ -412,12 +459,45 @@
                         <div class="page-subtitle mt-1">
                             Permintaan barang dari Gudang Produksi ke Gudang RTS.
                         </div>
+                        <div class="page-flow-note">
+                            Setelah permintaan disimpan, Gudang Produksi akan mengisi <strong>Qty Kirim</strong>.
+                            RTS kemudian konfirmasi fisik di halaman terpisah, dan di sana baru terjadi mutasi stok.
+                        </div>
+
                         @if (isset($prefillRequest))
-                            <div class="mt-1 text-xs text-amber-700">
-                                Mengedit permintaan tanggal
-                                <span class="mono">{{ $prefillRequest->date?->format('d M Y') }}</span>
-                                (data lama sudah diisi ulang di bawah).
-                            </div>
+                            @if ($prefillFromCompleted)
+                                <div class="mt-2">
+                                    <span class="badge-info-soft">
+                                        Permintaan sebelumnya tanggal
+                                        <span class="mono">
+                                            {{ $prefillRequest->date?->format('d M Y') }}
+                                        </span>
+                                        sudah <strong>SELESAI</strong>. Form ini kosong dan siap dipakai
+                                        sebagai <strong>permintaan baru</strong>.
+                                    </span>
+                                </div>
+                            @elseif($prefillStatus === 'submitted')
+                                <div class="mt-2">
+                                    <span class="badge-warning-soft">
+                                        Mengedit permintaan tanggal
+                                        <span class="mono">
+                                            {{ $prefillRequest->date?->format('d M Y') }}
+                                        </span>
+                                        yang masih berstatus <strong>SUBMITTED</strong>.
+                                        Menyimpan form ini akan <strong>mengganti isi permintaan lama</strong>.
+                                    </span>
+                                </div>
+                            @else
+                                <div class="mt-2">
+                                    <span class="badge-info-soft">
+                                        Form sudah diisi berdasarkan permintaan terakhir tanggal
+                                        <span class="mono">
+                                            {{ $prefillRequest->date?->format('d M Y') }}
+                                        </span>.
+                                        Anda bisa menyesuaikan angka untuk permintaan baru.
+                                    </span>
+                                </div>
+                            @endif
                         @endif
                     </div>
                     <div class="hidden sm:flex flex-col items-end gap-1">
@@ -443,8 +523,7 @@
                         <div class="form-group" style="grid-column: span 3 / span 3;">
                             <label for="date">Tanggal</label>
                             <input type="date" id="date" name="date"
-                                class="form-control @error('date') input-error @enderror"
-                                value="{{ old('date', $prefillDate ?? now()->toDateString()) }}">
+                                class="form-control @error('date') input-error @enderror" value="{{ $dateValue }}">
                             @error('date')
                                 <div class="text-error">{{ $message }}</div>
                             @enderror
@@ -468,7 +547,7 @@
                         <div class="form-group" style="grid-column: span 12 / span 12;">
                             <label for="notes">Catatan (opsional)</label>
                             <textarea id="notes" name="notes" class="form-control"
-                                placeholder="Contoh: isi stok untuk promo, flash sale, dsb.">{{ old('notes', isset($prefillRequest) ? $prefillRequest->notes : '') }}</textarea>
+                                placeholder="Contoh: isi stok untuk promo, flash sale, dsb.">{{ $notesValue }}</textarea>
                         </div>
                     </div>
 
@@ -477,7 +556,8 @@
                         <div class="flex items-center justify-between gap-2">
                             <div class="section-title">Detail Item</div>
                             <span class="badge-info">
-                                Pilih FG dari gudang produksi. Boleh request lebih besar dari stok live PRD.
+                                Pilih FG dari gudang produksi. Boleh request lebih besar dari stok live PRD —
+                                PRD akan menyesuaikan Qty Kirim sesuai fisik.
                             </span>
                         </div>
 
@@ -495,32 +575,20 @@
                                 <tbody id="lines-body">
                                     @php
                                         use App\Models\Item;
-
-                                        // Satu sumber kebenaran:
-                                        // - kalau ada old('lines') → pakai itu
-                                        // - kalau tidak, pakai prefillLines dari controller (kalau ada)
-                                        // - fallback: 1 baris kosong
-                                        $formLines = old(
-                                            'lines',
-                                            $prefillLines ?? [['item_id' => null, 'qty_request' => null]],
-                                        );
                                     @endphp
 
                                     @foreach ($formLines as $i => $lineData)
                                         @php
                                             $itemId = $lineData['item_id'] ?? null;
 
-                                            // 1️⃣ coba cari di finishedGoodsItems (mungkin cuma item stok > 0)
                                             $selectedItem = $itemId
                                                 ? $finishedGoodsItems->firstWhere('id', $itemId)
                                                 : null;
 
-                                            // 2️⃣ fallback: kalau tidak ketemu tapi ada item_id → ambil dari DB
                                             if (!$selectedItem && $itemId) {
                                                 $selectedItem = Item::select('id', 'code', 'name')->find($itemId);
                                             }
 
-                                            // 3️⃣ teks yang ditampilkan di input
                                             $displayValue = $selectedItem
                                                 ? trim(
                                                     ($selectedItem->code ?? '') . ' — ' . ($selectedItem->name ?? ''),
@@ -533,7 +601,6 @@
                                                 <span class="row-number">{{ $i + 1 }}</span>
                                             </td>
 
-                                            {{-- ITEM FG pakai x-item-suggest --}}
                                             <td>
                                                 <x-item-suggest :id-name="'lines[' . $i . '][item_id]'" :items="$finishedGoodsItems" type="finished_good"
                                                     :extra-params="['warehouse_id' => $prdWarehouse->id]" placeholder="Kode / nama FG" :display-value="$displayValue"
@@ -617,7 +684,6 @@
 @endsection
 
 @php
-    // Template x-item-suggest untuk baris baru (index diganti "__INDEX__" nanti di JS)
     $itemSuggestTemplate = view('components.item-suggest', [
         'idName' => 'lines[__INDEX__][item_id]',
         'items' => $finishedGoodsItems,
@@ -790,7 +856,6 @@
                     }
                 }
 
-                // Sekarang hanya info, tidak kasih error merah
                 function validateQtyAgainstStock(inputEl, available) {
                     const row = inputEl.closest('tr.line-row');
                     if (!row) return;
@@ -906,7 +971,6 @@
                 function attachGlobalListeners() {
                     addLineBtn?.addEventListener('click', handleAddLine);
 
-                    // Change events (item & qty)
                     linesBody.addEventListener('change', function(e) {
                         const target = e.target;
 
@@ -923,7 +987,6 @@
                         }
                     });
 
-                    // Click events (hapus baris, summary stok)
                     linesBody.addEventListener('click', function(e) {
                         const removeBtn = e.target.closest('.remove-row-btn');
                         const summaryBtn = e.target.closest('.btn-show-summary');
@@ -933,7 +996,6 @@
                             const row = findRowByIndex(rowIndex);
                             if (row) {
                                 if (linesBody.querySelectorAll('tr.line-row').length <= 1) {
-                                    // Kalau cuma 1 baris, jangan dihapus, cukup clear
                                     const wrap = row.querySelector('.item-suggest-wrap');
                                     if (wrap) {
                                         const input = wrap.querySelector('.js-item-suggest-input');
@@ -972,7 +1034,6 @@
                         }
                     });
 
-                    // Modal close (klik X / klik backdrop)
                     closeBtn?.addEventListener('click', () => {
                         backdrop?.classList.remove('show');
                     });
@@ -984,15 +1045,12 @@
                     });
                 }
 
-                // 🔹 1) Pasang semua listener dulu
                 attachGlobalListeners();
 
-                // 🔹 2) Init item-suggest untuk seluruh tbody
                 if (window.initItemSuggestInputs) {
                     window.initItemSuggestInputs(linesBody);
                 }
 
-                // 🔹 3) Fetch stok untuk semua baris yang sudah punya item (old()/prefill)
                 (function initExistingStocks() {
                     const existingHiddenIds = linesBody.querySelectorAll('.js-item-suggest-id');
                     existingHiddenIds.forEach(hidden => {

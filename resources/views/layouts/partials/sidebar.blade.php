@@ -269,7 +269,14 @@
             </button>
 
             <div class="collapse {{ $masterOpen ? 'show' : '' }}" id="navMaster">
-                {{-- nanti: items --}}
+                {{-- Items --}}
+                <a href="{{ route('master.items.index') }}"
+                    class="sidebar-link sidebar-link-sub {{ request()->routeIs('master.items.*') ? 'active' : '' }}">
+                    <span class="icon">📦</span>
+                    <span>Items</span>
+                </a>
+
+                {{-- Customers --}}
                 <a href="{{ route('master.customers.index') }}"
                     class="sidebar-link sidebar-link-sub {{ request()->routeIs('master.customers.*') ? 'active' : '' }}">
                     <span class="icon">👤</span>

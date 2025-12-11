@@ -5,10 +5,10 @@
 @section('content')
     <div class="page-wrap">
 
-        <form action="{{ route('items.store') }}" method="POST">
+        <form action="{{ route('master.items.store') }}" method="POST">
             @csrf
 
-            @include('items._form')
+            @include('master.items._form')
 
         </form>
 
