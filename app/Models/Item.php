@@ -24,20 +24,18 @@ class Item extends Model
         'last_purchase_price',
         'hpp',
         'active',
-        'consumption_cutting', // ⭐ NEW
-
-        'consumption_cutting_basis_qty', // ⭐ NEW
-        'base_unit_cost', //⭐ NEW
-
+        'consumption_cutting',
+        'consumption_cutting_basis_qty',
+        'base_unit_cost',
     ];
 
     protected $casts = [
         'last_purchase_price' => 'decimal:2',
         'hpp' => 'decimal:2',
         'active' => 'boolean',
-        'consumption_cutting' => 'decimal:2', // ⭐ NEW
-        'consumption_cutting' => 'decimal:2', // ⭐ NEW
-        'base_unit_cost' => 'decimal:2', // ⭐ NEW
+        'consumption_cutting' => 'decimal:2',
+        'consumption_cutting_basis_qty' => 'decimal:2',
+        'base_unit_cost' => 'decimal:2',
     ];
 
     /* ==========================
@@ -105,7 +103,7 @@ class Item extends Model
 
     public function isFinished(): bool
     {
-        return $this->type === 'finished';
+        return $this->type === 'finished_good';
     }
 
     public function isAccessory(): bool
@@ -142,9 +140,35 @@ class Item extends Model
      * HPP global sementara.
      * Nanti kalau modul HPP sudah jadi, logic di sini bisa diganti ambil dari snapshot dsb.
      */
+    /**
+     * HPP global “efektif”.
+     * Urutan:
+     * 1. Snapshot aktif global
+     * 2. base_unit_cost
+     * 3. hpp (legacy)
+     */
     public function getEffectiveUnitCostAttribute(): float
     {
-        return (float) ($this->base_unit_cost ?? 0);
+        // snapshot aktif global (tanpa filter gudang)
+        $snapshot = $this->costSnapshots()
+            ->active()
+            ->orderByDesc('snapshot_date')
+            ->orderByDesc('id')
+            ->first();
+
+        if ($snapshot && $snapshot->unit_cost > 0) {
+            return (float) $snapshot->unit_cost;
+        }
+
+        if ($this->base_unit_cost && $this->base_unit_cost > 0) {
+            return (float) $this->base_unit_cost;
+        }
+
+        if ($this->hpp && $this->hpp > 0) {
+            return (float) $this->hpp;
+        }
+
+        return 0.0;
     }
 
     public function costSnapshots()
@@ -158,13 +182,27 @@ class Item extends Model
      */
     public function getActiveUnitCostAttribute(): float
     {
-        $snapshot = $this->costSnapshots()
-            ->active() // scopeActive di ItemCostSnapshot
-            ->orderByDesc('snapshot_date')
-            ->orderByDesc('id')
-            ->first();
+        return $this->getActiveUnitCostForWarehouse(null);
+    }
 
-        return $snapshot?->unit_cost ?? 0;
+    public function getActiveUnitCostForWarehouse(?int $warehouseId = null): float
+    {
+        $snapshot = \App\Models\ItemCostSnapshot::getActiveForItem($this->id, $warehouseId);
+
+        if ($snapshot && $snapshot->unit_cost > 0) {
+            return (float) $snapshot->unit_cost;
+        }
+
+        // fallback ke base_unit_cost, lalu hpp legacy
+        if ($this->base_unit_cost && $this->base_unit_cost > 0) {
+            return (float) $this->base_unit_cost;
+        }
+
+        if ($this->hpp && $this->hpp > 0) {
+            return (float) $this->hpp;
+        }
+
+        return 0.0;
     }
 
     public function barcodes(): HasMany

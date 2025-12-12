@@ -3,6 +3,22 @@
 
 @section('title', 'Stock Opname • ' . $opname->code)
 
+@php
+    use App\Models\StockOpname;
+    use App\Models\ItemCostSnapshot;
+
+    // Gunakan helper dari model kalau ada
+    $isOpening = method_exists($opname, 'isOpening')
+        ? $opname->isOpening()
+        : $opname->type === StockOpname::TYPE_OPENING;
+
+    $canModifyLines = method_exists($opname, 'canModifyLines')
+        ? $opname->canModifyLines()
+        : !in_array($opname->status, [StockOpname::STATUS_REVIEWED, StockOpname::STATUS_FINALIZED], true);
+
+    $isReadonly = !$canModifyLines;
+@endphp
+
 @push('head')
     <style>
         :root {
@@ -91,7 +107,7 @@
             margin-top: .75rem;
             border-radius: 10px;
             border: 1px solid rgba(148, 163, 184, .25);
-            overflow: hidden;
+            overflow-x: auto;
             background: rgba(248, 250, 252, .9);
         }
 
@@ -106,6 +122,7 @@
             letter-spacing: .06em;
             color: rgba(100, 116, 139, 1);
             background: rgba(15, 23, 42, 0.02);
+            white-space: nowrap;
         }
 
         body[data-theme="dark"] .table thead th {
@@ -116,6 +133,7 @@
         .table tbody td {
             vertical-align: middle;
             font-size: .82rem;
+            white-space: nowrap;
         }
 
         .diff-plus {
@@ -131,28 +149,22 @@
                 padding-inline: .6rem;
             }
 
-            .table thead {
-                display: none;
+            .table-wrap {
+                border-radius: 8px;
             }
 
-            .table tbody tr {
-                display: block;
-                border-bottom: 1px solid rgba(148, 163, 184, .25);
-                padding: .4rem .7rem;
+            .table thead th {
+                font-size: .7rem;
             }
 
             .table tbody td {
-                display: flex;
-                justify-content: space-between;
-                gap: .75rem;
-                padding: .12rem 0;
-                border-top: none;
+                font-size: .78rem;
             }
 
-            .table tbody td::before {
-                content: attr(data-label);
-                font-weight: 500;
-                color: #64748b;
+            /* Hide kolom yang kurang penting di mobile */
+            .col-diff,
+            .col-notes {
+                display: none;
             }
         }
 
@@ -169,11 +181,6 @@
 @endpush
 
 @section('content')
-    @php
-        $isReadonly = in_array($opname->status, ['reviewed', 'finalized']);
-        $isOpening = $opname->type === 'opening';
-    @endphp
-
     <div class="so-page">
         <div class="page-wrap">
             {{-- HEADER --}}
@@ -187,7 +194,8 @@
                     </h1>
                     <p class="page-subtitle mb-0">
                         @if ($isReadonly)
-                            Dokumen ini sudah {{ $opname->status === 'finalized' ? 'difinalkan' : 'direview' }}.
+                            Dokumen ini sudah
+                            {{ $opname->status === StockOpname::STATUS_FINALIZED ? 'difinalkan' : 'direview' }}.
                         @else
                             @if ($isOpening)
                                 Mode saldo awal: isi <span class="text-mono">Qty Fisik</span> dan
@@ -201,10 +209,10 @@
                 <div class="text-end">
                     @php
                         $statusClass = match ($opname->status) {
-                            'draft' => 'badge-status badge-status--draft',
-                            'counting' => 'badge-status badge-status--counting',
-                            'reviewed' => 'badge-status badge-status--reviewed',
-                            'finalized' => 'badge-status badge-status--finalized',
+                            StockOpname::STATUS_DRAFT => 'badge-status badge-status--draft',
+                            StockOpname::STATUS_COUNTING => 'badge-status badge-status--counting',
+                            StockOpname::STATUS_REVIEWED => 'badge-status badge-status--reviewed',
+                            StockOpname::STATUS_FINALIZED => 'badge-status badge-status--finalized',
                             default => 'badge-status badge-status--draft',
                         };
                     @endphp
@@ -213,7 +221,7 @@
             </div>
 
             {{-- FORM TAMBAH ITEM (OPENING MODE, SIMPLE + AJAX) --}}
-            @if ($isOpening && !$isReadonly)
+            @if ($isOpening && $canModifyLines)
                 <div class="card card-main mb-3">
                     <div class="card-body">
                         <div class="mb-2">
@@ -318,12 +326,12 @@
                             </div>
                         </div>
 
-                        @if (!$isReadonly)
+                        @if ($canModifyLines)
                             <div class="mt-3 d-flex gap-2 flex-wrap">
                                 <button type="submit" class="btn btn-sm btn-primary">
                                     Simpan Perubahan
                                 </button>
-                                @if (in_array($opname->status, ['draft', 'counting']))
+                                @if (in_array($opname->status, [StockOpname::STATUS_DRAFT, StockOpname::STATUS_COUNTING], true))
                                     <button type="submit" name="mark_reviewed" value="1"
                                         class="btn btn-sm btn-outline-primary">
                                         Simpan &amp; Tandai Selesai Counting
@@ -361,7 +369,7 @@
                         </div>
 
                         {{-- TOMBOL RESET QTY & HPP (soft reset) --}}
-                        @if ($isOpening && !$isReadonly && $opname->lines->count() > 0)
+                        @if ($isOpening && $canModifyLines && $opname->lines->count() > 0)
                             <div class="mb-2 d-flex justify-content-between align-items-center flex-wrap gap-2">
                                 <div style="font-size:.78rem;color:#6b7280;">
                                     Reset hanya mengosongkan Qty Fisik &amp; HPP semua baris, daftar item tetap ada.
@@ -384,13 +392,13 @@
                                         <th style="width:40px;">#</th>
                                         <th>Item</th>
                                         <th class="text-end">Qty Sistem</th>
-                                        <th class="text-end" style="width:140px;">Qty Fisik</th>
-                                        <th class="text-end">Selisih</th>
+                                        <th class="text-end">Qty Fisik</th>
+                                        <th class="text-end col-diff d-none d-md-table-cell">Selisih</th>
                                         @if ($isOpening)
-                                            <th class="text-end" style="width:140px;">HPP / Unit</th>
+                                            <th class="text-end">HPP / Unit</th>
                                         @endif
-                                        <th>Catatan</th>
-                                        @if ($isOpening && !$isReadonly)
+                                        <th class="col-notes d-none d-md-table-cell">Catatan</th>
+                                        @if ($isOpening && $canModifyLines)
                                             <th class="text-end" style="width:70px;">Aksi</th>
                                         @endif
                                     </tr>
@@ -398,14 +406,13 @@
                                 <tbody>
                                     @foreach ($opname->lines as $index => $line)
                                         @php
-                                            $diff = $line->difference;
+                                            $diff = $line->difference ?? ($line->difference_qty ?? 0);
                                             $hasPhysical = !is_null($line->physical_qty);
                                             $diffDisplay =
                                                 $diff > 0 ? '+' . number_format($diff, 2) : number_format($diff, 2);
                                             $diffClass = $diff > 0 ? 'diff-plus' : ($diff < 0 ? 'diff-minus' : '');
                                             $inputNamePrefix = "lines[{$line->id}]";
 
-                                            // Raw value aman untuk dikirim ke server (tanpa thousand separator)
                                             $rawSystemQty = $line->system_qty ?? 0;
 
                                             $rawPhysical = old($inputNamePrefix . '.physical_qty', $line->physical_qty);
@@ -414,20 +421,39 @@
                                                 $rawPhysical = (float) $rawPhysical;
                                             }
 
+                                            // ==== HPP / UNIT (EFFECTIVE) ====
                                             $rawUnitCost = old($inputNamePrefix . '.unit_cost', $line->unit_cost);
                                             $hasUnitCostValue = $rawUnitCost !== null && $rawUnitCost !== '';
                                             if ($hasUnitCostValue) {
                                                 $rawUnitCost = (float) $rawUnitCost;
                                             }
+
+                                            $fallbackUnitCost = null;
+
+                                            if (!$hasUnitCostValue) {
+                                                // 1️⃣ coba snapshot aktif per item+gudang
+                                                $snapshot = ItemCostSnapshot::getActiveForItem(
+                                                    $line->item_id,
+                                                    $opname->warehouse_id,
+                                                );
+                                                if ($snapshot && $snapshot->unit_cost > 0) {
+                                                    $fallbackUnitCost = (float) $snapshot->unit_cost;
+                                                } elseif ($line->item && $line->item->base_unit_cost > 0) {
+                                                    // 2️⃣ fallback ke base_unit_cost item
+                                                    $fallbackUnitCost = (float) $line->item->base_unit_cost;
+                                                }
+                                            }
+
+                                            $effectiveUnitCost = $hasUnitCostValue ? $rawUnitCost : $fallbackUnitCost;
                                         @endphp
                                         <tr data-item-id="{{ $line->item_id }}"
                                             data-item-code="{{ $line->item?->code }}"
                                             data-item-name="{{ $line->item?->name }}"
                                             data-physical-qty="{{ $hasPhysicalValue ? $rawPhysical : '' }}">
-                                            <td data-label="#">
+                                            <td>
                                                 {{ $index + 1 }}
                                             </td>
-                                            <td data-label="Item">
+                                            <td>
                                                 <div class="fw-semibold">
                                                     {{ $line->item?->code ?? '-' }}
                                                 </div>
@@ -435,52 +461,69 @@
                                                     {{ $line->item?->name ?? '' }}
                                                 </div>
                                             </td>
-                                            <td data-label="Qty sistem" class="text-end text-mono">
+                                            <td class="text-end text-mono">
                                                 {{ number_format($rawSystemQty, 2) }}
                                                 <input type="hidden" name="{{ $inputNamePrefix }}[system_qty]"
                                                     value="{{ $rawSystemQty }}">
                                             </td>
-                                            <td data-label="Qty fisik" class="text-end">
-                                                @if ($hasPhysicalValue)
-                                                    <span class="text-mono">
-                                                        {{ number_format($rawPhysical, 2) }}
-                                                    </span>
-                                                    <input type="hidden" name="{{ $inputNamePrefix }}[physical_qty]"
-                                                        value="{{ $rawPhysical }}">
+                                            <td class="text-end">
+                                                @if ($isReadonly || $isOpening)
+                                                    {{-- Opening atau readonly: Qty hanya display --}}
+                                                    @if ($hasPhysicalValue)
+                                                        <span class="text-mono">
+                                                            {{ number_format($rawPhysical, 2) }}
+                                                        </span>
+                                                        <input type="hidden" name="{{ $inputNamePrefix }}[physical_qty]"
+                                                            value="{{ $rawPhysical }}">
+                                                    @else
+                                                        <span class="text-muted">-</span>
+                                                    @endif
                                                 @else
-                                                    <span class="text-muted">-</span>
-                                                    {{-- tidak kirim field jika belum ada qty fisik --}}
+                                                    {{-- Periodic & masih boleh edit -> input --}}
+                                                    <input type="number" step="0.01" min="0"
+                                                        name="{{ $inputNamePrefix }}[physical_qty]"
+                                                        class="form-control form-control-sm text-end"
+                                                        value="{{ $hasPhysicalValue ? $rawPhysical : '' }}">
                                                 @endif
                                             </td>
-                                            <td data-label="Selisih" class="text-end text-mono">
+                                            <td class="text-end text-mono col-diff d-none d-md-table-cell">
                                                 @if ($hasPhysical)
                                                     <span class="{{ $diffClass }}">{{ $diffDisplay }}</span>
                                                 @else
                                                     <span class="text-muted">-</span>
                                                 @endif
                                             </td>
+
                                             @if ($isOpening)
-                                                <td data-label="HPP / Unit" class="text-end">
-                                                    @if ($hasUnitCostValue)
-                                                        <span class="text-mono">
-                                                            {{ number_format($rawUnitCost, 2) }}
+                                                <td class="text-end">
+                                                    @if ($effectiveUnitCost && $effectiveUnitCost > 0)
+                                                        <span
+                                                            class="text-mono {{ $hasUnitCostValue ? '' : 'text-muted' }}">
+                                                            {{ number_format($effectiveUnitCost, 2) }}
                                                         </span>
-                                                        <input type="hidden" name="{{ $inputNamePrefix }}[unit_cost]"
-                                                            value="{{ $rawUnitCost }}">
+                                                        @unless ($hasUnitCostValue)
+                                                            <div style="font-size:.72rem;color:#9ca3af;">
+                                                                (HPP snapshot/master)
+                                                            </div>
+                                                        @endunless
                                                     @else
                                                         <span class="text-muted">-</span>
-                                                        {{-- tidak kirim field jika belum ada HPP --}}
                                                     @endif
+
+                                                    {{-- 🔁 SELALU KIRIM HPP KE SERVER --}}
+                                                    <input type="hidden" name="{{ $inputNamePrefix }}[unit_cost]"
+                                                        value="{{ $effectiveUnitCost !== null ? $effectiveUnitCost : '' }}">
                                                 </td>
                                             @endif
-                                            <td data-label="Catatan">
+
+                                            <td class="col-notes d-none d-md-table-cell">
                                                 <input type="text" name="{{ $inputNamePrefix }}[notes]"
                                                     class="form-control form-control-sm"
                                                     value="{{ old($inputNamePrefix . '.notes', $line->notes) }}"
                                                     @if ($isReadonly) readonly @endif>
                                             </td>
-                                            @if ($isOpening && !$isReadonly)
-                                                <td data-label="Aksi" class="text-end">
+                                            @if ($isOpening && $canModifyLines)
+                                                <td class="text-end">
                                                     <button type="button"
                                                         class="btn btn-sm btn-outline-danger js-delete-line"
                                                         data-line-id="{{ $line->id }}">
@@ -723,7 +766,6 @@
             // Lanjut submit AJAX normal
             performOpeningAjaxSubmit(addForm);
         }
-
 
         function performOpeningAjaxSubmit(addForm) {
             const formData = new FormData(addForm);

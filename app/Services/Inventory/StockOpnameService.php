@@ -5,6 +5,7 @@ namespace App\Services\Inventory;
 use App\Models\InventoryAdjustment;
 use App\Models\InventoryAdjustmentLine;
 use App\Models\InventoryMutation;
+use App\Models\ItemCostSnapshot;
 use App\Models\StockOpname;
 use App\Models\StockOpnameLine;
 use Carbon\Carbon;
@@ -15,7 +16,7 @@ use Illuminate\Support\Str;
 class StockOpnameService
 {
     public function __construct(
-        protected InventoryService $inventory, // ⬅️ pakai InventoryService kamu
+        protected InventoryService $inventory,
     ) {
         //
     }
@@ -30,7 +31,7 @@ class StockOpnameService
         int $warehouseId,
         bool $onlyWithStock = true
     ): void {
-        // Hapus dulu lines sebelumnya kalau mau di-regenerate
+        // Kalau mau re-generate:
         // $opname->lines()->delete();
 
         $query = InventoryMutation::selectRaw('item_id, SUM(qty_change) as qty')
@@ -43,6 +44,7 @@ class StockOpnameService
 
         $stocks = $query->get();
 
+        $now = now();
         $lines = [];
 
         foreach ($stocks as $row) {
@@ -54,8 +56,9 @@ class StockOpnameService
                 'difference_qty' => 0,
                 'is_counted' => false,
                 'notes' => null,
-                'created_at' => now(),
-                'updated_at' => now(),
+                'unit_cost' => null, // untuk mode opening (boleh kosong)
+                'created_at' => $now,
+                'updated_at' => $now,
             ];
         }
 
@@ -69,18 +72,23 @@ class StockOpnameService
      *
      * - opening:
      *   - Buat saldo awal ke inventory (adjustTo per item)
-     *   - Set HPP global sementara ke items.base_unit_cost dari unit_cost line
-     *   - TIDAK bikin InventoryAdjustment terpisah → return null
+     *   - HPP boleh diinput manual per line, atau otomatis fallback dari:
+     *       1) ItemCostSnapshot aktif, lalu
+     *       2) item.base_unit_cost
+     *   - Snapshot HPP opening (RM-only) dibuat per item+gudang (wajib untuk item yang punya Qty fisik)
+     *   - Update item.base_unit_cost dari HPP final opening
      *
      * - periodic:
      *   - Buat InventoryAdjustment
      *   - Buat InventoryAdjustmentLine per selisih
      *   - Koreksi stok real lewat InventoryService::adjustTo()
+     *   - Snapshot HPP sementara (dari snapshot aktif atau base_unit_cost)
+     *     per item+gudang (opsional, skip jika HPP 0)
      *   - Update status opname → finalized
      */
     public function finalize(StockOpname $opname, ?string $reason = null, ?string $notes = null): ?InventoryAdjustment
     {
-        if ($opname->status === 'finalized') {
+        if ($opname->status === StockOpname::STATUS_FINALIZED) {
             throw new \RuntimeException('Stock Opname sudah difinalkan.');
         }
 
@@ -92,19 +100,36 @@ class StockOpnameService
             // ============================
             // CABANG: OPENING BALANCE
             // ============================
-            if ($opname->type === 'opening') {
-                // 1️⃣ Terapkan saldo awal ke inventory (per item)
+            if ($opname->type === StockOpname::TYPE_OPENING) {
+                [$resolvedCosts, $missingCostLines] = $this->resolveOpeningUnitCosts($opname);
+
+                // Masih ada item dengan Qty fisik > 0 tapi HPP tidak ketemu sama sekali
+                if (!empty($missingCostLines)) {
+                    $codes = collect($missingCostLines)
+                        ->map(fn(StockOpnameLine $line) => $line->item?->code ?? ('#' . $line->id))
+                        ->take(5)
+                        ->implode(', ');
+
+                    throw new \RuntimeException(
+                        'Masih ada item opening dengan Qty fisik tetapi tidak punya HPP (unit cost) di master / snapshot: '
+                        . $codes
+                        . '. Lengkapi HPP di master item, snapshot, atau isi manual di dokumen opening.'
+                    );
+                }
+
+                // 1️⃣ Terapkan saldo awal ke inventory + snapshot opening
                 $this->applyOpeningMovements(
                     opname: $opname,
                     reason: $reason,
-                    notes: $notes
+                    notes: $notes,
+                    resolvedCosts: $resolvedCosts,
                 );
 
-                // 2️⃣ Set HPP global sementara dari unit_cost di line
-                $this->applyOpeningBaseUnitCosts($opname);
+                // 2️⃣ Set HPP global sementara dari unit_cost final ke item master
+                $this->applyOpeningBaseUnitCosts($opname, $resolvedCosts);
 
                 // 3️⃣ Update status dokumen
-                $opname->status = 'finalized';
+                $opname->status = StockOpname::STATUS_FINALIZED;
                 $opname->finalized_by = $user?->id;
                 $opname->finalized_at = now();
                 $opname->save();
@@ -114,8 +139,13 @@ class StockOpnameService
             }
 
             // ============================
-            // CABANG: PERIODIC (LOGIC LAMA)
+            // CABANG: PERIODIC
             // ============================
+
+            // Kalau mau dipaksa reviewed dulu:
+            // if ($opname->status !== StockOpname::STATUS_REVIEWED) {
+            //     throw new \RuntimeException('Stock Opname harus berstatus reviewed sebelum finalize.');
+            // }
 
             // Header Inventory Adjustment
             $adjustment = new InventoryAdjustment();
@@ -132,6 +162,8 @@ class StockOpnameService
             $adjustment->approved_at = now();
             $adjustment->save();
 
+            $warehouseId = $opname->warehouse_id;
+
             // Detail per item (lines)
             foreach ($opname->lines as $line) {
                 // Kalau qty fisik belum diisi → skip
@@ -144,7 +176,7 @@ class StockOpnameService
                 $difference = $physicalQty - $systemQty;
 
                 // Tidak ada selisih → skip
-                if ($difference === 0.0) {
+                if (abs($difference) < 0.0000001) {
                     continue;
                 }
 
@@ -163,26 +195,68 @@ class StockOpnameService
                 $adjLine->qty_after = $qtyAfter;
                 $adjLine->qty_change = $qtyChange;
                 $adjLine->direction = $direction;
-                $adjLine->notes = $line->notes; // catatan per item dari opname
+                $adjLine->notes = $line->notes;
                 $adjLine->save();
 
-                // 2️⃣ Koreksi stok real lewat InventoryService (akan:
-                //     - update inventory_stocks
-                //     - catat inventory_mutations)
+                // 2️⃣ Koreksi stok real lewat InventoryService
                 $this->inventory->adjustTo(
-                    warehouseId: $opname->warehouse_id,
+                    warehouseId: $warehouseId,
                     itemId: $line->item_id,
                     newQty: $physicalQty,
                     date: $adjustment->date,
                     sourceType: InventoryAdjustment::class,
                     sourceId: $adjustment->id,
                     notes: $adjustment->reason,
-                    lotId: null, // opname level item, bukan per LOT
+                    lotId: null,
                 );
+
+                // 3️⃣ Snapshot HPP sementara (opsional) → cocok dengan struktur tabel
+                $item = $line->item;
+                $activeSnapshot = ItemCostSnapshot::getActiveForItem($line->item_id, $warehouseId);
+
+                $unitCost = 0.0;
+
+                if ($activeSnapshot && $activeSnapshot->unit_cost > 0) {
+                    $unitCost = (float) $activeSnapshot->unit_cost;
+                } elseif ($item && $item->base_unit_cost > 0) {
+                    $unitCost = (float) $item->base_unit_cost;
+                }
+
+                // Kalau masih 0 → HPP tidak jelas, snapshot boleh di-skip
+                if ($unitCost <= 0) {
+                    continue;
+                }
+
+                // Nonaktifkan snapshot aktif sebelumnya untuk item + gudang ini
+                ItemCostSnapshot::query()
+                    ->where('item_id', $line->item_id)
+                    ->forWarehouseOrGlobal($warehouseId)
+                    ->active()
+                    ->update(['is_active' => false]);
+
+                // Insert snapshot baru untuk SO periodik
+                ItemCostSnapshot::create([
+                    'item_id' => $line->item_id,
+                    'warehouse_id' => $warehouseId,
+                    'snapshot_date' => $adjustment->date,
+                    'reference_type' => 'stock_opname_periodic',
+                    'reference_id' => $opname->id,
+                    'qty_basis' => $physicalQty,
+                    'rm_unit_cost' => $unitCost, // di SO periodic → anggap HPP aktif sebagai RM-only
+                    'cutting_unit_cost' => 0,
+                    'sewing_unit_cost' => 0,
+                    'finishing_unit_cost' => 0,
+                    'packaging_unit_cost' => 0,
+                    'overhead_unit_cost' => 0,
+                    'unit_cost' => $unitCost,
+                    'notes' => $notes ?: ('SO periodic ' . $opname->code),
+                    'is_active' => true,
+                    'created_by' => $opname->created_by ?? $user?->id,
+                ]);
             }
 
             // Update status opname → finalized
-            $opname->status = 'finalized';
+            $opname->status = StockOpname::STATUS_FINALIZED;
             $opname->finalized_by = $user?->id;
             $opname->finalized_at = now();
             $opname->save();
@@ -192,29 +266,89 @@ class StockOpnameService
     }
 
     /**
+     * Resolve HPP untuk opening:
+     * - Kalau line.unit_cost > 0 → pakai itu (user override)
+     * - Kalau kosong → fallback:
+     *     1) snapshot aktif per item+gudang
+     *     2) item.base_unit_cost
+     *
+     * Return:
+     *   [ array $resolvedCosts (line_id => unit_cost final),
+     *     array $missingCostLines (StockOpnameLine[] tanpa HPP padahal Qty fisik > 0) ]
+     */
+    protected function resolveOpeningUnitCosts(StockOpname $opname): array
+    {
+        $resolvedCosts = [];
+        $missingCostLines = [];
+
+        $warehouseId = $opname->warehouse_id;
+
+        foreach ($opname->lines as $line) {
+            $physicalQty = (float) ($line->physical_qty ?? 0);
+
+            // Kalau tidak ada Qty fisik atau <= 0 → HPP boleh di-skip
+            if ($physicalQty <= 0) {
+                continue;
+            }
+
+            // 1️⃣ Coba dari unit_cost di dokumen (user input)
+            $unitCost = $line->unit_cost !== null ? (float) $line->unit_cost : 0.0;
+
+            // 2️⃣ Kalau tidak ada, fallback ke snapshot aktif
+            if ($unitCost <= 0) {
+                $snapshot = ItemCostSnapshot::getActiveForItem($line->item_id, $warehouseId);
+                if ($snapshot && $snapshot->unit_cost > 0) {
+                    $unitCost = (float) $snapshot->unit_cost;
+                }
+            }
+
+            // 3️⃣ Kalau masih kosong, fallback ke item.base_unit_cost
+            if ($unitCost <= 0 && $line->item && $line->item->base_unit_cost > 0) {
+                $unitCost = (float) $line->item->base_unit_cost;
+            }
+
+            if ($unitCost <= 0) {
+                // Tidak bisa resolve HPP untuk item yang punya Qty fisik
+                $missingCostLines[] = $line;
+                continue;
+            }
+
+            $resolvedCosts[$line->id] = $unitCost;
+        }
+
+        return [$resolvedCosts, $missingCostLines];
+    }
+
+    /**
      * Opening:
-     * Terapkan saldo awal ke inventory.
+     * Terapkan saldo awal ke inventory + buat snapshot HPP opening (RM-only).
+     *
      * - SourceType: StockOpname::class
      * - SourceId  : id dokumen SO opening
      * - newQty    : physical_qty per item
+     * - unit_cost : diambil dari $resolvedCosts (hasil resolveOpeningUnitCosts)
      */
-    protected function applyOpeningMovements(StockOpname $opname, ?string $reason, ?string $notes): void
-    {
+    protected function applyOpeningMovements(
+        StockOpname $opname,
+        ?string $reason,
+        ?string $notes,
+        array $resolvedCosts
+    ): void {
         $date = $opname->date ?? now()->toDateString();
         $reasonText = $reason ?: ('Saldo awal dari stock opname opening ' . $opname->code);
-        $notesText = $notes;
+        $userId = Auth::id();
+        $warehouseId = $opname->warehouse_id;
 
         foreach ($opname->lines as $line) {
-            // Kalau belum ada qty fisik → skip (nggak usah dibuat stok)
             if ($line->physical_qty === null) {
                 continue;
             }
 
             $physicalQty = (float) $line->physical_qty;
 
-            // Untuk opening, biasanya kita mau set langsung ke qty fisik tersebut
+            // 1️⃣ Set saldo awal stok ke qty fisik (boleh 0, artinya stok nol)
             $this->inventory->adjustTo(
-                warehouseId: $opname->warehouse_id,
+                warehouseId: $warehouseId,
                 itemId: $line->item_id,
                 newQty: $physicalQty,
                 date: $date,
@@ -223,27 +357,60 @@ class StockOpnameService
                 notes: $reasonText,
                 lotId: null,
             );
+
+            // 2️⃣ Snapshot HPP opening hanya untuk Qty fisik > 0 dan HPP ter-resolve
+            $unitCost = $resolvedCosts[$line->id] ?? null;
+
+            if ($physicalQty <= 0 || !$unitCost || $unitCost <= 0) {
+                continue;
+            }
+
+            // Nonaktifkan snapshot aktif sebelumnya untuk item + gudang ini
+            ItemCostSnapshot::query()
+                ->where('item_id', $line->item_id)
+                ->forWarehouseOrGlobal($warehouseId)
+                ->active()
+                ->update(['is_active' => false]);
+
+            // Insert snapshot baru
+            ItemCostSnapshot::create([
+                'item_id' => $line->item_id,
+                'warehouse_id' => $warehouseId,
+                'snapshot_date' => $date,
+                'reference_type' => 'stock_opname_opening',
+                'reference_id' => $opname->id,
+                'qty_basis' => $physicalQty,
+                'rm_unit_cost' => $unitCost, // HPP RM-only
+                'cutting_unit_cost' => 0,
+                'sewing_unit_cost' => 0,
+                'finishing_unit_cost' => 0,
+                'packaging_unit_cost' => 0,
+                'overhead_unit_cost' => 0,
+                'unit_cost' => $unitCost, // total unit_cost = RM-only di fase opening
+                'notes' => $notes ?: ('Opening balance ' . $opname->code),
+                'is_active' => true,
+                'created_by' => $opname->created_by ?? $userId,
+            ]);
         }
     }
 
     /**
      * Opening:
-     * Set HPP global sementara (items.base_unit_cost) dari unit_cost di line.
+     * Set HPP global sementara (items.base_unit_cost) dari unit_cost final (resolvedCosts).
      *
      * Catatan:
      * - Hanya update kalau:
      *   - physical_qty > 0
      *   - unit_cost > 0
-     * - Sekarang pakai "last opening wins".
-     *   Kalau mau hanya isi kalau belum pernah di-set, tinggal aktifkan versi 2 di bawah.
+     * - "Last opening wins" (kalau ada >1 opening).
      */
-    protected function applyOpeningBaseUnitCosts(StockOpname $opname): void
+    protected function applyOpeningBaseUnitCosts(StockOpname $opname, array $resolvedCosts): void
     {
         foreach ($opname->lines as $line) {
             $qty = (float) ($line->physical_qty ?? 0);
-            $unitCost = (float) ($line->unit_cost ?? 0);
+            $unitCost = $resolvedCosts[$line->id] ?? null;
 
-            if ($qty <= 0 || $unitCost <= 0) {
+            if ($qty <= 0 || !$unitCost || $unitCost <= 0) {
                 continue;
             }
 

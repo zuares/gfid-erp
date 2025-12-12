@@ -9,6 +9,14 @@ use Illuminate\Database\Eloquent\Relations\HasMany;
 
 class StockOpname extends Model
 {
+    public const TYPE_OPENING = 'opening';
+    public const TYPE_PERIODIC = 'periodic';
+
+    public const STATUS_DRAFT = 'draft';
+    public const STATUS_COUNTING = 'counting';
+    public const STATUS_REVIEWED = 'reviewed';
+    public const STATUS_FINALIZED = 'finalized';
+
     protected $fillable = [
         'code',
         'date',
@@ -65,6 +73,85 @@ class StockOpname extends Model
 
     public function scopeFinalized(Builder $query): Builder
     {
-        return $query->where('status', 'finalized');
+        return $query->where('status', self::STATUS_FINALIZED);
+    }
+
+    public function scopeOpening(Builder $query): Builder
+    {
+        return $query->where('type', self::TYPE_OPENING);
+    }
+
+    public function scopePeriodic(Builder $query): Builder
+    {
+        return $query->where('type', self::TYPE_PERIODIC);
+    }
+
+    // ==========================
+    //  HELPER METHODS
+    // ==========================
+
+    /** Opening / Periodic */
+    public function isOpening(): bool
+    {
+        return $this->type === self::TYPE_OPENING;
+    }
+
+    public function isPeriodic(): bool
+    {
+        return $this->type === self::TYPE_PERIODIC;
+    }
+
+    /** Status helpers */
+    public function isDraft(): bool
+    {
+        return $this->status === self::STATUS_DRAFT;
+    }
+
+    public function isCounting(): bool
+    {
+        return $this->status === self::STATUS_COUNTING;
+    }
+
+    public function isReviewed(): bool
+    {
+        return $this->status === self::STATUS_REVIEWED;
+    }
+
+    public function isFinalized(): bool
+    {
+        return $this->status === self::STATUS_FINALIZED;
+    }
+
+    /**
+     * Boleh modif lines (tambah/hapus/update)?
+     * → hanya di draft / counting.
+     */
+    public function canModifyLines(): bool
+    {
+        return in_array($this->status, [self::STATUS_DRAFT, self::STATUS_COUNTING], true);
+    }
+
+    /**
+     * Boleh finalize?
+     * → status wajib reviewed, belum finalized.
+     */
+    public function canFinalize(): bool
+    {
+        return $this->status === self::STATUS_REVIEWED
+        && !$this->isFinalized();
+    }
+
+    // ==========================
+    //  ACCESSOR (property style)
+    // ==========================
+
+    public function getIsOpeningAttribute(): bool
+    {
+        return $this->isOpening();
+    }
+
+    public function getIsFinalizedAttribute(): bool
+    {
+        return $this->isFinalized();
     }
 }

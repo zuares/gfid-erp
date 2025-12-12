@@ -15,14 +15,37 @@ class StockOpnameLine extends Model
         'difference_qty',
         'is_counted',
         'notes',
+        'unit_cost', // ⭐ penting untuk mode opening (HPP per item)
     ];
 
     protected $casts = [
         'system_qty' => 'decimal:3',
         'physical_qty' => 'decimal:3',
         'difference_qty' => 'decimal:3',
+        'unit_cost' => 'decimal:4',
         'is_counted' => 'boolean',
     ];
+
+    /**
+     * Tambahan attribute terhitung:
+     * - difference          : selisih qty (fallback ke physical - system)
+     * - effective_unit_cost : HPP/unit yang dipakai (line → snapshot → master)
+     * - difference_value    : nilai rupiah selisih (difference × effective_unit_cost)
+     */
+    protected $appends = [
+        'difference',
+        'effective_unit_cost',
+        'difference_value',
+    ];
+
+    protected static function booted()
+    {
+        static::saving(function (StockOpnameLine $line) {
+            if (!is_null($line->physical_qty) && !is_null($line->system_qty)) {
+                $line->difference_qty = (float) $line->physical_qty - (float) $line->system_qty;
+            }
+        });
+    }
 
     public function stockOpname(): BelongsTo
     {
@@ -34,6 +57,10 @@ class StockOpnameLine extends Model
         return $this->belongsTo(Item::class);
     }
 
+    /**
+     * Selisih qty (qty fisik - qty sistem).
+     * Kalau difference_qty sudah ada di DB → pakai itu.
+     */
     public function getDifferenceAttribute(): float
     {
         if (!is_null($this->difference_qty)) {
@@ -43,4 +70,50 @@ class StockOpnameLine extends Model
         return (float) ($this->physical_qty ?? 0) - (float) ($this->system_qty ?? 0);
     }
 
+    /**
+     * HPP / unit yang dipakai untuk hitung nilai selisih:
+     * 1. unit_cost di line (kalau diisi)
+     * 2. snapshot aktif per item+gudang
+     * 3. base_unit_cost di master item
+     */
+    public function getEffectiveUnitCostAttribute(): float
+    {
+        // 1️⃣ user isi langsung di dokumen?
+        if (!is_null($this->unit_cost) && $this->unit_cost > 0) {
+            return (float) $this->unit_cost;
+        }
+
+        // 2️⃣ snapshot aktif per item + gudang
+        $warehouseId = $this->stockOpname?->warehouse_id;
+
+        if ($warehouseId) {
+            $snapshot = ItemCostSnapshot::getActiveForItem($this->item_id, $warehouseId);
+            if ($snapshot && $snapshot->unit_cost > 0) {
+                return (float) $snapshot->unit_cost;
+            }
+        }
+
+        // 3️⃣ fallback ke master item
+        if ($this->item && $this->item->base_unit_cost > 0) {
+            return (float) $this->item->base_unit_cost;
+        }
+
+        return 0.0;
+    }
+
+    /**
+     * Nilai selisih (Rp):
+     * difference_value = difference * effective_unit_cost
+     */
+    public function getDifferenceValueAttribute(): float
+    {
+        $diffQty = $this->difference; // pakai accessor di atas
+        $unitCost = $this->effective_unit_cost;
+
+        if ($unitCost <= 0 || abs($diffQty) < 0.0000001) {
+            return 0.0;
+        }
+
+        return $diffQty * $unitCost;
+    }
 }

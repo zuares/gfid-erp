@@ -1,6 +1,43 @@
+{{-- resources/views/inventory/stock_opnames/show.blade.php --}}
 @extends('layouts.app')
 
 @section('title', 'Detail Stock Opname • ' . $opname->code)
+
+@php
+    use App\Models\StockOpname;
+
+    $isOpening = method_exists($opname, 'isOpening')
+        ? $opname->isOpening()
+        : $opname->type === StockOpname::TYPE_OPENING;
+
+    // Ringkasan qty & nilai selisih
+    $totalPlusQty = 0;
+    $totalMinusQty = 0;
+    $totalPlusValue = 0;
+    $totalMinusValue = 0;
+
+    foreach ($opname->lines as $line) {
+        $diff = $line->difference; // dari accessor model
+        $unitCost = $line->effective_unit_cost; // HPP/unit
+        $diffValue = $line->difference_value; // Rp selisih
+
+        if (abs($diff) < 0.0000001) {
+            continue;
+        }
+
+        if ($diff > 0) {
+            $totalPlusQty += $diff;
+            if ($unitCost > 0 && $diffValue !== 0.0) {
+                $totalPlusValue += $diffValue;
+            }
+        } elseif ($diff < 0) {
+            $totalMinusQty += $diff; // tetap negatif
+            if ($unitCost > 0 && $diffValue !== 0.0) {
+                $totalMinusValue += $diffValue; // negatif
+            }
+        }
+    }
+@endphp
 
 @push('head')
     <style>
@@ -82,6 +119,7 @@
             letter-spacing: .06em;
             color: rgba(100, 116, 139, 1);
             background: rgba(15, 23, 42, 0.02);
+            white-space: nowrap;
         }
 
         .diff-plus {
@@ -154,9 +192,12 @@
                 </a>
                 <h1 class="h5 mb-1">
                     Detail Stock Opname • {{ $opname->code }}
+                    @if ($isOpening)
+                        <span class="badge bg-soft-primary ms-1" style="font-size:.7rem;">Opening Balance</span>
+                    @endif
                 </h1>
                 <p class="text-muted mb-0" style="font-size: .86rem;">
-                    Ringkasan sesi opname dan perbandingan stok sistem vs fisik.
+                    Ringkasan sesi opname dan perbandingan stok sistem vs fisik (qty &amp; nilai Rupiah).
                 </p>
             </div>
             <div class="text-end">
@@ -183,16 +224,20 @@
 
                 @if ($opname->status === 'reviewed')
                     <form action="{{ route('inventory.stock_opnames.finalize', $opname) }}" method="POST"
-                        onsubmit="return confirm('Yakin finalize stock opname ini? Adjustment stok akan dibuat dan stok gudang akan dikoreksi.');">
+                        onsubmit="return confirm('Yakin finalize stock opname ini? Stok gudang akan dikoreksi sesuai hasil fisik.');">
                         @csrf
                         <input type="hidden" name="reason" value="Stock Opname {{ $opname->code }}">
                         <button type="submit" class="btn btn-sm btn-success">
-                            Finalize &amp; Buat Adjustment
+                            @if ($isOpening)
+                                Finalize Opening Balance
+                            @else
+                                Finalize &amp; Buat Adjustment
+                            @endif
                         </button>
                     </form>
                 @elseif($opname->status === 'finalized')
                     <div class="text-muted" style="font-size: .8rem;">
-                        Dokumen sudah difinalkan. Adjustment stok telah dibuat.
+                        Dokumen sudah difinalkan.
                     </div>
                 @endif
             </div>
@@ -261,38 +306,53 @@
                 @endif
 
                 @php
-                    $totalPlus = $opname->lines->filter(fn($l) => ($l->difference_qty ?? 0) > 0)->sum('difference_qty');
-                    $totalMinus = $opname->lines
-                        ->filter(fn($l) => ($l->difference_qty ?? 0) < 0)
-                        ->sum('difference_qty');
+                    $totalLines = $opname->lines->count();
+                    $countedLines = $opname->lines->whereNotNull('physical_qty')->count();
                 @endphp
 
                 <div class="card card-section mt-3">
                     <div class="card-body py-2">
                         <div class="row g-3">
                             <div class="col-md-4">
-                                <div class="pill-label mb-1">Ringkasan Selisih</div>
+                                <div class="pill-label mb-1">Ringkasan Selisih (Qty)</div>
                                 <div style="font-size: .88rem;">
                                     <div>
                                         Lebih:
                                         <span class="text-mono diff-plus">
-                                            +{{ number_format($totalPlus, 2) }}
+                                            +{{ number_format($totalPlusQty, 2) }}
                                         </span>
                                     </div>
                                     <div>
                                         Kurang:
                                         <span class="text-mono diff-minus">
-                                            {{ number_format($totalMinus, 2) }}
+                                            {{ number_format($totalMinusQty, 2) }}
                                         </span>
                                     </div>
                                 </div>
                             </div>
-                            <div class="col-md-8">
+                            <div class="col-md-4">
+                                <div class="pill-label mb-1">Ringkasan Nilai Selisih (Rp)</div>
+                                <div style="font-size: .88rem;">
+                                    <div>
+                                        Lebih:
+                                        <span class="text-mono diff-plus">
+                                            +Rp {{ number_format($totalPlusValue, 0, ',', '.') }}
+                                        </span>
+                                    </div>
+                                    <div>
+                                        Kurang:
+                                        @php
+                                            // totalMinusValue negatif, tampilkan apa adanya (Rp -1.000.000)
+                                            $minusVal = $totalMinusValue;
+                                        @endphp
+                                        <span class="text-mono diff-minus">
+                                            Rp {{ number_format($minusVal, 0, ',', '.') }}
+                                        </span>
+                                    </div>
+                                </div>
+                            </div>
+                            <div class="col-md-4">
                                 <div class="pill-label mb-1">Status Counting</div>
-                                @php
-                                    $totalLines = $opname->lines->count();
-                                    $countedLines = $opname->lines->whereNotNull('physical_qty')->count();
-                                @endphp
                                 <div style="font-size: .88rem;">
                                     {{ $countedLines }} / {{ $totalLines }} item sudah diinput.
                                     @if ($opname->status === 'counting')
@@ -322,10 +382,6 @@
                         Detail Per Item
                     </h2>
                     <div class="text-muted" style="font-size: .8rem;">
-                        @php
-                            $totalLines = $opname->lines->count();
-                            $countedLines = $opname->lines->whereNotNull('physical_qty')->count();
-                        @endphp
                         {{ $countedLines }} / {{ $totalLines }} item sudah dihitung
                     </div>
                 </div>
@@ -338,7 +394,9 @@
                                 <th>Item</th>
                                 <th class="text-end">Qty Sistem</th>
                                 <th class="text-end">Qty Fisik</th>
-                                <th class="text-end">Selisih</th>
+                                <th class="text-end">Selisih Qty</th>
+                                <th class="text-end">HPP / Unit</th>
+                                <th class="text-end">Nilai Selisih (Rp)</th>
                                 <th class="text-center">Status Hitung</th>
                                 <th>Catatan</th>
                             </tr>
@@ -346,14 +404,20 @@
                         <tbody>
                             @forelse ($opname->lines as $index => $line)
                                 @php
-                                    $diff =
-                                        $line->difference_qty ?? ($line->physical_qty ?? 0) - ($line->system_qty ?? 0);
+                                    $system = (float) ($line->system_qty ?? 0);
+                                    $physical = (float) ($line->physical_qty ?? 0);
+                                    $diff = $line->difference;
+
                                     $diffClass = $diff > 0 ? 'diff-plus' : ($diff < 0 ? 'diff-minus' : '');
                                     $diffText = $diff > 0 ? '+' . number_format($diff, 2) : number_format($diff, 2);
+
                                     $counted = !is_null($line->physical_qty) || $line->is_counted;
                                     $countedClass = $counted
                                         ? 'badge-counted badge-counted--yes'
                                         : 'badge-counted badge-counted--no';
+
+                                    $unitCost = $line->effective_unit_cost;
+                                    $diffValue = $line->difference_value;
                                 @endphp
                                 <tr>
                                     <td data-label="#">
@@ -368,18 +432,33 @@
                                         </div>
                                     </td>
                                     <td data-label="Qty sistem" class="text-end text-mono">
-                                        {{ number_format($line->system_qty, 2) }}
+                                        {{ number_format($system, 2) }}
                                     </td>
                                     <td data-label="Qty fisik" class="text-end text-mono">
                                         @if (!is_null($line->physical_qty))
-                                            {{ number_format($line->physical_qty, 2) }}
+                                            {{ number_format($physical, 2) }}
                                         @else
                                             <span class="text-muted">-</span>
                                         @endif
                                     </td>
-                                    <td data-label="Selisih" class="text-end text-mono {{ $diffClass }}">
-                                        @if (!is_null($line->physical_qty))
+                                    <td data-label="Selisih qty" class="text-end text-mono {{ $diffClass }}">
+                                        @if (!is_null($line->physical_qty) && abs($diff) > 0.0000001)
                                             {{ $diffText }}
+                                        @else
+                                            <span class="text-muted">-</span>
+                                        @endif
+                                    </td>
+                                    <td data-label="HPP / Unit" class="text-end text-mono">
+                                        @if ($unitCost > 0)
+                                            {{ number_format($unitCost, 2) }}
+                                        @else
+                                            <span class="text-muted">-</span>
+                                        @endif
+                                    </td>
+                                    <td data-label="Nilai selisih (Rp)" class="text-end text-mono {{ $diffClass }}">
+                                        @if (!is_null($line->physical_qty) && $unitCost > 0 && abs($diff) > 0.0000001)
+                                            {{ $diff > 0 ? '+' : '' }}Rp
+                                            {{ number_format($diffValue, 0, ',', '.') }}
                                         @else
                                             <span class="text-muted">-</span>
                                         @endif
@@ -397,7 +476,7 @@
                                 </tr>
                             @empty
                                 <tr>
-                                    <td colspan="7" class="text-center py-3">
+                                    <td colspan="9" class="text-center py-3">
                                         <span class="text-muted">
                                             Belum ada item dalam sesi opname ini.
                                         </span>

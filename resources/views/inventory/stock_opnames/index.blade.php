@@ -1,6 +1,11 @@
+{{-- resources/views/inventory/stock_opnames/index.blade.php --}}
 @extends('layouts.app')
 
 @section('title', 'Inventory • Stock Opname')
+
+@php
+    use App\Models\StockOpname;
+@endphp
 
 @push('head')
     <style>
@@ -66,6 +71,23 @@
         .badge-status--finalized {
             background: rgba(22, 163, 74, 0.18);
             color: #15803d;
+        }
+
+        .badge-type {
+            font-size: .65rem;
+            padding: .12rem .45rem;
+            border-radius: 999px;
+            font-weight: 600;
+        }
+
+        .badge-type--periodic {
+            background: rgba(59, 130, 246, 0.15);
+            color: #1d4ed8;
+        }
+
+        .badge-type--opening {
+            background: rgba(249, 115, 22, 0.16);
+            color: #c2410c;
         }
 
         @media (max-width: 767.98px) {
@@ -147,8 +169,34 @@
                         <label class="form-label form-label-sm mb-1">Status</label>
                         <select name="status" class="form-select form-select-sm">
                             <option value="">Semua status</option>
-                            @foreach (['draft' => 'Draft', 'counting' => 'Counting', 'reviewed' => 'Reviewed', 'finalized' => 'Finalized'] as $value => $label)
+                            @php
+                                $statusOptions = [
+                                    StockOpname::STATUS_DRAFT => 'Draft',
+                                    StockOpname::STATUS_COUNTING => 'Counting',
+                                    StockOpname::STATUS_REVIEWED => 'Reviewed',
+                                    StockOpname::STATUS_FINALIZED => 'Finalized',
+                                ];
+                            @endphp
+                            @foreach ($statusOptions as $value => $label)
                                 <option value="{{ $value }}" {{ request('status') === $value ? 'selected' : '' }}>
+                                    {{ $label }}
+                                </option>
+                            @endforeach
+                        </select>
+                    </div>
+
+                    <div class="col-md-2">
+                        <label class="form-label form-label-sm mb-1">Tipe</label>
+                        <select name="type" class="form-select form-select-sm">
+                            <option value="">Semua tipe</option>
+                            @php
+                                $typeOptions = [
+                                    StockOpname::TYPE_PERIODIC => 'Periodic',
+                                    StockOpname::TYPE_OPENING => 'Opening',
+                                ];
+                            @endphp
+                            @foreach ($typeOptions as $value => $label)
+                                <option value="{{ $value }}" {{ request('type') === $value ? 'selected' : '' }}>
                                     {{ $label }}
                                 </option>
                             @endforeach
@@ -167,7 +215,7 @@
                             value="{{ request('date_to') }}">
                     </div>
 
-                    <div class="col-md-2 d-flex gap-2">
+                    <div class="col-12 col-md-2 d-flex gap-2 mt-2 mt-md-0">
                         <button type="submit" class="btn btn-sm btn-outline-primary w-100">
                             Filter
                         </button>
@@ -198,6 +246,7 @@
                             <tr>
                                 <th style="width: 40px;">#</th>
                                 <th>Kode</th>
+                                <th>Tipe</th>
                                 <th>Tanggal</th>
                                 <th>Gudang</th>
                                 <th>Status</th>
@@ -210,12 +259,18 @@
                             @forelse($opnames as $index => $opname)
                                 @php
                                     $statusClass = match ($opname->status) {
-                                        'draft' => 'badge-status badge-status--draft',
-                                        'counting' => 'badge-status badge-status--counting',
-                                        'reviewed' => 'badge-status badge-status--reviewed',
-                                        'finalized' => 'badge-status badge-status--finalized',
+                                        StockOpname::STATUS_DRAFT => 'badge-status badge-status--draft',
+                                        StockOpname::STATUS_COUNTING => 'badge-status badge-status--counting',
+                                        StockOpname::STATUS_REVIEWED => 'badge-status badge-status--reviewed',
+                                        StockOpname::STATUS_FINALIZED => 'badge-status badge-status--finalized',
                                         default => 'badge-status badge-status--draft',
                                     };
+
+                                    $typeLabel = $opname->type === StockOpname::TYPE_OPENING ? 'Opening' : 'Periodic';
+                                    $typeClass =
+                                        $opname->type === StockOpname::TYPE_OPENING
+                                            ? 'badge-type badge-type--opening'
+                                            : 'badge-type badge-type--periodic';
                                 @endphp
                                 <tr>
                                     <td data-label="#">
@@ -223,6 +278,11 @@
                                     </td>
                                     <td data-label="Kode">
                                         <span class="fw-semibold">{{ $opname->code }}</span>
+                                    </td>
+                                    <td data-label="Tipe">
+                                        <span class="{{ $typeClass }}">
+                                            {{ $typeLabel }}
+                                        </span>
                                     </td>
                                     <td data-label="Tanggal">
                                         {{ $opname->date?->format('d M Y') ?? '-' }}
@@ -258,7 +318,7 @@
                                 </tr>
                             @empty
                                 <tr>
-                                    <td colspan="8" class="text-center py-4">
+                                    <td colspan="9" class="text-center py-4">
                                         <div class="mb-2 text-muted">
                                             Belum ada dokumen stock opname.
                                         </div>
