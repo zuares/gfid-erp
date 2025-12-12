@@ -144,6 +144,24 @@
             color: #dc2626;
         }
 
+        /* Row yang belum di-count (Qty fisik kosong) */
+        .so-row-not-counted {
+            background: rgba(250, 204, 21, .05);
+        }
+
+        body[data-theme="dark"] .so-row-not-counted {
+            background: rgba(234, 179, 8, .12);
+        }
+
+        .badge-not-counted {
+            display: inline-block;
+            border-radius: 999px;
+            padding: .08rem .5rem;
+            font-size: .72rem;
+            background: rgba(234, 179, 8, .2);
+            color: #854d0e;
+        }
+
         @media (max-width: 767.98px) {
             .so-page .page-wrap {
                 padding-inline: .6rem;
@@ -201,7 +219,8 @@
                                 Mode saldo awal: isi <span class="text-mono">Qty Fisik</span> dan
                                 <span class="text-mono">HPP / Unit</span>.
                             @else
-                                Isi hasil hitung fisik per item, lalu simpan.
+                                Isi hasil hitung fisik per item, lalu simpan. Semua item wajib di-count sebelum tandai
+                                selesai.
                             @endif
                         @endif
                     </p>
@@ -326,11 +345,19 @@
                             </div>
                         </div>
 
+                        {{-- Error saat mark_reviewed (semua item wajib di-count) --}}
+                        @if ($errors->has('mark_reviewed'))
+                            <div class="alert alert-warning mt-3 mb-2 py-2 px-3" style="font-size:.8rem;">
+                                {{ $errors->first('mark_reviewed') }}
+                            </div>
+                        @endif
+
                         @if ($canModifyLines)
                             <div class="mt-3 d-flex gap-2 flex-wrap">
-                                <button type="submit" class="btn btn-sm btn-primary">
+                                <button type="submit" name="save_and_view" value="1" class="btn btn-sm btn-primary">
                                     Simpan Perubahan
                                 </button>
+
                                 @if (in_array($opname->status, [StockOpname::STATUS_DRAFT, StockOpname::STATUS_COUNTING], true))
                                     <button type="submit" name="mark_reviewed" value="1"
                                         class="btn btn-sm btn-outline-primary">
@@ -346,6 +373,7 @@
                 @php
                     $totalLines = $opname->lines->count();
                     $countedLines = $opname->lines->whereNotNull('physical_qty')->count();
+                    $notCounted = max($totalLines - $countedLines, 0);
                 @endphp
 
                 <div class="card card-main">
@@ -363,8 +391,17 @@
                                     Isi Qty fisik (dan HPP jika opening). Selisih dihitung saat disimpan.
                                 </div>
                             </div>
-                            <div style="font-size:.8rem;color:#6b7280;">
-                                {{ $countedLines }} / {{ $totalLines }} item sudah terisi Qty fisik
+                            <div style="font-size:.8rem;">
+                                @if ($notCounted === 0)
+                                    <span style="color:#16a34a;">
+                                        {{ $countedLines }} / {{ $totalLines }} item sudah terisi Qty fisik
+                                    </span>
+                                @else
+                                    <span style="color:#b45309;">
+                                        {{ $countedLines }} / {{ $totalLines }} item sudah terisi Qty fisik
+                                        ({{ $notCounted }} belum dihitung)
+                                    </span>
+                                @endif
                             </div>
                         </div>
 
@@ -445,8 +482,13 @@
                                             }
 
                                             $effectiveUnitCost = $hasUnitCostValue ? $rawUnitCost : $fallbackUnitCost;
+
+                                            $rowClasses = [];
+                                            if (!$hasPhysicalValue) {
+                                                $rowClasses[] = 'so-row-not-counted';
+                                            }
                                         @endphp
-                                        <tr data-item-id="{{ $line->item_id }}"
+                                        <tr class="{{ implode(' ', $rowClasses) }}" data-item-id="{{ $line->item_id }}"
                                             data-item-code="{{ $line->item?->code }}"
                                             data-item-name="{{ $line->item?->name }}"
                                             data-physical-qty="{{ $hasPhysicalValue ? $rawPhysical : '' }}">
@@ -460,11 +502,16 @@
                                                 <div style="font-size:.82rem;color:#6b7280;">
                                                     {{ $line->item?->name ?? '' }}
                                                 </div>
+
+                                                @if (!$hasPhysicalValue)
+                                                    <div class="d-md-none mt-1">
+                                                        <span class="badge-not-counted">Belum dihitung</span>
+                                                    </div>
+                                                @endif
                                             </td>
                                             <td class="text-end text-mono">
                                                 {{ number_format($rawSystemQty, 2) }}
-                                                <input type="hidden" name="{{ $inputNamePrefix }}[system_qty]"
-                                                    value="{{ $rawSystemQty }}">
+                                                {{-- system_qty hanya display, tidak dikirim sebagai input --}}
                                             </td>
                                             <td class="text-end">
                                                 @if ($isReadonly || $isOpening)

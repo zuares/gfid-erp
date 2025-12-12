@@ -5,21 +5,35 @@
 
 @php
     use App\Models\StockOpname;
+    use App\Models\InventoryAdjustment;
 
     $isOpening = method_exists($opname, 'isOpening')
         ? $opname->isOpening()
         : $opname->type === StockOpname::TYPE_OPENING;
 
+    /**
+     * Ambil adjustment yang sumbernya SO ini.
+     * - Jika controller sudah mengirim $adjustment, pakai itu
+     * - Kalau belum, query ringan di view (1x) biar tetap jalan
+     */
+    $adjustment =
+        $adjustment ??
+        InventoryAdjustment::query()
+            ->where('source_type', StockOpname::class)
+            ->where('source_id', $opname->id)
+            ->latest('id')
+            ->first();
+
     // Ringkasan qty & nilai selisih
     $totalPlusQty = 0;
-    $totalMinusQty = 0;
+    $totalMinusQty = 0; // negatif
     $totalPlusValue = 0;
-    $totalMinusValue = 0;
+    $totalMinusValue = 0; // negatif
 
     foreach ($opname->lines as $line) {
-        $diff = $line->difference; // dari accessor model
-        $unitCost = $line->effective_unit_cost; // HPP/unit
-        $diffValue = $line->difference_value; // Rp selisih
+        $diff = (float) $line->difference; // accessor model
+        $unitCost = (float) $line->effective_unit_cost; // accessor model
+        $diffValue = (float) $line->difference_value; // accessor model
 
         if (abs($diff) < 0.0000001) {
             continue;
@@ -37,6 +51,17 @@
             }
         }
     }
+
+    $totalLines = $opname->lines->count();
+    $countedLines = $opname->lines->whereNotNull('physical_qty')->count();
+
+    $statusClass = match ($opname->status) {
+        'draft' => 'badge-status badge-status--draft',
+        'counting' => 'badge-status badge-status--counting',
+        'reviewed' => 'badge-status badge-status--reviewed',
+        'finalized' => 'badge-status badge-status--finalized',
+        default => 'badge-status badge-status--draft',
+    };
 @endphp
 
 @push('head')
@@ -73,6 +98,9 @@
             padding: .18rem .5rem;
             border-radius: 999px;
             font-weight: 600;
+            display: inline-flex;
+            align-items: center;
+            gap: .35rem;
         }
 
         .badge-status--draft {
@@ -190,27 +218,26 @@
                 <a href="{{ route('inventory.stock_opnames.index') }}" class="btn btn-sm btn-link px-0 mb-1">
                     ← Kembali ke daftar
                 </a>
+
                 <h1 class="h5 mb-1">
                     Detail Stock Opname • {{ $opname->code }}
                     @if ($isOpening)
                         <span class="badge bg-soft-primary ms-1" style="font-size:.7rem;">Opening Balance</span>
                     @endif
+
+                    @if ($adjustment)
+                        <span class="badge bg-soft-secondary ms-1" style="font-size:.7rem;">
+                            Adjustment: {{ $adjustment->code }}
+                        </span>
+                    @endif
                 </h1>
+
                 <p class="text-muted mb-0" style="font-size: .86rem;">
                     Ringkasan sesi opname dan perbandingan stok sistem vs fisik (qty &amp; nilai Rupiah).
                 </p>
             </div>
-            <div class="text-end">
-                @php
-                    $statusClass = match ($opname->status) {
-                        'draft' => 'badge-status badge-status--draft',
-                        'counting' => 'badge-status badge-status--counting',
-                        'reviewed' => 'badge-status badge-status--reviewed',
-                        'finalized' => 'badge-status badge-status--finalized',
-                        default => 'badge-status badge-status--draft',
-                    };
-                @endphp
 
+            <div class="text-end">
                 <div class="mb-2">
                     <span class="{{ $statusClass }}">{{ ucfirst($opname->status) }}</span>
                 </div>
@@ -236,13 +263,21 @@
                         </button>
                     </form>
                 @elseif($opname->status === 'finalized')
-                    <div class="text-muted" style="font-size: .8rem;">
-                        Dokumen sudah difinalkan.
-                    </div>
+                    @if ($adjustment)
+                        <a href="{{ route('inventory.adjustments.show', $adjustment) }}"
+                            class="btn btn-sm btn-outline-secondary">
+                            Buka Adjustment →
+                        </a>
+                    @else
+                        <div class="text-muted" style="font-size: .8rem;">
+                            Dokumen sudah difinalkan.
+                        </div>
+                    @endif
                 @endif
             </div>
         </div>
 
+        {{-- CARD HEADER --}}
         <div class="card card-main mb-3">
             <div class="card-body">
                 <div class="row g-3">
@@ -256,6 +291,19 @@
                         <div>
                             {{ $opname->date?->format('d M Y') ?? '-' }}
                         </div>
+
+                        @if ($adjustment)
+                            <div class="pill-label mt-3 mb-1">Adjustment</div>
+                            <div>
+                                <a href="{{ route('inventory.adjustments.show', $adjustment) }}"
+                                    class="text-decoration-none">
+                                    {{ $adjustment->code }}
+                                </a>
+                                <div class="text-muted" style="font-size:.82rem;">
+                                    Status: {{ ucfirst($adjustment->status) }}
+                                </div>
+                            </div>
+                        @endif
                     </div>
 
                     <div class="col-md-4">
@@ -305,11 +353,7 @@
                     </div>
                 @endif
 
-                @php
-                    $totalLines = $opname->lines->count();
-                    $countedLines = $opname->lines->whereNotNull('physical_qty')->count();
-                @endphp
-
+                {{-- SUMMARY --}}
                 <div class="card card-section mt-3">
                     <div class="card-body py-2">
                         <div class="row g-3">
@@ -330,6 +374,7 @@
                                     </div>
                                 </div>
                             </div>
+
                             <div class="col-md-4">
                                 <div class="pill-label mb-1">Ringkasan Nilai Selisih (Rp)</div>
                                 <div style="font-size: .88rem;">
@@ -341,16 +386,14 @@
                                     </div>
                                     <div>
                                         Kurang:
-                                        @php
-                                            // totalMinusValue negatif, tampilkan apa adanya (Rp -1.000.000)
-                                            $minusVal = $totalMinusValue;
-                                        @endphp
                                         <span class="text-mono diff-minus">
-                                            Rp {{ number_format($minusVal, 0, ',', '.') }}
+                                            Rp
+                                            {{ $totalMinusValue < 0 ? '-' : '' }}{{ number_format(abs($totalMinusValue), 0, ',', '.') }}
                                         </span>
                                     </div>
                                 </div>
                             </div>
+
                             <div class="col-md-4">
                                 <div class="pill-label mb-1">Status Counting</div>
                                 <div style="font-size: .88rem;">
@@ -375,6 +418,7 @@
             </div>
         </div>
 
+        {{-- TABLE DETAIL --}}
         <div class="card card-main">
             <div class="card-body">
                 <div class="d-flex justify-content-between align-items-center mb-2">
@@ -406,7 +450,7 @@
                                 @php
                                     $system = (float) ($line->system_qty ?? 0);
                                     $physical = (float) ($line->physical_qty ?? 0);
-                                    $diff = $line->difference;
+                                    $diff = (float) $line->difference;
 
                                     $diffClass = $diff > 0 ? 'diff-plus' : ($diff < 0 ? 'diff-minus' : '');
                                     $diffText = $diff > 0 ? '+' . number_format($diff, 2) : number_format($diff, 2);
@@ -416,8 +460,8 @@
                                         ? 'badge-counted badge-counted--yes'
                                         : 'badge-counted badge-counted--no';
 
-                                    $unitCost = $line->effective_unit_cost;
-                                    $diffValue = $line->difference_value;
+                                    $unitCost = (float) $line->effective_unit_cost;
+                                    $diffValue = (float) $line->difference_value;
                                 @endphp
                                 <tr>
                                     <td data-label="#">
@@ -431,9 +475,11 @@
                                             {{ $line->item?->name ?? '' }}
                                         </div>
                                     </td>
+
                                     <td data-label="Qty sistem" class="text-end text-mono">
                                         {{ number_format($system, 2) }}
                                     </td>
+
                                     <td data-label="Qty fisik" class="text-end text-mono">
                                         @if (!is_null($line->physical_qty))
                                             {{ number_format($physical, 2) }}
@@ -441,6 +487,7 @@
                                             <span class="text-muted">-</span>
                                         @endif
                                     </td>
+
                                     <td data-label="Selisih qty" class="text-end text-mono {{ $diffClass }}">
                                         @if (!is_null($line->physical_qty) && abs($diff) > 0.0000001)
                                             {{ $diffText }}
@@ -448,6 +495,7 @@
                                             <span class="text-muted">-</span>
                                         @endif
                                     </td>
+
                                     <td data-label="HPP / Unit" class="text-end text-mono">
                                         @if ($unitCost > 0)
                                             {{ number_format($unitCost, 2) }}
@@ -455,19 +503,22 @@
                                             <span class="text-muted">-</span>
                                         @endif
                                     </td>
+
                                     <td data-label="Nilai selisih (Rp)" class="text-end text-mono {{ $diffClass }}">
                                         @if (!is_null($line->physical_qty) && $unitCost > 0 && abs($diff) > 0.0000001)
-                                            {{ $diff > 0 ? '+' : '' }}Rp
-                                            {{ number_format($diffValue, 0, ',', '.') }}
+                                            {{ $diff > 0 ? '+' : '-' }}Rp
+                                            {{ number_format(abs($diffValue), 0, ',', '.') }}
                                         @else
                                             <span class="text-muted">-</span>
                                         @endif
                                     </td>
+
                                     <td data-label="Status hitung" class="text-center">
                                         <span class="{{ $countedClass }}">
                                             {{ $counted ? 'Sudah' : 'Belum' }}
                                         </span>
                                     </td>
+
                                     <td data-label="Catatan">
                                         <span style="font-size: .82rem;">
                                             {{ $line->notes }}

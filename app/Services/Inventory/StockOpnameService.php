@@ -11,19 +11,16 @@ use App\Models\StockOpnameLine;
 use Carbon\Carbon;
 use Illuminate\Support\Facades\Auth;
 use Illuminate\Support\Facades\DB;
-use Illuminate\Support\Str;
 
 class StockOpnameService
 {
     public function __construct(
         protected InventoryService $inventory,
-    ) {
-        //
-    }
+    ) {}
 
     /**
-     * Generate lines dari stok sistem gudang:
-     * - Ambil stok per item (SUM(qty_change)) dari inventory_mutations
+     * Generate lines dari stok sistem gudang (periodic):
+     * - SUM(qty_change) dari inventory_mutations per item
      * - Hanya item dengan stok != 0 kalau $onlyWithStock = true
      */
     public function generateLinesFromWarehouse(
@@ -31,9 +28,6 @@ class StockOpnameService
         int $warehouseId,
         bool $onlyWithStock = true
     ): void {
-        // Kalau mau re-generate:
-        // $opname->lines()->delete();
-
         $query = InventoryMutation::selectRaw('item_id, SUM(qty_change) as qty')
             ->where('warehouse_id', $warehouseId)
             ->groupBy('item_id');
@@ -45,46 +39,36 @@ class StockOpnameService
         $stocks = $query->get();
 
         $now = now();
-        $lines = [];
+        $rows = [];
 
         foreach ($stocks as $row) {
-            $lines[] = [
+            $rows[] = [
                 'stock_opname_id' => $opname->id,
-                'item_id' => $row->item_id,
-                'system_qty' => $row->qty,
+                'item_id' => (int) $row->item_id,
+                'system_qty' => (float) $row->qty,
                 'physical_qty' => null,
                 'difference_qty' => 0,
                 'is_counted' => false,
                 'notes' => null,
-                'unit_cost' => null, // untuk mode opening (boleh kosong)
+                'unit_cost' => null,
                 'created_at' => $now,
                 'updated_at' => $now,
             ];
         }
 
-        if (!empty($lines)) {
-            StockOpnameLine::insert($lines);
+        if (!empty($rows)) {
+            StockOpnameLine::insert($rows);
         }
     }
 
     /**
-     * Finalize 1 dokumen Stock Opname:
+     * Finalize Stock Opname:
+     * - opening: SEKARANG juga bikin InventoryAdjustment (biar muncul di menu adjustment)
+     * - periodic: tetap bikin InventoryAdjustment
      *
-     * - opening:
-     *   - Buat saldo awal ke inventory (adjustTo per item)
-     *   - HPP boleh diinput manual per line, atau otomatis fallback dari:
-     *       1) ItemCostSnapshot aktif, lalu
-     *       2) item.base_unit_cost
-     *   - Snapshot HPP opening (RM-only) dibuat per item+gudang (wajib untuk item yang punya Qty fisik)
-     *   - Update item.base_unit_cost dari HPP final opening
-     *
-     * - periodic:
-     *   - Buat InventoryAdjustment
-     *   - Buat InventoryAdjustmentLine per selisih
-     *   - Koreksi stok real lewat InventoryService::adjustTo()
-     *   - Snapshot HPP sementara (dari snapshot aktif atau base_unit_cost)
-     *     per item+gudang (opsional, skip jika HPP 0)
-     *   - Update status opname → finalized
+     * Return:
+     * - opening  -> return InventoryAdjustment (baru)
+     * - periodic -> return InventoryAdjustment
      */
     public function finalize(StockOpname $opname, ?string $reason = null, ?string $notes = null): ?InventoryAdjustment
     {
@@ -94,168 +78,230 @@ class StockOpnameService
 
         return DB::transaction(function () use ($opname, $reason, $notes) {
             $user = Auth::user();
+            $isOwner = $user && (($user->role ?? null) === 'owner');
 
             $opname->loadMissing(['warehouse', 'lines.item']);
 
-            // ============================
-            // CABANG: OPENING BALANCE
-            // ============================
+            $date = $opname->date ?? now()->toDateString();
+            $warehouseId = (int) $opname->warehouse_id;
+
+            // ==========================================================
+            // OPENING: bikin adjustment juga
+            // ==========================================================
             if ($opname->type === StockOpname::TYPE_OPENING) {
-                [$resolvedCosts, $missingCostLines] = $this->resolveOpeningUnitCosts($opname);
 
-                // Masih ada item dengan Qty fisik > 0 tapi HPP tidak ketemu sama sekali
-                if (!empty($missingCostLines)) {
-                    $codes = collect($missingCostLines)
-                        ->map(fn(StockOpnameLine $line) => $line->item?->code ?? ('#' . $line->id))
-                        ->take(5)
-                        ->implode(', ');
+                // Owner: wajib resolve cost (karena akan bikin snapshot & update base cost)
+                // Non-owner pending: boleh lolos tanpa cost lengkap (akan dipaksa saat approve adjustment)
+                $resolvedCosts = [];
+                if ($isOwner) {
+                    [$resolvedCosts, $missingCostLines] = $this->resolveOpeningUnitCosts($opname);
 
-                    throw new \RuntimeException(
-                        'Masih ada item opening dengan Qty fisik tetapi tidak punya HPP (unit cost) di master / snapshot: '
-                        . $codes
-                        . '. Lengkapi HPP di master item, snapshot, atau isi manual di dokumen opening.'
-                    );
+                    if (!empty($missingCostLines)) {
+                        $codes = collect($missingCostLines)
+                            ->map(fn(StockOpnameLine $line) => $line->item?->code ?? ('#' . $line->id))
+                            ->take(8)
+                            ->implode(', ');
+
+                        throw new \RuntimeException(
+                            'Masih ada item opening dengan Qty fisik > 0 tetapi HPP (unit_cost) tidak ditemukan: '
+                            . $codes
+                            . '. Lengkapi HPP di item master / snapshot / input manual pada dokumen opening.'
+                        );
+                    }
                 }
 
-                // 1️⃣ Terapkan saldo awal ke inventory + snapshot opening
-                $this->applyOpeningMovements(
-                    opname: $opname,
-                    reason: $reason,
-                    notes: $notes,
-                    resolvedCosts: $resolvedCosts,
-                );
+                // Header InventoryAdjustment utk opening
+                $adjustment = new InventoryAdjustment();
+                $adjustment->code = $this->generateAdjustmentCodeForDate($date);
+                $adjustment->date = $date;
+                $adjustment->warehouse_id = $warehouseId;
+                $adjustment->source_type = StockOpname::class;
+                $adjustment->source_id = $opname->id;
+                $adjustment->reason = $reason ?: ('Saldo awal dari stock opname opening ' . $opname->code);
+                $adjustment->notes = $notes;
+                $adjustment->status = $isOwner
+                ? InventoryAdjustment::STATUS_APPROVED
+                : InventoryAdjustment::STATUS_PENDING;
+                $adjustment->created_by = $opname->created_by ?? $user?->id;
 
-                // 2️⃣ Set HPP global sementara dari unit_cost final ke item master
-                $this->applyOpeningBaseUnitCosts($opname, $resolvedCosts);
+                if ($isOwner) {
+                    $adjustment->approved_by = $user?->id;
+                    $adjustment->approved_at = now();
+                }
 
-                // 3️⃣ Update status dokumen
+                $adjustment->save();
+
+                foreach ($opname->lines as $line) {
+                    if ($line->physical_qty === null) {
+                        continue;
+                    }
+
+                    $itemId = (int) $line->item_id;
+                    $physicalQty = (float) $line->physical_qty;
+
+                    // qty_before = stok real saat finalize (lebih akurat utk opening)
+                    $qtyBefore = (float) $this->inventory->getOnHandQty(
+                        warehouseId: $warehouseId,
+                        itemId: $itemId
+                    );
+
+                    $difference = $physicalQty - $qtyBefore; // SIGNED
+
+                    if (abs($difference) < 0.0000001) {
+                        continue;
+                    }
+
+                    $direction = $difference >= 0 ? 'in' : 'out';
+
+                    InventoryAdjustmentLine::create([
+                        'inventory_adjustment_id' => $adjustment->id,
+                        'item_id' => $itemId,
+                        'qty_before' => $qtyBefore,
+                        'qty_after' => $physicalQty,
+                        'qty_change' => $difference, // ✅ SIGNED
+                        'direction' => $direction,
+                        'notes' => $line->notes,
+                        'lot_id' => null,
+                    ]);
+
+                    // Non-owner -> pending: stop (stok belum berubah)
+                    if (!$isOwner) {
+                        continue;
+                    }
+
+                    // Owner: set stok real jadi qty fisik (DENGAN COST)
+                    $unitCost = $resolvedCosts[$line->id] ?? null; // hasil resolveOpeningUnitCosts()
+
+                    $this->inventory->adjustByDifference(
+                        warehouseId: $warehouseId,
+                        itemId: $itemId,
+                        qtyChange: $difference, // SIGNED (physical - before)
+                        date: $date,
+                        sourceType: InventoryAdjustment::class,
+                        sourceId: $adjustment->id,
+                        notes: $adjustment->reason,
+                        lotId: null,
+                        allowNegative: false,
+                        unitCostOverride: $unitCost, // ✅ kunci agar mutasi punya unit_cost & total_cost
+                        affectLotCost: false,
+                    );
+
+                    // Snapshot opening hanya jika qty > 0 + cost > 0
+                    $unitCost = $resolvedCosts[$line->id] ?? null;
+                    if ($physicalQty > 0 && $unitCost && (float) $unitCost > 0) {
+                        $this->deactivateActiveSnapshots($itemId, $warehouseId);
+
+                        ItemCostSnapshot::create([
+                            'item_id' => $itemId,
+                            'warehouse_id' => $warehouseId,
+                            'snapshot_date' => $date,
+                            'reference_type' => 'stock_opname_opening',
+                            'reference_id' => $opname->id,
+                            'qty_basis' => $physicalQty,
+                            'rm_unit_cost' => (float) $unitCost,
+                            'cutting_unit_cost' => 0,
+                            'sewing_unit_cost' => 0,
+                            'finishing_unit_cost' => 0,
+                            'packaging_unit_cost' => 0,
+                            'overhead_unit_cost' => 0,
+                            'unit_cost' => (float) $unitCost,
+                            'notes' => $notes ?: ('Opening balance ' . $opname->code),
+                            'is_active' => true,
+                            'created_by' => $opname->created_by ?? Auth::id(),
+                        ]);
+
+                        // update base_unit_cost (last opening wins)
+                        if ($line->item) {
+                            $line->item->base_unit_cost = (float) $unitCost;
+                            $line->item->save();
+                        }
+                    }
+                }
+
+                // finalize opname (dikunci)
                 $opname->status = StockOpname::STATUS_FINALIZED;
                 $opname->finalized_by = $user?->id;
                 $opname->finalized_at = now();
                 $opname->save();
 
-                // Opening tidak menghasilkan dokumen InventoryAdjustment terpisah
-                return null;
+                return $adjustment;
             }
 
-            // ============================
-            // CABANG: PERIODIC
-            // ============================
+            // ==========================================================
+            // PERIODIC: tetap seperti biasa
+            // ==========================================================
 
-            // Kalau mau dipaksa reviewed dulu:
-            // if ($opname->status !== StockOpname::STATUS_REVIEWED) {
-            //     throw new \RuntimeException('Stock Opname harus berstatus reviewed sebelum finalize.');
-            // }
-
-            // Header Inventory Adjustment
             $adjustment = new InventoryAdjustment();
-            $adjustment->code = $this->generateAdjustmentCode();
-            $adjustment->date = $opname->date ?? now()->toDateString();
-            $adjustment->warehouse_id = $opname->warehouse_id;
+            $adjustment->code = $this->generateAdjustmentCodeForDate($date);
+            $adjustment->date = $date;
+            $adjustment->warehouse_id = $warehouseId;
             $adjustment->source_type = StockOpname::class;
             $adjustment->source_id = $opname->id;
-            $adjustment->reason = $reason ?: 'Penyesuaian stok dari hasil stock opname';
+            $adjustment->reason = $reason ?: ('Penyesuaian stok dari stock opname ' . $opname->code);
             $adjustment->notes = $notes;
-            $adjustment->status = 'approved';
+            $adjustment->status = $isOwner
+            ? InventoryAdjustment::STATUS_APPROVED
+            : InventoryAdjustment::STATUS_PENDING;
             $adjustment->created_by = $opname->created_by ?? $user?->id;
-            $adjustment->approved_by = $user?->id;
-            $adjustment->approved_at = now();
+
+            if ($isOwner) {
+                $adjustment->approved_by = $user?->id;
+                $adjustment->approved_at = now();
+            }
+
             $adjustment->save();
 
-            $warehouseId = $opname->warehouse_id;
-
-            // Detail per item (lines)
             foreach ($opname->lines as $line) {
-                // Kalau qty fisik belum diisi → skip
                 if ($line->physical_qty === null) {
                     continue;
                 }
 
                 $systemQty = (float) $line->system_qty;
                 $physicalQty = (float) $line->physical_qty;
-                $difference = $physicalQty - $systemQty;
+                $difference = $physicalQty - $systemQty; // SIGNED
 
-                // Tidak ada selisih → skip
                 if (abs($difference) < 0.0000001) {
                     continue;
                 }
 
-                // Direction + qty_change berdasarkan selisih (snapshot)
-                [$direction, $qtyChange] = $this->normalizeDifference($difference);
+                $direction = $difference >= 0 ? 'in' : 'out';
 
-                // sebelum/sesudah berdasarkan data SO (snapshot)
-                $qtyBefore = $systemQty;
-                $qtyAfter = $physicalQty;
+                InventoryAdjustmentLine::create([
+                    'inventory_adjustment_id' => $adjustment->id,
+                    'item_id' => (int) $line->item_id,
+                    'qty_before' => $systemQty,
+                    'qty_after' => $physicalQty,
+                    'qty_change' => $difference, // ✅ SIGNED
+                    'direction' => $direction,
+                    'notes' => $line->notes,
+                    'lot_id' => null,
+                ]);
 
-                // 1️⃣ Buat baris InventoryAdjustmentLine
-                $adjLine = new InventoryAdjustmentLine();
-                $adjLine->inventory_adjustment_id = $adjustment->id;
-                $adjLine->item_id = $line->item_id;
-                $adjLine->qty_before = $qtyBefore;
-                $adjLine->qty_after = $qtyAfter;
-                $adjLine->qty_change = $qtyChange;
-                $adjLine->direction = $direction;
-                $adjLine->notes = $line->notes;
-                $adjLine->save();
+                if (!$isOwner) {
+                    continue;
+                }
 
-                // 2️⃣ Koreksi stok real lewat InventoryService
                 $this->inventory->adjustTo(
                     warehouseId: $warehouseId,
-                    itemId: $line->item_id,
+                    itemId: (int) $line->item_id,
                     newQty: $physicalQty,
-                    date: $adjustment->date,
+                    date: $date,
                     sourceType: InventoryAdjustment::class,
                     sourceId: $adjustment->id,
                     notes: $adjustment->reason,
                     lotId: null,
                 );
 
-                // 3️⃣ Snapshot HPP sementara (opsional) → cocok dengan struktur tabel
-                $item = $line->item;
-                $activeSnapshot = ItemCostSnapshot::getActiveForItem($line->item_id, $warehouseId);
-
-                $unitCost = 0.0;
-
-                if ($activeSnapshot && $activeSnapshot->unit_cost > 0) {
-                    $unitCost = (float) $activeSnapshot->unit_cost;
-                } elseif ($item && $item->base_unit_cost > 0) {
-                    $unitCost = (float) $item->base_unit_cost;
-                }
-
-                // Kalau masih 0 → HPP tidak jelas, snapshot boleh di-skip
-                if ($unitCost <= 0) {
-                    continue;
-                }
-
-                // Nonaktifkan snapshot aktif sebelumnya untuk item + gudang ini
-                ItemCostSnapshot::query()
-                    ->where('item_id', $line->item_id)
-                    ->forWarehouseOrGlobal($warehouseId)
-                    ->active()
-                    ->update(['is_active' => false]);
-
-                // Insert snapshot baru untuk SO periodik
-                ItemCostSnapshot::create([
-                    'item_id' => $line->item_id,
-                    'warehouse_id' => $warehouseId,
-                    'snapshot_date' => $adjustment->date,
-                    'reference_type' => 'stock_opname_periodic',
-                    'reference_id' => $opname->id,
-                    'qty_basis' => $physicalQty,
-                    'rm_unit_cost' => $unitCost, // di SO periodic → anggap HPP aktif sebagai RM-only
-                    'cutting_unit_cost' => 0,
-                    'sewing_unit_cost' => 0,
-                    'finishing_unit_cost' => 0,
-                    'packaging_unit_cost' => 0,
-                    'overhead_unit_cost' => 0,
-                    'unit_cost' => $unitCost,
-                    'notes' => $notes ?: ('SO periodic ' . $opname->code),
-                    'is_active' => true,
-                    'created_by' => $opname->created_by ?? $user?->id,
-                ]);
+                $this->snapshotPeriodicCost(
+                    itemId: (int) $line->item_id,
+                    warehouseId: $warehouseId,
+                    snapshotDate: $date,
+                    qtyBasis: $physicalQty,
+                    opname: $opname,
+                    notes: $notes
+                );
             }
 
-            // Update status opname → finalized
             $opname->status = StockOpname::STATUS_FINALIZED;
             $opname->finalized_by = $user?->id;
             $opname->finalized_at = now();
@@ -265,195 +311,133 @@ class StockOpnameService
         });
     }
 
+    // ==========================================================
+    // OPENING HELPERS
+    // ==========================================================
+
     /**
-     * Resolve HPP untuk opening:
-     * - Kalau line.unit_cost > 0 → pakai itu (user override)
-     * - Kalau kosong → fallback:
-     *     1) snapshot aktif per item+gudang
-     *     2) item.base_unit_cost
-     *
-     * Return:
-     *   [ array $resolvedCosts (line_id => unit_cost final),
-     *     array $missingCostLines (StockOpnameLine[] tanpa HPP padahal Qty fisik > 0) ]
+     * Resolve HPP untuk opening (dipakai saat owner auto-approve):
+     * - line.unit_cost > 0 → pakai itu
+     * - fallback:
+     *   1) snapshot aktif (item+gudang)
+     *   2) item.base_unit_cost
      */
     protected function resolveOpeningUnitCosts(StockOpname $opname): array
     {
         $resolvedCosts = [];
-        $missingCostLines = [];
+        $missing = [];
 
-        $warehouseId = $opname->warehouse_id;
+        $warehouseId = (int) $opname->warehouse_id;
 
         foreach ($opname->lines as $line) {
-            $physicalQty = (float) ($line->physical_qty ?? 0);
-
-            // Kalau tidak ada Qty fisik atau <= 0 → HPP boleh di-skip
-            if ($physicalQty <= 0) {
+            $qty = (float) ($line->physical_qty ?? 0);
+            if ($qty <= 0) {
                 continue;
             }
 
-            // 1️⃣ Coba dari unit_cost di dokumen (user input)
             $unitCost = $line->unit_cost !== null ? (float) $line->unit_cost : 0.0;
 
-            // 2️⃣ Kalau tidak ada, fallback ke snapshot aktif
             if ($unitCost <= 0) {
-                $snapshot = ItemCostSnapshot::getActiveForItem($line->item_id, $warehouseId);
-                if ($snapshot && $snapshot->unit_cost > 0) {
-                    $unitCost = (float) $snapshot->unit_cost;
+                $snap = ItemCostSnapshot::getActiveForItem((int) $line->item_id, $warehouseId);
+                if ($snap && (float) $snap->unit_cost > 0) {
+                    $unitCost = (float) $snap->unit_cost;
                 }
             }
 
-            // 3️⃣ Kalau masih kosong, fallback ke item.base_unit_cost
-            if ($unitCost <= 0 && $line->item && $line->item->base_unit_cost > 0) {
+            if ($unitCost <= 0 && $line->item && (float) $line->item->base_unit_cost > 0) {
                 $unitCost = (float) $line->item->base_unit_cost;
             }
 
             if ($unitCost <= 0) {
-                // Tidak bisa resolve HPP untuk item yang punya Qty fisik
-                $missingCostLines[] = $line;
+                $missing[] = $line;
                 continue;
             }
 
             $resolvedCosts[$line->id] = $unitCost;
         }
 
-        return [$resolvedCosts, $missingCostLines];
+        return [$resolvedCosts, $missing];
     }
 
-    /**
-     * Opening:
-     * Terapkan saldo awal ke inventory + buat snapshot HPP opening (RM-only).
-     *
-     * - SourceType: StockOpname::class
-     * - SourceId  : id dokumen SO opening
-     * - newQty    : physical_qty per item
-     * - unit_cost : diambil dari $resolvedCosts (hasil resolveOpeningUnitCosts)
-     */
-    protected function applyOpeningMovements(
+    // ==========================================================
+    // PERIODIC HELPERS
+    // ==========================================================
+
+    protected function snapshotPeriodicCost(
+        int $itemId,
+        int $warehouseId,
+        string $snapshotDate,
+        float $qtyBasis,
         StockOpname $opname,
-        ?string $reason,
-        ?string $notes,
-        array $resolvedCosts
+        ?string $notes
     ): void {
-        $date = $opname->date ?? now()->toDateString();
-        $reasonText = $reason ?: ('Saldo awal dari stock opname opening ' . $opname->code);
-        $userId = Auth::id();
-        $warehouseId = $opname->warehouse_id;
+        $active = ItemCostSnapshot::getActiveForItem($itemId, $warehouseId);
 
-        foreach ($opname->lines as $line) {
-            if ($line->physical_qty === null) {
-                continue;
+        $unitCost = 0.0;
+
+        if ($active && (float) $active->unit_cost > 0) {
+            $unitCost = (float) $active->unit_cost;
+        } else {
+            $item = $opname->lines->firstWhere('item_id', $itemId)?->item;
+            if ($item && (float) $item->base_unit_cost > 0) {
+                $unitCost = (float) $item->base_unit_cost;
             }
-
-            $physicalQty = (float) $line->physical_qty;
-
-            // 1️⃣ Set saldo awal stok ke qty fisik (boleh 0, artinya stok nol)
-            $this->inventory->adjustTo(
-                warehouseId: $warehouseId,
-                itemId: $line->item_id,
-                newQty: $physicalQty,
-                date: $date,
-                sourceType: StockOpname::class,
-                sourceId: $opname->id,
-                notes: $reasonText,
-                lotId: null,
-            );
-
-            // 2️⃣ Snapshot HPP opening hanya untuk Qty fisik > 0 dan HPP ter-resolve
-            $unitCost = $resolvedCosts[$line->id] ?? null;
-
-            if ($physicalQty <= 0 || !$unitCost || $unitCost <= 0) {
-                continue;
-            }
-
-            // Nonaktifkan snapshot aktif sebelumnya untuk item + gudang ini
-            ItemCostSnapshot::query()
-                ->where('item_id', $line->item_id)
-                ->forWarehouseOrGlobal($warehouseId)
-                ->active()
-                ->update(['is_active' => false]);
-
-            // Insert snapshot baru
-            ItemCostSnapshot::create([
-                'item_id' => $line->item_id,
-                'warehouse_id' => $warehouseId,
-                'snapshot_date' => $date,
-                'reference_type' => 'stock_opname_opening',
-                'reference_id' => $opname->id,
-                'qty_basis' => $physicalQty,
-                'rm_unit_cost' => $unitCost, // HPP RM-only
-                'cutting_unit_cost' => 0,
-                'sewing_unit_cost' => 0,
-                'finishing_unit_cost' => 0,
-                'packaging_unit_cost' => 0,
-                'overhead_unit_cost' => 0,
-                'unit_cost' => $unitCost, // total unit_cost = RM-only di fase opening
-                'notes' => $notes ?: ('Opening balance ' . $opname->code),
-                'is_active' => true,
-                'created_by' => $opname->created_by ?? $userId,
-            ]);
         }
+
+        if ($unitCost <= 0) {
+            return;
+        }
+
+        $this->deactivateActiveSnapshots($itemId, $warehouseId);
+
+        ItemCostSnapshot::create([
+            'item_id' => $itemId,
+            'warehouse_id' => $warehouseId,
+            'snapshot_date' => $snapshotDate,
+            'reference_type' => 'stock_opname_periodic',
+            'reference_id' => $opname->id,
+            'qty_basis' => $qtyBasis,
+            'rm_unit_cost' => $unitCost,
+            'cutting_unit_cost' => 0,
+            'sewing_unit_cost' => 0,
+            'finishing_unit_cost' => 0,
+            'packaging_unit_cost' => 0,
+            'overhead_unit_cost' => 0,
+            'unit_cost' => $unitCost,
+            'notes' => $notes ?: ('SO periodic ' . $opname->code),
+            'is_active' => true,
+            'created_by' => $opname->created_by ?? Auth::id(),
+        ]);
+    }
+
+    protected function deactivateActiveSnapshots(int $itemId, int $warehouseId): void
+    {
+        ItemCostSnapshot::query()
+            ->where('item_id', $itemId)
+            ->forWarehouseOrGlobal($warehouseId)
+            ->active()
+            ->update(['is_active' => false]);
     }
 
     /**
-     * Opening:
-     * Set HPP global sementara (items.base_unit_cost) dari unit_cost final (resolvedCosts).
-     *
-     * Catatan:
-     * - Hanya update kalau:
-     *   - physical_qty > 0
-     *   - unit_cost > 0
-     * - "Last opening wins" (kalau ada >1 opening).
+     * Generate kode ADJ-YYYYMMDD-###
      */
-    protected function applyOpeningBaseUnitCosts(StockOpname $opname, array $resolvedCosts): void
+    protected function generateAdjustmentCodeForDate(string $date): string
     {
-        foreach ($opname->lines as $line) {
-            $qty = (float) ($line->physical_qty ?? 0);
-            $unitCost = $resolvedCosts[$line->id] ?? null;
+        $d = Carbon::parse($date);
+        $dateStr = $d->format('Ymd');
+        $prefix = 'ADJ-' . $dateStr . '-';
 
-            if ($qty <= 0 || !$unitCost || $unitCost <= 0) {
-                continue;
-            }
+        $last = InventoryAdjustment::where('code', 'like', $prefix . '%')
+            ->orderByDesc('code')
+            ->first();
 
-            if (!$line->item) {
-                continue;
-            }
-
-            $item = $line->item;
-
-            // Versi 1: selalu overwrite (last opening wins)
-            $item->base_unit_cost = $unitCost;
-
-            // Versi 2 (opsional): hanya isi kalau belum pernah di-set
-            // if (is_null($item->base_unit_cost) || $item->base_unit_cost <= 0) {
-            //     $item->base_unit_cost = $unitCost;
-            // }
-
-            $item->save();
-        }
-    }
-
-    /**
-     * Normalisasi selisih:
-     * > 0  → direction = in,  qtyChange = selisih
-     * < 0  → direction = out, qtyChange = |selisih|
-     */
-    protected function normalizeDifference(float $difference): array
-    {
-        if ($difference > 0) {
-            return ['in', $difference];
+        $next = 1;
+        if ($last) {
+            $n = (int) substr($last->code, strlen($prefix));
+            $next = $n + 1;
         }
 
-        return ['out', abs($difference)];
-    }
-
-    /**
-     * Generate kode ADJ sederhana: ADJ-YYYYMMDD-XXXX
-     */
-    protected function generateAdjustmentCode(): string
-    {
-        $date = Carbon::now()->format('Ymd');
-        $random = strtoupper(Str::random(4));
-
-        return "ADJ-{$date}-{$random}";
+        return sprintf('%s%03d', $prefix, $next);
     }
 }

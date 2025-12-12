@@ -19,10 +19,13 @@ class StockRequest extends Model
         'status',
         'requested_by_user_id',
         'notes',
+        'received_by_user_id',
+        'received_at',
     ];
 
     protected $casts = [
         'date' => 'date',
+        'received_at' => 'datetime',
     ];
 
     /*

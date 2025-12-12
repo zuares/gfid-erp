@@ -10,6 +10,21 @@ use Illuminate\Database\Eloquent\Relations\MorphTo;
 
 class InventoryAdjustment extends Model
 {
+    // ==========================
+    //  STATUS CONSTANTS
+    // ==========================
+    public const STATUS_DRAFT = 'draft';
+    public const STATUS_PENDING = 'pending';
+    public const STATUS_APPROVED = 'approved';
+    public const STATUS_VOID = 'void'; // / cancelled
+
+    // ==============================
+    // SOURCE TYPE (untuk inventory_mutations)
+    // ==============================
+    public const SOURCE_MANUAL = 'inventory_adjustment_manual';
+    public const SOURCE_SO_OPENING = 'stock_opname_opening';
+    public const SOURCE_SO_PERIODIC = 'stock_opname_periodic';
+
     protected $fillable = [
         'code',
         'date',
@@ -61,11 +76,79 @@ class InventoryAdjustment extends Model
 
     public function scopeApproved(Builder $query): Builder
     {
-        return $query->where('status', 'approved');
+        return $query->where('status', self::STATUS_APPROVED);
+    }
+
+    public function scopePending(Builder $query): Builder
+    {
+        return $query->where('status', self::STATUS_PENDING);
     }
 
     public function scopeForWarehouse(Builder $query, int $warehouseId): Builder
     {
         return $query->where('warehouse_id', $warehouseId);
+    }
+
+    public function scopeNotVoid(Builder $query): Builder
+    {
+        return $query->where('status', '!=', self::STATUS_VOID);
+    }
+
+    // ==========================
+    //  STATUS HELPERS
+    // ==========================
+
+    public function isDraft(): bool
+    {
+        return $this->status === self::STATUS_DRAFT;
+    }
+
+    public function isPending(): bool
+    {
+        return $this->status === self::STATUS_PENDING;
+    }
+
+    public function isApproved(): bool
+    {
+        return $this->status === self::STATUS_APPROVED;
+    }
+
+    public function isVoid(): bool
+    {
+        return in_array($this->status, [self::STATUS_VOID, 'cancelled'], true);
+    }
+/**
+ * Human readable source label
+ */
+    public static function sourceLabel(string | null $sourceType, ?string $fallback = null): string
+    {
+        return match ($sourceType) {
+            self::SOURCE_MANUAL => 'Adjustment Manual',
+            self::SOURCE_SO_OPENING => 'Stock Opname (Opening)',
+            self::SOURCE_SO_PERIODIC => 'Stock Opname (Periodic)',
+            default => $fallback ?? 'Lainnya',
+        };
+    }
+
+    /**
+     * Boleh di-approve?
+     * - sekarang status PENDING
+     * - belum ada approved_by
+     */
+    public function canApprove(): bool
+    {
+        return $this->isPending() && !$this->approved_by;
+    }
+
+    public function isOpening(): bool
+    {
+        return $this->source_type === StockOpname::class
+        && $this->source?->type === StockOpname::TYPE_OPENING;
+    }
+
+    public function isPeriodic(): bool
+    {
+        return $this->source_type === StockOpname::class
+        && $this->source?->type === StockOpname::TYPE_PERIODIC;
     }
 }

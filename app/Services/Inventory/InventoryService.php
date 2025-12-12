@@ -268,6 +268,8 @@ class InventoryService
         ?int $sourceId = null,
         ?string $notes = null,
         ?int $lotId = null, // bisa juga per LOT
+        float | int | string | null $unitCostOverride = null, // ✅ NEW: untuk kunci unit_cost mutasi (terutama IN)
+        bool $affectLotCost = true, // ✅ NEW: false untuk SO/adjustment biar LotCost aman
     ): ?InventoryMutation {
         $newQty = $this->num($newQty);
         $date = $this->normalizeDate($date);
@@ -285,8 +287,14 @@ class InventoryService
             return null; // tidak ada perubahan
         }
 
+        // Normalisasi unit cost override
+        $unitCostValue = $unitCostOverride !== null ? $this->num($unitCostOverride) : null;
+        if ($unitCostValue !== null && $unitCostValue <= 0) {
+            $unitCostValue = null;
+        }
+
         if ($diff > 0) {
-            // stok kurang → masuk
+            // stok kurang → masuk (IN)
             return $this->stockIn(
                 warehouseId: $warehouseId,
                 itemId: $itemId,
@@ -296,10 +304,12 @@ class InventoryService
                 sourceId: $sourceId,
                 notes: $notes,
                 lotId: $lotId,
+                unitCost: $unitCostValue, // ✅ kirim cost supaya mutasi IN punya unit_cost/total_cost
+                affectLotCost: $affectLotCost,
             );
         }
 
-        // stok kelebihan → keluar
+        // stok kelebihan → keluar (OUT)
         return $this->stockOut(
             warehouseId: $warehouseId,
             itemId: $itemId,
@@ -310,6 +320,8 @@ class InventoryService
             notes: $notes,
             allowNegative: false,
             lotId: $lotId,
+            unitCostOverride: $unitCostValue, // ✅ opsional: kalau mau OUT pakai cost override juga
+            affectLotCost: $affectLotCost,
         );
     }
 

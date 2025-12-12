@@ -27,7 +27,12 @@ return new class extends Migration
             $table->string('reason')->nullable(); // ringkas
             $table->text('notes')->nullable(); // detail
 
-            $table->enum('status', ['draft', 'approved', 'rejected'])
+            // ✅ align dengan controller + blade
+            // draft = baru dibuat, belum diajukan (opsional)
+            // pending = dibuat non-owner, menunggu owner approve (stok belum dikoreksi)
+            // approved = stok sudah dikoreksi (final)
+            // void = dibatalkan/di-void (tidak dipakai)
+            $table->enum('status', ['draft', 'pending', 'approved', 'void'])
                 ->default('draft');
 
             $table->foreignIdFor(User::class, 'created_by')
@@ -44,7 +49,9 @@ return new class extends Migration
 
             $table->timestamps();
 
-            // Supaya trace dari source (StockOpname, dsb) ke adjustment cepat
+            // indexes
+            $table->index(['date', 'warehouse_id'], 'inv_adj_date_wh_idx');
+            $table->index(['status', 'date'], 'inv_adj_status_date_idx');
             $table->index(['source_type', 'source_id'], 'inv_adj_source_idx');
         });
 
@@ -81,6 +88,9 @@ return new class extends Migration
             $table->text('notes')->nullable();
 
             $table->timestamps();
+
+            $table->index(['inventory_adjustment_id', 'item_id'], 'inv_adj_lines_adj_item_idx');
+            $table->index(['item_id', 'lot_id'], 'inv_adj_lines_item_lot_idx');
         });
     }
 

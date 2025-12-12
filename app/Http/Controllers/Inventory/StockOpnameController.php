@@ -7,9 +7,9 @@ use App\Models\StockOpname;
 use App\Models\StockOpnameLine;
 use App\Models\Warehouse;
 use App\Services\Inventory\StockOpnameService;
-use Carbon\Carbon;
 use Illuminate\Http\RedirectResponse;
 use Illuminate\Http\Request;
+use Illuminate\Support\Carbon;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Validation\ValidationException;
 use Illuminate\View\View;
@@ -38,10 +38,10 @@ class StockOpnameController extends Controller
             $query->where('warehouse_id', $request->integer('warehouse_id'));
         }
 
+        // status: draft/counting/reviewed/finalized/all
         if ($request->filled('status')) {
             $status = $request->string('status')->toString();
-
-            if (in_array($status, [
+            if ($status !== 'all' && in_array($status, [
                 StockOpname::STATUS_DRAFT,
                 StockOpname::STATUS_COUNTING,
                 StockOpname::STATUS_REVIEWED,
@@ -51,21 +51,19 @@ class StockOpnameController extends Controller
             }
         }
 
-        // optional: filter type (periodic / opening)
         if ($request->filled('type')) {
             $type = $request->string('type')->toString();
-
-            if (in_array($type, [StockOpname::TYPE_PERIODIC, StockOpname::TYPE_OPENING], true)) {
+            if ($type !== 'all' && in_array($type, [StockOpname::TYPE_PERIODIC, StockOpname::TYPE_OPENING], true)) {
                 $query->where('type', $type);
             }
         }
 
         if ($request->filled('date_from')) {
-            $query->whereDate('date', '>=', $request->date('date_from'));
+            $query->whereDate('date', '>=', Carbon::parse($request->input('date_from'))->toDateString());
         }
 
         if ($request->filled('date_to')) {
-            $query->whereDate('date', '<=', $request->date('date_to'));
+            $query->whereDate('date', '<=', Carbon::parse($request->input('date_to'))->toDateString());
         }
 
         $opnames = $query->paginate(20)->appends($request->query());
@@ -81,8 +79,10 @@ class StockOpnameController extends Controller
     {
         $warehouses = Warehouse::orderBy('code')->get();
 
-        // default periodic, bisa override via query string
         $mode = $request->get('type', StockOpname::TYPE_PERIODIC);
+        if (!in_array($mode, [StockOpname::TYPE_PERIODIC, StockOpname::TYPE_OPENING], true)) {
+            $mode = StockOpname::TYPE_PERIODIC;
+        }
 
         return view('inventory.stock_opnames.create', [
             'warehouses' => $warehouses,
@@ -102,7 +102,7 @@ class StockOpnameController extends Controller
             'date' => ['required', 'date'],
             'notes' => ['nullable', 'string'],
             'auto_generate_lines' => ['nullable', 'boolean'],
-            'type' => ['nullable', 'in:periodic,opening'],
+            'type' => ['nullable', 'in:' . StockOpname::TYPE_PERIODIC . ',' . StockOpname::TYPE_OPENING],
         ]);
 
         $type = $validated['type'] ?? StockOpname::TYPE_PERIODIC;
@@ -114,15 +114,15 @@ class StockOpnameController extends Controller
             $opname = new StockOpname();
             $opname->code = $this->generateOpnameCodeForDate($validated['date']);
             $opname->type = $type;
-            $opname->warehouse_id = $validated['warehouse_id'];
+            $opname->warehouse_id = (int) $validated['warehouse_id'];
             $opname->date = $validated['date'];
             $opname->notes = $validated['notes'] ?? null;
-            // langsung counting dari awal
+
+            // langsung masuk counting
             $opname->status = StockOpname::STATUS_COUNTING;
             $opname->created_by = auth()->id();
             $opname->save();
 
-            // periodic: generate lines dari stok sistem
             if ($type === StockOpname::TYPE_PERIODIC && $autoGenerate) {
                 $this->stockOpnameService->generateLinesFromWarehouse(
                     opname: $opname,
@@ -130,8 +130,6 @@ class StockOpnameController extends Controller
                     onlyWithStock: true,
                 );
             }
-
-            // opening: tidak generate apa-apa → user akan tambah baris manual via addLine()
         });
 
         return redirect()
@@ -145,23 +143,23 @@ class StockOpnameController extends Controller
      */
     public function edit(StockOpname $stockOpname): View
     {
-        // load relasi yang dibutuhkan
         $stockOpname->load(['warehouse', 'lines.item', 'creator']);
-
-        return view('inventory.stock_opnames.edit', [
-            'opname' => $stockOpname,
-        ]);
+        return view('inventory.stock_opnames.edit', ['opname' => $stockOpname]);
     }
 
-    /**
-     * Detail 1 dokumen stock opname.
-     */
     public function show(StockOpname $stockOpname): View
     {
-        $stockOpname->load(['warehouse', 'lines.item', 'creator', 'finalizer']);
+        $stockOpname->load(['warehouse', 'lines.item', 'creator', 'reviewer', 'finalizer']);
+
+        $adjustment = \App\Models\InventoryAdjustment::query()
+            ->where('source_type', \App\Models\StockOpname::class)
+            ->where('source_id', $stockOpname->id)
+            ->latest('id')
+            ->first();
 
         return view('inventory.stock_opnames.show', [
             'opname' => $stockOpname,
+            'adjustment' => $adjustment,
         ]);
     }
 
@@ -174,35 +172,24 @@ class StockOpnameController extends Controller
         $dateStr = $d->format('Ymd');
         $prefix = 'SO-' . $dateStr . '-';
 
-        // Cari code terakhir untuk tanggal tersebut
         $last = StockOpname::where('code', 'like', $prefix . '%')
             ->orderByDesc('code')
             ->first();
 
+        $nextNumber = 1;
         if ($last) {
             $lastNumber = (int) substr($last->code, strlen($prefix));
             $nextNumber = $lastNumber + 1;
-        } else {
-            $nextNumber = 1;
         }
 
         return sprintf('%s%03d', $prefix, $nextNumber);
     }
 
     /**
-     * Backward compat (kalau ada pemanggilan lama), tidak wajib dipakai.
-     */
-    private function generateOpnameCode(): string
-    {
-        return $this->generateOpnameCodeForDate(Carbon::today()->toDateString());
-    }
-
-    /**
-     * Update hasil counting (system_qty / physical_qty / unit_cost / notes).
+     * Update hasil counting (physical_qty / unit_cost / notes).
      */
     public function update(Request $request, StockOpname $stockOpname): RedirectResponse
     {
-        // 🔒 Jangan boleh update kalau status sudah reviewed/finalized
         if (!$stockOpname->canModifyLines()) {
             return redirect()
                 ->route('inventory.stock_opnames.show', $stockOpname)
@@ -213,9 +200,8 @@ class StockOpnameController extends Controller
         $validated = $request->validate([
             'notes' => ['nullable', 'string'],
             'lines' => ['nullable', 'array'],
-            'lines.*.physical_qty' => ['nullable', 'numeric'],
-            'lines.*.system_qty' => ['nullable', 'numeric'],
-            'lines.*.unit_cost' => ['nullable', 'numeric'], // HPP / unit (untuk opening)
+            'lines.*.physical_qty' => ['nullable', 'numeric', 'gte:0'],
+            'lines.*.unit_cost' => ['nullable', 'numeric', 'gte:0'],
             'lines.*.notes' => ['nullable', 'string'],
             'mark_reviewed' => ['nullable', 'boolean'],
         ]);
@@ -223,42 +209,31 @@ class StockOpnameController extends Controller
         $markReviewed = $request->boolean('mark_reviewed');
 
         DB::transaction(function () use ($stockOpname, $validated, $markReviewed) {
-            // 1️⃣ update header
             $stockOpname->notes = $validated['notes'] ?? $stockOpname->notes;
 
-            // kalau masih draft → counting
             if ($stockOpname->status === StockOpname::STATUS_DRAFT) {
                 $stockOpname->status = StockOpname::STATUS_COUNTING;
             }
 
-            // kalau user klik "Simpan & Tandai Selesai Counting"
-            if ($markReviewed) {
-                $stockOpname->status = StockOpname::STATUS_REVIEWED;
-            }
-
-            $stockOpname->save();
-
-            // 2️⃣ update lines
             $linesInput = $validated['lines'] ?? [];
 
             if (!empty($linesInput)) {
                 $stockOpname->load('lines');
 
                 foreach ($linesInput as $lineId => $data) {
+                    /** @var \App\Models\StockOpnameLine|null $line */
                     $line = $stockOpname->lines->firstWhere('id', (int) $lineId);
                     if (!$line) {
                         continue;
                     }
 
-                    $systemQty = isset($data['system_qty'])
-                    ? (float) $data['system_qty']
-                    : (float) $line->system_qty;
+                    $systemQty = (float) ($line->system_qty ?? 0);
 
-                    $physicalQty = ($data['physical_qty'] ?? '') !== ''
+                    $physicalQty = (($data['physical_qty'] ?? '') !== '')
                     ? (float) $data['physical_qty']
                     : null;
 
-                    $difference = 0;
+                    $difference = 0.0;
                     $isCounted = false;
 
                     if ($physicalQty !== null) {
@@ -266,48 +241,68 @@ class StockOpnameController extends Controller
                         $isCounted = true;
                     }
 
-                    $line->system_qty = $systemQty;
                     $line->physical_qty = $physicalQty;
                     $line->difference_qty = $difference;
                     $line->is_counted = $isCounted;
                     $line->notes = $data['notes'] ?? $line->notes;
 
-                    // simpan unit_cost kalau dikirim (mode opening)
                     if (array_key_exists('unit_cost', $data)) {
-                        $line->unit_cost = $data['unit_cost'] !== null
-                        ? (float) $data['unit_cost']
-                        : null;
+                        $line->unit_cost = $data['unit_cost'] !== null ? (float) $data['unit_cost'] : null;
                     }
 
                     $line->save();
                 }
             }
+
+            if ($markReviewed) {
+                $stockOpname->load('lines');
+
+                $notCountedExists = $stockOpname->lines->contains(fn($line) => !$line->is_counted);
+
+                if ($notCountedExists) {
+                    throw ValidationException::withMessages([
+                        'mark_reviewed' => 'Masih ada item yang belum di-count. Lengkapi dulu sebelum menandai counting selesai.',
+                    ]);
+                }
+
+                $stockOpname->status = StockOpname::STATUS_REVIEWED;
+                $stockOpname->reviewed_by = auth()->id();
+                $stockOpname->reviewed_at = now();
+            }
+
+            $stockOpname->save();
         });
 
-        // 3️⃣ redirect tergantung tombol
-        if ($markReviewed) {
-            // Selesai counting → ke halaman review (show)
+        // ✅ kalau klik tombol selesai counting
+        if ($request->boolean('mark_reviewed')) {
             return redirect()
                 ->route('inventory.stock_opnames.show', $stockOpname)
-                ->with('status', 'success')
-                ->with('message', 'Counting selesai. Dokumen sudah ditandai sebagai reviewed.');
+                ->with('success', 'Counting selesai. Dokumen dikirim untuk review.');
         }
 
-        // Hanya simpan → tetap di halaman edit
+        // ✅ kalau klik simpan biasa
+        if ($request->boolean('save_and_view')) {
+            return redirect()
+                ->route('inventory.stock_opnames.show', $stockOpname)
+                ->with('success', 'Perubahan berhasil disimpan.');
+        }
+
+        // fallback default (kalau ada submit lain)
         return redirect()
-            ->route('inventory.stock_opnames.edit', $stockOpname)
-            ->with('status', 'success')
-            ->with('message', 'Perubahan hasil counting berhasil disimpan.');
+            ->back()
+            ->with('success', 'Perubahan berhasil disimpan.');
     }
 
     /**
-     * Finalisasi dokumen stock opname:
-     * - periodic  → generate InventoryAdjustment + mutasi stok selisih.
-     * - opening   → generate saldo awal (stockIn dengan HPP), bisa tanpa ADJ.
+     * Finalisasi dokumen stock opname.
+     *
+     * NOTE:
+     * Dengan service yang baru:
+     * - opening  -> menghasilkan InventoryAdjustment (approved) -> muncul di adjustments
+     * - periodic -> menghasilkan InventoryAdjustment (approved/pending tergantung role)
      */
     public function finalize(Request $request, StockOpname $stockOpname): RedirectResponse
     {
-        // hanya boleh finalize kalau status sudah reviewed dan belum finalized
         if (!$stockOpname->canFinalize()) {
             return redirect()
                 ->route('inventory.stock_opnames.show', $stockOpname)
@@ -323,7 +318,7 @@ class StockOpnameController extends Controller
         try {
             $adjustment = $this->stockOpnameService->finalize(
                 $stockOpname,
-                $validated['reason'] ?? ('Penyesuaian stok dari stock opname ' . $stockOpname->code),
+                $validated['reason'] ?? null,
                 $validated['notes'] ?? null,
             );
         } catch (\Throwable $e) {
@@ -335,24 +330,23 @@ class StockOpnameController extends Controller
                 ->with('message', 'Gagal finalize stock opname: ' . $e->getMessage());
         }
 
-        // 🔀 Behavior beda untuk opening vs periodic
-        if ($stockOpname->isOpening() || !$adjustment) {
+        // SELALU redirect ke adjustment kalau ada
+        if ($adjustment) {
             return redirect()
-                ->route('inventory.stock_opnames.show', $stockOpname)
+                ->route('inventory.adjustments.show', $adjustment)
                 ->with('status', 'success')
-                ->with('message', 'Stock opname (opening balance) berhasil difinalkan.');
+                ->with('message', 'Stock opname difinalkan. Adjustment: ' . $adjustment->code);
         }
 
-        // periodic: redirect ke dokumen adjustment yang dibuat
+        // fallback (harusnya opening/periodic sekarang selalu menghasilkan adjustment)
         return redirect()
-            ->route('inventory.adjustments.show', $adjustment) // sesuaikan dengan nama route-mu
+            ->route('inventory.stock_opnames.show', $stockOpname)
             ->with('status', 'success')
-            ->with('message', 'Stock opname difinalkan. Adjustment: ' . $adjustment->code);
+            ->with('message', 'Stock opname berhasil difinalkan.');
     }
 
     public function addLine(Request $request, StockOpname $stockOpname): RedirectResponse | \Illuminate\Http\JsonResponse
     {
-        // Hanya boleh tambah baris kalau dokumen masih editable
         if (!$stockOpname->canModifyLines()) {
             $message = 'Tidak bisa menambah item pada dokumen yang sudah direview/final.';
             if ($request->ajax() || $request->wantsJson()) {
@@ -365,7 +359,6 @@ class StockOpnameController extends Controller
                 ->with('message', $message);
         }
 
-        // Batasi hanya mode opening
         if (!$stockOpname->isOpening()) {
             $message = 'Penambahan item manual hanya diizinkan untuk mode Opening Balance.';
             if ($request->ajax() || $request->wantsJson()) {
@@ -391,11 +384,8 @@ class StockOpnameController extends Controller
         DB::transaction(function () use ($stockOpname, $validated, $updateExisting) {
             $itemId = (int) $validated['item_id'];
 
-            $existingLine = $stockOpname->lines()
-                ->where('item_id', $itemId)
-                ->first();
+            $existingLine = $stockOpname->lines()->where('item_id', $itemId)->first();
 
-            // Kalau sudah ada & user TIDAK minta update → error lama
             if ($existingLine && !$updateExisting) {
                 throw ValidationException::withMessages([
                     'item_id' => 'Item ini sudah ada di daftar opname. Edit baris yang sudah ada.',
@@ -406,13 +396,12 @@ class StockOpnameController extends Controller
             ? (float) $validated['physical_qty']
             : null;
 
-            $unitCost = $validated['unit_cost'] ?? null;
+            $unitCost = array_key_exists('unit_cost', $validated) ? $validated['unit_cost'] : null;
             $notes = $validated['notes'] ?? null;
 
             if ($existingLine) {
-                // 🔁 UPDATE BARIS EXISTING
                 $systemQty = (float) ($existingLine->system_qty ?? 0);
-                $difference = 0;
+                $difference = 0.0;
                 $isCounted = false;
 
                 if ($physicalQty !== null) {
@@ -423,13 +412,12 @@ class StockOpnameController extends Controller
                 $existingLine->physical_qty = $physicalQty;
                 $existingLine->difference_qty = $difference;
                 $existingLine->is_counted = $isCounted;
-                $existingLine->unit_cost = $unitCost;
+                $existingLine->unit_cost = $unitCost !== null ? (float) $unitCost : null;
                 $existingLine->notes = $notes ?? $existingLine->notes;
                 $existingLine->save();
             } else {
-                // ➕ TAMBAH BARU
-                $systemQty = 0.0; // opening dari 0
-                $difference = 0;
+                $systemQty = 0.0;
+                $difference = 0.0;
                 $isCounted = false;
 
                 if ($physicalQty !== null) {
@@ -444,17 +432,14 @@ class StockOpnameController extends Controller
                 $line->physical_qty = $physicalQty;
                 $line->difference_qty = $difference;
                 $line->is_counted = $isCounted;
-                $line->unit_cost = $unitCost;
+                $line->unit_cost = $unitCost !== null ? (float) $unitCost : null;
                 $line->notes = $notes;
                 $line->save();
             }
         });
 
         if ($request->ajax() || $request->wantsJson()) {
-            return response()->json([
-                'status' => 'ok',
-                'message' => 'Item saldo awal berhasil disimpan.',
-            ]);
+            return response()->json(['status' => 'ok', 'message' => 'Item saldo awal berhasil disimpan.']);
         }
 
         return redirect()
@@ -465,12 +450,10 @@ class StockOpnameController extends Controller
 
     public function deleteLine(Request $request, StockOpname $stockOpname, StockOpnameLine $line)
     {
-        // pastikan line memang milik opname ini
         if ($line->stock_opname_id !== $stockOpname->id) {
             abort(404);
         }
 
-        // tidak boleh hapus kalau dokumen tidak boleh dimodifikasi lagi
         if (!$stockOpname->canModifyLines()) {
             $message = 'Tidak bisa menghapus item pada dokumen yang sudah direview/final.';
             if ($request->ajax() || $request->wantsJson()) {
@@ -486,10 +469,7 @@ class StockOpnameController extends Controller
         $line->delete();
 
         if ($request->ajax() || $request->wantsJson()) {
-            return response()->json([
-                'status' => 'ok',
-                'message' => 'Item berhasil dihapus dari opname.',
-            ]);
+            return response()->json(['status' => 'ok', 'message' => 'Item berhasil dihapus dari opname.']);
         }
 
         return redirect()
@@ -498,9 +478,8 @@ class StockOpnameController extends Controller
             ->with('message', 'Item berhasil dihapus dari opname.');
     }
 
-    public function resetLines(Request $request, StockOpname $stockOpname)
+    public function resetLines(Request $request, StockOpname $stockOpname): RedirectResponse
     {
-        // Hanya boleh reset kalau masih draft / counting
         if (!$stockOpname->canModifyLines()) {
             return redirect()
                 ->route('inventory.stock_opnames.edit', $stockOpname)
@@ -508,7 +487,6 @@ class StockOpnameController extends Controller
                 ->with('message', 'Tidak bisa reset baris pada dokumen yang sudah direview/final.');
         }
 
-        // Batasi hanya untuk mode opening
         if (!$stockOpname->isOpening()) {
             return redirect()
                 ->route('inventory.stock_opnames.edit', $stockOpname)
@@ -523,11 +501,7 @@ class StockOpnameController extends Controller
                 $line->physical_qty = null;
                 $line->difference_qty = 0;
                 $line->is_counted = false;
-
-                // reset HPP / unit
                 $line->unit_cost = null;
-
-                // Catatan tetap dibiarkan, supaya info tambahan tidak hilang
                 $line->save();
             }
         });
@@ -538,27 +512,20 @@ class StockOpnameController extends Controller
             ->with('message', 'Qty fisik dan HPP semua baris telah di-reset. Daftar item tetap dipertahankan.');
     }
 
-    public function resetAllLines(StockOpname $stockOpname)
+    public function resetAllLines(StockOpname $stockOpname): RedirectResponse
     {
-        // Hanya untuk opening & belum finalize
         if (!$stockOpname->isOpening()) {
-            return back()
-                ->with('status', 'error')
-                ->with('message', 'Reset semua baris hanya diperbolehkan untuk mode Opening.');
+            return back()->with('status', 'error')->with('message', 'Reset semua baris hanya diperbolehkan untuk mode Opening.');
         }
 
         if (!$stockOpname->canModifyLines()) {
-            return back()
-                ->with('status', 'error')
-                ->with('message', 'Tidak dapat reset: dokumen sudah direview atau final.');
+            return back()->with('status', 'error')->with('message', 'Tidak dapat reset: dokumen sudah direview atau final.');
         }
 
         DB::transaction(function () use ($stockOpname) {
             $stockOpname->lines()->delete();
         });
 
-        return back()
-            ->with('status', 'success')
-            ->with('message', 'Semua baris berhasil dihapus. Anda dapat mulai input kembali.');
+        return back()->with('status', 'success')->with('message', 'Semua baris berhasil dihapus. Anda dapat mulai input kembali.');
     }
 }

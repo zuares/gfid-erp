@@ -1,3 +1,4 @@
+{{-- resources/views/inventory/adjustments/manual_create.blade.php --}}
 @extends('layouts.app')
 
 @section('title', 'Adjustment Manual')
@@ -98,18 +99,32 @@
 @endpush
 
 @section('content')
+    @php
+        $user = auth()->user();
+        $isOwner = $user && ($user->role ?? null) === 'owner';
+    @endphp
+
     <div class="page-wrap">
         <div class="card card-main">
             <div class="card-body">
                 <div class="d-flex justify-content-between align-items-start mb-3">
                     <div>
-                        <h1 class="h5 mb-1">
-                            Adjustment Manual
-                        </h1>
-                        <p class="text-muted mb-0" style="font-size: .86rem;">
-                            Tabel item di gudang terpilih. Isi <strong>Qty Fisik</strong>, sistem akan hitung
-                            <strong>Selisih (±)</strong> dan mengirim <strong>Qty Change</strong> ke server.
+                        <h1 class="h5 mb-1">Adjustment Manual</h1>
+                        <p class="text-muted mb-1" style="font-size: .86rem;">
+                            Pilih gudang → isi <strong>Qty Fisik</strong>. Sistem hitung <strong>Selisih (±)</strong> dan
+                            hanya mengirim baris yang benar-benar berubah.
                         </p>
+
+                        @if ($isOwner)
+                            <div class="alert alert-info py-2 px-3 mb-0" style="font-size: .8rem;">
+                                Sebagai <strong>Owner</strong>, dokumen akan langsung <strong>Approved</strong> dan stok
+                                langsung dikoreksi.
+                            </div>
+                        @else
+                            <div class="alert alert-warning py-2 px-3 mb-0" style="font-size: .8rem;">
+                                Dokumen akan berstatus <strong>Pending</strong>. Stok belum berubah sampai disetujui Owner.
+                            </div>
+                        @endif
                     </div>
                     <div>
                         <a href="{{ route('inventory.adjustments.index') }}" class="btn btn-sm btn-outline-secondary">
@@ -134,9 +149,7 @@
                                     </option>
                                 @endforeach
                             </select>
-                            <div class="form-text">
-                                Setelah pilih gudang, daftar item & stok akan muncul di bawah.
-                            </div>
+                            <div class="form-text">Setelah pilih gudang, daftar item & stok akan muncul.</div>
                             @error('warehouse_id')
                                 <div class="text-danger small">{{ $message }}</div>
                             @enderror
@@ -170,11 +183,9 @@
                         </div>
                     </div>
 
-                    {{-- TOOLBAR TABLE --}}
+                    {{-- TOOLBAR --}}
                     <div class="d-flex justify-content-between align-items-center mb-1">
-                        <div class="pill-label">
-                            Daftar Item di Gudang
-                        </div>
+                        <div class="pill-label">Daftar Item di Gudang</div>
                         <div class="d-flex align-items-center gap-2">
                             <div class="input-group input-group-sm" style="width: 230px;">
                                 <span class="input-group-text">🔍</span>
@@ -203,7 +214,7 @@
                                 </tr>
                             </thead>
                             <tbody>
-                                {{-- akan di-render via JS --}}
+                                {{-- render via JS --}}
                             </tbody>
                         </table>
                     </div>
@@ -217,7 +228,10 @@
                         </div>
                     </div>
 
-                    <div class="d-flex justify-content-end">
+                    <div class="d-flex justify-content-end gap-2">
+                        <button type="button" class="btn btn-outline-secondary btn-sm" id="clear-all">
+                            Reset Qty Fisik
+                        </button>
                         <button type="submit" class="btn btn-primary btn-sm">
                             Simpan Adjustment
                         </button>
@@ -237,116 +251,81 @@
             const itemSearch = document.getElementById('item-search');
             const showChangedOnly = document.getElementById('show_changed_only');
             const summaryChange = document.getElementById('summary-change');
+            const form = document.getElementById('adj-form');
+            const clearAllBtn = document.getElementById('clear-all');
 
             const itemsUrl = @json(route('inventory.adjustments.items_for_warehouse'));
 
             let warehouseItems = []; // {id, code, name, on_hand}
-            let rowIndex = 0;
 
-            function formatNumber(value) {
-                const num = parseFloat(value);
-                if (isNaN(num)) return '';
-                return num.toFixed(2);
+            function fmt(n) {
+                const x = parseFloat(n);
+                if (isNaN(x)) return '0.00';
+                return x.toFixed(2);
             }
 
-            function renderRows() {
-                tbody.innerHTML = '';
-                rowIndex = 0;
+            function buildRow(item, idx) {
+                const onHand = parseFloat(item.on_hand) || 0;
 
-                warehouseItems.forEach(item => {
-                    rowIndex++;
-                    const tr = document.createElement('tr');
-                    tr.dataset.code = (item.code || '').toLowerCase();
-                    tr.dataset.name = (item.name || '').toLowerCase();
+                const tr = document.createElement('tr');
+                tr.dataset.code = (item.code || '').toLowerCase();
+                tr.dataset.name = (item.name || '').toLowerCase();
+                tr.dataset.idx = String(idx);
 
-                    const onHand = parseFloat(item.on_hand) || 0;
+                tr.innerHTML = `
+            <td data-label="#">${idx + 1}</td>
 
-                    tr.innerHTML = `
-                        <td data-label="#">
-                            ${rowIndex}
-                        </td>
-                        <td data-label="Item">
-                            <div class="fw-semibold text-mono">
-                                ${item.code}
-                            </div>
-                            <div class="text-muted" style="font-size: .82rem;">
-                                ${item.name ?? ''}
-                            </div>
-                            <input type="hidden"
-                                   name="lines[${rowIndex}][item_id]"
-                                   value="${item.id}">
-                        </td>
-                        <td data-label="Stok saat ini" class="text-end text-mono">
-                            <span class="on-hand" data-on-hand="${onHand}">
-                                ${formatNumber(onHand)}
-                            </span>
-                        </td>
-                        <td data-label="Qty fisik" class="text-end">
-                            <input type="number"
-                                   name="lines[${rowIndex}][physical_qty]"
-                                   class="form-control form-control-sm text-end physical-input"
-                                   step="0.01"
-                                   min="0"
-                                   placeholder="0.00">
-                            <input type="hidden"
-                                   name="lines[${rowIndex}][qty_change]"
-                                   class="qty-change-input"
-                                   value="">
-                        </td>
-                        <td data-label="Selisih" class="text-end text-mono">
-                            <span class="diff-display">0.00</span>
-                        </td>
-                        <td data-label="Catatan">
-                            <input type="text"
-                                   name="lines[${rowIndex}][notes]"
-                                   class="form-control form-control-sm"
-                                   placeholder="Catatan (opsional)">
-                        </td>
-                    `;
+            <td data-label="Item">
+                <div class="fw-semibold text-mono">${item.code ?? ''}</div>
+                <div class="text-muted" style="font-size:.82rem;">${item.name ?? ''}</div>
 
-                    tbody.appendChild(tr);
+                <input type="hidden" class="row-item-id" value="${item.id}">
+            </td>
+
+            <td data-label="Stok saat ini" class="text-end text-mono">
+                <span class="on-hand" data-on-hand="${onHand}">${fmt(onHand)}</span>
+            </td>
+
+            <td data-label="Qty fisik" class="text-end">
+                <input type="number"
+                       class="form-control form-control-sm text-end physical-input"
+                       step="0.01" min="0" placeholder="0.00">
+                <input type="hidden" class="qty-change-input" value="">
+            </td>
+
+            <td data-label="Selisih" class="text-end text-mono">
+                <span class="diff-display">0.00</span>
+            </td>
+
+            <td data-label="Catatan">
+                <input type="text" class="form-control form-control-sm notes-input" placeholder="Catatan (opsional)">
+            </td>
+        `;
+
+                // events
+                const physical = tr.querySelector('.physical-input');
+                physical.addEventListener('focus', () => physical.select());
+                physical.addEventListener('blur', () => {
+                    if (physical.value !== '' && !isNaN(parseFloat(physical.value))) {
+                        physical.value = fmt(physical.value);
+                    }
+                });
+                physical.addEventListener('input', () => {
+                    recalcRow(tr);
+                    applyFilter();
+                    updateSummary();
                 });
 
-                setupRowUX();
-                applyFilterAndToggle();
-                updateSummary();
-            }
-
-            function setupRowUX() {
-                const physicalInputs = tbody.querySelectorAll('.physical-input');
-
-                physicalInputs.forEach(input => {
-                    // fokus: select all biar gampang overwrite
-                    input.addEventListener('focus', function() {
-                        this.select();
-                    });
-
-                    // blur: normalize ke 2 decimal
-                    input.addEventListener('blur', function() {
-                        if (this.value !== '' && !isNaN(parseFloat(this.value))) {
-                            this.value = formatNumber(this.value);
-                        }
-                    });
-
-                    // input: hitung selisih + qty_change
-                    input.addEventListener('input', function() {
-                        recalcRow(this.closest('tr'));
-                        applyFilterAndToggle();
-                        updateSummary();
-                    });
-                });
+                return tr;
             }
 
             function recalcRow(tr) {
-                if (!tr) return;
-
                 const onHandSpan = tr.querySelector('.on-hand');
                 const physicalInp = tr.querySelector('.physical-input');
                 const diffSpan = tr.querySelector('.diff-display');
                 const qtyChangeInp = tr.querySelector('.qty-change-input');
 
-                const onHand = parseFloat(onHandSpan?.dataset.onHand ?? onHandSpan?.dataset.onHand ?? onHandSpan
-                    ?.getAttribute('data-on-hand') ?? '0') || 0;
+                const onHand = parseFloat(onHandSpan.dataset.onHand || '0') || 0;
                 const physical = parseFloat(physicalInp.value);
 
                 diffSpan.classList.remove('diff-plus', 'diff-minus');
@@ -354,70 +333,65 @@
                 if (isNaN(physical)) {
                     diffSpan.textContent = '0.00';
                     qtyChangeInp.value = '';
+                    tr.dataset.changed = '0';
                     return;
                 }
 
                 const diff = physical - onHand; // signed
-
                 qtyChangeInp.value = diff.toFixed(2);
+
+                tr.dataset.changed = (Math.abs(diff) > 0.000001) ? '1' : '0';
 
                 let text = diff.toFixed(2);
                 if (diff > 0) {
                     text = '+' + text;
                     diffSpan.classList.add('diff-plus');
-                } else if (diff < 0) {
+                }
+                if (diff < 0) {
                     diffSpan.classList.add('diff-minus');
                 }
-
                 diffSpan.textContent = text;
             }
 
-            function applyFilterAndToggle() {
+            function renderRows() {
+                tbody.innerHTML = '';
+
+                warehouseItems.forEach((item, idx) => {
+                    tbody.appendChild(buildRow(item, idx));
+                });
+
+                applyFilter();
+                updateSummary();
+            }
+
+            function applyFilter() {
                 const term = (itemSearch.value || '').trim().toLowerCase();
                 const changedOnly = showChangedOnly.checked;
 
-                const rows = tbody.querySelectorAll('tr');
-                rows.forEach(tr => {
+                tbody.querySelectorAll('tr').forEach(tr => {
                     const code = tr.dataset.code || '';
                     const name = tr.dataset.name || '';
+                    const changed = tr.dataset.changed === '1';
 
-                    const qtyChangeInp = tr.querySelector('.qty-change-input');
-                    const val = parseFloat(qtyChangeInp?.value || '0');
+                    let ok = true;
 
-                    let matchSearch = true;
-                    let matchChange = true;
+                    if (term) ok = (code.includes(term) || name.includes(term));
+                    if (ok && changedOnly) ok = changed;
 
-                    if (term !== '') {
-                        matchSearch = code.includes(term) || name.includes(term);
-                    }
-
-                    if (changedOnly) {
-                        matchChange = !isNaN(val) && Math.abs(val) > 0.000001;
-                    }
-
-                    if (matchSearch && matchChange) {
-                        tr.style.display = '';
-                    } else {
-                        tr.style.display = 'none';
-                    }
+                    tr.style.display = ok ? '' : 'none';
                 });
             }
 
             function updateSummary() {
-                let totalChange = 0;
-                const qtyChangeInputs = tbody.querySelectorAll('.qty-change-input');
+                let total = 0;
 
-                qtyChangeInputs.forEach(input => {
-                    const v = parseFloat(input.value);
-                    if (!isNaN(v)) {
-                        totalChange += v;
-                    }
+                tbody.querySelectorAll('.qty-change-input').forEach(inp => {
+                    const v = parseFloat(inp.value);
+                    if (!isNaN(v)) total += v;
                 });
 
-                let text = formatNumber(totalChange);
-                if (totalChange > 0) {
-                    text = '+' + text;
-                }
+                let text = fmt(total);
+                if (total > 0) text = '+' + text;
 
                 summaryChange.textContent = 'Total perubahan: ' + text;
             }
@@ -435,23 +409,18 @@
 
                 fetch(itemsUrl + '?warehouse_id=' + encodeURIComponent(warehouseId))
                     .then(res => {
-                        if (!res.ok) {
-                            throw new Error('HTTP ' + res.status);
-                        }
+                        if (!res.ok) throw new Error('HTTP ' + res.status);
                         return res.json();
                     })
                     .then(data => {
                         warehouseItems = Array.isArray(data) ? data : [];
-                        if (warehouseItems.length === 0) {
-                            itemsHint.textContent = 'Tidak ada item dengan stok di gudang ini.';
-                        } else {
-                            itemsHint.textContent =
-                                'Isi Qty Fisik. Sistem akan hitung selisih & qty change otomatis.';
-                        }
+                        itemsHint.textContent = warehouseItems.length ?
+                            'Isi Qty Fisik. Sistem akan hitung selisih otomatis.' :
+                            'Tidak ada item dengan stok di gudang ini.';
                         renderRows();
                     })
                     .catch(err => {
-                        console.error('Gagal load items:', err);
+                        console.error(err);
                         warehouseItems = [];
                         tbody.innerHTML = '';
                         itemsHint.textContent = 'Gagal memuat item. Coba reload halaman.';
@@ -459,18 +428,72 @@
                     });
             }
 
-            // Events
-            warehouseSelect.addEventListener('change', function() {
-                loadItemsForWarehouse(this.value || null);
+            // ✅ KRUSIAL: hanya kirim baris yang berubah (qty_change != 0)
+            form.addEventListener('submit', function() {
+                let outIndex = 0;
+
+                tbody.querySelectorAll('tr').forEach(tr => {
+                    // hapus input "named" dari submit sebelumnya (kalau user submit ulang setelah validation error)
+                    tr.querySelectorAll('[data-named="1"]').forEach(el => el.remove());
+
+                    const changed = tr.dataset.changed === '1';
+                    const qtyChange = parseFloat(tr.querySelector('.qty-change-input').value || '0');
+
+                    if (!changed || isNaN(qtyChange) || Math.abs(qtyChange) < 0.000001) {
+                        return;
+                    }
+
+                    const itemId = tr.querySelector('.row-item-id').value;
+                    const notes = tr.querySelector('.notes-input').value || '';
+
+                    // create hidden named inputs
+                    const h1 = document.createElement('input');
+                    h1.type = 'hidden';
+                    h1.name = `lines[${outIndex}][item_id]`;
+                    h1.value = itemId;
+                    h1.dataset.named = '1';
+
+                    const h2 = document.createElement('input');
+                    h2.type = 'hidden';
+                    h2.name = `lines[${outIndex}][qty_change]`;
+                    h2.value = qtyChange.toFixed(2);
+                    h2.dataset.named = '1';
+
+                    const h3 = document.createElement('input');
+                    h3.type = 'hidden';
+                    h3.name = `lines[${outIndex}][notes]`;
+                    h3.value = notes;
+                    h3.dataset.named = '1';
+
+                    tr.appendChild(h1);
+                    tr.appendChild(h2);
+                    tr.appendChild(h3);
+
+                    outIndex++;
+                });
             });
 
-            itemSearch.addEventListener('input', function() {
-                applyFilterAndToggle();
+            // reset qty fisik
+            clearAllBtn.addEventListener('click', function() {
+                tbody.querySelectorAll('tr').forEach(tr => {
+                    const inp = tr.querySelector('.physical-input');
+                    const notes = tr.querySelector('.notes-input');
+                    inp.value = '';
+                    notes.value = '';
+                    recalcRow(tr);
+                });
+                applyFilter();
+                updateSummary();
             });
 
-            showChangedOnly.addEventListener('change', function() {
-                applyFilterAndToggle();
-            });
+            warehouseSelect.addEventListener('change', () => loadItemsForWarehouse(warehouseSelect.value || null));
+            itemSearch.addEventListener('input', applyFilter);
+            showChangedOnly.addEventListener('change', applyFilter);
+
+            // initial load (kalau old('warehouse_id') kebaca)
+            if (warehouseSelect.value) {
+                loadItemsForWarehouse(warehouseSelect.value);
+            }
         })();
     </script>
 @endpush

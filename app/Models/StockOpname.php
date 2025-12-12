@@ -6,6 +6,7 @@ use Illuminate\Database\Eloquent\Builder;
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Eloquent\Relations\BelongsTo;
 use Illuminate\Database\Eloquent\Relations\HasMany;
+use Illuminate\Database\Eloquent\Relations\MorphOne;
 
 class StockOpname extends Model
 {
@@ -62,6 +63,15 @@ class StockOpname extends Model
     public function finalizer(): BelongsTo
     {
         return $this->belongsTo(User::class, 'finalized_by');
+    }
+
+    /**
+     * Adjustment yang dihasilkan dari opname ini (jika ada).
+     * Menggunakan morphOne dari sisi sumber dokumen.
+     */
+    public function adjustment(): MorphOne
+    {
+        return $this->morphOne(InventoryAdjustment::class, 'source');
     }
 
     // 🔍 Scope helper

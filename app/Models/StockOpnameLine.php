@@ -7,6 +7,9 @@ use Illuminate\Database\Eloquent\Relations\BelongsTo;
 
 class StockOpnameLine extends Model
 {
+
+    protected static array $activeCostCache = [];
+
     protected $fillable = [
         'stock_opname_id',
         'item_id',
@@ -78,23 +81,28 @@ class StockOpnameLine extends Model
      */
     public function getEffectiveUnitCostAttribute(): float
     {
-        // 1️⃣ user isi langsung di dokumen?
-        if (!is_null($this->unit_cost) && $this->unit_cost > 0) {
+        // 1) input manual di line
+        if (!is_null($this->unit_cost) && (float) $this->unit_cost > 0) {
             return (float) $this->unit_cost;
         }
 
-        // 2️⃣ snapshot aktif per item + gudang
+        // 2) snapshot aktif per item + gudang (pakai cache)
         $warehouseId = $this->stockOpname?->warehouse_id;
-
         if ($warehouseId) {
-            $snapshot = ItemCostSnapshot::getActiveForItem($this->item_id, $warehouseId);
-            if ($snapshot && $snapshot->unit_cost > 0) {
-                return (float) $snapshot->unit_cost;
+            $key = $warehouseId . ':' . $this->item_id;
+
+            if (!array_key_exists($key, self::$activeCostCache)) {
+                $snap = ItemCostSnapshot::getActiveForItem($this->item_id, $warehouseId);
+                self::$activeCostCache[$key] = ($snap && $snap->unit_cost > 0) ? (float) $snap->unit_cost : 0.0;
+            }
+
+            if (self::$activeCostCache[$key] > 0) {
+                return self::$activeCostCache[$key];
             }
         }
 
-        // 3️⃣ fallback ke master item
-        if ($this->item && $this->item->base_unit_cost > 0) {
+        // 3) fallback master item
+        if ($this->item && (float) $this->item->base_unit_cost > 0) {
             return (float) $this->item->base_unit_cost;
         }
 

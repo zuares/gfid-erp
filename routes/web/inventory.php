@@ -107,6 +107,9 @@ Route::middleware(['web', 'auth', 'role:owner,admin,operating'])->group(function
                     // DETAIL DOKUMEN
                     Route::get('/{inventoryAdjustment}', [InventoryAdjustmentController::class, 'show'])
                         ->name('show');
+
+                    Route::post('/{inventoryAdjustment}/approve', [InventoryAdjustmentController::class, 'approve'])
+                        ->name('approve');
                 });
         });
 
@@ -149,6 +152,7 @@ Route::middleware(['web', 'auth', 'role:owner,admin'])->group(function () {
             // 🔹 BARU: form konfirmasi fisik + finalize
             Route::get('/{stockRequest}/confirm', [RtsStockRequestController::class, 'confirmReceive'])->name('confirm');
             Route::post('/{stockRequest}/finalize', [RtsStockRequestController::class, 'finalize'])->name('finalize');
+
         });
 });
 

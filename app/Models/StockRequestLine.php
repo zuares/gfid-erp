@@ -17,6 +17,7 @@ class StockRequestLine extends Model
         'stock_snapshot_at_request',
         'qty_issued',
         'notes',
+        'qty_received_rts',
     ];
 
     protected $casts = [

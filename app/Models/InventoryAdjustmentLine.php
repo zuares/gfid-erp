@@ -15,6 +15,7 @@ class InventoryAdjustmentLine extends Model
         'qty_change',
         'direction',
         'notes',
+        'lot_id',
     ];
 
     protected $casts = [
