@@ -330,6 +330,7 @@
                         <tbody>
                             @forelse ($adjustments as $index => $adj)
                                 @php
+                                    // dd($adj);
                                     $statusClass = match ($adj->status) {
                                         'draft' => 'badge-status badge-status--draft',
                                         'pending' => 'badge-status badge-status--pending',
