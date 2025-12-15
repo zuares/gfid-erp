@@ -2,16 +2,18 @@
 @php
     $userRole = auth()->user()->role ?? null;
 
-    // Flag untuk buka/tutup collapse per grup (tetap seperti sebelumnya)
+    // Flag untuk buka/tutup collapse per grup
     $poOpen = request()->routeIs('purchasing.purchase_orders.*');
     $grnOpen = request()->routeIs('purchasing.purchase_receipts.*');
 
+    // ✅ Inventory (yang disederhanakan): Stocks + SO + Adjustments + (opsional) Stock Card/Transfer/Lot utk owner saja
+    $invStocksOpen = request()->routeIs('inventory.stocks.*'); // items / lots
+    $invCountsOpen = request()->routeIs('inventory.stock_opnames.*') || request()->routeIs('inventory.adjustments.*');
     $invOpen =
+        $invStocksOpen ||
+        $invCountsOpen ||
         request()->routeIs('inventory.stock_card.*') ||
-        request()->routeIs('inventory.transfers.*') ||
-        request()->routeIs('inventory.stocks.*') ||
-        request()->routeIs('inventory.stock_opnames.*') ||
-        request()->routeIs('inventory.adjustments.*');
+        request()->routeIs('inventory.transfers.*');
 
     $extInvOpen = request()->routeIs('inventory.external_transfers.*');
 
@@ -269,14 +271,12 @@
             </button>
 
             <div class="collapse {{ $masterOpen ? 'show' : '' }}" id="navMaster">
-                {{-- Items --}}
                 <a href="{{ route('master.items.index') }}"
                     class="sidebar-link sidebar-link-sub {{ request()->routeIs('master.items.*') ? 'active' : '' }}">
                     <span class="icon">📦</span>
                     <span>Items</span>
                 </a>
 
-                {{-- Customers --}}
                 <a href="{{ route('master.customers.index') }}"
                     class="sidebar-link sidebar-link-sub {{ request()->routeIs('master.customers.*') ? 'active' : '' }}">
                     <span class="icon">👤</span>
@@ -342,7 +342,6 @@
         @if (in_array($userRole, ['owner', 'admin']))
             <li class="mt-2 text-uppercase small menu-label">Sales &amp; Marketplace</li>
 
-            {{-- Marketplace Orders --}}
             <li class="mb-1">
                 <button class="sidebar-link sidebar-toggle {{ $marketplaceOpen ? 'is-open' : '' }}" type="button"
                     data-bs-toggle="collapse" data-bs-target="#navMarketplace"
@@ -367,7 +366,6 @@
                 </div>
             </li>
 
-            {{-- Sales (Invoices + Shipments + Reports) --}}
             <li class="mb-1">
                 <button class="sidebar-link sidebar-toggle {{ $salesOpen ? 'is-open' : '' }}" type="button"
                     data-bs-toggle="collapse" data-bs-target="#navSales"
@@ -433,11 +431,11 @@
             </li>
         @endif
 
-        {{-- INVENTORY (owner + operating sebagian, owner + admin untuk RTS) --}}
+        {{-- INVENTORY --}}
         @if (in_array($userRole, ['owner', 'admin', 'operating']))
             <li class="mt-2 text-uppercase small menu-label">Inventory</li>
 
-            {{-- Inventory internal & external (owner + operating) --}}
+            {{-- ✅ Inventory (simplified) --}}
             @if (in_array($userRole, ['owner', 'operating']))
                 <li class="mb-1">
                     <button class="sidebar-link sidebar-toggle {{ $invOpen ? 'is-open' : '' }}" type="button"
@@ -449,40 +447,56 @@
                     </button>
 
                     <div class="collapse {{ $invOpen ? 'show' : '' }}" id="navInventory">
+
+                        {{-- ✅ Stock (visible to owner + operating) --}}
+                        <div class="px-3 pt-2 pb-1 text-uppercase"
+                            style="font-size:.68rem; letter-spacing:.12em; color:var(--muted);">
+                            Stock
+                        </div>
+
                         <a href="{{ route('inventory.stocks.items') }}"
                             class="sidebar-link sidebar-link-sub {{ request()->routeIs('inventory.stocks.items') ? 'active' : '' }}">
                             <span class="icon">📦</span>
-                            <span>Stok per Item</span>
+                            <span>Stok Barang</span>
                         </a>
 
-                        <a href="{{ route('inventory.stocks.lots') }}"
-                            class="sidebar-link sidebar-link-sub {{ request()->routeIs('inventory.stocks.lots') ? 'active' : '' }}">
-                            <span class="icon">🎫</span>
-                            <span>Stok per LOT</span>
-                        </a>
+                        {{-- ✅ Hidden temporarily for non-owner (and requested hidden except owner) --}}
+                        @if ($userRole === 'owner')
+                            <a href="{{ route('inventory.stocks.lots') }}"
+                                class="sidebar-link sidebar-link-sub {{ request()->routeIs('inventory.stocks.lots') ? 'active' : '' }}">
+                                <span class="icon">🎫</span>
+                                <span>Stok per LOT</span>
+                            </a>
 
-                        <a href="{{ route('inventory.stock_card.index') }}"
-                            class="sidebar-link sidebar-link-sub {{ request()->routeIs('inventory.stock_card.index') ? 'active' : '' }}">
-                            <span class="icon">📋</span>
-                            <span>Kartu Stok</span>
-                        </a>
+                            <a href="{{ route('inventory.stock_card.index') }}"
+                                class="sidebar-link sidebar-link-sub {{ request()->routeIs('inventory.stock_card.*') ? 'active' : '' }}">
+                                <span class="icon">📋</span>
+                                <span>Kartu Stok</span>
+                            </a>
 
-                        <a href="{{ route('inventory.transfers.index') }}"
-                            class="sidebar-link sidebar-link-sub {{ request()->routeIs('inventory.transfers.index') ? 'active' : '' }}">
-                            <span class="icon">🔁</span>
-                            <span>Daftar Transfer</span>
-                        </a>
+                            <a href="{{ route('inventory.transfers.index') }}"
+                                class="sidebar-link sidebar-link-sub {{ request()->routeIs('inventory.transfers.index') ? 'active' : '' }}">
+                                <span class="icon">🔁</span>
+                                <span>Daftar Transfer</span>
+                            </a>
 
-                        <a href="{{ route('inventory.transfers.create') }}"
-                            class="sidebar-link sidebar-link-sub {{ request()->routeIs('inventory.transfers.create') ? 'active' : '' }}">
-                            <span class="icon">➕</span>
-                            <span>Transfer Baru</span>
-                        </a>
+                            <a href="{{ route('inventory.transfers.create') }}"
+                                class="sidebar-link sidebar-link-sub {{ request()->routeIs('inventory.transfers.create') ? 'active' : '' }}">
+                                <span class="icon">➕</span>
+                                <span>Transfer Baru</span>
+                            </a>
+                        @endif
+
+                        {{-- ✅ Grouped: Stock Opname + Adjustments --}}
+                        <div class="px-3 pt-3 pb-1 text-uppercase"
+                            style="font-size:.68rem; letter-spacing:.12em; color:var(--muted);">
+                            Opname
+                        </div>
 
                         <a href="{{ route('inventory.stock_opnames.index') }}"
                             class="sidebar-link sidebar-link-sub {{ request()->routeIs('inventory.stock_opnames.index') ? 'active' : '' }}">
                             <span class="icon">📊</span>
-                            <span>Daftar Stock Opname</span>
+                            <span>Stock Opname</span>
                         </a>
 
                         <a href="{{ route('inventory.stock_opnames.create') }}"
@@ -494,7 +508,7 @@
                         <a href="{{ route('inventory.adjustments.index') }}"
                             class="sidebar-link sidebar-link-sub {{ request()->routeIs('inventory.adjustments.index') ? 'active' : '' }}">
                             <span class="icon">⚖️</span>
-                            <span>Daftar Adjustment</span>
+                            <span>Inventory Adjustments</span>
                         </a>
 
                         <a href="{{ route('inventory.adjustments.manual.create') }}"
@@ -505,6 +519,7 @@
                     </div>
                 </li>
 
+                {{-- External Transfers (owner + operating) --}}
                 <li class="mb-1">
                     <button class="sidebar-link sidebar-toggle {{ $extInvOpen ? 'is-open' : '' }}" type="button"
                         data-bs-toggle="collapse" data-bs-target="#navInventoryExternal"
@@ -820,7 +835,6 @@
         @if ($userRole === 'owner')
             <li class="mt-2 text-uppercase small menu-label">Finance</li>
 
-            {{-- Payroll --}}
             <li class="mb-1">
                 <button class="sidebar-link sidebar-toggle {{ $payrollOpen ? 'is-open' : '' }}" type="button"
                     data-bs-toggle="collapse" data-bs-target="#navFinancePayroll"
@@ -868,7 +882,6 @@
                 </div>
             </li>
 
-            {{-- Costing / HPP --}}
             <li class="mb-1">
                 <button class="sidebar-link sidebar-toggle {{ $costingOpen ? 'is-open' : '' }}" type="button"
                     data-bs-toggle="collapse" data-bs-target="#navFinanceCosting"
@@ -893,7 +906,6 @@
                 </div>
             </li>
 
-            {{-- Finance Reports --}}
             <li class="mb-1">
                 <button class="sidebar-link sidebar-toggle {{ $financeReportsOpen ? 'is-open' : '' }}"
                     type="button" data-bs-toggle="collapse" data-bs-target="#navFinanceReports"

@@ -225,16 +225,17 @@
     // ROLE OPERATOR LAPANGAN (menu super ringkas)
     $isOperatorRole = in_array($userRole, ['sewing', 'cutting']);
 
-    // Flag open mirroring desktop
+    // Flag open mirroring desktop (✅ updated inventory grouping)
     $poOpen = request()->routeIs('purchasing.purchase_orders.*');
     $grnOpen = request()->routeIs('purchasing.purchase_receipts.*');
 
+    $invStocksOpen = request()->routeIs('inventory.stocks.*');
+    $invCountsOpen = request()->routeIs('inventory.stock_opnames.*') || request()->routeIs('inventory.adjustments.*');
     $invOpen =
+        $invStocksOpen ||
+        $invCountsOpen ||
         request()->routeIs('inventory.stock_card.*') ||
-        request()->routeIs('inventory.transfers.*') ||
-        request()->routeIs('inventory.stocks.*') ||
-        request()->routeIs('inventory.stock_opnames.*') ||
-        request()->routeIs('inventory.adjustments.*');
+        request()->routeIs('inventory.transfers.*');
 
     $extInvOpen = request()->routeIs('inventory.external_transfers.*');
 
@@ -317,7 +318,6 @@
                      Shortcut: Cutting Create, Sewing Pickup Create, Sewing Return Create, Finishing Create
                  ============================ --}}
                 @if ($isOperatorRole)
-                    {{-- DASHBOARD (boleh, biar tetap ada landing) --}}
                     <li>
                         <a href="{{ route('dashboard') }}"
                             class="mobile-sidebar-link {{ request()->routeIs('dashboard') ? 'active' : '' }}">
@@ -328,7 +328,6 @@
 
                     <div class="mobile-sidebar-section-label">Production</div>
 
-                    {{-- Cutting Job Baru --}}
                     <li>
                         <a href="{{ route('production.cutting_jobs.create') }}"
                             class="mobile-sidebar-link {{ request()->routeIs('production.cutting_jobs.create') ? 'active' : '' }}">
@@ -337,7 +336,6 @@
                         </a>
                     </li>
 
-                    {{-- Sewing Pickup Baru --}}
                     <li>
                         <a href="{{ route('production.sewing_pickups.create') }}"
                             class="mobile-sidebar-link {{ request()->routeIs('production.sewing_pickups.create') ? 'active' : '' }}">
@@ -346,7 +344,6 @@
                         </a>
                     </li>
 
-                    {{-- Sewing Return Baru --}}
                     <li>
                         <a href="{{ route('production.sewing_returns.create') }}"
                             class="mobile-sidebar-link {{ request()->routeIs('production.sewing_returns.create') ? 'active' : '' }}">
@@ -355,7 +352,6 @@
                         </a>
                     </li>
 
-                    {{-- Finishing Job Baru --}}
                     <li>
                         <a href="{{ route('production.finishing_jobs.create') }}"
                             class="mobile-sidebar-link {{ request()->routeIs('production.finishing_jobs.create') ? 'active' : '' }}">
@@ -365,7 +361,7 @@
                     </li>
                 @else
                     {{-- ============================
-                         OWNER / ADMIN / OPERATING MENU LENGKAP
+                         OWNER / ADMIN / OPERATING MENU
                      ============================ --}}
 
                     {{-- DASHBOARD --}}
@@ -390,12 +386,18 @@
                         </button>
 
                         <div class="collapse {{ $masterOpen ? 'show' : '' }}" id="navMasterMobile">
+                            {{-- Items --}}
+                            <a href="{{ route('master.items.index') }}"
+                                class="mobile-sidebar-link mobile-sidebar-link-sub {{ request()->routeIs('master.items.*') ? 'active' : '' }}">
+                                <span class="icon">📦</span>
+                                <span>Items</span>
+                            </a>
+
                             <a href="{{ route('master.customers.index') }}"
                                 class="mobile-sidebar-link mobile-sidebar-link-sub {{ request()->routeIs('master.customers.*') ? 'active' : '' }}">
                                 <span class="icon">👤</span>
                                 <span>Customers</span>
                             </a>
-                            {{-- nanti: Items --}}
                         </div>
                     </li>
 
@@ -403,7 +405,6 @@
                     @if (in_array($userRole, ['owner', 'admin']))
                         <div class="mobile-sidebar-section-label">Purchasing</div>
 
-                        {{-- Purchase Orders --}}
                         <li class="mb-1">
                             <button class="mobile-sidebar-link mobile-sidebar-toggle {{ $poOpen ? 'is-open' : '' }}"
                                 type="button" data-bs-toggle="collapse" data-bs-target="#navPurchasingPOmobile"
@@ -428,7 +429,6 @@
                             </div>
                         </li>
 
-                        {{-- Goods Receipts --}}
                         <li class="mb-1">
                             <button class="mobile-sidebar-link mobile-sidebar-toggle {{ $grnOpen ? 'is-open' : '' }}"
                                 type="button" data-bs-toggle="collapse" data-bs-target="#navPurchasingGRNmobile"
@@ -458,7 +458,6 @@
                     @if (in_array($userRole, ['owner', 'admin']))
                         <div class="mobile-sidebar-section-label">Sales &amp; Marketplace</div>
 
-                        {{-- Marketplace Orders --}}
                         <li class="mb-1">
                             <button
                                 class="mobile-sidebar-link mobile-sidebar-toggle {{ $marketplaceOpen ? 'is-open' : '' }}"
@@ -485,7 +484,6 @@
                             </div>
                         </li>
 
-                        {{-- Sales (Invoices + Shipments + Reports) --}}
                         <li class="mb-1">
                             <button class="mobile-sidebar-link mobile-sidebar-toggle {{ $salesOpen ? 'is-open' : '' }}"
                                 type="button" data-bs-toggle="collapse" data-bs-target="#navSalesMobile"
@@ -496,7 +494,6 @@
                             </button>
 
                             <div class="collapse {{ $salesOpen ? 'show' : '' }}" id="navSalesMobile">
-                                {{-- Invoices --}}
                                 <a href="{{ route('sales.invoices.index') }}"
                                     class="mobile-sidebar-link mobile-sidebar-link-sub {{ request()->routeIs('sales.invoices.index') ? 'active' : '' }}">
                                     <span class="icon">≡</span>
@@ -509,7 +506,6 @@
                                     <span>Invoice Baru</span>
                                 </a>
 
-                                {{-- Shipments --}}
                                 <div class="mobile-sidebar-section-label" style="margin-top:.4rem;">Shipments</div>
 
                                 <a href="{{ route('sales.shipments.index') }}"
@@ -524,7 +520,6 @@
                                     <span>Shipment Baru</span>
                                 </a>
 
-                                {{-- Sales Reports --}}
                                 <div class="mobile-sidebar-section-label" style="margin-top:.4rem;">Sales Reports</div>
 
                                 <a href="{{ route('sales.reports.item_profit') }}"
@@ -548,11 +543,10 @@
                         </li>
                     @endif
 
-                    {{-- INVENTORY (owner + admin + operating) --}}
-                    @if (in_array($userRole, ['owner', 'admin', 'operating']))
+                    {{-- INVENTORY (owner + operating) --}}
+                    @if (in_array($userRole, ['owner', 'operating']))
                         <div class="mobile-sidebar-section-label">Inventory</div>
 
-                        {{-- Inventory internal: stocks, stock card, stock opnames, transfers, adjustments --}}
                         <li class="mb-1">
                             <button class="mobile-sidebar-link mobile-sidebar-toggle {{ $invOpen ? 'is-open' : '' }}"
                                 type="button" data-bs-toggle="collapse" data-bs-target="#navInventoryMobile"
@@ -563,40 +557,52 @@
                             </button>
 
                             <div class="collapse {{ $invOpen ? 'show' : '' }}" id="navInventoryMobile">
+
+                                {{-- Stock --}}
+                                <div class="mobile-sidebar-section-label" style="margin-top:.35rem;">Stock</div>
+
                                 <a href="{{ route('inventory.stocks.items') }}"
                                     class="mobile-sidebar-link mobile-sidebar-link-sub {{ request()->routeIs('inventory.stocks.items') ? 'active' : '' }}">
                                     <span class="icon">📦</span>
                                     <span>Stok per Item</span>
                                 </a>
 
-                                <a href="{{ route('inventory.stocks.lots') }}"
-                                    class="mobile-sidebar-link mobile-sidebar-link-sub {{ request()->routeIs('inventory.stocks.lots') ? 'active' : '' }}">
-                                    <span class="icon">🎫</span>
-                                    <span>Stok per LOT</span>
-                                </a>
+                                {{-- Hidden sementara kecuali owner --}}
+                                @if ($userRole === 'owner')
+                                    <a href="{{ route('inventory.stocks.lots') }}"
+                                        class="mobile-sidebar-link mobile-sidebar-link-sub {{ request()->routeIs('inventory.stocks.lots') ? 'active' : '' }}">
+                                        <span class="icon">🎫</span>
+                                        <span>Stok per LOT</span>
+                                    </a>
 
-                                <a href="{{ route('inventory.stock_card.index') }}"
-                                    class="mobile-sidebar-link mobile-sidebar-link-sub {{ request()->routeIs('inventory.stock_card.index') ? 'active' : '' }}">
-                                    <span class="icon">📋</span>
-                                    <span>Kartu Stok</span>
-                                </a>
+                                    <a href="{{ route('inventory.stock_card.index') }}"
+                                        class="mobile-sidebar-link mobile-sidebar-link-sub {{ request()->routeIs('inventory.stock_card.*') ? 'active' : '' }}">
+                                        <span class="icon">📋</span>
+                                        <span>Kartu Stok</span>
+                                    </a>
 
-                                <a href="{{ route('inventory.transfers.index') }}"
-                                    class="mobile-sidebar-link mobile-sidebar-link-sub {{ request()->routeIs('inventory.transfers.index') ? 'active' : '' }}">
-                                    <span class="icon">🔁</span>
-                                    <span>Daftar Transfer</span>
-                                </a>
+                                    <a href="{{ route('inventory.transfers.index') }}"
+                                        class="mobile-sidebar-link mobile-sidebar-link-sub {{ request()->routeIs('inventory.transfers.index') ? 'active' : '' }}">
+                                        <span class="icon">🔁</span>
+                                        <span>Daftar Transfer</span>
+                                    </a>
 
-                                <a href="{{ route('inventory.transfers.create') }}"
-                                    class="mobile-sidebar-link mobile-sidebar-link-sub {{ request()->routeIs('inventory.transfers.create') ? 'active' : '' }}">
-                                    <span class="icon">➕</span>
-                                    <span>Transfer Baru</span>
-                                </a>
+                                    <a href="{{ route('inventory.transfers.create') }}"
+                                        class="mobile-sidebar-link mobile-sidebar-link-sub {{ request()->routeIs('inventory.transfers.create') ? 'active' : '' }}">
+                                        <span class="icon">➕</span>
+                                        <span>Transfer Baru</span>
+                                    </a>
+                                @endif
+
+                                {{-- Grouped: Stock Opname + Adjustments --}}
+                                <div class="mobile-sidebar-section-label" style="margin-top:.55rem;">
+                                    Counting &amp; Adjustments
+                                </div>
 
                                 <a href="{{ route('inventory.stock_opnames.index') }}"
                                     class="mobile-sidebar-link mobile-sidebar-link-sub {{ request()->routeIs('inventory.stock_opnames.index') ? 'active' : '' }}">
                                     <span class="icon">📊</span>
-                                    <span>Daftar Stock Opname</span>
+                                    <span>Stock Opname</span>
                                 </a>
 
                                 <a href="{{ route('inventory.stock_opnames.create') }}"
@@ -608,7 +614,7 @@
                                 <a href="{{ route('inventory.adjustments.index') }}"
                                     class="mobile-sidebar-link mobile-sidebar-link-sub {{ request()->routeIs('inventory.adjustments.index') ? 'active' : '' }}">
                                     <span class="icon">⚖️</span>
-                                    <span>Daftar Adjustment</span>
+                                    <span>Inventory Adjustments</span>
                                 </a>
 
                                 <a href="{{ route('inventory.adjustments.manual.create') }}"
@@ -644,8 +650,12 @@
                                 </a>
                             </div>
                         </li>
+                    @endif
 
-                        {{-- Stock Requests (RTS & PRD) --}}
+                    {{-- Stock Requests (RTS & PRD) --}}
+                    @if (in_array($userRole, ['owner', 'admin', 'operating']))
+                        <div class="mobile-sidebar-section-label">Stock Requests</div>
+
                         <li class="mb-1">
                             <button class="mobile-sidebar-link mobile-sidebar-toggle {{ $stockReqOpen ? 'is-open' : '' }}"
                                 type="button" data-bs-toggle="collapse"
@@ -753,31 +763,31 @@
 
                                 <a href="{{ route('production.reports.operators') }}"
                                     class="mobile-sidebar-link mobile-sidebar-link-sub {{ request()->routeIs('production.reports.operators') ? 'active' : '' }}">
-                                    <span class="icon">🧍</span>
+                                    <span class="icon">👥</span>
                                     <span>Operator Summary</span>
                                 </a>
 
                                 <a href="{{ route('production.reports.outstanding') }}"
                                     class="mobile-sidebar-link mobile-sidebar-link-sub {{ request()->routeIs('production.reports.outstanding') ? 'active' : '' }}">
-                                    <span class="icon">📋</span>
+                                    <span class="icon">⏳</span>
                                     <span>Outstanding</span>
                                 </a>
 
                                 <a href="{{ route('production.reports.aging_wip_sew') }}"
                                     class="mobile-sidebar-link mobile-sidebar-link-sub {{ request()->routeIs('production.reports.aging_wip_sew') ? 'active' : '' }}">
-                                    <span class="icon">⏳</span>
+                                    <span class="icon">📊</span>
                                     <span>Aging WIP Sewing</span>
                                 </a>
 
                                 <a href="{{ route('production.reports.productivity') }}"
                                     class="mobile-sidebar-link mobile-sidebar-link-sub {{ request()->routeIs('production.reports.productivity') ? 'active' : '' }}">
-                                    <span class="icon">⚡</span>
+                                    <span class="icon">📈</span>
                                     <span>Productivity</span>
                                 </a>
 
                                 <a href="{{ route('production.reports.partial_pickup') }}"
                                     class="mobile-sidebar-link mobile-sidebar-link-sub {{ request()->routeIs('production.reports.partial_pickup') ? 'active' : '' }}">
-                                    <span class="icon">📊</span>
+                                    <span class="icon">🧩</span>
                                     <span>Partial Pickup</span>
                                 </a>
 
@@ -942,7 +952,6 @@
                     @if ($userRole === 'owner')
                         <div class="mobile-sidebar-section-label">Finance</div>
 
-                        {{-- Payroll --}}
                         <li class="mb-1">
                             <button class="mobile-sidebar-link mobile-sidebar-toggle {{ $payrollOpen ? 'is-open' : '' }}"
                                 type="button" data-bs-toggle="collapse" data-bs-target="#navFinancePayrollMobile"
@@ -988,7 +997,6 @@
                             </div>
                         </li>
 
-                        {{-- Costing / HPP --}}
                         <li class="mb-1">
                             <button class="mobile-sidebar-link mobile-sidebar-toggle {{ $costingOpen ? 'is-open' : '' }}"
                                 type="button" data-bs-toggle="collapse" data-bs-target="#navFinanceCostingMobile"
@@ -1014,7 +1022,6 @@
                             </div>
                         </li>
 
-                        {{-- Finance Reports --}}
                         <li class="mb-1">
                             <button
                                 class="mobile-sidebar-link mobile-sidebar-toggle {{ $financeReportsOpen ? 'is-open' : '' }}"
@@ -1046,8 +1053,8 @@
                                 </a>
                             </div>
                         </li>
-                    @endif {{-- end owner --}}
-                @endif {{-- end non-operator --}}
+                    @endif
+                @endif
             @endauth
         </ul>
     </div>

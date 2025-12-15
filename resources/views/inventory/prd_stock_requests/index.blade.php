@@ -133,6 +133,11 @@
             color: rgba(30, 64, 175, 1);
         }
 
+        .badge-status.shipped {
+            background: rgba(45, 212, 191, .14);
+            color: rgba(15, 118, 110, 1);
+        }
+
         .badge-status.partial {
             background: rgba(234, 179, 8, .12);
             color: rgba(133, 77, 14, 1);
@@ -376,7 +381,7 @@
             <div>
                 <div class="page-title">PRD • Permintaan Stok dari RTS</div>
                 <div class="page-subtitle mt-1">
-                    Fokus ke permintaan yang perlu segera diproses Gudang Produksi.
+                    Fokus ke permintaan yang perlu segera diproses Gudang Produksi (kirim ke Transit).
                 </div>
             </div>
         </div>
@@ -407,7 +412,14 @@
         {{-- FILTERS --}}
         <div class="d-flex justify-content-between mb-3 flex-wrap gap-2">
             <div>
-                @foreach (['all' => 'Semua', 'pending' => 'Pending', 'submitted' => 'Submitted', 'partial' => 'Partial', 'completed' => 'Selesai'] as $key => $label)
+                @foreach ([
+            'all' => 'Semua',
+            'pending' => 'Pending',
+            'submitted' => 'Submitted',
+            'shipped' => 'Shipped',
+            'partial' => 'Partial',
+            'completed' => 'Selesai',
+        ] as $key => $label)
                     <a href="{{ route('prd.stock-requests.index', array_merge($statusQueryBase, ['status' => $key])) }}"
                         class="chip {{ $statusFilter === $key ? 'chip-active' : '' }}">
                         {{ $label }}
@@ -431,9 +443,9 @@
                 <thead>
                     <tr>
                         <th style="width: 85px;">Tanggal</th>
-                        <th style="width: 200px;">Kode & Qty</th>
+                        <th style="width: 220px;">Kode & Qty</th>
                         <th>Gudang</th>
-                        <th style="width: 260px;">Item</th>
+                        <th style="width: 280px;">Item</th>
                         <th style="width: 130px;">Status</th>
                         <th style="width: 90px;">Aksi</th>
                     </tr>
@@ -445,32 +457,53 @@
                             $extra = $req->lines->count() - 3;
 
                             $totalReq = (float) ($req->total_requested_qty ?? 0);
-                            $totalIssued = (float) ($req->total_issued_qty ?? 0);
-                            $outstanding = max($totalReq - $totalIssued, 0);
+                            $totalDispatched = (float) ($req->total_dispatched_qty ?? 0);
+                            $outstanding = max($totalReq - $totalDispatched, 0);
 
                             $statusLabel = match ($req->status) {
-                                'submitted' => 'Menunggu Diproses',
-                                'partial' => 'Sebagian Terkirim',
+                                'submitted' => 'Menunggu diproses PRD',
+                                'shipped' => 'Sudah dikirim (di Transit)',
+                                'partial' => 'Sebagian diterima RTS',
                                 'completed' => 'Selesai',
                                 default => ucfirst($req->status),
                             };
+
+                            $badgeClass = match ($req->status) {
+                                'completed' => 'completed',
+                                'partial' => 'partial',
+                                'shipped' => 'shipped',
+                                'submitted' => 'pending',
+                                'draft' => 'draft',
+                                default => 'pending',
+                            };
+
+                            $isProcessable = in_array($req->status, ['submitted', 'shipped', 'partial']);
                         @endphp
+
                         <tr>
                             <td class="mono">
                                 {{ $req->date?->format('d M') }}<br>
                                 <span class="muted">{{ $req->date?->format('Y') }}</span>
                             </td>
+
                             <td>
                                 <div class="code-badge">
                                     <span class="dot"></span>
                                     <span class="mono">{{ $req->code }}</span>
                                 </div>
+
                                 @if ($totalReq > 0)
                                     <div class="qty-badges">
                                         <span class="qty-badge">
                                             Diminta
                                             <span class="mono">{{ (int) $totalReq }}</span>
                                         </span>
+
+                                        <span class="qty-badge">
+                                            Dikirim
+                                            <span class="mono">{{ (int) $totalDispatched }}</span>
+                                        </span>
+
                                         @if ($outstanding > 0)
                                             <span class="qty-badge qty-badge--sisa">
                                                 Sisa
@@ -480,46 +513,46 @@
                                     </div>
                                 @endif
                             </td>
+
                             <td>
                                 {{ $req->sourceWarehouse?->name ?? '-' }}<br>
                                 <span class="muted">
-                                    → {{ $req->destinationWarehouse?->name ?? '-' }}
+                                    → Transit → {{ $req->destinationWarehouse?->name ?? '-' }}
                                 </span>
                             </td>
+
                             <td>
                                 @foreach ($lines as $line)
                                     @php
                                         $lineReq = (float) $line->qty_request;
-                                        $lineIssued = (float) $line->qty_issued;
-                                        $lineOutstanding = max($lineReq - $lineIssued, 0);
+                                        $lineDisp = (float) ($line->qty_dispatched ?? 0);
+                                        $lineOutstanding = max($lineReq - $lineDisp, 0);
                                     @endphp
                                     <div class="item-line">
                                         <span class="mono">{{ $line->item?->code ?? '-' }}</span> :
-                                        <strong>{{ $lineReq }}</strong> pcs
+                                        <strong class="mono">{{ (int) $lineReq }}</strong> pcs
                                         @if ($lineOutstanding > 0)
                                             <span class="item-sisa">
                                                 sisa
-                                                <span class="mono">{{ $lineOutstanding }}</span>
+                                                <span class="mono">{{ (int) $lineOutstanding }}</span>
                                             </span>
                                         @endif
                                     </div>
                                 @endforeach
+
                                 @if ($extra > 0)
                                     <div class="muted">+{{ $extra }} item lainnya</div>
                                 @endif
                             </td>
+
                             <td>
-                                <div
-                                    class="badge-status
-                                    {{ $req->status === 'completed' ? 'completed' : '' }}
-                                    {{ $req->status === 'partial' ? 'partial' : '' }}
-                                    {{ in_array($req->status, ['submitted', 'draft']) ? 'pending' : '' }}
-                                    {{ $req->status === 'draft' ? 'draft' : '' }}">
+                                <div class="badge-status {{ $badgeClass }}">
                                     {{ $statusLabel }}
                                 </div>
                             </td>
+
                             <td>
-                                @if (in_array($req->status, ['submitted', 'partial']))
+                                @if ($isProcessable)
                                     <a href="{{ route('prd.stock-requests.edit', $req) }}" class="link-detail">
                                         Proses
                                     </a>
@@ -547,7 +580,7 @@
             @endif
         </div>
 
-        {{-- MOBILE CARD LIST (MINIMALIS + FOKUS SISA) --}}
+        {{-- MOBILE CARD LIST --}}
         <div class="mobile-list d-md-none">
             @forelse ($stockRequests as $req)
                 @php
@@ -555,17 +588,27 @@
                     $extra = $req->lines->count() - 2;
 
                     $totalReq = (float) ($req->total_requested_qty ?? 0);
-                    $totalIssued = (float) ($req->total_issued_qty ?? 0);
-                    $outstanding = max($totalReq - $totalIssued, 0);
+                    $totalDispatched = (float) ($req->total_dispatched_qty ?? 0);
+                    $outstanding = max($totalReq - $totalDispatched, 0);
 
                     $statusLabel = match ($req->status) {
                         'submitted' => 'Menunggu',
+                        'shipped' => 'Transit',
                         'partial' => 'Sebagian',
                         'completed' => 'Selesai',
                         default => ucfirst($req->status),
                     };
 
-                    $isProcessable = in_array($req->status, ['submitted', 'partial']);
+                    $badgeClass = match ($req->status) {
+                        'completed' => 'completed',
+                        'partial' => 'partial',
+                        'shipped' => 'shipped',
+                        'submitted' => 'pending',
+                        'draft' => 'draft',
+                        default => 'pending',
+                    };
+
+                    $isProcessable = in_array($req->status, ['submitted', 'shipped', 'partial']);
                 @endphp
 
                 <div class="rts-card">
@@ -574,12 +617,7 @@
                             <span class="dot"></span>
                             <span class="mono">{{ $req->code }}</span>
                         </div>
-                        <div
-                            class="badge-status
-                            {{ $req->status === 'completed' ? 'completed' : '' }}
-                            {{ $req->status === 'partial' ? 'partial' : '' }}
-                            {{ in_array($req->status, ['submitted', 'draft']) ? 'pending' : '' }}
-                            {{ $req->status === 'draft' ? 'draft' : '' }}">
+                        <div class="badge-status {{ $badgeClass }}">
                             {{ $statusLabel }}
                         </div>
                     </div>
@@ -591,22 +629,28 @@
 
                     <div class="rts-card-gudang">
                         {{ $req->sourceWarehouse?->name ?? '-' }} →
-                        <span class="muted">{{ $req->destinationWarehouse?->name ?? '-' }}</span>
+                        <span class="muted">Transit → {{ $req->destinationWarehouse?->name ?? '-' }}</span>
                     </div>
 
-                    @if ($outstanding > 0)
-                        <div class="total-sisa-pill">
-                            <span>Sisa total</span>
+                    <div class="total-sisa-pill">
+                        <span>Diminta</span>
+                        <span class="mono">{{ (int) $totalReq }}</span>
+                        <span class="muted">•</span>
+                        <span>Dikirim</span>
+                        <span class="mono">{{ (int) $totalDispatched }}</span>
+                        @if ($outstanding > 0)
+                            <span class="muted">•</span>
+                            <span>Sisa</span>
                             <span class="mono">{{ (int) $outstanding }}</span>
-                        </div>
-                    @endif
+                        @endif
+                    </div>
 
                     <div class="rts-card-items">
                         @foreach ($lines as $line)
                             @php
                                 $lineReq = (float) $line->qty_request;
-                                $lineIssued = (float) $line->qty_issued;
-                                $lineOutstanding = max($lineReq - $lineIssued, 0);
+                                $lineDisp = (float) ($line->qty_dispatched ?? 0);
+                                $lineOutstanding = max($lineReq - $lineDisp, 0);
                             @endphp
                             <div class="item-row">
                                 <div class="item-row-left">
@@ -628,8 +672,8 @@
 
                     @if ($isProcessable)
                         <a href="{{ route('prd.stock-requests.edit', $req) }}" class="btn-process">
-                            <span class="icon">⚡</span>
-                            Proses permintaan
+                            <span class="icon">🚚</span>
+                            Kirim ke Transit
                         </a>
                     @else
                         <a href="{{ route('prd.stock-requests.show', $req) }}" class="btn-detail-ghost">

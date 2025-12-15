@@ -1,10 +1,11 @@
 {{-- resources/views/inventory/rts_stock_requests/confirm.blade.php --}}
 @extends('layouts.app')
 
-@section('title', 'RTS • Konfirmasi Fisik • ' . $stockRequest->code)
+@section('title', 'RTS • Terima dari Transit • ' . $stockRequest->code)
 
 @push('head')
     <style>
+        /* pakai CSS kamu (biar konsisten) */
         :root {
             --rts-main: rgba(45, 212, 191, 1);
             --rts-main-strong: rgba(15, 118, 110, 1);
@@ -48,8 +49,7 @@
         }
 
         .mono {
-            font-family: ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, "Liberation Mono", "Courier New",
-                monospace;
+            font-family: ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, "Liberation Mono", "Courier New", monospace;
             font-variant-numeric: tabular-nums;
         }
 
@@ -61,11 +61,9 @@
         .card-main {
             background: var(--card);
             border-radius: 10px;
-            border: 1px solid rgba(148, 163, 184, 0.26);
+            border: 1px solid rgba(148, 163, 184, .26);
             margin-bottom: .9rem;
-            box-shadow:
-                0 10px 24px rgba(15, 23, 42, 0.05),
-                0 0 0 1px rgba(15, 23, 42, 0.02);
+            box-shadow: 0 10px 24px rgba(15, 23, 42, 0.05), 0 0 0 1px rgba(15, 23, 42, 0.02);
         }
 
         .card-body {
@@ -79,12 +77,16 @@
             font-weight: 500;
             display: inline-flex;
             align-items: center;
-            line-height: 1.2;
         }
 
         .badge-status.submitted {
             background: rgba(59, 130, 246, .10);
             color: rgba(30, 64, 175, 1);
+        }
+
+        .badge-status.shipped {
+            background: rgba(45, 212, 191, .14);
+            color: rgba(15, 118, 110, 1);
         }
 
         .badge-status.partial {
@@ -97,11 +99,6 @@
             color: rgba(22, 101, 52, 1);
         }
 
-        .badge-status.draft {
-            background: rgba(148, 163, 184, 0.18);
-            color: #475569;
-        }
-
         .code-badge {
             display: inline-flex;
             align-items: center;
@@ -109,8 +106,8 @@
             border-radius: 999px;
             padding: .14rem .6rem;
             font-size: .8rem;
-            background: rgba(15, 23, 42, 0.03);
-            border: 1px solid rgba(148, 163, 184, 0.45);
+            background: rgba(15, 23, 42, .03);
+            border: 1px solid rgba(148, 163, 184, .45);
         }
 
         .code-badge .dot {
@@ -185,14 +182,6 @@
             color: #6b7280;
         }
 
-        .qty-text {
-            font-variant-numeric: tabular-nums;
-        }
-
-        .qty-snapshot {
-            color: #0ea5e9;
-        }
-
         .qty-live {
             color: #0f766e;
         }
@@ -208,12 +197,6 @@
             color: #94a3b8;
         }
 
-        .hint-danger {
-            font-size: .74rem;
-            color: #b91c1c;
-            margin-top: .08rem;
-        }
-
         .btn-primary-rts {
             display: inline-flex;
             align-items: center;
@@ -227,63 +210,6 @@
             font-weight: 600;
         }
 
-        .btn-primary-rts:hover {
-            filter: brightness(0.97);
-            color: #ecfdf5;
-        }
-
-        .btn-outline-rts {
-            display: inline-flex;
-            align-items: center;
-            gap: .3rem;
-            padding: .38rem .9rem;
-            border-radius: 999px;
-            border: 1px solid rgba(148, 163, 184, 0.8);
-            background: transparent;
-            color: #0f172a;
-            font-size: .8rem;
-            font-weight: 500;
-            text-decoration: none;
-        }
-
-        .btn-outline-rts:hover {
-            filter: brightness(0.98);
-            text-decoration: none;
-        }
-
-        /* Alert */
-        .alert {
-            border-radius: 10px;
-            padding: .5rem .75rem;
-            font-size: .78rem;
-            margin-bottom: .55rem;
-        }
-
-        .alert-error {
-            background: #fef2f2;
-            border: 1px solid #fecaca;
-            color: #b91c1c;
-        }
-
-        .alert-warning {
-            background: #fffbeb;
-            border: 1px solid #fcd34d;
-            color: #92400e;
-        }
-
-        .alert-neutral {
-            background: #f9fafb;
-            border: 1px solid #e5e7eb;
-            color: #4b5563;
-        }
-
-        .alert-success {
-            background: #ecfdf5;
-            border: 1px solid #6ee7b7;
-            color: #065f46;
-        }
-
-        /* Mobile */
         @media (max-width: 767.98px) {
             .page-wrap {
                 padding-inline: .85rem;
@@ -340,109 +266,55 @@
         $status = $stockRequest->status;
 
         $statusLabel = match ($status) {
-            'submitted' => 'Menunggu konfirmasi fisik',
-            'partial' => 'Sebagian sudah diterima',
+            'submitted' => 'Menunggu PRD kirim',
+            'shipped' => 'Sudah dikirim PRD (ada di Transit)',
+            'partial' => 'Sebagian sudah diterima RTS',
             'completed' => 'Selesai',
             default => ucfirst($status),
         };
 
-        $totalOutstanding = max($totalRequested - $totalPlanned, 0);
+        $totalRequested = (float) ($totalRequested ?? 0);
+        $totalDispatched = (float) ($totalDispatched ?? 0);
+        $totalReceived = (float) ($totalReceived ?? 0);
 
-        // Deteksi secara kasar: adakah default qty (planned/request) yang bisa bikin stok PRD minus?
-        $hasPotentialMinus = false;
-        foreach ($stockRequest->lines as $tmpLine) {
-            $tmpId = $tmpLine->id;
-            $tmpRequested = (float) $tmpLine->qty_request;
-            $tmpPlanned = (float) ($tmpLine->qty_issued ?? 0);
-            $tmpDefault = $tmpPlanned > 0 ? $tmpPlanned : $tmpRequested;
-            $tmpLive = (float) ($liveStocks[$tmpId] ?? 0);
-
-            if ($tmpDefault > $tmpLive) {
-                $hasPotentialMinus = true;
-                break;
-            }
-        }
+        $totalReceivable = max($totalDispatched - $totalReceived, 0);
     @endphp
 
     <div class="page-wrap">
 
-        {{-- ALERT / STATUS BAR --}}
         @if (session('status'))
-            <div class="alert alert-success">
-                {{ session('status') }}
-            </div>
+            <div class="alert alert-success">{{ session('status') }}</div>
         @endif
-
         @if (session('warning'))
-            <div class="alert alert-warning">
-                {{ session('warning') }}
-            </div>
+            <div class="alert alert-warning">{{ session('warning') }}</div>
         @endif
-
-        @if ($errors->has('stock') || $errors->has('general'))
-            <div class="alert alert-error">
-                @if ($errors->has('stock'))
-                    <div>{{ $errors->first('stock') }}</div>
-                @endif
-                @if ($errors->has('general'))
-                    <div>{{ $errors->first('general') }}</div>
-                @endif
-            </div>
-        @endif
-
-        @if ($errors->any() && !($errors->has('stock') || $errors->has('general')))
-            <div class="alert alert-error">
-                @foreach ($errors->all() as $error)
-                    <div>{{ $error }}</div>
-                @endforeach
-            </div>
-        @endif
-
-        {{-- Info global tentang stok minus (versi singkat) --}}
-        @if ($hasPotentialMinus)
-            <div class="alert alert-warning">
-                Beberapa baris default Qty lebih besar dari stok PRD. Jika disimpan, stok gudang PRD bisa
-                <strong>minus</strong>. Pastikan angka sudah dicek fisik.
-            </div>
-        @else
-            <div class="alert alert-neutral">
-                Qty fisik boleh lebih besar dari stok PRD. Jika lebih besar, stok PRD akan
-                <strong>minus</strong> (diperbolehkan khusus alur RTS).
-            </div>
+        @if ($errors->has('stock'))
+            <div class="alert alert-error">{{ $errors->first('stock') }}</div>
         @endif
 
         <div class="d-flex justify-content-between align-items-start mb-3 flex-wrap gap-2">
             <div>
                 <div class="step-chip mb-1">
-                    <span>Langkah 2 dari 2</span>
-                    <span>•</span>
-                    <span>Konfirmasi fisik</span>
+                    <span>Langkah 2 dari 2</span><span>•</span><span>RTS terima dari Transit</span>
                 </div>
-                <div>
-                    <a href="{{ route('rts.stock-requests.show', $stockRequest) }}" class="btn btn-link btn-sm px-0 mb-1">
-                        ← Kembali ke detail
-                    </a>
-                </div>
-                <div class="page-title">
-                    Konfirmasi Fisik Permintaan RTS
-                </div>
+                <a href="{{ route('rts.stock-requests.show', $stockRequest) }}" class="btn btn-link btn-sm px-0 mb-1">
+                    ← Kembali ke detail
+                </a>
+
+                <div class="page-title">Terima Barang dari Transit</div>
                 <div class="page-subtitle mt-1">
-                    Isi qty yang benar-benar diterima di RTS. Sistem akan mutasi stok PRD → RTS sesuai angka ini.
+                    Isi qty yang benar-benar kamu terima di RTS.
+                    Sistem akan mutasi stok <strong>TRANSIT → RTS</strong>.
                 </div>
             </div>
 
             <div class="text-end">
                 <div class="mb-2">
-                    <span class="badge-status {{ $status }}">
-                        {{ $statusLabel }}
-                    </span>
+                    <span class="badge-status {{ $status }}">{{ $statusLabel }}</span>
                 </div>
                 <div class="code-badge">
                     <span class="dot"></span>
                     <span class="mono">{{ $stockRequest->code }}</span>
-                </div>
-                <div class="mt-1 muted">
-                    Langkah terakhir sebelum stok PRD → RTS dimutasi.
                 </div>
             </div>
         </div>
@@ -452,46 +324,27 @@
                 <div class="row g-3">
                     <div class="col-md-4">
                         <div class="pill-label mb-1">Tanggal & gudang</div>
-                        <div class="mb-1 mono">
-                            {{ $stockRequest->date?->format('d M Y') ?? '-' }}
-                        </div>
+                        <div class="mb-1 mono">{{ $stockRequest->date?->format('d M Y') ?? '-' }}</div>
                         <div style="font-size:.82rem;">
-                            {{ $stockRequest->sourceWarehouse?->name ?? '-' }} →
-                            <span class="muted">{{ $stockRequest->destinationWarehouse?->name ?? '-' }}</span>
+                            Transit → <span class="muted">{{ $stockRequest->destinationWarehouse?->name ?? '-' }}</span>
                         </div>
                     </div>
-                    <div class="col-md-4">
-                        <div class="pill-label mb-1">Ringkasan qty</div>
+                    <div class="col-md-8">
+                        <div class="pill-label mb-1">Ringkasan</div>
                         <div class="d-flex flex-wrap gap-2">
-                            <div class="summary-pill">
-                                <span>Diminta</span>
-                                <strong class="mono">{{ (int) $totalRequested }}</strong>
-                            </div>
-                            <div class="summary-pill">
-                                <span>Rencana PRD</span>
-                                <strong class="mono">{{ (int) $totalPlanned }}</strong>
-                            </div>
-                            <div class="summary-pill summary-pill--sisa">
-                                <span>Selisih</span>
-                                <strong class="mono">{{ (int) $totalOutstanding }}</strong>
-                            </div>
+                            <div class="summary-pill"><span>Diminta</span><strong
+                                    class="mono">{{ (int) $totalRequested }}</strong></div>
+                            <div class="summary-pill"><span>Sudah dikirim PRD</span><strong
+                                    class="mono">{{ (int) $totalDispatched }}</strong></div>
+                            <div class="summary-pill"><span>Sudah diterima RTS</span><strong
+                                    class="mono">{{ (int) $totalReceived }}</strong></div>
+                            <div class="summary-pill summary-pill--sisa"><span>Sisa di Transit</span><strong
+                                    class="mono">{{ (int) $totalReceivable }}</strong></div>
+                        </div>
+                        <div class="hint mt-2">
+                            Rule: Qty diterima tidak boleh melebihi <strong>sisa di Transit</strong>.
                         </div>
                     </div>
-                    <div class="col-md-4">
-                        <div class="pill-label mb-1">Catatan</div>
-                        <div style="font-size:.82rem;">
-                            @if ($stockRequest->notes)
-                                {!! nl2br(e($stockRequest->notes)) !!}
-                            @else
-                                <span class="muted">Tidak ada catatan.</span>
-                            @endif
-                        </div>
-                    </div>
-                </div>
-
-                <div class="mt-3 hint">
-                    Fokus di kolom <strong>Qty fisik</strong> saja. Baris yang dibiarkan 0 dianggap tidak ada barang yang
-                    diterima.
                 </div>
             </div>
         </div>
@@ -501,14 +354,7 @@
 
             <div class="card-main">
                 <div class="card-body">
-                    <div class="d-flex justify-content-between align-items-center flex-wrap gap-2 mb-1">
-                        <div class="pill-label">
-                            Konfirmasi per item
-                        </div>
-                        <div class="hint">
-                            Gunakan Tab / Enter untuk pindah ke baris berikutnya.
-                        </div>
-                    </div>
+                    <div class="pill-label mb-1">Konfirmasi per item</div>
 
                     <div class="table-wrap">
                         <table class="table align-middle mb-0">
@@ -517,9 +363,10 @@
                                     <th style="width: 40px;">#</th>
                                     <th>Item</th>
                                     <th class="text-end" style="width: 90px;">Diminta</th>
-                                    <th class="text-end" style="width: 100px;">Rencana PRD</th>
-                                    <th class="text-end" style="width: 110px;">Stok PRD</th>
-                                    <th class="text-end" style="width: 130px;">Qty fisik</th>
+                                    <th class="text-end" style="width: 110px;">Sudah dikirim</th>
+                                    <th class="text-end" style="width: 110px;">Sudah diterima</th>
+                                    <th class="text-end" style="width: 120px;">Stok Transit</th>
+                                    <th class="text-end" style="width: 130px;">Terima sekarang</th>
                                 </tr>
                             </thead>
                             <tbody>
@@ -527,78 +374,40 @@
                                     @php
                                         $lineId = $line->id;
                                         $requested = (float) $line->qty_request;
-                                        $planned = (float) ($line->qty_issued ?? 0);
-                                        $snapshot = $line->stock_snapshot_at_request;
-                                        $live = (float) ($liveStocks[$lineId] ?? 0);
+                                        $dispatched = (float) ($line->qty_dispatched ?? 0);
+                                        $received = (float) ($line->qty_received ?? 0);
+                                        $receivable = max($dispatched - $received, 0);
+
+                                        $transitLive = (float) ($liveStocks[$lineId] ?? 0);
 
                                         $inputName = "lines[{$lineId}][qty_received]";
-                                        $defaultValue = $planned > 0 ? $planned : $requested;
-                                        $inputValue = old($inputName, $defaultValue);
+                                        $inputValue = old($inputName, 0);
                                         $errorKey = "lines.{$lineId}.qty_received";
-
-                                        // potensi minus dengan nilai default (bukan input user real-time)
-                                        $potentialMinus = $defaultValue > $live;
                                     @endphp
-
                                     <tr>
-                                        <td class="td-row-number row-number" data-label="#">
-                                            {{ $index + 1 }}
-                                        </td>
+                                        <td class="td-row-number row-number" data-label="#">{{ $index + 1 }}</td>
 
                                         <td data-label="Item">
-                                            <div class="fw-semibold">
-                                                {{ $line->item?->code ?? '-' }}
-                                            </div>
-                                            <div class="line-item-name">
-                                                {{ $line->item?->name ?? '' }}
-                                            </div>
+                                            <div class="fw-semibold">{{ $line->item?->code ?? '-' }}</div>
+                                            <div class="line-item-name">{{ $line->item?->name ?? '' }}</div>
                                         </td>
 
-                                        <td class="text-end" data-label="Diminta">
-                                            <span class="mono qty-text">
-                                                {{ (int) $requested }}
-                                            </span>
-                                        </td>
+                                        <td class="text-end mono" data-label="Diminta">{{ (int) $requested }}</td>
+                                        <td class="text-end mono" data-label="Sudah dikirim">{{ (int) $dispatched }}</td>
+                                        <td class="text-end mono" data-label="Sudah diterima">{{ (int) $received }}</td>
 
-                                        <td class="text-end" data-label="Rencana PRD">
-                                            <span class="mono qty-text">
-                                                {{ (int) $planned }}
-                                            </span>
-                                        </td>
+                                        <td class="text-end mono qty-live" data-label="Stok Transit">
+                                            {{ (int) $transitLive }}</td>
 
-                                        <td class="text-end" data-label="Stok PRD">
-                                            <div class="mono qty-text">
-                                                @if (!is_null($snapshot))
-                                                    <span class="qty-snapshot">{{ (int) $snapshot }}</span>
-                                                    <span class="muted">→</span>
-                                                @endif
-                                                <span class="qty-live">{{ (int) $live }}</span>
-                                            </div>
-                                        </td>
-
-                                        <td class="text-end" data-label="Qty fisik">
+                                        <td class="text-end" data-label="Terima sekarang">
                                             <x-number-input name="{{ $inputName }}" :value="$inputValue" mode="integer"
                                                 min="0" class="text-end mono js-qty-received" />
-
                                             @error($errorKey)
-                                                <div class="error-text">
-                                                    {{ $message }}
-                                                </div>
+                                                <div class="error-text">{{ $message }}</div>
                                             @enderror
-
-                                            @if ($live <= 0 && $defaultValue > 0)
-                                                <div class="hint-danger">
-                                                    Stok PRD 0. Default Qty fisik akan membuat stok PRD minus
-                                                    {{ (int) $defaultValue }} pcs.
-                                                </div>
-                                            @elseif ($potentialMinus && $live > 0)
-                                                <div class="hint-danger">
-                                                    Default Qty fisik ({{ (int) $defaultValue }}) > stok PRD
-                                                    ({{ (int) $live }})
-                                                    . Potensi minus
-                                                    {{ (int) ($defaultValue - $live) }} pcs.
-                                                </div>
-                                            @endif
+                                            <div class="muted mt-1">
+                                                Maks: <span class="mono">{{ (int) $receivable }}</span>
+                                            </div>
                                         </td>
                                     </tr>
                                 @endforeach
@@ -608,15 +417,11 @@
 
                     <div class="mt-3 d-flex justify-content-between align-items-center flex-wrap gap-2">
                         <div class="hint">
-                            Hanya baris dengan <strong>Qty fisik &gt; 0</strong> yang akan dimutasi PRD → RTS.
+                            Baris dengan <strong>Terima sekarang = 0</strong> dianggap tidak ada penerimaan.
+                            Mutasi yang terjadi: <strong>TRANSIT → RTS</strong>.
                         </div>
-                        <div class="d-flex gap-2">
-                            <button type="submit" class="btn-primary-rts">
-                                ✔ Simpan & mutasi stok PRD → RTS
-                            </button>
-                        </div>
+                        <button type="submit" class="btn-primary-rts">✔ Simpan & Terima ke RTS</button>
                     </div>
-
                 </div>
             </div>
         </form>
@@ -627,21 +432,17 @@
     <script>
         document.addEventListener('DOMContentLoaded', function() {
             const inputs = Array.from(document.querySelectorAll('.js-qty-received'));
-
             inputs.forEach((input) => {
                 input.addEventListener('focus', function() {
                     setTimeout(() => this.select(), 10);
                 });
-
                 input.addEventListener('keydown', function(e) {
                     const currentIndex = inputs.indexOf(this);
-
                     if (e.key === 'Enter' || e.key === 'ArrowDown') {
                         e.preventDefault();
                         const next = inputs[currentIndex + 1];
                         if (next) next.focus();
                     }
-
                     if (e.key === 'ArrowUp') {
                         e.preventDefault();
                         const prev = inputs[currentIndex - 1];
@@ -649,7 +450,6 @@
                     }
                 });
             });
-
             if (inputs.length > 0) {
                 inputs[0].focus();
                 inputs[0].select();

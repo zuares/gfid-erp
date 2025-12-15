@@ -5,6 +5,34 @@
 
 @push('head')
     <style>
+        :root {
+            --chip-bg: rgba(59, 130, 246, .10);
+            --chip-br: rgba(59, 130, 246, .22);
+            --chip-tx: rgba(29, 78, 216, 1);
+
+            --chip2-bg: rgba(45, 212, 191, .12);
+            --chip2-br: rgba(45, 212, 191, .24);
+            --chip2-tx: rgba(15, 118, 110, 1);
+
+            --chip3-bg: rgba(148, 163, 184, .14);
+            --chip3-br: rgba(148, 163, 184, .26);
+            --chip3-tx: rgba(71, 85, 105, 1);
+        }
+
+        body[data-theme="dark"] {
+            --chip-bg: rgba(147, 197, 253, .12);
+            --chip-br: rgba(147, 197, 253, .22);
+            --chip-tx: rgba(191, 219, 254, 1);
+
+            --chip2-bg: rgba(45, 212, 191, .12);
+            --chip2-br: rgba(45, 212, 191, .22);
+            --chip2-tx: rgba(153, 246, 228, 1);
+
+            --chip3-bg: rgba(148, 163, 184, .14);
+            --chip3-br: rgba(148, 163, 184, .22);
+            --chip3-tx: rgba(203, 213, 225, 1);
+        }
+
         .page-wrap {
             max-width: 1150px;
             margin-inline: auto;
@@ -53,8 +81,13 @@
             color: #9ca3af;
         }
 
-        .table-wrap {
-            overflow-x: auto;
+        .summary-text {
+            font-size: .80rem;
+            color: #6b7280;
+        }
+
+        body[data-theme="dark"] .summary-text {
+            color: #9ca3af;
         }
 
         .mono {
@@ -71,13 +104,41 @@
             padding-block: .35rem;
         }
 
-        .summary-text {
-            font-size: .80rem;
-            color: #6b7280;
+        .mode-chip {
+            display: inline-flex;
+            align-items: center;
+            gap: .45rem;
+            padding: .28rem .65rem;
+            border-radius: 999px;
+            border: 1px solid var(--chip-br);
+            background: var(--chip-bg);
+            color: var(--chip-tx);
+            font-size: .72rem;
+            letter-spacing: .06em;
+            text-transform: uppercase;
+            white-space: nowrap;
         }
 
-        body[data-theme="dark"] .summary-text {
-            color: #9ca3af;
+        .mode-chip--admin {
+            border-color: var(--chip2-br);
+            background: var(--chip2-bg);
+            color: var(--chip2-tx);
+        }
+
+        .mode-chip--operating {
+            border-color: var(--chip-br);
+            background: var(--chip-bg);
+            color: var(--chip-tx);
+        }
+
+        .mode-chip--owner {
+            border-color: var(--chip3-br);
+            background: var(--chip3-bg);
+            color: var(--chip3-tx);
+        }
+
+        .table-wrap {
+            overflow-x: auto;
         }
 
         .table thead th {
@@ -122,20 +183,49 @@
 @endpush
 
 @section('content')
+    @php
+        $role = auth()->user()->role ?? null;
+
+        $modeText = match ($role) {
+            'admin' => 'Mode: Admin (RTS & WIP-SEW)',
+            'operating' => 'Mode: Operating (Produksi)',
+            'owner' => 'Mode: Owner (Semua)',
+            default => 'Mode: User',
+        };
+
+        $modeClass = match ($role) {
+            'admin' => 'mode-chip mode-chip--admin',
+            'operating' => 'mode-chip mode-chip--operating',
+            'owner' => 'mode-chip mode-chip--owner',
+            default => 'mode-chip',
+        };
+
+        $activeWarehouse = $warehouses->firstWhere('id', $filters['warehouse_id'] ?? null);
+        $activeItem = $items->firstWhere('id', $filters['item_id'] ?? null);
+        $activeSearch = trim($filters['search'] ?? '');
+        $hasBalance = (bool) ($filters['has_balance_only'] ?? true);
+    @endphp
+
     <div class="page-wrap py-3 py-md-4">
         {{-- Header + Tabs --}}
         <div class="d-flex flex-column flex-md-row align-items-md-center justify-content-between gap-2 mb-3">
             <div>
-                <div class="meta-label mb-1">
-                    Inventory • Stok per Item (Finished Good)
+                <div class="meta-label mb-1 d-flex flex-wrap align-items-center gap-2">
+                    <span>Inventory • Stok per Item (Finished Good)</span>
+                    <span class="{{ $modeClass }}">
+                        <i class="bi bi-shield-check"></i>
+                        {{ $modeText }}
+                    </span>
                 </div>
+
                 <h5 class="mb-1">
                     📦 Rekap Stok Finished Good per Item
                 </h5>
+
                 <div class="header-sub">
                     Hanya item <strong>type = finished_good</strong>.
                     Total stok per item, terpisah antara <strong>Finished Good</strong> (WH-RTS) & <strong>WIP</strong>
-                    (gudang WIP-*).<br>
+                    (WIP-*).<br>
                     Klik <strong>kode item</strong> untuk melihat posisi barang di gudang mana saja.
                 </div>
             </div>
@@ -157,9 +247,8 @@
         {{-- Filter Card --}}
         <div class="card card-main mb-3">
             <div class="card-body">
-                <div class="meta-label mb-2">
-                    Filter
-                </div>
+                <div class="meta-label mb-2">Filter</div>
+
                 <form method="GET" class="row g-2 align-items-end filter-row">
                     <div class="col-6 col-md-3">
                         <label for="warehouse_id" class="form-label small">Gudang (opsional)</label>
@@ -206,6 +295,7 @@
                             Filter
                         </button>
                     </div>
+
                     <div class="col-6 col-md-1 d-flex justify-content-md-end mt-1 mt-md-0">
                         <a href="{{ route('inventory.stocks.items') }}"
                             class="btn btn-outline-secondary btn-sm w-100 w-md-auto btn-chip">
@@ -217,8 +307,36 @@
         </div>
 
         {{-- Summary --}}
-        <div class="mb-2 summary-text">
-            Menampilkan <strong>{{ $stocks->total() }}</strong> item finished_good dengan stok.
+        <div class="mb-2 summary-text d-flex flex-wrap align-items-center gap-2">
+            <span>
+                Menampilkan <strong>{{ $stocks->total() }}</strong> item.
+            </span>
+
+            @if ($activeWarehouse)
+                <span class="mode-chip">
+                    <i class="bi bi-building"></i>
+                    Gudang: {{ $activeWarehouse->code }}
+                </span>
+            @endif
+
+            @if ($activeItem)
+                <span class="mode-chip">
+                    <i class="bi bi-tag"></i>
+                    Item: {{ $activeItem->code }}
+                </span>
+            @endif
+
+            @if ($activeSearch)
+                <span class="mode-chip">
+                    <i class="bi bi-search"></i>
+                    Cari: {{ $activeSearch }}
+                </span>
+            @endif
+
+            <span class="mode-chip">
+                <i class="bi bi-filter"></i>
+                {{ $hasBalance ? 'Hanya ada stok' : 'Termasuk nol/minus' }}
+            </span>
         </div>
 
         {{-- Table Card --}}
@@ -243,25 +361,16 @@
                                         {{ $stocks->firstItem() + $index }}
                                     </td>
                                     <td class="mono">
-                                        {{-- KODE ITEM KLIKABLE --}}
                                         <button type="button" class="item-code-link" data-item-id="{{ $row->item_id }}"
                                             data-item-code="{{ $row->item_code }}" data-item-name="{{ $row->item_name }}"
                                             data-locations-url="{{ route('inventory.stocks.item_locations', $row->item_id) }}">
                                             {{ $row->item_code }}
                                         </button>
                                     </td>
-                                    <td>
-                                        {{ $row->item_name }}
-                                    </td>
-                                    <td class="text-end mono">
-                                        {{ number_format($row->total_qty, 2, ',', '.') }}
-                                    </td>
-                                    <td class="text-end mono">
-                                        {{ number_format($row->fg_qty, 2, ',', '.') }}
-                                    </td>
-                                    <td class="text-end mono">
-                                        {{ number_format($row->wip_qty, 2, ',', '.') }}
-                                    </td>
+                                    <td>{{ $row->item_name }}</td>
+                                    <td class="text-end mono">{{ number_format($row->total_qty, 2, ',', '.') }}</td>
+                                    <td class="text-end mono">{{ number_format($row->fg_qty, 2, ',', '.') }}</td>
+                                    <td class="text-end mono">{{ number_format($row->wip_qty, 2, ',', '.') }}</td>
                                 </tr>
                             @empty
                                 <tr>
@@ -293,16 +402,16 @@
                         <h6 class="modal-title mb-0" id="itemLocationsModalLabel">
                             Posisi Stok Item
                         </h6>
-                        <div class="small text-muted" id="itemLocationsSubtitle">
-                            {{-- diisi via JS --}}
-                        </div>
+                        <div class="small text-muted" id="itemLocationsSubtitle"></div>
                     </div>
                     <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Tutup"></button>
                 </div>
+
                 <div class="modal-body">
                     <div id="itemLocationsLoading" class="small text-muted mb-2" style="display: none;">
                         Mengambil data posisi stok...
                     </div>
+
                     <div class="table-responsive">
                         <table class="table table-sm align-middle mb-0">
                             <thead>
@@ -313,12 +422,11 @@
                                     <th style="width: 1%"></th>
                                 </tr>
                             </thead>
-                            <tbody id="itemLocationsTbody">
-                                {{-- diisi via JS --}}
-                            </tbody>
+                            <tbody id="itemLocationsTbody"></tbody>
                         </table>
                     </div>
                 </div>
+
                 <div class="modal-footer small">
                     <button type="button" class="btn btn-secondary btn-sm" data-bs-dismiss="modal">
                         Tutup
@@ -342,112 +450,105 @@
 
             const bsModal = new bootstrap.Modal(modalEl);
 
-            function formatNumber(n) {
-                return new Intl.NumberFormat('id-ID', {
-                    minimumFractionDigits: 2,
-                    maximumFractionDigits: 2
-                }).format(n || 0);
+            const fmt = (n) => new Intl.NumberFormat('id-ID', {
+                minimumFractionDigits: 2,
+                maximumFractionDigits: 2
+            }).format(Number(n || 0));
+
+            const esc = (s) => String(s ?? '')
+                .replaceAll('&', '&amp;')
+                .replaceAll('<', '&lt;')
+                .replaceAll('>', '&gt;')
+                .replaceAll('"', '&quot;')
+                .replaceAll("'", '&#039;');
+
+            function renderEmpty(msg) {
+                if (!tbody) return;
+                tbody.innerHTML = `
+                    <tr>
+                        <td colspan="4" class="text-center text-muted py-3">${esc(msg)}</td>
+                    </tr>`;
             }
 
-            function handleClickItemCode(btn) {
-                const itemId = btn.dataset.itemId;
-                const itemCode = btn.dataset.itemCode || '';
-                const itemName = btn.dataset.itemName || '';
-                const url = btn.dataset.locationsUrl;
+            function setLoading(on) {
+                if (!loadingEl) return;
+                loadingEl.style.display = on ? 'block' : 'none';
+            }
 
+            async function loadLocations({
+                itemId,
+                itemCode,
+                itemName,
+                url
+            }) {
                 if (!itemId || !url) return;
 
-                // Set subtitle
-                if (subtitleEl) {
-                    subtitleEl.textContent = itemCode + ' — ' + itemName;
-                }
-
-                // Clear previous
-                if (tbody) {
-                    tbody.innerHTML = '';
-                }
-
-                if (loadingEl) {
-                    loadingEl.style.display = 'block';
-                }
-
+                if (subtitleEl) subtitleEl.textContent = `${itemCode} — ${itemName}`;
+                if (tbody) tbody.innerHTML = '';
+                setLoading(true);
                 bsModal.show();
 
-                fetch(url, {
+                try {
+                    const res = await fetch(url, {
                         headers: {
                             'Accept': 'application/json'
                         }
-                    })
-                    .then(res => res.json())
-                    .then(data => {
-                        if (loadingEl) {
-                            loadingEl.style.display = 'none';
-                        }
-                        if (!tbody) return;
-
-                        const locations = data.locations || [];
-
-                        if (!locations.length) {
-                            tbody.innerHTML = `
-                                <tr>
-                                    <td colspan="4" class="text-center text-muted py-3">
-                                        Tidak ada stok di gudang manapun.
-                                    </td>
-                                </tr>`;
-                            return;
-                        }
-
-                        let rowsHtml = '';
-                        locations.forEach((loc, idx) => {
-                            const whId = loc.id;
-                            const whCode = loc.code || '-';
-                            const whName = loc.name || '-';
-                            const qty = loc.qty || 0;
-
-                            const stockCardUrl = stockCardBaseUrl ?
-                                stockCardBaseUrl + '?item_id=' + encodeURIComponent(itemId) +
-                                '&warehouse_id=' + encodeURIComponent(whId) :
-                                '#';
-
-                            rowsHtml += `
-                                <tr>
-                                    <td class="text-muted small">${idx + 1}</td>
-                                    <td>
-                                        <div class="fw-semibold">${whCode}</div>
-                                        <div class="small text-muted">${whName}</div>
-                                    </td>
-                                    <td class="text-end mono">
-                                        ${formatNumber(qty)}
-                                    </td>
-                                    <td class="text-end">
-                                        <a href="${stockCardUrl}" class="btn btn-outline-secondary btn-sm py-0 px-2">
-                                            <i class="bi bi-journal-text"></i>
-                                        </a>
-                                    </td>
-                                </tr>`;
-                        });
-
-                        tbody.innerHTML = rowsHtml;
-                    })
-                    .catch(() => {
-                        if (loadingEl) {
-                            loadingEl.style.display = 'none';
-                        }
-                        if (tbody) {
-                            tbody.innerHTML = `
-                                <tr>
-                                    <td colspan="4" class="text-center text-danger py-3">
-                                        Gagal mengambil data posisi stok.
-                                    </td>
-                                </tr>`;
-                        }
                     });
+                    const data = await res.json();
+                    const locations = data.locations || [];
+
+                    setLoading(false);
+
+                    if (!locations.length) {
+                        renderEmpty('Tidak ada stok di gudang manapun.');
+                        return;
+                    }
+
+                    let html = '';
+                    locations.forEach((loc, idx) => {
+                        const whId = loc.id;
+                        const whCode = loc.code || '-';
+                        const whName = loc.name || '-';
+                        const qty = loc.qty || 0;
+
+                        const stockCardUrl = stockCardBaseUrl ?
+                            `${stockCardBaseUrl}?item_id=${encodeURIComponent(itemId)}&warehouse_id=${encodeURIComponent(whId)}` :
+                            '#';
+
+                        html += `
+                            <tr>
+                                <td class="text-muted small">${idx + 1}</td>
+                                <td>
+                                    <div class="fw-semibold">${esc(whCode)}</div>
+                                    <div class="small text-muted">${esc(whName)}</div>
+                                </td>
+                                <td class="text-end mono">${fmt(qty)}</td>
+                                <td class="text-end">
+                                    <a href="${stockCardUrl}" class="btn btn-outline-secondary btn-sm py-0 px-2" title="Stock Card">
+                                        <i class="bi bi-journal-text"></i>
+                                    </a>
+                                </td>
+                            </tr>`;
+                    });
+
+                    if (tbody) tbody.innerHTML = html;
+
+                } catch (e) {
+                    setLoading(false);
+                    renderEmpty('Gagal mengambil data posisi stok.');
+                }
             }
 
-            // Bind klik ke semua kode item
-            document.querySelectorAll('.item-code-link').forEach(btn => {
-                btn.addEventListener('click', function() {
-                    handleClickItemCode(this);
+            // Event delegation: lebih ringan daripada bind ke semua tombol
+            document.addEventListener('click', function(e) {
+                const btn = e.target.closest('.item-code-link');
+                if (!btn) return;
+
+                loadLocations({
+                    itemId: btn.dataset.itemId,
+                    itemCode: btn.dataset.itemCode || '',
+                    itemName: btn.dataset.itemName || '',
+                    url: btn.dataset.locationsUrl
                 });
             });
         });

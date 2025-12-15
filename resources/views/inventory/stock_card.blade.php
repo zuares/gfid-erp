@@ -326,7 +326,8 @@
                                                 {{ number_format($val, 0, ',', '.') }}
                                             </td>
 
-                                            <td class="text-end fw-semibold {{ $m->running_value < 0 ? 'text-danger' : '' }}">
+                                            <td
+                                                class="text-end fw-semibold {{ $m->running_value < 0 ? 'text-danger' : '' }}">
                                                 {{ number_format($m->running_value, 0, ',', '.') }}
                                             </td>
 

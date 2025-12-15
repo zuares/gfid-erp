@@ -16,15 +16,17 @@ class StockRequestLine extends Model
         'qty_request',
         'stock_snapshot_at_request',
         'qty_issued',
+        'qty_dispatched', // NEW
+        'qty_received', // NEW
         'notes',
-        'qty_received_rts',
     ];
 
     protected $casts = [
         'qty_request' => 'decimal:2',
         'stock_snapshot_at_request' => 'decimal:2',
         'qty_issued' => 'decimal:2',
-        'qty_received_rts' => 'decimal:2',
+        'qty_dispatched' => 'decimal:3',
+        'qty_received' => 'decimal:3',
     ];
 
     /*
@@ -83,31 +85,5 @@ class StockRequestLine extends Model
         $issued = (float) ($this->qty_issued ?? 0);
 
         return $issued > 0 && $issued < $requested;
-    }
-
-    public function receivedQty(): float
-    {
-        return (float) ($this->qty_received_rts ?? 0);
-    }
-
-    public function isReceived(): bool
-    {
-        return $this->receivedQty() > 0;
-    }
-
-    public function isFullyReceived(): bool
-    {
-        $requested = (float) $this->qty_request;
-        $received = $this->receivedQty();
-
-        return $requested > 0 && bccomp((string) $requested, (string) $received, 2) === 0;
-    }
-
-    public function isPartiallyReceived(): bool
-    {
-        $requested = (float) $this->qty_request;
-        $received = $this->receivedQty();
-
-        return $received > 0 && $received < $requested;
     }
 }

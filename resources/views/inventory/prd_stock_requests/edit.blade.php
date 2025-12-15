@@ -1,7 +1,7 @@
 {{-- resources/views/inventory/prd_stock_requests/edit.blade.php --}}
 @extends('layouts.app')
 
-@section('title', 'Proses Permintaan RTS • ' . $stockRequest->code)
+@section('title', 'Kirim Barang RTS • ' . $stockRequest->code)
 
 @push('head')
     <style>
@@ -22,8 +22,7 @@
         }
 
         body[data-theme="light"] .rts-edit-page .page-wrap {
-            background:
-                radial-gradient(circle at top left,
+            background: radial-gradient(circle at top left,
                     rgba(59, 130, 246, 0.08) 0,
                     rgba(45, 212, 191, 0.1) 28%,
                     #f9fafb 70%);
@@ -65,8 +64,7 @@
         }
 
         .mono {
-            font-family: ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, "Liberation Mono", "Courier New",
-                monospace;
+            font-family: ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, "Liberation Mono", "Courier New", monospace;
             font-variant-numeric: tabular-nums;
         }
 
@@ -113,6 +111,11 @@
         .badge-status.submitted {
             background: rgba(59, 130, 246, .10);
             color: rgba(30, 64, 175, 1);
+        }
+
+        .badge-status.shipped {
+            background: rgba(45, 212, 191, .14);
+            color: rgba(15, 118, 110, 1);
         }
 
         .badge-status.partial {
@@ -235,11 +238,7 @@
             color: #0f172a;
             font-size: .8rem;
             font-weight: 500;
-        }
-
-        .btn-outline-rts:hover {
             text-decoration: none;
-            filter: brightness(0.98);
         }
 
         .hint {
@@ -250,6 +249,33 @@
         .hint-soft {
             font-size: .78rem;
             color: #64748b;
+        }
+
+        .callout {
+            margin-top: .8rem;
+            padding: .7rem .9rem;
+            border-radius: 12px;
+            border: 1px solid rgba(45, 212, 191, 0.35);
+            background: rgba(45, 212, 191, 0.10);
+            color: rgba(15, 118, 110, 1);
+            font-size: .82rem;
+        }
+
+        .route-badge {
+            display: inline-flex;
+            align-items: center;
+            gap: .35rem;
+            padding: .18rem .55rem;
+            border-radius: 999px;
+            background: rgba(15, 23, 42, 0.03);
+            border: 1px solid rgba(148, 163, 184, 0.30);
+            font-size: .76rem;
+            color: #0f172a;
+        }
+
+        .route-badge .arrow {
+            color: rgba(15, 118, 110, 1);
+            font-weight: 700;
         }
 
         @media (max-width: 767.98px) {
@@ -305,16 +331,75 @@
 @section('content')
     @php
         $status = $stockRequest->status;
+
         $statusLabel = match ($status) {
-            'submitted' => 'Menunggu diproses PRD',
-            'partial' => 'Sebagian sudah dikirim',
-            'completed' => 'Selesai',
+            'submitted' => 'Menunggu dikirim PRD',
+            'shipped' => 'Sudah dikirim PRD (di Transit)',
+            'partial' => 'Sebagian sudah diterima RTS',
+            'completed' => 'Selesai (semua diterima RTS)',
             default => ucfirst($status),
         };
 
         $totalRequested = (float) ($stockRequest->total_requested_qty ?? $stockRequest->lines->sum('qty_request'));
-        $totalIssued = (float) ($stockRequest->total_issued_qty ?? $stockRequest->lines->sum('qty_issued'));
-        $totalOutstanding = max($totalRequested - $totalIssued, 0);
+        $totalDispatched = (float) ($stockRequest->total_dispatched_qty ?? $stockRequest->lines->sum('qty_dispatched'));
+        $totalOutstanding = max($totalRequested - $totalDispatched, 0);
+
+        /**
+         * ======= HISTORI GABUNGAN (OUT+IN jadi 1 baris) =======
+         * Pakai qty_change (sesuai schema), bukan mv->qty.
+         *
+         * Group key: source_type|source_id|item_id|abs(qty_change)|created_at(second)
+         */
+        $historyRows = collect($movementHistory ?? [])
+            ->groupBy(function ($mv) {
+                $createdKey = $mv->created_at ? $mv->created_at->format('Y-m-d H:i:s') : 'no-time';
+                $absQty = (string) abs((float) ($mv->qty_change ?? 0));
+                return implode('|', [
+                    $mv->source_type ?? '-',
+                    (string) ($mv->source_id ?? 0),
+                    (string) ($mv->item_id ?? 0),
+                    $absQty,
+                    $createdKey,
+                ]);
+            })
+            ->map(function ($group) {
+                $first = $group->first();
+
+                $out = $group->firstWhere('direction', 'out');
+                $in = $group->firstWhere('direction', 'in');
+
+                $qty = abs((float) ($out?->qty_change ?? ($in?->qty_change ?? ($first?->qty_change ?? 0))));
+
+                $fromWh = $out?->warehouse;
+                $toWh = $in?->warehouse;
+
+                if (!$fromWh && $first?->direction === 'out') {
+                    $fromWh = $first->warehouse;
+                }
+                if (!$toWh && $first?->direction === 'in') {
+                    $toWh = $first->warehouse;
+                }
+
+                $fromCode = $fromWh?->code ?? '?';
+                $toCode = $toWh?->code ?? '?';
+
+                return [
+                    'date' => $first?->date,
+                    'created_at' => $first?->created_at,
+                    'item' => $first?->item,
+                    'qty' => $qty,
+                    'from_wh' => $fromWh,
+                    'to_wh' => $toWh,
+                    'from_code' => $fromCode,
+                    'to_code' => $toCode,
+                    'notes' => $first?->notes,
+                    'source_type' => $first?->source_type,
+                    'source_id' => $first?->source_id,
+                ];
+            })
+            ->values()
+            ->sortByDesc(fn($row) => $row['created_at']?->timestamp ?? 0)
+            ->values();
     @endphp
 
     <div class="rts-edit-page">
@@ -325,26 +410,31 @@
                     <div class="step-chip mb-1">
                         <span>Langkah 1 dari 2</span>
                         <span>•</span>
-                        <span>PRD isi rencana kirim</span>
+                        <span>PRD kirim ke Transit</span>
                     </div>
 
                     <a href="{{ route('prd.stock-requests.index') }}" class="btn btn-link btn-sm px-0 mb-1">
                         ← Kembali ke daftar
                     </a>
 
-                    <div class="page-title">
-                        Proses Permintaan RTS
-                    </div>
+                    <div class="page-title">Kirim Barang ke Transit (Untuk RTS)</div>
+
                     <div class="page-subtitle">
-                        Tentukan rencana Qty yang akan dikirim dari Gudang Produksi ke Gudang RTS.
-                        Stok baru benar-benar pindah setelah RTS konfirmasi fisik.
+                        Isi <strong>Kirim Sekarang</strong> untuk mengirim barang dari Gudang Produksi ke
+                        <strong>Gudang Transit</strong>.
+                        RTS akan melakukan penerimaan dari Transit pada langkah berikutnya.
+                    </div>
+
+                    <div class="callout">
+                        ✅ Setelah kamu klik <strong>Simpan & Kirim</strong>, stok akan <strong>langsung berpindah</strong>
+                        dari <strong>PRD → TRANSIT</strong>.
+                        (Ini bukan rencana/plan.)
                     </div>
                 </div>
+
                 <div class="text-end">
                     <div class="mb-2">
-                        <span class="badge-status {{ $status }}">
-                            {{ $statusLabel }}
-                        </span>
+                        <span class="badge-status {{ $status }}">{{ $statusLabel }}</span>
                     </div>
                     <div class="code-badge">
                         <span class="dot"></span>
@@ -359,27 +449,25 @@
                         <div class="col-md-4">
                             <div class="pill-label mb-1">Tanggal & Gudang</div>
                             <div class="mb-1">
-                                <span class="mono">
-                                    {{ $stockRequest->date?->format('d M Y') ?? '-' }}
-                                </span>
+                                <span class="mono">{{ $stockRequest->date?->format('d M Y') ?? '-' }}</span>
                             </div>
                             <div style="font-size:.84rem;">
                                 {{ $stockRequest->sourceWarehouse?->name ?? '-' }} →
-                                <span class="muted">
-                                    {{ $stockRequest->destinationWarehouse?->name ?? '-' }}
-                                </span>
+                                <span class="muted">Transit →
+                                    {{ $stockRequest->destinationWarehouse?->name ?? '-' }}</span>
                             </div>
                         </div>
+
                         <div class="col-md-4">
                             <div class="pill-label mb-1">Ringkasan Qty</div>
                             <div class="d-flex flex-wrap gap-2">
                                 <div class="summary-pill">
-                                    <span>Diminta</span>
+                                    <span>Diminta RTS</span>
                                     <strong class="mono">{{ (int) $totalRequested }}</strong>
                                 </div>
                                 <div class="summary-pill">
-                                    <span>Rencana kirim</span>
-                                    <strong class="mono">{{ (int) $totalIssued }}</strong>
+                                    <span>Sudah dikirim PRD</span>
+                                    <strong class="mono">{{ (int) $totalDispatched }}</strong>
                                 </div>
                                 <div class="summary-pill summary-pill--sisa">
                                     <span>Sisa permintaan</span>
@@ -387,6 +475,7 @@
                                 </div>
                             </div>
                         </div>
+
                         <div class="col-md-4">
                             <div class="pill-label mb-1">Catatan permintaan</div>
                             <div style="font-size:.82rem;">
@@ -401,8 +490,8 @@
 
                     <div class="mt-3 d-flex justify-content-between align-items-center flex-wrap gap-2">
                         <div class="hint">
-                            Di kolom <strong>Qty Kirim</strong>, isi rencana Qty yang akan dikirim.
-                            RTS akan konfirmasi Qty fisik saat barang diterima.
+                            Isi kolom <strong>Kirim Sekarang</strong> (kirim tambahan).
+                            Baris yang diisi > 0 akan dibuat mutasi <strong>PRD → TRANSIT</strong>.
                         </div>
                         <div class="d-flex gap-2">
                             <a href="{{ route('prd.stock-requests.show', $stockRequest) }}" class="btn-outline-rts">
@@ -419,12 +508,9 @@
                 <div class="card-main">
                     <div class="card-body">
                         <div class="d-flex justify-content-between align-items-center flex-wrap gap-2 mb-1">
-                            <div class="pill-label">
-                                Daftar item permintaan
-                            </div>
+                            <div class="pill-label">Daftar item permintaan</div>
                             <div class="hint-soft">
-                                Stok PRD di kolom hijau hanya untuk informasi.
-                                Sistem tidak membatasi Qty Kirim terhadap stok atau Outstanding.
+                                Stok PRD (hijau) hanya informasi. Sistem boleh kirim bertahap sesuai fisik.
                             </div>
                         </div>
 
@@ -435,9 +521,10 @@
                                         <th style="width: 50px;">#</th>
                                         <th>Item</th>
                                         <th class="text-end" style="width: 90px;">Diminta</th>
-                                        <th class="text-end" style="width: 100px;">Outstanding</th>
+                                        <th class="text-end" style="width: 110px;">Sudah dikirim</th>
+                                        <th class="text-end" style="width: 100px;">Sisa</th>
                                         <th class="text-end" style="width: 110px;">Stok PRD</th>
-                                        <th class="text-end" style="width: 130px;">Qty Kirim (rencana)</th>
+                                        <th class="text-end" style="width: 140px;">Kirim sekarang</th>
                                     </tr>
                                 </thead>
                                 <tbody>
@@ -445,59 +532,42 @@
                                         @php
                                             $lineId = $line->id;
                                             $requested = (float) $line->qty_request;
-                                            $issued = (float) $line->qty_issued;
-                                            $outstanding = max($requested - $issued, 0);
+                                            $dispatched = (float) ($line->qty_dispatched ?? 0);
+                                            $outstanding = max($requested - $dispatched, 0);
                                             $available = (float) ($liveStocks[$lineId] ?? 0);
 
+                                            // name tetap qty_issued (sesuai controller confirm input mapping)
                                             $inputName = "lines[{$lineId}][qty_issued]";
-
-                                            // Pertama kali kosong; kalau ada error, pakai old()
-                                            $inputValue = old($inputName, null);
-
+                                            $inputValue = old($inputName, 0);
                                             $errorKey = "lines.{$lineId}.qty_issued";
                                         @endphp
 
                                         <tr>
-                                            <td class="td-row-number row-number" data-label="#">
-                                                {{ $index + 1 }}
-                                            </td>
+                                            <td class="td-row-number row-number" data-label="#">{{ $index + 1 }}</td>
 
                                             <td data-label="Item">
-                                                <div class="fw-semibold">
-                                                    {{ $line->item?->code ?? '-' }}
-                                                </div>
-                                                <div class="line-item-name">
-                                                    {{ $line->item?->name ?? '' }}
-                                                </div>
+                                                <div class="fw-semibold">{{ $line->item?->code ?? '-' }}</div>
+                                                <div class="line-item-name">{{ $line->item?->name ?? '' }}</div>
                                             </td>
 
-                                            <td class="text-end" data-label="Diminta">
-                                                <span class="mono qty-text">
-                                                    {{ (int) $requested }}
-                                                </span>
+                                            <td class="text-end mono" data-label="Diminta">{{ (int) $requested }}</td>
+                                            <td class="text-end mono" data-label="Sudah dikirim">{{ (int) $dispatched }}
                                             </td>
-
-                                            <td class="text-end" data-label="Outstanding">
-                                                <span class="mono qty-text">
-                                                    {{ (int) $outstanding }}
-                                                </span>
-                                            </td>
+                                            <td class="text-end mono" data-label="Sisa">{{ (int) $outstanding }}</td>
 
                                             <td class="text-end" data-label="Stok PRD">
-                                                <span class="mono qty-text qty-available">
-                                                    {{ (int) $available }}
-                                                </span>
+                                                <span class="mono qty-text qty-available">{{ (int) $available }}</span>
                                             </td>
 
-                                            <td class="text-end" data-label="Qty kirim (rencana)">
+                                            <td class="text-end" data-label="Kirim sekarang">
                                                 <x-number-input name="{{ $inputName }}" :value="$inputValue" mode="integer"
                                                     min="0" class="text-end mono js-qty-issued" />
 
                                                 @error($errorKey)
-                                                    <div class="error-text">
-                                                        {{ $message }}
-                                                    </div>
+                                                    <div class="error-text">{{ $message }}</div>
                                                 @enderror
+
+                                                <div class="muted mt-1">Mutasi: PRD → TRANSIT</div>
                                             </td>
                                         </tr>
                                     @endforeach
@@ -507,63 +577,80 @@
 
                         <div class="mt-3 d-flex justify-content-between align-items-center flex-wrap gap-2">
                             <div class="hint">
-                                Baris dengan <strong>Qty Kirim = 0</strong> dianggap tidak ada rencana kirim untuk item
-                                tersebut.
+                                Baris dengan <strong>Kirim sekarang = 0</strong> dianggap tidak ada pengiriman.
+                                Kamu bisa kirim bertahap selama dokumen belum completed.
                             </div>
-                            <div class="d-flex gap-2">
-                                <button type="submit" class="btn-primary-rts">
-                                    <span>✔ Simpan rencana Qty Kirim</span>
-                                </button>
-                            </div>
+                            <button type="submit" class="btn-primary-rts">
+                                🚚 Simpan & Kirim ke Transit
+                            </button>
                         </div>
                     </div>
                 </div>
             </form>
 
-            @if ($movementHistory->count() > 0)
+            {{-- ====== HISTORI (1 BARIS PER TRANSFER) ====== --}}
+            @if (($movementHistory->count() ?? 0) > 0)
                 <div class="card-main mt-3">
                     <div class="card-body">
-                        <div class="pill-label mb-1">
-                            Histori mutasi terkait dokumen ini
-                        </div>
+                        <div class="pill-label mb-1">Histori pergerakan stok (ringkas)</div>
                         <div class="hint mb-2">
-                            Ringkasan pergerakan stok yang sudah pernah dibuat dari dokumen ini (setelah RTS
-                            konfirmasi fisik).
+                            Ditampilkan 1 baris per perpindahan (contoh: <strong>PRD → TRANSIT qty 25</strong>).
                         </div>
 
                         <div class="table-wrap">
                             <table class="table mb-0">
                                 <thead>
                                     <tr>
-                                        <th style="width: 110px;">Tanggal</th>
+                                        <th style="width: 130px;">Tanggal</th>
                                         <th>Item</th>
-                                        <th class="text-end" style="width: 100px;">Qty</th>
-                                        <th style="width: 120px;">Gudang</th>
+                                        <th style="width: 180px;">Rute</th>
+                                        <th class="text-end" style="width: 110px;">Qty</th>
+                                        <th style="width: 220px;">Catatan</th>
                                     </tr>
                                 </thead>
                                 <tbody>
-                                    @foreach ($movementHistory as $mv)
+                                    @foreach ($historyRows as $row)
+                                        @php
+                                            $fromCode = $row['from_code'] ?? '?';
+                                            $toCode = $row['to_code'] ?? '?';
+                                            $fromName = $row['from_wh']?->name ?? '';
+                                            $toName = $row['to_wh']?->name ?? '';
+                                            $qty = (float) ($row['qty'] ?? 0);
+                                        @endphp
                                         <tr>
                                             <td class="mono">
-                                                {{ $mv->date?->format('d M Y') ?? '-' }}<br>
-                                                <span class="muted">{{ $mv->created_at?->format('H:i') }}</span>
+                                                {{ $row['date']?->format('d M Y') ?? '-' }}<br>
+                                                <span
+                                                    class="muted">{{ $row['created_at']?->format('H:i:s') ?? '' }}</span>
                                             </td>
+
                                             <td>
-                                                <div class="fw-semibold">
-                                                    {{ $mv->item?->code ?? '-' }}
-                                                </div>
-                                                <div class="line-item-name">
-                                                    {{ $mv->item?->name ?? '' }}
-                                                </div>
+                                                <div class="fw-semibold">{{ $row['item']?->code ?? '-' }}</div>
+                                                <div class="line-item-name">{{ $row['item']?->name ?? '' }}</div>
                                             </td>
-                                            <td class="text-end mono">
-                                                {{ (int) $mv->qty }}
-                                            </td>
+
                                             <td>
-                                                {{ $mv->warehouse?->code ?? '-' }}<br>
-                                                <span class="muted">
-                                                    {{ $mv->warehouse?->name ?? '' }}
+                                                <span class="route-badge">
+                                                    <span class="mono">{{ $fromCode }}</span>
+                                                    <span class="arrow">→</span>
+                                                    <span class="mono">{{ $toCode }}</span>
                                                 </span>
+                                                <div class="muted mt-1">
+                                                    {{ $fromName }}{!! $fromName && $toName ? ' → ' : '' !!}{{ $toName }}
+                                                </div>
+                                            </td>
+
+                                            <td class="text-end mono">{{ (int) abs($qty) }}</td>
+
+                                            <td>
+                                                @if (!empty($row['notes']))
+                                                    <div style="font-size:.82rem;">{!! nl2br(e($row['notes'])) !!}</div>
+                                                @else
+                                                    <span class="muted">-</span>
+                                                @endif
+                                                <div class="muted mt-1">
+                                                    Ref: {{ $row['source_type'] ?? '-' }}#{{ $row['source_id'] ?? '-' }}
+                                                </div>
                                             </td>
                                         </tr>
                                     @endforeach
@@ -571,6 +658,11 @@
                             </table>
                         </div>
 
+                        <div class="hint mt-2">
+                            Jika suatu saat ada baris yang tidak kepair, rute akan tampil <span class="mono">? →
+                                WH</span>
+                            atau <span class="mono">WH → ?</span>.
+                        </div>
                     </div>
                 </div>
             @endif
@@ -584,11 +676,9 @@
         document.addEventListener('DOMContentLoaded', function() {
             const inputs = Array.from(document.querySelectorAll('.js-qty-issued'));
 
-            inputs.forEach((input, index) => {
+            inputs.forEach((input) => {
                 input.addEventListener('focus', function() {
-                    setTimeout(() => {
-                        this.select();
-                    }, 10);
+                    setTimeout(() => this.select(), 10);
                 });
 
                 input.addEventListener('keydown', function(e) {
@@ -597,17 +687,13 @@
                     if (e.key === 'Enter' || e.key === 'ArrowDown') {
                         e.preventDefault();
                         const next = inputs[currentIndex + 1];
-                        if (next) {
-                            next.focus();
-                        }
+                        if (next) next.focus();
                     }
 
                     if (e.key === 'ArrowUp') {
                         e.preventDefault();
                         const prev = inputs[currentIndex - 1];
-                        if (prev) {
-                            prev.focus();
-                        }
+                        if (prev) prev.focus();
                     }
                 });
             });

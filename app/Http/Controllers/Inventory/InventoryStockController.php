@@ -15,6 +15,42 @@ class InventoryStockController extends Controller
         protected InventoryService $inventory,
     ) {}
 
+    private function applyWarehouseScopeByRole($query, ?int $warehouseId = null, string $mode = 'prod')
+    {
+        $user = auth()->user();
+
+        // OWNER: bebas semua
+        if ($user?->role === 'owner') {
+            if ($warehouseId) {
+                $query->where('inventory_stocks.warehouse_id', $warehouseId);
+            }
+            return $query;
+        }
+
+        // ADMIN: hanya RTS + Transit + WIP-SEW
+        if ($mode === 'rts' || $user?->role === 'admin') {
+            $allowed = ['WH-RTS', 'WH-TRANSIT', 'WIP-SEW'];
+
+            $query->whereIn('warehouses.code', $allowed);
+
+            // kalau user pilih gudang spesifik, tetap boleh asalkan ada di allowed
+            if ($warehouseId) {
+                $query->where('inventory_stocks.warehouse_id', $warehouseId);
+            }
+
+            return $query;
+        }
+
+        // OPERATING: semua kecuali RTS
+        $query->where('warehouses.code', '!=', 'WH-RTS');
+
+        if ($warehouseId) {
+            $query->where('inventory_stocks.warehouse_id', $warehouseId);
+        }
+
+        return $query;
+    }
+
     /**
      * STOK PER ITEM (snapshot dari inventory_stocks)
      */
@@ -75,22 +111,42 @@ class InventoryStockController extends Controller
 
     public function items(Request $request)
     {
-        $items = Item::where('active', 1)
-            ->orderBy('name')
-            ->get();
+        $user = auth()->user();
 
-        $warehouses = Warehouse::orderBy('name')->get();
+        $items = Item::where('active', 1)->orderBy('name')->get();
+
+        // ====== FILTER GUDANG UNTUK DROPDOWN (BIAR RAPI) ======
+        $warehousesQuery = Warehouse::orderBy('name');
+
+        if ($user?->role === 'admin') {
+            $warehousesQuery->whereIn('code', ['WH-RTS', 'WH-TRANSIT', 'WIP-SEW']);
+        } elseif ($user?->role === 'operating') {
+            $warehousesQuery->where('code', '!=', 'WH-RTS');
+        }
+        // owner → bebas
+
+        $warehouses = $warehousesQuery->get();
 
         $warehouseId = $request->input('warehouse_id');
         $itemId = $request->input('item_id');
         $search = $request->input('search');
         $hasBalanceOnly = (bool) $request->boolean('has_balance_only', true);
 
+        // ====== BASE QUERY ======
         $query = InventoryStock::query()
             ->join('items', 'items.id', '=', 'inventory_stocks.item_id')
             ->join('warehouses', 'warehouses.id', '=', 'inventory_stocks.warehouse_id')
             ->where('items.active', 1);
 
+        // ====== ROLE SCOPE ======
+        if ($user?->role === 'admin') {
+            $query->whereIn('warehouses.code', ['WH-RTS', 'WH-TRANSIT', 'WIP-SEW']);
+        } elseif ($user?->role === 'operating') {
+            $query->where('warehouses.code', '!=', 'WH-RTS');
+        }
+        // owner → no filter
+
+        // ====== FILTER TAMBAHAN ======
         if ($warehouseId) {
             $query->where('inventory_stocks.warehouse_id', $warehouseId);
         }
@@ -100,26 +156,28 @@ class InventoryStockController extends Controller
         }
 
         if ($search) {
-            $searchLike = '%' . $search . '%';
-            $query->where(function ($q) use ($searchLike) {
-                $q->where('items.code', 'like', $searchLike)
-                    ->orWhere('items.name', 'like', $searchLike);
+            $like = '%' . $search . '%';
+            $query->where(function ($q) use ($like) {
+                $q->where('items.code', 'like', $like)
+                    ->orWhere('items.name', 'like', $like);
             });
         }
 
+        // ====== AGGREGATE ======
         $query->selectRaw('
         inventory_stocks.item_id,
         items.code AS item_code,
         items.name AS item_name,
         SUM(inventory_stocks.qty) AS total_qty,
-        SUM(CASE WHEN warehouses.code = "WH-RTS" THEN inventory_stocks.qty ELSE 0 END) AS fg_qty,
+        SUM(CASE WHEN warehouses.code IN ("WH-RTS") THEN inventory_stocks.qty ELSE 0 END) AS fg_qty,
         SUM(CASE WHEN warehouses.code LIKE "WIP-%" THEN inventory_stocks.qty ELSE 0 END) AS wip_qty
     ')
             ->groupBy('inventory_stocks.item_id', 'items.code', 'items.name')
             ->orderBy('items.code');
 
+        // ====== HAS BALANCE ONLY (ANTI OFFSET BUG) ======
         if ($hasBalanceOnly) {
-            $query->havingRaw('SUM(inventory_stocks.qty) <> 0');
+            $query->havingRaw('SUM(ABS(inventory_stocks.qty)) <> 0');
         }
 
         $stocks = $query->paginate(50)->appends($request->query());

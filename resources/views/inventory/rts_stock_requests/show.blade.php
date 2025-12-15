@@ -100,6 +100,11 @@
             color: rgba(30, 64, 175, 1);
         }
 
+        .badge-status.shipped {
+            background: rgba(45, 212, 191, 0.14);
+            color: rgba(15, 118, 110, 1);
+        }
+
         .badge-status.partial {
             background: rgba(234, 179, 8, 0.12);
             color: rgba(133, 77, 14, 1);
@@ -226,6 +231,27 @@
         }
 
         .btn-edit-today:hover {
+            background: rgba(15, 23, 42, 0.03);
+            text-decoration: none;
+        }
+
+        .btn-secondary-rts {
+            display: inline-flex;
+            align-items: center;
+            justify-content: center;
+            gap: .35rem;
+            padding: .42rem .9rem;
+            border-radius: 999px;
+            font-size: .8rem;
+            text-decoration: none;
+            border: 1px solid rgba(148, 163, 184, 0.8);
+            background: rgba(15, 23, 42, 0.01);
+            color: rgba(15, 23, 42, .9);
+            font-weight: 600;
+            white-space: nowrap;
+        }
+
+        .btn-secondary-rts:hover {
             background: rgba(15, 23, 42, 0.03);
             text-decoration: none;
         }
@@ -367,7 +393,8 @@
                 align-items: stretch;
             }
 
-            .btn-confirm-rts {
+            .btn-confirm-rts,
+            .btn-secondary-rts {
                 width: 100%;
             }
 
@@ -383,7 +410,7 @@
             }
 
             .table {
-                min-width: 780px;
+                min-width: 820px;
             }
         }
     </style>
@@ -391,23 +418,81 @@
 
 @section('content')
     @php
+        /**
+         * ====== UPGRADE LOGIC STATUS & CTA ======
+         * Flow baru:
+         * - PRD dispatch: PRD → TRANSIT => qty_dispatched naik
+         * - RTS receive: TRANSIT → RTS => qty_received naik
+         *
+         * Status yang mungkin: submitted | shipped | partial | completed
+         */
+
         $status = $stockRequest->status;
 
+        $totalRequested = (float) $stockRequest->lines->sum(fn($l) => (float) ($l->qty_request ?? 0));
+        $totalDispatched = (float) $stockRequest->lines->sum(fn($l) => (float) ($l->qty_dispatched ?? 0));
+        $totalReceived = (float) $stockRequest->lines->sum(fn($l) => (float) ($l->qty_received ?? 0));
+
+        $remainingToDispatch = max($totalRequested - $totalDispatched, 0); // sisa yang PRD belum kirim ke Transit
+        $remainingToReceive = max($totalDispatched - $totalReceived, 0); // sisa yang masih ada di Transit (belum diterima RTS)
+        $remainingOverall = max($totalRequested - $totalReceived, 0); // sisa menuju selesai (berdasarkan received)
+
+        $hasDispatched = $totalDispatched > 0;
+        $hasReceived = $totalReceived > 0;
+
+        $canOpenConfirm = $remainingToReceive > 0 && $status !== 'completed';
+
+        // Label status + badge class
         $statusLabel = match ($status) {
-            'submitted' => 'Menunggu PRD',
-            'partial' => 'Sebagian keluar',
+            'submitted' => 'Menunggu PRD kirim',
+            'shipped' => 'Barang di Transit (siap diterima RTS)',
+            'partial' => 'Sebagian sudah diterima RTS',
             'completed' => 'Selesai',
             default => ucfirst($status ?? 'Draft'),
         };
 
-        $totalRequested = $stockRequest->lines->sum(fn($line) => (float) ($line->qty_request ?? 0));
-        $totalIssued = $stockRequest->lines->sum(
-            fn($line) => $line->qty_issued !== null ? (float) $line->qty_issued : 0,
-        );
-        $totalRemaining = max($totalRequested - $totalIssued, 0);
-        $hasIssued = $totalIssued > 0;
+        $badgeClass = match ($status) {
+            'completed' => 'completed',
+            'partial' => 'partial',
+            'shipped' => 'shipped',
+            default => 'pending', // submitted/draft
+        };
 
-        $canConfirm = $hasIssued && $status !== 'completed';
+        $dotColor = match ($status) {
+            'completed' => 'rgba(22,163,74,1)',
+            'partial' => 'rgba(234,179,8,1)',
+            'shipped' => 'rgba(15,118,110,1)',
+            default => 'rgba(59,130,246,1)',
+        };
+
+        // CTA text (agar tidak selalu "menunggu PRD")
+        $ctaMain = '';
+        $ctaSub = '';
+        $ctaActionLabel = null;
+
+        if ($status === 'completed') {
+            $ctaMain = 'Dokumen sudah selesai.';
+            $ctaSub = 'Semua qty sudah diterima RTS. Dokumen terkunci.';
+        } elseif ($remainingToReceive > 0) {
+            // Ada barang di Transit → CTA utama: terima fisik
+            $ctaMain = 'Barang sudah ada di Transit. RTS bisa terima sekarang.';
+            $ctaSub = 'Input qty yang benar-benar diterima. Sistem akan mutasi stok TRANSIT → RTS.';
+            $ctaActionLabel = '⚡ Buka form penerimaan RTS';
+        } elseif ($hasDispatched && $remainingToReceive <= 0 && $remainingOverall > 0) {
+            // Sudah pernah dispatch tapi saat ini tidak ada sisa di Transit (misal sudah diterima semua yang dikirim),
+            // tapi total request belum terpenuhi → tunggu dispatch berikutnya dari PRD
+            $ctaMain = 'Menunggu pengiriman berikutnya dari PRD.';
+            $ctaSub = 'PRD perlu kirim tambahan (PRD → Transit). Setelah itu RTS bisa terima di sini.';
+        } else {
+            // Belum ada dispatch sama sekali
+            $ctaMain = 'Menunggu PRD mengirim ke Transit.';
+            $ctaSub = 'Setelah PRD dispatch (PRD → Transit), RTS akan menerima dari Transit di halaman ini.';
+        }
+
+        // Over-request (pakai summary yang dikirim controller kalau ada)
+        $hasOver = !empty($summary['has_over_request']);
+        $overLinesCount = $summary['over_lines_count'] ?? 0;
+        $overQtyTotal = $summary['over_qty_total'] ?? 0;
     @endphp
 
     <div class="page-wrap">
@@ -437,18 +522,23 @@
                             <span class="mono">{{ $stockRequest->created_at?->format('d M Y H:i') ?? '—' }}</span>
                         </div>
 
+                        {{-- SUMMARY UPGRADE (request / dispatched / received / sisa transit) --}}
                         <div class="summary-row">
                             <div class="summary-pill">
                                 <span>Diminta</span>
                                 <span class="mono">{{ (int) $totalRequested }} pcs</span>
                             </div>
                             <div class="summary-pill">
-                                <span>Terkirim (draft)</span>
-                                <span class="mono">{{ (int) $totalIssued }} pcs</span>
+                                <span>Dikirim PRD</span>
+                                <span class="mono">{{ (int) $totalDispatched }} pcs</span>
+                            </div>
+                            <div class="summary-pill">
+                                <span>Diterima RTS</span>
+                                <span class="mono">{{ (int) $totalReceived }} pcs</span>
                             </div>
                             <div class="summary-pill summary-pill--sisa">
-                                <span>Sisa</span>
-                                <span class="mono">{{ (int) $totalRemaining }} pcs</span>
+                                <span>Sisa di Transit</span>
+                                <span class="mono">{{ (int) $remainingToReceive }} pcs</span>
                             </div>
                         </div>
 
@@ -457,7 +547,12 @@
                                 <span class="code">{{ $stockRequest->sourceWarehouse?->code }}</span>
                                 <span>{{ $stockRequest->sourceWarehouse?->name }}</span>
                             </div>
-                            <span style="font-size:.9rem; opacity:.7;">↓</span>
+                            <span style="font-size:.9rem; opacity:.7;">→</span>
+                            <div class="badge-warehouse">
+                                <span class="code">WH-TRANSIT</span>
+                                <span>Transit</span>
+                            </div>
+                            <span style="font-size:.9rem; opacity:.7;">→</span>
                             <div class="badge-warehouse">
                                 <span class="code">{{ $stockRequest->destinationWarehouse?->code }}</span>
                                 <span>{{ $stockRequest->destinationWarehouse?->name }}</span>
@@ -467,18 +562,8 @@
 
                     {{-- KANAN: status + tombol edit --}}
                     <div class="d-flex flex-col align-end gap-1">
-                        <div
-                            class="badge-status
-                            {{ $status === 'completed' ? 'completed' : '' }}
-                            {{ $status === 'partial' ? 'partial' : '' }}
-                            {{ in_array($status, ['submitted', 'draft', null], true) ? 'pending' : '' }}">
-                            <span class="dot"
-                                style="background:
-                                    {{ $status === 'completed'
-                                        ? 'rgba(22,163,74,1)'
-                                        : ($status === 'partial'
-                                            ? 'rgba(234,179,8,1)'
-                                            : 'rgba(59,130,246,1)') }};"></span>
+                        <div class="badge-status {{ $badgeClass }}">
+                            <span class="dot" style="background: {{ $dotColor }};"></span>
                             <span>{{ $statusLabel }}</span>
                         </div>
 
@@ -491,39 +576,32 @@
                     </div>
                 </div>
 
-                {{-- STRIP CTA – FOKUS USER --}}
+                {{-- STRIP CTA – UPGRADE (dinamis sesuai stage) --}}
                 <div class="cta-strip">
                     <div>
-                        @if ($canConfirm)
-                            <div class="cta-text-main">
-                                Konfirmasi fisik & finalize pengiriman ke RTS.
-                            </div>
-                            <div class="cta-text-sub mt-1">
-                                <span class="step">1</span> Cek fisik di RTS ·
-                                <span class="step">2</span> Input qty fisik ·
-                                <span class="step">3</span> Sistem mutasi stok PRD → RTS.
-                            </div>
-                        @elseif($status === 'completed')
-                            <div class="cta-text-main">
-                                Dokumen sudah selesai.
-                            </div>
-                            <div class="cta-text-sub mt-1">
-                                Qty kirim sudah dikunci dan stok PRD → RTS sudah dimutasi.
-                            </div>
-                        @else
-                            <div class="cta-text-main">
-                                Menunggu proses dari Gudang Produksi.
-                            </div>
-                            <div class="cta-text-sub mt-1">
-                                Setelah PRD isi Qty Kirim, RTS bisa konfirmasi fisik di sini.
-                            </div>
-                        @endif
+                        <div class="cta-text-main">{{ $ctaMain }}</div>
+                        <div class="cta-text-sub mt-1">
+                            @if ($status === 'completed')
+                                {{ $ctaSub }}
+                            @elseif ($remainingToReceive > 0)
+                                <span class="step">1</span> Cek fisik (Transit/RTS) ·
+                                <span class="step">2</span> Input qty diterima ·
+                                <span class="step">3</span> Mutasi stok <strong>TRANSIT → RTS</strong>.
+                            @else
+                                {{ $ctaSub }}
+                            @endif
+                        </div>
                     </div>
 
-                    <div>
-                        @if ($canConfirm)
+                    <div class="d-flex gap-2 flex-wrap">
+                        @if ($canOpenConfirm)
                             <a href="{{ route('rts.stock-requests.confirm', $stockRequest) }}" class="btn-confirm-rts">
-                                ⚡ Buka form konfirmasi fisik
+                                {{ $ctaActionLabel ?? '⚡ Buka form penerimaan RTS' }}
+                            </a>
+                        @elseif ($status !== 'completed')
+                            {{-- tombol alternatif: ke detail PRD process (biar RTS bisa “lihat progres PRD”) --}}
+                            <a href="{{ route('prd.stock-requests.edit', $stockRequest) }}" class="btn-secondary-rts">
+                                👀 Lihat proses PRD
                             </a>
                         @endif
                     </div>
@@ -544,12 +622,12 @@
                 @endif
 
                 {{-- OVER-REQUEST (kecil, nggak rame) --}}
-                @if (!empty($summary['has_over_request']))
+                @if ($hasOver)
                     <div class="mb-2">
                         <span class="badge-over">
                             <span class="badge-over-dot"></span>
-                            {{ $summary['over_lines_count'] }} baris over-request ·
-                            selisih {{ $summary['over_qty_total'] }} pcs dari stok PRD (snapshot).
+                            {{ $overLinesCount }} baris over-request ·
+                            selisih {{ $overQtyTotal }} pcs dari stok PRD (snapshot).
                         </span>
                     </div>
                 @endif
@@ -559,7 +637,7 @@
                         DETAIL ITEM
                     </div>
                     <div class="muted">
-                        Sisa = Request − Keluar PRD (draft sebelum finalize)
+                        Sisa Transit = Dikirim PRD − Diterima RTS
                     </div>
                 </div>
 
@@ -569,25 +647,28 @@
                             <tr>
                                 <th style="width: 32px;">#</th>
                                 <th>Item FG</th>
-                                <th style="width: 14%;">Qty Request</th>
-                                <th style="width: 18%;">Qty Keluar PRD</th>
-                                <th style="width: 16%;">Sisa</th>
-                                <th style="width: 18%;">Stok PRD (snapshot)</th>
+                                <th style="width: 12%;">Qty Request</th>
+                                <th style="width: 14%;">Dikirim PRD</th>
+                                <th style="width: 14%;">Diterima RTS</th>
+                                <th style="width: 14%;">Sisa Transit</th>
+                                <th style="width: 16%;">Stok PRD (snapshot)</th>
                             </tr>
                         </thead>
                         <tbody>
                             @forelse ($stockRequest->lines as $index => $line)
                                 @php
                                     $qtyRequest = (float) ($line->qty_request ?? 0);
+                                    $qtyDispatched = (float) ($line->qty_dispatched ?? 0);
+                                    $qtyReceived = (float) ($line->qty_received ?? 0);
+
                                     $snapshot =
                                         $line->stock_snapshot_at_request !== null
                                             ? (float) $line->stock_snapshot_at_request
                                             : null;
-                                    $qtyIssued = $line->qty_issued !== null ? (float) $line->qty_issued : null;
+
                                     $isOverRequest = $snapshot !== null && $qtyRequest > $snapshot;
 
-                                    $diff = $qtyIssued !== null ? $qtyRequest - $qtyIssued : $qtyRequest;
-                                    $displayDiff = $diff < 0 ? 0 : $diff;
+                                    $sisaTransit = max($qtyDispatched - $qtyReceived, 0);
                                 @endphp
                                 <tr>
                                     <td class="mono align-top">
@@ -619,24 +700,26 @@
 
                                     {{-- Qty Request --}}
                                     <td class="mono align-top">
-                                        {{ $qtyRequest }}
+                                        {{ (int) $qtyRequest }}
                                         <span class="text-slate-400" style="font-size:.7rem;">pcs</span>
                                     </td>
 
-                                    {{-- Qty Keluar PRD --}}
+                                    {{-- Dikirim PRD --}}
                                     <td class="mono align-top">
-                                        @if ($qtyIssued !== null)
-                                            {{ $qtyIssued }}
-                                            <span class="text-slate-400" style="font-size:.7rem;">pcs</span>
-                                        @else
-                                            <span class="text-slate-400">—</span>
-                                        @endif
+                                        {{ (int) $qtyDispatched }}
+                                        <span class="text-slate-400" style="font-size:.7rem;">pcs</span>
                                     </td>
 
-                                    {{-- Sisa --}}
+                                    {{-- Diterima RTS --}}
                                     <td class="mono align-top">
-                                        <span class="{{ $displayDiff > 0 ? 'text-danger fw-semibold' : 'text-success' }}">
-                                            {{ $displayDiff }}
+                                        {{ (int) $qtyReceived }}
+                                        <span class="text-slate-400" style="font-size:.7rem;">pcs</span>
+                                    </td>
+
+                                    {{-- Sisa Transit --}}
+                                    <td class="mono align-top">
+                                        <span class="{{ $sisaTransit > 0 ? 'text-danger fw-semibold' : 'text-success' }}">
+                                            {{ (int) $sisaTransit }}
                                         </span>
                                         <span class="text-slate-400" style="font-size:.7rem;">pcs</span>
                                     </td>
@@ -644,7 +727,7 @@
                                     {{-- Stok PRD snapshot --}}
                                     <td class="mono align-top">
                                         @if ($snapshot !== null)
-                                            {{ $snapshot }}
+                                            {{ (int) $snapshot }}
                                             <span class="text-slate-400" style="font-size:.7rem;">pcs</span>
                                         @else
                                             <span class="text-slate-400">—</span>
@@ -653,7 +736,7 @@
                                 </tr>
                             @empty
                                 <tr>
-                                    <td colspan="6" class="text-center text-sm text-slate-500 py-4">
+                                    <td colspan="7" class="text-center text-sm text-slate-500 py-4">
                                         Tidak ada detail item.
                                     </td>
                                 </tr>
@@ -668,6 +751,19 @@
                         <span class="mono">
                             {{ $stockRequest->updated_at?->format('d M Y H:i') ?? '—' }}
                         </span>
+                    </div>
+
+                    {{-- hint status kecil biar user paham stage --}}
+                    <div class="muted">
+                        @if ($status === 'completed')
+                            Status: selesai.
+                        @elseif ($remainingToReceive > 0)
+                            Status: siap diterima RTS (ada sisa di Transit).
+                        @elseif ($remainingOverall > 0)
+                            Status: menunggu PRD kirim tambahan.
+                        @else
+                            Status: siap selesai (cek data).
+                        @endif
                     </div>
                 </div>
             </div>

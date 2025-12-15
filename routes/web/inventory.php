@@ -124,7 +124,7 @@ Route::middleware(['web', 'auth', 'role:owner,admin,operating'])->group(function
         ->group(function () {
             Route::get('/', [RtsStockRequestProcessController::class, 'index'])->name('index');
             Route::get('/{stockRequest}/process', [RtsStockRequestProcessController::class, 'edit'])->name('edit');
-            Route::post('/{stockRequest}/process', [RtsStockRequestProcessController::class, 'update'])->name('update');
+            // Route::post('/{stockRequest}/process', [RtsStockRequestProcessController::class, 'update'])->name('update');
             Route::get('/{stockRequest}', [RtsStockRequestProcessController::class, 'show'])->name('show');
             Route::post('/{stockRequest}/process/confirm',
                 [RtsStockRequestProcessController::class, 'confirm']
