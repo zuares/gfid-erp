@@ -2,6 +2,7 @@
 
 namespace App\Models;
 
+use App\Models\User;
 use Illuminate\Database\Eloquent\Factories\HasFactory;
 use Illuminate\Database\Eloquent\Model;
 
@@ -9,7 +10,6 @@ class StockRequest extends Model
 {
     use HasFactory;
 
-    // Kalau mau pakai guarded, boleh juga
     protected $fillable = [
         'code',
         'date',
@@ -28,89 +28,34 @@ class StockRequest extends Model
         'received_at' => 'datetime',
     ];
 
-    /*
-    |--------------------------------------------------------------------------
-    |  RELATIONSHIPS
-    |--------------------------------------------------------------------------
-     */
-
-    /**
-     * Detail baris item yang diminta.
-     */
     public function lines()
     {
-        return $this->hasMany(StockRequestLine::class)
-            ->orderBy('line_no');
+        return $this->hasMany(StockRequestLine::class)->orderBy('line_no');
     }
 
-    /**
-     * Gudang asal (source).
-     */
     public function sourceWarehouse()
     {
         return $this->belongsTo(Warehouse::class, 'source_warehouse_id');
     }
 
-    /**
-     * Gudang tujuan (destination).
-     */
     public function destinationWarehouse()
     {
         return $this->belongsTo(Warehouse::class, 'destination_warehouse_id');
     }
 
-    /**
-     * User yang mengajukan request.
-     */
     public function requestedBy()
     {
         return $this->belongsTo(User::class, 'requested_by_user_id');
     }
 
-    /*
-    |--------------------------------------------------------------------------
-    |  SCOPES
-    |--------------------------------------------------------------------------
-     */
-
-    /**
-     * Scope: hanya stock request dengan purpose tertentu.
-     */
-    public function scopePurpose($query, string $purpose)
+    public function scopePurpose($q, string $purpose)
     {
-        return $query->where('purpose', $purpose);
+        return $q->where('purpose', $purpose);
     }
 
-    /**
-     * Scope: khusus untuk Ready To Sell Replenish (RTS minta ke PRD).
-     */
-    public function scopeRtsReplenish($query)
+    public function scopeRtsReplenish($q)
     {
-        return $query->where('purpose', 'rts_replenish');
-    }
-
-    /**
-     * Scope: filter berdasarkan status.
-     */
-    public function scopeStatus($query, string $status)
-    {
-        return $query->where('status', $status);
-    }
-
-    /*
-    |--------------------------------------------------------------------------
-    |  HELPERS / ACCESSORS SEDERHANA
-    |--------------------------------------------------------------------------
-     */
-
-    public function isDraft(): bool
-    {
-        return $this->status === 'draft';
-    }
-
-    public function isSubmitted(): bool
-    {
-        return $this->status === 'submitted';
+        return $q->where('purpose', 'rts_replenish');
     }
 
     public function isCompleted(): bool
@@ -118,27 +63,33 @@ class StockRequest extends Model
         return $this->status === 'completed';
     }
 
-    public function isPartial(): bool
+    public function totalRequested(): float
     {
-        return $this->status === 'partial';
-    }
-
-    /**
-     * Hitung total qty_request semua baris.
-     */
-    public function getTotalRequestedQtyAttribute(): float
-    {
-        // pastikan lines sudah di-load biar nggak N+1
         return (float) $this->lines->sum('qty_request');
     }
 
-    /**
-     * Hitung total qty_issued semua baris.
-     */
-    public function getTotalIssuedQtyAttribute(): float
+    public function totalDispatched(): float
     {
-        return (float) $this->lines->sum(function (StockRequestLine $line) {
-            return $line->qty_issued ?? 0;
-        });
+        return (float) $this->lines->sum('qty_dispatched');
+    }
+
+    public function totalReceived(): float
+    {
+        return (float) $this->lines->sum('qty_received');
+    }
+
+    public function totalPicked(): float
+    {
+        return (float) $this->lines->sum('qty_picked');
+    }
+
+    public function totalFulfilledToRts(): float
+    {
+        return (float) $this->lines->sum(fn($l) => (float) $l->qty_received + (float) $l->qty_picked);
+    }
+
+    public function outstandingToRts(): float
+    {
+        return (float) $this->lines->sum(fn($l) => $l->outstandingQty());
     }
 }

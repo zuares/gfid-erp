@@ -152,7 +152,8 @@ Route::middleware(['web', 'auth', 'role:owner,admin'])->group(function () {
             // 🔹 BARU: form konfirmasi fisik + finalize
             Route::get('/{stockRequest}/confirm', [RtsStockRequestController::class, 'confirmReceive'])->name('confirm');
             Route::post('/{stockRequest}/finalize', [RtsStockRequestController::class, 'finalize'])->name('finalize');
-
+            Route::post('/{stockRequest}/direct-pickup', [RtsStockRequestController::class, 'directPickup'])
+                ->name('direct-pickup');
         });
 });
 

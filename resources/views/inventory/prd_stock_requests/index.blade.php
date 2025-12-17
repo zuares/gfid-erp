@@ -26,12 +26,8 @@
 
         .page-title {
             font-size: 1.1rem;
-            font-weight: 600;
-        }
-
-        .page-subtitle {
-            font-size: .84rem;
-            color: rgba(100, 116, 139, 1);
+            font-weight: 650;
+            margin-bottom: .2rem;
         }
 
         .mono {
@@ -40,48 +36,43 @@
             font-variant-numeric: tabular-nums;
         }
 
-        .muted {
-            color: rgba(148, 163, 184, 1);
-            font-size: .76rem;
-        }
-
         /* STATS */
         .stats-grid {
             display: grid;
             grid-template-columns: repeat(4, minmax(0, 1fr));
             gap: .7rem;
-            margin: .9rem 0;
+            margin: .8rem 0 1rem;
         }
 
         .stat-card {
             background: var(--card);
-            border-radius: 10px;
-            padding: .65rem .8rem;
-            border: 1px solid rgba(148, 163, 184, 0.25);
+            border-radius: 12px;
+            padding: .7rem .85rem;
+            border: 1px solid rgba(148, 163, 184, 0.22);
         }
 
         .stat-label {
-            font-size: .7rem;
-            color: rgba(148, 163, 184, 1);
+            font-size: .68rem;
+            color: rgba(100, 116, 139, 1);
             letter-spacing: .14em;
             text-transform: uppercase;
         }
 
         .stat-value {
-            font-size: 1.02rem;
-            font-weight: 600;
+            font-size: 1.05rem;
+            font-weight: 650;
             margin-top: .18rem;
             font-variant-numeric: tabular-nums;
         }
 
         /* FILTER CHIPS */
         .chip {
-            padding: .16rem .55rem;
+            padding: .18rem .6rem;
             font-size: .78rem;
             border-radius: 999px;
             text-decoration: none;
-            border: 1px solid rgba(148, 163, 184, .5);
-            background: rgba(248, 250, 252, .9);
+            border: 1px solid rgba(148, 163, 184, .45);
+            background: rgba(248, 250, 252, .85);
             margin-right: .25rem;
             display: inline-block;
         }
@@ -92,40 +83,47 @@
             border-color: var(--rts-main-strong);
         }
 
-        /* DESKTOP TABLE */
+        /* TABLE */
         .table-card {
             background: var(--card);
-            border-radius: 10px;
-            border: 1px solid rgba(148, 163, 184, .25);
+            border-radius: 12px;
+            border: 1px solid rgba(148, 163, 184, .22);
             overflow: hidden;
         }
 
         .table {
             width: 100%;
             border-collapse: collapse;
-            font-size: .82rem;
+            font-size: .84rem;
         }
 
         .table th,
         .table td {
-            padding: .45rem .6rem;
-            border-bottom: 1px solid rgba(148, 163, 184, .22);
+            padding: .55rem .65rem;
+            border-bottom: 1px solid rgba(148, 163, 184, .18);
             vertical-align: top;
         }
 
         .table thead {
-            background: rgba(15, 23, 42, 0.035);
+            background: rgba(15, 23, 42, 0.03);
+        }
+
+        .table thead th {
+            font-size: .72rem;
+            text-transform: uppercase;
+            letter-spacing: .08em;
+            color: rgba(100, 116, 139, 1);
         }
 
         /* STATUS BADGE */
         .badge-status {
-            padding: .12rem .48rem;
+            padding: .14rem .5rem;
             border-radius: 999px;
             font-size: .72rem;
-            font-weight: 500;
+            font-weight: 600;
             display: inline-flex;
             align-items: center;
-            line-height: 1.2;
+            line-height: 1.1;
         }
 
         .badge-status.pending {
@@ -153,16 +151,16 @@
             color: #475569;
         }
 
-        /* CODE + QTY BADGES */
+        /* CODE + MINI BADGES */
         .code-badge {
             display: inline-flex;
             align-items: center;
-            gap: .28rem;
+            gap: .35rem;
             border-radius: 999px;
-            padding: .1rem .5rem;
-            font-size: .78rem;
+            padding: .12rem .55rem;
+            font-size: .8rem;
             background: rgba(15, 23, 42, 0.03);
-            border: 1px solid rgba(148, 163, 184, 0.4);
+            border: 1px solid rgba(148, 163, 184, 0.35);
         }
 
         .code-badge .dot {
@@ -172,19 +170,33 @@
             background: var(--rts-main-strong);
         }
 
+        .badge-mini-dadakan {
+            display: inline-flex;
+            align-items: center;
+            gap: .25rem;
+            padding: .06rem .45rem;
+            border-radius: 999px;
+            font-size: .68rem;
+            border: 1px solid rgba(234, 179, 8, .55);
+            background: rgba(234, 179, 8, .14);
+            color: rgba(133, 77, 14, 1);
+            line-height: 1.1;
+        }
+
+        /* QTY BADGES */
         .qty-badges {
             display: inline-flex;
             flex-wrap: wrap;
             gap: .25rem;
-            margin-top: .25rem;
+            margin-top: .35rem;
         }
 
         .qty-badge {
             border-radius: 999px;
-            padding: .06rem .45rem;
+            padding: .08rem .5rem;
             font-size: .72rem;
             background: rgba(15, 23, 42, 0.02);
-            border: 1px solid rgba(148, 163, 184, .5);
+            border: 1px solid rgba(148, 163, 184, .45);
             display: inline-flex;
             align-items: center;
             gap: .25rem;
@@ -197,113 +209,46 @@
             color: var(--rts-main-strong);
         }
 
-        .item-line {
-            font-size: .8rem;
-        }
-
-        .item-line .mono {
-            font-size: .78rem;
-        }
-
-        .item-sisa {
-            display: inline-flex;
-            align-items: center;
-            gap: .25rem;
-            margin-left: .35rem;
-            font-size: .74rem;
-            padding: .02rem .4rem;
-            border-radius: 999px;
-            background: rgba(45, 212, 191, 0.09);
-            color: var(--rts-main-strong);
-        }
-
-        .link-detail {
+        /* ACTION */
+        .link-action {
             color: var(--rts-main-strong);
             text-decoration: none;
-            font-size: .78rem;
+            font-size: .8rem;
+            font-weight: 650;
         }
 
-        .link-detail:hover {
+        .link-action:hover {
             text-decoration: underline;
         }
 
-        /* MOBILE CARDS */
+        /* MOBILE */
         .mobile-list {
             display: none;
         }
 
         .rts-card {
             background: var(--card);
-            border-radius: 10px;
-            border: 1px solid rgba(148, 163, 184, .32);
-            padding: .75rem .85rem;
-            margin-bottom: .65rem;
+            border-radius: 12px;
+            border: 1px solid rgba(148, 163, 184, .28);
+            padding: .85rem .9rem;
+            margin-bottom: .7rem;
         }
 
-        .rts-card-header {
+        .rts-card-top {
             display: flex;
             justify-content: space-between;
-            align-items: center;
-            gap: .5rem;
-            margin-bottom: .25rem;
+            align-items: flex-start;
+            gap: .6rem;
+            margin-bottom: .55rem;
         }
 
         .rts-card-meta {
-            font-size: .78rem;
+            display: inline-flex;
+            align-items: center;
+            gap: .5rem;
+            font-size: .8rem;
             color: rgba(100, 116, 139, 1);
-            margin-bottom: .25rem;
-        }
-
-        .rts-card-gudang {
-            font-size: .8rem;
-            margin-bottom: .2rem;
-        }
-
-        .rts-card-gudang span {
-            display: inline-block;
-        }
-
-        .total-sisa-pill {
-            display: inline-flex;
-            align-items: center;
-            gap: .35rem;
-            border-radius: 999px;
-            padding: .12rem .55rem;
-            font-size: .78rem;
-            background: var(--rts-main-soft);
-            color: var(--rts-main-strong);
-            margin-bottom: .2rem;
-        }
-
-        .total-sisa-pill span.mono {
-            font-weight: 600;
-        }
-
-        .rts-card-items {
-            font-size: .8rem;
-            margin-top: .15rem;
-        }
-
-        .item-row {
-            display: flex;
-            justify-content: space-between;
-            align-items: center;
-            gap: .75rem;
-            margin-bottom: .06rem;
-        }
-
-        .item-row-left {
-            display: inline-flex;
-            align-items: center;
-            gap: .25rem;
-        }
-
-        .badge-sisa {
-            border-radius: 999px;
-            padding: .03rem .45rem;
-            font-size: .74rem;
-            background: rgba(45, 212, 191, 0.12);
-            color: var(--rts-main-strong);
+            margin-top: .25rem;
         }
 
         .btn-process {
@@ -311,42 +256,31 @@
             justify-content: center;
             align-items: center;
             width: 100%;
-            padding: .42rem .8rem;
+            padding: .48rem .9rem;
             border-radius: 999px;
             border: none;
             background: var(--rts-main-strong);
             color: #ecfeff;
-            font-size: .82rem;
-            font-weight: 600;
+            font-size: .85rem;
+            font-weight: 650;
             text-decoration: none;
-            margin-top: .45rem;
+            margin-top: .65rem;
         }
 
-        .btn-process span.icon {
-            font-size: .9rem;
-            margin-right: .2rem;
-        }
-
-        .btn-detail-ghost {
+        .btn-detail {
             display: inline-flex;
             justify-content: center;
             align-items: center;
             width: 100%;
-            padding: .38rem .8rem;
+            padding: .44rem .9rem;
             border-radius: 999px;
-            border: 1px solid rgba(148, 163, 184, .7);
+            border: 1px solid rgba(148, 163, 184, .6);
             background: transparent;
             color: #0f172a;
-            font-size: .8rem;
-            font-weight: 500;
+            font-size: .85rem;
+            font-weight: 600;
             text-decoration: none;
-            margin-top: .45rem;
-        }
-
-        .btn-detail-ghost:hover,
-        .btn-process:hover {
-            text-decoration: none;
-            filter: brightness(0.98);
+            margin-top: .6rem;
         }
 
         @media (max-width: 768px) {
@@ -377,19 +311,16 @@
 
     <div class="page-wrap">
 
-        <div class="d-flex justify-content-between align-items-start mb-3 flex-wrap gap-2">
+        <div class="d-flex justify-content-between align-items-start mb-2 flex-wrap gap-2">
             <div>
                 <div class="page-title">PRD • Permintaan Stok dari RTS</div>
-                <div class="page-subtitle mt-1">
-                    Fokus ke permintaan yang perlu segera diproses Gudang Produksi (kirim ke Transit).
-                </div>
             </div>
         </div>
 
         {{-- STATS --}}
         <div class="stats-grid">
             <div class="stat-card">
-                <div class="stat-label">Total Dokumen</div>
+                <div class="stat-label">Total</div>
                 <div class="stat-value mono">{{ $stats['total'] ?? 0 }}</div>
             </div>
 
@@ -442,29 +373,29 @@
             <table class="table">
                 <thead>
                     <tr>
-                        <th style="width: 85px;">Tanggal</th>
-                        <th style="width: 220px;">Kode & Qty</th>
-                        <th>Gudang</th>
-                        <th style="width: 280px;">Item</th>
-                        <th style="width: 130px;">Status</th>
-                        <th style="width: 90px;">Aksi</th>
+                        <th style="width: 92px;">Tanggal</th>
+                        <th style="width: 320px;">Dokumen</th>
+                        <th style="width: 210px;">Qty</th>
+                        <th style="width: 140px;">Status</th>
+                        <th style="width: 90px;" class="text-end">Aksi</th>
                     </tr>
                 </thead>
                 <tbody>
                     @forelse ($stockRequests as $req)
                         @php
-                            $lines = $req->lines->take(3);
-                            $extra = $req->lines->count() - 3;
-
                             $totalReq = (float) ($req->total_requested_qty ?? 0);
                             $totalDispatched = (float) ($req->total_dispatched_qty ?? 0);
                             $outstanding = max($totalReq - $totalDispatched, 0);
 
+                            $totalPicked = (float) ($req->total_picked_qty ?? $req->lines->sum('qty_picked'));
+                            $isDadakan = $totalPicked > 0 && $req->status === 'submitted';
+
                             $statusLabel = match ($req->status) {
-                                'submitted' => 'Menunggu diproses PRD',
-                                'shipped' => 'Sudah dikirim (di Transit)',
-                                'partial' => 'Sebagian diterima RTS',
+                                'submitted' => 'Submitted',
+                                'shipped' => 'Transit',
+                                'partial' => 'Partial',
                                 'completed' => 'Selesai',
+                                'draft' => 'Draft',
                                 default => ucfirst($req->status),
                             };
 
@@ -482,67 +413,44 @@
 
                         <tr>
                             <td class="mono">
-                                {{ $req->date?->format('d M') }}<br>
-                                <span class="muted">{{ $req->date?->format('Y') }}</span>
+                                {{ $req->date?->format('d M') ?? '-' }}<br>
+                                <span style="color:rgba(100,116,139,1);font-size:.76rem;">
+                                    {{ $req->date?->format('Y') ?? '' }}
+                                </span>
                             </td>
 
                             <td>
                                 <div class="code-badge">
                                     <span class="dot"></span>
                                     <span class="mono">{{ $req->code }}</span>
+                                    @if ($isDadakan)
+                                        <span class="badge-mini-dadakan">⚡ Dadakan</span>
+                                    @endif
                                 </div>
-
-                                @if ($totalReq > 0)
-                                    <div class="qty-badges">
-                                        <span class="qty-badge">
-                                            Diminta
-                                            <span class="mono">{{ (int) $totalReq }}</span>
-                                        </span>
-
-                                        <span class="qty-badge">
-                                            Dikirim
-                                            <span class="mono">{{ (int) $totalDispatched }}</span>
-                                        </span>
-
-                                        @if ($outstanding > 0)
-                                            <span class="qty-badge qty-badge--sisa">
-                                                Sisa
-                                                <span class="mono">{{ (int) $outstanding }}</span>
-                                            </span>
-                                        @endif
-                                    </div>
-                                @endif
+                                <div class="qty-badges">
+                                    <span class="qty-badge">Diminta <span
+                                            class="mono">{{ (int) $totalReq }}</span></span>
+                                    <span class="qty-badge">Dikirim <span
+                                            class="mono">{{ (int) $totalDispatched }}</span></span>
+                                    @if ($totalPicked > 0)
+                                        <span class="qty-badge">Picked <span
+                                                class="mono">{{ (int) $totalPicked }}</span></span>
+                                    @endif
+                                    @if ($outstanding > 0)
+                                        <span class="qty-badge qty-badge--sisa">Sisa <span
+                                                class="mono">{{ (int) $outstanding }}</span></span>
+                                    @endif
+                                </div>
                             </td>
 
                             <td>
-                                {{ $req->sourceWarehouse?->name ?? '-' }}<br>
-                                <span class="muted">
-                                    → Transit → {{ $req->destinationWarehouse?->name ?? '-' }}
-                                </span>
-                            </td>
-
-                            <td>
-                                @foreach ($lines as $line)
-                                    @php
-                                        $lineReq = (float) $line->qty_request;
-                                        $lineDisp = (float) ($line->qty_dispatched ?? 0);
-                                        $lineOutstanding = max($lineReq - $lineDisp, 0);
-                                    @endphp
-                                    <div class="item-line">
-                                        <span class="mono">{{ $line->item?->code ?? '-' }}</span> :
-                                        <strong class="mono">{{ (int) $lineReq }}</strong> pcs
-                                        @if ($lineOutstanding > 0)
-                                            <span class="item-sisa">
-                                                sisa
-                                                <span class="mono">{{ (int) $lineOutstanding }}</span>
-                                            </span>
-                                        @endif
-                                    </div>
-                                @endforeach
-
-                                @if ($extra > 0)
-                                    <div class="muted">+{{ $extra }} item lainnya</div>
-                                @endif
+                                <div class="mono" style="font-weight:650;">
+                                    {{ $req->lines_count ?? $req->lines->count() }} item
+                                </div>
+                                <div style="color:rgba(100,116,139,1);font-size:.78rem;">
+                                    {{ $req->sourceWarehouse?->code ?? 'PRD' }} →
+                                    {{ $req->destinationWarehouse?->code ?? 'RTS' }}
+                                </div>
                             </td>
 
                             <td>
@@ -551,22 +459,18 @@
                                 </div>
                             </td>
 
-                            <td>
+                            <td class="text-end">
                                 @if ($isProcessable)
-                                    <a href="{{ route('prd.stock-requests.edit', $req) }}" class="link-detail">
-                                        Proses
-                                    </a>
+                                    <a href="{{ route('prd.stock-requests.edit', $req) }}" class="link-action">Proses</a>
                                 @else
-                                    <a href="{{ route('prd.stock-requests.show', $req) }}" class="link-detail">
-                                        Detail
-                                    </a>
+                                    <a href="{{ route('prd.stock-requests.show', $req) }}" class="link-action">Detail</a>
                                 @endif
                             </td>
                         </tr>
                     @empty
                         <tr>
-                            <td colspan="6" class="text-center py-4 text-muted">
-                                Belum ada permintaan RTS.
+                            <td colspan="5" class="text-center py-4" style="color:rgba(100,116,139,1);">
+                                Belum ada permintaan.
                             </td>
                         </tr>
                     @endforelse
@@ -584,18 +488,19 @@
         <div class="mobile-list d-md-none">
             @forelse ($stockRequests as $req)
                 @php
-                    $lines = $req->lines->take(2);
-                    $extra = $req->lines->count() - 2;
-
                     $totalReq = (float) ($req->total_requested_qty ?? 0);
                     $totalDispatched = (float) ($req->total_dispatched_qty ?? 0);
                     $outstanding = max($totalReq - $totalDispatched, 0);
 
+                    $totalPicked = (float) ($req->total_picked_qty ?? $req->lines->sum('qty_picked'));
+                    $isDadakan = $totalPicked > 0 && $req->status === 'submitted';
+
                     $statusLabel = match ($req->status) {
-                        'submitted' => 'Menunggu',
+                        'submitted' => 'Submitted',
                         'shipped' => 'Transit',
-                        'partial' => 'Sebagian',
+                        'partial' => 'Partial',
                         'completed' => 'Selesai',
+                        'draft' => 'Draft',
                         default => ucfirst($req->status),
                     };
 
@@ -612,79 +517,49 @@
                 @endphp
 
                 <div class="rts-card">
-                    <div class="rts-card-header">
-                        <div class="code-badge">
-                            <span class="dot"></span>
-                            <span class="mono">{{ $req->code }}</span>
+                    <div class="rts-card-top">
+                        <div>
+                            <div class="code-badge">
+                                <span class="dot"></span>
+                                <span class="mono">{{ $req->code }}</span>
+                                @if ($isDadakan)
+                                    <span class="badge-mini-dadakan">⚡ Dadakan</span>
+                                @endif
+                            </div>
+                            <div class="rts-card-meta">
+                                <span class="mono">{{ $req->date?->format('d M Y') ?? '-' }}</span>
+                                <span>•</span>
+                                <span class="mono">{{ $req->lines_count ?? $req->lines->count() }} item</span>
+                            </div>
                         </div>
+
                         <div class="badge-status {{ $badgeClass }}">
                             {{ $statusLabel }}
                         </div>
                     </div>
 
-                    <div class="rts-card-meta">
-                        {{ $req->date?->format('d M Y') ?? '-' }} •
-                        <span class="mono">{{ $req->created_at?->format('H:i') }}</span>
-                    </div>
-
-                    <div class="rts-card-gudang">
-                        {{ $req->sourceWarehouse?->name ?? '-' }} →
-                        <span class="muted">Transit → {{ $req->destinationWarehouse?->name ?? '-' }}</span>
-                    </div>
-
-                    <div class="total-sisa-pill">
-                        <span>Diminta</span>
-                        <span class="mono">{{ (int) $totalReq }}</span>
-                        <span class="muted">•</span>
-                        <span>Dikirim</span>
-                        <span class="mono">{{ (int) $totalDispatched }}</span>
-                        @if ($outstanding > 0)
-                            <span class="muted">•</span>
-                            <span>Sisa</span>
-                            <span class="mono">{{ (int) $outstanding }}</span>
+                    <div class="qty-badges">
+                        <span class="qty-badge">Diminta <span class="mono">{{ (int) $totalReq }}</span></span>
+                        <span class="qty-badge">Dikirim <span class="mono">{{ (int) $totalDispatched }}</span></span>
+                        @if ($totalPicked > 0)
+                            <span class="qty-badge">Picked <span class="mono">{{ (int) $totalPicked }}</span></span>
                         @endif
-                    </div>
-
-                    <div class="rts-card-items">
-                        @foreach ($lines as $line)
-                            @php
-                                $lineReq = (float) $line->qty_request;
-                                $lineDisp = (float) ($line->qty_dispatched ?? 0);
-                                $lineOutstanding = max($lineReq - $lineDisp, 0);
-                            @endphp
-                            <div class="item-row">
-                                <div class="item-row-left">
-                                    <span class="mono">{{ $line->item?->code ?? '-' }}</span>
-                                    <span class="mono">{{ (int) $lineReq }}</span>
-                                </div>
-                                @if ($lineOutstanding > 0)
-                                    <span class="badge-sisa mono">
-                                        sisa {{ (int) $lineOutstanding }}
-                                    </span>
-                                @endif
-                            </div>
-                        @endforeach
-
-                        @if ($extra > 0)
-                            <div class="muted mt-1">+{{ $extra }} item</div>
+                        @if ($outstanding > 0)
+                            <span class="qty-badge qty-badge--sisa">Sisa <span
+                                    class="mono">{{ (int) $outstanding }}</span></span>
                         @endif
                     </div>
 
                     @if ($isProcessable)
-                        <a href="{{ route('prd.stock-requests.edit', $req) }}" class="btn-process">
-                            <span class="icon">🚚</span>
-                            Kirim ke Transit
-                        </a>
+                        <a href="{{ route('prd.stock-requests.edit', $req) }}" class="btn-process">🚚 Proses Kirim</a>
                     @else
-                        <a href="{{ route('prd.stock-requests.show', $req) }}" class="btn-detail-ghost">
-                            Lihat detail
-                        </a>
+                        <a href="{{ route('prd.stock-requests.show', $req) }}" class="btn-detail">Lihat Detail</a>
                     @endif
                 </div>
             @empty
                 <div class="rts-card">
-                    <div class="text-center muted">
-                        Belum ada permintaan RTS.
+                    <div class="text-center" style="color:rgba(100,116,139,1);">
+                        Belum ada permintaan.
                     </div>
                 </div>
             @endforelse

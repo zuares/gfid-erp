@@ -2,6 +2,7 @@
 
 namespace App\Models;
 
+use App\Models\Item;
 use Illuminate\Database\Eloquent\Factories\HasFactory;
 use Illuminate\Database\Eloquent\Model;
 
@@ -15,75 +16,40 @@ class StockRequestLine extends Model
         'item_id',
         'qty_request',
         'stock_snapshot_at_request',
-        'qty_issued',
-        'qty_dispatched', // NEW
-        'qty_received', // NEW
+        'qty_dispatched',
+        'qty_received',
+        'qty_picked',
         'notes',
     ];
 
     protected $casts = [
-        'qty_request' => 'decimal:2',
-        'stock_snapshot_at_request' => 'decimal:2',
-        'qty_issued' => 'decimal:2',
+        'qty_request' => 'decimal:3',
+        'stock_snapshot_at_request' => 'decimal:3',
         'qty_dispatched' => 'decimal:3',
         'qty_received' => 'decimal:3',
+        'qty_picked' => 'decimal:3',
     ];
 
-    /*
-    |--------------------------------------------------------------------------
-    |  RELATIONSHIPS
-    |--------------------------------------------------------------------------
-     */
-
-    /**
-     * Header stock request.
-     */
     public function request()
     {
         return $this->belongsTo(StockRequest::class, 'stock_request_id');
     }
 
-    /**
-     * Item yang diminta.
-     */
     public function item()
     {
         return $this->belongsTo(Item::class);
     }
 
-    /*
-    |--------------------------------------------------------------------------
-    |  HELPERS
-    |--------------------------------------------------------------------------
-     */
-
-    /**
-     * Apakah line ini sudah di-issue (qty_issued ada dan > 0).
-     */
-    public function isIssued(): bool
+    public function outstandingQty(): float
     {
-        return !is_null($this->qty_issued) && (float) $this->qty_issued > 0;
+        $req = (float) ($this->qty_request ?? 0);
+        $rec = (float) ($this->qty_received ?? 0);
+        $pick = (float) ($this->qty_picked ?? 0);
+        return max($req - $rec - $pick, 0);
     }
 
-    /**
-     * Apakah qty_issued sama dengan qty_request (terpenuhi penuh).
-     */
-    public function isFullyIssued(): bool
+    public function fulfilledQty(): float
     {
-        $requested = (float) $this->qty_request;
-        $issued = (float) ($this->qty_issued ?? 0);
-
-        return $requested > 0 && bccomp((string) $requested, (string) $issued, 2) === 0;
-    }
-
-    /**
-     * Apakah hanya terpenuhi sebagian.
-     */
-    public function isPartiallyIssued(): bool
-    {
-        $requested = (float) $this->qty_request;
-        $issued = (float) ($this->qty_issued ?? 0);
-
-        return $issued > 0 && $issued < $requested;
+        return (float) ($this->qty_received ?? 0) + (float) ($this->qty_picked ?? 0);
     }
 }

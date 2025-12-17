@@ -61,7 +61,8 @@ class RtsStockRequestProcessController extends Controller
             ->with(['destinationWarehouse', 'sourceWarehouse'])
             ->withSum('lines as total_requested_qty', 'qty_request')
             ->withSum('lines as total_dispatched_qty', 'qty_dispatched')
-            ->withSum('lines as total_received_qty', 'qty_received');
+            ->withSum('lines as total_received_qty', 'qty_received')
+            ->withSum('lines as total_picked_qty', 'qty_picked'); // ✅ NEW for PRD visibility
 
         $baseQuery = $applyDateFilter($baseQuery);
 
@@ -77,15 +78,23 @@ class RtsStockRequestProcessController extends Controller
         ];
         $stats['pending'] = $stats['submitted'] + $stats['shipped'] + $stats['partial'];
 
-        // Outstanding PRD = requested - dispatched
+        /**
+         * ✅ FIX: Outstanding PRD harus mengurangi direct pickup juga
+         * Outstanding PRD = requested - (dispatched + picked)
+         * - dispatched: PRD -> TRANSIT
+         * - picked: PRD -> RTS langsung (dadakan)
+         */
         $outstandingQty = (clone $statsBase)
             ->withSum('lines as total_requested_qty', 'qty_request')
             ->withSum('lines as total_dispatched_qty', 'qty_dispatched')
+            ->withSum('lines as total_picked_qty', 'qty_picked')
             ->get()
             ->sum(function ($req) {
                 $reqQty = (float) ($req->total_requested_qty ?? 0);
                 $dispQty = (float) ($req->total_dispatched_qty ?? 0);
-                return max($reqQty - $dispQty, 0);
+                $picked = (float) ($req->total_picked_qty ?? 0);
+
+                return max($reqQty - $dispQty - $picked, 0);
             });
 
         $listQuery = clone $baseQuery;
@@ -140,7 +149,7 @@ class RtsStockRequestProcessController extends Controller
         ]);
     }
 
-    public function edit(StockRequest $stockRequest): View
+    public function edit(StockRequest $stockRequest): View | RedirectResponse
     {
         abort_unless($stockRequest->purpose === 'rts_replenish', 404);
 
@@ -169,16 +178,39 @@ class RtsStockRequestProcessController extends Controller
             ->orderBy('id')
             ->get();
 
+        // ✅ bentuk rows yang lebih "user friendly" untuk Blade
+        $historyRows = $movementHistory->map(function ($m) {
+            $qty = (float) ($m->qty_change ?? 0);
+
+            return [
+                'date' => $m->date ? \Carbon\Carbon::parse($m->date) : null,
+
+                // ✅ tambah ini (ambil dari created_at inventory_mutations)
+                'created_at' => $m->created_at
+                ? \Carbon\Carbon::parse($m->created_at)
+                : null,
+
+                'warehouse_code' => $m->warehouse->code ?? '-',
+                'warehouse_name' => $m->warehouse->name ?? '-',
+                'item_code' => $m->item->code ?? '-',
+                'item_name' => $m->item->name ?? '-',
+                'qty' => abs($qty),
+                'direction' => $qty >= 0 ? 'in' : 'out',
+                'notes' => $m->notes ?? null,
+            ];
+        })->values();
+
         return view('inventory.prd_stock_requests.edit', [
             'stockRequest' => $stockRequest,
             'liveStocks' => $liveStocks,
-            'movementHistory' => $movementHistory,
+            'movementHistory' => $movementHistory, // kalau masih mau dipakai
+            'historyRows' => $historyRows, // ✅ ini yang Blade kamu butuh
         ]);
     }
 
     /**
      * PRD KIRIM SEKARANG: PRD → TRANSIT
-     * OPSI A2: allowNegative=true (PRD boleh minus)
+     * allowNegative=true (PRD boleh minus)
      *
      * Input: lines[line_id][qty_issued]
      */
@@ -229,23 +261,36 @@ class RtsStockRequestProcessController extends Controller
                     continue;
                 }
 
-                // Optional guard: jangan lebih dari sisa request (kalau kamu mau strict)
-                // $maxDispatch = max((float)$line->qty_request - (float)$line->qty_dispatched, 0);
-                // if ($qtyToDispatch > $maxDispatch + 0.0000001) { ... }
+                /**
+                 * ✅ GUARD PENTING:
+                 * Jangan dispatch melebihi sisa "kebutuhan PRD" karena sebagian mungkin sudah terpenuhi via direct pickup.
+                 * maxDispatch = request - (dispatched + picked)
+                 */
+                $alreadyDispatched = (float) ($line->qty_dispatched ?? 0);
+                $picked = (float) ($line->qty_picked ?? 0);
+                $requested = (float) ($line->qty_request ?? 0);
+
+                $maxDispatch = max($requested - $alreadyDispatched - $picked, 0);
+
+                if ($qtyToDispatch > $maxDispatch + 0.0000001) {
+                    throw ValidationException::withMessages([
+                        "lines.{$lineId}.qty_issued" => "Qty kirim melebihi sisa kebutuhan (maks: {$maxDispatch}). Sudah ada direct pickup (picked) / dispatch sebelumnya.",
+                    ]);
+                }
 
                 $anyDispatched = true;
 
                 try {
                     $this->inventory->move(
-                        $line->item_id,
-                        $sourceWarehouseId,
-                        $transitWarehouseId,
-                        $qtyToDispatch,
+                        itemId: (int) $line->item_id,
+                        fromWarehouseId: $sourceWarehouseId,
+                        toWarehouseId: $transitWarehouseId,
+                        qty: $qtyToDispatch,
                         referenceType: 'stock_request',
                         referenceId: $stockRequest->id,
                         notes: 'PRD dispatch to TRANSIT',
                         date: $stockRequest->date ?? now(),
-                        allowNegative: true, // OPSI A2
+                        allowNegative: true,
                     );
                 } catch (\RuntimeException $e) {
                     throw ValidationException::withMessages([
@@ -253,7 +298,7 @@ class RtsStockRequestProcessController extends Controller
                     ]);
                 }
 
-                // ✅ simpan ke qty_dispatched (akumulasi)
+                // ✅ simpan akumulasi dispatch
                 $line->qty_dispatched = (float) ($line->qty_dispatched ?? 0) + $qtyToDispatch;
                 $line->save();
             }
@@ -262,10 +307,42 @@ class RtsStockRequestProcessController extends Controller
                 return;
             }
 
-            // status minimal: ada dispatch → shipped
+            /**
+             * ✅ Update status PRD-side:
+             * - shipped: ada dispatch (minimal)
+             * - partial/completed: jika (dispatched + picked) memenuhi request sepenuhnya
+             *
+             * Catatan: received itu RTS-side (Transit -> RTS), PRD gak perlu menunggu received untuk menutup permintaan,
+             * karena tujuan PRD adalah memenuhi permintaan (entah via transit atau via direct pickup).
+             */
+            $anyOutstanding = $stockRequest->lines->contains(function ($l) {
+                $req = (float) ($l->qty_request ?? 0);
+                $disp = (float) ($l->qty_dispatched ?? 0);
+                $pick = (float) ($l->qty_picked ?? 0);
+
+                return max($req - $disp - $pick, 0) > 0;
+            });
+
+            if ($anyOutstanding) {
+                // kalau ada dispatch -> shipped/partial, pilih partial bila sudah ada pemenuhan sebagian
+                $anyFulfilled = $stockRequest->lines->contains(function ($l) {
+                    return ((float) ($l->qty_dispatched ?? 0) + (float) ($l->qty_picked ?? 0)) > 0;
+                });
+
+                $stockRequest->status = $anyFulfilled ? 'partial' : 'submitted';
+                // tapi karena confirm() terjadi, anyFulfilled pasti true
+                $stockRequest->status = 'partial';
+            } else {
+                $stockRequest->status = 'completed';
+                // received_by/at tetap diisi oleh RTS-side saat benar-benar selesai di RTS,
+                // tapi tidak masalah jika completed dari PRD duluan. Biarkan null di sini.
+            }
+
+            // minimal ketika confirm() dipakai, pasti ada pergerakan -> shipped/partial/completed
             if ($stockRequest->status === 'submitted') {
                 $stockRequest->status = 'shipped';
             }
+
             $stockRequest->save();
         });
 
@@ -275,6 +352,6 @@ class RtsStockRequestProcessController extends Controller
 
         return redirect()
             ->route('prd.stock-requests.edit', $stockRequest)
-            ->with('status', 'Pengiriman PRD → TRANSIT berhasil diproses (PRD boleh minus sesuai opsi A2).');
+            ->with('status', 'Pengiriman PRD → TRANSIT berhasil diproses. (Sudah mempertimbangkan direct pickup / qty_picked).');
     }
 }
