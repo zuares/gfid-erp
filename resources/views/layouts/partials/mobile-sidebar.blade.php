@@ -152,6 +152,7 @@
         font-family: ui-monospace, SFMono-Regular, Menlo, Consolas, "Liberation Mono";
     }
 
+    /* dropdown (owner only) */
     .mobile-sidebar-toggle {
         cursor: pointer;
         border: 0;
@@ -222,67 +223,18 @@
 @php
     $userRole = auth()->user()->role ?? null;
 
-    // ROLE OPERATOR LAPANGAN (menu super ringkas)
+    $isOwner = $userRole === 'owner';
+    $isAdmin = $userRole === 'admin';
+    $isOperating = $userRole === 'operating';
+
+    // operator lapangan (menu super ringkas)
     $isOperatorRole = in_array($userRole, ['sewing', 'cutting']);
 
-    // Flag open mirroring desktop (✅ updated inventory grouping)
+    // OPEN STATE (OWNER dropdown only)
+    $masterOpen = request()->routeIs('master.customers.*') || request()->routeIs('master.items.*');
+
     $poOpen = request()->routeIs('purchasing.purchase_orders.*');
     $grnOpen = request()->routeIs('purchasing.purchase_receipts.*');
-
-    $invStocksOpen = request()->routeIs('inventory.stocks.*');
-    $invCountsOpen = request()->routeIs('inventory.stock_opnames.*') || request()->routeIs('inventory.adjustments.*');
-    $invOpen =
-        $invStocksOpen ||
-        $invCountsOpen ||
-        request()->routeIs('inventory.stock_card.*') ||
-        request()->routeIs('inventory.transfers.*');
-
-    $extInvOpen = request()->routeIs('inventory.external_transfers.*');
-
-    $stockReqOpen = request()->routeIs('rts.stock-requests.*') || request()->routeIs('prd.stock-requests.*');
-
-    $prodCutOpen = request()->routeIs('production.cutting_jobs.*');
-
-    $prodSewOpen =
-        request()->routeIs('production.sewing_pickups.*') ||
-        request()->routeIs('production.sewing_returns.*') ||
-        request()->routeIs('production.reports.operators') ||
-        request()->routeIs('production.reports.outstanding') ||
-        request()->routeIs('production.reports.aging_wip_sew') ||
-        request()->routeIs('production.reports.productivity') ||
-        request()->routeIs('production.reports.partial_pickup') ||
-        request()->routeIs('production.reports.report_reject') ||
-        request()->routeIs('production.reports.dashboard') ||
-        request()->routeIs('production.reports.lead_time') ||
-        request()->routeIs('production.reports.operator_behavior');
-
-    $prodFinOpen =
-        request()->routeIs('production.finishing_jobs.*') ||
-        request()->routeIs('production.finishing_jobs.bundles_ready');
-
-    $prodPackOpen =
-        request()->routeIs('production.packing_jobs.*') || request()->routeIs('production.packing_jobs.ready_items');
-
-    $prodQcOpen = request()->routeIs('production.qc.*');
-
-    $prodReportOpen =
-        request()->routeIs('production.reports.daily_production') ||
-        request()->routeIs('production.reports.reject_detail') ||
-        request()->routeIs('production.reports.wip_sewing_age') ||
-        request()->routeIs('production.reports.sewing_per_item') ||
-        request()->routeIs('production.reports.finishing_jobs') ||
-        request()->routeIs('production.finishing_jobs.report_per_item') ||
-        request()->routeIs('production.finishing_jobs.report_per_item_detail');
-
-    $payrollOpen =
-        request()->routeIs('payroll.cutting.*') ||
-        request()->routeIs('payroll.sewing.*') ||
-        request()->routeIs('payroll.piece_rates.*') ||
-        request()->routeIs('payroll.reports.*');
-
-    $costingOpen = request()->routeIs('costing.hpp.*') || request()->routeIs('costing.production_cost_periods.*');
-
-    $masterOpen = request()->routeIs('master.customers.*') || request()->routeIs('master.items.*');
 
     $marketplaceOpen = request()->routeIs('marketplace.orders.*');
 
@@ -291,6 +243,38 @@
     $salesReportOpen = request()->routeIs('sales.reports.*');
     $salesOpen = $salesInvoiceOpen || $salesShipmentOpen || $salesReportOpen;
 
+    $invOpen =
+        request()->routeIs('inventory.stocks.*') ||
+        request()->routeIs('inventory.stock_opnames.*') ||
+        request()->routeIs('inventory.adjustments.*') ||
+        request()->routeIs('inventory.stock_card.*') ||
+        request()->routeIs('inventory.transfers.*') ||
+        request()->routeIs('inventory.external_transfers.*');
+
+    $stockReqOpen = request()->routeIs('rts.stock-requests.*') || request()->routeIs('prd.stock-requests.*');
+
+    $prodCutOpen = request()->routeIs('production.cutting_jobs.*');
+    $prodSewOpen =
+        request()->routeIs('production.sewing_pickups.*') ||
+        request()->routeIs('production.sewing_returns.*') ||
+        request()->routeIs('production.reports.*');
+
+    $prodFinOpen =
+        request()->routeIs('production.finishing_jobs.*') ||
+        request()->routeIs('production.finishing_jobs.bundles_ready');
+    $prodPackOpen =
+        request()->routeIs('production.packing_jobs.*') || request()->routeIs('production.packing_jobs.ready_items');
+    $prodQcOpen = request()->routeIs('production.qc.*');
+    $prodReportOpen =
+        request()->routeIs('production.reports.*') || request()->routeIs('production.finishing_jobs.report_per_item*');
+
+    $payrollOpen =
+        request()->routeIs('payroll.cutting.*') ||
+        request()->routeIs('payroll.sewing.*') ||
+        request()->routeIs('payroll.piece_rates.*') ||
+        request()->routeIs('payroll.reports.*');
+
+    $costingOpen = request()->routeIs('costing.hpp.*') || request()->routeIs('costing.production_cost_periods.*');
     $financeReportsOpen = $salesReportOpen;
 @endphp
 
@@ -303,9 +287,7 @@
         <div class="mobile-sidebar-title">
             {{ config('app.name', 'GFID') }}
         </div>
-        <button type="button" class="mobile-sidebar-close-btn" id="mobileSidebarCloseBtn">
-            ✕
-        </button>
+        <button type="button" class="mobile-sidebar-close-btn" id="mobileSidebarCloseBtn">✕</button>
     </div>
 
     <div class="mobile-sidebar-body">
@@ -313,11 +295,11 @@
             @auth
 
                 {{-- ============================
-                     MODE OPERATOR LAPANGAN ONLY
-                     (role: sewing / cutting)
-                     Shortcut: Cutting Create, Sewing Pickup Create, Sewing Return Create, Finishing Create
-                 ============================ --}}
+                    MODE OPERATOR LAPANGAN ONLY
+                    (role: sewing / cutting)
+                ============================ --}}
                 @if ($isOperatorRole)
+
                     <li>
                         <a href="{{ route('dashboard') }}"
                             class="mobile-sidebar-link {{ request()->routeIs('dashboard') ? 'active' : '' }}">
@@ -360,10 +342,6 @@
                         </a>
                     </li>
                 @else
-                    {{-- ============================
-                         OWNER / ADMIN / OPERATING MENU
-                     ============================ --}}
-
                     {{-- DASHBOARD --}}
                     <li>
                         <a href="{{ route('dashboard') }}"
@@ -373,36 +351,137 @@
                         </a>
                     </li>
 
-                    {{-- MASTER DATA (boleh semua yang login non-operator) --}}
-                    <div class="mobile-sidebar-section-label">Master Data</div>
+                    {{-- =====================================================
+                        SIMPLE (NO DROPDOWN): ADMIN + OPERATING
+                    ====================================================== --}}
+                    @if ($isAdmin || $isOperating)
+                        <div class="mobile-sidebar-section-label">Inventory</div>
 
-                    <li class="mb-1">
-                        <button class="mobile-sidebar-link mobile-sidebar-toggle {{ $masterOpen ? 'is-open' : '' }}"
-                            type="button" data-bs-toggle="collapse" data-bs-target="#navMasterMobile"
-                            aria-expanded="{{ $masterOpen ? 'true' : 'false' }}" aria-controls="navMasterMobile">
-                            <span class="icon">🗂️</span>
-                            <span>Master</span>
-                            <span class="chevron">▸</span>
-                        </button>
-
-                        <div class="collapse {{ $masterOpen ? 'show' : '' }}" id="navMasterMobile">
-                            {{-- Items --}}
-                            <a href="{{ route('master.items.index') }}"
-                                class="mobile-sidebar-link mobile-sidebar-link-sub {{ request()->routeIs('master.items.*') ? 'active' : '' }}">
+                        <li>
+                            <a href="{{ route('inventory.stocks.items') }}"
+                                class="mobile-sidebar-link {{ request()->routeIs('inventory.stocks.items') ? 'active' : '' }}">
                                 <span class="icon">📦</span>
-                                <span>Items</span>
+                                <span>Stok Barang</span>
                             </a>
+                        </li>
 
-                            <a href="{{ route('master.customers.index') }}"
-                                class="mobile-sidebar-link mobile-sidebar-link-sub {{ request()->routeIs('master.customers.*') ? 'active' : '' }}">
-                                <span class="icon">👤</span>
-                                <span>Customers</span>
+                        <li>
+                            <a href="{{ route('inventory.stock_opnames.index') }}"
+                                class="mobile-sidebar-link {{ request()->routeIs('inventory.stock_opnames.*') ? 'active' : '' }}">
+                                <span class="icon">📊</span>
+                                <span>Stock Opname</span>
                             </a>
-                        </div>
-                    </li>
+                        </li>
 
-                    {{-- PURCHASING (owner + admin) --}}
-                    @if (in_array($userRole, ['owner', 'admin']))
+                        {{-- ADMIN tambahan: Shipments --}}
+                        @if ($isAdmin)
+                            <div class="mobile-sidebar-section-label">Sales</div>
+
+                            <li>
+                                <a href="{{ route('sales.shipments.index') }}"
+                                    class="mobile-sidebar-link {{ request()->routeIs('sales.shipments.*') ? 'active' : '' }}">
+                                    <span class="icon">🚚</span>
+                                    <span>Shipments</span>
+                                </a>
+                            </li>
+                        @endif
+
+                        <div class="mobile-sidebar-section-label">Stock Requests</div>
+
+                        @if ($isAdmin)
+                            <li>
+                                <a href="{{ route('rts.stock-requests.index') }}"
+                                    class="mobile-sidebar-link {{ request()->routeIs('rts.stock-requests.*') ? 'active' : '' }}">
+                                    <span class="icon">🛒</span>
+                                    <span>Permintaan Stock (RTS)</span>
+                                </a>
+                            </li>
+                        @endif
+
+                        @if ($isOperating)
+                            <li>
+                                <a href="{{ route('prd.stock-requests.index') }}"
+                                    class="mobile-sidebar-link {{ request()->routeIs('prd.stock-requests.*') ? 'active' : '' }}">
+                                    <span class="icon">🏭</span>
+                                    <span>Proses Stock Request (PRD)</span>
+                                </a>
+                            </li>
+
+                            <div class="mobile-sidebar-section-label">Production</div>
+
+                            <li>
+                                <a href="{{ route('production.cutting_jobs.index') }}"
+                                    class="mobile-sidebar-link {{ request()->routeIs('production.cutting_jobs.*') ? 'active' : '' }}">
+                                    <span class="icon">✂️</span>
+                                    <span>Daftar Cutting Jobs</span>
+                                </a>
+                            </li>
+
+                            <li>
+                                <a href="{{ route('production.sewing_pickups.index') }}"
+                                    class="mobile-sidebar-link {{ request()->routeIs('production.sewing_pickups.*') ? 'active' : '' }}">
+                                    <span class="icon">🧵</span>
+                                    <span>Daftar Sewing Pickups</span>
+                                </a>
+                            </li>
+
+                            <li>
+                                <a href="{{ route('production.sewing_returns.index') }}"
+                                    class="mobile-sidebar-link {{ request()->routeIs('production.sewing_returns.*') ? 'active' : '' }}">
+                                    <span class="icon">📥</span>
+                                    <span>Daftar Sewing Returns</span>
+                                </a>
+                            </li>
+
+                            <li>
+                                <a href="{{ route('production.finishing_jobs.index') }}"
+                                    class="mobile-sidebar-link {{ request()->routeIs('production.finishing_jobs.*') ? 'active' : '' }}">
+                                    <span class="icon">🧶</span>
+                                    <span>Daftar Finishing</span>
+                                </a>
+                            </li>
+
+                            <li>
+                                <a href="{{ route('production.qc.index') }}"
+                                    class="mobile-sidebar-link {{ request()->routeIs('production.qc.*') ? 'active' : '' }}">
+                                    <span class="icon">✅</span>
+                                    <span>QC Cutting</span>
+                                </a>
+                            </li>
+                        @endif
+
+                        {{-- =====================================================
+                        OWNER (FULL): tetap dropdown lengkap
+                    ====================================================== --}}
+                    @elseif ($isOwner)
+                        {{-- MASTER DATA --}}
+                        <div class="mobile-sidebar-section-label">Master Data</div>
+
+                        <li class="mb-1">
+                            <button class="mobile-sidebar-link mobile-sidebar-toggle {{ $masterOpen ? 'is-open' : '' }}"
+                                type="button" data-bs-toggle="collapse" data-bs-target="#navMasterMobile"
+                                aria-expanded="{{ $masterOpen ? 'true' : 'false' }}" aria-controls="navMasterMobile">
+                                <span class="icon">🗂️</span>
+                                <span>Master</span>
+                                <span class="chevron">▸</span>
+                            </button>
+
+                            <div class="collapse {{ $masterOpen ? 'show' : '' }}" id="navMasterMobile">
+                                <a href="{{ route('master.items.index') }}"
+                                    class="mobile-sidebar-link mobile-sidebar-link-sub {{ request()->routeIs('master.items.*') ? 'active' : '' }}">
+                                    <span class="icon">📦</span>
+                                    <span>Items</span>
+                                </a>
+
+                                <a href="{{ route('master.customers.index') }}"
+                                    class="mobile-sidebar-link mobile-sidebar-link-sub {{ request()->routeIs('master.customers.*') ? 'active' : '' }}">
+                                    <span class="icon">👤</span>
+                                    <span>Customers</span>
+                                </a>
+                            </div>
+                        </li>
+
+                        {{-- PURCHASING --}}
                         <div class="mobile-sidebar-section-label">Purchasing</div>
 
                         <li class="mb-1">
@@ -452,10 +531,8 @@
                                 </a>
                             </div>
                         </li>
-                    @endif
 
-                    {{-- SALES & MARKETPLACE (owner + admin) --}}
-                    @if (in_array($userRole, ['owner', 'admin']))
+                        {{-- SALES & MARKETPLACE --}}
                         <div class="mobile-sidebar-section-label">Sales &amp; Marketplace</div>
 
                         <li class="mb-1">
@@ -509,7 +586,7 @@
                                 <div class="mobile-sidebar-section-label" style="margin-top:.4rem;">Shipments</div>
 
                                 <a href="{{ route('sales.shipments.index') }}"
-                                    class="mobile-sidebar-link mobile-sidebar-link-sub {{ request()->routeIs('sales.shipments.index') ? 'active' : '' }}">
+                                    class="mobile-sidebar-link mobile-sidebar-link-sub {{ request()->routeIs('sales.shipments.*') ? 'active' : '' }}">
                                     <span class="icon">🚚</span>
                                     <span>Daftar Shipment</span>
                                 </a>
@@ -541,10 +618,8 @@
                                 </a>
                             </div>
                         </li>
-                    @endif
 
-                    {{-- INVENTORY (owner + operating) --}}
-                    @if (in_array($userRole, ['owner', 'operating']))
+                        {{-- INVENTORY (OWNER FULL) --}}
                         <div class="mobile-sidebar-section-label">Inventory</div>
 
                         <li class="mb-1">
@@ -557,167 +632,105 @@
                             </button>
 
                             <div class="collapse {{ $invOpen ? 'show' : '' }}" id="navInventoryMobile">
-
-                                {{-- Stock --}}
                                 <div class="mobile-sidebar-section-label" style="margin-top:.35rem;">Stock</div>
 
                                 <a href="{{ route('inventory.stocks.items') }}"
                                     class="mobile-sidebar-link mobile-sidebar-link-sub {{ request()->routeIs('inventory.stocks.items') ? 'active' : '' }}">
                                     <span class="icon">📦</span>
-                                    <span>Stok per Item</span>
+                                    <span>Stok Barang</span>
                                 </a>
 
-                                {{-- Hidden sementara kecuali owner --}}
-                                @if ($userRole === 'owner')
-                                    <a href="{{ route('inventory.stocks.lots') }}"
-                                        class="mobile-sidebar-link mobile-sidebar-link-sub {{ request()->routeIs('inventory.stocks.lots') ? 'active' : '' }}">
-                                        <span class="icon">🎫</span>
-                                        <span>Stok per LOT</span>
-                                    </a>
+                                <a href="{{ route('inventory.stocks.lots') }}"
+                                    class="mobile-sidebar-link mobile-sidebar-link-sub {{ request()->routeIs('inventory.stocks.lots') ? 'active' : '' }}">
+                                    <span class="icon">🎫</span>
+                                    <span>Stok per LOT</span>
+                                </a>
 
-                                    <a href="{{ route('inventory.stock_card.index') }}"
-                                        class="mobile-sidebar-link mobile-sidebar-link-sub {{ request()->routeIs('inventory.stock_card.*') ? 'active' : '' }}">
-                                        <span class="icon">📋</span>
-                                        <span>Kartu Stok</span>
-                                    </a>
+                                <a href="{{ route('inventory.stock_card.index') }}"
+                                    class="mobile-sidebar-link mobile-sidebar-link-sub {{ request()->routeIs('inventory.stock_card.*') ? 'active' : '' }}">
+                                    <span class="icon">📋</span>
+                                    <span>Kartu Stok</span>
+                                </a>
 
-                                    <a href="{{ route('inventory.transfers.index') }}"
-                                        class="mobile-sidebar-link mobile-sidebar-link-sub {{ request()->routeIs('inventory.transfers.index') ? 'active' : '' }}">
-                                        <span class="icon">🔁</span>
-                                        <span>Daftar Transfer</span>
-                                    </a>
+                                <a href="{{ route('inventory.transfers.index') }}"
+                                    class="mobile-sidebar-link mobile-sidebar-link-sub {{ request()->routeIs('inventory.transfers.*') ? 'active' : '' }}">
+                                    <span class="icon">🔁</span>
+                                    <span>Transfer</span>
+                                </a>
 
-                                    <a href="{{ route('inventory.transfers.create') }}"
-                                        class="mobile-sidebar-link mobile-sidebar-link-sub {{ request()->routeIs('inventory.transfers.create') ? 'active' : '' }}">
-                                        <span class="icon">➕</span>
-                                        <span>Transfer Baru</span>
-                                    </a>
-                                @endif
+                                <a href="{{ route('inventory.external_transfers.index') }}"
+                                    class="mobile-sidebar-link mobile-sidebar-link-sub {{ request()->routeIs('inventory.external_transfers.*') ? 'active' : '' }}">
+                                    <span class="icon">🚚</span>
+                                    <span>External Transfers</span>
+                                </a>
 
-                                {{-- Grouped: Stock Opname + Adjustments --}}
-                                <div class="mobile-sidebar-section-label" style="margin-top:.55rem;">
-                                    Counting &amp; Adjustments
-                                </div>
+                                <div class="mobile-sidebar-section-label" style="margin-top:.55rem;">Opname</div>
 
                                 <a href="{{ route('inventory.stock_opnames.index') }}"
-                                    class="mobile-sidebar-link mobile-sidebar-link-sub {{ request()->routeIs('inventory.stock_opnames.index') ? 'active' : '' }}">
+                                    class="mobile-sidebar-link mobile-sidebar-link-sub {{ request()->routeIs('inventory.stock_opnames.*') ? 'active' : '' }}">
                                     <span class="icon">📊</span>
                                     <span>Stock Opname</span>
                                 </a>
 
-                                <a href="{{ route('inventory.stock_opnames.create') }}"
-                                    class="mobile-sidebar-link mobile-sidebar-link-sub {{ request()->routeIs('inventory.stock_opnames.create') ? 'active' : '' }}">
-                                    <span class="icon">＋</span>
-                                    <span>Stock Opname Baru</span>
-                                </a>
-
                                 <a href="{{ route('inventory.adjustments.index') }}"
-                                    class="mobile-sidebar-link mobile-sidebar-link-sub {{ request()->routeIs('inventory.adjustments.index') ? 'active' : '' }}">
+                                    class="mobile-sidebar-link mobile-sidebar-link-sub {{ request()->routeIs('inventory.adjustments.*') ? 'active' : '' }}">
                                     <span class="icon">⚖️</span>
-                                    <span>Inventory Adjustments</span>
-                                </a>
-
-                                <a href="{{ route('inventory.adjustments.manual.create') }}"
-                                    class="mobile-sidebar-link mobile-sidebar-link-sub {{ request()->routeIs('inventory.adjustments.manual.create') ? 'active' : '' }}">
-                                    <span class="icon">✏️</span>
-                                    <span>Manual Adjustment</span>
+                                    <span>Adjustments</span>
                                 </a>
                             </div>
                         </li>
 
-                        {{-- External Transfers --}}
-                        <li class="mb-1">
-                            <button class="mobile-sidebar-link mobile-sidebar-toggle {{ $extInvOpen ? 'is-open' : '' }}"
-                                type="button" data-bs-toggle="collapse" data-bs-target="#navInventoryExternalMobile"
-                                aria-expanded="{{ $extInvOpen ? 'true' : 'false' }}"
-                                aria-controls="navInventoryExternalMobile">
-                                <span class="icon">🚚</span>
-                                <span>External Transfers</span>
-                                <span class="chevron">▸</span>
-                            </button>
-
-                            <div class="collapse {{ $extInvOpen ? 'show' : '' }}" id="navInventoryExternalMobile">
-                                <a href="{{ route('inventory.external_transfers.index') }}"
-                                    class="mobile-sidebar-link mobile-sidebar-link-sub {{ request()->routeIs('inventory.external_transfers.index') ? 'active' : '' }}">
-                                    <span class="icon">≡</span>
-                                    <span>Daftar External TF</span>
-                                </a>
-
-                                <a href="{{ route('inventory.external_transfers.create') }}"
-                                    class="mobile-sidebar-link mobile-sidebar-link-sub {{ request()->routeIs('inventory.external_transfers.create') ? 'active' : '' }}">
-                                    <span class="icon">➕</span>
-                                    <span>External TF Baru</span>
-                                </a>
-                            </div>
-                        </li>
-                    @endif
-
-                    {{-- Stock Requests (RTS & PRD) --}}
-                    @if (in_array($userRole, ['owner', 'admin', 'operating']))
+                        {{-- STOCK REQUESTS (OWNER) --}}
                         <div class="mobile-sidebar-section-label">Stock Requests</div>
-
                         <li class="mb-1">
                             <button class="mobile-sidebar-link mobile-sidebar-toggle {{ $stockReqOpen ? 'is-open' : '' }}"
-                                type="button" data-bs-toggle="collapse"
-                                data-bs-target="#navInventoryStockRequestsMobile"
+                                type="button" data-bs-toggle="collapse" data-bs-target="#navStockRequestsMobile"
                                 aria-expanded="{{ $stockReqOpen ? 'true' : 'false' }}"
-                                aria-controls="navInventoryStockRequestsMobile">
+                                aria-controls="navStockRequestsMobile">
                                 <span class="icon">📤</span>
                                 <span>Stock Requests</span>
                                 <span class="chevron">▸</span>
                             </button>
 
-                            <div class="collapse {{ $stockReqOpen ? 'show' : '' }}" id="navInventoryStockRequestsMobile">
-                                @if (in_array($userRole, ['owner', 'admin']))
-                                    <a href="{{ route('rts.stock-requests.index') }}"
-                                        class="mobile-sidebar-link mobile-sidebar-link-sub {{ request()->routeIs('rts.stock-requests.*') ? 'active' : '' }}">
-                                        <span class="icon">🛒</span>
-                                        <span>Permintaan Stok RTS</span>
-                                    </a>
-                                @endif
+                            <div class="collapse {{ $stockReqOpen ? 'show' : '' }}" id="navStockRequestsMobile">
+                                <a href="{{ route('rts.stock-requests.index') }}"
+                                    class="mobile-sidebar-link mobile-sidebar-link-sub {{ request()->routeIs('rts.stock-requests.*') ? 'active' : '' }}">
+                                    <span class="icon">🛒</span>
+                                    <span>Permintaan Stock (RTS)</span>
+                                </a>
 
-                                @if (in_array($userRole, ['owner', 'operating']))
-                                    <a href="{{ route('prd.stock-requests.index') }}"
-                                        class="mobile-sidebar-link mobile-sidebar-link-sub {{ request()->routeIs('prd.stock-requests.*') ? 'active' : '' }}">
-                                        <span class="icon">🏭</span>
-                                        <span>Proses Stok Request PRD</span>
-                                    </a>
-                                @endif
+                                <a href="{{ route('prd.stock-requests.index') }}"
+                                    class="mobile-sidebar-link mobile-sidebar-link-sub {{ request()->routeIs('prd.stock-requests.*') ? 'active' : '' }}">
+                                    <span class="icon">🏭</span>
+                                    <span>Proses Stock Request (PRD)</span>
+                                </a>
                             </div>
                         </li>
-                    @endif
 
-                    {{-- PRODUCTION (owner + operating) --}}
-                    @if (in_array($userRole, ['owner', 'operating']))
+                        {{-- PRODUCTION (OWNER) --}}
                         <div class="mobile-sidebar-section-label">Production</div>
 
-                        {{-- Cutting Jobs --}}
                         <li class="mb-1">
                             <button class="mobile-sidebar-link mobile-sidebar-toggle {{ $prodCutOpen ? 'is-open' : '' }}"
                                 type="button" data-bs-toggle="collapse" data-bs-target="#navProductionCuttingMobile"
                                 aria-expanded="{{ $prodCutOpen ? 'true' : 'false' }}"
                                 aria-controls="navProductionCuttingMobile">
                                 <span class="icon">✂️</span>
-                                <span>Cutting Jobs</span>
+                                <span>Cutting</span>
                                 <span class="chevron">▸</span>
                             </button>
-
                             <div class="collapse {{ $prodCutOpen ? 'show' : '' }}" id="navProductionCuttingMobile">
                                 <a href="{{ route('production.cutting_jobs.index') }}"
-                                    class="mobile-sidebar-link mobile-sidebar-link-sub {{ request()->routeIs('production.cutting_jobs.index') ? 'active' : '' }}">
-                                    <span class="icon">≡</span>
-                                    <span>Daftar Cutting Job</span>
+                                    class="mobile-sidebar-link mobile-sidebar-link-sub {{ request()->routeIs('production.cutting_jobs.*') ? 'active' : '' }}">
+                                    <span class="icon">≡</span><span>Daftar Cutting Job</span>
                                 </a>
-
                                 <a href="{{ route('production.cutting_jobs.create') }}"
                                     class="mobile-sidebar-link mobile-sidebar-link-sub {{ request()->routeIs('production.cutting_jobs.create') ? 'active' : '' }}">
-                                    <span class="icon">＋</span>
-                                    <span>Cutting Job Baru</span>
+                                    <span class="icon">＋</span><span>Cutting Job Baru</span>
                                 </a>
                             </div>
                         </li>
 
-                        {{-- Sewing --}}
                         <li class="mb-1">
                             <button class="mobile-sidebar-link mobile-sidebar-toggle {{ $prodSewOpen ? 'is-open' : '' }}"
                                 type="button" data-bs-toggle="collapse" data-bs-target="#navProductionSewingMobile"
@@ -727,91 +740,22 @@
                                 <span>Sewing</span>
                                 <span class="chevron">▸</span>
                             </button>
-
                             <div class="collapse {{ $prodSewOpen ? 'show' : '' }}" id="navProductionSewingMobile">
                                 <a href="{{ route('production.sewing_pickups.index') }}"
-                                    class="mobile-sidebar-link mobile-sidebar-link-sub {{ request()->routeIs('production.sewing_pickups.index') ? 'active' : '' }}">
-                                    <span class="icon">📤</span>
-                                    <span>Sewing Pickups</span>
+                                    class="mobile-sidebar-link mobile-sidebar-link-sub {{ request()->routeIs('production.sewing_pickups.*') ? 'active' : '' }}">
+                                    <span class="icon">📤</span><span>Sewing Pickups</span>
                                 </a>
-
-                                <a href="{{ route('production.sewing_pickups.create') }}"
-                                    class="mobile-sidebar-link mobile-sidebar-link-sub {{ request()->routeIs('production.sewing_pickups.create') ? 'active' : '' }}">
-                                    <span class="icon">＋</span>
-                                    <span>Pickup Baru</span>
-                                </a>
-
                                 <a href="{{ route('production.sewing_returns.index') }}"
-                                    class="mobile-sidebar-link mobile-sidebar-link-sub {{ request()->routeIs('production.sewing_returns.index') ? 'active' : '' }}">
-                                    <span class="icon">📥</span>
-                                    <span>Sewing Returns</span>
+                                    class="mobile-sidebar-link mobile-sidebar-link-sub {{ request()->routeIs('production.sewing_returns.*') ? 'active' : '' }}">
+                                    <span class="icon">📥</span><span>Sewing Returns</span>
                                 </a>
-
-                                <a href="{{ route('production.sewing_returns.create') }}"
-                                    class="mobile-sidebar-link mobile-sidebar-link-sub {{ request()->routeIs('production.sewing_returns.create') ? 'active' : '' }}">
-                                    <span class="icon">＋</span>
-                                    <span>Return Baru</span>
-                                </a>
-
-                                <div class="mobile-sidebar-section-label" style="margin-top:.4rem;">Sewing Reports</div>
-
                                 <a href="{{ route('production.reports.dashboard') }}"
                                     class="mobile-sidebar-link mobile-sidebar-link-sub {{ request()->routeIs('production.reports.dashboard') ? 'active' : '' }}">
-                                    <span class="icon">📋</span>
-                                    <span>Daily Dashboard</span>
-                                </a>
-
-                                <a href="{{ route('production.reports.operators') }}"
-                                    class="mobile-sidebar-link mobile-sidebar-link-sub {{ request()->routeIs('production.reports.operators') ? 'active' : '' }}">
-                                    <span class="icon">👥</span>
-                                    <span>Operator Summary</span>
-                                </a>
-
-                                <a href="{{ route('production.reports.outstanding') }}"
-                                    class="mobile-sidebar-link mobile-sidebar-link-sub {{ request()->routeIs('production.reports.outstanding') ? 'active' : '' }}">
-                                    <span class="icon">⏳</span>
-                                    <span>Outstanding</span>
-                                </a>
-
-                                <a href="{{ route('production.reports.aging_wip_sew') }}"
-                                    class="mobile-sidebar-link mobile-sidebar-link-sub {{ request()->routeIs('production.reports.aging_wip_sew') ? 'active' : '' }}">
-                                    <span class="icon">📊</span>
-                                    <span>Aging WIP Sewing</span>
-                                </a>
-
-                                <a href="{{ route('production.reports.productivity') }}"
-                                    class="mobile-sidebar-link mobile-sidebar-link-sub {{ request()->routeIs('production.reports.productivity') ? 'active' : '' }}">
-                                    <span class="icon">📈</span>
-                                    <span>Productivity</span>
-                                </a>
-
-                                <a href="{{ route('production.reports.partial_pickup') }}"
-                                    class="mobile-sidebar-link mobile-sidebar-link-sub {{ request()->routeIs('production.reports.partial_pickup') ? 'active' : '' }}">
-                                    <span class="icon">🧩</span>
-                                    <span>Partial Pickup</span>
-                                </a>
-
-                                <a href="{{ route('production.reports.report_reject') }}"
-                                    class="mobile-sidebar-link mobile-sidebar-link-sub {{ request()->routeIs('production.reports.report_reject') ? 'active' : '' }}">
-                                    <span class="icon">⚠️</span>
-                                    <span>Reject Analysis</span>
-                                </a>
-
-                                <a href="{{ route('production.reports.lead_time') }}"
-                                    class="mobile-sidebar-link mobile-sidebar-link-sub {{ request()->routeIs('production.reports.lead_time') ? 'active' : '' }}">
-                                    <span class="icon">⏱️</span>
-                                    <span>Lead Time</span>
-                                </a>
-
-                                <a href="{{ route('production.reports.operator_behavior') }}"
-                                    class="mobile-sidebar-link mobile-sidebar-link-sub {{ request()->routeIs('production.reports.operator_behavior') ? 'active' : '' }}">
-                                    <span class="icon">👀</span>
-                                    <span>Operator Behavior</span>
+                                    <span class="icon">📋</span><span>Daily Dashboard</span>
                                 </a>
                             </div>
                         </li>
 
-                        {{-- Finishing --}}
                         <li class="mb-1">
                             <button class="mobile-sidebar-link mobile-sidebar-toggle {{ $prodFinOpen ? 'is-open' : '' }}"
                                 type="button" data-bs-toggle="collapse" data-bs-target="#navProductionFinishingMobile"
@@ -821,135 +765,36 @@
                                 <span>Finishing</span>
                                 <span class="chevron">▸</span>
                             </button>
-
                             <div class="collapse {{ $prodFinOpen ? 'show' : '' }}" id="navProductionFinishingMobile">
                                 <a href="{{ route('production.finishing_jobs.index') }}"
-                                    class="mobile-sidebar-link mobile-sidebar-link-sub {{ request()->routeIs('production.finishing_jobs.index') ? 'active' : '' }}">
-                                    <span class="icon">≡</span>
-                                    <span>Daftar Finishing Job</span>
+                                    class="mobile-sidebar-link mobile-sidebar-link-sub {{ request()->routeIs('production.finishing_jobs.*') ? 'active' : '' }}">
+                                    <span class="icon">≡</span><span>Daftar Finishing</span>
                                 </a>
-
                                 <a href="{{ route('production.finishing_jobs.create') }}"
                                     class="mobile-sidebar-link mobile-sidebar-link-sub {{ request()->routeIs('production.finishing_jobs.create') ? 'active' : '' }}">
-                                    <span class="icon">＋</span>
-                                    <span>Finishing Job Baru</span>
-                                </a>
-
-                                <a href="{{ route('production.finishing_jobs.bundles_ready') }}"
-                                    class="mobile-sidebar-link mobile-sidebar-link-sub {{ request()->routeIs('production.finishing_jobs.bundles_ready') ? 'active' : '' }}">
-                                    <span class="icon">📦</span>
-                                    <span>Bundles Ready for Finishing</span>
+                                    <span class="icon">＋</span><span>Finishing Baru</span>
                                 </a>
                             </div>
                         </li>
 
-                        {{-- Packing --}}
-                        <li class="mb-1">
-                            <button
-                                class="mobile-sidebar-link mobile-sidebar-toggle {{ $prodPackOpen ? 'is-open' : '' }}"
-                                type="button" data-bs-toggle="collapse" data-bs-target="#navProductionPackingMobile"
-                                aria-expanded="{{ $prodPackOpen ? 'true' : 'false' }}"
-                                aria-controls="navProductionPackingMobile">
-                                <span class="icon">📦</span>
-                                <span>Packing</span>
-                                <span class="chevron">▸</span>
-                            </button>
-
-                            <div class="collapse {{ $prodPackOpen ? 'show' : '' }}" id="navProductionPackingMobile">
-                                <a href="{{ route('production.packing_jobs.index') }}"
-                                    class="mobile-sidebar-link mobile-sidebar-link-sub {{ request()->routeIs('production.packing_jobs.index') ? 'active' : '' }}">
-                                    <span class="icon">≡</span>
-                                    <span>Daftar Packing Job</span>
-                                </a>
-
-                                <a href="{{ route('production.packing_jobs.create') }}"
-                                    class="mobile-sidebar-link mobile-sidebar-link-sub {{ request()->routeIs('production.packing_jobs.create') ? 'active' : '' }}">
-                                    <span class="icon">＋</span>
-                                    <span>Packing Job Baru</span>
-                                </a>
-
-                                <a href="{{ route('production.packing_jobs.ready_items') }}"
-                                    class="mobile-sidebar-link mobile-sidebar-link-sub {{ request()->routeIs('production.packing_jobs.ready_items') ? 'active' : '' }}">
-                                    <span class="icon">📦</span>
-                                    <span>Ready Items (WH-PRD)</span>
-                                </a>
-                            </div>
-                        </li>
-
-                        {{-- QC --}}
                         <li class="mb-1">
                             <button class="mobile-sidebar-link mobile-sidebar-toggle {{ $prodQcOpen ? 'is-open' : '' }}"
                                 type="button" data-bs-toggle="collapse" data-bs-target="#navProductionQcMobile"
                                 aria-expanded="{{ $prodQcOpen ? 'true' : 'false' }}"
                                 aria-controls="navProductionQcMobile">
                                 <span class="icon">✅</span>
-                                <span>Quality Control</span>
+                                <span>QC</span>
                                 <span class="chevron">▸</span>
                             </button>
-
                             <div class="collapse {{ $prodQcOpen ? 'show' : '' }}" id="navProductionQcMobile">
                                 <a href="{{ route('production.qc.index') }}"
-                                    class="mobile-sidebar-link mobile-sidebar-link-sub {{ request()->routeIs('production.qc.index') || request()->routeIs('production.qc.cutting.*') ? 'active' : '' }}">
-                                    <span class="icon">✂️</span>
-                                    <span>QC Cutting</span>
+                                    class="mobile-sidebar-link mobile-sidebar-link-sub {{ request()->routeIs('production.qc.*') ? 'active' : '' }}">
+                                    <span class="icon">✂️</span><span>QC Cutting</span>
                                 </a>
                             </div>
                         </li>
 
-                        {{-- Laporan Produksi --}}
-                        <li class="mb-1">
-                            <button
-                                class="mobile-sidebar-link mobile-sidebar-toggle {{ $prodReportOpen ? 'is-open' : '' }}"
-                                type="button" data-bs-toggle="collapse" data-bs-target="#navProductionReportsMobile"
-                                aria-expanded="{{ $prodReportOpen ? 'true' : 'false' }}"
-                                aria-controls="navProductionReportsMobile">
-                                <span class="icon">📈</span>
-                                <span>Laporan Produksi</span>
-                                <span class="chevron">▸</span>
-                            </button>
-
-                            <div class="collapse {{ $prodReportOpen ? 'show' : '' }}" id="navProductionReportsMobile">
-                                <a href="{{ route('production.reports.daily_production') }}"
-                                    class="mobile-sidebar-link mobile-sidebar-link-sub {{ request()->routeIs('production.reports.daily_production') ? 'active' : '' }}">
-                                    <span class="icon">📆</span>
-                                    <span>Daily Production Summary</span>
-                                </a>
-
-                                <a href="{{ route('production.reports.wip_sewing_age') }}"
-                                    class="mobile-sidebar-link mobile-sidebar-link-sub {{ request()->routeIs('production.reports.wip_sewing_age') ? 'active' : '' }}">
-                                    <span class="icon">⏳</span>
-                                    <span>WIP Sewing Age</span>
-                                </a>
-
-                                <a href="{{ route('production.reports.sewing_per_item') }}"
-                                    class="mobile-sidebar-link mobile-sidebar-link-sub {{ request()->routeIs('production.reports.sewing_per_item') ? 'active' : '' }}">
-                                    <span class="icon">🧵</span>
-                                    <span>Sewing per Item</span>
-                                </a>
-
-                                <a href="{{ route('production.reports.reject_detail') }}"
-                                    class="mobile-sidebar-link mobile-sidebar-link-sub {{ request()->routeIs('production.reports.reject_detail') ? 'active' : '' }}">
-                                    <span class="icon">⚠️</span>
-                                    <span>Reject Detail</span>
-                                </a>
-
-                                <a href="{{ route('production.reports.finishing_jobs') }}"
-                                    class="mobile-sidebar-link mobile-sidebar-link-sub {{ request()->routeIs('production.reports.finishing_jobs') ? 'active' : '' }}">
-                                    <span class="icon">🧶</span>
-                                    <span>Finishing Jobs Summary</span>
-                                </a>
-
-                                <a href="{{ route('production.finishing_jobs.report_per_item') }}"
-                                    class="mobile-sidebar-link mobile-sidebar-link-sub {{ request()->routeIs('production.finishing_jobs.report_per_item') || request()->routeIs('production.finishing_jobs.report_per_item_detail') ? 'active' : '' }}">
-                                    <span class="icon">📦</span>
-                                    <span>Finishing per Item</span>
-                                </a>
-                            </div>
-                        </li>
-                    @endif
-
-                    {{-- FINANCE (owner only) --}}
-                    @if ($userRole === 'owner')
+                        {{-- FINANCE (OWNER ONLY) --}}
                         <div class="mobile-sidebar-section-label">Finance</div>
 
                         <li class="mb-1">
@@ -961,38 +806,18 @@
                                 <span>Payroll</span>
                                 <span class="chevron">▸</span>
                             </button>
-
                             <div class="collapse {{ $payrollOpen ? 'show' : '' }}" id="navFinancePayrollMobile">
                                 <a href="{{ route('payroll.cutting.index') }}"
                                     class="mobile-sidebar-link mobile-sidebar-link-sub {{ request()->routeIs('payroll.cutting.*') ? 'active' : '' }}">
-                                    <span class="icon">✂️</span>
-                                    <span>Cutting Payroll</span>
+                                    <span class="icon">✂️</span><span>Cutting Payroll</span>
                                 </a>
-
                                 <a href="{{ route('payroll.sewing.index') }}"
                                     class="mobile-sidebar-link mobile-sidebar-link-sub {{ request()->routeIs('payroll.sewing.*') ? 'active' : '' }}">
-                                    <span class="icon">🧵</span>
-                                    <span>Sewing Payroll</span>
+                                    <span class="icon">🧵</span><span>Sewing Payroll</span>
                                 </a>
-
                                 <a href="{{ route('payroll.piece_rates.index') }}"
                                     class="mobile-sidebar-link mobile-sidebar-link-sub {{ request()->routeIs('payroll.piece_rates.*') ? 'active' : '' }}">
-                                    <span class="icon">📑</span>
-                                    <span>Master Piece Rates</span>
-                                </a>
-
-                                <div class="mobile-sidebar-section-label" style="margin-top:.4rem;">Payroll Reports</div>
-
-                                <a href="{{ route('payroll.reports.operators') }}"
-                                    class="mobile-sidebar-link mobile-sidebar-link-sub {{ request()->routeIs('payroll.reports.operators') || request()->routeIs('payroll.reports.operator_detail') ? 'active' : '' }}">
-                                    <span class="icon">📊</span>
-                                    <span>Rekap per Operator</span>
-                                </a>
-
-                                <a href="{{ route('payroll.reports.operator_slips') }}"
-                                    class="mobile-sidebar-link mobile-sidebar-link-sub {{ request()->routeIs('payroll.reports.operator_slips') ? 'active' : '' }}">
-                                    <span class="icon">🧾</span>
-                                    <span>Slip Borongan (All)</span>
+                                    <span class="icon">📑</span><span>Piece Rates</span>
                                 </a>
                             </div>
                         </li>
@@ -1006,50 +831,14 @@
                                 <span>Costing &amp; HPP</span>
                                 <span class="chevron">▸</span>
                             </button>
-
                             <div class="collapse {{ $costingOpen ? 'show' : '' }}" id="navFinanceCostingMobile">
                                 <a href="{{ route('costing.hpp.index') }}"
                                     class="mobile-sidebar-link mobile-sidebar-link-sub {{ request()->routeIs('costing.hpp.*') ? 'active' : '' }}">
-                                    <span class="icon">⚙️</span>
-                                    <span>HPP Finished Goods</span>
+                                    <span class="icon">⚙️</span><span>HPP Finished Goods</span>
                                 </a>
-
                                 <a href="{{ route('costing.production_cost_periods.index') }}"
                                     class="mobile-sidebar-link mobile-sidebar-link-sub {{ request()->routeIs('costing.production_cost_periods.*') ? 'active' : '' }}">
-                                    <span class="icon">📆</span>
-                                    <span>Production Cost Periods</span>
-                                </a>
-                            </div>
-                        </li>
-
-                        <li class="mb-1">
-                            <button
-                                class="mobile-sidebar-link mobile-sidebar-toggle {{ $financeReportsOpen ? 'is-open' : '' }}"
-                                type="button" data-bs-toggle="collapse" data-bs-target="#navFinanceReportsMobile"
-                                aria-expanded="{{ $financeReportsOpen ? 'true' : 'false' }}"
-                                aria-controls="navFinanceReportsMobile">
-                                <span class="icon">📊</span>
-                                <span>Finance Reports</span>
-                                <span class="chevron">▸</span>
-                            </button>
-
-                            <div class="collapse {{ $financeReportsOpen ? 'show' : '' }}" id="navFinanceReportsMobile">
-                                <a href="{{ route('sales.reports.item_profit') }}"
-                                    class="mobile-sidebar-link mobile-sidebar-link-sub {{ request()->routeIs('sales.reports.item_profit') ? 'active' : '' }}">
-                                    <span class="icon">💹</span>
-                                    <span>Laba Rugi per Item</span>
-                                </a>
-
-                                <a href="{{ route('sales.reports.channel_profit') }}"
-                                    class="mobile-sidebar-link mobile-sidebar-link-sub {{ request()->routeIs('sales.reports.channel_profit') ? 'active' : '' }}">
-                                    <span class="icon">🏬</span>
-                                    <span>Laba Rugi per Channel</span>
-                                </a>
-
-                                <a href="{{ route('sales.reports.shipment_analytics') }}"
-                                    class="mobile-sidebar-link mobile-sidebar-link-sub {{ request()->routeIs('sales.reports.shipment_analytics') ? 'active' : '' }}">
-                                    <span class="icon">📦</span>
-                                    <span>Shipment Analytics</span>
+                                    <span class="icon">📆</span><span>Production Cost Periods</span>
                                 </a>
                             </div>
                         </li>
@@ -1092,27 +881,17 @@
             }
 
             toggleBtn.addEventListener('click', function() {
-                if (sidebar.classList.contains('is-open')) {
-                    closeSidebar();
-                } else {
-                    openSidebar();
-                }
+                sidebar.classList.contains('is-open') ? closeSidebar() : openSidebar();
             });
 
             closeBtn?.addEventListener('click', closeSidebar);
             overlay.addEventListener('click', closeSidebar);
 
             // Auto-close ketika klik link menu
-            links.forEach(link => {
-                link.addEventListener('click', () => {
-                    closeSidebar();
-                });
-            });
+            links.forEach(link => link.addEventListener('click', closeSidebar));
 
             document.addEventListener('keyup', function(e) {
-                if (e.key === 'Escape') {
-                    closeSidebar();
-                }
+                if (e.key === 'Escape') closeSidebar();
             });
         });
     </script>

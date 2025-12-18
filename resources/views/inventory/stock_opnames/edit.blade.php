@@ -7,7 +7,11 @@
     use App\Models\StockOpname;
     use App\Models\ItemCostSnapshot;
 
-    // Gunakan helper dari model kalau ada
+    $userRole = auth()->user()->role ?? null;
+    $isOperating = $userRole === 'operating';
+    $isAdmin = $userRole === 'admin';
+    $isOpOrAdmin = $isOperating || $isAdmin;
+
     $isOpening = method_exists($opname, 'isOpening')
         ? $opname->isOpening()
         : $opname->type === StockOpname::TYPE_OPENING;
@@ -17,37 +21,44 @@
         : !in_array($opname->status, [StockOpname::STATUS_REVIEWED, StockOpname::STATUS_FINALIZED], true);
 
     $isReadonly = !$canModifyLines;
+
+    $statusClass = match ($opname->status) {
+        StockOpname::STATUS_DRAFT => 'badge-status badge-status--draft',
+        StockOpname::STATUS_COUNTING => 'badge-status badge-status--counting',
+        StockOpname::STATUS_REVIEWED => 'badge-status badge-status--reviewed',
+        StockOpname::STATUS_FINALIZED => 'badge-status badge-status--finalized',
+        default => 'badge-status badge-status--draft',
+    };
+
+    $totalLines = $opname->lines->count();
+    $countedLines = $opname->lines->whereNotNull('physical_qty')->count();
+    $notCounted = max($totalLines - $countedLines, 0);
 @endphp
 
 @push('head')
     <style>
         :root {
             --so-card-radius: 14px;
-            --so-border: rgba(148, 163, 184, 0.30);
-            --so-muted: #6b7280;
+            --so-border: rgba(148, 163, 184, 0.28);
+            --so-muted: rgba(100, 116, 139, 1);
         }
 
-        .so-page {
-            min-height: 100vh;
-        }
-
-        .so-page .page-wrap {
-            max-width: 1000px;
+        .page-wrap {
+            max-width: 1050px;
             margin-inline: auto;
-            padding: 1rem .85rem 3rem;
+            padding: .85rem .75rem 4rem;
         }
 
-        body[data-theme="light"] .so-page .page-wrap {
+        body[data-theme="light"] .page-wrap {
             background:
                 radial-gradient(circle at top left,
                     rgba(59, 130, 246, 0.10) 0,
-                    rgba(148, 163, 184, 0.08) 30%,
+                    rgba(148, 163, 184, 0.07) 30%,
                     #f9fafb 70%);
         }
 
-        body[data-theme="dark"] .so-page .page-wrap {
-            background:
-                radial-gradient(circle at top left,
+        body[data-theme="dark"] .page-wrap {
+            background: radial-gradient(circle at top left,
                     rgba(59, 130, 246, 0.26) 0,
                     rgba(15, 23, 42, 1) 55%);
         }
@@ -56,57 +67,109 @@
             background: var(--card);
             border-radius: var(--so-card-radius);
             border: 1px solid var(--so-border);
+            box-shadow:
+                0 10px 26px rgba(15, 23, 42, 0.06),
+                0 0 0 1px rgba(15, 23, 42, 0.03);
         }
 
-        .page-subtitle {
-            font-size: .82rem;
-            color: var(--so-muted);
+        .page-head {
+            display: flex;
+            align-items: flex-start;
+            justify-content: space-between;
+            gap: .75rem;
+            margin-bottom: .85rem;
+        }
+
+        .page-title {
+            margin: 0;
+            font-size: 1.05rem;
+            font-weight: 800;
+            letter-spacing: -.01em;
+        }
+
+        .subtle {
+            display: none !important;
+        }
+
+        /* hide muted helper */
+
+        .chip {
+            display: inline-flex;
+            align-items: center;
+            gap: .35rem;
+            padding: .25rem .55rem;
+            border-radius: 999px;
+            font-size: .72rem;
+            font-weight: 800;
+            border: 1px solid rgba(148, 163, 184, .22);
+            background: rgba(15, 23, 42, 0.02);
+            color: rgba(71, 85, 105, 1);
+        }
+
+        body[data-theme="dark"] .chip {
+            background: rgba(148, 163, 184, 0.08);
+            border-color: rgba(148, 163, 184, 0.18);
+            color: rgba(226, 232, 240, .86);
         }
 
         .pill-label {
             font-size: .72rem;
             text-transform: uppercase;
             letter-spacing: .06em;
-            color: #94a3b8;
+            color: rgba(100, 116, 139, 1);
+            font-weight: 800;
+        }
+
+        .meta {
+            color: var(--so-muted);
         }
 
         .text-mono {
             font-variant-numeric: tabular-nums;
-            font-family: ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, "Liberation Mono", "Courier New",
-                monospace;
+            font-family: ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, "Liberation Mono", "Courier New", monospace;
         }
 
         .badge-status {
-            font-size: .72rem;
-            padding: .16rem .6rem;
+            font-size: .7rem;
+            padding: .18rem .52rem;
             border-radius: 999px;
-            font-weight: 600;
+            font-weight: 800;
+            display: inline-flex;
+            align-items: center;
+            gap: .35rem;
         }
 
         .badge-status--draft {
-            background: rgba(148, 163, 184, .16);
+            background: rgba(148, 163, 184, 0.2);
             color: #475569;
         }
 
         .badge-status--counting {
-            background: rgba(59, 130, 246, .18);
+            background: rgba(59, 130, 246, 0.16);
             color: #1d4ed8;
         }
 
         .badge-status--reviewed {
-            background: rgba(234, 179, 8, .20);
+            background: rgba(234, 179, 8, 0.18);
             color: #854d0e;
         }
 
         .badge-status--finalized {
-            background: rgba(22, 163, 74, .20);
+            background: rgba(22, 163, 74, 0.18);
             color: #15803d;
         }
 
-        .table-wrap {
+        .action-bar {
+            display: flex;
+            flex-wrap: wrap;
+            gap: .5rem;
             margin-top: .75rem;
-            border-radius: 10px;
-            border: 1px solid rgba(148, 163, 184, .25);
+        }
+
+        .table-wrap {
+            margin-top: .65rem;
+            border-radius: 12px;
+            border: 1px solid rgba(148, 163, 184, .22);
             overflow-x: auto;
             background: rgba(248, 250, 252, .9);
         }
@@ -117,7 +180,7 @@
         }
 
         .table thead th {
-            font-size: .75rem;
+            font-size: .72rem;
             text-transform: uppercase;
             letter-spacing: .06em;
             color: rgba(100, 116, 139, 1);
@@ -138,15 +201,16 @@
 
         .diff-plus {
             color: #16a34a;
+            font-weight: 800;
         }
 
         .diff-minus {
             color: #dc2626;
+            font-weight: 800;
         }
 
-        /* Row yang belum di-count (Qty fisik kosong) */
         .so-row-not-counted {
-            background: rgba(250, 204, 21, .05);
+            background: rgba(250, 204, 21, .06);
         }
 
         body[data-theme="dark"] .so-row-not-counted {
@@ -154,35 +218,93 @@
         }
 
         .badge-not-counted {
-            display: inline-block;
+            display: inline-flex;
+            align-items: center;
+            gap: .35rem;
             border-radius: 999px;
-            padding: .08rem .5rem;
+            padding: .1rem .55rem;
             font-size: .72rem;
-            background: rgba(234, 179, 8, .2);
+            font-weight: 800;
+            background: rgba(234, 179, 8, .18);
             color: #854d0e;
         }
 
+        /* ===== MOBILE ORDER WRAPPER ===== */
+        .mobile-stack {
+            display: flex;
+            flex-direction: column;
+            gap: .75rem;
+        }
+
+        /* order */
+        .section-meta {
+            order: 1;
+        }
+
+        .section-add {
+            order: 2;
+        }
+
+        .section-table {
+            order: 3;
+        }
+
+        /* ===== OPENING ADD (MOBILE INLINE) ===== */
+        .opening-add-simple {
+            margin-top: 0;
+        }
+
+        .opening-add-row {
+            display: grid;
+            grid-template-columns: 1fr 120px 96px;
+            gap: .5rem;
+            align-items: end;
+        }
+
+        /* Desktop add grid */
+        .opening-add-grid {
+            display: grid;
+            grid-template-columns: 1fr 160px 160px 1fr 120px;
+            gap: .5rem;
+            align-items: end;
+        }
+
+        @media (max-width: 991.98px) {
+            .opening-add-grid {
+                grid-template-columns: 1fr 140px 140px 1fr 110px;
+            }
+        }
+
         @media (max-width: 767.98px) {
-            .so-page .page-wrap {
-                padding-inline: .6rem;
+            .page-wrap {
+                padding-inline: .55rem;
             }
 
-            .table-wrap {
-                border-radius: 8px;
+            /* Hide extra meta on mobile for operating/admin */
+            .so-meta--hide-mobile {
+                display: none !important;
             }
 
-            .table thead th {
-                font-size: .7rem;
+            /* Hide columns on mobile */
+            .col-system,
+            .col-notes,
+            .col-unit {
+                display: none !important;
             }
 
             .table tbody td {
                 font-size: .78rem;
             }
 
-            /* Hide kolom yang kurang penting di mobile */
-            .col-diff,
-            .col-notes {
-                display: none;
+            /* hide desktop add */
+            .opening-add-desktop {
+                display: none !important;
+            }
+        }
+
+        @media (min-width: 768px) {
+            .opening-add-simple {
+                display: none !important;
             }
         }
 
@@ -199,102 +321,213 @@
 @endpush
 
 @section('content')
-    <div class="so-page">
-        <div class="page-wrap">
-            {{-- HEADER --}}
-            <div class="d-flex justify-content-between align-items-center mb-3 flex-wrap gap-2">
-                <div>
-                    <a href="{{ route('inventory.stock_opnames.show', $opname) }}" class="btn btn-link btn-sm px-0 mb-1">
-                        ← Kembali ke detail
-                    </a>
-                    <h1 class="h5 mb-1">
-                        Stock Opname • {{ $opname->code }}
-                    </h1>
-                    <p class="page-subtitle mb-0">
-                        @if ($isReadonly)
-                            Dokumen ini sudah
-                            {{ $opname->status === StockOpname::STATUS_FINALIZED ? 'difinalkan' : 'direview' }}.
-                        @else
-                            @if ($isOpening)
-                                Mode saldo awal: isi <span class="text-mono">Qty Fisik</span> dan
-                                <span class="text-mono">HPP / Unit</span>.
-                            @else
-                                Isi hasil hitung fisik per item, lalu simpan. Semua item wajib di-count sebelum tandai
-                                selesai.
-                            @endif
-                        @endif
-                    </p>
-                </div>
-                <div class="text-end">
-                    @php
-                        $statusClass = match ($opname->status) {
-                            StockOpname::STATUS_DRAFT => 'badge-status badge-status--draft',
-                            StockOpname::STATUS_COUNTING => 'badge-status badge-status--counting',
-                            StockOpname::STATUS_REVIEWED => 'badge-status badge-status--reviewed',
-                            StockOpname::STATUS_FINALIZED => 'badge-status badge-status--finalized',
-                            default => 'badge-status badge-status--draft',
-                        };
-                    @endphp
-                    <span class="{{ $statusClass }}">{{ ucfirst($opname->status) }}</span>
-                </div>
+    <div class="page-wrap">
+        {{-- HEADER --}}
+        <div class="page-head">
+            <div>
+                <a href="{{ route('inventory.stock_opnames.show', $opname) }}" class="btn btn-sm btn-link px-0 mb-1">
+                    ← Kembali
+                </a>
+
+                <h1 class="page-title">
+                    {{ $opname->code }}
+                    <span class="{{ $statusClass }} ms-1">{{ ucfirst($opname->status) }}</span>
+                    <span class="chip ms-1">{{ $isOpening ? 'Opening' : 'Periodic' }}</span>
+                </h1>
             </div>
 
-            {{-- FORM TAMBAH ITEM (OPENING MODE, SIMPLE + AJAX) --}}
-            @if ($isOpening && $canModifyLines)
-                <div class="card card-main mb-3">
-                    <div class="card-body">
-                        <div class="mb-2">
-                            <div class="pill-label mb-1">Tambah item saldo awal</div>
-                            <div style="font-size:.8rem;color:#6b7280;">
-                                Flow: ketik item → Tab (ambil suggest pertama) → isi Qty → Enter untuk simpan → fokus
-                                kembali ke item.
+            <div class="text-end">
+                <span class="chip">
+                    {{ $countedLines }} / {{ $totalLines }} terisi
+                    @if ($notCounted > 0)
+                        ({{ $notCounted }} belum)
+                    @endif
+                </span>
+            </div>
+        </div>
+
+        <div class="mobile-stack">
+
+            {{-- =========================
+                 SECTION 1 — META + ACTION (FORM UPDATE)
+                 ========================= --}}
+            <div class="section-meta">
+                <form id="soUpdateForm" action="{{ route('inventory.stock_opnames.update', $opname) }}" method="POST">
+                    @csrf
+                    @method('PUT')
+
+                    <div class="card card-main">
+                        <div class="card-body">
+                            <div class="row g-3 align-items-start">
+                                @if ($isOpOrAdmin)
+                                    <div class="col-md-6">
+                                        <div class="pill-label mb-1">Tanggal</div>
+                                        <div style="font-size:.92rem;">
+                                            {{ $opname->date?->format('d M Y') ?? '-' }}
+                                        </div>
+
+                                        <div class="pill-label mt-3 mb-1">Gudang</div>
+                                        <div class="fw-semibold">
+                                            {{ $opname->warehouse?->code ?? '-' }}
+                                        </div>
+                                        <div class="meta">
+                                            {{ $opname->warehouse?->name }}
+                                        </div>
+                                    </div>
+
+                                    <div class="col-md-6 so-meta--hide-mobile">
+                                        <div class="pill-label mb-1">Dokumen</div>
+                                        <div class="text-mono fw-semibold">{{ $opname->code }}</div>
+
+                                        <div class="pill-label mt-3 mb-1">Catatan</div>
+                                        <textarea name="notes" class="form-control form-control-sm" rows="3" placeholder="Catatan…"
+                                            @if ($isReadonly) readonly @endif>{{ old('notes', $opname->notes) }}</textarea>
+                                    </div>
+                                @else
+                                    <div class="col-md-4">
+                                        <div class="pill-label mb-1">Kode</div>
+                                        <div class="text-mono fw-semibold">{{ $opname->code }}</div>
+
+                                        <div class="pill-label mt-3 mb-1">Tanggal</div>
+                                        <div style="font-size:.9rem;">
+                                            {{ $opname->date?->format('d M Y') ?? '-' }}
+                                        </div>
+                                    </div>
+
+                                    <div class="col-md-4">
+                                        <div class="pill-label mb-1">Gudang</div>
+                                        <div class="fw-semibold">
+                                            {{ $opname->warehouse?->code ?? '-' }}
+                                        </div>
+                                        <div class="meta">
+                                            {{ $opname->warehouse?->name }}
+                                        </div>
+                                    </div>
+
+                                    <div class="col-md-4">
+                                        <div class="pill-label mb-1">Catatan</div>
+                                        <textarea name="notes" class="form-control form-control-sm" rows="3" placeholder="Catatan…"
+                                            @if ($isReadonly) readonly @endif>{{ old('notes', $opname->notes) }}</textarea>
+                                    </div>
+                                @endif
+                            </div>
+
+                            @if ($errors->has('mark_reviewed'))
+                                <div class="alert alert-warning mt-3 mb-2 py-2 px-3" style="font-size:.82rem;">
+                                    {{ $errors->first('mark_reviewed') }}
+                                </div>
+                            @endif
+
+                            @if ($canModifyLines)
+                                <div class="action-bar">
+                                    <button type="submit" name="save_and_view" value="1"
+                                        class="btn btn-sm btn-primary">
+                                        Simpan
+                                    </button>
+
+                                    @if (in_array($opname->status, [StockOpname::STATUS_DRAFT, StockOpname::STATUS_COUNTING], true))
+                                        <button type="submit" name="mark_reviewed" value="1"
+                                            class="btn btn-sm btn-outline-primary">
+                                            Simpan & Tandai Selesai
+                                        </button>
+                                    @endif
+                                </div>
+                            @endif
+                        </div>
+                    </div>
+            </div>
+
+            {{-- =========================
+                 SECTION 2 — TAMBAH ITEM (BUKAN FORM, SUPAYA TIDAK SUBMIT "SIMPAN")
+                 ========================= --}}
+            <div class="section-add">
+                @if ($isOpening && $canModifyLines)
+                    {{-- MOBILE SIMPLE ADD --}}
+                    <div class="card card-main opening-add-simple">
+                        <div class="card-body">
+                            <div id="openingAddMobile"
+                                data-action="{{ route('inventory.stock_opnames.lines.store', $opname) }}">
+                                {{-- csrf token untuk fetch --}}
+                                <input type="hidden" id="openingAddTokenMobile" value="{{ csrf_token() }}">
+
+                                <div class="opening-add-row">
+                                    <div id="opening-item-suggest-mobile">
+                                        <label class="pill-label mb-1">Item</label>
+                                        <x-item-suggest idName="item_id" :idValue="old('item_id')" :displayValue="''"
+                                            placeholder="Kode / nama" :autofocus="false" :autoSelectFirst="true" />
+                                    </div>
+
+                                    <div>
+                                        <label class="pill-label mb-1">Qty Fisik</label>
+                                        <x-number-input name="physical_qty" :value="old('physical_qty')" mode="integer" min="0"
+                                            class="text-end js-opening-qty-mobile" />
+                                    </div>
+
+                                    <div class="d-grid">
+                                        <button type="button" class="btn btn-sm btn-primary" style="height:34px;"
+                                            id="btnOpeningAddMobile">
+                                            Tambah
+                                        </button>
+                                    </div>
+                                </div>
+
+                                {{-- Hidden: tetap kirim field yg dibutuhkan server --}}
+                                <input type="hidden" name="unit_cost" value="{{ old('unit_cost', '') }}">
+                                <input type="hidden" name="notes" value="{{ old('notes', '') }}">
+                                <input type="hidden" name="update_existing" value="0">
                             </div>
                         </div>
+                    </div>
 
-                        <form id="opening-add-form" action="{{ route('inventory.stock_opnames.lines.store', $opname) }}"
-                            method="POST" class="row g-2 align-items-end">
-                            @csrf
-
-                            {{-- Item (pakai item-suggest versi terbaru) --}}
-                            <div class="col-md-4" id="opening-item-suggest">
-                                <label class="pill-label mb-1">Item</label>
-                                <x-item-suggest idName="item_id" :idValue="old('item_id')" :displayValue="''"
-                                    placeholder="Kode / nama barang" :autofocus="true" :autoSelectFirst="true" />
+                    {{-- DESKTOP FULL ADD (juga bukan form) --}}
+                    <div class="card card-main mb-3 opening-add-desktop">
+                        <div class="card-body">
+                            <div class="d-flex justify-content-between align-items-start gap-2 mb-2">
+                                <div class="pill-label">Tambah item saldo awal</div>
+                                <span class="chip">Mode Opening</span>
                             </div>
 
-                            {{-- Qty Fisik --}}
-                            <div class="col-6 col-md-2">
-                                <label class="pill-label mb-1">Qty Fisik</label>
-                                <x-number-input name="physical_qty" :value="old('physical_qty')" mode="integer" min="0"
-                                    class="text-end js-opening-qty js-next-focus" />
-                            </div>
+                            <div id="openingAddDesktop"
+                                data-action="{{ route('inventory.stock_opnames.lines.store', $opname) }}">
+                                <input type="hidden" id="openingAddTokenDesktop" value="{{ csrf_token() }}">
 
-                            {{-- HPP / Unit --}}
-                            <div class="col-6 col-md-2">
-                                <label class="pill-label mb-1">HPP / Unit</label>
-                                <x-number-input name="unit_cost" :value="old('unit_cost')" mode="decimal" :decimals="2"
-                                    min="0" class="text-end" />
-                            </div>
+                                <div class="opening-add-grid">
+                                    <div id="opening-item-suggest">
+                                        <label class="pill-label mb-1">Item</label>
+                                        <x-item-suggest idName="item_id" :idValue="old('item_id')" :displayValue="''"
+                                            placeholder="Kode / nama barang" :autofocus="true" :autoSelectFirst="true" />
+                                    </div>
 
-                            {{-- Catatan --}}
-                            <div class="col-md-3">
-                                <label class="pill-label mb-1">Catatan</label>
-                                <input type="text" name="notes" value="{{ old('notes') }}"
-                                    class="form-control form-control-sm">
-                            </div>
+                                    <div>
+                                        <label class="pill-label mb-1">Qty Fisik</label>
+                                        <x-number-input name="physical_qty" :value="old('physical_qty')" mode="integer"
+                                            min="0" class="text-end js-opening-qty" />
+                                    </div>
 
-                            {{-- Hidden flag untuk update existing row --}}
-                            <input type="hidden" name="update_existing" value="0">
+                                    <div>
+                                        <label class="pill-label mb-1">HPP / Unit</label>
+                                        <x-number-input name="unit_cost" :value="old('unit_cost')" mode="decimal"
+                                            :decimals="2" min="0" class="text-end" />
+                                    </div>
 
-                            {{-- Tombol submit --}}
-                            <div class="col-md-1 d-grid">
-                                <button type="submit" class="btn btn-sm btn-primary">
-                                    + Tambah
-                                </button>
+                                    <div>
+                                        <label class="pill-label mb-1">Catatan</label>
+                                        <input type="text" name="notes" value="{{ old('notes') }}"
+                                            class="form-control form-control-sm">
+                                    </div>
+
+                                    <input type="hidden" name="update_existing" value="0">
+
+                                    <div class="d-grid">
+                                        <button type="button" class="btn btn-sm btn-primary" id="btnOpeningAddDesktop">
+                                            + Tambah
+                                        </button>
+                                    </div>
+                                </div>
                             </div>
 
                             @if ($errors->has('item_id') || $errors->has('physical_qty') || $errors->has('unit_cost'))
-                                <div class="col-12 mt-1">
+                                <div class="mt-2">
                                     @error('item_id')
                                         <div class="text-danger small">{{ $message }}</div>
                                     @enderror
@@ -306,140 +539,53 @@
                                     @enderror
                                 </div>
                             @endif
-                        </form>
-                    </div>
-                </div>
-            @endif
-
-            {{-- FORM UPDATE UTAMA (HEADER + TABEL) --}}
-            <form action="{{ route('inventory.stock_opnames.update', $opname) }}" method="POST">
-                @csrf
-                @method('PUT')
-
-                {{-- META DOKUMEN --}}
-                <div class="card card-main mb-3">
-                    <div class="card-body">
-                        <div class="row g-3">
-                            <div class="col-md-4">
-                                <div class="pill-label mb-1">Kode Dokumen</div>
-                                <div class="text-mono fw-semibold">{{ $opname->code }}</div>
-
-                                <div class="pill-label mt-3 mb-1">Tanggal Opname</div>
-                                <div style="font-size:.85rem;">
-                                    {{ $opname->date?->format('d M Y') ?? '-' }}
-                                </div>
-                            </div>
-                            <div class="col-md-4">
-                                <div class="pill-label mb-1">Gudang</div>
-                                <div class="fw-semibold">
-                                    {{ $opname->warehouse?->code ?? '-' }}
-                                </div>
-                                <div style="font-size:.85rem;color:#6b7280;">
-                                    {{ $opname->warehouse?->name }}
-                                </div>
-                            </div>
-                            <div class="col-md-4">
-                                <div class="pill-label mb-1">Catatan</div>
-                                <textarea name="notes" class="form-control form-control-sm" rows="3" placeholder="Catatan tambahan…"
-                                    @if ($isReadonly) readonly @endif>{{ old('notes', $opname->notes) }}</textarea>
-                            </div>
                         </div>
-
-                        {{-- Error saat mark_reviewed (semua item wajib di-count) --}}
-                        @if ($errors->has('mark_reviewed'))
-                            <div class="alert alert-warning mt-3 mb-2 py-2 px-3" style="font-size:.8rem;">
-                                {{ $errors->first('mark_reviewed') }}
-                            </div>
-                        @endif
-
-                        @if ($canModifyLines)
-                            <div class="mt-3 d-flex gap-2 flex-wrap">
-                                <button type="submit" name="save_and_view" value="1" class="btn btn-sm btn-primary">
-                                    Simpan Perubahan
-                                </button>
-
-                                @if (in_array($opname->status, [StockOpname::STATUS_DRAFT, StockOpname::STATUS_COUNTING], true))
-                                    <button type="submit" name="mark_reviewed" value="1"
-                                        class="btn btn-sm btn-outline-primary">
-                                        Simpan &amp; Tandai Selesai Counting
-                                    </button>
-                                @endif
-                            </div>
-                        @endif
                     </div>
-                </div>
+                @endif
+            </div>
 
-                {{-- TABEL ITEM --}}
-                @php
-                    $totalLines = $opname->lines->count();
-                    $countedLines = $opname->lines->whereNotNull('physical_qty')->count();
-                    $notCounted = max($totalLines - $countedLines, 0);
-                @endphp
-
+            {{-- =========================
+                 SECTION 3 — TABLE (MASIH DI DALAM FORM UPDATE)
+                 ========================= --}}
+            <div class="section-table">
                 <div class="card card-main">
                     <div class="card-body">
-                        <div class="d-flex justify-content-between align-items-center mb-1 flex-wrap gap-2">
-                            <div>
-                                <div class="pill-label mb-1">
-                                    @if ($isOpening)
-                                        Saldo awal per item
-                                    @else
-                                        Hasil hitung fisik per item
-                                    @endif
-                                </div>
-                                <div style="font-size:.78rem;color:#6b7280;">
-                                    Isi Qty fisik (dan HPP jika opening). Selisih dihitung saat disimpan.
-                                </div>
+                        <div class="d-flex justify-content-between align-items-center flex-wrap gap-2">
+                            <div class="pill-label">
+                                {{ $isOpening ? 'Saldo awal per item' : 'Hasil hitung fisik per item' }}
                             </div>
-                            <div style="font-size:.8rem;">
-                                @if ($notCounted === 0)
-                                    <span style="color:#16a34a;">
-                                        {{ $countedLines }} / {{ $totalLines }} item sudah terisi Qty fisik
-                                    </span>
-                                @else
-                                    <span style="color:#b45309;">
-                                        {{ $countedLines }} / {{ $totalLines }} item sudah terisi Qty fisik
-                                        ({{ $notCounted }} belum dihitung)
-                                    </span>
-                                @endif
-                            </div>
+                            <span class="chip">{{ $countedLines }} / {{ $totalLines }} terisi</span>
                         </div>
 
-                        {{-- TOMBOL RESET QTY & HPP (soft reset) --}}
-                        @if ($isOpening && $canModifyLines && $opname->lines->count() > 0)
-                            <div class="mb-2 d-flex justify-content-between align-items-center flex-wrap gap-2">
-                                <div style="font-size:.78rem;color:#6b7280;">
-                                    Reset hanya mengosongkan Qty Fisik &amp; HPP semua baris, daftar item tetap ada.
-                                </div>
-                                <form action="{{ route('inventory.stock_opnames.reset_lines', $opname) }}" method="POST"
-                                    onsubmit="return confirm('Reset Qty Fisik dan HPP semua baris untuk sesi opname ini?\n\nDaftar item tetap dipertahankan. Lanjutkan?');">
-                                    @csrf
-                                    <button type="submit" class="btn btn-sm btn-outline-warning">
-                                        Reset Qty &amp; HPP Semua Baris
-                                    </button>
-                                </form>
-                            </div>
-                        @endif
-
-                        <div class="table-wrap mt-2" id="opname-lines-table"
+                        <div class="table-wrap" id="opname-lines-table"
                             data-delete-url-template="{{ route('inventory.stock_opnames.lines.destroy', ['stockOpname' => $opname, 'line' => '__LINE_ID__']) }}">
                             <table class="table table-sm mb-0 align-middle">
                                 <thead>
                                     <tr>
                                         <th style="width:40px;">#</th>
                                         <th>Item</th>
-                                        <th class="text-end">Qty Sistem</th>
+
+                                        @unless ($isOpOrAdmin)
+                                            <th class="text-end col-system">Qty Sistem</th>
+                                        @endunless
+
                                         <th class="text-end">Qty Fisik</th>
                                         <th class="text-end col-diff d-none d-md-table-cell">Selisih</th>
-                                        @if ($isOpening)
-                                            <th class="text-end">HPP / Unit</th>
+
+                                        @if ($isOpening && !$isOpOrAdmin)
+                                            <th class="text-end col-unit">HPP / Unit</th>
                                         @endif
-                                        <th class="col-notes d-none d-md-table-cell">Catatan</th>
+
+                                        @unless ($isOpOrAdmin)
+                                            <th class="col-notes d-none d-md-table-cell">Catatan</th>
+                                        @endunless
+
                                         @if ($isOpening && $canModifyLines)
                                             <th class="text-end" style="width:70px;">Aksi</th>
                                         @endif
                                     </tr>
                                 </thead>
+
                                 <tbody>
                                     @foreach ($opname->lines as $index => $line)
                                         @php
@@ -458,7 +604,6 @@
                                                 $rawPhysical = (float) $rawPhysical;
                                             }
 
-                                            // ==== HPP / UNIT (EFFECTIVE) ====
                                             $rawUnitCost = old($inputNamePrefix . '.unit_cost', $line->unit_cost);
                                             $hasUnitCostValue = $rawUnitCost !== null && $rawUnitCost !== '';
                                             if ($hasUnitCostValue) {
@@ -466,9 +611,7 @@
                                             }
 
                                             $fallbackUnitCost = null;
-
                                             if (!$hasUnitCostValue) {
-                                                // 1️⃣ coba snapshot aktif per item+gudang
                                                 $snapshot = ItemCostSnapshot::getActiveForItem(
                                                     $line->item_id,
                                                     $opname->warehouse_id,
@@ -476,11 +619,9 @@
                                                 if ($snapshot && $snapshot->unit_cost > 0) {
                                                     $fallbackUnitCost = (float) $snapshot->unit_cost;
                                                 } elseif ($line->item && $line->item->base_unit_cost > 0) {
-                                                    // 2️⃣ fallback ke base_unit_cost item
                                                     $fallbackUnitCost = (float) $line->item->base_unit_cost;
                                                 }
                                             }
-
                                             $effectiveUnitCost = $hasUnitCostValue ? $rawUnitCost : $fallbackUnitCost;
 
                                             $rowClasses = [];
@@ -488,20 +629,16 @@
                                                 $rowClasses[] = 'so-row-not-counted';
                                             }
                                         @endphp
+
                                         <tr class="{{ implode(' ', $rowClasses) }}" data-item-id="{{ $line->item_id }}"
                                             data-item-code="{{ $line->item?->code }}"
                                             data-item-name="{{ $line->item?->name }}"
                                             data-physical-qty="{{ $hasPhysicalValue ? $rawPhysical : '' }}">
+                                            <td>{{ $index + 1 }}</td>
+
                                             <td>
-                                                {{ $index + 1 }}
-                                            </td>
-                                            <td>
-                                                <div class="fw-semibold">
-                                                    {{ $line->item?->code ?? '-' }}
-                                                </div>
-                                                <div style="font-size:.82rem;color:#6b7280;">
-                                                    {{ $line->item?->name ?? '' }}
-                                                </div>
+                                                <div class="fw-semibold">{{ $line->item?->code ?? '-' }}</div>
+                                                <div class="meta">{{ $line->item?->name ?? '' }}</div>
 
                                                 @if (!$hasPhysicalValue)
                                                     <div class="d-md-none mt-1">
@@ -509,66 +646,68 @@
                                                     </div>
                                                 @endif
                                             </td>
-                                            <td class="text-end text-mono">
-                                                {{ number_format($rawSystemQty, 2) }}
-                                                {{-- system_qty hanya display, tidak dikirim sebagai input --}}
-                                            </td>
+
+                                            @unless ($isOpOrAdmin)
+                                                <td class="text-end text-mono col-system">
+                                                    {{ number_format($rawSystemQty, 2) }}
+                                                </td>
+                                            @endunless
+
                                             <td class="text-end">
                                                 @if ($isReadonly || $isOpening)
-                                                    {{-- Opening atau readonly: Qty hanya display --}}
                                                     @if ($hasPhysicalValue)
-                                                        <span class="text-mono">
-                                                            {{ number_format($rawPhysical, 2) }}
-                                                        </span>
+                                                        <span
+                                                            class="text-mono">{{ number_format($rawPhysical, 2) }}</span>
                                                         <input type="hidden" name="{{ $inputNamePrefix }}[physical_qty]"
                                                             value="{{ $rawPhysical }}">
                                                     @else
-                                                        <span class="text-muted">-</span>
+                                                        <span class="meta">-</span>
                                                     @endif
                                                 @else
-                                                    {{-- Periodic & masih boleh edit -> input --}}
                                                     <input type="number" step="0.01" min="0"
                                                         name="{{ $inputNamePrefix }}[physical_qty]"
                                                         class="form-control form-control-sm text-end"
                                                         value="{{ $hasPhysicalValue ? $rawPhysical : '' }}">
                                                 @endif
                                             </td>
+
                                             <td class="text-end text-mono col-diff d-none d-md-table-cell">
                                                 @if ($hasPhysical)
                                                     <span class="{{ $diffClass }}">{{ $diffDisplay }}</span>
                                                 @else
-                                                    <span class="text-muted">-</span>
+                                                    <span class="meta">-</span>
                                                 @endif
                                             </td>
 
-                                            @if ($isOpening)
-                                                <td class="text-end">
+                                            {{-- ✅ selalu kirim unit_cost --}}
+                                            <input type="hidden" name="{{ $inputNamePrefix }}[unit_cost]"
+                                                value="{{ $effectiveUnitCost !== null ? $effectiveUnitCost : '' }}">
+
+                                            @if ($isOpening && !$isOpOrAdmin)
+                                                <td class="text-end col-unit">
                                                     @if ($effectiveUnitCost && $effectiveUnitCost > 0)
-                                                        <span
-                                                            class="text-mono {{ $hasUnitCostValue ? '' : 'text-muted' }}">
+                                                        <span class="text-mono {{ $hasUnitCostValue ? '' : 'meta' }}">
                                                             {{ number_format($effectiveUnitCost, 2) }}
                                                         </span>
-                                                        @unless ($hasUnitCostValue)
-                                                            <div style="font-size:.72rem;color:#9ca3af;">
-                                                                (HPP snapshot/master)
-                                                            </div>
-                                                        @endunless
                                                     @else
-                                                        <span class="text-muted">-</span>
+                                                        <span class="meta">-</span>
                                                     @endif
-
-                                                    {{-- 🔁 SELALU KIRIM HPP KE SERVER --}}
-                                                    <input type="hidden" name="{{ $inputNamePrefix }}[unit_cost]"
-                                                        value="{{ $effectiveUnitCost !== null ? $effectiveUnitCost : '' }}">
                                                 </td>
                                             @endif
 
-                                            <td class="col-notes d-none d-md-table-cell">
-                                                <input type="text" name="{{ $inputNamePrefix }}[notes]"
-                                                    class="form-control form-control-sm"
-                                                    value="{{ old($inputNamePrefix . '.notes', $line->notes) }}"
-                                                    @if ($isReadonly) readonly @endif>
-                                            </td>
+                                            @unless ($isOpOrAdmin)
+                                                <td class="col-notes d-none d-md-table-cell">
+                                                    <input type="text" name="{{ $inputNamePrefix }}[notes]"
+                                                        class="form-control form-control-sm"
+                                                        value="{{ old($inputNamePrefix . '.notes', $line->notes) }}"
+                                                        @if ($isReadonly) readonly @endif>
+                                                </td>
+                                            @else
+                                                {{-- ✅ tetap kirim notes --}}
+                                                <input type="hidden" name="{{ $inputNamePrefix }}[notes]"
+                                                    value="{{ old($inputNamePrefix . '.notes', $line->notes) }}">
+                                            @endunless
+
                                             @if ($isOpening && $canModifyLines)
                                                 <td class="text-end">
                                                     <button type="button"
@@ -583,10 +722,12 @@
                                 </tbody>
                             </table>
                         </div>
-
                     </div>
                 </div>
-            </form>
+
+                {{-- CLOSE UPDATE FORM (no nested form!) --}}
+                </form>
+            </div>
         </div>
     </div>
 
@@ -596,16 +737,13 @@
         <div class="modal-dialog modal-sm modal-dialog-centered">
             <div class="modal-content">
                 <div class="modal-header py-2">
-                    <h6 class="modal-title" id="duplicateItemModalLabel">Item sudah ada di opname</h6>
+                    <h6 class="modal-title" id="duplicateItemModalLabel">Item sudah ada</h6>
                     <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Tutup"></button>
                 </div>
                 <div class="modal-body">
                     <div class="mb-1">
                         <div class="fw-semibold" id="dupItemLabel">Item</div>
-                        <div class="dup-meta">
-                            Akan <span class="fw-semibold">mengganti</span> Qty &amp; HPP baris yang sudah ada untuk item
-                            ini.
-                        </div>
+                        <div class="dup-meta">Akan <span class="fw-semibold">mengganti</span> Qty baris existing.</div>
                     </div>
 
                     <div class="dup-meta mt-2">
@@ -624,7 +762,7 @@
                     </div>
 
                     <div class="alert alert-warning mt-3 mb-1 py-1 px-2" style="font-size:.78rem;">
-                        Lanjutkan untuk <strong>update baris existing</strong> di tabel saldo awal.
+                        Lanjutkan untuk <strong>update baris existing</strong>.
                     </div>
                 </div>
                 <div class="modal-footer py-2">
@@ -645,8 +783,26 @@
 
         document.addEventListener('DOMContentLoaded', function() {
             initDuplicateItemModal();
-            initOpeningAddAjax();
+
+            initOpeningAddBlock({
+                rootSelector: '#openingAddMobile',
+                tokenSelector: '#openingAddTokenMobile',
+                itemSuggestInputSelector: '#opening-item-suggest-mobile .js-item-suggest-input',
+                qtySelector: '.js-opening-qty-mobile',
+                submitBtnSelector: '#btnOpeningAddMobile',
+            });
+
+            initOpeningAddBlock({
+                rootSelector: '#openingAddDesktop',
+                tokenSelector: '#openingAddTokenDesktop',
+                itemSuggestInputSelector: '#opening-item-suggest .js-item-suggest-input',
+                qtySelector: '.js-opening-qty',
+                submitBtnSelector: '#btnOpeningAddDesktop',
+            });
+
             initDeleteLineAjax();
+
+            focusBackAfterReload();
         });
 
         function initDuplicateItemModal() {
@@ -661,27 +817,19 @@
                     if (!pendingOpeningSubmit) return;
 
                     const {
-                        addForm,
+                        rootEl,
                         updateExistingInput
                     } = pendingOpeningSubmit;
+                    if (updateExistingInput) updateExistingInput.value = '1';
 
-                    if (updateExistingInput) {
-                        updateExistingInput.value = '1';
-                    }
+                    performOpeningAjaxSubmit(rootEl, {
+                        focusBackToItemOnSuccess: true
+                    });
 
-                    performOpeningAjaxSubmit(addForm);
                     pendingOpeningSubmit = null;
                     duplicateItemModalInstance.hide();
                 });
             }
-        }
-
-        function getCsrfToken() {
-            const meta = document.querySelector('meta[name="csrf-token"]');
-            if (meta) return meta.getAttribute('content');
-            const input = document.querySelector('input[name="_token"]');
-            if (input) return input.value;
-            return '';
         }
 
         function formatNumberForDisplay(num) {
@@ -692,77 +840,91 @@
             }).format(n);
         }
 
-        function initOpeningAddAjax() {
-            const addForm = document.getElementById('opening-add-form');
-            if (!addForm) return;
-
-            const itemInput = document.querySelector('#opening-item-suggest .js-item-suggest-input');
-            const qtyInput = addForm.querySelector('.js-opening-qty');
-            const updateExistingInput = addForm.querySelector('input[name="update_existing"]');
-
-            // Fokus awal ke item (backup)
-            if (itemInput) {
-                itemInput.focus();
-                itemInput.select();
-            }
-
-            // Kumpulkan item_id yang sudah ada di tabel
+        function collectExistingItemIds() {
             const existingIds = new Set();
             document.querySelectorAll('tr[data-item-id]').forEach(tr => {
                 const id = tr.getAttribute('data-item-id');
                 if (id) existingIds.add(id);
             });
+            return existingIds;
+        }
 
-            // Enter di Qty Fisik => submit via AJAX
+        function initOpeningAddBlock(opts) {
+            const rootEl = document.querySelector(opts.rootSelector);
+            if (!rootEl) return;
+
+            const actionUrl = rootEl.dataset.action;
+            const tokenEl = document.querySelector(opts.tokenSelector);
+            const csrf = tokenEl ? tokenEl.value : '';
+
+            const itemSuggestInput = document.querySelector(opts.itemSuggestInputSelector);
+            const qtyInput = rootEl.querySelector(opts.qtySelector);
+            const submitBtn = document.querySelector(opts.submitBtnSelector);
+
+            const itemIdField = rootEl.querySelector('input[name="item_id"]');
+            const updateExistingInput = rootEl.querySelector('input[name="update_existing"]');
+
+            // Fokus awal desktop
+            if (itemSuggestInput && window.innerWidth >= 768 && opts.rootSelector === '#openingAddDesktop') {
+                itemSuggestInput.focus();
+                itemSuggestInput.select && itemSuggestInput.select();
+            }
+
+            // pilih item -> fokus qty
+            if (itemIdField && qtyInput) {
+                itemIdField.addEventListener('change', function() {
+                    setTimeout(() => {
+                        qtyInput.focus();
+                        qtyInput.select && qtyInput.select();
+                    }, 60);
+                });
+            }
+
+            // Enter di qty -> submit
             if (qtyInput) {
                 qtyInput.addEventListener('keydown', function(e) {
                     if (e.key === 'Enter') {
                         e.preventDefault();
-                        submitOpeningFormAjax(addForm, existingIds, updateExistingInput, itemInput);
+                        submitOpening(rootEl, actionUrl, csrf, itemSuggestInput, updateExistingInput);
                     }
                 });
             }
 
-            // Klik tombol Tambah => juga AJAX
-            addForm.addEventListener('submit', function(e) {
-                e.preventDefault();
-                submitOpeningFormAjax(addForm, existingIds, updateExistingInput, itemInput);
-            });
+            // klik Tambah -> submit
+            if (submitBtn) {
+                submitBtn.addEventListener('click', function(e) {
+                    e.preventDefault();
+                    submitOpening(rootEl, actionUrl, csrf, itemSuggestInput, updateExistingInput);
+                });
+            }
         }
 
-        function submitOpeningFormAjax(addForm, existingIds, updateExistingInput, itemInput) {
-            const itemIdField = addForm.querySelector('input[name="item_id"]');
+        function submitOpening(rootEl, actionUrl, csrf, itemSuggestInput, updateExistingInput) {
+            const existingIds = collectExistingItemIds();
+
+            const itemIdField = rootEl.querySelector('input[name="item_id"]');
+            const qtyField = rootEl.querySelector('input[name="physical_qty"]');
+
             if (!itemIdField || !itemIdField.value) {
                 alert('Pilih item terlebih dahulu.');
-                if (itemInput) {
-                    itemInput.focus();
-                }
+                itemSuggestInput && itemSuggestInput.focus();
+                return;
+            }
+            if (!qtyField || qtyField.value.trim() === '') {
+                alert('Isi Qty Fisik terlebih dahulu.');
+                qtyField && qtyField.focus();
+                qtyField && qtyField.select && qtyField.select();
                 return;
             }
 
             const itemId = itemIdField.value;
-
-            // ✅ CEK QTY FISIK WAJIB DIISI
-            const qtyField = addForm.querySelector('input[name="physical_qty"]');
-            if (!qtyField || qtyField.value.trim() === '') {
-                alert('Isi Qty Fisik terlebih dahulu.');
-                if (qtyField) {
-                    qtyField.focus();
-                    qtyField.select && qtyField.select();
-                }
-                return;
-            }
-
             const newQtyValue = qtyField.value;
 
-            // Jika item sudah ada di tabel → tampilkan mini modal konfirmasi
             if (existingIds.has(itemId)) {
-                // Kalau modal bootstrap tersedia, pakai modal
                 if (duplicateItemModalInstance) {
                     const row = document.querySelector('tr[data-item-id="' + itemId + '"]');
                     const oldQty = row ? parseFloat(row.getAttribute('data-physical-qty') || '0') : 0;
                     const newQty = parseFloat(newQtyValue || '0');
-
                     const diff = newQty - oldQty;
 
                     const code = row ? (row.getAttribute('data-item-code') || '') : '';
@@ -773,9 +935,7 @@
                     const qtyNewEl = document.getElementById('dupQtyNew');
                     const qtyDiffEl = document.getElementById('dupQtyDiff');
 
-                    if (labelEl) {
-                        labelEl.textContent = (code ? code : 'Item') + (name ? ' — ' + name : '');
-                    }
+                    if (labelEl) labelEl.textContent = (code ? code : 'Item') + (name ? ' — ' + name : '');
                     if (qtyOldEl) qtyOldEl.textContent = formatNumberForDisplay(oldQty);
                     if (qtyNewEl) qtyNewEl.textContent = formatNumberForDisplay(newQty);
                     if (qtyDiffEl) {
@@ -784,43 +944,44 @@
                     }
 
                     pendingOpeningSubmit = {
-                        addForm,
+                        rootEl,
                         updateExistingInput
                     };
-
                     duplicateItemModalInstance.show();
                     return;
                 } else {
-                    // Fallback: confirm biasa kalau bootstrap modal nggak tersedia
-                    const ok = confirm(
-                        'Item ini sudah ada di daftar opname.\n\n' +
-                        'Apakah Anda ingin mengupdate baris yang sudah ada (Qty / HPP akan diganti)?'
-                    );
-                    if (!ok) {
-                        return;
-                    }
-                    if (updateExistingInput) {
-                        updateExistingInput.value = '1';
-                    }
+                    const ok = confirm('Item ini sudah ada.\n\nUpdate baris existing (Qty diganti)?');
+                    if (!ok) return;
+                    updateExistingInput && (updateExistingInput.value = '1');
                 }
             } else {
-                // Item baru
-                if (updateExistingInput) {
-                    updateExistingInput.value = '0';
-                }
+                updateExistingInput && (updateExistingInput.value = '0');
             }
 
-            // Lanjut submit AJAX normal
-            performOpeningAjaxSubmit(addForm);
+            performOpeningAjaxSubmit(rootEl, {
+                actionUrl,
+                csrf,
+                focusBackToItemOnSuccess: true
+            });
         }
 
-        function performOpeningAjaxSubmit(addForm) {
-            const formData = new FormData(addForm);
+        function performOpeningAjaxSubmit(rootEl, opts = {}) {
+            const actionUrl = opts.actionUrl || rootEl.dataset.action;
+            const csrf = opts.csrf || '';
 
-            fetch(addForm.action, {
+            const formData = new FormData();
+            // kirim token (Laravel)
+            formData.append('_token', csrf);
+
+            // ambil semua input yang ada di block add (termasuk hidden unit_cost/notes/update_existing)
+            rootEl.querySelectorAll('input[name]').forEach(inp => {
+                formData.append(inp.name, inp.value ?? '');
+            });
+
+            fetch(actionUrl, {
                     method: 'POST',
                     headers: {
-                        'X-CSRF-TOKEN': getCsrfToken(),
+                        'X-CSRF-TOKEN': csrf,
                         'X-Requested-With': 'XMLHttpRequest',
                         'Accept': 'application/json',
                     },
@@ -831,9 +992,8 @@
                         let msg = 'Gagal menyimpan item.';
                         try {
                             const data = await response.json();
-                            if (data?.message) {
-                                msg = data.message;
-                            } else if (data?.errors) {
+                            if (data?.message) msg = data.message;
+                            else if (data?.errors) {
                                 const firstKey = Object.keys(data.errors)[0];
                                 msg = data.errors[firstKey][0] ?? msg;
                             }
@@ -846,15 +1006,48 @@
                 .then((data) => {
                     if (!data) return;
                     if (data.status === 'ok') {
-                        // Simple: reload supaya tabel & summary ke-refresh
+                        if (opts.focusBackToItemOnSuccess) {
+                            try {
+                                sessionStorage.setItem('so_opening_focus_back', '1');
+                            } catch (e) {}
+                        }
                         window.location.reload();
                     } else {
                         alert(data.message || 'Gagal menyimpan item.');
                     }
                 })
-                .catch(() => {
-                    alert('Terjadi kesalahan saat menyimpan item.');
-                });
+                .catch(() => alert('Terjadi kesalahan saat menyimpan item.'));
+        }
+
+        function focusBackAfterReload() {
+            try {
+                const flag = sessionStorage.getItem('so_opening_focus_back');
+                if (!flag) return;
+                sessionStorage.removeItem('so_opening_focus_back');
+
+                const mobileInput = document.querySelector('#opening-item-suggest-mobile .js-item-suggest-input');
+                const desktopInput = document.querySelector('#opening-item-suggest .js-item-suggest-input');
+
+                const target = (mobileInput && isElementVisible(mobileInput)) ? mobileInput : desktopInput;
+                if (target) {
+                    setTimeout(() => {
+                        target.focus();
+                        target.select && target.select();
+                    }, 140);
+                }
+            } catch (e) {}
+        }
+
+        function isElementVisible(el) {
+            if (!el) return false;
+            const rect = el.getBoundingClientRect();
+            return rect.width > 0 && rect.height > 0;
+        }
+
+        function getCsrfToken() {
+            const meta = document.querySelector('meta[name="csrf-token"]');
+            if (meta) return meta.getAttribute('content');
+            return '';
         }
 
         function initDeleteLineAjax() {
@@ -869,9 +1062,7 @@
                     const lineId = this.dataset.lineId;
                     if (!lineId) return;
 
-                    if (!confirm('Hapus baris ini dari sesi opname?')) {
-                        return;
-                    }
+                    if (!confirm('Hapus baris ini dari sesi opname?')) return;
 
                     const url = urlTemplate.replace('__LINE_ID__', lineId);
 
@@ -883,7 +1074,7 @@
                                 'Accept': 'application/json',
                             },
                             body: new URLSearchParams({
-                                '_method': 'DELETE',
+                                '_method': 'DELETE'
                             }),
                         })
                         .then(async (response) => {
@@ -907,9 +1098,7 @@
                                 alert(data.message || 'Gagal menghapus item.');
                             }
                         })
-                        .catch(() => {
-                            alert('Terjadi kesalahan saat menghapus item.');
-                        });
+                        .catch(() => alert('Terjadi kesalahan saat menghapus item.'));
                 });
             });
         }

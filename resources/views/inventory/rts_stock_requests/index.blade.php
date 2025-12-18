@@ -1,523 +1,474 @@
 {{-- resources/views/inventory/rts_stock_requests/index.blade.php --}}
 @extends('layouts.app')
 
-@section('title', 'RTS • Permintaan Stok')
+@section('title', 'RTS • Permintaan Replenish')
 
 @push('head')
     <style>
         :root {
             --rts-main: rgba(45, 212, 191, 1);
-            --rts-strong: rgba(15, 118, 110, 1);
-            --rts-soft: rgba(45, 212, 191, 0.12);
+            --rts-soft: rgba(45, 212, 191, .14);
+            --warn-soft: rgba(245, 158, 11, .14);
+            --danger-soft: rgba(239, 68, 68, .12);
         }
 
         .page-wrap {
-            max-width: 1100px;
+            max-width: 1150px;
             margin-inline: auto;
-            padding: .85rem .85rem 3rem;
+            padding: .85rem .85rem 4rem;
         }
 
         body[data-theme="light"] .page-wrap {
             background: radial-gradient(circle at top left,
-                    rgba(59, 130, 246, 0.08) 0,
-                    rgba(45, 212, 191, 0.10) 28%,
-                    #f9fafb 70%);
+                    rgba(59, 130, 246, .10) 0,
+                    rgba(45, 212, 191, .12) 28%,
+                    #f9fafb 65%);
+        }
+
+        /* Header */
+        .header-row {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            gap: .75rem;
+            flex-wrap: wrap;
+            margin-bottom: .75rem;
         }
 
         .title {
-            font-size: 1.12rem;
-            font-weight: 750;
+            font-size: 1.15rem;
+            font-weight: 900;
+            letter-spacing: -.01em;
             margin: 0;
         }
 
-        .sub {
-            font-size: .84rem;
-            color: rgba(100, 116, 139, 1);
-            margin-top: .2rem;
-        }
-
-        .mono {
-            font-family: ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, "Liberation Mono", "Courier New", monospace;
-            font-variant-numeric: tabular-nums;
-        }
-
-        /* button */
-        .btn-primary {
-            background: var(--rts-strong);
-            padding: .40rem .95rem;
-            border-radius: 999px;
-            font-size: .82rem;
-            color: #ecfeff;
-            text-decoration: none;
-            display: inline-flex;
+        .header-actions {
+            display: flex;
+            gap: .5rem;
+            flex-wrap: wrap;
             align-items: center;
-            gap: .35rem;
-            border: none;
         }
 
-        /* stats */
+        /* Stats (compact) */
         .stats {
             display: grid;
-            grid-template-columns: repeat(4, minmax(0, 1fr));
-            gap: .65rem;
-            margin: .85rem 0;
+            grid-template-columns: repeat(5, minmax(0, 1fr));
+            gap: .55rem;
+            margin-bottom: .75rem;
         }
 
         .stat {
             background: var(--card);
             border-radius: 12px;
-            padding: .65rem .8rem;
-            border: 1px solid rgba(148, 163, 184, 0.25);
+            border: 1px solid rgba(148, 163, 184, .25);
+            padding: .55rem .6rem;
+            min-height: 58px;
+            display: flex;
+            flex-direction: column;
+            justify-content: center;
         }
 
         .stat .label {
-            font-size: .68rem;
-            color: rgba(148, 163, 184, 1);
-            letter-spacing: .14em;
-            text-transform: uppercase;
+            font-size: .72rem;
+            opacity: .72;
+            line-height: 1.1;
         }
 
-        .stat .val {
-            font-size: 1.02rem;
-            font-weight: 750;
-            margin-top: .18rem;
+        .stat .value {
+            font-size: 1.1rem;
+            font-weight: 900;
+            margin-top: .12rem;
+            line-height: 1.1;
         }
 
-        /* filters */
-        .chip {
-            padding: .16rem .58rem;
-            font-size: .78rem;
+        /* Filters (compact pills) */
+        .filters {
+            display: flex;
+            flex-wrap: wrap;
+            gap: .55rem;
+            align-items: center;
+            justify-content: space-between;
+            margin-bottom: .75rem;
+        }
+
+        .filter-group {
+            display: flex;
+            flex-wrap: wrap;
+            gap: .45rem;
+        }
+
+        .filters a {
+            padding: .26rem .55rem;
             border-radius: 999px;
+            font-size: .78rem;
+            border: 1px solid rgba(148, 163, 184, .35);
             text-decoration: none;
-            border: 1px solid rgba(148, 163, 184, .5);
-            background: rgba(248, 250, 252, .9);
-            display: inline-block;
-            margin-right: .25rem;
+            color: inherit;
+            opacity: .86;
+            transition: background .12s ease, border-color .12s ease, opacity .12s ease;
+            white-space: nowrap;
         }
 
-        .chip-active {
+        .filters a:hover {
+            opacity: 1;
+        }
+
+        .filters a.active {
             background: var(--rts-soft);
-            color: var(--rts-strong);
-            border-color: var(--rts-strong);
+            border-color: var(--rts-main);
+            font-weight: 800;
+            opacity: 1;
         }
 
-        /* desktop table */
-        .table-card {
+        /* List */
+        .list {
+            display: grid;
+            gap: .65rem;
+        }
+
+        .card {
             background: var(--card);
             border-radius: 14px;
-            border: 1px solid rgba(148, 163, 184, .25);
-            overflow: hidden;
+            border: 1px solid rgba(148, 163, 184, .30);
+            box-shadow:
+                0 10px 26px rgba(15, 23, 42, .06),
+                0 0 0 1px rgba(15, 23, 42, .03);
+            padding: .75rem .8rem;
+            transition: transform .12s ease, box-shadow .12s ease, border-color .12s ease, opacity .12s ease;
         }
 
-        .table {
-            width: 100%;
-            border-collapse: collapse;
-            font-size: .82rem;
+        .card.is-clickable {
+            cursor: pointer;
         }
 
-        .table th,
-        .table td {
-            padding: .5rem .65rem;
-            border-bottom: 1px solid rgba(148, 163, 184, .20);
-            vertical-align: top;
+        .card.is-clickable:hover {
+            transform: translateY(-1px);
+            border-color: rgba(45, 212, 191, .45);
+            box-shadow:
+                0 14px 34px rgba(15, 23, 42, .10),
+                0 0 0 1px rgba(15, 23, 42, .03);
         }
 
-        .table thead {
-            background: rgba(15, 23, 42, 0.05);
-        }
-
-        .code-badge {
-            display: inline-flex;
-            align-items: center;
-            gap: .3rem;
-            border-radius: 999px;
-            padding: .10rem .55rem;
-            font-size: .78rem;
-            background: rgba(15, 23, 42, 0.04);
-            border: 1px solid rgba(148, 163, 184, 0.4);
-            color: rgba(15, 23, 42, 0.86);
-        }
-
-        .code-badge .dot {
-            width: 6px;
-            height: 6px;
-            border-radius: 999px;
-            background: var(--rts-strong);
-        }
-
-        .badge-status {
-            padding: .12rem .55rem;
-            border-radius: 999px;
-            font-size: .72rem;
-            font-weight: 650;
-            display: inline-flex;
-            align-items: center;
-        }
-
-        .badge-status.pending {
-            background: rgba(59, 130, 246, .12);
-            color: rgba(30, 64, 175, 1);
-        }
-
-        .badge-status.partial {
-            background: rgba(234, 179, 8, .14);
-            color: rgba(133, 77, 14, 1);
-        }
-
-        .badge-status.completed {
-            background: rgba(22, 163, 74, .14);
-            color: rgba(22, 101, 52, 1);
-        }
-
-        .qty-pill {
-            display: inline-flex;
-            align-items: center;
-            gap: .35rem;
-            border-radius: 999px;
-            padding: .10rem .55rem;
-            font-size: .74rem;
-            background: rgba(15, 23, 42, 0.03);
-            border: 1px solid rgba(148, 163, 184, 0.35);
-            margin-top: .28rem;
-        }
-
-        .item-line {
-            font-size: .8rem;
-            font-variant-numeric: tabular-nums;
-        }
-
-        .muted {
-            color: rgba(148, 163, 184, 1);
-            font-size: .75rem;
-        }
-
-        .link-detail {
-            color: var(--rts-strong);
-            text-decoration: none;
-            font-size: .78rem;
-            font-weight: 650;
-        }
-
-        /* mobile cards */
-        .mobile-list {
-            display: none;
-        }
-
-        .card-row {
-            background: var(--card);
-            border-radius: 12px;
-            border: 1px solid rgba(148, 163, 184, .28);
-            padding: .75rem .85rem;
-            margin-bottom: .65rem;
-        }
-
-        .card-head-row {
+        .row-top {
             display: flex;
             justify-content: space-between;
-            align-items: center;
-            gap: .6rem;
+            gap: .75rem;
+            align-items: flex-start;
             flex-wrap: wrap;
         }
 
-        .card-meta {
-            margin-top: .35rem;
-            font-size: .78rem;
-            color: rgba(100, 116, 139, 1);
+        .mono {
+            font-family: ui-monospace, SFMono-Regular, Menlo, monospace;
         }
 
-        .route {
-            margin-top: .25rem;
+        .code {
+            font-weight: 900;
+            letter-spacing: -.01em;
+        }
+
+        .sub {
             font-size: .82rem;
+            opacity: .82;
+            margin-top: .12rem;
         }
 
-        .card-items {
-            margin-top: .55rem;
-            font-size: .82rem;
-        }
-
-        .btn-row {
-            margin-top: .65rem;
+        .top-actions {
             display: flex;
-            gap: .5rem;
-        }
-
-        .btn-ghost {
-            display: inline-flex;
-            justify-content: center;
+            gap: .45rem;
             align-items: center;
-            width: 100%;
-            padding: .42rem .85rem;
-            border-radius: 999px;
-            border: 1px solid rgba(148, 163, 184, .70);
-            background: transparent;
-            color: #0f172a;
-            font-size: .82rem;
-            font-weight: 650;
-            text-decoration: none;
+            flex-wrap: wrap;
         }
 
-        @media (max-width: 768px) {
+        .btn-mini {
+            padding: .18rem .5rem;
+            border-radius: 999px;
+            font-size: .78rem;
+            border: 1px solid rgba(148, 163, 184, .45);
+            background: transparent;
+            color: inherit;
+            text-decoration: none;
+            opacity: .9;
+            transition: opacity .12s ease, border-color .12s ease, background .12s ease;
+            white-space: nowrap;
+        }
+
+        .btn-mini:hover {
+            opacity: 1;
+            border-color: rgba(45, 212, 191, .55);
+        }
+
+        /* Compact metrics row */
+        .metrics {
+            display: grid;
+            grid-template-columns: repeat(5, minmax(0, 1fr));
+            gap: .4rem;
+            margin-top: .6rem;
+        }
+
+        .m {
+            border: 1px dashed rgba(148, 163, 184, .28);
+            border-radius: 12px;
+            padding: .42rem .5rem;
+            display: flex;
+            justify-content: space-between;
+            gap: .5rem;
+            align-items: baseline;
+            min-height: 38px;
+        }
+
+        .m .k {
+            font-size: .72rem;
+            opacity: .72;
+            white-space: nowrap;
+        }
+
+        .m .v {
+            font-size: .92rem;
+            font-weight: 900;
+            white-space: nowrap;
+        }
+
+        /* Outstanding badge */
+        .out-badge {
+            display: inline-flex;
+            align-items: center;
+            gap: .35rem;
+            padding: .16rem .52rem;
+            border-radius: 999px;
+            font-size: .78rem;
+            border: 1px solid rgba(148, 163, 184, .35);
+            background: rgba(148, 163, 184, .10);
+            white-space: nowrap;
+            font-weight: 800;
+        }
+
+        .out-badge.is-ok {
+            border-color: rgba(16, 185, 129, .35);
+            background: rgba(16, 185, 129, .14);
+        }
+
+        .out-badge.is-warn {
+            border-color: rgba(245, 158, 11, .40);
+            background: var(--warn-soft);
+        }
+
+        .out-badge.is-danger {
+            border-color: rgba(239, 68, 68, .40);
+            background: var(--danger-soft);
+        }
+
+        .right-badges {
+            display: flex;
+            gap: .4rem;
+            align-items: center;
+            flex-wrap: wrap;
+            justify-content: flex-end;
+        }
+
+        .empty {
+            padding: 1.25rem .9rem;
+            text-align: center;
+            opacity: .75;
+        }
+
+        @media (max-width: 980px) {
             .stats {
                 grid-template-columns: repeat(2, minmax(0, 1fr));
             }
 
+            .metrics {
+                grid-template-columns: repeat(2, minmax(0, 1fr));
+            }
+
             .page-wrap {
-                padding-inline: .65rem;
+                padding: .75rem .75rem 5rem;
+            }
+        }
+
+        @media (max-width: 420px) {
+            .title {
+                font-size: 1.05rem;
             }
 
-            .table-card {
-                display: none;
+            .stat .value {
+                font-size: 1.05rem;
             }
 
-            .mobile-list {
-                display: block;
+            .m {
+                padding: .38rem .45rem;
             }
         }
     </style>
 @endpush
 
 @section('content')
-    @php
-        $statusQueryBase = request()->except('status', 'page');
-        $periodQueryBase = request()->except('period', 'page');
-    @endphp
-
     <div class="page-wrap">
 
-        {{-- HEADER --}}
-        <div class="d-flex justify-content-between align-items-start gap-2 flex-wrap">
-            <div>
-                <h1 class="title">RTS • Permintaan Stok</h1>
-                <div class="sub">Permintaan barang dari PRD ke RTS.</div>
-            </div>
+        {{-- =======================
+            HEADER
+        ======================== --}}
+        <div class="header-row">
+            <h1 class="title">Permintaan Replenish RTS</h1>
 
-            <a href="{{ route('rts.stock-requests.today') }}" class="btn-primary">
-                + Buat / Buka hari ini
-            </a>
+            <div class="header-actions">
+                <a href="{{ route('rts.stock-requests.today') }}" class="btn btn-primary">
+                    Hari Ini
+                </a>
+                <a href="{{ route('rts.stock-requests.create') }}" class="btn btn-outline">
+                    Buat
+                </a>
+            </div>
         </div>
 
-        {{-- STATS --}}
+        {{-- =======================
+            STATS (ringkas)
+        ======================== --}}
         <div class="stats">
             <div class="stat">
                 <div class="label">Total</div>
-                <div class="val mono">{{ $stats['total'] ?? 0 }}</div>
+                <div class="value">{{ $stats['total'] }}</div>
             </div>
             <div class="stat">
-                <div class="label">Pending</div>
-                <div class="val mono">{{ $stats['pending'] ?? 0 }}</div>
+                <div class="label">Menunggu PRD</div>
+                <div class="value">{{ $stats['submitted'] }}</div>
             </div>
             <div class="stat">
-                <div class="label">Selesai</div>
-                <div class="val mono">{{ $stats['completed'] ?? 0 }}</div>
+                <div class="label">Dikirim</div>
+                <div class="value">{{ $stats['shipped'] }}</div>
             </div>
             <div class="stat">
-                <div class="label">Sisa Qty</div>
-                <div class="val mono">{{ (int) ($outstandingQty ?? 0) }}</div>
+                <div class="label">Sebagian</div>
+                <div class="value">{{ $stats['partial'] }}</div>
+            </div>
+            <div class="stat">
+                <div class="label">Sisa RTS</div>
+                <div class="value">{{ number_format($outstandingQty, 2) }}</div>
             </div>
         </div>
 
-        {{-- FILTERS --}}
-        <div class="d-flex justify-content-between mb-3 flex-wrap gap-2">
-            <div>
-                @foreach (['all' => 'Semua', 'pending' => 'Pending', 'submitted' => 'Submitted', 'partial' => 'Partial', 'completed' => 'Selesai'] as $key => $label)
-                    <a href="{{ route('rts.stock-requests.index', array_merge($statusQueryBase, ['status' => $key])) }}"
-                        class="chip {{ $statusFilter === $key ? 'chip-active' : '' }}">
+        {{-- =======================
+            FILTERS (status + periode)
+        ======================== --}}
+        <div class="filters">
+            <div class="filter-group">
+                @foreach ([
+            'all' => 'Semua',
+            'pending' => 'Pending',
+            'submitted' => 'Menunggu PRD',
+            'shipped' => 'Dikirim',
+            'partial' => 'Sebagian',
+            'completed' => 'Selesai',
+        ] as $key => $label)
+                    <a href="{{ request()->fullUrlWithQuery(['status' => $key]) }}"
+                        class="{{ $statusFilter === $key ? 'active' : '' }}">
                         {{ $label }}
                     </a>
                 @endforeach
             </div>
 
-            <div>
-                @foreach (['today' => 'Hari ini', 'week' => 'Minggu ini', 'month' => 'Bulan ini', 'all' => 'Semua'] as $key => $label)
-                    <a href="{{ route('rts.stock-requests.index', array_merge($periodQueryBase, ['period' => $key])) }}"
-                        class="chip {{ $period === $key ? 'chip-active' : '' }}">
-                        {{ $label }}
+            <div class="filter-group">
+                @foreach ([
+            'today' => 'Hari ini',
+            'week' => 'Minggu ini',
+            'month' => 'Bulan ini',
+            'all' => 'Semua periode',
+        ] as $pKey => $pLabel)
+                    <a href="{{ request()->fullUrlWithQuery(['period' => $pKey]) }}"
+                        class="{{ $period === $pKey ? 'active' : '' }}">
+                        {{ $pLabel }}
                     </a>
                 @endforeach
             </div>
         </div>
 
-        {{-- DESKTOP TABLE --}}
-        <div class="table-card">
-            <table class="table">
-                <thead>
-                    <tr>
-                        <th style="width: 90px;">Tanggal</th>
-                        <th style="width: 170px;">Kode</th>
-                        <th>Rute</th>
-                        <th style="width: 320px;">Item</th>
-                        <th style="width: 130px;">Status</th>
-                        <th style="width: 70px;">Aksi</th>
-                    </tr>
-                </thead>
-
-                <tbody>
-                    @forelse ($stockRequests as $req)
-                        @php
-                            $lines = $req->lines->take(3);
-                            $extra = max($req->lines->count() - 3, 0);
-
-                            $status = $req->status;
-                            $statusLabel = match ($status) {
-                                'submitted' => 'Menunggu PRD',
-                                'partial' => 'Sebagian',
-                                'completed' => 'Selesai',
-                                default => ucfirst($status),
-                            };
-
-                            $badgeClass = match ($status) {
-                                'completed' => 'completed',
-                                'partial' => 'partial',
-                                default => 'pending',
-                            };
-
-                            $totalReq = (float) ($req->total_requested_qty ?? $req->lines->sum('qty_request'));
-                            $totalIssued = (float) ($req->total_issued_qty ?? $req->lines->sum('qty_issued'));
-                            $outstanding = max($totalReq - $totalIssued, 0);
-                        @endphp
-
-                        <tr>
-                            <td class="mono">
-                                {{ $req->date?->format('d M') }}<br>
-                                <span class="muted">{{ $req->date?->format('Y') }}</span>
-                            </td>
-
-                            <td>
-                                <div class="code-badge">
-                                    <span class="dot"></span>
-                                    <span class="mono">{{ $req->code }}</span>
-                                </div>
-
-                                <div class="qty-pill">
-                                    <span>Diminta</span> <strong class="mono">{{ (int) $totalReq }}</strong>
-                                    @if ($outstanding > 0)
-                                        <span class="muted">•</span>
-                                        <span>Sisa</span> <strong class="mono">{{ (int) $outstanding }}</strong>
-                                    @endif
-                                </div>
-                            </td>
-
-                            <td>
-                                {{ $req->sourceWarehouse?->name ?? '-' }} → {{ $req->destinationWarehouse?->name ?? '-' }}
-                            </td>
-
-                            <td>
-                                @foreach ($lines as $line)
-                                    <div class="item-line">
-                                        <span class="mono">{{ $line->item?->code ?? '-' }}</span> :
-                                        <strong class="mono">{{ (int) $line->qty_request }}</strong>
-                                    </div>
-                                @endforeach
-                                @if ($extra > 0)
-                                    <div class="muted">+{{ $extra }} item</div>
-                                @endif
-                            </td>
-
-                            <td>
-                                <span class="badge-status {{ $badgeClass }}">{{ $statusLabel }}</span>
-                            </td>
-
-                            <td>
-                                <a href="{{ route('rts.stock-requests.show', $req) }}" class="link-detail">Detail</a>
-                            </td>
-                        </tr>
-                    @empty
-                        <tr>
-                            <td colspan="6" class="text-center py-4 text-muted">
-                                Belum ada data permintaan.
-                            </td>
-                        </tr>
-                    @endforelse
-                </tbody>
-            </table>
-
-            <div class="p-3">
-                {{ $stockRequests->links() }}
-            </div>
-        </div>
-
-        {{-- MOBILE CARDS --}}
-        <div class="mobile-list">
-            @forelse ($stockRequests as $req)
+        {{-- =======================
+            LIST
+        ======================== --}}
+        <div class="list">
+            @forelse ($stockRequests as $sr)
                 @php
-                    $lines = $req->lines->take(2);
-                    $extra = max($req->lines->count() - 2, 0);
+                    $req = (float) ($sr->total_requested_qty ?? 0);
+                    $disp = (float) ($sr->total_dispatched_qty ?? 0);
+                    $recv = (float) ($sr->total_received_qty ?? 0);
+                    $pick = (float) ($sr->total_picked_qty ?? 0);
 
-                    $status = $req->status;
-                    $statusLabel = match ($status) {
-                        'submitted' => 'Menunggu PRD',
-                        'partial' => 'Sebagian',
-                        'completed' => 'Selesai',
-                        default => ucfirst($status),
-                    };
+                    // RTS perspective: sisa RTS = request - (received + picked)
+                    $outRts = max($req - $recv - $pick, 0);
+                    $inTransit = max($disp - $recv, 0);
 
-                    $badgeClass = match ($status) {
-                        'completed' => 'completed',
-                        'partial' => 'partial',
-                        default => 'pending',
-                    };
+                    $clickUrl = route('rts.stock-requests.show', $sr);
 
-                    $totalReq = (float) ($req->total_requested_qty ?? $req->lines->sum('qty_request'));
-                    $totalIssued = (float) ($req->total_issued_qty ?? $req->lines->sum('qty_issued'));
-                    $outstanding = max($totalReq - $totalIssued, 0);
+                    // badge sisa
+                    if ($outRts <= 0.0000001) {
+                        $outCls = 'out-badge is-ok';
+                        $outText = 'AMAN';
+                    } elseif ($outRts >= $req * 0.5 && $req > 0) {
+                        $outCls = 'out-badge is-danger';
+                        $outText = 'URGENT';
+                    } else {
+                        $outCls = 'out-badge is-warn';
+                        $outText = 'BUTUH';
+                    }
                 @endphp
 
-                <div class="card-row">
-                    <div class="card-head-row">
-                        <div class="code-badge">
-                            <span class="dot"></span>
-                            <span class="mono">{{ $req->code }}</span>
+                <div class="card is-clickable" onclick="window.location='{{ $clickUrl }}'">
+                    <div class="row-top">
+                        <div>
+                            <div class="mono code">{{ $sr->code }}</div>
+                            <div class="sub">
+                                {{ optional($sr->date)->format('d M Y') }}
+                                · {{ $sr->sourceWarehouse->code ?? '-' }}
+                                → {{ $sr->destinationWarehouse->code ?? '-' }}
+                            </div>
                         </div>
 
-                        <span class="badge-status {{ $badgeClass }}">{{ $statusLabel }}</span>
+                        <div class="top-actions">
+                            <span class="{{ $outCls }}">
+                                {{ $outText }} · Sisa <span class="mono">{{ $outRts }}</span>
+                            </span>
+                            <x-status-pill :status="$sr->status" />
+                            <a href="{{ route('rts.stock-requests.show', $sr) }}" class="btn-mini"
+                                onclick="event.stopPropagation();">
+                                Detail
+                            </a>
+                        </div>
                     </div>
 
-                    <div class="card-meta">
-                        <span class="mono">{{ $req->date?->format('d M Y') ?? '-' }}</span>
-                        <span class="muted">•</span>
-                        <span class="mono">{{ $req->created_at?->format('H:i') }}</span>
-                    </div>
-
-                    <div class="route">
-                        {{ $req->sourceWarehouse?->name ?? '-' }} → {{ $req->destinationWarehouse?->name ?? '-' }}
-                    </div>
-
-                    <div class="qty-pill">
-                        <span>Diminta</span> <strong class="mono">{{ (int) $totalReq }}</strong>
-                        @if ($outstanding > 0)
-                            <span class="muted">•</span>
-                            <span>Sisa</span> <strong class="mono">{{ (int) $outstanding }}</strong>
-                        @endif
-                    </div>
-
-                    <div class="card-items">
-                        @foreach ($lines as $line)
-                            <div class="item-line">
-                                <span class="mono">{{ $line->item?->code ?? '-' }}</span>
-                                <span class="muted">×</span>
-                                <strong class="mono">{{ (int) $line->qty_request }}</strong>
-                            </div>
-                        @endforeach
-                        @if ($extra > 0)
-                            <div class="muted">+{{ $extra }} item</div>
-                        @endif
-                    </div>
-
-                    <div class="btn-row">
-                        <a href="{{ route('rts.stock-requests.show', $req) }}" class="btn-ghost">Detail</a>
+                    <div class="metrics">
+                        <div class="m">
+                            <span class="k">Req</span>
+                            <span class="v mono">{{ $req }}</span>
+                        </div>
+                        <div class="m">
+                            <span class="k">Kirim</span>
+                            <span class="v mono">{{ $disp }}</span>
+                        </div>
+                        <div class="m">
+                            <span class="k">Terima</span>
+                            <span class="v mono">{{ $recv }}</span>
+                        </div>
+                        <div class="m">
+                            <span class="k">Pickup</span>
+                            <span class="v mono">{{ $pick }}</span>
+                        </div>
+                        <div class="m">
+                            <span class="k">Transit</span>
+                            <span class="v mono">{{ $inTransit }}</span>
+                        </div>
                     </div>
                 </div>
             @empty
-                <div class="card-row">
-                    <div class="text-center muted">Belum ada data permintaan.</div>
+                <div class="card empty">
+                    Belum ada permintaan.
                 </div>
             @endforelse
+        </div>
 
-            @if (method_exists($stockRequests, 'links'))
-                <div class="mt-2">
-                    {{ $stockRequests->links() }}
-                </div>
-            @endif
+        {{-- =======================
+            PAGINATION
+        ======================== --}}
+        <div style="margin-top:1rem">
+            {{ $stockRequests->links() }}
         </div>
 
     </div>

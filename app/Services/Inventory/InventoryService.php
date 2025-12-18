@@ -40,15 +40,19 @@ class InventoryService
         $date = $this->normalizeDate($date);
 
         /** @var InventoryStock $stock */
-        $stock = InventoryStock::firstOrCreate(
-            [
+        $stock = InventoryStock::query()
+            ->where('warehouse_id', $warehouseId)
+            ->where('item_id', $itemId)
+            ->lockForUpdate()
+            ->first();
+
+        if (!$stock) {
+            $stock = InventoryStock::create([
                 'warehouse_id' => $warehouseId,
                 'item_id' => $itemId,
-            ],
-            [
                 'qty' => 0,
-            ]
-        );
+            ]);
+        }
 
         // UPDATE SALDO QTY
         $stock->qty = $this->num($stock->qty) + $qty;
@@ -232,8 +236,16 @@ class InventoryService
                 // Kalau ada LOT → pakai moving average per LOT
                 $unitCostForTransfer = $this->lotCost->getAvgCost($lotId);
             } else {
-                // ✅ Non-LOT (FG/WIP) pakai snapshot cost (bukan avg incoming gudang asal)
-                $unitCostForTransfer = $this->resolveUnitCostFromSnapshot($itemId, $fromWarehouseId) ?? 0.0;
+                /**
+                 * ✅ Non-LOT (FG/WIP) - PRIORITAS:
+                 * 1) last known unit_cost dari ledger gudang asal (mutasi terakhir yang punya unit_cost)
+                 * 2) snapshot cost (per-warehouse/global)
+                 * 3) 0
+                 *
+                 * Ini penting untuk WIP-FIN → RTS supaya cost yang kebawa nyambung dengan jejak WIP-FIN.
+                 */
+                $unitCostForTransfer =
+                $this->getLastKnownUnitCost($fromWarehouseId, $itemId) ?? $this->resolveUnitCostFromSnapshot($itemId, $fromWarehouseId) ?? 0.0;
             }
 
             $unitCostOverride = ($unitCostForTransfer > 0.000001) ? $unitCostForTransfer : null;
@@ -450,6 +462,11 @@ class InventoryService
         return $totalCost / $totalQty;
     }
 
+    /**
+     * Rata-rata unit_cost berdasarkan seluruh mutasi IN (historis) di gudang tsb.
+     * Catatan: ini bukan MA "true perpetual" (tidak memperhitungkan OUT),
+     * tapi cukup sebagai fallback untuk item tanpa override.
+     */
     public function getItemIncomingUnitCost(int $warehouseId, int $itemId): float
     {
         $query = InventoryMutation::query()
@@ -650,5 +667,27 @@ class InventoryService
         }
 
         return null;
+    }
+
+    /**
+     * ✅ NEW: Ambil unit_cost terakhir yang "tercatat" untuk item pada gudang tertentu.
+     * Dipakai untuk carry-cost transfer non-LOT (WIP/FG), agar nyambung dengan ledger gudang asal.
+     */
+    public function getLastKnownUnitCost(int $warehouseId, int $itemId): ?float
+    {
+        $row = InventoryMutation::query()
+            ->where('warehouse_id', $warehouseId)
+            ->where('item_id', $itemId)
+            ->whereNotNull('unit_cost')
+            ->orderByDesc('date')
+            ->orderByDesc('id')
+            ->first();
+
+        if (!$row) {
+            return null;
+        }
+
+        $cost = (float) $row->unit_cost;
+        return ($cost > 0.000001) ? $cost : null;
     }
 }

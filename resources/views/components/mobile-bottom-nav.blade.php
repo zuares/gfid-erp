@@ -52,7 +52,9 @@
         backdrop-filter: blur(16px);
         -webkit-backdrop-filter: blur(16px);
         z-index: 9999;
-        transform: translateZ(0);
+
+        /* ✅ Android keyboard (QWERTY) fix: nav tidak ikut naik */
+        transform: translate3d(0, var(--vv-kbd, 0px), 0);
         will-change: transform;
     }
 
@@ -282,7 +284,6 @@
         {{-- HOME / SAVE (CENTER FAB) --}}
         <div class="nav-item center-btn {{ $isDashboardTab ? 'active' : '' }}">
             <button type="button" class="center-icon js-mobile-primary-save" data-fallback-href="{{ $dashboardHref }}">
-                {{-- Icon: check (save/submit) --}}
                 <svg viewBox="0 0 24 24" xmlns="http://www.w3.org/2000/svg">
                     <path d="M5 12.5 10 17.5 19 8.5" />
                 </svg>
@@ -318,7 +319,7 @@
         <a href="{{ route('dashboard') }}" class="nav-item {{ $isDashboard ? 'active' : '' }}">
             <span class="icon">
                 <svg viewBox="0 0 24 24" xmlns="http://www.w3.org/2000/svg">
-                    <path d="M4 10.5 11.24 4.6a1.1 1.1 0 0 1 1.52 0L20 10.5" />
+                    <path d="M4 10.5 11.24 4.6a1.1 0 0 1 1.52 0L20 10.5" />
                     <path d="M6.5 9.5V18a1.5 1.5 0 0 0 1.5 1.5h8a1.5 1.5 0 0 0 1.5-1.5V9.5" />
                     <path d="M10 19.5V13.5a2 2 0 0 1 2-2 2 2 0 0 1 2 2v6" />
                 </svg>
@@ -345,7 +346,6 @@
         </a>
 
         @php
-            // fallback default kalau tidak ada form di halaman
             $fabFallbackHref = Route::has('production.sewing_pickups.create')
                 ? route('production.sewing_pickups.create')
                 : '#';
@@ -354,7 +354,6 @@
         <div class="nav-item center-btn">
             <button type="button" class="center-icon js-mobile-primary-save"
                 data-fallback-href="{{ $fabFallbackHref }}">
-                {{-- Icon: check (save/submit) --}}
                 <svg viewBox="0 0 24 24" xmlns="http://www.w3.org/2000/svg">
                     <path d="M5 12.5 10 17.5 19 8.5" />
                 </svg>
@@ -391,59 +390,114 @@
 
 <script>
     document.addEventListener('DOMContentLoaded', function() {
+
+        // ==========================
+        // A) PRIMARY SAVE BUTTON
+        // ==========================
         const buttons = document.querySelectorAll('.js-mobile-primary-save');
+        if (buttons.length) {
+            buttons.forEach(function(btn) {
+                btn.addEventListener('click', function(e) {
+                    e.preventDefault();
+                    if (btn.hasAttribute('disabled')) return;
 
-        if (!buttons.length) return;
+                    let form = document.querySelector('form[data-mobile-primary-form="1"]');
+                    if (!form) form = document.querySelector(
+                    'main form, .page-wrap form, form');
 
-        buttons.forEach(function(btn) {
-            btn.addEventListener('click', function(e) {
-                e.preventDefault();
+                    if (form) {
+                        try {
+                            btn.setAttribute('disabled', 'disabled');
 
-                if (btn.hasAttribute('disabled')) {
-                    return;
-                }
-
-                // 1) Cari form yang ditandai khusus
-                let form = document.querySelector('form[data-mobile-primary-form="1"]');
-
-                // 2) Kalau belum ada, fallback ke form pertama yang kelihatan (optional)
-                if (!form) {
-                    form = document.querySelector('main form, .page-wrap form, form');
-                }
-
-                if (form) {
-                    try {
-                        // Optional: tambahkan flag agar tombol lain bisa disable
-                        btn.setAttribute('disabled', 'disabled');
-
-                        // Kalau ada tombol submit utama di form, bisa kita trigger klik supaya
-                        // jalan validasi HTML bawaan browser:
-                        const submitBtn = form.querySelector(
-                            'button[type="submit"], input[type="submit"]');
-                        if (submitBtn) {
-                            submitBtn.click();
-                        } else {
-                            form.submit();
+                            const submitBtn = form.querySelector(
+                                'button[type="submit"], input[type="submit"]');
+                            if (submitBtn) submitBtn.click();
+                            else form.submit();
+                        } catch (error) {
+                            btn.removeAttribute('disabled');
+                            console.error('Mobile primary submit failed:', error);
+                            const fallbackHref = btn.getAttribute('data-fallback-href');
+                            if (fallbackHref && fallbackHref !== '#') window.location.href =
+                                fallbackHref;
                         }
-
-                        // Note: jangan langsung remove disabled, biarkan setelah response / reload
-                    } catch (error) {
-                        btn.removeAttribute('disabled');
-                        console.error('Mobile primary submit failed:', error);
-                        // Kalau gagal submit karena error, boleh fallback ke href
+                    } else {
                         const fallbackHref = btn.getAttribute('data-fallback-href');
-                        if (fallbackHref && fallbackHref !== '#') {
-                            window.location.href = fallbackHref;
-                        }
+                        if (fallbackHref && fallbackHref !== '#') window.location.href =
+                            fallbackHref;
                     }
-                } else {
-                    // 3) Kalau tidak ada form sama sekali → pakai fallback href
-                    const fallbackHref = btn.getAttribute('data-fallback-href');
-                    if (fallbackHref && fallbackHref !== '#') {
-                        window.location.href = fallbackHref;
-                    }
-                }
+                });
             });
+        }
+
+        // ==========================
+        // B) ANDROID KEYBOARD FIX
+        // ✅ QWERTY yang bikin viewport "pan" -> offsetTop naik
+        // ==========================
+        const root = document.documentElement;
+
+        // baseline "bottom" ketika normal (offsetTop ~= 0)
+        let baselineBottom = null;
+
+        function getFocusedInputType() {
+            const el = document.activeElement;
+            if (!el) return null;
+
+            const tag = (el.tagName || '').toLowerCase();
+            if (tag === 'textarea') return 'textarea';
+
+            if (tag === 'input') return (el.getAttribute('type') || 'text').toLowerCase();
+
+            if (el.isContentEditable) return 'contenteditable';
+
+            return null;
+        }
+
+        function updateKeyboardOffset() {
+            let kbd = 0;
+
+            const t = getFocusedInputType();
+            const isNumeric =
+                t === 'number' || t === 'tel' || t === 'numeric' || t === 'date' || t === 'time';
+
+            if (window.visualViewport) {
+                const vv = window.visualViewport;
+
+                // current bottom of visual viewport relative to layout viewport
+                const currentBottom = vv.height + vv.offsetTop;
+
+                // set/update baseline ketika kondisi normal (offsetTop kecil)
+                if (baselineBottom === null || vv.offsetTop < 4) {
+                    baselineBottom = Math.max(baselineBottom ?? 0, currentBottom);
+                }
+
+                // ✅ KUNCI: kompensasi pakai (height + offsetTop) -> QWERTY anti dorong
+                kbd = Math.max(0, Math.round((baselineBottom ?? currentBottom) - currentBottom));
+            }
+
+            // threshold biar address bar/toolbar ga kebaca keyboard
+            if (kbd < 120) kbd = 0;
+
+            // kalau numeric keyboard biasanya aman (dan kadang logic ini bikin overcompensate)
+            if (isNumeric) kbd = 0;
+
+            root.style.setProperty('--vv-kbd', kbd + 'px');
+        }
+
+        updateKeyboardOffset();
+
+        if (window.visualViewport) {
+            window.visualViewport.addEventListener('resize', updateKeyboardOffset);
+            window.visualViewport.addEventListener('scroll', updateKeyboardOffset);
+        }
+
+        window.addEventListener('resize', updateKeyboardOffset);
+
+        document.addEventListener('focusin', function() {
+            setTimeout(updateKeyboardOffset, 0);
+        });
+
+        document.addEventListener('focusout', function() {
+            setTimeout(updateKeyboardOffset, 80);
         });
     });
 </script>

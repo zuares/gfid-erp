@@ -57,6 +57,9 @@ Route::middleware(['web', 'auth', 'role:owner,admin,operating'])->group(function
                     Route::get('/lots', [InventoryStockController::class, 'lots'])->name('lots');
                     Route::get('{item}/locations', [InventoryStockController::class, 'itemLocations'])
                         ->name('item_locations');
+                    Route::get('/items-legacy', [InventoryStockController::class, 'itemsLegacy'])
+                        ->name('items_legacy');
+
                 });
 
             // ================== STOCK OPNAME ==================

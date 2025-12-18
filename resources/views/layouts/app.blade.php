@@ -3,7 +3,10 @@
 
 <head>
     <meta charset="utf-8">
-    <meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=1, user-scalable=no">
+
+    {{-- viewport: biarkan standar, jangan pakai maximum-scale kalau ga perlu --}}
+    <meta name="viewport" content="width=device-width, initial-scale=1, user-scalable=no">
+
     <meta name="csrf-token" content="{{ csrf_token() }}">
 
     <title>@yield('title', config('app.name', 'GFID'))</title>
@@ -18,6 +21,7 @@
         html {
             box-sizing: border-box;
             -webkit-text-size-adjust: 100%;
+            height: 100%;
         }
 
         *,
@@ -31,13 +35,38 @@
             font-size: 14px;
             line-height: 1.4;
             margin: 0;
+            height: 100%;
         }
 
         input,
         select,
         textarea {
             font-size: 16px;
-            /* cegah auto-zoom di Chrome iOS */
+            /* cegah auto-zoom di iOS */
+        }
+
+        /**
+         * ✅ ANDROID FIX:
+         * Jangan pakai 100vh/min-vh-100 langsung (sering berubah saat keyboard)
+         * Pakai baseline height dari JS -> --app-vh (px)
+         */
+        :root {
+            --app-vh: 100vh;
+            /* fallback awal */
+            --vv-kbd: 0px;
+            /* untuk bottom-nav */
+        }
+
+        #app.app-root {
+            min-height: var(--app-vh);
+        }
+
+        /* ✅ Tambahan: ganjel konten di atas bottom nav khusus mobile */
+        @media (max-width: 767.98px) {
+            .app-main .page-wrap {
+                padding-bottom: 9rem;
+                /* > tinggi bottom nav */
+            }
         }
     </style>
 
@@ -46,23 +75,17 @@
     <link rel="stylesheet" href="{{ asset('css/light-minimal.css') }}">
     <link rel="stylesheet" href="{{ asset('css/dark-high-contrast.css') }}"> {{-- override dark --}}
 
-    {{-- ✅ Tambahan: ganjel konten di atas bottom nav khusus mobile --}}
-    <style>
-        @media (max-width: 767.98px) {
-            .app-main .page-wrap {
-                padding-bottom: 9rem;
-                /* > 62px tinggi bottom nav, jadi ada jarak */
-            }
-        }
-    </style>
-
     @stack('head')
 </head>
 
-
 <body>
-    <div id="app" class="d-flex flex-column min-vh-100">
+    {{-- ✅ HAPUS min-vh-100 supaya tidak “ketarik” keyboard --}}
+    <div id="app" class="d-flex flex-column" class="app-root">
+        {{-- (Bootstrap ga suka duplicate class attr) --}}
+    </div>
 
+    {{-- ✅ Render app root benar --}}
+    <div id="app" class="app-root d-flex flex-column">
         {{-- NAVBAR --}}
         @include('layouts.partials.navbar')
 
@@ -111,12 +134,10 @@
                     @yield('content')
                 </div>
             </main>
-            {{-- APP FOOTER (kalau nanti mau ditambah) --}}
         </div>
 
         {{-- BOTTOM NAV MOBILE --}}
         @auth
-            {{-- Bottom nav hanya muncul di mobile --}}
             <x-mobile-bottom-nav />
         @endauth
     </div>
@@ -136,11 +157,85 @@
         let lastTouchEnd = 0;
         document.addEventListener('touchend', function(event) {
             const now = Date.now();
-            if (now - lastTouchEnd <= 300) {
-                event.preventDefault();
-            }
+            if (now - lastTouchEnd <= 300) event.preventDefault();
             lastTouchEnd = now;
         }, false);
+    </script>
+
+    {{-- ✅ GLOBAL ANDROID KEYBOARD FIX (baseline viewport + bottom-nav anti naik) --}}
+    <script>
+        (function() {
+            const root = document.documentElement;
+
+            // baseline height (ambil yang terbesar; jangan turun saat keyboard muncul)
+            let baselineInnerH = window.innerHeight;
+            let baselineVvH = window.visualViewport ? window.visualViewport.height : null;
+
+            function isTextInput(el) {
+                if (!el) return false;
+                const tag = (el.tagName || '').toLowerCase();
+                if (tag === 'textarea') return true;
+                if (tag !== 'input') return false;
+                const type = (el.getAttribute('type') || 'text').toLowerCase();
+                return !['checkbox', 'radio', 'range', 'button', 'submit', 'reset', 'file', 'image', 'color'].includes(
+                    type);
+            }
+
+            function isTypingNow() {
+                const el = document.activeElement;
+                return isTextInput(el) || (el && el.isContentEditable);
+            }
+
+            function updateVhAndKeyboard() {
+                const typing = isTypingNow();
+
+                // Update baseline hanya saat tidak mengetik
+                if (!typing) {
+                    baselineInnerH = Math.max(baselineInnerH, window.innerHeight);
+                    if (window.visualViewport) {
+                        baselineVvH = Math.max(baselineVvH ?? 0, window.visualViewport.height);
+                    }
+                }
+
+                // 1) app height: pakai baseline (supaya flex container tidak “ketarik” keyboard)
+                root.style.setProperty('--app-vh', baselineInnerH + 'px');
+
+                // 2) keyboard height estimate (Android-proof)
+                let kbd = 0;
+                kbd = Math.max(kbd, baselineInnerH - window.innerHeight);
+
+                if (window.visualViewport && baselineVvH != null) {
+                    kbd = Math.max(kbd, Math.round(baselineVvH - window.visualViewport.height));
+                }
+
+                // threshold biar address bar ga dianggap keyboard
+                if (kbd < 120) kbd = 0;
+
+                // 3) dorong balik bottom-nav ke bawah sebesar kbd (jadi tidak ikut naik)
+                root.style.setProperty('--vv-kbd', kbd + 'px');
+            }
+
+            updateVhAndKeyboard();
+
+            window.addEventListener('resize', updateVhAndKeyboard);
+            window.addEventListener('orientationchange', function() {
+                baselineInnerH = window.innerHeight;
+                baselineVvH = window.visualViewport ? window.visualViewport.height : baselineVvH;
+                setTimeout(updateVhAndKeyboard, 120);
+            });
+
+            if (window.visualViewport) {
+                window.visualViewport.addEventListener('resize', updateVhAndKeyboard);
+                window.visualViewport.addEventListener('scroll', updateVhAndKeyboard);
+            }
+
+            document.addEventListener('focusin', function() {
+                setTimeout(updateVhAndKeyboard, 0);
+            });
+            document.addEventListener('focusout', function() {
+                setTimeout(updateVhAndKeyboard, 120);
+            });
+        })();
     </script>
 
 </body>

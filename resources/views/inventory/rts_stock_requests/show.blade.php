@@ -1,820 +1,816 @@
+{{-- resources/views/inventory/rts_stock_requests/show.blade.php --}}
 @extends('layouts.app')
 
-@section('title', 'Stock Request RTS • ' . $stockRequest->code)
+@section('title', 'RTS • ' . $stockRequest->code)
 
 @push('head')
     <style>
         :root {
             --rts-main: rgba(45, 212, 191, 1);
-            --rts-strong: rgba(15, 118, 110, 1);
-            --rts-soft: rgba(45, 212, 191, 0.12);
+            --rts-soft: rgba(45, 212, 191, .14);
+            --warn-soft: rgba(245, 158, 11, .14);
+            --danger-soft: rgba(239, 68, 68, .12);
         }
 
         .page-wrap {
-            max-width: 1100px;
+            max-width: 1150px;
             margin-inline: auto;
-            padding: .95rem .85rem 3rem;
+            padding: .85rem .85rem 4.5rem;
         }
 
         body[data-theme="light"] .page-wrap {
             background: radial-gradient(circle at top left,
-                    rgba(59, 130, 246, 0.09) 0,
-                    rgba(45, 212, 191, 0.10) 26%,
+                    rgba(59, 130, 246, .10) 0,
+                    rgba(45, 212, 191, .12) 28%,
                     #f9fafb 65%);
         }
 
         .card {
             background: var(--card);
             border-radius: 14px;
-            border: 1px solid rgba(148, 163, 184, 0.22);
-            box-shadow: 0 10px 26px rgba(15, 23, 42, 0.06);
-            overflow: hidden;
-        }
-
-        .card-head {
-            padding: .85rem 1.05rem .75rem;
-            border-bottom: 1px solid rgba(148, 163, 184, 0.18);
-        }
-
-        .card-body {
-            padding: .85rem 1.05rem 1.05rem;
+            border: 1px solid rgba(148, 163, 184, .30);
+            box-shadow:
+                0 10px 26px rgba(15, 23, 42, .06),
+                0 0 0 1px rgba(15, 23, 42, .03);
+            padding: .8rem .85rem;
         }
 
         .mono {
-            font-family: ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, "Liberation Mono", "Courier New", monospace;
-            font-variant-numeric: tabular-nums;
-        }
-
-        /* soft-bold helper */
-        .soft-strong {
-            font-weight: 650;
-        }
-
-        .title-row {
-            display: flex;
-            justify-content: space-between;
-            gap: .75rem;
-            flex-wrap: wrap;
-            align-items: flex-start;
-        }
-
-        .back {
-            display: inline-flex;
-            align-items: center;
-            gap: .35rem;
-            font-size: .82rem;
-            text-decoration: none;
-            color: rgba(100, 116, 139, 1);
-            margin-bottom: .35rem;
-        }
-
-        .back:hover {
-            color: rgba(30, 64, 175, 1);
-            text-decoration: none;
-        }
-
-        .doc-code {
-            display: inline-flex;
-            align-items: center;
-            gap: .35rem;
-            border-radius: 999px;
-            padding: .12rem .6rem;
-            background: rgba(15, 23, 42, 0.04);
-            border: 1px solid rgba(148, 163, 184, 0.4);
-            font-size: .82rem;
-        }
-
-        .dot {
-            width: 7px;
-            height: 7px;
-            border-radius: 999px;
-            background: var(--rts-strong);
+            font-family: ui-monospace, SFMono-Regular, Menlo, monospace;
         }
 
         .meta {
-            margin-top: .35rem;
             font-size: .82rem;
-            color: rgba(100, 116, 139, 1);
+            opacity: .82;
         }
 
-        .badge-status {
-            display: inline-flex;
-            align-items: center;
-            gap: .35rem;
-            border-radius: 999px;
-            padding: .14rem .65rem;
-            font-size: .78rem;
-            font-weight: 650;
-            white-space: nowrap;
-        }
-
-        .badge-status.pending {
-            background: rgba(59, 130, 246, 0.12);
-            color: rgba(30, 64, 175, 1);
-        }
-
-        .badge-status.shipped {
-            background: rgba(45, 212, 191, 0.14);
-            color: rgba(15, 118, 110, 1);
-        }
-
-        .badge-status.partial {
-            background: rgba(234, 179, 8, 0.14);
-            color: rgba(133, 77, 14, 1);
-        }
-
-        .badge-status.completed {
-            background: rgba(22, 163, 74, 0.14);
-            color: rgba(22, 101, 52, 1);
-        }
-
-        .route {
-            margin-top: .45rem;
-            display: flex;
-            gap: .35rem;
-            flex-wrap: wrap;
-            align-items: center;
-            font-size: .82rem;
-        }
-
-        .route-pill {
-            display: inline-flex;
-            align-items: center;
-            gap: .35rem;
-            padding: .12rem .55rem;
-            border-radius: 999px;
-            border: 1px solid rgba(148, 163, 184, .55);
-            background: rgba(15, 23, 42, 0.02);
-            font-size: .78rem;
-        }
-
-        .sum-row {
-            margin-top: .65rem;
-            display: flex;
-            flex-wrap: wrap;
-            gap: .4rem;
-        }
-
-        .sum-pill {
-            display: inline-flex;
-            align-items: center;
-            gap: .35rem;
-            padding: .14rem .55rem;
-            border-radius: 999px;
-            border: 1px solid rgba(148, 163, 184, 0.45);
-            background: rgba(15, 23, 42, 0.02);
-            font-size: .78rem;
-        }
-
-        .sum-pill--out {
-            border-color: var(--rts-strong);
-            background: var(--rts-soft);
-            color: var(--rts-strong);
-        }
-
-        .cta {
-            margin-top: .75rem;
-            border-radius: 12px;
-            border: 1px solid rgba(148, 163, 184, 0.28);
-            background: linear-gradient(135deg, rgba(45, 212, 191, 0.14), rgba(15, 23, 42, 0.02));
-            padding: .7rem .75rem;
+        .header-row {
             display: flex;
             justify-content: space-between;
+            align-items: flex-start;
             gap: .75rem;
             flex-wrap: wrap;
+            margin-bottom: .75rem;
+        }
+
+        .title {
+            margin: 0;
+            font-size: 1.12rem;
+            font-weight: 900;
+            letter-spacing: -.01em;
+        }
+
+        .sub {
+            margin-top: .18rem;
+        }
+
+        .actions {
+            display: flex;
+            gap: .5rem;
+            flex-wrap: wrap;
             align-items: center;
-        }
-
-        .cta .text {
-            min-width: 240px;
-        }
-
-        .cta .main {
-            font-size: .86rem;
-            font-weight: 650;
-            color: rgba(15, 23, 42, .92);
-        }
-
-        .cta .sub {
-            margin-top: .12rem;
-            font-size: .8rem;
-            color: rgba(100, 116, 139, 1);
-        }
-
-        .btn {
-            display: inline-flex;
-            align-items: center;
-            justify-content: center;
-            gap: .35rem;
-            padding: .42rem .95rem;
-            border-radius: 999px;
-            font-size: .82rem;
-            font-weight: 650;
-            text-decoration: none;
-            border: 1px solid transparent;
-            cursor: pointer;
-            white-space: nowrap;
         }
 
         .btn-primary {
-            background: var(--rts-strong);
-            color: #ecfeff;
+            background: var(--rts-main);
+            border-color: var(--rts-main);
+            color: #022c22;
         }
 
         .btn-outline {
+            border: 1px solid rgba(148, 163, 184, .45);
             background: transparent;
-            border-color: rgba(148, 163, 184, 0.85);
-            color: rgba(15, 23, 42, .9);
         }
 
-        .btn-danger {
-            background: rgba(220, 38, 38, 1);
-            color: #fff;
-        }
-
-        .notes {
-            margin-top: .75rem;
-            padding: .65rem .75rem;
-            border-radius: 12px;
-            border: 1px solid rgba(148, 163, 184, 0.22);
-            background: rgba(15, 23, 42, 0.02);
-            font-size: .82rem;
-            color: rgba(15, 23, 42, .9);
-            white-space: pre-line;
-        }
-
-        /* direct pickup */
-        .direct {
-            margin-top: .85rem;
-            border-radius: 14px;
-            border: 1px solid rgba(148, 163, 184, 0.28);
-            overflow: hidden;
-            background: color-mix(in srgb, var(--card) 88%, rgba(59, 130, 246, 0.06));
-        }
-
-        .direct-head {
-            padding: .7rem .8rem;
-            border-bottom: 1px solid rgba(148, 163, 184, 0.18);
-            display: flex;
-            justify-content: space-between;
-            align-items: center;
-            gap: .6rem;
-            flex-wrap: wrap;
-        }
-
-        .direct-title {
-            font-size: .78rem;
-            font-weight: 650;
-            letter-spacing: .10em;
-            text-transform: uppercase;
-            color: rgba(100, 116, 139, 1);
-        }
-
-        .direct-body {
-            padding: .75rem .8rem 1rem;
-            display: none;
-        }
-
-        .form-row {
+        .stats {
             display: grid;
-            grid-template-columns: 1.8fr .9fr;
-            gap: .6rem;
-            align-items: center;
-            padding: .55rem .6rem;
-            border: 1px solid rgba(148, 163, 184, 0.20);
-            border-radius: 12px;
-            background: rgba(255, 255, 255, 0.55);
-            margin-bottom: .55rem;
+            grid-template-columns: repeat(3, minmax(0, 1fr));
+            gap: .55rem;
         }
 
-        body[data-theme="dark"] .form-row {
-            background: rgba(2, 6, 23, 0.35);
+        .stat {
+            background: rgba(148, 163, 184, .06);
+            border: 1px solid rgba(148, 163, 184, .18);
+            border-radius: 12px;
+            padding: .55rem .6rem;
+        }
+
+        .stat .k {
+            font-size: .72rem;
+            opacity: .72;
+            line-height: 1.1;
+        }
+
+        .stat .v {
+            margin-top: .12rem;
+            font-size: 1.12rem;
+            font-weight: 900;
+            line-height: 1.1;
+        }
+
+        .chips {
+            display: flex;
+            gap: .45rem;
+            flex-wrap: wrap;
+            align-items: center;
+        }
+
+        .chip {
+            display: inline-flex;
+            align-items: center;
+            gap: .35rem;
+            padding: .16rem .52rem;
+            border-radius: 999px;
+            font-size: .78rem;
+            border: 1px solid rgba(148, 163, 184, .35);
+            background: rgba(148, 163, 184, .10);
+            white-space: nowrap;
+            font-weight: 800;
+        }
+
+        .chip.ok {
+            border-color: rgba(16, 185, 129, .35);
+            background: rgba(16, 185, 129, .14);
+        }
+
+        .chip.warn {
+            border-color: rgba(245, 158, 11, .40);
+            background: var(--warn-soft);
+        }
+
+        .chip.danger {
+            border-color: rgba(239, 68, 68, .40);
+            background: var(--danger-soft);
+        }
+
+        .line {
+            border-top: 1px dashed rgba(148, 163, 184, .35);
+            margin: .7rem 0;
+        }
+
+        .note {
+            border: 1px solid rgba(148, 163, 184, .25);
+            border-radius: 12px;
+            padding: .65rem .75rem;
+            background: rgba(148, 163, 184, .08);
+            font-size: .85rem;
+            opacity: .92;
+            white-space: pre-wrap;
+        }
+
+        /* =========================
+                               TABLE (DESKTOP) + STACK (MOBILE)
+                               Columns: No | Item | Status | Req | Kirim | Terima
+                            ========================== */
+        .table-wrap {
+            overflow: auto;
+            -webkit-overflow-scrolling: touch;
+            border: 1px solid rgba(148, 163, 184, .22);
+            border-radius: 12px;
+        }
+
+        .tbl {
+            width: 100%;
+            border-collapse: collapse;
+            min-width: 760px;
+        }
+
+        .tbl th,
+        .tbl td {
+            padding: .55rem .55rem;
+            border-bottom: 1px solid rgba(148, 163, 184, .18);
+            vertical-align: top;
+            font-size: .9rem;
+        }
+
+        .tbl thead th {
+            position: sticky;
+            top: 0;
+            z-index: 1;
+            background: var(--card);
+            font-size: .78rem;
+            letter-spacing: .02em;
+            text-transform: uppercase;
+            opacity: .75;
+            border-bottom: 1px solid rgba(148, 163, 184, .26);
+        }
+
+        .tbl tbody tr:hover {
+            background: rgba(148, 163, 184, .05);
+        }
+
+        .td-right {
+            text-align: right;
+            white-space: nowrap;
+        }
+
+        .td-center {
+            text-align: center;
+            white-space: nowrap;
+        }
+
+        .no {
+            width: 44px;
+            opacity: .75;
+        }
+
+        .item-cell {
+            min-width: 100px;
+        }
+
+        .item-code {
+            font-weight: 900;
         }
 
         .item-name {
-            font-size: .84rem;
-            font-weight: 650;
-            color: rgba(15, 23, 42, .92);
-        }
-
-        body[data-theme="dark"] .item-name {
-            color: rgba(226, 232, 240, 1);
-        }
-
-        .item-meta {
             margin-top: .12rem;
-            font-size: .76rem;
-            color: rgba(100, 116, 139, 1);
-        }
-
-        .qty-input {
-            width: 100%;
-            padding: .42rem .55rem;
-            border-radius: 12px;
-            border: 1px solid rgba(148, 163, 184, 0.6);
-            background: var(--card);
-            font-size: .84rem;
-            text-align: right;
-        }
-
-        .textarea {
-            width: 100%;
-            min-height: 70px;
-            border-radius: 12px;
-            padding: .55rem .65rem;
-            border: 1px solid rgba(148, 163, 184, 0.6);
-            background: var(--card);
             font-size: .82rem;
+            opacity: .82;
         }
 
-        /* detail */
-        .section-title {
-            margin-top: .95rem;
-            font-size: .78rem;
-            font-weight: 650;
-            letter-spacing: .12em;
-            text-transform: uppercase;
-            color: rgba(100, 116, 139, 1);
+        .item-badges {
+            margin-top: .35rem;
             display: flex;
-            justify-content: space-between;
-            gap: .6rem;
+            gap: .35rem;
             flex-wrap: wrap;
             align-items: center;
         }
 
-        .table-wrap {
-            margin-top: .55rem;
-            border-radius: 12px;
-            border: 1px solid rgba(148, 163, 184, 0.28);
-            overflow: hidden;
-        }
-
-        .table {
-            width: 100%;
-            border-collapse: collapse;
-            font-size: .82rem;
-        }
-
-        .table thead {
-            background: rgba(15, 23, 42, 0.05);
-        }
-
-        .table th,
-        .table td {
-            padding: .48rem .6rem;
-            border-bottom: 1px solid rgba(148, 163, 184, 0.20);
-            vertical-align: top;
-        }
-
-        .table th {
-            text-align: left;
-            font-weight: 650;
-            font-size: .75rem;
-            text-transform: uppercase;
-            letter-spacing: .06em;
-            color: rgba(100, 116, 139, 1);
-        }
-
-        .mobile-list {
-            display: none;
-        }
-
-        .item-card {
-            background: var(--card);
-            border-radius: 12px;
-            border: 1px solid rgba(148, 163, 184, 0.25);
-            padding: .7rem .75rem;
-            margin-top: .55rem;
-        }
-
-        .pills {
-            margin-top: .45rem;
-            display: flex;
-            flex-wrap: wrap;
-            gap: .35rem;
-        }
-
-        .pill {
+        .mini {
             display: inline-flex;
             align-items: center;
-            gap: .3rem;
-            padding: .12rem .52rem;
+            gap: .35rem;
+            padding: .12rem .45rem;
             border-radius: 999px;
-            font-size: .76rem;
-            border: 1px solid rgba(148, 163, 184, 0.45);
-            background: rgba(15, 23, 42, 0.02);
-            color: rgba(15, 23, 42, .9);
+            font-size: .74rem;
+            border: 1px solid rgba(148, 163, 184, .30);
+            background: rgba(148, 163, 184, .10);
+            white-space: nowrap;
+            font-weight: 800;
         }
 
-        .pill--ok {
-            border-color: rgba(34, 197, 94, 0.55);
-            background: rgba(34, 197, 94, 0.10);
-            color: rgba(22, 101, 52, 1);
+        .mini.ok {
+            border-color: rgba(16, 185, 129, .30);
+            background: rgba(16, 185, 129, .12);
         }
 
-        .pill--warn {
-            border-color: rgba(234, 179, 8, 0.55);
-            background: rgba(234, 179, 8, 0.12);
-            color: rgba(133, 77, 14, 1);
+        .mini.warn {
+            border-color: rgba(245, 158, 11, .38);
+            background: var(--warn-soft);
         }
 
-        .pill--info {
-            border-color: rgba(59, 130, 246, 0.55);
-            background: rgba(59, 130, 246, 0.10);
-            color: rgba(30, 64, 175, 1);
+        .mini.danger {
+            border-color: rgba(239, 68, 68, .38);
+            background: var(--danger-soft);
         }
 
-        @media (max-width: 768px) {
-            .page-wrap {
-                padding-inline: .65rem;
-            }
-
-            .card-head,
-            .card-body {
-                padding-inline: .85rem;
-            }
-
-            .cta {
-                align-items: stretch;
-            }
-
-            .btn {
+        /* Mobile stacked rows */
+        @media (max-width: 780px) {
+            .tbl {
+                min-width: 0;
                 width: 100%;
             }
 
             .table-wrap {
+                border: none;
+                border-radius: 0;
+                overflow: visible;
+            }
+
+            .tbl thead {
                 display: none;
             }
 
-            .mobile-list {
+            .tbl,
+            .tbl tbody,
+            .tbl tr,
+            .tbl td {
                 display: block;
+                width: 100%;
             }
 
-            .form-row {
-                grid-template-columns: 1fr;
+            .tbl tr {
+                border: 1px solid rgba(148, 163, 184, .22);
+                border-radius: 12px;
+                padding: .6rem .65rem;
+                background: rgba(148, 163, 184, .05);
+                margin-bottom: .55rem;
+            }
+
+            .tbl td {
+                border-bottom: none;
+                padding: .22rem 0;
+            }
+
+            .tbl td[data-k]::before {
+                content: attr(data-k);
+                display: inline-block;
+                width: 92px;
+                font-size: .72rem;
+                opacity: .7;
+                text-transform: uppercase;
+                letter-spacing: .02em;
+                margin-right: .5rem;
+            }
+
+            .td-right,
+            .td-center {
+                text-align: left;
+            }
+        }
+
+        /* =====================================================
+                               RTS DIRECT PICKUP MODAL (DESKTOP CENTER + MOBILE SHEET)
+                               - Namespace-safe: rtsDp*
+                            ====================================================== */
+        #rtsDpOverlay {
+            position: fixed;
+            inset: 0;
+            background: rgba(15, 23, 42, .55);
+            z-index: 99999;
+            display: none;
+            align-items: center;
+            justify-content: center;
+            padding: 1rem;
+        }
+
+        #rtsDpOverlay.is-open {
+            display: flex !important;
+        }
+
+        #rtsDpOverlay .rts-dp-panel {
+            width: min(960px, 100%);
+            max-height: calc(100vh - 2rem);
+            overflow: auto;
+            background: var(--card);
+            border-radius: 18px;
+            border: 1px solid rgba(148, 163, 184, .25);
+            box-shadow: 0 18px 45px rgba(15, 23, 42, .35);
+            padding: .9rem .9rem 1rem;
+            transform: translateY(10px);
+            opacity: 0;
+            transition: transform .18s ease, opacity .18s ease;
+        }
+
+        #rtsDpOverlay.is-open .rts-dp-panel {
+            transform: translateY(0);
+            opacity: 1;
+        }
+
+        .modal-head {
+            display: flex;
+            justify-content: space-between;
+            align-items: flex-start;
+            gap: .75rem;
+            position: sticky;
+            top: 0;
+            background: var(--card);
+            padding-top: .1rem;
+            padding-bottom: .55rem;
+            z-index: 2;
+        }
+
+        .modal-title {
+            font-weight: 900;
+            font-size: 1.02rem;
+            margin: 0;
+        }
+
+        .dp-table {
+            width: 100%;
+            border-collapse: collapse;
+            margin-top: .65rem;
+        }
+
+        .dp-table th,
+        .dp-table td {
+            padding: .58rem .55rem;
+            border-bottom: 1px solid rgba(148, 163, 184, .22);
+            vertical-align: top;
+            font-size: .9rem;
+        }
+
+        .dp-table th {
+            text-align: left;
+            font-size: .78rem;
+            opacity: .75;
+        }
+
+        .num {
+            width: 140px;
+            max-width: 100%;
+            padding: .45rem .55rem;
+            border-radius: 12px;
+            border: 1px solid rgba(148, 163, 184, .35);
+            background: var(--card);
+            color: inherit;
+        }
+
+        .err {
+            margin-top: .35rem;
+            font-size: .82rem;
+            color: rgba(239, 68, 68, 1);
+        }
+
+        @media (max-width: 980px) {
+            .page-wrap {
+                padding: .75rem .75rem 5rem;
+            }
+
+            .stats {
+                grid-template-columns: repeat(2, minmax(0, 1fr));
+            }
+        }
+
+        @media (max-width: 720px) {
+            #rtsDpOverlay {
+                align-items: flex-end;
+                padding: .7rem;
+            }
+
+            #rtsDpOverlay .rts-dp-panel {
+                width: 100%;
+                border-radius: 18px 18px 14px 14px;
+                max-height: calc(100vh - 1.2rem);
+                transform: translateY(22px);
+            }
+
+            .rts-dp-handle {
+                width: 56px;
+                height: 5px;
+                border-radius: 999px;
+                background: rgba(148, 163, 184, .55);
+                margin: .1rem auto .55rem;
+            }
+
+            .dp-table thead {
+                display: none;
+            }
+
+            .dp-table,
+            .dp-table tbody,
+            .dp-table tr,
+            .dp-table td {
+                display: block;
+                width: 100%;
+            }
+
+            .dp-table tr {
+                padding: .45rem 0;
+            }
+
+            .dp-table td {
+                border-bottom: none;
+                padding: .35rem 0;
+            }
+
+            .dp-table tr+tr {
+                border-top: 1px solid rgba(148, 163, 184, .22);
             }
         }
     </style>
 @endpush
 
 @section('content')
-    @php
-        // totals
-        $status = $stockRequest->status;
-
-        $totalRequested = (float) $stockRequest->lines->sum(fn($l) => (float) ($l->qty_request ?? 0));
-        $totalDispatched = (float) $stockRequest->lines->sum(fn($l) => (float) ($l->qty_dispatched ?? 0));
-        $totalReceived = (float) $stockRequest->lines->sum(fn($l) => (float) ($l->qty_received ?? 0));
-        $totalPicked = (float) $stockRequest->lines->sum(fn($l) => (float) ($l->qty_picked ?? 0));
-
-        $remainingToReceive = max($totalDispatched - $totalReceived, 0); // masih di Transit
-        $remainingOverall = max($totalRequested - $totalReceived - $totalPicked, 0); // sisa akhir
-
-        $statusLabel = match ($status) {
-            'submitted' => 'Menunggu PRD',
-            'shipped' => 'Barang di Transit',
-            'partial' => 'Sebagian selesai',
-            'completed' => 'Selesai',
-            default => ucfirst($status ?? 'Draft'),
-        };
-
-        $badgeClass = match ($status) {
-            'completed' => 'completed',
-            'partial' => 'partial',
-            'shipped' => 'shipped',
-            default => 'pending',
-        };
-
-        $canOpenConfirm = $remainingToReceive > 0 && $status !== 'completed';
-        $canDirectPickup = $status !== 'completed';
-
-        // CTA
-        if ($status === 'completed') {
-            $ctaMain = 'Dokumen sudah selesai.';
-            $ctaSub = 'Semua barang sudah terpenuhi (diterima + diambil langsung).';
-        } elseif ($remainingToReceive > 0) {
-            $ctaMain = 'Ada barang di Transit.';
-            $ctaSub = 'Klik “Terima dari Transit” lalu isi jumlah yang benar-benar diterima.';
-        } elseif ($remainingOverall > 0) {
-            $ctaMain = 'Menunggu PRD kirim lagi / bisa ambil langsung.';
-            $ctaSub = 'Masih ada sisa yang belum terpenuhi.';
-        } else {
-            $ctaMain = 'Cek data.';
-            $ctaSub = 'Sisa sudah 0, tapi status belum “Selesai”.';
-        }
-
-        // over-request (optional)
-        $hasOver = !empty($summary['has_over_request']);
-        $overLinesCount = $summary['over_lines_count'] ?? 0;
-        $overQtyTotal = $summary['over_qty_total'] ?? 0;
-    @endphp
-
     <div class="page-wrap">
-        <a href="{{ route('rts.stock-requests.index') }}" class="back">← Kembali</a>
 
-        <div class="card">
-            <div class="card-head">
-                <div class="title-row">
-                    <div>
-                        <div class="doc-code">
-                            <span class="dot"></span>
-                            <span class="mono soft-strong">{{ $stockRequest->code }}</span>
-                        </div>
-
-                        <div class="meta">
-                            <span class="mono">{{ $stockRequest->date?->format('d M Y') ?? '-' }}</span>
-                            <span style="opacity:.7;">•</span>
-                            <span>{{ $stockRequest->requestedBy?->name ?? '—' }}</span>
-                            <span style="opacity:.7;">•</span>
-                            <span class="mono">{{ $stockRequest->created_at?->format('H:i') ?? '—' }}</span>
-                        </div>
-
-                        <div class="route">
-                            <span class="route-pill">
-                                <span class="mono soft-strong">{{ $stockRequest->sourceWarehouse?->code ?? '-' }}</span>
-                                <span>{{ $stockRequest->sourceWarehouse?->name ?? '-' }}</span>
-                            </span>
-                            <span style="opacity:.7;">→</span>
-                            <span class="route-pill">
-                                <span class="mono soft-strong">TRANSIT</span>
-                                <span>Transit</span>
-                            </span>
-                            <span style="opacity:.7;">→</span>
-                            <span class="route-pill">
-                                <span
-                                    class="mono soft-strong">{{ $stockRequest->destinationWarehouse?->code ?? '-' }}</span>
-                                <span>{{ $stockRequest->destinationWarehouse?->name ?? '-' }}</span>
-                            </span>
-                        </div>
-
-                        <div class="sum-row">
-                            <span class="sum-pill">Diminta <span
-                                    class="mono soft-strong">{{ (int) $totalRequested }}</span></span>
-                            <span class="sum-pill">Dikirim PRD <span
-                                    class="mono soft-strong">{{ (int) $totalDispatched }}</span></span>
-                            <span class="sum-pill">Diterima RTS <span
-                                    class="mono soft-strong">{{ (int) $totalReceived }}</span></span>
-                            <span class="sum-pill">Diambil langsung <span
-                                    class="mono soft-strong">{{ (int) $totalPicked }}</span></span>
-                            <span class="sum-pill sum-pill--out">Sisa <span
-                                    class="mono soft-strong">{{ (int) $remainingOverall }}</span></span>
-                        </div>
-                    </div>
-
-                    <div>
-                        <span class="badge-status {{ $badgeClass }}">{{ $statusLabel }}</span>
-                    </div>
+        {{-- =======================
+            HEADER
+        ======================== --}}
+        <div class="header-row">
+            <div>
+                <h1 class="title mono">{{ $stockRequest->code }}</h1>
+                <div class="meta sub">
+                    {{ optional($stockRequest->date)->format('d M Y') }}
+                    · {{ $stockRequest->sourceWarehouse->code ?? '-' }}
+                    → {{ $stockRequest->destinationWarehouse->code ?? '-' }}
                 </div>
-
-                <div class="cta">
-                    <div class="text">
-                        <div class="main">{{ $ctaMain }}</div>
-                        <div class="sub">{{ $ctaSub }}</div>
-                    </div>
-
-                    <div class="d-flex gap-2 flex-wrap" style="display:flex;">
-                        @if ($canOpenConfirm)
-                            <a href="{{ route('rts.stock-requests.confirm', $stockRequest) }}" class="btn btn-primary">
-                                ⚡ Terima dari Transit
-                            </a>
-                        @endif
-
-                        @if ($status !== 'completed')
-                            <a href="{{ route('prd.stock-requests.edit', $stockRequest) }}" class="btn btn-outline">
-                                👀 Lihat proses PRD
-                            </a>
-                        @endif
-                    </div>
-                </div>
-
-                @if ($hasOver)
-                    <div style="margin-top:.55rem; font-size:.8rem; color: rgba(124,45,18,1);">
-                        ⚠️ Permintaan melebihi stok PRD (snapshot): {{ $overLinesCount }} baris · selisih
-                        {{ $overQtyTotal }} pcs
-                    </div>
-                @endif
             </div>
 
-            <div class="card-body">
-                @if ($stockRequest->notes)
-                    <div class="notes">{{ $stockRequest->notes }}</div>
-                @endif
+            <div class="actions">
+                <x-status-pill :status="$stockRequest->status" />
+                <a href="{{ route('rts.stock-requests.index') }}" class="btn btn-outline">← List</a>
+            </div>
+        </div>
 
-                {{-- DIRECT PICKUP --}}
-                @if ($canDirectPickup)
-                    <div class="direct">
-                        <div class="direct-head">
-                            <div>
-                                <div class="direct-title">Ambil langsung (PRD → RTS)</div>
-                            </div>
-                            <button type="button" class="btn btn-outline" id="btnToggleDirect">
-                                🧾 Isi ambil langsung
-                            </button>
-                        </div>
+        {{-- =======================
+            SUMMARY
+        ======================== --}}
+        @php
+            $reqTotal = (float) $stockRequest->lines->sum('qty_request');
+            $dispTotal = (float) $stockRequest->lines->sum('qty_dispatched');
+            $recvTotal = (float) $stockRequest->lines->sum('qty_received');
+            $pickTotal = (float) $stockRequest->lines->sum('qty_picked');
 
-                        <div class="direct-body" id="directPanel">
-                            <form method="POST" action="{{ route('rts.stock-requests.direct-pickup', $stockRequest) }}">
-                                @csrf
+            $outRtsTotal = max($reqTotal - $recvTotal - $pickTotal, 0);
+            $inTransitTotal = max($dispTotal - $recvTotal, 0);
 
-                                @foreach ($stockRequest->lines as $line)
-                                    @php
-                                        $req = (float) ($line->qty_request ?? 0);
-                                        $rec = (float) ($line->qty_received ?? 0);
-                                        $pick = (float) ($line->qty_picked ?? 0);
-                                        $remaining = max($req - $rec - $pick, 0);
-                                    @endphp
+            if ($outRtsTotal <= 0.0000001) {
+                $outCls = 'chip ok';
+                $outLabel = 'AMAN';
+            } elseif ($outRtsTotal >= $reqTotal * 0.5 && $reqTotal > 0) {
+                $outCls = 'chip danger';
+                $outLabel = 'URGENT';
+            } else {
+                $outCls = 'chip warn';
+                $outLabel = 'BUTUH';
+            }
+        @endphp
 
-                                    <div class="form-row">
-                                        <div>
-                                            <div class="item-name">
-                                                {{ $line->item?->code ?? '—' }} — {{ $line->item?->name ?? '—' }}
-                                            </div>
-                                            <div class="item-meta">
-                                                Maksimum bisa diambil: <span
-                                                    class="mono soft-strong">{{ (int) $remaining }}</span> pcs
-                                            </div>
-                                            @error("lines.$line->id.qty_picked")
-                                                <div class="text-danger" style="font-size:.78rem; margin-top:.15rem;">
-                                                    {{ $message }}
-                                                </div>
-                                            @enderror
-                                        </div>
+        <div class="card">
+            <div class="stats">
+                <div class="stat">
+                    <div class="k">Total Request</div>
+                    <div class="v mono">{{ $reqTotal }}</div>
+                </div>
+                <div class="stat">
+                    <div class="k">Transit</div>
+                    <div class="v mono">{{ $inTransitTotal }}</div>
+                </div>
+                <div class="stat">
+                    <div class="k">Sisa RTS</div>
+                    <div class="v mono">{{ $outRtsTotal }}</div>
+                </div>
+            </div>
 
-                                        <div>
-                                            <input class="qty-input mono" type="number"
-                                                name="lines[{{ $line->id }}][qty_picked]"
-                                                value="{{ old("lines.$line->id.qty_picked") }}" min="0"
-                                                step="0.001" placeholder="0">
-                                        </div>
-                                    </div>
-                                @endforeach
-
-                                <div style="margin-top:.45rem;">
-                                    <textarea class="textarea" name="notes" placeholder="Catatan (opsional)">{{ old('notes') }}</textarea>
-                                    @error('notes')
-                                        <div class="text-danger" style="font-size:.78rem; margin-top:.15rem;">
-                                            {{ $message }}
-                                        </div>
-                                    @enderror
-                                </div>
-
-                                @error('stock')
-                                    <div class="text-danger" style="font-size:.8rem; margin-top:.25rem;">
-                                        {{ $message }}
-                                    </div>
-                                @enderror
-
-                                <div style="margin-top:.6rem; display:flex; gap:.5rem; flex-wrap:wrap;">
-                                    <button type="submit" class="btn btn-danger"
-                                        onclick="return confirm('Proses ambil langsung sekarang? Stok akan pindah PRD → RTS.');">
-                                        ✅ Simpan ambil langsung
-                                    </button>
-                                    <button type="button" class="btn btn-outline" id="btnCloseDirect">
-                                        ✖️ Tutup
-                                    </button>
-                                </div>
-                            </form>
-                        </div>
-                    </div>
-                @endif
-
-                {{-- DETAIL ITEMS --}}
-                <div class="section-title">
-                    <span>Detail barang</span>
-                    <span>Sisa = Diminta − (Diterima + Diambil langsung)</span>
+            <div
+                style="margin-top:.6rem;display:flex;justify-content:space-between;gap:.6rem;flex-wrap:wrap;align-items:center">
+                <div class="chips">
+                    <span class="{{ $outCls }}">{{ $outLabel }} · Sisa <span
+                            class="mono">{{ $outRtsTotal }}</span></span>
                 </div>
 
-                {{-- DESKTOP TABLE --}}
-                <div class="table-wrap">
-                    <table class="table">
+                <div class="actions">
+                    @if (in_array($stockRequest->status, ['submitted', 'shipped', 'partial']))
+                        <a href="{{ route('rts.stock-requests.confirm', $stockRequest) }}" class="btn btn-primary">
+                            Terima (Transit → RTS)
+                        </a>
+                        <button type="button" class="btn btn-outline" data-rts-dp-open>
+                            Direct Pickup
+                        </button>
+                    @endif
+                </div>
+            </div>
+
+            @if ($stockRequest->notes)
+                <div class="line"></div>
+                <div class="note">{{ $stockRequest->notes }}</div>
+            @endif
+        </div>
+
+        {{-- =======================
+            ITEMS TABLE (minimal columns) + badges di item
+            Columns: No | Item | Status | Req | Kirim | Terima
+        ======================== --}}
+        <div class="card" style="margin-top:.85rem">
+            <div style="display:flex;justify-content:space-between;align-items:baseline;gap:.6rem;flex-wrap:wrap">
+                <div style="font-weight:900;letter-spacing:-.01em">Daftar Item</div>
+                <div class="meta">{{ $stockRequest->lines->count() }} item</div>
+            </div>
+
+            <div class="line"></div>
+
+            <div class="table-wrap">
+                <table class="tbl">
+                    <thead>
+                        <tr>
+                            <th class="no">No</th>
+                            <th class="item-cell">Item</th>
+                            <th class="status-cell">Status</th>
+                            <th class="td-right">Req</th>
+                            <th class="td-right">Kirim</th>
+                            <th class="td-right">Terima</th>
+                        </tr>
+                    </thead>
+                    <tbody>
+                        @foreach ($stockRequest->lines as $i => $line)
+                            @php
+                                $req = (float) $line->qty_request;
+                                $disp = (float) $line->qty_dispatched;
+                                $recv = (float) $line->qty_received;
+                                $pick = (float) $line->qty_picked;
+
+                                $outRts = max($req - $recv - $pick, 0);
+                                $inTransit = max($disp - $recv, 0);
+
+                                // status utama (sisa RTS)
+                                if ($outRts <= 0.0000001) {
+                                    $lCls = 'chip ok';
+                                    $lLbl = 'AMAN';
+                                } elseif ($outRts >= $req * 0.5 && $req > 0) {
+                                    $lCls = 'chip danger';
+                                    $lLbl = 'URGENT';
+                                } else {
+                                    $lCls = 'chip warn';
+                                    $lLbl = 'BUTUH';
+                                }
+
+                                // badges compact (yang tadinya kolom-kolom)
+                                // - Transit: kalau ada barang di jalan
+                                // - Pickup: kalau ada pickup
+                                // - Sisa: angka sisa RTS biar jelas
+                                if ($inTransit > 0.0000001) {
+                                    $bTransitCls = $inTransit >= $req * 0.5 && $req > 0 ? 'mini warn' : 'mini ok';
+                                } else {
+                                    $bTransitCls = 'mini';
+                                }
+
+                                $bPickCls = $pick > 0.0000001 ? 'mini ok' : 'mini';
+                            @endphp
+
+                            <tr>
+                                <td class="no td-center" data-k="No">{{ $i + 1 }}</td>
+
+                                <td class="item-cell" data-k="Item">
+                                    <div class="item-code mono">{{ $line->item->code }}</div>
+                                    <div class="item-name">{{ $line->item->name }}</div>
+
+                                    <div class="item-badges">
+                                        <span class="mini {{ $inTransit > 0.0000001 ? $bTransitCls : 'mini' }}">
+                                            Transit <span class="mono">{{ $inTransit }}</span>
+                                        </span>
+
+                                        <span class="mini {{ $pick > 0.0000001 ? $bPickCls : 'mini' }}">
+                                            Pickup <span class="mono">{{ $pick }}</span>
+                                        </span>
+
+                                        <span
+                                            class="mini {{ $outRts <= 0.0000001 ? 'ok' : ($outRts >= $req * 0.5 && $req > 0 ? 'danger' : 'warn') }}">
+                                            Sisa <span class="mono">{{ $outRts }}</span>
+                                        </span>
+                                    </div>
+                                </td>
+
+                                <td class="status-cell" data-k="Status">
+                                    <span class="{{ $lCls }}">{{ $lLbl }}</span>
+                                </td>
+
+                                <td class="td-right mono" data-k="Req">{{ $req }}</td>
+                                <td class="td-right mono" data-k="Kirim">{{ $disp }}</td>
+                                <td class="td-right mono" data-k="Terima">{{ $recv }}</td>
+                            </tr>
+                        @endforeach
+                    </tbody>
+                </table>
+            </div>
+        </div>
+
+        {{-- =======================
+            DIRECT PICKUP MODAL
+        ======================== --}}
+        <div id="rtsDpOverlay" aria-hidden="true">
+            <div class="rts-dp-panel" role="dialog" aria-modal="true" aria-label="Direct Pickup">
+                <div class="rts-dp-handle" aria-hidden="true"></div>
+
+                <div class="modal-head">
+                    <div>
+                        <h3 class="modal-title">Direct Pickup (Penjahit/WIP → RTS)</h3>
+                        <div class="meta">Isi qty yang diambil. Max otomatis = Sisa.</div>
+                    </div>
+                    <button type="button" class="btn btn-outline" data-rts-dp-close>Tutup</button>
+                </div>
+
+                <div class="line"></div>
+
+                <form method="POST" action="{{ route('rts.stock-requests.direct-pickup', $stockRequest) }}"
+                    id="dpForm">
+                    @csrf
+
+                    <table class="dp-table">
                         <thead>
                             <tr>
-                                <th style="width:32px;">#</th>
-                                <th>Barang</th>
-                                <th style="width:12%;">Diminta</th>
-                                <th style="width:13%;">Dikirim PRD</th>
-                                <th style="width:12%;">Diterima RTS</th>
-                                <th style="width:14%;">Diambil langsung</th>
-                                <th style="width:10%;">Sisa</th>
-                                <th style="width:12%;">Stok PRD (saat request)</th>
+                                <th style="width:48%">Item</th>
+                                <th style="width:26%">Info</th>
+                                <th style="width:26%">Qty Pickup</th>
                             </tr>
                         </thead>
                         <tbody>
-                            @foreach ($stockRequest->lines as $i => $line)
+                            @foreach ($stockRequest->lines as $line)
                                 @php
-                                    $r = (float) ($line->qty_request ?? 0);
-                                    $d = (float) ($line->qty_dispatched ?? 0);
-                                    $rc = (float) ($line->qty_received ?? 0);
-                                    $p = (float) ($line->qty_picked ?? 0);
-                                    $o = max($r - $rc - $p, 0);
-
-                                    $snap =
-                                        $line->stock_snapshot_at_request !== null
-                                            ? (float) $line->stock_snapshot_at_request
-                                            : null;
+                                    $req = (float) $line->qty_request;
+                                    $recv = (float) $line->qty_received;
+                                    $pick = (float) $line->qty_picked;
+                                    $maxPick = max($req - $recv - $pick, 0);
+                                    $old = old("lines.{$line->id}.qty_picked", 0);
                                 @endphp
-                                <tr>
-                                    <td class="mono">{{ $i + 1 }}</td>
+
+                                <tr style="{{ $maxPick <= 0.0000001 ? 'opacity:.55' : '' }}">
                                     <td>
-                                        <div class="soft-strong" style="font-size:.84rem;">
-                                            {{ $line->item?->code ?? '—' }} — {{ $line->item?->name ?? '—' }}
+                                        <div class="mono" style="font-weight:900">{{ $line->item->code }}</div>
+                                        <div class="meta">{{ $line->item->name }}</div>
+                                    </td>
+
+                                    <td>
+                                        <div class="meta">
+                                            Req <b class="mono">{{ $req }}</b>
+                                            · Terima <b class="mono">{{ $recv }}</b>
+                                            · Pickup <b class="mono">{{ $pick }}</b>
                                         </div>
-                                        @if ($line->notes)
-                                            <div style="margin-top:.15rem; font-size:.78rem; color: rgba(100,116,139,1);">
-                                                {{ $line->notes }}
-                                            </div>
-                                        @endif
+                                        <div class="meta" style="margin-top:.2rem">
+                                            Sisa <b class="mono">{{ $maxPick }}</b>
+                                        </div>
                                     </td>
-                                    <td class="mono">{{ (int) $r }}</td>
-                                    <td class="mono">{{ (int) $d }}</td>
-                                    <td class="mono">{{ (int) $rc }}</td>
-                                    <td class="mono">{{ (int) $p }}</td>
-                                    <td class="mono">
-                                        <span class="{{ $o > 0 ? 'text-danger' : 'text-success' }}">
-                                            {{ (int) $o }}
-                                        </span>
+
+                                    <td>
+                                        <input class="num js-pick" type="number" step="0.01" min="0"
+                                            max="{{ $maxPick }}" name="lines[{{ $line->id }}][qty_picked]"
+                                            value="{{ $old }}" data-max="{{ $maxPick }}"
+                                            {{ $maxPick <= 0.0000001 ? 'disabled' : '' }}>
+                                        @error("lines.{$line->id}.qty_picked")
+                                            <div class="err">{{ $message }}</div>
+                                        @enderror
                                     </td>
-                                    <td class="mono">{{ $snap !== null ? (int) $snap : '—' }}</td>
                                 </tr>
                             @endforeach
                         </tbody>
                     </table>
-                </div>
 
-                {{-- MOBILE LIST --}}
-                <div class="mobile-list">
-                    @foreach ($stockRequest->lines as $line)
-                        @php
-                            $r = (float) ($line->qty_request ?? 0);
-                            $d = (float) ($line->qty_dispatched ?? 0);
-                            $rc = (float) ($line->qty_received ?? 0);
-                            $p = (float) ($line->qty_picked ?? 0);
-                            $o = max($r - $rc - $p, 0);
-                            $snap =
-                                $line->stock_snapshot_at_request !== null
-                                    ? (float) $line->stock_snapshot_at_request
-                                    : null;
-                        @endphp
+                    <div style="margin-top:.75rem">
+                        <label class="meta" style="display:block;margin-bottom:.25rem">Catatan (opsional)</label>
+                        <textarea name="notes" rows="2"
+                            style="width:100%;border-radius:12px;border:1px solid rgba(148,163,184,.35);padding:.55rem .6rem;background:var(--card);color:inherit">{{ old('notes') }}</textarea>
+                    </div>
 
-                        <div class="item-card">
-                            <div class="soft-strong" style="font-size:.86rem;">
-                                {{ $line->item?->code ?? '—' }} — {{ $line->item?->name ?? '—' }}
-                            </div>
-
-                            <div class="pills">
-                                <span class="pill">Diminta <span
-                                        class="mono soft-strong">{{ (int) $r }}</span></span>
-                                <span class="pill pill--info">Dikirim <span
-                                        class="mono soft-strong">{{ (int) $d }}</span></span>
-                                <span class="pill pill--ok">Diterima <span
-                                        class="mono soft-strong">{{ (int) $rc }}</span></span>
-                                <span class="pill pill--info">Ambil <span
-                                        class="mono soft-strong">{{ (int) $p }}</span></span>
-                                <span class="pill pill--warn">Sisa <span
-                                        class="mono soft-strong">{{ (int) $o }}</span></span>
-                                <span class="pill">Stok (snap) <span
-                                        class="mono soft-strong">{{ $snap !== null ? (int) $snap : '—' }}</span></span>
-                            </div>
-
-                            @if ($line->notes)
-                                <div style="margin-top:.35rem; font-size:.78rem; color: rgba(100,116,139,1);">
-                                    {{ $line->notes }}
-                                </div>
-                            @endif
-                        </div>
-                    @endforeach
-                </div>
-
-                <div style="margin-top:.75rem; font-size:.78rem; color: rgba(100,116,139,1);">
-                    Terakhir update: <span
-                        class="mono">{{ $stockRequest->updated_at?->format('d M Y H:i') ?? '—' }}</span>
-                </div>
+                    <div style="display:flex;gap:.6rem;justify-content:flex-end;flex-wrap:wrap;margin-top:1rem">
+                        <button type="button" class="btn btn-outline" id="btnDpClear">Kosongkan</button>
+                        <button type="submit" class="btn btn-primary"
+                            onclick="return confirm('Proses direct pickup sekarang?')">
+                            Simpan
+                        </button>
+                    </div>
+                </form>
             </div>
         </div>
-    </div>
-@endsection
 
-@push('scripts')
+    </div>
+
     <script>
         (function() {
-            const btn = document.getElementById('btnToggleDirect');
-            const panel = document.getElementById('directPanel');
-            const close = document.getElementById('btnCloseDirect');
+            const overlay = document.getElementById('rtsDpOverlay');
+            if (!overlay) return;
 
-            if (!btn || !panel) return;
+            const getInputs = () => Array.from(document.querySelectorAll('.js-pick'));
 
-            const open = () => {
-                panel.style.display = 'block';
-                const first = panel.querySelector('input[type="number"]');
-                if (first) first.focus();
-            };
-            const hide = () => panel.style.display = 'none';
+            function clamp(el) {
+                if (el.disabled) return;
+                const max = parseFloat(el.dataset.max || el.max || '0') || 0;
+                let v = parseFloat(el.value || '0');
+                if (Number.isNaN(v) || v < 0) v = 0;
+                if (v > max) v = max;
+                el.value = (Math.round(v * 100) / 100).toFixed(2).replace(/\.00$/, '');
+            }
 
-            btn.addEventListener('click', function() {
-                (panel.style.display === 'none' || panel.style.display === '') ? open(): hide();
+            function openDp() {
+                overlay.classList.add('is-open');
+                overlay.setAttribute('aria-hidden', 'false');
+                document.body.style.overflow = 'hidden';
+
+                const list = getInputs();
+                const first = list.find(i => !i.disabled && ((parseFloat(i.dataset.max || '0') || 0) > 0)) ||
+                    list.find(i => !i.disabled) || list[0];
+                first?.focus();
+            }
+
+            function closeDp() {
+                overlay.classList.remove('is-open');
+                overlay.setAttribute('aria-hidden', 'true');
+                document.body.style.overflow = '';
+            }
+
+            document.addEventListener('click', function(e) {
+                if (e.target.closest('[data-rts-dp-open]')) return openDp();
+                if (e.target.closest('[data-rts-dp-close]')) return closeDp();
+
+                if (e.target === overlay && overlay.classList.contains('is-open')) return closeDp();
+
+                if (e.target && e.target.id === 'btnDpClear') {
+                    getInputs().forEach(i => {
+                        if (!i.disabled) {
+                            i.value = 0;
+                            clamp(i);
+                        }
+                    });
+                    return;
+                }
             });
 
-            if (close) close.addEventListener('click', hide);
+            document.addEventListener('keydown', function(e) {
+                if (e.key === 'Escape') closeDp();
+            });
+
+            document.addEventListener('change', function(e) {
+                const el = e.target;
+                if (el?.classList?.contains('js-pick')) clamp(el);
+            });
+
+            document.addEventListener('blur', function(e) {
+                const el = e.target;
+                if (el?.classList?.contains('js-pick')) clamp(el);
+            }, true);
+
+            @if ($errors->has('lines.*.qty_picked'))
+                openDp();
+            @endif
         })();
     </script>
-@endpush
+@endsection

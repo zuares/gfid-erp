@@ -1,459 +1,559 @@
 {{-- resources/views/inventory/rts_stock_requests/confirm.blade.php --}}
 @extends('layouts.app')
 
-@section('title', 'RTS • Terima dari Transit • ' . $stockRequest->code)
+@section('title', 'RTS Receive • ' . $stockRequest->code)
 
 @push('head')
     <style>
-        /* pakai CSS kamu (biar konsisten) */
         :root {
             --rts-main: rgba(45, 212, 191, 1);
-            --rts-main-strong: rgba(15, 118, 110, 1);
-            --rts-main-soft: rgba(45, 212, 191, 0.14);
+            --rts-soft: rgba(45, 212, 191, .14);
+            --danger-soft: rgba(239, 68, 68, .12);
+            --warn-soft: rgba(245, 158, 11, .14);
         }
 
         .page-wrap {
-            max-width: 1100px;
+            max-width: 1150px;
             margin-inline: auto;
-            padding: 1.2rem 1.1rem 3.5rem;
+            padding: .85rem .85rem 4.5rem;
         }
 
         body[data-theme="light"] .page-wrap {
             background: radial-gradient(circle at top left,
-                    rgba(59, 130, 246, 0.08) 0,
-                    rgba(45, 212, 191, 0.1) 28%,
-                    #f9fafb 70%);
+                    rgba(59, 130, 246, .10) 0,
+                    rgba(45, 212, 191, .12) 28%,
+                    #f9fafb 65%);
         }
 
-        .page-title {
-            font-size: 1.12rem;
-            font-weight: 600;
-        }
-
-        .page-subtitle {
-            font-size: .8rem;
-            color: rgba(100, 116, 139, 1);
-        }
-
-        .step-chip {
-            display: inline-flex;
-            align-items: center;
-            gap: .35rem;
-            padding: .18rem .6rem;
-            border-radius: 999px;
-            font-size: .7rem;
-            text-transform: uppercase;
-            letter-spacing: .12em;
-            background: rgba(15, 23, 42, 0.02);
-            color: #6b7280;
+        .card {
+            background: var(--card);
+            border-radius: 14px;
+            border: 1px solid rgba(148, 163, 184, .30);
+            box-shadow:
+                0 10px 26px rgba(15, 23, 42, .06),
+                0 0 0 1px rgba(15, 23, 42, .03);
+            padding: .8rem .85rem;
         }
 
         .mono {
-            font-family: ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, "Liberation Mono", "Courier New", monospace;
-            font-variant-numeric: tabular-nums;
+            font-family: ui-monospace, SFMono-Regular, Menlo, monospace;
         }
 
-        .muted {
-            color: rgba(148, 163, 184, 1);
-            font-size: .78rem;
+        .meta {
+            font-size: .82rem;
+            opacity: .82;
         }
 
-        .card-main {
-            background: var(--card);
-            border-radius: 10px;
-            border: 1px solid rgba(148, 163, 184, .26);
-            margin-bottom: .9rem;
-            box-shadow: 0 10px 24px rgba(15, 23, 42, 0.05), 0 0 0 1px rgba(15, 23, 42, 0.02);
+        .header-row {
+            display: flex;
+            justify-content: space-between;
+            align-items: flex-start;
+            gap: .75rem;
+            flex-wrap: wrap;
+            margin-bottom: .75rem;
         }
 
-        .card-body {
-            padding: 1rem 1.1rem;
+        .title {
+            margin: 0;
+            font-size: 1.12rem;
+            font-weight: 900;
+            letter-spacing: -.01em;
         }
 
-        .badge-status {
-            padding: .14rem .55rem;
-            border-radius: 999px;
-            font-size: .72rem;
-            font-weight: 500;
-            display: inline-flex;
+        .sub {
+            margin-top: .18rem;
+        }
+
+        .actions {
+            display: flex;
+            gap: .5rem;
+            flex-wrap: wrap;
             align-items: center;
         }
 
-        .badge-status.submitted {
-            background: rgba(59, 130, 246, .10);
-            color: rgba(30, 64, 175, 1);
+        .btn-primary {
+            background: var(--rts-main);
+            border-color: var(--rts-main);
+            color: #022c22;
         }
 
-        .badge-status.shipped {
-            background: rgba(45, 212, 191, .14);
-            color: rgba(15, 118, 110, 1);
-        }
-
-        .badge-status.partial {
-            background: rgba(234, 179, 8, .12);
-            color: rgba(133, 77, 14, 1);
-        }
-
-        .badge-status.completed {
-            background: rgba(22, 163, 74, .12);
-            color: rgba(22, 101, 52, 1);
-        }
-
-        .code-badge {
-            display: inline-flex;
-            align-items: center;
-            gap: .3rem;
-            border-radius: 999px;
-            padding: .14rem .6rem;
-            font-size: .8rem;
-            background: rgba(15, 23, 42, .03);
+        .btn-outline {
             border: 1px solid rgba(148, 163, 184, .45);
+            background: transparent;
         }
 
-        .code-badge .dot {
-            width: 6px;
-            height: 6px;
-            border-radius: 999px;
-            background: var(--rts-main-strong);
+        .note {
+            border: 1px solid rgba(148, 163, 184, .25);
+            border-radius: 12px;
+            padding: .65rem .75rem;
+            background: rgba(148, 163, 184, .08);
+            font-size: .85rem;
+            opacity: .92;
+            white-space: pre-wrap;
         }
 
-        .pill-label {
-            font-size: .72rem;
-            text-transform: uppercase;
-            letter-spacing: .08em;
-            color: #94a3b8;
+        .line {
+            border-top: 1px dashed rgba(148, 163, 184, .35);
+            margin: .7rem 0;
         }
 
-        .summary-pill {
+        /* =========================
+               CLEAN SOFT BADGES + AUTO-HIDE ZERO (JS)
+            ========================== */
+        .badges {
+            display: flex;
+            flex-wrap: wrap;
+            gap: .4rem;
+            margin-top: .38rem;
+        }
+
+        .badge {
             display: inline-flex;
             align-items: center;
-            gap: .35rem;
-            padding: .24rem .65rem;
+            gap: .38rem;
+            padding: .18rem .55rem;
             border-radius: 999px;
-            border: 1px solid rgba(148, 163, 184, .5);
-            font-size: .76rem;
-            background: rgba(15, 23, 42, 0.015);
+            font-size: .75rem;
+            font-weight: 850;
+            white-space: nowrap;
+            border: 1px solid transparent;
+            line-height: 1;
         }
 
-        .summary-pill--sisa {
-            border-color: var(--rts-main-strong);
-            background: var(--rts-main-soft);
-            color: var(--rts-main-strong);
+        /* small dot */
+        .badge .dot {
+            width: 8px;
+            height: 8px;
+            border-radius: 999px;
+            background: currentColor;
+            opacity: .75;
         }
 
+        /* neutral info */
+        .badge.info {
+            background: rgba(148, 163, 184, .14);
+            border-color: rgba(148, 163, 184, .30);
+            color: rgba(51, 65, 85, 1);
+        }
+
+        /* OK */
+        .badge.ok {
+            background: rgba(16, 185, 129, .16);
+            border-color: rgba(16, 185, 129, .35);
+            color: rgba(4, 120, 87, 1);
+        }
+
+        /* Warning */
+        .badge.warn {
+            background: rgba(245, 158, 11, .18);
+            border-color: rgba(245, 158, 11, .40);
+            color: rgba(146, 64, 14, 1);
+        }
+
+        /* Danger */
+        .badge.danger {
+            background: rgba(239, 68, 68, .16);
+            border-color: rgba(239, 68, 68, .40);
+            color: rgba(153, 27, 27, 1);
+        }
+
+        /* Muted */
+        .badge.muted {
+            background: rgba(100, 116, 139, .16);
+            border-color: rgba(100, 116, 139, .35);
+            color: rgba(51, 65, 85, 1);
+        }
+
+        /* when hidden by JS */
+        .badge.is-hidden {
+            display: none !important;
+        }
+
+        /* =========================
+               TABLE (DESKTOP) + STACK (MOBILE)
+               Columns: No | Item(with badges) | Req | Kirim | Qty Receive
+            ========================== */
         .table-wrap {
-            margin-top: .7rem;
-            border-radius: 10px;
-            border: 1px solid rgba(148, 163, 184, .28);
-            overflow: hidden;
+            overflow: auto;
+            -webkit-overflow-scrolling: touch;
+            border: 1px solid rgba(148, 163, 184, .22);
+            border-radius: 12px;
         }
 
-        .table {
+        .tbl {
             width: 100%;
             border-collapse: collapse;
-            font-size: .82rem;
+            min-width: 860px;
         }
 
-        .table th,
-        .table td {
-            padding: .42rem .55rem;
-            border-bottom: 1px solid rgba(148, 163, 184, .22);
-            vertical-align: middle;
+        .tbl th,
+        .tbl td {
+            padding: .55rem .55rem;
+            border-bottom: 1px solid rgba(148, 163, 184, .18);
+            vertical-align: top;
+            font-size: .9rem;
         }
 
-        .table thead {
-            background: rgba(15, 23, 42, 0.035);
-        }
-
-        .table thead th {
-            font-size: .74rem;
+        .tbl thead th {
+            position: sticky;
+            top: 0;
+            z-index: 1;
+            background: var(--card);
+            font-size: .78rem;
+            letter-spacing: .02em;
             text-transform: uppercase;
-            letter-spacing: .07em;
-            color: #6b7280;
+            opacity: .75;
+            border-bottom: 1px solid rgba(148, 163, 184, .26);
         }
 
-        .row-number {
-            font-weight: 600;
-            color: #64748b;
+        .tbl tbody tr:hover {
+            background: rgba(148, 163, 184, .05);
         }
 
-        .line-item-name {
-            font-size: .8rem;
-            color: #6b7280;
+        .no {
+            width: 44px;
+            opacity: .75;
         }
 
-        .qty-live {
-            color: #0f766e;
+        .td-right {
+            text-align: right;
+            white-space: nowrap;
         }
 
-        .error-text {
-            font-size: .76rem;
-            color: #dc2626;
-            margin-top: .1rem;
+        .td-center {
+            text-align: center;
+            white-space: nowrap;
+        }
+
+        .item-cell {
+            min-width: 420px;
+        }
+
+        .item-code {
+            font-weight: 900;
+        }
+
+        .item-name {
+            margin-top: .10rem;
+            font-size: .82rem;
+            opacity: .82;
+        }
+
+        .num {
+            width: 160px;
+            max-width: 100%;
+            padding: .45rem .55rem;
+            border-radius: 12px;
+            border: 1px solid rgba(148, 163, 184, .35);
+            background: var(--card);
+            color: inherit;
+        }
+
+        .num.is-disabled {
+            opacity: .6;
+            cursor: not-allowed;
+            pointer-events: none;
         }
 
         .hint {
             font-size: .78rem;
-            color: #94a3b8;
+            opacity: .75;
+            margin-top: .22rem;
         }
 
-        .btn-primary-rts {
-            display: inline-flex;
-            align-items: center;
-            gap: .35rem;
-            padding: .42rem 1.1rem;
-            border-radius: 999px;
-            border: none;
-            background: var(--rts-main-strong);
-            color: #e0f2f1;
+        .err {
+            margin-top: .35rem;
             font-size: .82rem;
-            font-weight: 600;
+            color: rgba(239, 68, 68, 1);
         }
 
-        @media (max-width: 767.98px) {
-            .page-wrap {
-                padding-inline: .85rem;
+        /* Mobile stacked */
+        @media (max-width: 820px) {
+            .table-wrap {
+                border: none;
+                border-radius: 0;
+                overflow: visible;
             }
 
-            .table thead {
+            .tbl {
+                min-width: 0;
+                width: 100%;
+            }
+
+            .tbl thead {
                 display: none;
             }
 
-            .table tbody tr {
+            .tbl,
+            .tbl tbody,
+            .tbl tr,
+            .tbl td {
                 display: block;
-                border-bottom: 1px solid rgba(148, 163, 184, .28);
-                padding: .6rem .45rem;
-            }
-
-            .table tbody td {
-                display: flex;
-                justify-content: space-between;
-                gap: .6rem;
-                padding: .22rem 0;
-                border-top: none;
-                font-size: .84rem;
-            }
-
-            .table tbody td::before {
-                content: attr(data-label);
-                font-weight: 500;
-                color: #64748b;
-                flex: 0 0 42%;
-                max-width: 52%;
-            }
-
-            .td-row-number {
-                justify-content: flex-start;
-                gap: .45rem;
-            }
-
-            .td-row-number::before {
-                content: '#';
-                flex: 0 0 auto;
-                color: #94a3b8;
-            }
-
-            .btn-primary-rts {
                 width: 100%;
-                justify-content: center;
+            }
+
+            .tbl tr {
+                border: 1px solid rgba(148, 163, 184, .22);
+                border-radius: 12px;
+                padding: .6rem .65rem;
+                background: rgba(148, 163, 184, .05);
+                margin-bottom: .55rem;
+            }
+
+            .tbl td {
+                border-bottom: none;
+                padding: .22rem 0;
+            }
+
+            .tbl td[data-k]::before {
+                content: attr(data-k);
+                display: inline-block;
+                width: 110px;
+                font-size: .72rem;
+                opacity: .7;
+                text-transform: uppercase;
+                letter-spacing: .02em;
+                margin-right: .5rem;
+            }
+
+            .td-right,
+            .td-center {
+                text-align: left;
+            }
+
+            .num {
+                width: 190px;
+            }
+
+            .item-cell {
+                min-width: 0;
+            }
+        }
+
+        @media (max-width: 980px) {
+            .page-wrap {
+                padding: .75rem .75rem 5rem;
             }
         }
     </style>
 @endpush
 
 @section('content')
-    @php
-        $status = $stockRequest->status;
-
-        $statusLabel = match ($status) {
-            'submitted' => 'Menunggu PRD kirim',
-            'shipped' => 'Sudah dikirim PRD (ada di Transit)',
-            'partial' => 'Sebagian sudah diterima RTS',
-            'completed' => 'Selesai',
-            default => ucfirst($status),
-        };
-
-        $totalRequested = (float) ($totalRequested ?? 0);
-        $totalDispatched = (float) ($totalDispatched ?? 0);
-        $totalReceived = (float) ($totalReceived ?? 0);
-
-        $totalReceivable = max($totalDispatched - $totalReceived, 0);
-    @endphp
-
     <div class="page-wrap">
 
-        @if (session('status'))
-            <div class="alert alert-success">{{ session('status') }}</div>
-        @endif
-        @if (session('warning'))
-            <div class="alert alert-warning">{{ session('warning') }}</div>
-        @endif
-        @if ($errors->has('stock'))
-            <div class="alert alert-error">{{ $errors->first('stock') }}</div>
-        @endif
-
-        <div class="d-flex justify-content-between align-items-start mb-3 flex-wrap gap-2">
+        {{-- =======================
+            HEADER
+        ======================== --}}
+        <div class="header-row">
             <div>
-                <div class="step-chip mb-1">
-                    <span>Langkah 2 dari 2</span><span>•</span><span>RTS terima dari Transit</span>
-                </div>
-                <a href="{{ route('rts.stock-requests.show', $stockRequest) }}" class="btn btn-link btn-sm px-0 mb-1">
-                    ← Kembali ke detail
-                </a>
-
-                <div class="page-title">Terima Barang dari Transit</div>
-                <div class="page-subtitle mt-1">
-                    Isi qty yang benar-benar kamu terima di RTS.
-                    Sistem akan mutasi stok <strong>TRANSIT → RTS</strong>.
+                <h1 class="title mono">{{ $stockRequest->code }} — Receive</h1>
+                <div class="meta sub">
+                    {{ optional($stockRequest->date)->format('d M Y') }}
+                    · TRANSIT → {{ $stockRequest->destinationWarehouse->code ?? 'RTS' }}
                 </div>
             </div>
 
-            <div class="text-end">
-                <div class="mb-2">
-                    <span class="badge-status {{ $status }}">{{ $statusLabel }}</span>
+            <div class="actions">
+                <x-status-pill :status="$stockRequest->status" />
+                <a href="{{ route('rts.stock-requests.show', $stockRequest) }}" class="btn btn-outline">← Kembali</a>
+            </div>
+        </div>
+
+        {{-- =======================
+            TOP ACTIONS + RULE
+        ======================== --}}
+        <div class="card">
+            <div style="display:flex;justify-content:space-between;gap:.75rem;flex-wrap:wrap;align-items:center">
+                <div class="note" style="padding:.55rem .65rem;border:none;background:transparent;margin:0">
+                    <b>Aturan:</b> Qty receive ≤ <b>Sisa Transit</b> (Kirim - Terima).<br>
+                    <span class="meta">Kalau PRD belum kirim, input otomatis nonaktif.</span>
                 </div>
-                <div class="code-badge">
-                    <span class="dot"></span>
-                    <span class="mono">{{ $stockRequest->code }}</span>
+
+                <div class="actions">
+                    <button type="button" class="btn btn-outline" id="btnFillAll">Isi Semua = Max</button>
+                    <button type="button" class="btn btn-outline" id="btnClearAll">Kosongkan</button>
                 </div>
             </div>
         </div>
 
-        <div class="card-main">
-            <div class="card-body">
-                <div class="row g-3">
-                    <div class="col-md-4">
-                        <div class="pill-label mb-1">Tanggal & gudang</div>
-                        <div class="mb-1 mono">{{ $stockRequest->date?->format('d M Y') ?? '-' }}</div>
-                        <div style="font-size:.82rem;">
-                            Transit → <span class="muted">{{ $stockRequest->destinationWarehouse?->name ?? '-' }}</span>
-                        </div>
-                    </div>
-                    <div class="col-md-8">
-                        <div class="pill-label mb-1">Ringkasan</div>
-                        <div class="d-flex flex-wrap gap-2">
-                            <div class="summary-pill"><span>Diminta</span><strong
-                                    class="mono">{{ (int) $totalRequested }}</strong></div>
-                            <div class="summary-pill"><span>Sudah dikirim PRD</span><strong
-                                    class="mono">{{ (int) $totalDispatched }}</strong></div>
-                            <div class="summary-pill"><span>Sudah diterima RTS</span><strong
-                                    class="mono">{{ (int) $totalReceived }}</strong></div>
-                            <div class="summary-pill summary-pill--sisa"><span>Sisa di Transit</span><strong
-                                    class="mono">{{ (int) $totalReceivable }}</strong></div>
-                        </div>
-                        <div class="hint mt-2">
-                            Rule: Qty diterima tidak boleh melebihi <strong>sisa di Transit</strong>.
-                        </div>
-                    </div>
-                </div>
-            </div>
-        </div>
-
-        <form action="{{ route('rts.stock-requests.finalize', $stockRequest) }}" method="POST" novalidate>
+        <form method="POST" action="{{ route('rts.stock-requests.finalize', $stockRequest) }}" style="margin-top:.85rem">
             @csrf
 
-            <div class="card-main">
-                <div class="card-body">
-                    <div class="pill-label mb-1">Konfirmasi per item</div>
+            <div class="card">
+                <div style="display:flex;justify-content:space-between;align-items:baseline;gap:.6rem;flex-wrap:wrap">
+                    <div style="font-weight:900;letter-spacing:-.01em">Daftar Item</div>
+                    <div class="meta">{{ $stockRequest->lines->count() }} item</div>
+                </div>
 
-                    <div class="table-wrap">
-                        <table class="table align-middle mb-0">
-                            <thead>
-                                <tr>
-                                    <th style="width: 40px;">#</th>
-                                    <th>Item</th>
-                                    <th class="text-end" style="width: 90px;">Diminta</th>
-                                    <th class="text-end" style="width: 110px;">Sudah dikirim</th>
-                                    <th class="text-end" style="width: 110px;">Sudah diterima</th>
-                                    <th class="text-end" style="width: 120px;">Stok Transit</th>
-                                    <th class="text-end" style="width: 130px;">Terima sekarang</th>
+                <div class="line"></div>
+
+                <div class="table-wrap">
+                    <table class="tbl">
+                        <thead>
+                            <tr>
+                                <th class="no">No</th>
+                                <th class="item-cell">Item</th>
+                                <th class="td-right">Req</th>
+                                <th class="td-right">Kirim</th>
+                                <th class="td-right">Qty Receive</th>
+                            </tr>
+                        </thead>
+
+                        <tbody>
+                            @foreach ($stockRequest->lines as $i => $line)
+                                @php
+                                    $req = (float) ($line->qty_request ?? 0);
+                                    $disp = (float) ($line->qty_dispatched ?? 0);
+                                    $recv = (float) ($line->qty_received ?? 0);
+                                    $pick = (float) ($line->qty_picked ?? 0);
+
+                                    $maxReceivable = max($disp - $recv, 0);
+                                    $liveTransit = (float) ($liveStocks[$line->id] ?? 0);
+
+                                    // disable jika PRD belum kirim atau sisa transit 0
+                                    $isDisabled = $disp <= 0.0000001 || $maxReceivable <= 0.0000001;
+
+                                    // status badge
+                                    if ($disp <= 0.0000001) {
+                                        $statusCls = 'badge muted';
+                                        $statusLbl = 'Belum dikirim';
+                                    } elseif ($maxReceivable <= 0.0000001) {
+                                        $statusCls = 'badge danger';
+                                        $statusLbl = 'Kosong';
+                                    } elseif ($liveTransit + 0.0000001 < $maxReceivable) {
+                                        $statusCls = 'badge warn';
+                                        $statusLbl = 'Live < Sisa';
+                                    } else {
+                                        $statusCls = 'badge ok';
+                                        $statusLbl = 'OK';
+                                    }
+
+                                    $old = old("lines.{$line->id}.qty_received", 0);
+                                @endphp
+
+                                <tr style="{{ $isDisabled ? 'opacity:.78' : '' }}">
+                                    <td class="no td-center" data-k="No">{{ $i + 1 }}</td>
+
+                                    <td class="item-cell" data-k="Item">
+                                        <div class="item-code mono">{{ $line->item->code }}</div>
+                                        <div class="item-name">{{ $line->item->name }}</div>
+
+                                        {{-- badges compact (auto-hide 0 via JS) --}}
+                                        <div class="badges" data-badge-group>
+                                            <span class="badge info js-hide-zero" data-zero="{{ $pick }}">
+                                                <span class="dot"></span> Pickup <b
+                                                    class="mono">{{ $pick }}</b>
+                                            </span>
+                                            <span class="badge info js-hide-zero" data-zero="{{ $maxReceivable }}">
+                                                <span class="dot"></span> Sisa <b
+                                                    class="mono">{{ $maxReceivable }}</b>
+                                            </span>
+                                            <span class="badge info js-hide-zero" data-zero="{{ $liveTransit }}">
+                                                <span class="dot"></span> Live <b class="mono">{{ $liveTransit }}</b>
+                                            </span>
+
+                                            <span class="{{ $statusCls }}">
+                                                <span class="dot"></span> {{ $statusLbl }}
+                                            </span>
+                                        </div>
+                                    </td>
+
+                                    <td class="td-right mono" data-k="Req">{{ $req }}</td>
+                                    <td class="td-right mono" data-k="Kirim">{{ $disp }}</td>
+
+                                    <td class="td-right" data-k="Qty Receive">
+                                        <input class="num js-recv {{ $isDisabled ? 'is-disabled' : '' }}" type="number"
+                                            step="0.01" min="0" max="{{ $maxReceivable }}"
+                                            name="lines[{{ $line->id }}][qty_received]"
+                                            value="{{ $isDisabled ? 0 : $old }}" data-max="{{ $maxReceivable }}"
+                                            {{ $isDisabled ? 'disabled' : '' }}>
+
+                                        <div class="hint">Max: <b class="mono">{{ $maxReceivable }}</b></div>
+
+                                        @error("lines.{$line->id}.qty_received")
+                                            <div class="err">{{ $message }}</div>
+                                        @enderror
+                                    </td>
                                 </tr>
-                            </thead>
-                            <tbody>
-                                @foreach ($stockRequest->lines as $index => $line)
-                                    @php
-                                        $lineId = $line->id;
-                                        $requested = (float) $line->qty_request;
-                                        $dispatched = (float) ($line->qty_dispatched ?? 0);
-                                        $received = (float) ($line->qty_received ?? 0);
-                                        $receivable = max($dispatched - $received, 0);
+                            @endforeach
+                        </tbody>
+                    </table>
+                </div>
 
-                                        $transitLive = (float) ($liveStocks[$lineId] ?? 0);
-
-                                        $inputName = "lines[{$lineId}][qty_received]";
-                                        $inputValue = old($inputName, 0);
-                                        $errorKey = "lines.{$lineId}.qty_received";
-                                    @endphp
-                                    <tr>
-                                        <td class="td-row-number row-number" data-label="#">{{ $index + 1 }}</td>
-
-                                        <td data-label="Item">
-                                            <div class="fw-semibold">{{ $line->item?->code ?? '-' }}</div>
-                                            <div class="line-item-name">{{ $line->item?->name ?? '' }}</div>
-                                        </td>
-
-                                        <td class="text-end mono" data-label="Diminta">{{ (int) $requested }}</td>
-                                        <td class="text-end mono" data-label="Sudah dikirim">{{ (int) $dispatched }}</td>
-                                        <td class="text-end mono" data-label="Sudah diterima">{{ (int) $received }}</td>
-
-                                        <td class="text-end mono qty-live" data-label="Stok Transit">
-                                            {{ (int) $transitLive }}</td>
-
-                                        <td class="text-end" data-label="Terima sekarang">
-                                            <x-number-input name="{{ $inputName }}" :value="$inputValue" mode="integer"
-                                                min="0" class="text-end mono js-qty-received" />
-                                            @error($errorKey)
-                                                <div class="error-text">{{ $message }}</div>
-                                            @enderror
-                                            <div class="muted mt-1">
-                                                Maks: <span class="mono">{{ (int) $receivable }}</span>
-                                            </div>
-                                        </td>
-                                    </tr>
-                                @endforeach
-                            </tbody>
-                        </table>
+                @error('stock')
+                    <div class="note"
+                        style="margin-top:.85rem;border-color:rgba(239,68,68,.35);background:rgba(239,68,68,.10)">
+                        <b>Error stock:</b> {{ $message }}
                     </div>
+                @enderror
 
-                    <div class="mt-3 d-flex justify-content-between align-items-center flex-wrap gap-2">
-                        <div class="hint">
-                            Baris dengan <strong>Terima sekarang = 0</strong> dianggap tidak ada penerimaan.
-                            Mutasi yang terjadi: <strong>TRANSIT → RTS</strong>.
-                        </div>
-                        <button type="submit" class="btn-primary-rts">✔ Simpan & Terima ke RTS</button>
-                    </div>
+                <div style="display:flex;gap:.6rem;justify-content:flex-end;flex-wrap:wrap;margin-top:1rem">
+                    <a href="{{ route('rts.stock-requests.show', $stockRequest) }}" class="btn btn-outline">Batal</a>
+                    <button class="btn btn-primary" type="submit">Simpan Receive</button>
                 </div>
             </div>
         </form>
     </div>
-@endsection
 
-@push('scripts')
     <script>
-        document.addEventListener('DOMContentLoaded', function() {
-            const inputs = Array.from(document.querySelectorAll('.js-qty-received'));
-            inputs.forEach((input) => {
-                input.addEventListener('focus', function() {
-                    setTimeout(() => this.select(), 10);
-                });
-                input.addEventListener('keydown', function(e) {
-                    const currentIndex = inputs.indexOf(this);
-                    if (e.key === 'Enter' || e.key === 'ArrowDown') {
-                        e.preventDefault();
-                        const next = inputs[currentIndex + 1];
-                        if (next) next.focus();
-                    }
-                    if (e.key === 'ArrowUp') {
-                        e.preventDefault();
-                        const prev = inputs[currentIndex - 1];
-                        if (prev) prev.focus();
-                    }
+        (function() {
+            // =========================
+            // Auto-hide zero badges (Pickup/Sisa/Live)
+            // - If ALL info badges hidden, hide whole group row except Status
+            // =========================
+            function toNum(x) {
+                const n = parseFloat(String(x ?? '').replace(',', '.'));
+                return Number.isFinite(n) ? n : 0;
+            }
+
+            function isZero(n) {
+                return Math.abs(n) <= 0.0000001;
+            }
+
+            document.querySelectorAll('.js-hide-zero').forEach(b => {
+                const v = toNum(b.getAttribute('data-zero'));
+                if (isZero(v)) b.classList.add('is-hidden');
+            });
+
+            // If a badge group ends up with only Status visible, keep it (clean).
+            // But if you want to also hide the "badges" wrapper when only 1 badge, you can tweak here.
+            // We'll keep it visible so Status always shows in same spot.
+
+            // =========================
+            // Qty receive clamping + fill/clear
+            // =========================
+            const inputs = Array.from(document.querySelectorAll('.js-recv'));
+
+            function clampInput(el) {
+                if (el.disabled) return;
+                const max = parseFloat(el.dataset.max || el.max || '0') || 0;
+                let v = parseFloat(el.value || '0');
+                if (Number.isNaN(v) || v < 0) v = 0;
+                if (v > max) v = max;
+                el.value = (Math.round(v * 100) / 100).toFixed(2).replace(/\.00$/, '');
+            }
+
+            inputs.forEach(i => {
+                i.addEventListener('blur', () => clampInput(i));
+                i.addEventListener('change', () => clampInput(i));
+            });
+
+            document.getElementById('btnFillAll')?.addEventListener('click', () => {
+                inputs.forEach(el => {
+                    if (el.disabled) return;
+                    const max = parseFloat(el.dataset.max || el.max || '0') || 0;
+                    el.value = max > 0 ? max : 0;
+                    clampInput(el);
                 });
             });
-            if (inputs.length > 0) {
-                inputs[0].focus();
-                inputs[0].select();
-            }
-        });
+
+            document.getElementById('btnClearAll')?.addEventListener('click', () => {
+                inputs.forEach(el => {
+                    if (el.disabled) return;
+                    el.value = 0;
+                    clampInput(el);
+                });
+            });
+        })();
     </script>
-@endpush
+@endsection
