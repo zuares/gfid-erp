@@ -1,3 +1,4 @@
+{{-- resources/views/production/sewing_returns/index.blade.php --}}
 @extends('layouts.app')
 
 @section('title', 'Produksi • Sewing Returns')
@@ -25,16 +26,6 @@
             font-size: .82rem;
         }
 
-        .badge-soft {
-            border-radius: 999px;
-            padding: .15rem .55rem;
-            font-size: .7rem;
-        }
-
-        .table-wrap {
-            overflow-x: auto;
-        }
-
         .status-pill {
             border-radius: 999px;
             padding: .15rem .7rem;
@@ -46,6 +37,10 @@
             text-transform: uppercase;
             letter-spacing: .08em;
             color: var(--muted);
+        }
+
+        .table-wrap {
+            overflow-x: auto;
         }
 
         .table-sewing-return-index th {
@@ -65,8 +60,8 @@
         }
 
         .sr-code {
-            font-size: .9rem;
-            font-weight: 600;
+            font-size: .92rem;
+            font-weight: 700;
         }
 
         .sr-meta {
@@ -74,7 +69,30 @@
             color: var(--muted);
         }
 
-        /* ============ MOBILE ============ */
+        .sr-meta-inline {
+            display: flex;
+            flex-wrap: wrap;
+            gap: .15rem .6rem;
+            margin-top: .15rem;
+        }
+
+        .sr-meta-chip {
+            font-size: .75rem;
+            color: var(--muted);
+        }
+
+        .sr-amounts {
+            margin-top: .25rem;
+            display: flex;
+            justify-content: flex-start;
+            gap: .75rem;
+            font-size: .78rem;
+        }
+
+        .sr-amounts span {
+            white-space: nowrap;
+        }
+
         @media (max-width: 767.98px) {
             .page-wrap {
                 padding-inline: .75rem;
@@ -105,13 +123,13 @@
                 flex-direction: column;
             }
 
+            .table-sewing-return-index thead {
+                display: none;
+            }
+
             .table-sewing-return-index {
                 border-collapse: separate;
                 border-spacing: 0 .55rem;
-            }
-
-            .table-sewing-return-index thead {
-                display: none;
             }
 
             .table-sewing-return-index tbody tr {
@@ -120,11 +138,6 @@
                 border: 1px solid var(--line);
                 padding: .6rem .7rem;
                 background: var(--card);
-                margin-bottom: .4rem;
-            }
-
-            .table-sewing-return-index tbody tr:last-child {
-                margin-bottom: 0;
             }
 
             .table-sewing-return-index td {
@@ -133,37 +146,8 @@
                 padding: .06rem 0;
                 font-size: .8rem;
             }
-
-            .sr-meta-inline {
-                display: flex;
-                flex-wrap: wrap;
-                gap: .15rem .6rem;
-                margin-top: .15rem;
-            }
-
-            .sr-meta-chip {
-                font-size: .75rem;
-                color: var(--muted);
-            }
-
-            .sr-amounts {
-                margin-top: .25rem;
-                display: flex;
-                justify-content: flex-start;
-                gap: .75rem;
-                font-size: .78rem;
-            }
-
-            .sr-amounts span {
-                white-space: nowrap;
-            }
-
-            .sr-link {
-                margin-top: .25rem;
-            }
         }
 
-        /* ============ DESKTOP ============ */
         @media (min-width: 768px) {
             .filter-row .col-auto {
                 display: flex;
@@ -185,27 +169,26 @@
 
     <div class="page-wrap py-3 py-md-4">
 
-        {{-- HEADER + FILTER --}}
+        {{-- Header + Filter --}}
         <div class="card p-3 p-md-4 mb-3">
             <div class="d-flex justify-content-between align-items-start header-row">
                 <div>
                     <h1 class="h5 mb-1">Sewing Returns</h1>
-                    <div class="help">
-                        Rekap semua setoran hasil jahit dari WIP-SEW ke WIP-FIN.
-                    </div>
+                    <div class="help">Rekap semua setoran hasil jahit dari WIP-SEW ke WIP-FIN.</div>
                 </div>
 
                 <div class="header-actions">
                     <a href="{{ route('production.sewing_pickups.index') }}"
                         class="btn btn-sm btn-outline-secondary d-inline-flex align-items-center gap-1">
-                        <i class="bi bi-arrow-left"></i>
-                        <span>Ke Sewing Pickup</span>
+                        <i class="bi bi-arrow-left"></i><span>Ke Sewing Pickup</span>
                     </a>
-                    {{-- kalau nanti mau tambah tombol create manual, taruh di sini --}}
+                    <a href="{{ route('production.sewing_returns.create') }}"
+                        class="btn btn-sm btn-success d-inline-flex align-items-center gap-1">
+                        <i class="bi bi-plus-lg"></i><span>Setor Jahit</span>
+                    </a>
                 </div>
             </div>
 
-            {{-- FILTERS --}}
             <form method="get" class="mt-3">
                 <div class="row g-2 filter-row">
                     <div class="col-6 col-md-2">
@@ -218,6 +201,7 @@
                         <input type="date" name="to_date" value="{{ $filters['to_date'] }}"
                             class="form-control form-control-sm">
                     </div>
+
                     <div class="col-6 col-md-3">
                         <div class="filter-label mb-1">Operator</div>
                         <select name="operator_id" class="form-select form-select-sm">
@@ -230,27 +214,28 @@
                             @endforeach
                         </select>
                     </div>
+
                     <div class="col-6 col-md-2">
                         <div class="filter-label mb-1">Status</div>
                         <select name="status" class="form-select form-select-sm">
                             @foreach ($statusOptions as $value => $label)
-                                <option value="{{ $value }}" {{ $filters['status'] === $value ? 'selected' : '' }}>
+                                <option value="{{ $value }}"
+                                    {{ (string) $filters['status'] === (string) $value ? 'selected' : '' }}>
                                     {{ $label }}
                                 </option>
                             @endforeach
                         </select>
                     </div>
+
                     <div class="col-12 col-md-3">
                         <div class="filter-label mb-1">Cari</div>
                         <div class="input-group input-group-sm">
-                            <span class="input-group-text bg-light border-end-0">
-                                <i class="bi bi-search"></i>
-                            </span>
+                            <span class="input-group-text bg-light border-end-0"><i class="bi bi-search"></i></span>
                             <input type="text" name="q" value="{{ $filters['q'] }}"
                                 class="form-control border-start-0" placeholder="Kode return / pickup / operator...">
                             @if (array_filter($filters))
-                                <button class="btn btn-outline-secondary" type="submit" name="reset" value="1"
-                                    onclick="window.location='{{ route('production.sewing_returns.index') }}';return false;">
+                                <button class="btn btn-outline-secondary" type="button"
+                                    onclick="window.location='{{ route('production.sewing_returns.index') }}'">
                                     Reset
                                 </button>
                             @endif
@@ -259,14 +244,12 @@
                 </div>
 
                 <div class="mt-2 d-flex justify-content-end">
-                    <button type="submit" class="btn btn-sm btn-primary">
-                        Terapkan Filter
-                    </button>
+                    <button type="submit" class="btn btn-sm btn-primary">Terapkan Filter</button>
                 </div>
             </form>
         </div>
 
-        {{-- LIST / TABLE --}}
+        {{-- List --}}
         <div class="card p-3 p-md-4 mb-3">
             <div class="d-flex justify-content-between align-items-center mb-2">
                 <h2 class="h6 mb-0">Daftar Sewing Return</h2>
@@ -280,21 +263,21 @@
                 <table class="table table-sm align-middle mono table-sewing-return-index mb-0">
                     <thead>
                         <tr>
-                            <th style="width: 110px;">Tanggal</th>
-                            <th style="width: 140px;">Kode</th>
-                            <th style="width: 160px;">Operator</th>
-                            <th style="width: 150px;">Pickup</th>
-                            <th style="width: 110px;" class="text-end">Total OK</th>
-                            <th style="width: 110px;" class="text-end">Total Reject</th>
-                            <th style="width: 110px;">Status</th>
-                            <th style="width: 80px;"></th>
+                            <th style="width:110px;">Tanggal</th>
+                            <th style="width:150px;">Kode</th>
+                            <th style="width:190px;">Operator</th>
+                            <th style="width:170px;">Pickup</th>
+                            <th style="width:110px;" class="text-end">Total OK</th>
+                            <th style="width:110px;" class="text-end">Total Reject</th>
+                            <th style="width:110px;">Status</th>
+                            <th style="width:90px;"></th>
                         </tr>
                     </thead>
                     <tbody>
                         @forelse ($returns as $ret)
                             @php
-                                $totalOk = $ret->lines->sum('qty_ok');
-                                $totalReject = $ret->lines->sum('qty_reject');
+                                $totalOk = (float) ($ret->total_ok ?? 0);
+                                $totalReject = (float) ($ret->total_reject ?? 0);
 
                                 $statusMap = [
                                     'draft' => ['label' => 'Draft', 'class' => 'secondary'],
@@ -305,109 +288,76 @@
                                     'label' => strtoupper($ret->status ?? '-'),
                                     'class' => 'secondary',
                                 ];
+
+                                $pickupCode = $ret->pickup?->code ?? '-';
                             @endphp
-                            <tr>
-                                {{-- DESKTOP VIEW --}}
-                                <td class="d-none d-md-table-cell">
-                                    {{ $ret->date?->format('Y-m-d') ?? $ret->date }}
+
+                            {{-- Desktop row --}}
+                            <tr class="d-none d-md-table-row">
+                                <td>{{ $ret->date?->format('Y-m-d') ?? $ret->date }}</td>
+                                <td>
+                                    <a href="{{ route('production.sewing_returns.show', $ret) }}">{{ $ret->code }}</a>
                                 </td>
-                                <td class="d-none d-md-table-cell">
-                                    <a href="{{ route('production.sewing_returns.show', $ret) }}">
-                                        {{ $ret->code }}
-                                    </a>
-                                </td>
-                                <td class="d-none d-md-table-cell">
+                                <td>
                                     @if ($ret->operator)
                                         {{ $ret->operator->code }} — {{ $ret->operator->name }}
                                     @else
                                         <span class="text-muted">-</span>
                                     @endif
                                 </td>
-                                <td class="d-none d-md-table-cell">
+                                <td>
                                     @if ($ret->pickup)
-                                        <a href="{{ route('production.sewing_pickups.show', $ret->pickup) }}">
-                                            {{ $ret->pickup->code }}
-                                        </a>
+                                        <a
+                                            href="{{ route('production.sewing_pickups.show', $ret->pickup) }}">{{ $pickupCode }}</a>
                                     @else
                                         <span class="text-muted">-</span>
                                     @endif
                                 </td>
-                                <td class="text-end d-none d-md-table-cell">
-                                    {{ number_format($totalOk, 2, ',', '.') }}
+                                <td class="text-end">{{ number_format($totalOk, 2, ',', '.') }}</td>
+                                <td class="text-end {{ $totalReject > 0 ? 'text-danger' : '' }}">
+                                    {{ number_format($totalReject, 2, ',', '.') }}</td>
+                                <td><span class="status-pill bg-{{ $cfg['class'] }} text-light">{{ $cfg['label'] }}</span>
                                 </td>
-                                <td class="text-end d-none d-md-table-cell {{ $totalReject > 0 ? 'text-danger' : '' }}">
-                                    {{ number_format($totalReject, 2, ',', '.') }}
-                                </td>
-                                <td class="d-none d-md-table-cell">
-                                    <span class="status-pill bg-{{ $cfg['class'] }} text-light">
-                                        {{ $cfg['label'] }}
-                                    </span>
-                                </td>
-                                <td class="text-end d-none d-md-table-cell">
+                                <td class="text-end">
                                     <a href="{{ route('production.sewing_returns.show', $ret) }}"
-                                        class="btn btn-sm btn-outline-primary">
-                                        Detail
-                                    </a>
+                                        class="btn btn-sm btn-outline-primary">Detail</a>
                                 </td>
+                            </tr>
 
-                                {{-- MOBILE CARD VIEW --}}
-                                <td colspan="8" class="d-md-none">
+                            {{-- Mobile card row --}}
+                            <tr class="d-md-none">
+                                <td>
                                     <div class="sr-card-header">
                                         <div>
                                             <div class="sr-code">
-                                                <a href="{{ route('production.sewing_returns.show', $ret) }}">
-                                                    {{ $ret->code }}
-                                                </a>
+                                                <a
+                                                    href="{{ route('production.sewing_returns.show', $ret) }}">{{ $ret->code }}</a>
                                             </div>
-                                            <div class="sr-meta">
-                                                {{ $ret->date?->format('Y-m-d') ?? $ret->date }}
-                                            </div>
+                                            <div class="sr-meta">{{ $ret->date?->format('Y-m-d') ?? $ret->date }}</div>
                                         </div>
-                                        <span class="status-pill bg-{{ $cfg['class'] }} text-light">
-                                            {{ $cfg['label'] }}
-                                        </span>
+                                        <span
+                                            class="status-pill bg-{{ $cfg['class'] }} text-light">{{ $cfg['label'] }}</span>
                                     </div>
 
                                     <div class="sr-meta-inline">
-                                        <span class="sr-meta-chip">
-                                            Op:
-                                            @if ($ret->operator)
-                                                {{ $ret->operator->code }}
-                                            @else
-                                                -
-                                            @endif
-                                        </span>
-                                        <span class="sr-meta-chip">
-                                            Pickup:
-                                            @if ($ret->pickup)
-                                                {{ $ret->pickup->code }}
-                                            @else
-                                                -
-                                            @endif
-                                        </span>
+                                        <span class="sr-meta-chip">Op: {{ $ret->operator?->code ?? '-' }}</span>
+                                        <span class="sr-meta-chip">Pickup: {{ $pickupCode }}</span>
                                     </div>
 
                                     <div class="sr-amounts">
-                                        <span>
-                                            OK:
-                                            {{ number_format($totalOk, 2, ',', '.') }}
-                                        </span>
-                                        <span class="{{ $totalReject > 0 ? 'text-danger' : '' }}">
-                                            RJ:
-                                            {{ number_format($totalReject, 2, ',', '.') }}
-                                        </span>
+                                        <span>OK: {{ number_format($totalOk, 2, ',', '.') }}</span>
+                                        <span class="{{ $totalReject > 0 ? 'text-danger' : '' }}">RJ:
+                                            {{ number_format($totalReject, 2, ',', '.') }}</span>
                                     </div>
 
                                     @if ($ret->notes)
                                         <div class="mt-1 text-muted small">
-                                            {{ \Illuminate\Support\Str::limit($ret->notes, 80) }}
-                                        </div>
+                                            {{ \Illuminate\Support\Str::limit($ret->notes, 80) }}</div>
                                     @endif
 
-                                    <div class="sr-link">
-                                        <a href="{{ route('production.sewing_returns.show', $ret) }}" class="small">
-                                            Lihat detail →
-                                        </a>
+                                    <div class="mt-1">
+                                        <a href="{{ route('production.sewing_returns.show', $ret) }}" class="small">Lihat
+                                            detail →</a>
                                     </div>
                                 </td>
                             </tr>
@@ -422,15 +372,12 @@
                 </table>
             </div>
 
-            {{-- PAGINATION --}}
             @if ($returns->hasPages())
                 <div class="mt-3 d-flex justify-content-between align-items-center flex-wrap gap-2">
                     <div class="small text-muted">
                         Halaman {{ $returns->currentPage() }} dari {{ $returns->lastPage() }}
                     </div>
-                    <div>
-                        {{ $returns->links() }}
-                    </div>
+                    <div>{{ $returns->links() }}</div>
                 </div>
             @endif
         </div>

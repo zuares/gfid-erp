@@ -690,4 +690,15 @@ class InventoryService
         $cost = (float) $row->unit_cost;
         return ($cost > 0.000001) ? $cost : null;
     }
+
+    public function getStockQty(int $warehouseId, int $itemId): float
+    {
+        $stock = \App\Models\InventoryStock::query()
+            ->where('warehouse_id', $warehouseId)
+            ->where('item_id', $itemId)
+            ->first();
+
+        return (float) ($stock?->qty ?? 0);
+    }
+
 }

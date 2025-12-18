@@ -8,31 +8,28 @@
         .page-wrap {
             max-width: 1000px;
             margin-inline: auto;
-            padding: .75rem .75rem 3.5rem;
+            padding: .8rem .8rem 3.5rem;
         }
 
         body[data-theme="light"] .page-wrap {
-            background:
-                radial-gradient(circle at top left,
-                    rgba(16, 185, 129, 0.18) 0,
-                    rgba(110, 231, 183, 0.1) 22%,
+            background: radial-gradient(circle at top left,
+                    rgba(16, 185, 129, .18) 0,
+                    rgba(110, 231, 183, .10) 22%,
                     #f9fafb 58%);
         }
 
         .card {
             background: var(--card);
             border-radius: 16px;
-            border: 1px solid rgba(148, 163, 184, 0.22);
-            box-shadow:
-                0 10px 26px rgba(15, 23, 42, 0.08),
-                0 0 0 1px rgba(15, 23, 42, 0.03);
+            border: 1px solid rgba(148, 163, 184, .22);
+            box-shadow: 0 10px 26px rgba(15, 23, 42, .08), 0 0 0 1px rgba(15, 23, 42, .03);
         }
 
         .card-section {
-            padding: .85rem .95rem;
+            padding: .9rem 1rem;
         }
 
-        @media (min-width: 768px) {
+        @media(min-width:768px) {
             .page-wrap {
                 padding: 1.1rem 1rem 3.5rem;
             }
@@ -47,110 +44,72 @@
             font-family: ui-monospace, SFMono-Regular, Menlo, Consolas, "Liberation Mono";
         }
 
-        .badge-soft {
-            border-radius: 999px;
-            padding: .16rem .58rem;
-            font-size: .72rem;
-        }
-
         .badge-status {
             font-size: .7rem;
             text-transform: uppercase;
             letter-spacing: .12em;
             border-radius: 999px;
-            padding: .16rem .72rem;
-            font-weight: 700;
-        }
-
-        .badge-status-posted {
-            background: rgba(22, 163, 74, 0.12);
-            color: #166534;
-            border: 1px solid rgba(22, 163, 74, 0.5);
-        }
-
-        .badge-status-draft {
-            background: rgba(148, 163, 184, 0.18);
-            color: #4b5563;
-            border: 1px solid rgba(148, 163, 184, 0.7);
-        }
-
-        .badge-status-reject {
-            background: rgba(248, 113, 113, 0.14);
-            color: #b91c1c;
-            border: 1px solid rgba(248, 113, 113, 0.65);
-        }
-
-        .badge-flow {
-            background: rgba(59, 130, 246, 0.08);
-            color: #1d4ed8;
-            border: 1px solid rgba(59, 130, 246, 0.4);
-            font-size: .7rem;
-            border-radius: 999px;
             padding: .16rem .7rem;
+            font-weight: 800;
         }
 
-        .header-row {
-            display: flex;
-            justify-content: space-between;
-            gap: .75rem;
-            flex-wrap: wrap;
-            align-items: flex-start;
+        .badge-posted {
+            background: rgba(22, 163, 74, .14);
+            color: #166534;
+            border: 1px solid rgba(22, 163, 74, .45);
         }
 
-        .header-main {
-            display: flex;
-            gap: .6rem;
-            align-items: center;
+        .badge-draft {
+            background: rgba(148, 163, 184, .18);
+            color: #4b5563;
+            border: 1px solid rgba(148, 163, 184, .6);
         }
 
-        .header-icon-circle {
-            width: 40px;
-            height: 40px;
+        .badge-reject {
+            background: rgba(248, 113, 113, .16);
+            color: #b91c1c;
+            border: 1px solid rgba(248, 113, 113, .6);
+        }
+
+        .pill {
             border-radius: 999px;
-            display: inline-flex;
-            align-items: center;
-            justify-content: center;
-            background: radial-gradient(circle,
-                    rgba(22, 163, 74, 0.18) 0,
-                    rgba(22, 163, 74, 0.05) 55%,
-                    transparent 100%);
-            color: #16a34a;
-        }
-
-        .header-title {
-            display: flex;
-            flex-direction: column;
-            gap: .12rem;
-        }
-
-        .header-title h1 {
-            font-size: 1rem;
-            font-weight: 700;
-            margin: 0;
-        }
-
-        .header-sub {
-            font-size: .78rem;
-            color: var(--muted);
-        }
-
-        .header-meta-row {
-            display: flex;
-            flex-wrap: wrap;
-            gap: .25rem .4rem;
-            font-size: .74rem;
-            color: var(--muted);
-        }
-
-        .header-meta-row .mono {
-            font-size: .8rem;
-        }
-
-        .pill-meta {
-            border-radius: 999px;
-            padding: .1rem .6rem;
-            background: rgba(148, 163, 184, 0.1);
+            padding: .12rem .6rem;
             font-size: .72rem;
+            font-weight: 800;
+        }
+
+        .pill-ok {
+            background: rgba(22, 163, 74, .12);
+            color: #166534;
+            border: 1px solid rgba(22, 163, 74, .4);
+        }
+
+        .pill-rj {
+            background: rgba(248, 113, 113, .14);
+            color: #b91c1c;
+            border: 1px solid rgba(248, 113, 113, .5);
+        }
+
+        .pill-total {
+            background: rgba(59, 130, 246, .08);
+            color: #1d4ed8;
+            border: 1px solid rgba(59, 130, 246, .4);
+        }
+
+        .pill-muted {
+            background: rgba(148, 163, 184, .12);
+            color: #475569;
+        }
+
+        .section-title {
+            font-size: .9rem;
+            font-weight: 900;
+            margin-bottom: .15rem;
+        }
+
+        .section-sub {
+            font-size: .75rem;
+            color: var(--muted);
         }
 
         .summary-grid {
@@ -160,9 +119,9 @@
             font-size: .8rem;
         }
 
-        @media (min-width: 768px) {
+        @media(min-width:768px) {
             .summary-grid {
-                grid-template-columns: repeat(4, minmax(0, 1fr));
+                grid-template-columns: repeat(5, minmax(0, 1fr));
             }
         }
 
@@ -174,581 +133,321 @@
         }
 
         .summary-value {
-            font-weight: 600;
+            font-weight: 900;
         }
 
-        .summary-value-ok {
+        .summary-ok {
             color: #166534;
         }
 
-        .summary-value-reject {
+        .summary-rj {
             color: #b91c1c;
         }
 
-        .summary-value-warning {
+        .summary-warn {
             color: #b45309;
         }
 
-        .summary-sub {
-            font-size: .7rem;
-            color: var(--muted);
-        }
-
-        .table-wrap {
-            overflow-x: auto;
-        }
-
-        .table {
-            margin-bottom: 0;
-        }
-
         .table thead th {
-            font-size: .75rem;
+            font-size: .74rem;
             text-transform: uppercase;
             letter-spacing: .08em;
             color: var(--muted);
             border-top: none;
-            border-bottom-color: rgba(148, 163, 184, 0.35);
         }
 
         .table tbody td {
             font-size: .8rem;
-            border-top-color: rgba(148, 163, 184, 0.2);
         }
 
-        .row-ok-dominant {
-            background: rgba(240, 253, 244, 0.95);
+        .row-ok {
+            background: rgba(240, 253, 244, .96);
         }
 
-        .row-reject-dominant {
-            background: rgba(254, 242, 242, 0.96);
+        .row-rj {
+            background: rgba(254, 242, 242, .96);
         }
 
-        body[data-theme="dark"] .row-ok-dominant {
-            background: rgba(22, 163, 74, 0.18);
-        }
-
-        body[data-theme="dark"] .row-reject-dominant {
-            background: rgba(248, 113, 113, 0.15);
-        }
-
-        .qty-pill-ok {
-            border-radius: 999px;
-            padding: .08rem .5rem;
-            font-size: .76rem;
-            background: rgba(22, 163, 74, 0.12);
-            color: #166534;
-            border: 1px solid rgba(22, 163, 74, 0.4);
-        }
-
-        .qty-pill-reject {
-            border-radius: 999px;
-            padding: .08rem .5rem;
-            font-size: .76rem;
-            background: rgba(248, 113, 113, 0.16);
-            color: #b91c1c;
-            border: 1px solid rgba(248, 113, 113, 0.5);
-        }
-
-        .qty-pill-total {
-            border-radius: 999px;
-            padding: .08rem .5rem;
-            font-size: .76rem;
-            background: rgba(59, 130, 246, 0.06);
-            color: #1d4ed8;
-            border: 1px solid rgba(59, 130, 246, 0.35);
-        }
-
-        .section-title-row {
+        .header-actions {
             display: flex;
-            justify-content: space-between;
-            align-items: center;
-            gap: .5rem;
-            margin-bottom: .4rem;
+            gap: .45rem;
+            flex-wrap: wrap;
+            justify-content: flex-end;
         }
 
-        .section-title-row h2 {
-            margin: 0;
-            font-size: .88rem;
-            font-weight: 700;
-        }
-
-        .section-sub {
-            font-size: .75rem;
-            color: var(--muted);
-        }
-
-        .chip-small {
+        .btn-pill {
             border-radius: 999px;
-            padding: .06rem .55rem;
-            font-size: .7rem;
-            background: rgba(148, 163, 184, 0.16);
-        }
-
-        .btn-back {
-            border-radius: 999px;
-            padding: .2rem .7rem;
+            padding: .25rem .75rem;
             font-size: .78rem;
             display: inline-flex;
             align-items: center;
-            gap: .25rem;
-            background: rgba(248, 250, 252, 0.96);
-            border: 1px solid rgba(148, 163, 184, 0.7);
-        }
-
-        .btn-link-pickup {
-            border-radius: 999px;
-            padding: .2rem .7rem;
-            font-size: .78rem;
-            display: inline-flex;
-            align-items: center;
-            gap: .25rem;
-            background: rgba(219, 234, 254, 0.96);
-            border: 1px solid rgba(59, 130, 246, 0.7);
-            color: #1d4ed8;
-        }
-
-        .btn-link-pickup:hover {
-            color: #1e40af;
-        }
-
-        @media (max-width: 767.98px) {
-            .header-row {
-                flex-direction: column;
-            }
-
-            .header-actions {
-                width: 100%;
-                display: flex;
-                justify-content: space-between;
-                gap: .5rem;
-            }
-
-            .btn-back,
-            .btn-link-pickup {
-                width: auto;
-                padding-inline: .85rem;
-            }
+            gap: .35rem;
         }
     </style>
 @endpush
 
 @section('content')
     @php
-        /** @var \App\Models\SewingReturn $return */
         $lines = $return->lines ?? collect();
+        $hasReject = ((float) ($totalReject ?? 0)) > 0.000001;
 
-        $hasReject = $totalReject > 0;
-
-        // Group per item (WIP-FIN / REJ-SEW summary)
-        $perItem = $lines
-            ->groupBy(function ($line) {
-                return optional(optional($line->sewingPickupLine)->bundle)->finished_item_id;
-            })
-            ->map(function ($group) {
-                $line = $group->first();
-                $bundle = optional($line->sewingPickupLine)->bundle;
-                $item = optional($bundle)->finishedItem;
-
-                return [
-                    'item_id' => $item->id ?? null,
-                    'item_code' => $item->code ?? '-',
-                    'item_name' => $item->name ?? '',
-                    'total_ok' => (float) $group->sum('qty_ok'),
-                    'total_reject' => (float) $group->sum('qty_reject'),
-                ];
-            })
-            ->sortBy('item_code')
-            ->values();
+        $status = $return->status ?? 'draft';
 
         try {
-            $dateLabel = $return->date ? id_day($return->date) : '-';
+            $dateLabel = $return->date
+                ? (function_exists('id_day')
+                    ? id_day($return->date)
+                    : \Illuminate\Support\Carbon::parse($return->date)->format('d/m/Y'))
+                : '-';
         } catch (\Throwable $e) {
             $dateLabel = optional($return->date)->format('d/m/Y') ?? '-';
         }
 
-        // Label tanggal pickup (ambil dari header pickup)
         try {
-            $pickupDateLabel = $return->pickup?->date ? id_day($return->pickup->date) : '-';
+            $pickupDate = $return->pickup?->date
+                ? (function_exists('id_day')
+                    ? id_day($return->pickup->date)
+                    : \Illuminate\Support\Carbon::parse($return->pickup->date)->format('d/m/Y'))
+                : '-';
         } catch (\Throwable $e) {
-            $pickupDateLabel = optional($return->pickup?->date)->format('d/m/Y') ?? '-';
+            $pickupDate = optional($return->pickup?->date)->format('d/m/Y') ?? '-';
         }
+
+        // Per item summary
+        $perItem = $lines
+            ->groupBy(function ($l) {
+                return (int) ($l->item_id ?? (optional(optional($l->sewingPickupLine)->bundle)->finished_item_id ?? 0));
+            })
+            ->map(function ($group) {
+                $first = $group->first();
+                $bundle = optional($first->sewingPickupLine)->bundle;
+                $item = optional($bundle)->finishedItem;
+
+                return [
+                    'code' => $item?->code ?? '-',
+                    'name' => $item?->name ?? '',
+                    'ok' => (float) $group->sum('qty_ok'),
+                    'rj' => (float) $group->sum('qty_reject'),
+                ];
+            })
+            ->sortBy('code')
+            ->values();
     @endphp
 
     <div class="page-wrap">
+
         {{-- HEADER --}}
         <div class="card mb-2">
-            <div class="card-section">
-                <div class="header-row">
-                    <div class="header-main">
-                        <div class="header-icon-circle">
-                            <i class="bi bi-clipboard-check"></i>
-                        </div>
-                        <div class="header-title">
-                            <h1>Sewing Return {{ $return->code }}</h1>
-                            <div class="header-sub">
-                                Setor hasil jahit dari pickup
-                                <span class="mono">{{ $return->pickup?->code ?? '-' }}</span>
-                            </div>
-
-                            <div class="header-meta-row mt-1">
-                                <span class="pill-meta mono">
-                                    {{ $dateLabel }}
-                                </span>
-
-                                @if ($return->warehouse)
-                                    <span class="pill-meta">
-                                        Gudang: <span class="mono">{{ $return->warehouse->code }}</span>
-                                        — {{ $return->warehouse->name }}
-                                    </span>
-                                @endif
-
-                                @if ($return->pickup?->operator)
-                                    <span class="pill-meta">
-                                        Operator ambil:
-                                        <span class="mono">{{ $return->pickup->operator->code }}</span>
-                                        — {{ $return->pickup->operator->name }}
-                                    </span>
-                                @endif
-                            </div>
-                        </div>
+            <div class="card-section d-flex justify-content-between flex-wrap gap-2">
+                <div>
+                    <div class="fw-bold mb-1">
+                        Sewing Return <span class="mono">{{ $return->code }}</span>
                     </div>
 
-                    <div class="header-actions d-flex flex-column align-items-end gap-2">
-                        <div class="d-flex flex-wrap gap-1 justify-content-end">
-                            {{-- Status posted/draft --}}
-                            @php
-                                $status = $return->status ?? 'posted';
-                            @endphp
-                            <span
-                                class="badge-status {{ $status === 'posted' ? 'badge-status-posted' : 'badge-status-draft' }}">
-                                {{ strtoupper($status) }}
-                            </span>
+                    <div class="small text-muted">
+                        Tanggal setor: <span class="mono">{{ $dateLabel }}</span>
+                        @if ($return->warehouse)
+                            • Gudang: <span class="mono">{{ $return->warehouse->code }}</span>
+                        @endif
+                    </div>
 
-                            {{-- Badge ada reject / semua OK --}}
-                            @if ($hasReject)
-                                <span class="badge-status badge-status-reject">
-                                    ADA REJECT
-                                </span>
-                            @else
-                                <span class="badge-soft bg-success-subtle text-success">
-                                    Semua OK
-                                </span>
-                            @endif
-                        </div>
+                    <div class="small text-muted mt-1">
+                        Pickup: <span class="mono">{{ $return->pickup?->code ?? '-' }}</span>
+                        • {{ $pickupDate }}
+                    </div>
 
-                        {{-- Badge flow mutasi --}}
-                        <div class="d-flex flex-wrap gap-1 justify-content-end">
-                            <span class="badge-flow">
-                                <i class="bi bi-arrow-right"></i>
-                                <span class="mono">WIP-SEW</span>
-                                <span class="mx-1">➜</span>
-                                <span class="mono">WIP-FIN</span>
-                                <span class="mx-1">+</span>
-                                <span class="mono">REJ-SEW</span>
-                            </span>
-                        </div>
+                    <div class="small text-muted mt-1">
+                        Operator (pickup):
+                        {{ $return->pickup?->operator?->code ?? '-' }}
+                        — {{ $return->pickup?->operator?->name ?? '-' }}
+                    </div>
+                </div>
 
-                        <div class="d-flex flex-wrap gap-2 justify-content-end mt-1">
-                            <a href="{{ route('production.sewing_returns.index') }}" class="btn btn-sm btn-back">
-                                <i class="bi bi-arrow-left"></i>
-                                <span class="d-none d-sm-inline">Kembali ke daftar</span>
-                                <span class="d-inline d-sm-none">Kembali</span>
+                <div class="d-flex flex-column align-items-end gap-2">
+                    <div class="d-flex gap-1 flex-wrap justify-content-end">
+                        <span class="badge-status {{ $status === 'posted' ? 'badge-posted' : 'badge-draft' }}">
+                            {{ strtoupper($status) }}
+                        </span>
+                        @if ($hasReject)
+                            <span class="badge-status badge-reject">ADA REJECT</span>
+                        @else
+                            <span class="pill pill-ok">SEMUA OK</span>
+                        @endif
+                    </div>
+
+                    <div class="header-actions">
+                        <a href="{{ route('production.sewing_returns.index') }}"
+                            class="btn btn-outline-secondary btn-sm btn-pill">
+                            <i class="bi bi-arrow-left"></i><span>Kembali</span>
+                        </a>
+                        @if ($return->pickup)
+                            <a href="{{ route('production.sewing_pickups.show', $return->pickup) }}"
+                                class="btn btn-outline-primary btn-sm btn-pill">
+                                <i class="bi bi-box-seam"></i><span>Lihat Pickup</span>
                             </a>
-
-                            @if ($return->pickup)
-                                <a href="{{ route('production.sewing_pickups.show', $return->pickup) }}"
-                                    class="btn btn-sm btn-link-pickup">
-                                    <i class="bi bi-box-seam"></i>
-                                    <span>Lihat Pickup</span>
-                                </a>
-                            @endif
-                        </div>
+                        @endif
                     </div>
                 </div>
             </div>
         </div>
 
-        {{-- RINGKASAN ANGKA (PAKAI DATA DARI CONTROLLER) --}}
+        {{-- SUMMARY (dari controller) --}}
         <div class="card mb-2">
             <div class="card-section">
-                <div class="section-title-row mb-2">
-                    <div>
-                        <h2>Ringkasan mutasi WIP</h2>
-                        <div class="section-sub">
-                            Dari gudang <span class="mono">{{ $return->warehouse?->code ?? 'WIP-SEW' }}</span>
-                            (pickup {{ $pickupDateLabel }})
-                            ke WIP-FIN &amp; REJ-SEW.
-                        </div>
-                    </div>
-                    <div class="d-none d-md-block">
-                        <span class="chip-small mono">
-                            {{ $lines->count() }} baris return
-                        </span>
-                    </div>
+                <div class="section-title">Ringkasan Mutasi</div>
+                <div class="section-sub mb-2">
+                    Mutasi dari <span class="mono">{{ $return->warehouse?->code ?? 'WIP-SEW' }}</span> → WIP-FIN /
+                    REJ-SEW
+                    (Remaining sudah termasuk direct pickup).
                 </div>
 
                 <div class="summary-grid">
                     <div>
                         <div class="summary-label">Total ambil (pickup)</div>
-                        <div class="summary-value mono">
-                            {{ number_format($totalPickup, 2, ',', '.') }} pcs
-                        </div>
-                        <div class="summary-sub">
-                            Qty di Sewing Pickup (qty_bundle).
-                        </div>
+                        <div class="summary-value mono">{{ number_format($totalPickup, 2, ',', '.') }}</div>
+                        <div class="section-sub">Qty bundle dari pickup line.</div>
                     </div>
                     <div>
-                        <div class="summary-label">Total setor (OK + Reject)</div>
-                        <div class="summary-value mono">
-                            {{ number_format($totalProcessed, 2, ',', '.') }} pcs
-                        </div>
-                        <div class="summary-sub">
-                            Mutasi keluar dari WIP-SEW.
-                        </div>
+                        <div class="summary-label">Total setor</div>
+                        <div class="summary-value mono">{{ number_format($totalProcessed, 2, ',', '.') }}</div>
+                        <div class="section-sub">OK + Reject yang diinput.</div>
                     </div>
                     <div>
-                        <div class="summary-label">Masuk WIP-FIN (OK)</div>
-                        <div class="summary-value summary-value-ok mono">
-                            {{ number_format($totalOk, 2, ',', '.') }} pcs
-                        </div>
-                        <div class="summary-sub">
-                            {{ number_format($okPercent, 1, ',', '.') }}% dari setoran.
-                        </div>
+                        <div class="summary-label">OK</div>
+                        <div class="summary-value summary-ok mono">{{ number_format($totalOk, 2, ',', '.') }}</div>
+                        <div class="section-sub">{{ number_format($okPercent, 1, ',', '.') }}%</div>
                     </div>
                     <div>
-                        <div class="summary-label">Masuk REJ-SEW (Reject)</div>
-                        <div class="summary-value summary-value-reject mono">
-                            {{ number_format($totalReject, 2, ',', '.') }} pcs
-                        </div>
-                        <div class="summary-sub">
-                            {{ number_format($rejectPercent, 1, ',', '.') }}% dari setoran.
-                        </div>
+                        <div class="summary-label">Reject</div>
+                        <div class="summary-value summary-rj mono">{{ number_format($totalReject, 2, ',', '.') }}</div>
+                        <div class="section-sub">{{ number_format($rejectPercent, 1, ',', '.') }}%</div>
                     </div>
                     <div>
                         <div class="summary-label">Sisa belum setor</div>
-                        <div class="summary-value summary-value-warning mono">
-                            {{ number_format($totalRemaining, 2, ',', '.') }} pcs
+                        <div class="summary-value summary-warn mono">{{ number_format($totalRemaining, 2, ',', '.') }}
                         </div>
-                        <div class="summary-sub">
-                            Berdasarkan saldo di Sewing Pickup Line.
-                        </div>
+                        <div class="section-sub">bundle - returned - direct picked.</div>
                     </div>
                 </div>
             </div>
         </div>
 
-        {{-- PER ITEM: WIP-FIN vs REJ-SEW --}}
+        {{-- PER ITEM --}}
         <div class="card mb-2">
             <div class="card-section">
-                <div class="section-title-row">
-                    <div>
-                        <h2>Ringkasan per item</h2>
-                        <div class="section-sub">
-                            Total masuk WIP-FIN dan REJ-SEW per item jadi.
-                        </div>
-                    </div>
-                </div>
+                <div class="section-title">Ringkasan per Item</div>
+                <div class="section-sub mb-2">Total OK masuk WIP-FIN dan Reject masuk REJ-SEW per item.</div>
 
-                <div class="table-wrap">
-                    <table class="table table-sm align-middle">
-                        <thead>
-                            <tr>
-                                <th style="width:40px" class="text-center">#</th>
-                                <th style="width:140px;">Item</th>
-                                <th>Nama</th>
-                                <th style="width:120px;" class="text-end">WIP-FIN (OK)</th>
-                                <th style="width:120px;" class="text-end">REJ-SEW</th>
-                                <th style="width:120px;" class="text-end">Total</th>
+                <table class="table table-sm align-middle mb-0">
+                    <thead>
+                        <tr>
+                            <th style="width:140px;">Item</th>
+                            <th>Nama</th>
+                            <th class="text-end" style="width:120px;">OK</th>
+                            <th class="text-end" style="width:120px;">Reject</th>
+                            <th class="text-end" style="width:120px;">Total</th>
+                        </tr>
+                    </thead>
+                    <tbody>
+                        @forelse($perItem as $row)
+                            @php $total = (float)$row['ok'] + (float)$row['rj']; @endphp
+                            <tr
+                                class="{{ $row['rj'] > 0 && $row['ok'] == 0 ? 'row-rj' : ($row['ok'] > 0 && $row['rj'] == 0 ? 'row-ok' : '') }}">
+                                <td class="mono fw-bold">{{ $row['code'] }}</td>
+                                <td>{{ $row['name'] }}</td>
+                                <td class="text-end"><span
+                                        class="pill pill-ok mono">{{ number_format($row['ok'], 2, ',', '.') }}</span></td>
+                                <td class="text-end">
+                                    @if ($row['rj'] > 0)
+                                        <span class="pill pill-rj mono">{{ number_format($row['rj'], 2, ',', '.') }}</span>
+                                    @else
+                                        <span class="text-muted mono">0,00</span>
+                                    @endif
+                                </td>
+                                <td class="text-end"><span
+                                        class="pill pill-total mono">{{ number_format($total, 2, ',', '.') }}</span></td>
                             </tr>
-                        </thead>
-                        <tbody>
-                            @forelse ($perItem as $i => $row)
-                                @php
-                                    $totalItem = $row['total_ok'] + $row['total_reject'];
-                                    $rowClass =
-                                        $row['total_reject'] > 0 && $row['total_ok'] == 0
-                                            ? 'row-reject-dominant'
-                                            : ($row['total_ok'] > 0 && $row['total_reject'] == 0
-                                                ? 'row-ok-dominant'
-                                                : '');
-                                @endphp
-                                <tr class="{{ $rowClass }}">
-                                    <td class="text-center text-muted">
-                                        #{{ $i + 1 }}
-                                    </td>
-                                    <td class="mono">
-                                        {{ $row['item_code'] ?? '-' }}
-                                    </td>
-                                    <td>
-                                        <div class="small">
-                                            {{ $row['item_name'] ?: '—' }}
-                                        </div>
-                                    </td>
-                                    <td class="text-end">
-                                        <span class="qty-pill-ok mono">
-                                            {{ number_format($row['total_ok'], 2, ',', '.') }}
-                                        </span>
-                                    </td>
-                                    <td class="text-end">
-                                        @if ($row['total_reject'] > 0)
-                                            <span class="qty-pill-reject mono">
-                                                {{ number_format($row['total_reject'], 2, ',', '.') }}
-                                            </span>
-                                        @else
-                                            <span class="text-muted mono">
-                                                0,00
-                                            </span>
-                                        @endif
-                                    </td>
-                                    <td class="text-end">
-                                        <span class="qty-pill-total mono">
-                                            {{ number_format($totalItem, 2, ',', '.') }}
-                                        </span>
-                                    </td>
-                                </tr>
-                            @empty
-                                <tr>
-                                    <td colspan="6" class="text-center text-muted small py-3">
-                                        Belum ada detail return.
-                                    </td>
-                                </tr>
-                            @endforelse
-                        </tbody>
-                    </table>
-                </div>
+                        @empty
+                            <tr>
+                                <td colspan="5" class="text-center text-muted small py-3">Tidak ada data item.</td>
+                            </tr>
+                        @endforelse
+                    </tbody>
+                </table>
             </div>
         </div>
 
-        {{-- DETAIL PER BARIS RETURN --}}
+        {{-- DETAIL --}}
         <div class="card mb-2">
             <div class="card-section">
-                <div class="section-title-row">
-                    <div>
-                        <h2>Detail baris Sewing Return</h2>
-                        <div class="section-sub">
-                            Per bundle hasil ambil jahit, termasuk pickup, bundle, dan LOT.
-                        </div>
-                    </div>
-                </div>
+                <div class="section-title">Detail Baris</div>
+                <div class="section-sub mb-2">Per bundle yang disetor dari pickup.</div>
 
-                <div class="table-wrap">
-                    <table class="table table-sm align-middle mono">
-                        <thead>
-                            <tr>
-                                <th style="width:36px" class="text-center">#</th>
-                                <th style="width:130px;">Item</th>
-                                <th>Bundle</th>
-                                <th style="width:120px;" class="text-end">OK</th>
-                                <th style="width:120px;" class="text-end">Reject</th>
-                                <th style="width:120px;" class="text-end">Total</th>
-                                <th style="width:200px;">Catatan</th>
+                <table class="table table-sm align-middle mono mb-0">
+                    <thead>
+                        <tr>
+                            <th style="width:40px;">#</th>
+                            <th style="width:150px;">Item</th>
+                            <th>Bundle / LOT</th>
+                            <th class="text-end" style="width:120px;">OK</th>
+                            <th class="text-end" style="width:120px;">Reject</th>
+                            <th class="text-end" style="width:120px;">Total</th>
+                            <th style="width:220px;">Catatan</th>
+                        </tr>
+                    </thead>
+                    <tbody>
+                        @forelse($lines as $i => $line)
+                            @php
+                                $pickupLine = $line->sewingPickupLine;
+                                $bundle = optional($pickupLine)->bundle;
+                                $item = optional($bundle)->finishedItem;
+                                $lot = optional(optional($bundle)->cuttingJob)->lot;
+
+                                $ok = (float) $line->qty_ok;
+                                $rj = (float) $line->qty_reject;
+                                $tot = $ok + $rj;
+                            @endphp
+
+                            <tr class="{{ $rj > 0 && $ok == 0 ? 'row-rj' : ($ok > 0 && $rj == 0 ? 'row-ok' : '') }}">
+                                <td class="text-muted">{{ $i + 1 }}</td>
+                                <td>
+                                    <div class="fw-bold">{{ $item?->code ?? '-' }}</div>
+                                    <div class="small text-muted">{{ $item?->name ?? '' }}</div>
+                                </td>
+                                <td>
+                                    <div class="small">
+                                        {{ $bundle?->bundle_code ?? '-' }}
+                                        @if ($lot)
+                                            • LOT <span class="mono">{{ $lot->code }}</span>
+                                        @endif
+                                    </div>
+                                    <div class="small text-muted mt-1">
+                                        Pickup qty_bundle:
+                                        <span
+                                            class="mono">{{ number_format((float) ($pickupLine->qty_bundle ?? 0), 2, ',', '.') }}</span>
+                                    </div>
+                                </td>
+                                <td class="text-end">{{ number_format($ok, 2, ',', '.') }}</td>
+                                <td class="text-end">{{ number_format($rj, 2, ',', '.') }}</td>
+                                <td class="text-end">{{ number_format($tot, 2, ',', '.') }}</td>
+                                <td>{{ $line->notes ?: '—' }}</td>
                             </tr>
-                        </thead>
-                        <tbody>
-                            @forelse ($lines as $i => $line)
-                                @php
-                                    /** @var \App\Models\SewingReturnLine $line */
-                                    $pickupLine = $line->sewingPickupLine;
-                                    $bundle = optional($pickupLine)->bundle;
-                                    $item = optional($bundle)->finishedItem;
-                                    $cuttingJob = optional($bundle)->cuttingJob;
-                                    $lot = optional($cuttingJob)->lot;
-
-                                    $ok = (float) $line->qty_ok;
-                                    $reject = (float) $line->qty_reject;
-                                    $total = $ok + $reject;
-
-                                    $rowClass =
-                                        $reject > 0 && $ok == 0
-                                            ? 'row-reject-dominant'
-                                            : ($ok > 0 && $reject == 0
-                                                ? 'row-ok-dominant'
-                                                : '');
-                                @endphp
-                                <tr class="{{ $rowClass }}">
-                                    <td class="text-center text-muted">
-                                        #{{ $i + 1 }}
-                                    </td>
-                                    <td>
-                                        <div class="fw-semibold">
-                                            {{ $item?->code ?? '-' }}
-                                        </div>
-                                        <div class="small text-muted">
-                                            {{ $item?->name ?? '' }}
-                                        </div>
-                                    </td>
-                                    <td>
-                                        <div class="small">
-                                            @if ($bundle?->bundle_code)
-                                                <span class="badge-soft bg-light border text-muted">
-                                                    {{ $bundle->bundle_code }}
-                                                </span>
-                                            @endif
-
-                                            @if ($lot)
-                                                <span class="badge-soft bg-light border text-muted ms-1">
-                                                    LOT {{ $lot->code }}
-                                                </span>
-                                            @endif
-                                        </div>
-                                        <div class="small text-muted mt-1">
-                                            Pickup:
-                                            <span class="mono">
-                                                {{ number_format($pickupLine->qty_bundle ?? 0, 2, ',', '.') }} pcs
-                                            </span>
-                                        </div>
-                                    </td>
-                                    <td class="text-end">
-                                        <span class="qty-pill-ok">
-                                            {{ number_format($ok, 2, ',', '.') }}
-                                        </span>
-                                    </td>
-                                    <td class="text-end">
-                                        @if ($reject > 0)
-                                            <span class="qty-pill-reject">
-                                                {{ number_format($reject, 2, ',', '.') }}
-                                            </span>
-                                        @else
-                                            <span class="text-muted">
-                                                0,00
-                                            </span>
-                                        @endif
-                                    </td>
-                                    <td class="text-end">
-                                        <span class="qty-pill-total">
-                                            {{ number_format($total, 2, ',', '.') }}
-                                        </span>
-                                    </td>
-                                    <td>
-                                        @if ($line->notes)
-                                            <div class="small">
-                                                {{ $line->notes }}
-                                            </div>
-                                        @else
-                                            <span class="small text-muted">—</span>
-                                        @endif
-                                    </td>
-                                </tr>
-                            @empty
-                                <tr>
-                                    <td colspan="7" class="text-center text-muted small py-3">
-                                        Tidak ada detail baris return.
-                                    </td>
-                                </tr>
-                            @endforelse
-                        </tbody>
-                    </table>
-                </div>
+                        @empty
+                            <tr>
+                                <td colspan="7" class="text-center text-muted small py-3">Tidak ada detail.</td>
+                            </tr>
+                        @endforelse
+                    </tbody>
+                </table>
 
                 @if ($return->notes)
                     <hr class="my-2">
                     <div class="small">
-                        <span class="text-muted">Catatan header:</span>
-                        <span>{{ $return->notes }}</span>
+                        <span class="text-muted">Catatan header:</span> {{ $return->notes }}
                     </div>
                 @endif
             </div>
         </div>
+
     </div>
 @endsection

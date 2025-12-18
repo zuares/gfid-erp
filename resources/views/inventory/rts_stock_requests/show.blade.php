@@ -159,9 +159,9 @@
         }
 
         /* =========================
-                               TABLE (DESKTOP) + STACK (MOBILE)
-                               Columns: No | Item | Status | Req | Kirim | Terima
-                            ========================== */
+                   TABLE (DESKTOP) + STACK (MOBILE)
+                   Columns: No | Item | Status | Req | Kirim | Terima
+                ========================== */
         .table-wrap {
             overflow: auto;
             -webkit-overflow-scrolling: touch;
@@ -320,9 +320,9 @@
         }
 
         /* =====================================================
-                               RTS DIRECT PICKUP MODAL (DESKTOP CENTER + MOBILE SHEET)
-                               - Namespace-safe: rtsDp*
-                            ====================================================== */
+                   RTS DIRECT PICKUP MODAL (DESKTOP CENTER + MOBILE SHEET)
+                   - Namespace-safe: rtsDp*
+                ====================================================== */
         #rtsDpOverlay {
             position: fixed;
             inset: 0;
@@ -406,6 +406,15 @@
             color: inherit;
         }
 
+        .sel {
+            width: 100%;
+            padding: .55rem .6rem;
+            border-radius: 12px;
+            border: 1px solid rgba(148, 163, 184, .35);
+            background: var(--card);
+            color: inherit;
+        }
+
         .err {
             margin-top: .35rem;
             font-size: .82rem;
@@ -472,6 +481,13 @@
 @endpush
 
 @section('content')
+    @php
+        use App\Models\Employee;
+
+        // Supaya blade bisa jalan tanpa ubah controller show:
+        $dpOperators = Employee::query()->orderBy('code')->get();
+    @endphp
+
     <div class="page-wrap">
 
         {{-- =======================
@@ -559,8 +575,7 @@
         </div>
 
         {{-- =======================
-            ITEMS TABLE (minimal columns) + badges di item
-            Columns: No | Item | Status | Req | Kirim | Terima
+            ITEMS TABLE
         ======================== --}}
         <div class="card" style="margin-top:.85rem">
             <div style="display:flex;justify-content:space-between;align-items:baseline;gap:.6rem;flex-wrap:wrap">
@@ -593,7 +608,6 @@
                                 $outRts = max($req - $recv - $pick, 0);
                                 $inTransit = max($disp - $recv, 0);
 
-                                // status utama (sisa RTS)
                                 if ($outRts <= 0.0000001) {
                                     $lCls = 'chip ok';
                                     $lLbl = 'AMAN';
@@ -605,15 +619,12 @@
                                     $lLbl = 'BUTUH';
                                 }
 
-                                // badges compact (yang tadinya kolom-kolom)
-                                // - Transit: kalau ada barang di jalan
-                                // - Pickup: kalau ada pickup
-                                // - Sisa: angka sisa RTS biar jelas
-                                if ($inTransit > 0.0000001) {
-                                    $bTransitCls = $inTransit >= $req * 0.5 && $req > 0 ? 'mini warn' : 'mini ok';
-                                } else {
-                                    $bTransitCls = 'mini';
-                                }
+                                $bTransitCls =
+                                    $inTransit > 0.0000001
+                                        ? ($inTransit >= $req * 0.5 && $req > 0
+                                            ? 'mini warn'
+                                            : 'mini ok')
+                                        : 'mini';
 
                                 $bPickCls = $pick > 0.0000001 ? 'mini ok' : 'mini';
                             @endphp
@@ -626,11 +637,11 @@
                                     <div class="item-name">{{ $line->item->name }}</div>
 
                                     <div class="item-badges">
-                                        <span class="mini {{ $inTransit > 0.0000001 ? $bTransitCls : 'mini' }}">
+                                        <span class="{{ $bTransitCls }}">
                                             Transit <span class="mono">{{ $inTransit }}</span>
                                         </span>
 
-                                        <span class="mini {{ $pick > 0.0000001 ? $bPickCls : 'mini' }}">
+                                        <span class="{{ $bPickCls }}">
                                             Pickup <span class="mono">{{ $pick }}</span>
                                         </span>
 
@@ -656,7 +667,7 @@
         </div>
 
         {{-- =======================
-            DIRECT PICKUP MODAL
+            DIRECT PICKUP MODAL (SEWING/WIP → RTS | FIFO by operator + tanggal pickup)
         ======================== --}}
         <div id="rtsDpOverlay" aria-hidden="true">
             <div class="rts-dp-panel" role="dialog" aria-modal="true" aria-label="Direct Pickup">
@@ -665,7 +676,11 @@
                 <div class="modal-head">
                     <div>
                         <h3 class="modal-title">Direct Pickup (Penjahit/WIP → RTS)</h3>
-                        <div class="meta">Isi qty yang diambil. Max otomatis = Sisa.</div>
+                        <div class="meta">
+                            Wajib pilih penjahit. Sistem akan ambil stok dari Sewing Pickup tertua (FIFO) berdasarkan
+                            <b>operator + tanggal pickup</b>.
+                            Max input per item = <b>Sisa RTS</b> (Req - Terima - Pickup).
+                        </div>
                     </div>
                     <button type="button" class="btn btn-outline" data-rts-dp-close>Tutup</button>
                 </div>
@@ -673,8 +688,26 @@
                 <div class="line"></div>
 
                 <form method="POST" action="{{ route('rts.stock-requests.direct-pickup', $stockRequest) }}"
-                    id="dpForm">
+                    id="rtsDpForm">
                     @csrf
+
+                    {{-- OPERATOR (WAJIB) --}}
+                    <div style="margin-bottom:.75rem">
+                        <label class="meta" style="display:block;margin-bottom:.25rem">
+                            Penjahit / Operator <b style="color:rgba(239,68,68,1)">*</b>
+                        </label>
+                        <select name="operator_id" class="sel" required>
+                            <option value="">— Pilih Penjahit —</option>
+                            @foreach ($dpOperators as $op)
+                                <option value="{{ $op->id }}" @selected((string) old('operator_id') === (string) $op->id)>
+                                    {{ $op->code }} — {{ $op->name }}
+                                </option>
+                            @endforeach
+                        </select>
+                        @error('operator_id')
+                            <div class="err">{{ $message }}</div>
+                        @enderror
+                    </div>
 
                     <table class="dp-table">
                         <thead>
@@ -712,10 +745,10 @@
                                     </td>
 
                                     <td>
-                                        <input class="num js-pick" type="number" step="0.01" min="0"
+                                        <input class="num js-rts-pick" type="number" step="0.01" min="0"
                                             max="{{ $maxPick }}" name="lines[{{ $line->id }}][qty_picked]"
                                             value="{{ $old }}" data-max="{{ $maxPick }}"
-                                            {{ $maxPick <= 0.0000001 ? 'disabled' : '' }}>
+                                            inputmode="decimal" {{ $maxPick <= 0.0000001 ? 'disabled' : '' }}>
                                         @error("lines.{$line->id}.qty_picked")
                                             <div class="err">{{ $message }}</div>
                                         @enderror
@@ -732,9 +765,8 @@
                     </div>
 
                     <div style="display:flex;gap:.6rem;justify-content:flex-end;flex-wrap:wrap;margin-top:1rem">
-                        <button type="button" class="btn btn-outline" id="btnDpClear">Kosongkan</button>
-                        <button type="submit" class="btn btn-primary"
-                            onclick="return confirm('Proses direct pickup sekarang?')">
+                        <button type="button" class="btn btn-outline" id="rtsDpClear">Kosongkan</button>
+                        <button type="submit" class="btn btn-primary" id="rtsDpSubmit">
                             Simpan
                         </button>
                     </div>
@@ -747,17 +779,28 @@
     <script>
         (function() {
             const overlay = document.getElementById('rtsDpOverlay');
-            if (!overlay) return;
+            const form = document.getElementById('rtsDpForm');
+            const btnSubmit = document.getElementById('rtsDpSubmit');
+            const btnClear = document.getElementById('rtsDpClear');
+            if (!overlay || !form) return;
 
-            const getInputs = () => Array.from(document.querySelectorAll('.js-pick'));
+            const getInputs = () => Array.from(overlay.querySelectorAll('.js-rts-pick'));
+            const getOperator = () => overlay.querySelector('select[name="operator_id"]');
 
             function clamp(el) {
-                if (el.disabled) return;
-                const max = parseFloat(el.dataset.max || el.max || '0') || 0;
-                let v = parseFloat(el.value || '0');
-                if (Number.isNaN(v) || v < 0) v = 0;
-                if (v > max) v = max;
-                el.value = (Math.round(v * 100) / 100).toFixed(2).replace(/\.00$/, '');
+                if (!el || el.disabled) return;
+                const max = parseFloat(el.dataset.max || el.getAttribute('max') || '0') || 0;
+
+                let v = (el.value ?? '').toString().trim();
+                if (v === '') v = '0';
+                v = v.replace(',', '.');
+                let n = parseFloat(v);
+                if (Number.isNaN(n) || n < 0) n = 0;
+                if (n > max) n = max;
+
+                n = Math.round(n * 100) / 100;
+                const s = (n % 1 === 0) ? String(n.toFixed(0)) : String(n);
+                el.value = s;
             }
 
             function openDp() {
@@ -765,10 +808,10 @@
                 overlay.setAttribute('aria-hidden', 'false');
                 document.body.style.overflow = 'hidden';
 
-                const list = getInputs();
-                const first = list.find(i => !i.disabled && ((parseFloat(i.dataset.max || '0') || 0) > 0)) ||
-                    list.find(i => !i.disabled) || list[0];
-                first?.focus();
+                const op = getOperator();
+                setTimeout(() => {
+                    if (op) op.focus();
+                }, 40);
             }
 
             function closeDp() {
@@ -778,37 +821,79 @@
             }
 
             document.addEventListener('click', function(e) {
-                if (e.target.closest('[data-rts-dp-open]')) return openDp();
-                if (e.target.closest('[data-rts-dp-close]')) return closeDp();
-
-                if (e.target === overlay && overlay.classList.contains('is-open')) return closeDp();
-
-                if (e.target && e.target.id === 'btnDpClear') {
-                    getInputs().forEach(i => {
-                        if (!i.disabled) {
-                            i.value = 0;
-                            clamp(i);
-                        }
-                    });
-                    return;
+                if (e.target.closest('[data-rts-dp-open]')) {
+                    e.preventDefault();
+                    return openDp();
+                }
+                if (e.target.closest('[data-rts-dp-close]')) {
+                    e.preventDefault();
+                    return closeDp();
+                }
+                if (e.target === overlay && overlay.classList.contains('is-open')) {
+                    return closeDp();
                 }
             });
 
             document.addEventListener('keydown', function(e) {
-                if (e.key === 'Escape') closeDp();
+                if (e.key === 'Escape' && overlay.classList.contains('is-open')) closeDp();
             });
 
-            document.addEventListener('change', function(e) {
+            overlay.addEventListener('input', function(e) {
                 const el = e.target;
-                if (el?.classList?.contains('js-pick')) clamp(el);
+                if (el?.classList?.contains('js-rts-pick')) clamp(el);
             });
 
-            document.addEventListener('blur', function(e) {
+            overlay.addEventListener('change', function(e) {
                 const el = e.target;
-                if (el?.classList?.contains('js-pick')) clamp(el);
+                if (el?.classList?.contains('js-rts-pick')) clamp(el);
+            });
+
+            overlay.addEventListener('blur', function(e) {
+                const el = e.target;
+                if (el?.classList?.contains('js-rts-pick')) clamp(el);
             }, true);
 
-            @if ($errors->has('lines.*.qty_picked'))
+            btnClear?.addEventListener('click', function() {
+                getInputs().forEach(i => {
+                    if (!i.disabled) {
+                        i.value = 0;
+                        clamp(i);
+                    }
+                });
+                const op = getOperator();
+                op?.focus();
+            });
+
+            form.addEventListener('submit', function(e) {
+                // operator required (extra guard)
+                const op = getOperator();
+                if (op && !op.value) {
+                    e.preventDefault();
+                    alert('Pilih penjahit/operator terlebih dahulu.');
+                    op.focus();
+                    return false;
+                }
+
+                let any = false;
+                getInputs().forEach(i => {
+                    clamp(i);
+                    if (!i.disabled && (parseFloat(i.value || '0') || 0) > 0) any = true;
+                });
+
+                if (!any) {
+                    e.preventDefault();
+                    alert('Isi minimal 1 item (qty > 0).');
+                    return false;
+                }
+
+                if (btnSubmit) {
+                    btnSubmit.disabled = true;
+                    btnSubmit.innerText = 'Memproses...';
+                }
+            });
+
+            // Auto-open if validation errors related to modal
+            @if ($errors->has('operator_id') || $errors->has('lines.*.qty_picked') || $errors->has('lines'))
                 openDp();
             @endif
         })();

@@ -17,6 +17,7 @@ class SewingReturn extends Model
         'status',
         'notes',
         'pickup_id',
+        'qty_direct_picked',
     ];
 
     protected $casts = [
@@ -42,4 +43,10 @@ class SewingReturn extends Model
     {
         return $this->belongsTo(SewingPickup::class, 'pickup_id');
     }
+
+    public function directPickupLines()
+    {
+        return $this->hasMany(\App\Models\DirectPickupLine::class, 'sewing_return_id');
+    }
+
 }

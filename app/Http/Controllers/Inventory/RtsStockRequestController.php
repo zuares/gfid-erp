@@ -3,7 +3,9 @@
 namespace App\Http\Controllers\Inventory;
 
 use App\Http\Controllers\Controller;
+use App\Models\CuttingJobBundle;
 use App\Models\Item;
+use App\Models\SewingPickupLine;
 use App\Models\StockRequest;
 use App\Models\StockRequestLine;
 use App\Models\Warehouse;
@@ -499,87 +501,138 @@ class RtsStockRequestController extends Controller
         abort_if($stockRequest->status === 'completed', 404);
 
         $validated = $request->validate([
+            'operator_id' => ['required', 'integer', 'exists:employees,id'], // ✅ operator penjahit sumber
             'lines' => ['required', 'array'],
             'lines.*.qty_picked' => ['nullable', 'numeric', 'gte:0'],
             'notes' => ['nullable', 'string'],
         ]);
 
-        // ✅ sumber pickup dari penjahit/WIP (bukan PRD)
-        $sewing = Warehouse::whereIn('code', [
-            'WIP-SEW',
-            'WH-SEWING',
-            'WH-SEW',
-        ])->first();
+        // ✅ gudang sumber = WIP-SEW / WH-SEWING / WH-SEW
+        $sewingWh = Warehouse::query()
+            ->whereIn('code', ['WIP-SEW', 'WH-SEWING', 'WH-SEW'])
+            ->first();
 
-        if (!$sewing) {
+        if (!$sewingWh) {
             throw ValidationException::withMessages([
-                'warehouse' => 'Gudang sewing/WIP (WIP-SEW / WH-SEWING) belum diset.',
+                'warehouse' => 'Gudang sewing/WIP (WIP-SEW / WH-SEWING / WH-SEW) belum diset.',
             ]);
         }
 
-        $rts = Warehouse::where('code', 'WH-RTS')->firstOrFail();
+        $rtsWh = Warehouse::query()->where('code', 'WH-RTS')->firstOrFail();
+
+        $opId = (int) $validated['operator_id'];
 
         $any = false;
 
-        DB::transaction(function () use (&$any, $validated, $stockRequest, $sewing, $rts) {
+        DB::transaction(function () use (&$any, $validated, $stockRequest, $sewingWh, $rtsWh, $opId) {
+
             $stockRequest->load('lines');
 
+            // Append notes (optional)
             if (!empty($validated['notes'])) {
-                $append = trim($validated['notes']);
+                $append = trim((string) $validated['notes']);
                 $stockRequest->notes = trim(($stockRequest->notes ?? '') . "\n" . $append);
             }
 
-            foreach ($stockRequest->lines as $line) {
-                $input = $validated['lines'][$line->id] ?? null;
+            // =============================
+            // 0) Parse input -> wanted per SR line + wanted per item
+            // =============================
+            $wantedBySrLineId = []; // srLineId => qty
+            $wantedByItem = []; // itemId => total qty (untuk inventory move + FIFO allocation)
+
+            foreach ($stockRequest->lines as $srLine) {
+                $input = $validated['lines'][$srLine->id] ?? null;
                 $qty = $input && isset($input['qty_picked']) ? (float) $input['qty_picked'] : 0.0;
 
-                if ($qty <= 0) {
+                if ($qty <= 0.000001) {
                     continue;
                 }
 
-                // Guard: tidak boleh pickup melebihi sisa request (request - received - picked)
-                $already = (float) $line->qty_received + (float) $line->qty_picked;
-                $max = max((float) $line->qty_request - $already, 0);
+                // Guard: tidak boleh > sisa request (req - received - picked)
+                $already = (float) $srLine->qty_received + (float) $srLine->qty_picked;
+                $max = max((float) $srLine->qty_request - $already, 0);
 
-                if ($qty > $max + 0.0000001) {
+                if ($qty > $max + 0.000001) {
                     throw ValidationException::withMessages([
-                        "lines.{$line->id}.qty_picked" => "Qty melebihi sisa request (maks: {$max}).",
+                        "lines.{$srLine->id}.qty_picked" => "Qty melebihi sisa request (maks: {$max}).",
                     ]);
                 }
 
-                $any = true;
+                $wantedBySrLineId[$srLine->id] = $qty;
 
+                $itemId = (int) $srLine->item_id;
+                $wantedByItem[$itemId] = ($wantedByItem[$itemId] ?? 0) + $qty;
+            }
+
+            if (empty($wantedByItem)) {
+                return; // nanti di luar transaction -> warning
+            }
+
+            // =============================
+            // 1) Lock FIFO pickup lines (operator + item)
+            // =============================
+            $itemIds = array_keys($wantedByItem);
+            $fifoGrouped = $this->loadLockedFifoPickupLinesByOperator($opId, $itemIds);
+
+            // =============================
+            // 2) Clamp: FIFO availability harus cukup
+            // =============================
+            $this->assertFifoAvailability($fifoGrouped, $wantedByItem, $opId);
+
+            // =============================
+            // 3) Mutasi inventory + update SR lines + allocate FIFO (qty_direct_picked)
+            // =============================
+            foreach ($wantedByItem as $itemId => $needQty) {
+
+                // 3a) Inventory move sekali per item
                 try {
                     $this->inventory->move(
-                        itemId: (int) $line->item_id,
-                        fromWarehouseId: (int) $sewing->id,
-                        toWarehouseId: (int) $rts->id,
-                        qty: $qty,
+                        itemId: (int) $itemId,
+                        fromWarehouseId: (int) $sewingWh->id,
+                        toWarehouseId: (int) $rtsWh->id,
+                        qty: (float) $needQty,
                         referenceType: 'stock_request',
                         referenceId: $stockRequest->id,
-                        notes: 'RTS direct pickup (SEWING/WIP → RTS)',
+                        notes: 'RTS direct pickup (SEWING/WIP → RTS) — FIFO by pickup date + operator',
                         date: $stockRequest->date ?? now(),
-                        allowNegative: false// ✅ sewing/WIP sebaiknya real (tidak minus)
+                        allowNegative: false
                     );
                 } catch (\RuntimeException $e) {
                     throw ValidationException::withMessages(['stock' => $e->getMessage()]);
                 }
 
-                $line->qty_picked = (float) $line->qty_picked + $qty;
-                $line->save();
+                // 3b) Update qty_picked pada StockRequestLine sesuai input UI (per-line SR)
+                foreach ($stockRequest->lines->where('item_id', $itemId) as $srLine) {
+                    $qtyLine = (float) ($wantedBySrLineId[$srLine->id] ?? 0);
+                    if ($qtyLine <= 0.000001) {
+                        continue;
+                    }
+
+                    $srLine->qty_picked = (float) $srLine->qty_picked + $qtyLine;
+                    $srLine->save();
+
+                    $any = true;
+                }
+
+                // 3c) FIFO allocation: update qty_direct_picked di SewingPickupLine (ngunci sumber)
+                $fifoLines = $fifoGrouped->get($itemId, collect());
+                $this->allocateFifoDirectPicked($fifoLines, (float) $needQty);
             }
 
             if (!$any) {
                 return;
             }
 
-            $stockRequest->load('lines');
+            // =============================
+            // 4) Update status StockRequest
+            // =============================
+            $stockRequest->refresh()->load('lines');
 
             $anyOutstanding = $stockRequest->lines->contains(function ($l) {
                 $req = (float) $l->qty_request;
                 $rec = (float) $l->qty_received;
                 $pick = (float) $l->qty_picked;
-                return max($req - $rec - $pick, 0) > 0;
+                return max($req - $rec - $pick, 0) > 0.000001;
             });
 
             $stockRequest->status = $anyOutstanding ? 'partial' : 'completed';
@@ -598,7 +651,7 @@ class RtsStockRequestController extends Controller
 
         return redirect()
             ->route('rts.stock-requests.show', $stockRequest)
-            ->with('status', 'Direct pickup berhasil (SEWING/WIP → RTS).');
+            ->with('status', 'Direct pickup berhasil (SEWING/WIP → RTS) + terkunci FIFO per Sewing Pickup Line (operator+tanggal).');
     }
 
     public function quickToday(): RedirectResponse
@@ -653,4 +706,108 @@ class RtsStockRequestController extends Controller
 
         return sprintf('%s-%03d', $prefix, $next);
     }
+
+    /**
+     * Ambil & lock FIFO pickup lines untuk operator + itemIds.
+     * FIFO = sewing_pickups.date, sewing_pickups.id, sewing_pickup_lines.id
+     */
+    private function loadLockedFifoPickupLinesByOperator(
+        int $operatorId,
+        array $itemIds
+    ): \Illuminate\Support\Collection {
+        return SewingPickupLine::query()
+            ->join('sewing_pickups', 'sewing_pickups.id', '=', 'sewing_pickup_lines.sewing_pickup_id')
+            ->where('sewing_pickups.operator_id', $operatorId)
+            ->whereIn('sewing_pickup_lines.finished_item_id', $itemIds)
+            ->whereRaw('(sewing_pickup_lines.qty_bundle - (sewing_pickup_lines.qty_returned_ok + sewing_pickup_lines.qty_returned_reject + sewing_pickup_lines.qty_direct_picked)) > 0.000001')
+            ->orderBy('sewing_pickups.date')
+            ->orderBy('sewing_pickups.id')
+            ->orderBy('sewing_pickup_lines.id')
+            ->lockForUpdate()
+            ->get([
+                'sewing_pickup_lines.*',
+                'sewing_pickups.date as pickup_date',
+                'sewing_pickups.id as pickup_id_join',
+                'sewing_pickups.operator_id as pickup_operator_id',
+            ])
+            ->groupBy('finished_item_id');
+    }
+
+/** Hitung sisa pickup line (remaining = bundle - returned_ok - returned_reject - direct_picked) */
+    private function calcPickupLineRemaining(SewingPickupLine $pl): float
+    {
+        $qtyBundle = (float) ($pl->qty_bundle ?? 0);
+        $retOk = (float) ($pl->qty_returned_ok ?? 0);
+        $retRj = (float) ($pl->qty_returned_reject ?? 0);
+        $dp = (float) ($pl->qty_direct_picked ?? 0);
+
+        return max($qtyBundle - ($retOk + $retRj + $dp), 0);
+    }
+
+/**
+ * Clamp: pastikan ketersediaan FIFO cukup untuk wantedByItem.
+ * $fifoGrouped = hasil loadLockedFifoPickupLinesByOperator()->groupBy(item_id)
+ */
+    private function assertFifoAvailability(
+        \Illuminate\Support\Collection $fifoGrouped,
+        array $wantedByItem,
+        int $operatorId
+    ): void {
+        foreach ($wantedByItem as $itemId => $need) {
+            $lines = $fifoGrouped->get($itemId, collect());
+
+            $avail = (float) $lines->sum(fn($pl) => $this->calcPickupLineRemaining($pl));
+
+            if ((float) $need > $avail + 0.000001) {
+                throw ValidationException::withMessages([
+                    'lines' => "Sisa Sewing Pickup (operator #{$operatorId}) tidak cukup untuk item #{$itemId}. Butuh {$need}, tersedia {$avail}.",
+                ]);
+            }
+        }
+    }
+
+/**
+ * Alokasi FIFO: update qty_direct_picked pada pickup lines, dan (opsional) update bundle sewing_picked_qty.
+ * Dipanggil di dalam DB::transaction + sudah lock FIFO lines (lockForUpdate).
+ */
+    private function allocateFifoDirectPicked(
+        \Illuminate\Support\Collection $fifoLinesForItem,
+        float $needQty
+    ): void {
+        $remaining = (float) $needQty;
+
+        foreach ($fifoLinesForItem as $pl) {
+            if ($remaining <= 0.000001) {
+                break;
+            }
+
+            $avail = $this->calcPickupLineRemaining($pl);
+            if ($avail <= 0.000001) {
+                continue;
+            }
+
+            $take = min($avail, $remaining);
+
+            $pl->qty_direct_picked = (float) ($pl->qty_direct_picked ?? 0) + $take;
+            $pl->save();
+
+            if (!empty($pl->cutting_job_bundle_id)) {
+                CuttingJobBundle::query()
+                    ->where('id', (int) $pl->cutting_job_bundle_id)
+                    ->lockForUpdate()
+                    ->update([
+                        'sewing_picked_qty' => DB::raw('COALESCE(sewing_picked_qty,0) + ' . (float) $take),
+                    ]);
+            }
+
+            $remaining -= $take;
+        }
+
+        if ($remaining > 0.000001) {
+            throw ValidationException::withMessages([
+                'lines' => "Alokasi FIFO pickup line gagal. Kurang {$remaining}.",
+            ]);
+        }
+    }
+
 }

@@ -277,4 +277,5 @@ class CuttingJobBundle extends Model
 
         return $query->where('wip_qty', '>', 0.0001);
     }
+
 }
