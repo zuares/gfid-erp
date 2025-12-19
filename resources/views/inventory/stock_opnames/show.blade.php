@@ -10,6 +10,7 @@
     $userRole = auth()->user()->role ?? null;
     $isOperating = $userRole === 'operating';
     $isAdmin = $userRole === 'admin';
+    $isOwner = $userRole === 'owner';
     $isOpOrAdmin = $isOperating || $isAdmin;
 
     $isOpening = method_exists($opname, 'isOpening')
@@ -29,30 +30,38 @@
             ->first();
 
     // ===== Ringkasan qty & nilai selisih
-    $totalPlusQty = 0;
-    $totalMinusQty = 0; // negatif
-    $totalPlusValue = 0;
-    $totalMinusValue = 0; // negatif
+    $totalPlusQty = 0.0;
+    $totalMinusQty = 0.0; // disimpan negatif
+    $totalPlusValue = 0.0; // disimpan positif
+    $totalMinusValue = 0.0; // disimpan negatif
 
     foreach ($opname->lines as $line) {
-        $diff = (float) $line->difference; // accessor
-        $unitCost = (float) $line->effective_unit_cost; // accessor
-        $diffValue = (float) $line->difference_value; // accessor
+        $diff = (float) $line->difference; // accessor (physical - system)
+        $unitCost = (float) $line->effective_unit_cost; // accessor (HPP efektif: SO / snapshot / HPP master)
+
+        // Hitung nilai selisih berbasis HPP efektif
+        $diffValue = 0.0;
+        if (abs($diff) >= 0.0000001 && $unitCost > 0) {
+            // diff > 0 → plus (masuk), diff < 0 → minus (keluar)
+            $diffValue = $diff * $unitCost;
+        }
 
         if (abs($diff) < 0.0000001) {
             continue;
         }
 
         if ($diff > 0) {
+            // Qty lebih → positif
             $totalPlusQty += $diff;
-            if ($unitCost > 0 && $diffValue !== 0.0) {
-                $totalPlusValue += $diffValue;
-            }
+
+            // Nilai lebih → simpan sebagai POSITIF
+            $totalPlusValue += abs($diffValue);
         } else {
-            $totalMinusQty += $diff; // negatif
-            if ($unitCost > 0 && $diffValue !== 0.0) {
-                $totalMinusValue += $diffValue; // negatif
-            }
+            // Qty kurang → simpan negatif
+            $totalMinusQty += $diff;
+
+            // Nilai kurang → simpan NEGATIF
+            $totalMinusValue += $diffValue <= 0 ? $diffValue : -abs($diffValue);
         }
     }
 
@@ -70,11 +79,30 @@
     $typeLabel = $isOpening ? 'Opening' : 'Periodic';
     $typeClass = $isOpening ? 'badge-type badge-type--opening' : 'badge-type badge-type--periodic';
 
+    // Boleh edit (lanjut counting) selama masih draft/counting
     $canEdit = in_array($opname->status, [StockOpname::STATUS_DRAFT, StockOpname::STATUS_COUNTING], true);
-    $canFinalize = $opname->status === StockOpname::STATUS_REVIEWED;
+
+    // Finalize hanya kalau REVIEWED dan role Owner
+    $canFinalize = $opname->status === StockOpname::STATUS_REVIEWED && $isOwner;
 
     // ✅ Role rule: admin/operating tidak boleh lihat / buka adjustment
     $canSeeAdjustmentLink = !$isOpOrAdmin;
+
+    // ✅ Siapa yang boleh tandai selesai hitung (hanya operating/admin, bukan owner) & belum ada adjustment
+    $canMarkReviewed =
+        in_array($opname->status, [StockOpname::STATUS_DRAFT, StockOpname::STATUS_COUNTING], true) &&
+        in_array($userRole, ['operating', 'admin'], true) &&
+        !$adjustment;
+
+    // Badge "Counting selesai oleh ..."
+    $hasReviewedInfo = $opname->status === StockOpname::STATUS_REVIEWED && $opname->reviewed_by && $opname->reviewed_at;
+
+    // ===== Net total selisih (Qty & Nilai)
+    $netQty = $totalPlusQty + $totalMinusQty;
+    $netValue = $totalPlusValue + $totalMinusValue;
+
+    $netQtyClass = $netQty < 0 ? 'diff-danger' : ($netQty > 0 ? 'diff-warning' : 'diff-success');
+    $netValueClass = $netValue < 0 ? 'diff-danger' : ($netValue > 0 ? 'diff-warning' : 'diff-success');
 @endphp
 
 @push('head')
@@ -194,6 +222,27 @@
             color: #c2410c;
         }
 
+        .badge-review {
+            font-size: .68rem;
+            padding: .16rem .55rem;
+            border-radius: 999px;
+            font-weight: 600;
+            display: inline-flex;
+            align-items: center;
+            gap: .35rem;
+            margin-top: .25rem;
+            border: 1px solid rgba(234, 179, 8, .45);
+            background: rgba(251, 191, 36, .12);
+            color: #854d0e;
+        }
+
+        .badge-review-dot {
+            width: 8px;
+            height: 8px;
+            border-radius: 999px;
+            background: currentColor;
+        }
+
         .meta {
             font-size: .82rem;
             color: rgba(100, 116, 139, 1);
@@ -254,6 +303,34 @@
         .diff-minus {
             color: #dc2626;
             font-weight: 800;
+        }
+
+        /* tone untuk net total & detail */
+        .diff-danger {
+            color: #b91c1c;
+            font-weight: 800;
+        }
+
+        .diff-success {
+            color: #15803d;
+            font-weight: 800;
+        }
+
+        .diff-warning {
+            color: #854d0e;
+            font-weight: 800;
+        }
+
+        body[data-theme="dark"] .diff-danger {
+            color: rgba(254, 202, 202, .98);
+        }
+
+        body[data-theme="dark"] .diff-success {
+            color: rgba(134, 239, 172, .98);
+        }
+
+        body[data-theme="dark"] .diff-warning {
+            color: rgba(253, 230, 138, .98);
         }
 
         .table-wrap {
@@ -522,18 +599,48 @@
                 <div class="subtle">
                     {{ $opname->warehouse?->code ?? '-' }} — {{ $opname->warehouse?->name ?? '-' }}
                 </div>
+
+                {{-- Badge kecil: Counting selesai oleh ... --}}
+                @if ($hasReviewedInfo)
+                    <div class="badge-review mt-2">
+                        <span class="badge-review-dot"></span>
+                        Counting selesai oleh
+                        <span class="fw-semibold">{{ $opname->reviewer?->name ?? '-' }}</span>
+                        <span class="text-mono" style="font-size:.72rem;">
+                            {{ $opname->reviewed_at?->format('d M Y H:i') ?? '-' }}
+                        </span>
+                    </div>
+                @endif
             </div>
 
             <div class="text-end">
-                @if ($canEdit)
-                    <a href="{{ route('inventory.stock_opnames.edit', $opname) }}"
-                        class="btn btn-sm btn-outline-primary mb-1">
-                        Lanjut Counting
-                    </a>
+                {{-- ✅ SEBELUM DI-ADJUST: Lanjut Counting + Simpan & Selesai Hitung (inline untuk non-owner) --}}
+                @if (!$adjustment && $canEdit)
+                    <div class="d-flex flex-wrap justify-content-end gap-2 mb-1">
+                        <a href="{{ route('inventory.stock_opnames.edit', $opname) }}"
+                            class="btn btn-sm btn-outline-primary">
+                            Lanjut Counting
+                        </a>
+
+                        @if ($canMarkReviewed)
+                            <form action="{{ route('inventory.stock_opnames.update', $opname) }}" method="POST"
+                                onsubmit="return confirm('Tandai sesi ini sebagai selesai hitung? Pastikan semua item sudah di-count.');"
+                                class="d-inline">
+                                @csrf
+                                @method('PUT')
+                                <input type="hidden" name="mark_reviewed" value="1">
+
+                                <button type="submit" class="btn btn-sm btn-primary">
+                                    Simpan &amp; Selesai Hitung
+                                </button>
+                            </form>
+                        @endif
+                    </div>
                 @endif
 
+                {{-- Setelah Reviewed: tombol Finalize / Buka Adjustment --}}
                 @if ($canFinalize)
-                    <form action="{{ route('inventory.stock_opnames.finalize', $opname) }}" method="POST"
+                    <form action="{{ route('inventory.stock_opnames.finalize', $opname) }}" method="POST" class="mt-2"
                         onsubmit="return confirm('Yakin finalize stock opname ini? Stok gudang akan dikoreksi sesuai hasil fisik.');">
                         @csrf
                         <input type="hidden" name="reason" value="Stock Opname {{ $opname->code }}">
@@ -541,17 +648,24 @@
                             {{ $isOpening ? 'Finalize Opening' : 'Finalize & Buat Adjustment' }}
                         </button>
                     </form>
-                @elseif($opname->status === StockOpname::STATUS_FINALIZED)
+                @elseif ($opname->status === StockOpname::STATUS_FINALIZED)
                     {{-- ✅ tombol Buka Adjustment hanya untuk role non admin/operating --}}
                     @if ($adjustment && $canSeeAdjustmentLink)
                         <a href="{{ route('inventory.adjustments.show', $adjustment) }}"
-                            class="btn btn-sm btn-outline-secondary">
+                            class="btn btn-sm btn-outline-secondary mt-2">
                             Buka Adjustment →
                         </a>
                     @endif
                 @endif
             </div>
         </div>
+
+        {{-- Error mark_reviewed kalau masih ada yang belum di-count --}}
+        @if ($errors->has('mark_reviewed'))
+            <div class="alert alert-warning py-2 px-3 mb-3" style="font-size:.82rem;">
+                {{ $errors->first('mark_reviewed') }}
+            </div>
+        @endif
 
         {{-- INFO CARD --}}
         <div class="card card-main mb-3">
@@ -611,9 +725,12 @@
                                     <span class="fw-semibold">{{ $countedLines }}</span> / {{ $totalLines }} item sudah
                                     diinput.
                                     @if ($opname->status === StockOpname::STATUS_COUNTING)
-                                        <div class="meta mt-1">Isi qty fisik lalu tandai reviewed.</div>
+                                        <div class="meta mt-1">Isi qty fisik lalu gunakan "Simpan &amp; Selesai Hitung".
+                                        </div>
                                     @elseif($opname->status === StockOpname::STATUS_REVIEWED)
-                                        <div class="meta mt-1">Data siap difinalisasi.</div>
+                                        <div class="meta mt-1">Counting selesai, menunggu Finalize dari Owner.</div>
+                                    @elseif($opname->status === StockOpname::STATUS_FINALIZED)
+                                        <div class="meta mt-1">Sesi sudah difinalkan & stok terkoreksi.</div>
                                     @endif
                                 </div>
                             </div>
@@ -628,11 +745,15 @@
                         <div style="font-size:.95rem;">
                             <div>
                                 Lebih:
-                                <span class="text-mono diff-plus">+{{ number_format($totalPlusQty, 2) }}</span>
+                                <span class="text-mono diff-plus">
+                                    +{{ number_format($totalPlusQty, 2) }}
+                                </span>
                             </div>
                             <div>
                                 Kurang:
-                                <span class="text-mono diff-minus">{{ number_format($totalMinusQty, 2) }}</span>
+                                <span class="text-mono diff-minus">
+                                    {{ number_format($totalMinusQty, 2) }}
+                                </span>
                             </div>
                         </div>
                     </div>
@@ -642,8 +763,9 @@
                         <div style="font-size:.95rem;">
                             <div>
                                 Lebih:
-                                <span class="text-mono diff-plus">+Rp
-                                    {{ number_format($totalPlusValue, 0, ',', '.') }}</span>
+                                <span class="text-mono diff-plus">
+                                    +Rp {{ number_format($totalPlusValue, 0, ',', '.') }}
+                                </span>
                             </div>
                             <div>
                                 Kurang:
@@ -655,12 +777,30 @@
                         </div>
                     </div>
 
+                    {{-- ✅ CARD KETIGA: TOTAL SELISIH (NET QTY + NET NILAI) --}}
                     <div class="sum-card">
-                        <div class="sum-label">Progress</div>
+                        <div class="sum-label">Total Selisih</div>
                         <div style="font-size:.95rem;">
-                            <span class="fw-semibold">{{ $countedLines }}</span> / {{ $totalLines }} item
-                            <div class="meta mt-1">
-                                {{ $opname->status === StockOpname::STATUS_FINALIZED ? 'Sesi sudah difinalkan.' : 'Cek detail per item di bawah.' }}
+                            <div>
+                                Qty:
+                                <span class="text-mono {{ $netQtyClass }}">
+                                    @if (abs($netQty) < 0.0000001)
+                                        0.00
+                                    @else
+                                        {{ $netQty > 0 ? '+' : '' }}{{ number_format($netQty, 2) }}
+                                    @endif
+                                </span>
+                            </div>
+                            <div>
+                                Nilai:
+                                <span class="text-mono {{ $netValueClass }}">
+                                    @if (abs($netValue) < 0.0000001)
+                                        Rp 0
+                                    @else
+                                        {{ $netValue > 0 ? '+Rp' : '-Rp' }}
+                                        {{ number_format(abs($netValue), 0, ',', '.') }}
+                                    @endif
+                                </span>
                             </div>
                         </div>
                     </div>
@@ -679,7 +819,9 @@
                     <div class="cell">
                         <div class="label">Nilai (Rp)</div>
                         <div class="value">
-                            <span class="diff-plus">+Rp {{ number_format($totalPlusValue, 0, ',', '.') }}</span>
+                            <span class="diff-plus">
+                                +Rp {{ number_format($totalPlusValue, 0, ',', '.') }}
+                            </span>
                             <span style="opacity:.55; padding:0 .35rem;">|</span>
                             <span class="diff-minus">
                                 Rp
@@ -700,7 +842,7 @@
                     <span class="chip">{{ $countedLines }} / {{ $totalLines }} dihitung</span>
                 </div>
 
-                {{-- DESKTOP TABLE (TETAP SAMA, TIDAK DIUBAH) --}}
+                {{-- DESKTOP TABLE --}}
                 <div class="table-wrap">
                     <table class="table table-sm mb-0 align-middle">
                         <thead>
@@ -722,8 +864,14 @@
                                     $system = (float) ($line->system_qty ?? 0);
                                     $physical = (float) ($line->physical_qty ?? 0);
                                     $diff = (float) $line->difference;
+                                    $unitCost = (float) $line->effective_unit_cost;
 
-                                    $diffClass = $diff > 0 ? 'diff-plus' : ($diff < 0 ? 'diff-minus' : '');
+                                    // nilai selisih per baris
+                                    $diffValue = 0.0;
+                                    if (abs($diff) >= 0.0000001 && $unitCost > 0) {
+                                        $diffValue = $diff * $unitCost;
+                                    }
+
                                     $diffText = $diff > 0 ? '+' . number_format($diff, 2) : number_format($diff, 2);
 
                                     $counted = !is_null($line->physical_qty) || ($line->is_counted ?? false);
@@ -731,11 +879,20 @@
                                         ? 'badge-counted badge-counted--yes'
                                         : 'badge-counted badge-counted--no';
 
-                                    $unitCost = (float) $line->effective_unit_cost;
-                                    $diffValue = (float) $line->difference_value;
+                                    $showDiff = !is_null($line->physical_qty);
+                                    $showValue = !is_null($line->physical_qty) && $unitCost > 0;
 
-                                    $showDiff = !is_null($line->physical_qty) && abs($diff) > 0.0000001;
-                                    $showValue = $showDiff && $unitCost > 0 && abs($diffValue) > 0.0000001;
+                                    if (!is_null($line->physical_qty)) {
+                                        if ($diff < 0) {
+                                            $diffToneClass = 'diff-danger';
+                                        } elseif ($diff > 0) {
+                                            $diffToneClass = 'diff-warning';
+                                        } else {
+                                            $diffToneClass = 'diff-success';
+                                        }
+                                    } else {
+                                        $diffToneClass = '';
+                                    }
                                 @endphp
 
                                 <tr>
@@ -746,7 +903,8 @@
                                         <div class="meta">{{ $line->item?->name ?? '' }}</div>
                                     </td>
 
-                                    <td data-label="Sistem" class="text-end text-mono">{{ number_format($system, 2) }}
+                                    <td data-label="Sistem" class="text-end text-mono">
+                                        {{ number_format($system, 2) }}
                                     </td>
 
                                     <td data-label="Fisik" class="text-end text-mono">
@@ -757,7 +915,8 @@
                                         @endif
                                     </td>
 
-                                    <td data-label="Selisih" class="text-end text-mono {{ $diffClass }}">
+                                    <td data-label="Selisih"
+                                        class="text-end text-mono {{ $showDiff ? $diffToneClass : '' }}">
                                         @if ($showDiff)
                                             {{ $diffText }}
                                         @else
@@ -773,10 +932,15 @@
                                         @endif
                                     </td>
 
-                                    <td data-label="Nilai (Rp)" class="text-end text-mono {{ $diffClass }}">
+                                    <td data-label="Nilai (Rp)"
+                                        class="text-end text-mono {{ $showValue ? $diffToneClass : '' }}">
                                         @if ($showValue)
-                                            {{ $diff > 0 ? '+' : '-' }}Rp
-                                            {{ number_format(abs($diffValue), 0, ',', '.') }}
+                                            @if (abs($diffValue) < 0.0000001)
+                                                Rp 0
+                                            @else
+                                                {{ $diffValue > 0 ? '+Rp' : '-Rp' }}
+                                                {{ number_format(abs($diffValue), 0, ',', '.') }}
+                                            @endif
                                         @else
                                             <span class="meta">-</span>
                                         @endif
@@ -817,25 +981,25 @@
                                     $system = (float) ($line->system_qty ?? 0);
                                     $physical = (float) ($line->physical_qty ?? 0);
                                     $diff = (float) $line->difference;
-
                                     $unitCost = (float) $line->effective_unit_cost;
-                                    $diffValue = (float) $line->difference_value;
 
-                                    // show
+                                    $diffValue = 0.0;
+                                    if (abs($diff) >= 0.0000001 && $unitCost > 0) {
+                                        $diffValue = $diff * $unitCost;
+                                    }
+
                                     $showDiff = !is_null($line->physical_qty) && abs($diff) > 0.0000001;
-                                    $showValue = $showDiff && $unitCost > 0 && abs($diffValue) > 0.0000001;
+                                    $showValue = !is_null($line->physical_qty) && $unitCost > 0;
 
                                     $counted = !is_null($line->physical_qty) || ($line->is_counted ?? false);
                                     $countedClass = $counted
                                         ? 'badge-counted badge-counted--yes'
                                         : 'badge-counted badge-counted--no';
 
-                                    // tone: diff <0 danger, =0 success, >0 warning
                                     if (!is_null($line->physical_qty)) {
                                         $tone =
                                             $diff < 0 ? 'tone-danger' : ($diff > 0 ? 'tone-warning' : 'tone-success');
                                     } else {
-                                        // belum dihitung => neutral (pakai success agar tidak "keras")
                                         $tone = 'tone-success';
                                     }
 
@@ -862,8 +1026,13 @@
 
                                             <span class="mini-badge">
                                                 <span class="k">Fisik</span>
-                                                <span
-                                                    class="v">{{ !is_null($line->physical_qty) ? number_format($physical, 2) : '-' }}</span>
+                                                <span class="v">
+                                                    @if (!is_null($line->physical_qty))
+                                                        {{ number_format($physical, 2) }}
+                                                    @else
+                                                        -
+                                                    @endif
+                                                </span>
                                             </span>
 
                                             <span class="{{ $countedClass }}">{{ $counted ? 'Sudah' : 'Belum' }}</span>
@@ -872,8 +1041,12 @@
                                                 <span class="k">Nilai</span>
                                                 <span class="v">
                                                     @if ($showValue)
-                                                        {{ $diff > 0 ? '+Rp' : '-Rp' }}
-                                                        {{ number_format(abs($diffValue), 0, ',', '.') }}
+                                                        @if (abs($diffValue) < 0.0000001)
+                                                            Rp 0
+                                                        @else
+                                                            {{ $diffValue > 0 ? '+Rp' : '-Rp' }}
+                                                            {{ number_format(abs($diffValue), 0, ',', '.') }}
+                                                        @endif
                                                     @else
                                                         -
                                                     @endif
@@ -886,7 +1059,7 @@
                                         <span class="mini-badge {{ $tone }}" style="justify-content:flex-end;">
                                             <span class="v">
                                                 @if (!is_null($line->physical_qty))
-                                                    {{ $diffText }}
+                                                    {{ $showDiff ? $diffText : '0.00' }}
                                                 @else
                                                     -
                                                 @endif

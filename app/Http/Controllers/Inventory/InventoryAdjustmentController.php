@@ -87,25 +87,25 @@ class InventoryAdjustmentController extends Controller
 
         $ids = $adjustments->pluck('id')->all();
 
-// 1) qty summary dari adjustment_lines (selalu ada)
+        // 1) qty summary dari adjustment_lines (selalu ada)
         $qtyRows = \App\Models\InventoryAdjustmentLine::query()
             ->selectRaw('
-        inventory_adjustment_id,
-        COALESCE(SUM(CASE WHEN direction = "in"  THEN ABS(qty_change) ELSE 0 END), 0) AS in_qty,
-        COALESCE(SUM(CASE WHEN direction = "out" THEN ABS(qty_change) ELSE 0 END), 0) AS out_qty
-    ')
+                inventory_adjustment_id,
+                COALESCE(SUM(CASE WHEN direction = "in"  THEN ABS(qty_change) ELSE 0 END), 0) AS in_qty,
+                COALESCE(SUM(CASE WHEN direction = "out" THEN ABS(qty_change) ELSE 0 END), 0) AS out_qty
+            ')
             ->whereIn('inventory_adjustment_id', $ids)
             ->groupBy('inventory_adjustment_id')
             ->get()
             ->keyBy('inventory_adjustment_id');
 
-// 2) value summary dari inventory_mutations (hanya ada saat approved / sudah eksekusi)
+        // 2) value summary dari inventory_mutations (hanya ada saat approved / sudah eksekusi)
         $valRows = \App\Models\InventoryMutation::query()
             ->selectRaw('
-        source_id as inventory_adjustment_id,
-        COALESCE(SUM(CASE WHEN direction = "in"  THEN total_cost ELSE 0 END), 0) AS in_value,
-        COALESCE(SUM(CASE WHEN direction = "out" THEN total_cost ELSE 0 END), 0) AS out_value
-    ')
+                source_id as inventory_adjustment_id,
+                COALESCE(SUM(CASE WHEN direction = "in"  THEN total_cost ELSE 0 END), 0) AS in_value,
+                COALESCE(SUM(CASE WHEN direction = "out" THEN total_cost ELSE 0 END), 0) AS out_value
+            ')
             ->where('source_type', \App\Models\InventoryAdjustment::class)
             ->whereIn('source_id', $ids)
             ->groupBy('source_id')
@@ -167,7 +167,6 @@ class InventoryAdjustmentController extends Controller
             'filters',
             'adjustmentSummaries'
         ));
-
     }
 
     /**
@@ -188,11 +187,18 @@ class InventoryAdjustmentController extends Controller
 
         $warehouseId = (int) $inventoryAdjustment->warehouse_id;
 
+        // ========= MAP UNIT COST DARI SO (KALAU SUMBER STOCK OPNAME) =========
+        $soUnitCostByItemId = collect();
+        if ($inventoryAdjustment->source_type === StockOpname::class && $inventoryAdjustment->source) {
+            $inventoryAdjustment->source->loadMissing('lines');
+            $soUnitCostByItemId = $inventoryAdjustment->source->lines->pluck('unit_cost', 'item_id');
+        }
+
         // ========= SUMMARY QTY =========
         $totalInQty = (float) $inventoryAdjustment->lines->where('direction', 'in')->sum('qty_change');
         $totalOutQtyAbs = abs((float) $inventoryAdjustment->lines->where('direction', 'out')->sum('qty_change'));
 
-        // ========= (A) APPROVED -> ambil nilai dari MUTATIONS (LOCKED) =========
+        // ========= (A) APPROVED -> utamakan nilai dari MUTATIONS, tapi HPP boleh fallback =========
         if ($inventoryAdjustment->status === InventoryAdjustment::STATUS_APPROVED) {
             $mutations = InventoryMutation::query()
                 ->where('source_type', InventoryAdjustment::class)
@@ -200,8 +206,9 @@ class InventoryAdjustmentController extends Controller
                 ->orderBy('id')
                 ->get();
 
+            // total nilai: tetap pakai yang "locked" dari mutasi
             $totalInValue = (float) $mutations->where('direction', 'in')->sum('total_cost'); // positif
-            $totalOutValueAbs = abs((float) $mutations->where('direction', 'out')->sum('total_cost')); // total_cost out negatif
+            $totalOutValueAbs = abs((float) $mutations->where('direction', 'out')->sum('total_cost')); // out negatif
             $netValue = $totalInValue - $totalOutValueAbs;
 
             $mutByItem = $mutations->groupBy('item_id');
@@ -210,15 +217,36 @@ class InventoryAdjustmentController extends Controller
             foreach ($inventoryAdjustment->lines as $line) {
                 $muts = $mutByItem->get($line->item_id, collect());
 
+                // nilai "locked" dari mutasi (bisa 0 kalau unit_cost kosong)
                 $itemTotalCostAbs = abs((float) $muts->sum('total_cost'));
 
                 $lastWithCost = $muts->whereNotNull('unit_cost')->last();
                 $unitCost = $lastWithCost?->unit_cost !== null ? (float) $lastWithCost->unit_cost : null;
 
+                // ✅ Fallback kalau mutasi tidak punya HPP:
+                //    pakai aturan yang sama: SO line → snapshot aktif → master HPP (items.hpp)
+                if ($unitCost === null || $unitCost <= 0) {
+                    $fallback = $this->resolveUnitCostForLine(
+                        line: $line,
+                        warehouseId: $warehouseId,
+                        soUnitCostByItemId: $soUnitCostByItemId
+                    );
+
+                    if ($fallback !== null && $fallback > 0) {
+                        $unitCost = $fallback;
+
+                        // untuk tampilan per-baris: value = |qty| × HPP fallback
+                        $qtyAbs = abs((float) ($line->qty_change ?? 0));
+                        $itemTotalCostAbs = $qtyAbs * $unitCost;
+                    }
+                }
+
                 $lineTotals[$line->id] = [
                     'unit_cost' => $unitCost,
                     'value' => $itemTotalCostAbs,
-                    'unit_cost_fmt' => ($unitCost !== null && $unitCost > 0) ? $this->formatRupiah($unitCost) : '-',
+                    'unit_cost_fmt' => ($unitCost !== null && $unitCost > 0)
+                    ? $this->formatRupiah($unitCost)
+                    : '-',
                     'value_fmt' => $this->formatRupiah($itemTotalCostAbs),
                 ];
             }
@@ -245,14 +273,7 @@ class InventoryAdjustmentController extends Controller
             ]);
         }
 
-        // ========= (B) BELUM APPROVED -> estimasi (snapshot/base/SO unit cost) =========
-
-        // map unit cost dari SO (opening)
-        $soUnitCostByItemId = collect();
-        if ($inventoryAdjustment->source_type === StockOpname::class && $inventoryAdjustment->source) {
-            $inventoryAdjustment->source->loadMissing('lines');
-            $soUnitCostByItemId = $inventoryAdjustment->source->lines->pluck('unit_cost', 'item_id');
-        }
+        // ========= (B) BELUM APPROVED -> estimasi (pakai resolveUnitCostForLine) =========
 
         $totalInValue = 0.0;
         $totalOutValue = 0.0;
@@ -292,7 +313,9 @@ class InventoryAdjustmentController extends Controller
             $lineTotals[$line->id] = [
                 'unit_cost' => $unitCost,
                 'value' => $value,
-                'unit_cost_fmt' => ($unitCost !== null && $unitCost > 0) ? $this->formatRupiah($unitCost) : '-',
+                'unit_cost_fmt' => ($unitCost !== null && $unitCost > 0)
+                ? $this->formatRupiah($unitCost)
+                : '-',
                 'value_fmt' => $this->formatRupiah($value),
             ];
         }
@@ -333,12 +356,13 @@ class InventoryAdjustmentController extends Controller
 
     /**
      * Resolve HPP/unit untuk line (untuk ESTIMASI di show sebelum approved):
-     * - Prioritas 1: SO Opening line unit_cost (kalau ada)
+     * - Prioritas 1: SO Opening/Periodic line unit_cost (kalau ada)
      * - Prioritas 2: Snapshot aktif item+warehouse
-     * - Prioritas 3: Item base_unit_cost
+     * - Prioritas 3: Item HPP master (kolom items.hpp)
      */
     protected function resolveUnitCostForLine($line, int $warehouseId, $soUnitCostByItemId): ?float
     {
+        // 1) dari SO (opening/periodik)
         if ($soUnitCostByItemId && $soUnitCostByItemId->has($line->item_id)) {
             $uc = (float) $soUnitCostByItemId[$line->item_id];
             if ($uc > 0) {
@@ -346,13 +370,15 @@ class InventoryAdjustmentController extends Controller
             }
         }
 
+        // 2) snapshot aktif
         $snap = ItemCostSnapshot::getActiveForItem($line->item_id, $warehouseId);
         if ($snap && (float) $snap->unit_cost > 0) {
             return (float) $snap->unit_cost;
         }
 
-        if ($line->item && (float) $line->item->base_unit_cost > 0) {
-            return (float) $line->item->base_unit_cost;
+        // 3) fallback ke master HPP (items.hpp)
+        if ($line->item && (float) $line->item->hpp > 0) {
+            return (float) $line->item->hpp;
         }
 
         return null;
@@ -361,7 +387,7 @@ class InventoryAdjustmentController extends Controller
     /**
      * Resolve unit cost yang dipakai SAAT APPROVE manual (biar mutation IN juga punya cost)
      * - Snapshot aktif
-     * - base_unit_cost
+     * - HPP master (items.hpp)
      * - fallback avg incoming (dari inventory_mutations)
      */
     protected function resolveUnitCostForAdjustmentApprove(
@@ -375,8 +401,9 @@ class InventoryAdjustmentController extends Controller
             return (float) $snap->unit_cost;
         }
 
-        if ($item && (float) $item->base_unit_cost > 0) {
-            return (float) $item->base_unit_cost;
+        // ✅ pakai kolom HPP master
+        if ($item && (float) $item->hpp > 0) {
+            return (float) $item->hpp;
         }
 
         $avg = (float) $inventory->getItemIncomingUnitCost($warehouseId, $itemId);
@@ -401,7 +428,7 @@ class InventoryAdjustmentController extends Controller
      */
     public function storeManual(Request $request, InventoryService $inventory): RedirectResponse
     {
-        $validated = $request->validate([
+        $rules = [
             'warehouse_id' => ['required', 'exists:warehouses,id'],
             'date' => ['required', 'date'],
             'reason' => ['nullable', 'string', 'max:255'],
@@ -410,7 +437,17 @@ class InventoryAdjustmentController extends Controller
             'lines.*.item_id' => ['required', 'exists:items,id'],
             'lines.*.qty_change' => ['required', 'numeric'],
             'lines.*.notes' => ['nullable', 'string'],
-        ]);
+        ];
+
+        $user = $request->user();
+        $isOwner = $user && (($user->role ?? null) === 'owner');
+
+        if (!$isOwner) {
+            // Non-owner WAJIB isi alasan
+            $rules['reason'] = ['required', 'string', 'max:255'];
+        }
+
+        $validated = $request->validate($rules);
 
         $user = $request->user();
         $userId = $user?->id;
@@ -505,14 +542,30 @@ class InventoryAdjustmentController extends Controller
     }
 
     /**
-     * APPROVE dokumen Adjustment (khusus Owner).
+     * APPROVE dokumen Adjustment (khusus Owner/Admin).
      */
     public function approve(Request $request, InventoryAdjustment $inventoryAdjustment, InventoryService $inventory): RedirectResponse
     {
         $user = $request->user();
 
-        if (!$user || ($user->role ?? null) !== 'owner') {
-            abort(403, 'Hanya Owner yang boleh approve adjustment.');
+        if (!$user) {
+            abort(403, 'Harus login untuk approve adjustment.');
+        }
+
+        $role = $user->role ?? null;
+        $isOwner = $role === 'owner';
+        $isAdmin = $role === 'admin';
+
+        // Hanya Owner & Admin yang boleh approve
+        if (!$isOwner && !$isAdmin) {
+            abort(403, 'Hanya Owner atau Admin yang boleh approve adjustment.');
+        }
+
+        $fromStockOpname = $inventoryAdjustment->source_type === StockOpname::class;
+
+        // Kalau sumber dari StockOpname (opening / periodic) → WAJIB Owner
+        if ($fromStockOpname && !$isOwner) {
+            abort(403, 'Adjustment dari Stock Opname hanya boleh di-approve oleh Owner.');
         }
 
         if (!$inventoryAdjustment->canApprove()) {
@@ -529,8 +582,10 @@ class InventoryAdjustmentController extends Controller
             $date = $inventoryAdjustment->date?->toDateString() ?? now()->toDateString();
 
             if ($inventoryAdjustment->source_type === StockOpname::class && $inventoryAdjustment->source_id) {
+                // SO Opening / Periodic
                 $this->approveFromStockOpname($inventoryAdjustment, $inventory, $warehouseId, $date);
             } else {
+                // Manual Adjustment
                 $this->approveManualAdjustment($inventoryAdjustment, $inventory, $warehouseId, $date);
             }
 
@@ -679,8 +734,7 @@ class InventoryAdjustmentController extends Controller
             $line->direction = $signedDiff >= 0 ? 'in' : 'out';
             $line->save();
 
-            // (opsional) buat snapshot aktif + update base_unit_cost seperti yang sudah kamu punya
-            // ... (biarkan kode snapshot kamu tetap)
+            // (opsional) snapshot & update base_unit_cost tetap pakai kode kamu yang sudah ada
         }
     }
 
@@ -691,6 +745,14 @@ class InventoryAdjustmentController extends Controller
         string $date,
         ?StockOpname $opname
     ): void {
+        // Pastikan relasi sudah ke-load untuk menghindari N+1
+        $adjustment->loadMissing(['lines.item']);
+
+        // Map baris SO per item_id biar gampang ambil unit_cost dari SO
+        $opnameLinesByItem = $opname
+        ? $opname->lines->keyBy('item_id')
+        : collect();
+
         foreach ($adjustment->lines as $line) {
             if ($line->qty_after === null) {
                 continue;
@@ -699,18 +761,32 @@ class InventoryAdjustmentController extends Controller
             $itemId = (int) $line->item_id;
             $physicalQty = (float) $line->qty_after;
 
-            $qtyBefore = $inventory->getOnHandQty(warehouseId: $warehouseId, itemId: $itemId);
+            // qty_before = stok on hand sebelum penyesuaian
+            $qtyBefore = $inventory->getOnHandQty(
+                warehouseId: $warehouseId,
+                itemId: $itemId
+            );
 
-            // resolve unit cost periodic
-            $activeSnapshot = ItemCostSnapshot::getActiveForItem($itemId, $warehouseId);
+            /**
+             * ==== Resolve unit cost periodic ====
+             * Urutan:
+             * 1. Kalau SO Periodik punya unit_cost di baris item → pakai itu
+             * 2. Kalau tidak, pakai HPP master item (items.hpp)
+             *
+             * (di sini tidak baca ItemCostSnapshot; snapshot dibuat terpisah)
+             */
             $unitCost = null;
 
-            if ($activeSnapshot && (float) $activeSnapshot->unit_cost > 0) {
-                $unitCost = (float) $activeSnapshot->unit_cost;
-            } elseif ($line->item && (float) $line->item->base_unit_cost > 0) {
-                $unitCost = (float) $line->item->base_unit_cost;
+            // 1) Ambil dari baris SO kalau ada
+            $soLine = $opnameLinesByItem->get($itemId);
+            if ($soLine && (float) $soLine->unit_cost > 0) {
+                $unitCost = (float) $soLine->unit_cost;
+            } elseif ($line->item && (float) $line->item->hpp > 0) {
+                // 2) fallback dari master item HPP
+                $unitCost = (float) $line->item->hpp;
             }
 
+            // Sesuaikan stok ke qty fisik hasil SO
             $inventory->adjustTo(
                 warehouseId: $warehouseId,
                 itemId: $itemId,
@@ -720,10 +796,11 @@ class InventoryAdjustmentController extends Controller
                 sourceId: $adjustment->id,
                 notes: $adjustment->reason ?? ('Penyesuaian stok dari stock opname ' . ($opname?->code ?? '')),
                 lotId: null,
-                unitCostOverride: $unitCost,
+                unitCostOverride: $unitCost, // ← override cost di mutasi periodic
                 affectLotCost: false,
             );
 
+            // Update ringkasan line adjustment
             $qtyAfter = $physicalQty;
             $qtyChange = $qtyAfter - (float) $qtyBefore;
 
@@ -733,7 +810,7 @@ class InventoryAdjustmentController extends Controller
             $line->direction = $qtyChange >= 0 ? 'in' : 'out';
             $line->save();
 
-            // snapshot periodic (opsional; kamu sudah ada)
+            // Snapshot periodic (pakai unitCost yg sama: SO line / HPP master)
             if ($unitCost !== null && $unitCost > 0) {
                 ItemCostSnapshot::query()
                     ->where('item_id', $itemId)
@@ -778,9 +855,14 @@ class InventoryAdjustmentController extends Controller
 
         $query = InventoryStock::query()
             ->with('item')
-            ->where('warehouse_id', $warehouseId)
-            ->where('qty', '!=', 0);
+            ->where('warehouse_id', $warehouseId);
 
+        // Kalau user TIDAK mengisi q → hanya tampilkan yang qty != 0
+        if ($q === '') {
+            $query->where('qty', '!=', 0);
+        }
+
+        // Kalau user isi q → boleh cari semua item di warehouse tsb (termasuk qty = 0)
         if ($q !== '') {
             $query->whereHas('item', function ($sub) use ($q) {
                 $sub->where('code', 'like', '%' . $q . '%')
@@ -788,7 +870,10 @@ class InventoryAdjustmentController extends Controller
             });
         }
 
-        $rows = $query->orderBy('item_id')->limit(500)->get();
+        $rows = $query
+            ->orderBy('item_id')
+            ->limit(500)
+            ->get();
 
         return response()->json(
             $rows->map(fn(InventoryStock $row) => [
