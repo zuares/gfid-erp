@@ -20,6 +20,7 @@ class FinishingJob extends Model
 
     protected $casts = [
         'date' => 'date',
+        'posted_at' => 'datetime',
     ];
 
     // ====== RELATIONSHIPS ======

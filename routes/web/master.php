@@ -1,4 +1,5 @@
 <?php
+use App\Http\Controllers\Master\CustomerController;
 use App\Http\Controllers\Master\ItemController;
 
 Route::middleware(['web', 'auth'])
@@ -15,7 +16,7 @@ Route::middleware(['web', 'auth'])
             Route::post('items/{item}/hpp-temp', [ItemController::class, 'storeHppTemp'])
                 ->name('items.hpp_temp.store');
 
-            Route::resource('customers', MasterCustomerController::class)
+            Route::resource('customers', CustomerController::class)
                 ->except(['show']);
 
         });

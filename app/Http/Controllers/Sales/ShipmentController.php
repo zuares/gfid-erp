@@ -317,7 +317,7 @@ class ShipmentController extends Controller
                     sourceType: 'shipment',
                     sourceId: $shipment->id,
                     notes: 'Shipment ' . $shipment->code . ' ke store ' . ($shipment->store->code ?? '-'),
-                    allowNegative: false, // stok FG tidak boleh minus
+                    allowNegative: true, // stok FG tidak boleh minus
                     lotId: null, // FG tidak pakai LOT
                     unitCostOverride: null, // biarkan pakai avg cost FG di WH-RTS
                     affectLotCost: false, // jangan sentuh LotCost (bukan kain mentah)

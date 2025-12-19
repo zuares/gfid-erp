@@ -4,6 +4,7 @@ namespace App\Http\Controllers\Production;
 
 use App\Http\Controllers\Controller;
 use App\Models\CuttingJob;
+use App\Models\CuttingJobBundle;
 use App\Models\Employee;
 use App\Models\FinishingJobLine;
 use App\Models\Item;
@@ -568,7 +569,7 @@ class ProductionReportController extends Controller
         // Data untuk filter dropdown
         $items = Item::orderBy('code')->get();
         $operators = Employee::orderBy('name')->get();
-        dd($items);
+        // dd($items);
         return view('production.reports.finishing_jobs', [
             'rows' => $rows,
             'summary' => $summary,
@@ -578,6 +579,299 @@ class ProductionReportController extends Controller
             'operatorId' => $operatorId,
             'items' => $items,
             'operators' => $operators,
+        ]);
+    }
+
+    public function productionFlowDashboard(Request $request)
+    {
+        $today = now();
+
+        // =========================
+        // 1. WIP STOCK PER GUDANG
+        // =========================
+
+        $wipCutWarehouseId = Warehouse::where('code', 'WIP-CUT')->value('id');
+        $wipSewWarehouseId = Warehouse::where('code', 'WIP-SEW')->value('id');
+        $wipFinWarehouseId = Warehouse::where('code', 'WIP-FIN')->value('id');
+
+        $wipCutTotal = $wipCutWarehouseId
+        ? (float) DB::table('inventory_stocks')
+            ->where('warehouse_id', $wipCutWarehouseId)
+            ->sum('qty')
+        : 0;
+
+        $wipSewTotal = $wipSewWarehouseId
+        ? (float) DB::table('inventory_stocks')
+            ->where('warehouse_id', $wipSewWarehouseId)
+            ->sum('qty')
+        : 0;
+
+        $wipFinTotal = $wipFinWarehouseId
+        ? (float) DB::table('inventory_stocks')
+            ->where('warehouse_id', $wipFinWarehouseId)
+            ->sum('qty')
+        : 0;
+
+        // =========================
+        // 2. TOP WIP PER ITEM (server-side filter qty > 0)
+        // =========================
+
+        $wipCutItems = collect();
+        if ($wipCutWarehouseId) {
+            $wipCutItems = DB::table('inventory_stocks as s')
+                ->join('items as i', 'i.id', '=', 's.item_id')
+                ->where('s.warehouse_id', $wipCutWarehouseId)
+                ->groupBy('s.item_id', 'i.code', 'i.name')
+                ->selectRaw('
+                s.item_id,
+                i.code  as item_code,
+                i.name  as item_name,
+                SUM(s.qty) as qty_wip
+            ')
+                ->havingRaw('SUM(s.qty) > 0.0001')
+                ->orderByDesc('qty_wip')
+                ->limit(10)
+                ->get();
+        }
+
+        $wipSewItems = collect();
+        if ($wipSewWarehouseId) {
+            $wipSewItems = DB::table('inventory_stocks as s')
+                ->join('items as i', 'i.id', '=', 's.item_id')
+                ->where('s.warehouse_id', $wipSewWarehouseId)
+                ->groupBy('s.item_id', 'i.code', 'i.name')
+                ->selectRaw('
+                s.item_id,
+                i.code  as item_code,
+                i.name  as item_name,
+                SUM(s.qty) as qty_wip
+            ')
+                ->havingRaw('SUM(s.qty) > 0.0001')
+                ->orderByDesc('qty_wip')
+                ->limit(10)
+                ->get();
+        }
+
+        $wipFinItems = collect();
+        if ($wipFinWarehouseId) {
+            $wipFinItems = DB::table('inventory_stocks as s')
+                ->join('items as i', 'i.id', '=', 's.item_id')
+                ->where('s.warehouse_id', $wipFinWarehouseId)
+                ->groupBy('s.item_id', 'i.code', 'i.name')
+                ->selectRaw('
+                s.item_id,
+                i.code  as item_code,
+                i.name  as item_name,
+                SUM(s.qty) as qty_wip
+            ')
+                ->havingRaw('SUM(s.qty) > 0.0001')
+                ->orderByDesc('qty_wip')
+                ->limit(10)
+                ->get();
+        }
+
+        // =======================================
+        // 3. DETAIL + AGING WIP-CUT per BUNDLE
+        // =======================================
+
+        $wipCutBundles = DB::table('cutting_job_bundles as b')
+            ->join('cutting_jobs as j', 'j.id', '=', 'b.cutting_job_id')
+            ->leftJoin('qc_results as qc', function ($join) {
+                $join->on('qc.cutting_job_bundle_id', '=', 'b.id')
+                    ->where('qc.stage', 'cutting');
+            })
+            ->leftJoin('sewing_pickup_lines as pl', 'pl.cutting_job_bundle_id', '=', 'b.id')
+            ->selectRaw('
+            b.id,
+            b.bundle_no,
+            j.code              as cutting_code,
+            j.date              as cutting_date,
+            COALESCE(SUM(qc.qty_ok), 0)                     as qty_cut_ok,
+            COALESCE(SUM(pl.qty_bundle), 0)                 as qty_picked,
+            COALESCE(SUM(qc.qty_ok), 0) - COALESCE(SUM(pl.qty_bundle), 0) as wip_cut_qty
+        ')
+            ->groupBy('b.id', 'b.bundle_no', 'j.code', 'j.date')
+            ->having('wip_cut_qty', '>', 0)
+            ->get()
+            ->map(function ($row) use ($today) {
+                $cutDate = $row->cutting_date
+                ? \Illuminate\Support\Carbon::parse($row->cutting_date)
+                : null;
+
+                $row->age_days = $cutDate ? $cutDate->diffInDays($today) : null;
+
+                return $row;
+            })
+            ->sortByDesc('age_days')
+            ->take(30)
+            ->values();
+
+        // =======================================
+        // 4. DETAIL + AGING WIP-SEW per PICKUP LINE
+        // =======================================
+
+        $wipSewLines = SewingPickupLine::query()
+            ->with([
+                'sewingPickup.operator',
+                'sewingPickup.warehouse',
+                'bundle.finishedItem',
+                'bundle.cuttingJob.lot.item',
+            ])
+            ->where('status', 'in_progress')
+            ->get()
+            ->map(function ($line) use ($today) {
+                $pickup = $line->sewingPickup;
+                $pickupDate = $pickup?->date
+                ? \Illuminate\Support\Carbon::parse($pickup->date)
+                : null;
+
+                $returnedOk = (float) ($line->qty_returned_ok ?? 0);
+                $returnedReject = (float) ($line->qty_returned_reject ?? 0);
+                $used = $returnedOk + $returnedReject;
+                $remaining = (float) $line->qty_bundle - $used;
+
+                if ($remaining < 0) {
+                    $remaining = 0;
+                }
+
+                $line->age_days = $pickupDate ? $pickupDate->diffInDays($today) : null;
+                $line->remaining_qty = $remaining;
+                $line->used_qty = $used;
+
+                return $line;
+            });
+
+        $wipSewTotalFromLines = $wipSewLines->sum('remaining_qty');
+
+        $wipSewAging = $wipSewLines
+            ->filter(fn($l) => $l->remaining_qty > 0)
+            ->sortByDesc('age_days')
+            ->take(30)
+            ->values();
+
+        // =======================================
+        // 5. DETAIL + AGING WIP-FIN per BUNDLE
+        // =======================================
+
+        $wipFinBundles = DB::table('cutting_job_bundles as b')
+            ->join('cutting_jobs as j', 'j.id', '=', 'b.cutting_job_id')
+            ->leftJoin('sewing_pickup_lines as pl', 'pl.cutting_job_bundle_id', '=', 'b.id')
+            ->leftJoin('sewing_return_lines as rl', 'rl.sewing_pickup_line_id', '=', 'pl.id')
+            ->leftJoin('sewing_returns as r', 'r.id', '=', 'rl.sewing_return_id')
+            ->selectRaw('
+            b.id,
+            b.bundle_no,
+            j.code                              as cutting_code,
+            j.date                              as cutting_date,
+            b.finished_item_id                  as item_id,
+            b.wip_qty,
+            MAX(r.date)                         as last_sewing_return_date
+        ')
+            ->groupBy('b.id', 'b.bundle_no', 'j.code', 'j.date', 'b.finished_item_id', 'b.wip_qty')
+            ->having('b.wip_qty', '>', 0)
+            ->get()
+            ->map(function ($row) use ($today) {
+                $baseDate = $row->last_sewing_return_date
+                ? \Illuminate\Support\Carbon::parse($row->last_sewing_return_date)
+                : ($row->cutting_date
+                    ? \Illuminate\Support\Carbon::parse($row->cutting_date)
+                    : null);
+
+                $row->age_days = $baseDate ? $baseDate->diffInDays($today) : null;
+
+                return $row;
+            })
+            ->sortByDesc('age_days')
+            ->take(30)
+            ->values();
+
+        $wipFinTotalFromBundles = $wipFinBundles->sum('wip_qty');
+
+        // =======================================
+        // 6. SUMMARY + AGING COMBINED
+        // =======================================
+
+        $summary = [
+            'wip_cut_total' => $wipCutTotal,
+            'wip_sew_total' => $wipSewTotal,
+            'wip_fin_total' => $wipFinTotal,
+            'bundle_count_wip_cut' => $wipCutBundles->count(),
+            'bundle_count_wip_sew' => $wipSewAging->count(),
+            'bundle_count_wip_fin' => $wipFinBundles->count(),
+        ];
+
+        $agingBundles = collect()
+        // CUT
+            ->merge(
+                $wipCutBundles->map(function ($row) {
+                    return (object) [
+                        'stage' => 'cut',
+                        'bundle_id' => $row->id,
+                        'bundle_code' => $row->bundle_no,
+                        'cutting_code' => $row->cutting_code,
+                        'item_code' => null,
+                        'item_name' => null,
+                        'lot_code' => null,
+                        'lot_item_code' => null,
+                        'qty_wip' => $row->wip_cut_qty,
+                        'age_days' => $row->age_days,
+                    ];
+                })
+            )
+            // SEW
+            ->merge(
+                $wipSewAging->map(function ($line) {
+                    $bundle = $line->bundle;
+                    $cutJob = $bundle?->cuttingJob;
+                    $lot = $cutJob?->lot;
+
+                    return (object) [
+                        'stage' => 'sew',
+                        'bundle_id' => $bundle?->id,
+                        'bundle_code' => $bundle?->bundle_no,
+                        'cutting_code' => $cutJob?->code,
+                        'item_code' => $bundle?->finishedItem?->code,
+                        'item_name' => $bundle?->finishedItem?->name,
+                        'lot_code' => $lot?->code,
+                        'lot_item_code' => $lot?->item?->code,
+                        'qty_wip' => $line->remaining_qty,
+                        'age_days' => $line->age_days,
+                    ];
+                })
+            )
+            // FIN
+            ->merge(
+                $wipFinBundles->map(function ($row) {
+                    return (object) [
+                        'stage' => 'fin',
+                        'bundle_id' => $row->id,
+                        'bundle_code' => $row->bundle_no,
+                        'cutting_code' => $row->cutting_code,
+                        'item_code' => null, // bisa di-join kalau mau
+                        'item_name' => null,
+                        'lot_code' => null,
+                        'lot_item_code' => null,
+                        'qty_wip' => $row->wip_qty,
+                        'age_days' => $row->age_days,
+                    ];
+                })
+            )
+            ->sortByDesc('age_days')
+            ->values();
+
+        return view('production.reports.production_flow_dashboard', [
+            'summary' => $summary,
+            'wipCutItems' => $wipCutItems,
+            'wipSewItems' => $wipSewItems,
+            'wipFinItems' => $wipFinItems,
+            'agingBundles' => $agingBundles,
+            'cards' => [
+                'wip_cut_stocks' => $wipCutTotal,
+                'wip_sew_stocks' => $wipSewTotal,
+                'wip_fin_stocks' => $wipFinTotal,
+                'wip_sew_from_lines' => $wipSewTotalFromLines,
+                'wip_fin_from_bundles' => $wipFinTotalFromBundles,
+            ],
         ]);
     }
 

@@ -17,6 +17,11 @@ class SewingReturnLine extends Model
         'notes',
     ];
 
+    protected $casts = [
+        'qty_ok' => 'float',
+        'qty_reject' => 'float',
+    ];
+
     /*
     |--------------------------------------------------------------------------
     | RELASI

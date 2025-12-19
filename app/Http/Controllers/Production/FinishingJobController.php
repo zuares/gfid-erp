@@ -321,11 +321,11 @@ class FinishingJobController extends Controller
 
                     $qtyOkThisBundle = max(0, $takeIn - $rejectForThisBundle);
 
-                    // Ambil sewing attribution dari SewingReturnLine terbaru untuk bundle ini
-                    // ⚠️ Penting: pastikan SewingPickupLine punya kolom bundle_id (FK ke cutting_job_bundles.id)
+                    // Ambil sewing attribution dari SewingReturnLine terbaru untuk bundle + item ini
                     $sewingReturnLine = SewingReturnLine::query()
-                        ->whereHas('sewingPickupLine', function ($q) use ($bundle) {
-                            $q->where('bundle_id', $bundle->id);
+                        ->whereHas('sewingPickupLine', function ($q) use ($bundle, $itemId) {
+                            $q->where('cutting_job_bundle_id', $bundle->id)
+                                ->where('finished_item_id', $itemId);
                         })
                         ->latest('id')
                         ->first();
@@ -367,12 +367,23 @@ class FinishingJobController extends Controller
             ->exists();
 
         if (!$hasReject) {
-            return $this->post($job); // sudah transaction-safe di post()
+            try {
+                // Coba auto-post (langsung WIP-FIN → WH-PRD)
+                return $this->post($job);
+            } catch (ValidationException $e) {
+                // Kalau auto-post gagal (contoh: Sewing Return tidak cukup),
+                // job tetap ada sebagai draft, user diarahkan ke halaman SHOW
+                return redirect()
+                    ->route('production.finishing_jobs.show', $job->id)
+                    ->withErrors($e->errors())
+                    ->with('status', 'Finishing Job berhasil dibuat sebagai draft, namun auto-post gagal. Periksa detail di bawah.');
+            }
         }
 
         return redirect()
             ->route('production.finishing_jobs.show', $job->id)
             ->with('status', 'Finishing Job (per item) berhasil dibuat sebagai draft (Qty proses bisa sebagian).');
+
     }
 
     /* ============================================================
@@ -487,7 +498,7 @@ class FinishingJobController extends Controller
 
                 $sewingReturnLine = SewingReturnLine::query()
                     ->whereHas('sewingPickupLine', function ($q) use ($bundle) {
-                        $q->where('bundle_id', $bundle->id);
+                        $q->where('cutting_job_bundle_id', $bundle->id);
                     })
                     ->latest('id')
                     ->first();
@@ -594,7 +605,8 @@ class FinishingJobController extends Controller
 
     public function post(FinishingJob $finishing_job): RedirectResponse
     {
-        $job = $finishing_job;
+        // Pakai satu variabel $job, dan sekalian load lines + bundle untuk loop validasi
+        $job = $finishing_job->loadMissing(['lines']);
 
         if (!$job || !$job->id) {
             return redirect()
@@ -608,6 +620,7 @@ class FinishingJobController extends Controller
                 ->with('status', 'Finishing Job ini sudah diposting sebelumnya.');
         }
 
+        // Pastikan warehouse wajib sudah ada
         $requiredCodes = ['WIP-FIN', 'WH-PRD', 'REJECT'];
         $warehouses = $this->getRequiredWarehouses($requiredCodes);
 
@@ -625,6 +638,9 @@ class FinishingJobController extends Controller
         $rejectWarehouseId = $warehouses['REJECT']->id;
 
         $movementDate = $this->resolveMovementDate($job);
+
+        // ✅ VALIDASI: saldo Sewing Return cukup untuk semua finishing OK di job ini
+        $this->assertSewingReturnBalanceForFinishingJob($job);
 
         DB::transaction(function () use ($job, $wipFinWarehouseId, $prodWarehouseId, $rejectWarehouseId, $movementDate) {
             $this->applyPostingMovements(
@@ -880,15 +896,15 @@ class FinishingJobController extends Controller
         // Fail-fast jika relasi belum dibuat di model (biar jelas)
         if (!method_exists(SewingReturnLine::class, 'sewingPickupLine')) {
             throw ValidationException::withMessages([
-                'finishing' => 'Model SewingReturnLine belum memiliki relasi sewingPickupLine(). Tambahkan belongsTo ke SewingPickupLine.',
+                'sewing_balance' => 'Model SewingReturnLine belum memiliki relasi sewingPickupLine(). Tambahkan belongsTo ke SewingPickupLine.',
             ]);
         }
 
         $lines = SewingReturnLine::query()
             ->whereHas('sewingPickupLine', function ($q) use ($bundleId, $itemId) {
-                // ✅ pastikan nama kolomnya bundle_id dan item_id di sewing_pickup_lines
-                $q->where('bundle_id', $bundleId)
-                    ->where('item_id', $itemId);
+                // 🔁 SAMA persis dengan query Tinker yang tadi berhasil
+                $q->where('cutting_job_bundle_id', $bundleId)
+                    ->where('finished_item_id', $itemId);
             })
             ->whereRaw('qty_ok - finished_qty > 0')
             ->orderBy('id')
@@ -905,7 +921,7 @@ class FinishingJobController extends Controller
 
             $take = min($avail, $remaining);
 
-            // ⚠️ finished_qty kamu INTEGER. Kalau qty bisa desimal, sebaiknya ubah ke decimal.
+            // ⚠️ finished_qty kamu INTEGER. Kalau qty bisa desimal, sebaiknya ubah ke decimal nanti.
             $rl->finished_qty = (int) ((float) $rl->finished_qty + $take);
             $rl->save();
 
@@ -913,12 +929,132 @@ class FinishingJobController extends Controller
             if ($remaining <= 0.0000001) {
                 break;
             }
-
         }
 
         if ($remaining > 0.0000001) {
             throw ValidationException::withMessages([
                 'finishing' => "Sewing Return (bundle {$bundleId}, item {$itemId}) tidak cukup untuk finishing OK {$qtyOkNeed}. Kurang {$remaining}. Job: {$jobCode}",
+            ]);
+        }
+    }
+
+    /**
+     * Pastikan total Finishing OK di job ini tidak melebihi saldo Sewing Return per bundle.
+     * Anchor ke bundle_id via relasi sewingPickupLine, bukan ke item_id langsung di sewing_return_lines.
+     */
+    protected function assertSewingReturnBalanceForFinishingJob(FinishingJob $job): void
+    {
+        // Pastikan lines sudah ke-load
+        $job->loadMissing('lines');
+
+        // Group per bundle + item, dan hitung total qty_ok di job ini
+        $lines = $job->lines()
+            ->select('bundle_id', 'item_id', DB::raw('SUM(qty_ok) as qty_ok_total'))
+            ->groupBy('bundle_id', 'item_id')
+            ->get();
+
+        foreach ($lines as $line) {
+            $bundleId = $line->bundle_id;
+            $itemId = $line->item_id;
+            $qtyOkJob = (float) $line->qty_ok_total;
+
+            if ($qtyOkJob <= 0.0) {
+                continue;
+            }
+
+            // 🔍 Ambil WIP-FIN real per bundle (fisik)
+            $bundle = CuttingJobBundle::find($bundleId);
+            $bundleWipQty = (float) ($bundle?->wip_qty ?? 0.0);
+
+            // 🔢 Total OK dari Sewing Return utk bundle + item ini
+            // → pakai query yang tadi kamu pakai di Tinker (terbukti dapet 18)
+            $totalSewingOk = DB::table('sewing_return_lines as srl')
+                ->join('sewing_pickup_lines as spl', 'srl.sewing_pickup_line_id', '=', 'spl.id')
+                ->where('spl.cutting_job_bundle_id', $bundleId)
+                ->where('spl.finished_item_id', $itemId)
+                ->sum('srl.qty_ok');
+
+            $totalSewingOk = (float) $totalSewingOk;
+
+            // 🔢 Total Finishing OK yang SUDAH POSTED di job lain (bukan job ini)
+            $totalFinishingOkPosted = DB::table('finishing_job_lines as fjl')
+                ->join('finishing_jobs as fj', 'fjl.finishing_job_id', '=', 'fj.id')
+                ->where('fjl.bundle_id', $bundleId)
+                ->where('fjl.item_id', $itemId)
+                ->where('fj.status', 'posted')
+                ->where('fj.id', '<>', $job->id)
+                ->sum('fjl.qty_ok');
+
+            $totalFinishingOkPosted = (float) $totalFinishingOkPosted;
+
+            // "Logis" menurut Sewing Return:
+            $availableFromSew = max(0.0, $totalSewingOk - $totalFinishingOkPosted);
+            $sewingDiff = $qtyOkJob - $availableFromSew;
+
+            // "Fisik" menurut WIP-FIN bundle:
+            $wipDiff = $qtyOkJob - $bundleWipQty;
+
+            Log::info('DEBUG_FINISHING_GUARD', [
+                'job_id' => $job->id,
+                'job_code' => $job->code,
+                'bundle_id' => $bundleId,
+                'item_id' => $itemId,
+                'qtyOkJob' => $qtyOkJob,
+                'totalSewingOk' => $totalSewingOk,
+                'totalFinishingOkPosted' => $totalFinishingOkPosted,
+                'availableFromSew' => $availableFromSew,
+                'sewingDiff' => $sewingDiff,
+                'bundle_wip_qty' => $bundleWipQty,
+                'wipDiff' => $wipDiff,
+            ]);
+
+            // ✅ CASE 1: Secara Sewing Return sudah cukup
+            if ($sewingDiff <= 0.0001) {
+                // Tapi kalau WIP-FIN fisik malah kurang, itu indikasi stok minus → wajib blokir
+                if ($wipDiff > 0.0001) {
+                    $short = $wipDiff;
+
+                    throw ValidationException::withMessages([
+                        'finishing_job' =>
+                        "WIP-FIN untuk bundle {$bundleId}, item {$itemId} tidak cukup untuk finishing OK {$qtyOkJob}. " .
+                        "Kurang {$short}. Job: {$job->code}",
+                    ]);
+                }
+
+                continue;
+            }
+
+            // ❗ Di titik ini: menurut Sewing Return, qty job ini melebihi saldo "logis".
+            // → cek WIP-FIN fisik per bundle.
+
+            // ✅ CASE 2: Sewing Return kurang, tapi WIP-FIN fisik masih cukup
+            //    → TOLERANSI (mungkin data lama / adjustment), jangan blokir, cuma log warning.
+            if ($bundleWipQty + 0.0001 >= $qtyOkJob) {
+                Log::warning('FINISHING_GUARD_SEWING_MISMATCH_WIP_OK', [
+                    'job_id' => $job->id,
+                    'job_code' => $job->code,
+                    'bundle_id' => $bundleId,
+                    'item_id' => $itemId,
+                    'qtyOkJob' => $qtyOkJob,
+                    'totalSewingOk' => $totalSewingOk,
+                    'availableFromSew' => $availableFromSew,
+                    'bundle_wip_qty' => $bundleWipQty,
+                    'note' => 'Sewing Return secara logis kurang, tapi stok WIP-FIN fisik masih cukup. Diizinkan dengan warning.',
+                ]);
+
+                continue;
+            }
+
+            // ❌ CASE 3: Sewing Return kurang DAN WIP-FIN fisik juga kurang
+            // → ini benar-benar minus, wajib diblokir.
+            $shortLogical = max(0.0, $sewingDiff);
+            $shortPhysical = max(0.0, $wipDiff);
+            $short = max($shortLogical, $shortPhysical);
+
+            throw ValidationException::withMessages([
+                'finishing_job' =>
+                "Sewing Return / WIP-FIN untuk bundle {$bundleId}, item {$itemId} tidak cukup untuk finishing OK {$qtyOkJob}. " .
+                "Kurang {$short}. Job: {$job->code}",
             ]);
         }
     }

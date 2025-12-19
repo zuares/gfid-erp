@@ -1,6 +1,7 @@
+{{-- resources/views/sales/shipments/show.blade.php --}}
 @extends('layouts.app')
 
-@section('title', 'Detail Shipment • ' . $shipment->shipment_no)
+@section('title', 'Detail Shipment • ' . $shipment->code)
 
 @push('head')
     <style>
@@ -512,7 +513,7 @@
                     DETAIL SHIPMENT
                 </div>
                 <h1 class="h4 mb-1">
-                    {{ $shipment->shipment_no }}
+                    {{ $shipment->code }}
                 </h1>
                 <div class="d-flex flex-wrap gap-2 align-items-center">
                     <span class="text-muted small">
@@ -559,8 +560,9 @@
                         </div>
                         <div class="text-end">
                             <div class="scan-meta">
-                                Shipment No:<br>
-                                <span class="fw-semibold">{{ $shipment->shipment_no }}</span>
+                                Shipment:
+                                <br>
+                                <span class="fw-semibold">{{ $shipment->code }}</span>
                             </div>
                         </div>
                     </div>
@@ -1100,7 +1102,7 @@
                             showToast('success', data.message || 'Berhasil scan.');
                         } else {
                             let row = linesTbody.querySelector('tr[data-line-id="' + line.id +
-                            '"]');
+                                '"]');
 
                             if (!row) {
                                 const emptyRow = linesTbody.querySelector('.no-lines-row');

@@ -5,6 +5,7 @@ use App\Http\Controllers\Sales\Reports\ItemProfitReportController;
 use App\Http\Controllers\Sales\Reports\ShipmentAnalyticsController;
 use App\Http\Controllers\Sales\SalesInvoiceController;
 use App\Http\Controllers\Sales\ShipmentController;
+use App\Http\Controllers\Sales\ShipmentReturnController;
 use Illuminate\Support\Facades\Route;
 
 Route::middleware(['web', 'auth', 'role:owner,admin'])->group(function () {
@@ -17,15 +18,12 @@ Route::middleware(['web', 'auth', 'role:owner,admin'])->group(function () {
          * =========================
          */
 
-        // Buat invoice dari shipment
         Route::get('invoices/create-from-shipment/{shipment}', [SalesInvoiceController::class, 'createFromShipment'])
             ->name('invoices.create_from_shipment');
 
-        // Posting invoice
         Route::post('invoices/{invoice}/post', [SalesInvoiceController::class, 'post'])
             ->name('invoices.post');
 
-        // Resource invoices (index, create, store, show, edit, update, destroy)
         Route::resource('invoices', SalesInvoiceController::class);
 
         /**
@@ -73,5 +71,37 @@ Route::middleware(['web', 'auth', 'role:owner,admin'])->group(function () {
 
         Route::patch('shipments/lines/{line}', [ShipmentController::class, 'updateLineQty'])
             ->name('shipments.update_line_qty');
+
+        /**
+         * =========================
+         *  SHIPMENT RETURNS
+         * =========================
+         */
+        Route::get('shipment-returns', [ShipmentReturnController::class, 'index'])
+            ->name('shipment_returns.index');
+
+        Route::get('shipment-returns/create', [ShipmentReturnController::class, 'create'])
+            ->name('shipment_returns.create');
+
+        Route::post('shipment-returns', [ShipmentReturnController::class, 'store'])
+            ->name('shipment_returns.store');
+
+        Route::get('shipment-returns/{shipmentReturn}', [ShipmentReturnController::class, 'show'])
+            ->name('shipment_returns.show');
+
+        Route::post('shipment-returns/{shipmentReturn}/scan-item', [ShipmentReturnController::class, 'scanItem'])
+            ->name('shipment_returns.scan_item');
+
+        Route::post('shipment-returns/{shipmentReturn}/submit', [ShipmentReturnController::class, 'submit'])
+            ->name('shipment_returns.submit');
+
+        Route::post('shipment-returns/{shipmentReturn}/post', [ShipmentReturnController::class, 'post'])
+            ->name('shipment_returns.post');
+
+        Route::post('shipment-returns/{shipmentReturn}/sync-scans', [ShipmentReturnController::class, 'syncScans'])
+            ->name('shipment_returns.sync_scans');
+
+        Route::patch('shipment-return-lines/{line}', [ShipmentReturnController::class, 'updateLineQty'])
+            ->name('shipment_returns.update_line_qty');
     });
 });

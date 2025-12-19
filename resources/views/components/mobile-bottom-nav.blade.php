@@ -8,19 +8,21 @@
     $isInventory = request()->routeIs('inventory.*');
     $isProfile = request()->routeIs('profile.*') || request()->routeIs('settings.*');
 
-    // Khusus operating: tab Cutting, QC, Sewing, Finishing
+    // Khusus operating: dashboard = halaman Flow Production
+    if ($userRole === 'operating') {
+        $isDashboardTab =
+            request()->routeIs('production.reports.flow-dashboard') ||
+            request()->is('production/reports/flow-dashboard');
+    } else {
+        $isDashboardTab = $isDashboard;
+    }
+
+    // Tab khusus
     $isCuttingTab = request()->routeIs('production.cutting_jobs.*');
     $isQcTab = request()->routeIs('production.qc.*');
     $isSewingTab =
         request()->routeIs('production.sewing_pickups.*') || request()->routeIs('production.sewing_returns.*');
     $isFinishingTab = request()->routeIs('production.finishing_jobs.*');
-
-    // Dashboard tab khusus operating → pakai halaman Sewing Operator Summary
-    if ($userRole === 'operating') {
-        $isDashboardTab = request()->routeIs('production.reports.operators');
-    } else {
-        $isDashboardTab = $isDashboard;
-    }
 @endphp
 
 <style>
@@ -30,14 +32,14 @@
         right: 0;
         bottom: 0;
 
-        height: calc(66px + env(safe-area-inset-bottom));
-        padding: .35rem .85rem calc(.55rem + env(safe-area-inset-bottom));
+        height: calc(70px + env(safe-area-inset-bottom));
+        padding: .45rem 1.1rem calc(.7rem + env(safe-area-inset-bottom));
 
         display: flex;
         flex-wrap: nowrap;
         justify-content: space-between;
         align-items: center;
-        gap: .25rem;
+        gap: .3rem;
 
         background:
             linear-gradient(to top,
@@ -145,11 +147,17 @@
         display: inline-flex;
         align-items: center;
         justify-content: center;
-        background: radial-gradient(circle at 30% 0%,
-                color-mix(in srgb, var(--accent) 12%, #ffffff 88%) 0,
-                color-mix(in srgb, var(--accent) 90%, #000000 10%) 70%);
+
+        /* ✅ Fallback solid color supaya di Android tetap kelihatan */
+        background-color: var(--accent, #0ea5e9);
+        background-image: radial-gradient(circle at 30% 0%,
+                rgba(255, 255, 255, .92) 0,
+                rgba(255, 255, 255, .2) 35%,
+                var(--accent, #0ea5e9) 80%);
+        background-blend-mode: normal;
+
         color: #fff;
-        border: 1px solid color-mix(in srgb, var(--accent) 45%, #000 55%);
+        border: 1px solid color-mix(in srgb, var(--accent, #0ea5e9) 45%, #000 55%);
         box-shadow:
             0 12px 28px rgba(15, 23, 42, .28),
             0 0 0 1px rgba(15, 23, 42, .08);
@@ -158,7 +166,6 @@
             box-shadow .12s ease,
             filter .12s ease,
             opacity .12s ease;
-        cursor: pointer;
     }
 
     .mobile-bottom-nav .center-icon svg {
@@ -169,19 +176,10 @@
         fill: none;
     }
 
-    .mobile-bottom-nav .center-icon:active {
+    .mobile-bottom-nav .center-btn:active .center-icon {
         transform: scale(.94) translateY(1px);
         box-shadow: 0 6px 16px rgba(15, 23, 42, .22);
         filter: brightness(.96);
-    }
-
-    .mobile-bottom-nav .center-icon[disabled] {
-        opacity: .7;
-        cursor: default;
-        transform: none;
-        box-shadow:
-            0 12px 28px rgba(15, 23, 42, .18),
-            0 0 0 1px rgba(15, 23, 42, .08);
     }
 
     /* TWEAK KHUSUS ROLE OPERATING: lebih mini supaya muat di Android kecil */
@@ -203,8 +201,8 @@
 
     @media (max-width: 400px) {
         .mobile-bottom-nav {
-            padding-inline: .55rem;
-            gap: .18rem;
+            padding-inline: .9rem;
+            gap: .24rem;
         }
 
         .mobile-bottom-nav .nav-item {
@@ -234,11 +232,10 @@
     @if ($userRole === 'operating')
         {{-- ====== VARIAN UNTUK ROLE OPERATING ====== --}}
         @php
-            $dashboardHref = Route::has('production.reports.operators')
-                ? route('production.reports.operators')
-                : (Route::has('dashboard')
-                    ? route('dashboard')
-                    : '#');
+            // Dashboard = Flow Production (flow-dashboard)
+            $dashboardHref = Route::has('production.reports.flow-dashboard')
+                ? route('production.reports.flow-dashboard')
+                : url('/production/reports/flow-dashboard');
 
             $cuttingCreateHref = Route::has('production.cutting_jobs.create')
                 ? route('production.cutting_jobs.create')
@@ -281,14 +278,16 @@
             <span class="label">QC</span>
         </a>
 
-        {{-- HOME / SAVE (CENTER FAB) --}}
-        <div class="nav-item center-btn {{ $isDashboardTab ? 'active' : '' }}">
-            <button type="button" class="center-icon js-mobile-primary-save" data-fallback-href="{{ $dashboardHref }}">
+        {{-- FLOW PRODUCTION (CENTER FAB) --}}
+        <a href="{{ $dashboardHref }}" class="nav-item center-btn {{ $isDashboardTab ? 'active' : '' }}">
+            <span class="center-icon">
+                {{-- Ikon Home / Flow --}}
                 <svg viewBox="0 0 24 24" xmlns="http://www.w3.org/2000/svg">
-                    <path d="M5 12.5 10 17.5 19 8.5" />
+                    <path d="M4 11 11.24 4.6a1.1 1.1 0 0 1 1.52 0L20 11" />
+                    <path d="M7 10.5V18a1.5 1.5 0 0 0 1.5 1.5h7A1.5 1.5 0 0 0 17 18v-7.5" />
                 </svg>
-            </button>
-        </div>
+            </span>
+        </a>
 
         {{-- SEWING (Create Return) --}}
         <a href="{{ $sewingCreateHref }}" class="nav-item {{ $isSewingTab ? 'active' : '' }}">
@@ -346,19 +345,19 @@
         </a>
 
         @php
-            $fabFallbackHref = Route::has('production.sewing_pickups.create')
-                ? route('production.sewing_pickups.create')
-                : '#';
+            $dashboardHref = Route::has('dashboard') ? route('dashboard') : '#';
         @endphp
 
-        <div class="nav-item center-btn">
-            <button type="button" class="center-icon js-mobile-primary-save"
-                data-fallback-href="{{ $fabFallbackHref }}">
+        {{-- DASHBOARD (CENTER FAB) --}}
+        <a href="{{ $dashboardHref }}" class="nav-item center-btn {{ $isDashboard ? 'active' : '' }}">
+            <span class="center-icon">
+                {{-- Ikon Home / Dashboard --}}
                 <svg viewBox="0 0 24 24" xmlns="http://www.w3.org/2000/svg">
-                    <path d="M5 12.5 10 17.5 19 8.5" />
+                    <path d="M4 11 11.24 4.6a1.1 1.1 0 0 1 1.52 0L20 11" />
+                    <path d="M7 10.5V18a1.5 1.5 0 0 0 1.5 1.5h7A1.5 1.5 0 0 0 17 18v-7.5" />
                 </svg>
-            </button>
-        </div>
+            </span>
+        </a>
 
         @if (in_array($userRole, ['owner', 'admin', 'operating']))
             <a href="{{ Route::has('inventory.stock_card.index') ? route('inventory.stock_card.index') : '#' }}"
@@ -390,52 +389,10 @@
 
 <script>
     document.addEventListener('DOMContentLoaded', function() {
-
         // ==========================
-        // A) PRIMARY SAVE BUTTON
-        // ==========================
-        const buttons = document.querySelectorAll('.js-mobile-primary-save');
-        if (buttons.length) {
-            buttons.forEach(function(btn) {
-                btn.addEventListener('click', function(e) {
-                    e.preventDefault();
-                    if (btn.hasAttribute('disabled')) return;
-
-                    let form = document.querySelector('form[data-mobile-primary-form="1"]');
-                    if (!form) form = document.querySelector(
-                    'main form, .page-wrap form, form');
-
-                    if (form) {
-                        try {
-                            btn.setAttribute('disabled', 'disabled');
-
-                            const submitBtn = form.querySelector(
-                                'button[type="submit"], input[type="submit"]');
-                            if (submitBtn) submitBtn.click();
-                            else form.submit();
-                        } catch (error) {
-                            btn.removeAttribute('disabled');
-                            console.error('Mobile primary submit failed:', error);
-                            const fallbackHref = btn.getAttribute('data-fallback-href');
-                            if (fallbackHref && fallbackHref !== '#') window.location.href =
-                                fallbackHref;
-                        }
-                    } else {
-                        const fallbackHref = btn.getAttribute('data-fallback-href');
-                        if (fallbackHref && fallbackHref !== '#') window.location.href =
-                            fallbackHref;
-                    }
-                });
-            });
-        }
-
-        // ==========================
-        // B) ANDROID KEYBOARD FIX
-        // ✅ QWERTY yang bikin viewport "pan" -> offsetTop naik
+        // ANDROID KEYBOARD FIX
         // ==========================
         const root = document.documentElement;
-
-        // baseline "bottom" ketika normal (offsetTop ~= 0)
         let baselineBottom = null;
 
         function getFocusedInputType() {
@@ -454,30 +411,22 @@
 
         function updateKeyboardOffset() {
             let kbd = 0;
-
             const t = getFocusedInputType();
             const isNumeric =
                 t === 'number' || t === 'tel' || t === 'numeric' || t === 'date' || t === 'time';
 
             if (window.visualViewport) {
                 const vv = window.visualViewport;
-
-                // current bottom of visual viewport relative to layout viewport
                 const currentBottom = vv.height + vv.offsetTop;
 
-                // set/update baseline ketika kondisi normal (offsetTop kecil)
                 if (baselineBottom === null || vv.offsetTop < 4) {
                     baselineBottom = Math.max(baselineBottom ?? 0, currentBottom);
                 }
 
-                // ✅ KUNCI: kompensasi pakai (height + offsetTop) -> QWERTY anti dorong
                 kbd = Math.max(0, Math.round((baselineBottom ?? currentBottom) - currentBottom));
             }
 
-            // threshold biar address bar/toolbar ga kebaca keyboard
             if (kbd < 120) kbd = 0;
-
-            // kalau numeric keyboard biasanya aman (dan kadang logic ini bikin overcompensate)
             if (isNumeric) kbd = 0;
 
             root.style.setProperty('--vv-kbd', kbd + 'px');

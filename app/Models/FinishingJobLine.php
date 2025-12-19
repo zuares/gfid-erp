@@ -25,6 +25,9 @@ class FinishingJobLine extends Model
     ];
 
     protected $casts = [
+        'qty_in' => 'float',
+        'qty_ok' => 'float',
+        'qty_reject' => 'float',
         'processed_at' => 'datetime',
     ];
 
@@ -53,7 +56,7 @@ class FinishingJobLine extends Model
 
     public function sewingOperator()
     {
-        return $this->belongsTo(\App\Models\User::class, 'operator_sewing_id');
+        return $this->belongsTo(User::class, 'sewing_operator_id');
     }
 
 }

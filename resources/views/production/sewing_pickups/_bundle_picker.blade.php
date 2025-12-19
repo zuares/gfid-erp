@@ -342,6 +342,7 @@
         }
 
         /* ============ MOBILE (<= 767.98px) ============ */
+        /* ============ MOBILE (<= 767.98px) ============ */
         @media (max-width: 767.98px) {
 
             .sewing-pickup-bundle-picker-card .card-section {
@@ -431,7 +432,7 @@
             }
 
             .mobile-row-header-left {
-                font-size: .82rem;
+                font-size: clamp(.78rem, 2.5vw, .9rem);
                 display: flex;
                 flex-direction: column;
                 gap: .06rem;
@@ -444,27 +445,32 @@
                 align-items: center;
                 gap: .4rem;
                 min-width: 0;
+                flex-wrap: wrap;
             }
 
             .mobile-row-header-left .row-index {
-                font-size: .72rem;
+                font-size: clamp(.68rem, 2vw, .78rem);
                 color: var(--muted);
                 flex-shrink: 0;
             }
 
+            /* ✅ KODE BARANG RESPONSIVE */
             .mobile-row-header-left .item-code {
-                font-size: 1.02rem !important;
+                font-size: clamp(.9rem, 3.6vw, 1.1rem) !important;
                 font-weight: 800 !important;
                 color: #2563eb !important;
                 letter-spacing: .12px;
-                white-space: nowrap;
+
+                white-space: normal;
                 max-width: 100%;
-                overflow: hidden;
-                text-overflow: ellipsis;
+                overflow: visible;
+                text-overflow: clip;
+                word-break: break-word;
+                flex: 1 1 auto;
             }
 
             .mobile-row-header-left .item-name {
-                font-size: .78rem !important;
+                font-size: clamp(.72rem, 2.6vw, .84rem) !important;
                 color: var(--muted) !important;
                 overflow: hidden;
                 text-overflow: ellipsis;
@@ -473,13 +479,13 @@
 
             .mobile-row-header-right {
                 text-align: right;
-                font-size: .78rem;
-                min-width: 120px;
+                font-size: clamp(.7rem, 2.4vw, .82rem);
+                min-width: 110px;
                 flex-shrink: 0;
             }
 
             .mobile-row-header-right .qty-ready-label {
-                font-size: .65rem !important;
+                font-size: clamp(.6rem, 2vw, .7rem) !important;
                 font-weight: 600;
                 color: var(--muted);
                 text-transform: uppercase;
@@ -497,7 +503,7 @@
                 color: #1d4ed8 !important;
                 padding: .18rem .58rem !important;
                 border-radius: 999px !important;
-                font-size: .94rem !important;
+                font-size: clamp(.86rem, 3.2vw, .98rem) !important;
                 font-weight: 800 !important;
                 max-width: 100%;
                 min-width: 0;
@@ -506,7 +512,7 @@
             }
 
             .mobile-row-meta {
-                font-size: .74rem;
+                font-size: clamp(.7rem, 2.4vw, .8rem);
                 color: var(--muted);
                 margin-bottom: .18rem;
                 display: flex;
@@ -520,7 +526,7 @@
             }
 
             .mobile-row-meta-label {
-                font-size: .68rem;
+                font-size: clamp(.62rem, 2vw, .7rem);
                 text-transform: uppercase;
                 color: var(--muted);
                 opacity: .9;
@@ -528,16 +534,16 @@
             }
 
             .mobile-row-meta-value {
-                font-size: .78rem;
+                font-size: clamp(.7rem, 2.4vw, .8rem);
                 word-break: break-word;
             }
 
             .mobile-row-meta-value .mono {
-                font-size: .8rem;
+                font-size: clamp(.72rem, 2.4vw, .82rem);
             }
 
             .mobile-row-footer-left .pickup-label {
-                font-size: .74rem !important;
+                font-size: clamp(.7rem, 2.4vw, .8rem) !important;
                 font-weight: 600 !important;
                 color: #2563eb !important;
                 margin-bottom: .1rem;
@@ -546,7 +552,7 @@
             }
 
             .mobile-row-footer-left input.qty-input {
-                font-size: .94rem !important;
+                font-size: clamp(.9rem, 3.2vw, 1rem) !important;
                 font-weight: 600 !important;
                 padding-block: .35rem !important;
                 border: 1.4px solid rgba(37, 99, 235, .45) !important;

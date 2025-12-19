@@ -223,6 +223,10 @@ Route::middleware(['web', 'auth', 'role:owner,operating'])->group(function () {
 
                     Route::get('finishing-jobs', [ProductionReportController::class, 'finishingJobs'])
                         ->name('finishing_jobs');
+
+                    Route::get('flow-dashboard', [\App\Http\Controllers\Production\ProductionReportController::class, 'productionFlowDashboard'])
+                        ->name('production_flow_dashboard');
+
                 });
         });
 });

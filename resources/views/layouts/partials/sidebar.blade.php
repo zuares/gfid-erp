@@ -16,8 +16,9 @@
 
     $salesInvoiceOpen = request()->routeIs('sales.invoices.*');
     $salesShipmentOpen = request()->routeIs('sales.shipments.*');
+    $salesShipmentReturnOpen = request()->routeIs('sales.shipment_returns.*');
     $salesReportOpen = request()->routeIs('sales.reports.*');
-    $salesOpen = $salesInvoiceOpen || $salesShipmentOpen || $salesReportOpen;
+    $salesOpen = $salesInvoiceOpen || $salesShipmentOpen || $salesShipmentReturnOpen || $salesReportOpen;
 
     $payrollOpen =
         request()->routeIs('payroll.cutting.*') ||
@@ -41,19 +42,41 @@
 
     $stockReqOpen = request()->routeIs('rts.stock-requests.*') || request()->routeIs('prd.stock-requests.*');
 
+    // ===== PRODUCTION flags =====
     $prodCutOpen = request()->routeIs('production.cutting_jobs.*');
+
     $prodSewOpen =
         request()->routeIs('production.sewing_pickups.*') ||
         request()->routeIs('production.sewing_returns.*') ||
-        request()->routeIs('production.reports.*');
+        request()->routeIs('production.reports.operators') ||
+        request()->routeIs('production.reports.outstanding') ||
+        request()->routeIs('production.reports.aging_wip_sew') ||
+        request()->routeIs('production.reports.productivity') ||
+        request()->routeIs('production.reports.partial_pickup') ||
+        request()->routeIs('production.reports.report_reject') ||
+        request()->routeIs('production.reports.dashboard') ||
+        request()->routeIs('production.reports.lead_time') ||
+        request()->routeIs('production.reports.operator_behavior');
+
     $prodFinOpen =
         request()->routeIs('production.finishing_jobs.*') ||
-        request()->routeIs('production.finishing_jobs.bundles_ready');
+        request()->routeIs('production.finishing_jobs.bundles_ready') ||
+        request()->routeIs('production.finishing_jobs.report_per_item*');
+
     $prodPackOpen =
         request()->routeIs('production.packing_jobs.*') || request()->routeIs('production.packing_jobs.ready_items');
+
     $prodQcOpen = request()->routeIs('production.qc.*');
+
     $prodReportOpen =
-        request()->routeIs('production.reports.*') || request()->routeIs('production.finishing_jobs.report_per_item*');
+        request()->routeIs('production.reports.daily_production') ||
+        request()->routeIs('production.reports.reject_detail') ||
+        request()->routeIs('production.reports.wip_sewing_age') ||
+        request()->routeIs('production.reports.sewing_per_item') ||
+        request()->routeIs('production.reports.finishing_jobs');
+
+    // agregat: kalau salah satu menu produksi aktif, dropdown Production dibuka
+    $prodOpen = $prodCutOpen || $prodSewOpen || $prodFinOpen || $prodPackOpen || $prodQcOpen || $prodReportOpen;
 @endphp
 
 <style>
@@ -156,7 +179,6 @@
         color: var(--accent);
     }
 
-    /* owner-only dropdown */
     .sidebar-toggle {
         cursor: pointer;
         border: 0;
@@ -274,12 +296,17 @@
                 @endif
             </li>
 
-            {{-- ✅ Tambahan: ADMIN bisa akses Shipments --}}
+            {{-- ✅ Sales (Admin) --}}
             @if ($isAdmin)
                 <x-sidebar.label text="Sales" />
                 <li class="simple-group">
                     <x-sidebar.simple-link href="{{ route('sales.shipments.index') }}" icon="🚚" :active="request()->routeIs('sales.shipments.*')">
                         Shipments
+                    </x-sidebar.simple-link>
+
+                    <x-sidebar.simple-link href="{{ route('sales.shipment_returns.index') }}" icon="🔁"
+                        :active="request()->routeIs('sales.shipment_returns.*')">
+                        Retur Shipment
                     </x-sidebar.simple-link>
                 </li>
             @endif
@@ -315,7 +342,7 @@
             @endif
 
             {{-- ===========================
-            OWNER (FULL + DROPDOWN)
+            OWNER (FULL + DROPDOWN, SEMUA ROUTE PENTING)
         ============================ --}}
         @elseif ($isOwner)
             {{-- MASTER --}}
@@ -440,6 +467,20 @@
                         class="sidebar-link sidebar-link-sub {{ request()->routeIs('sales.shipments.create') ? 'active' : '' }}">
                         <span class="icon">＋</span><span>Shipment Baru</span>
                     </a>
+
+                    <div class="px-3 pt-3 pb-1 text-uppercase"
+                        style="font-size:.68rem; letter-spacing:.12em; color:var(--muted);">
+                        Shipment Returns
+                    </div>
+
+                    <a href="{{ route('sales.shipment_returns.index') }}"
+                        class="sidebar-link sidebar-link-sub {{ request()->routeIs('sales.shipment_returns.index') ? 'active' : '' }}">
+                        <span class="icon">🔁</span><span>Daftar Retur</span>
+                    </a>
+                    <a href="{{ route('sales.shipment_returns.create') }}"
+                        class="sidebar-link sidebar-link-sub {{ request()->routeIs('sales.shipment_returns.create') ? 'active' : '' }}">
+                        <span class="icon">＋</span><span>Retur Shipment Baru</span>
+                    </a>
                 </div>
             </li>
 
@@ -534,6 +575,143 @@
                     <a href="{{ route('prd.stock-requests.index') }}"
                         class="sidebar-link sidebar-link-sub {{ request()->routeIs('prd.stock-requests.*') ? 'active' : '' }}">
                         <span class="icon">🏭</span><span>Proses Stock Request (PRD)</span>
+                    </a>
+                </div>
+            </li>
+
+            {{-- PRODUCTION (OWNER, SEMUA ROUTE GET PENTING) --}}
+            <x-sidebar.label text="Production" />
+            <li class="mb-1">
+                <button class="sidebar-link sidebar-toggle {{ $prodOpen ? 'is-open' : '' }}" type="button"
+                    data-bs-toggle="collapse" data-bs-target="#navProduction"
+                    aria-expanded="{{ $prodOpen ? 'true' : 'false' }}" aria-controls="navProduction">
+                    <span class="icon">🏭</span>
+                    <span>Production</span>
+                    <span class="chevron">▸</span>
+                </button>
+
+                <div class="collapse {{ $prodOpen ? 'show' : '' }}" id="navProduction">
+                    {{-- JOBS --}}
+                    <div class="px-3 pt-2 pb-1 text-uppercase"
+                        style="font-size:.68rem; letter-spacing:.12em; color:var(--muted);">
+                        Jobs
+                    </div>
+
+                    <a href="{{ route('production.cutting_jobs.index') }}"
+                        class="sidebar-link sidebar-link-sub {{ request()->routeIs('production.cutting_jobs.*') ? 'active' : '' }}">
+                        <span class="icon">✂️</span><span>Cutting Jobs</span>
+                    </a>
+
+                    <a href="{{ route('production.sewing_pickups.index') }}"
+                        class="sidebar-link sidebar-link-sub {{ request()->routeIs('production.sewing_pickups.*') ? 'active' : '' }}">
+                        <span class="icon">🧵</span><span>Sewing Pickups</span>
+                    </a>
+
+                    <a href="{{ route('production.sewing_returns.index') }}"
+                        class="sidebar-link sidebar-link-sub {{ request()->routeIs('production.sewing_returns.*') ? 'active' : '' }}">
+                        <span class="icon">📥</span><span>Sewing Returns</span>
+                    </a>
+
+                    <a href="{{ route('production.finishing_jobs.index') }}"
+                        class="sidebar-link sidebar-link-sub {{ request()->routeIs('production.finishing_jobs.*') ? 'active' : '' }}">
+                        <span class="icon">🧶</span><span>Finishing Jobs</span>
+                    </a>
+
+                    <a href="{{ route('production.packing_jobs.index') }}"
+                        class="sidebar-link sidebar-link-sub {{ request()->routeIs('production.packing_jobs.*') ? 'active' : '' }}">
+                        <span class="icon">📦</span><span>Packing Jobs</span>
+                    </a>
+
+                    <a href="{{ route('production.qc.index') }}"
+                        class="sidebar-link sidebar-link-sub {{ request()->routeIs('production.qc.*') ? 'active' : '' }}">
+                        <span class="icon">✅</span><span>QC Cutting</span>
+                    </a>
+
+                    {{-- SEWING REPORTS (nama aslinya: production.reports.* dari SewingReportController) --}}
+                    <div class="px-3 pt-3 pb-1 text-uppercase"
+                        style="font-size:.68rem; letter-spacing:.12em; color:var(--muted);">
+                        Sewing Reports
+                    </div>
+
+                    <a href="{{ route('production.reports.dashboard') }}"
+                        class="sidebar-link sidebar-link-sub {{ request()->routeIs('production.reports.dashboard') ? 'active' : '' }}">
+                        <span class="icon">📊</span><span>Sewing Dashboard</span>
+                    </a>
+
+                    <a href="{{ route('production.reports.operators') }}"
+                        class="sidebar-link sidebar-link-sub {{ request()->routeIs('production.reports.operators') ? 'active' : '' }}">
+                        <span class="icon">👥</span><span>Operator Summary</span>
+                    </a>
+
+                    <a href="{{ route('production.reports.outstanding') }}"
+                        class="sidebar-link sidebar-link-sub {{ request()->routeIs('production.reports.outstanding') ? 'active' : '' }}">
+                        <span class="icon">⏳</span><span>Outstanding WIP-SEW</span>
+                    </a>
+
+                    <a href="{{ route('production.reports.aging_wip_sew') }}"
+                        class="sidebar-link sidebar-link-sub {{ request()->routeIs('production.reports.aging_wip_sew') ? 'active' : '' }}">
+                        <span class="icon">📆</span><span>Aging WIP-SEW</span>
+                    </a>
+
+                    <a href="{{ route('production.reports.partial_pickup') }}"
+                        class="sidebar-link sidebar-link-sub {{ request()->routeIs('production.reports.partial_pickup') ? 'active' : '' }}">
+                        <span class="icon">🧩</span><span>Partial Pickup</span>
+                    </a>
+
+                    <a href="{{ route('production.reports.productivity') }}"
+                        class="sidebar-link sidebar-link-sub {{ request()->routeIs('production.reports.productivity') ? 'active' : '' }}">
+                        <span class="icon">📈</span><span>Productivity</span>
+                    </a>
+
+                    <a href="{{ route('production.reports.report_reject') }}"
+                        class="sidebar-link sidebar-link-sub {{ request()->routeIs('production.reports.report_reject') ? 'active' : '' }}">
+                        <span class="icon">🚫</span><span>Reject Analysis</span>
+                    </a>
+
+                    <a href="{{ route('production.reports.lead_time') }}"
+                        class="sidebar-link sidebar-link-sub {{ request()->routeIs('production.reports.lead_time') ? 'active' : '' }}">
+                        <span class="icon">⏱️</span><span>Lead Time</span>
+                    </a>
+
+                    <a href="{{ route('production.reports.operator_behavior') }}"
+                        class="sidebar-link sidebar-link-sub {{ request()->routeIs('production.reports.operator_behavior') ? 'active' : '' }}">
+                        <span class="icon">👀</span><span>Operator Behavior</span>
+                    </a>
+
+                    {{-- PRODUCTION-WIDE REPORTS (ProductionReportController) --}}
+                    <div class="px-3 pt-3 pb-1 text-uppercase"
+                        style="font-size:.68rem; letter-spacing:.12em; color:var(--muted);">
+                        Chain / WIP Reports
+                    </div>
+
+                    <a href="{{ route('production.reports.daily_production') }}"
+                        class="sidebar-link sidebar-link-sub {{ request()->routeIs('production.reports.daily_production') ? 'active' : '' }}">
+                        <span class="icon">📅</span><span>Daily Production</span>
+                    </a>
+
+                    <a href="{{ route('production.reports.reject_detail') }}"
+                        class="sidebar-link sidebar-link-sub {{ request()->routeIs('production.reports.reject_detail') ? 'active' : '' }}">
+                        <span class="icon">🧾</span><span>Reject Detail</span>
+                    </a>
+
+                    <a href="{{ route('production.reports.wip_sewing_age') }}"
+                        class="sidebar-link sidebar-link-sub {{ request()->routeIs('production.reports.wip_sewing_age') ? 'active' : '' }}">
+                        <span class="icon">📆</span><span>WIP Sewing Age</span>
+                    </a>
+
+                    <a href="{{ route('production.reports.sewing_per_item') }}"
+                        class="sidebar-link sidebar-link-sub {{ request()->routeIs('production.reports.sewing_per_item') ? 'active' : '' }}">
+                        <span class="icon">🧵</span><span>Sewing per Item</span>
+                    </a>
+
+                    <a href="{{ route('production.reports.finishing_jobs') }}"
+                        class="sidebar-link sidebar-link-sub {{ request()->routeIs('production.reports.finishing_jobs') ? 'active' : '' }}">
+                        <span class="icon">🧶</span><span>Finishing Jobs Report</span>
+                    </a>
+
+                    <a href="{{ route('production.finishing_jobs.report_per_item') }}"
+                        class="sidebar-link sidebar-link-sub {{ request()->routeIs('production.finishing_jobs.report_per_item*') ? 'active' : '' }}">
+                        <span class="icon">📦</span><span>Finishing per Item</span>
                     </a>
                 </div>
             </li>

@@ -1,3 +1,4 @@
+{{-- resources/views/production/finishing_jobs/create.blade.php --}}
 @extends('layouts.app')
 
 @section('title', 'Produksi • Finishing')
@@ -21,7 +22,6 @@
             padding: 1rem .9rem 3.5rem;
         }
 
-        /* background minimal */
         body[data-theme="light"] .finishing-page .page-wrap {
             background: linear-gradient(to bottom,
                     #f5f6fa 0,
@@ -60,7 +60,6 @@
             font-family: ui-monospace, SFMono-Regular, Menlo, Consolas;
         }
 
-        /* ===== HEADER PAGE ala Sewing Return, khas Finishing ===== */
         .header-card {
             border-radius: 14px;
             border: 1px solid rgba(148, 163, 184, 0.3);
@@ -127,7 +126,6 @@
             color: #e5e7eb;
         }
 
-        /* ===== META ROW ===== */
         .meta-row {
             margin-top: .25rem;
             border-radius: 10px;
@@ -153,7 +151,6 @@
             padding: .32rem .48rem;
         }
 
-        /* ===== FILTER BAR ===== */
         .filter-bar {
             display: flex;
             flex-wrap: wrap;
@@ -215,7 +212,6 @@
             opacity: .7;
         }
 
-        /* ===== TABLE ===== */
         .finishing-table-wrap {
             margin-top: .75rem;
         }
@@ -310,7 +306,6 @@
             background: rgba(248, 113, 113, 0.1);
         }
 
-        /* Footer actions (desktop static) */
         .footer-actions {
             margin-top: 1rem;
             display: flex;
@@ -323,7 +318,6 @@
             padding-inline: 1rem;
         }
 
-        /* ===== MOBILE ===== */
         @media (max-width: 767.98px) {
             .finishing-page .page-wrap {
                 padding-inline: .8rem;
@@ -343,12 +337,10 @@
                 align-items: flex-start;
             }
 
-            /* HILANGKAN KOLOM TANGGAL + CATATAN DI MOBILE (tetap kirim default dari server) */
             .meta-row .row.g-3 {
                 display: none !important;
             }
 
-            /* FILTER: select & search jadi inline, hierarchy: select lebih dominan, cari kalem */
             .filter-bar {
                 margin-top: .4rem;
                 gap: .5rem;
@@ -396,12 +388,10 @@
                 font-weight: 400;
             }
 
-            /* summary geser ke kiri biar ga terlalu rame di kanan */
             .filter-summary {
                 justify-content: flex-start;
             }
 
-            /* Sembunyikan hanya index & alasan; WIP-FIN tetap tampil di mobile */
             th.col-index,
             th.col-reason,
             td.col-index,
@@ -409,7 +399,6 @@
                 display: none !important;
             }
 
-            /* Item: hanya kode (tanpa nama) di mobile → C5BLK saja */
             .item-label-main-desktop {
                 display: none;
             }
@@ -421,7 +410,6 @@
                 letter-spacing: .08em;
             }
 
-            /* Input OK/RJ jadi focal point di mobile */
             .qty-ok-input,
             .qty-reject-input {
                 text-align: center;
@@ -431,7 +419,6 @@
                 font-size: .9rem;
             }
 
-            /* Floating footer ala sewing pickup: 2 tombol ngumpul di kanan */
             .footer-actions {
                 position: fixed;
                 left: .1rem;
@@ -449,7 +436,6 @@
                     0 3px 8px rgba(15, 23, 42, 0.18);
             }
 
-            /* urutan: Simpan (kiri), Kembali (kanan) */
             .footer-actions .btn-save {
                 order: 1;
                 background: linear-gradient(135deg, #22c55e 0%, #16a34a 60%, #15803d 100%);
@@ -492,7 +478,7 @@
                 </div>
             @endif
 
-            {{-- HEADER UTAMA ala Sewing Return, tapi Finishing --}}
+            {{-- HEADER --}}
             <div class="card mb-2 header-card">
                 <div class="card-section">
                     <div class="header-row">
@@ -503,7 +489,7 @@
                             <div class="header-title d-flex flex-column gap-1">
                                 <h1>Halaman Finishing</h1>
                                 <div class="header-subtitle">
-                                    Proses WIP-FIN menjadi barang jadi, fokus input per item.
+                                    Proses WIP-FIN menjadi barang jadi, input Qty Proses & Reject per item.
                                 </div>
                             </div>
                         </div>
@@ -519,6 +505,7 @@
                 </div>
             </div>
 
+            {{-- MAIN CARD --}}
             <div class="card card-main">
                 <form id="finishing-form" action="{{ route('production.finishing_jobs.store') }}" method="POST" novalidate>
                     @csrf
@@ -546,14 +533,39 @@
                             ->values();
                     @endphp
 
-                    {{-- HIDDEN OPERATOR GLOBAL (diisi dari modal) --}}
+
+                    {{-- Flash / Errors --}}
+                    @if (session('status'))
+                        <div class="alert alert-success alert-dismissible fade show mb-3" role="alert">
+                            {{ session('status') }}
+                            <button type="button" class="btn-close" data-bs-dismiss="alert" aria-label="Close"></button>
+                        </div>
+                    @endif
+
+                    {{-- Error khusus Finishing Job (misal dari assertSewingReturnBalanceForFinishingJob) --}}
+                    @if ($errors->has('finishing_job'))
+                        <div class="alert alert-danger alert-dismissible fade show mb-3" role="alert">
+                            {{ $errors->first('finishing_job') }}
+                            <button type="button" class="btn-close" data-bs-dismiss="alert" aria-label="Close"></button>
+                        </div>
+                    @endif
+
+                    {{-- Error input form biasa --}}
+                    @if ($errors->any() && !$errors->has('finishing_job'))
+                        <div class="alert alert-danger alert-dismissible fade show mb-3" role="alert">
+                            <strong>Oops!</strong> Ada error input, cek form di bawah.
+                            <button type="button" class="btn-close" data-bs-dismiss="alert" aria-label="Close"></button>
+                        </div>
+                    @endif
+
+
+                    {{-- HIDDEN GLOBAL OPERATOR --}}
                     <input type="hidden" name="operator_global_id" id="operator_global_id_hidden"
                         value="{{ old('operator_global_id', $defaultOperator) }}">
 
                     {{-- META + FILTER --}}
                     <div class="card-section">
                         <div class="meta-row">
-                            {{-- TANGGAL & CATATAN (HILANG DI MOBILE, HANYA DESKTOP) --}}
                             <div class="row g-3 align-items-end">
                                 <div class="col-6 col-md-3">
                                     <label class="form-label form-label-sm">Tanggal</label>
@@ -574,7 +586,6 @@
                                 </div>
                             </div>
 
-                            {{-- FILTER + SUMMARY --}}
                             <div class="filter-bar">
                                 <div class="filter-bar-left">
                                     <div class="filter-label">Filter kode item</div>
@@ -625,9 +636,9 @@
                                             <th class="text-center col-index" style="width:5%;">No</th>
                                             <th class="col-item" style="width:32%;">Kode Item</th>
                                             <th class="text-end col-wip" style="width:16%;">Total WIP-FIN</th>
-                                            <th class="text-end col-ok" style="width:16%;">OK</th>
+                                            <th class="text-end col-ok" style="width:16%;">Proses</th>
                                             <th class="text-end col-reject" style="width:16%;">Reject</th>
-                                            <th class="col-reason" style="width:17%;">Alasan Reject</th>
+                                            <th class="col-reason" style="width:17%;">Alasan / Catatan</th>
                                         </tr>
                                     </thead>
                                     <tbody>
@@ -645,8 +656,9 @@
                                                     : $line['qty_reject'] ?? 0;
                                                 $rejectReason =
                                                     $oldLine['reject_reason'] ?? ($line['reject_reason'] ?? '');
+                                                $rejectNotes =
+                                                    $oldLine['reject_notes'] ?? ($line['reject_notes'] ?? '');
                                                 $fullLabel = $line['item_label'] ?? 'Item #' . $itemId;
-
                                                 $codeOnly = Str::contains($fullLabel, ' - ')
                                                     ? Str::before($fullLabel, ' - ')
                                                     : $fullLabel;
@@ -674,18 +686,18 @@
                                                     </span>
                                                 </td>
 
-                                                {{-- Qty OK pakai x-number-input (integer) --}}
+                                                {{-- Qty Proses (qty_in) --}}
                                                 <td class="text-end align-middle col-ok">
                                                     <x-number-input :name="'lines[' . $idx . '][qty_in]'" :value="is_null($qtyIn) ? '' : (int) $qtyIn" mode="integer"
                                                         :min="0" :max="$totalWip"
                                                         class="form-control form-control-sm text-end integer-input qty-ok-input"
-                                                        placeholder="OK" />
+                                                        placeholder="Proses" />
                                                     @error("lines.$idx.qty_in")
                                                         <div class="invalid-feedback d-block">{{ $message }}</div>
                                                     @enderror
                                                 </td>
 
-                                                {{-- Qty Reject pakai x-number-input (integer) --}}
+                                                {{-- Qty Reject --}}
                                                 <td class="text-end align-middle col-reject">
                                                     <x-number-input :name="'lines[' . $idx . '][qty_reject]'" :value="(int) $qtyReject" mode="integer"
                                                         :min="0" :max="$totalWip"
@@ -699,9 +711,17 @@
                                                 <td class="align-middle col-reason">
                                                     <input type="text"
                                                         name="lines[{{ $idx }}][reject_reason]"
-                                                        class="form-control form-control-sm"
+                                                        class="form-control form-control-sm mb-1"
                                                         placeholder="Alasan (opsional)" value="{{ $rejectReason }}">
                                                     @error("lines.$idx.reject_reason")
+                                                        <div class="invalid-feedback d-block">{{ $message }}</div>
+                                                    @enderror
+
+                                                    <input type="text" name="lines[{{ $idx }}][reject_notes]"
+                                                        class="form-control form-control-sm"
+                                                        placeholder="Catatan reject (opsional)"
+                                                        value="{{ $rejectNotes }}">
+                                                    @error("lines.$idx.reject_notes")
                                                         <div class="invalid-feedback d-block">{{ $message }}</div>
                                                     @enderror
                                                 </td>
@@ -724,13 +744,14 @@
                             </div>
                         </div>
 
-                        {{-- Footer actions (desktop + floating mobile) --}}
+                        {{-- Footer actions --}}
                         <div class="footer-actions">
                             <a href="{{ route('production.finishing_jobs.index') }}"
                                 class="btn btn-sm btn-outline-secondary btn-back">
                                 <i class="bi bi-arrow-left"></i>
                             </a>
-                            <button type="submit" class="btn btn-sm btn-primary btn-save" disabled>
+                            {{-- pakai button biasa, submit lewat modal --}}
+                            <button type="button" class="btn btn-sm btn-primary btn-save" disabled>
                                 <i class="bi bi-check2-circle"></i>
                                 Simpan Finishing
                             </button>
@@ -762,7 +783,7 @@
                                                 </span>
                                             </div>
                                             <div class="d-flex justify-content-between mb-1">
-                                                <span>Total OK</span>
+                                                <span>Total Proses</span>
                                                 <span id="summary-total-ok">0</span>
                                             </div>
                                             <div class="d-flex justify-content-between">
@@ -795,7 +816,8 @@
                                     </div>
 
                                     <div class="alert alert-info small mb-0">
-                                        Pastikan angka OK dan Reject sudah benar sebelum menyimpan.
+                                        Pastikan <strong>Qty Proses</strong> dan <strong>Qty Reject</strong> sudah benar.
+                                        Qty OK akan dihitung otomatis sebagai Proses - Reject per item.
                                     </div>
                                 </div>
                                 <div class="modal-footer">
@@ -837,8 +859,6 @@
             const modalConfirmBtn = document.getElementById('modal-confirm-submit');
             const operatorModalEl = document.getElementById('finishingOperatorModal');
 
-            /* ========= HELPERS ========= */
-
             function isRejectInput(el) {
                 if (!el) return false;
                 if (el.classList.contains('qty-reject-input')) return true;
@@ -856,7 +876,6 @@
                     return allowEmpty ? '' : '0';
                 }
 
-                // ganti koma jadi titik lalu ambil integer-nya
                 if (/[.,]/.test(v)) {
                     v = v.replace(',', '.');
                     const f = parseFloat(v);
@@ -880,8 +899,6 @@
                 return !isNaN(num) && num > 0;
             }
 
-            /* ========= PENOMORAN TABEL ========= */
-
             function renumberRows() {
                 if (!table) return;
                 const rows = table.querySelectorAll('tbody tr');
@@ -898,8 +915,6 @@
                 });
             }
 
-            /* ========= SAVE BUTTON & SUMMARY ========= */
-
             function updateSaveButtonState() {
                 if (!saveBtn) return;
 
@@ -909,7 +924,7 @@
             }
 
             function computeSummary() {
-                let totalOk = 0;
+                let totalProses = 0;
                 let totalReject = 0;
 
                 integerInputs.forEach(i => {
@@ -919,13 +934,13 @@
 
                     const val = parseInt(i.value || '0', 10) || 0;
                     if (match[2] === 'qty_in') {
-                        totalOk += val;
+                        totalProses += val;
                     } else if (match[2] === 'qty_reject') {
                         totalReject += val;
                     }
                 });
 
-                if (summaryOkEl) summaryOkEl.textContent = totalOk.toString();
+                if (summaryOkEl) summaryOkEl.textContent = totalProses.toString();
                 if (summaryRejectEl) summaryRejectEl.textContent = totalReject.toString();
 
                 const dateInput = document.querySelector('input[name="date"]');
@@ -934,19 +949,14 @@
                 }
             }
 
-            /* ========= INPUT HANDLING (OK & REJECT) ========= */
-
             integerInputs.forEach(el => {
-                // input
                 el.addEventListener('input', function() {
-                    // REJECT: tidak boleh kosong → selalu minimal 0
                     if (isRejectInput(this)) {
                         const normalized = sanitizeToIntString(this.value, {
                             allowEmpty: false
                         });
                         this.value = normalized;
                     } else {
-                        // OK: boleh kosong, tapi tetap integer bersih
                         const normalized = sanitizeToIntString(this.value, {
                             allowEmpty: true
                         });
@@ -957,7 +967,6 @@
                     computeSummary();
                 });
 
-                // paste
                 el.addEventListener('paste', function(e) {
                     e.preventDefault();
                     const paste = (e.clipboardData || window.clipboardData).getData('text') || '';
@@ -982,7 +991,6 @@
                     }));
                 });
 
-                // mouse wheel disable
                 el.addEventListener('wheel', function(ev) {
                     if (document.activeElement === this) {
                         ev.preventDefault();
@@ -991,8 +999,6 @@
                     passive: false
                 });
             });
-
-            /* ========= GUARD: OK + REJECT ≤ WIP-FIN ========= */
 
             if (table) {
                 table.addEventListener('input', function(e) {
@@ -1003,7 +1009,7 @@
                     if (!match) return;
 
                     const idx = match[1];
-                    const field = match[2]; // qty_in / qty_reject
+                    const field = match[2];
 
                     const qtyInEl = document.querySelector(`[name="lines[${idx}][qty_in]"]`);
                     const qtyRejectEl = document.querySelector(`[name="lines[${idx}][qty_reject]"]`);
@@ -1014,11 +1020,9 @@
                     let qtyIn = Math.max(0, parseInt(qtyInEl?.value || 0, 10) || 0);
                     let qtyReject = Math.max(0, parseInt(qtyRejectEl?.value || 0, 10) || 0);
 
-                    // clamp per field ke totalWip
                     if (qtyIn > totalWip) qtyIn = totalWip;
                     if (qtyReject > totalWip) qtyReject = totalWip;
 
-                    // kombinasi OK + Reject tidak boleh > totalWip
                     if (qtyIn + qtyReject > totalWip) {
                         if (field === 'qty_in') {
                             qtyIn = Math.max(0, totalWip - qtyReject);
@@ -1028,15 +1032,12 @@
                     }
 
                     if (qtyInEl) qtyInEl.value = qtyIn === 0 ? '' : String(qtyIn);
-                    if (qtyRejectEl) qtyRejectEl.value = String(
-                        qtyReject); // reject tidak boleh kosong → minimal "0"
+                    if (qtyRejectEl) qtyRejectEl.value = String(qtyReject);
 
                     updateSaveButtonState();
                     computeSummary();
                 });
             }
-
-            /* ========= FILTER KODE ITEM ========= */
 
             function applyItemFilter() {
                 if (!table) return;
@@ -1055,7 +1056,6 @@
                     row.style.display = (matchText && matchSelect) ? '' : 'none';
                 });
 
-                // setelah filter, update penomoran
                 renumberRows();
             }
 
@@ -1088,8 +1088,6 @@
                 });
             }
 
-            /* ========= MOBILE KEYBOARD HELPER ========= */
-
             const body = document.body;
             integerInputs.forEach(inp => {
                 inp.addEventListener('focus', () => {
@@ -1101,8 +1099,6 @@
                     body.classList.remove('keyboard-open');
                 });
             });
-
-            /* ========= SUBMIT: FINAL SANITIZE & REJECT KOSONG → 0 ========= */
 
             if (form) {
                 form.addEventListener('submit', function() {
@@ -1123,8 +1119,6 @@
                     });
                 });
             }
-
-            /* ========= MODAL KONFIRMASI OPERATOR ========= */
 
             if (saveBtn && operatorModalEl && typeof bootstrap !== 'undefined') {
                 const bsModal = new bootstrap.Modal(operatorModalEl);
@@ -1150,7 +1144,6 @@
                 }
             }
 
-            // Init awal
             updateSaveButtonState();
             computeSummary();
             renumberRows();
