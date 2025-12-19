@@ -73,7 +73,8 @@
         request()->routeIs('production.reports.reject_detail') ||
         request()->routeIs('production.reports.wip_sewing_age') ||
         request()->routeIs('production.reports.sewing_per_item') ||
-        request()->routeIs('production.reports.finishing_jobs');
+        request()->routeIs('production.reports.finishing_jobs') ||
+        request()->routeIs('production.reports.production_flow_dashboard');
 
     // agregat: kalau salah satu menu produksi aktif, dropdown Production dibuka
     $prodOpen = $prodCutOpen || $prodSewOpen || $prodFinOpen || $prodPackOpen || $prodQcOpen || $prodReportOpen;
@@ -684,6 +685,11 @@
                         Chain / WIP Reports
                     </div>
 
+                    <a href="{{ route('production.reports.production_flow_dashboard') }}"
+                        class="sidebar-link sidebar-link-sub {{ request()->routeIs('production.reports.production_flow_dashboard') ? 'active' : '' }}">
+                        <span class="icon">🌀</span><span>Flow Dashboard</span>
+                    </a>
+
                     <a href="{{ route('production.reports.daily_production') }}"
                         class="sidebar-link sidebar-link-sub {{ request()->routeIs('production.reports.daily_production') ? 'active' : '' }}">
                         <span class="icon">📅</span><span>Daily Production</span>
@@ -734,7 +740,6 @@
                     </a>
                 </div>
             </li>
-
         @endif
     </ul>
 </aside>
