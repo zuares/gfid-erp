@@ -52,6 +52,55 @@
             color: #b91c1c;
         }
 
+        /* ✅ Badge siapa yang approve (Owner vs Admin) */
+        .badge-approver {
+            font-size: .7rem;
+            padding: .18rem .55rem;
+            border-radius: 999px;
+            font-weight: 700;
+            display: inline-flex;
+            align-items: center;
+            gap: .3rem;
+            border: 1px solid rgba(148, 163, 184, 0.45);
+            background: rgba(15, 23, 42, 0.02);
+            color: #0f172a;
+        }
+
+        body[data-theme="dark"] .badge-approver {
+            background: rgba(15, 23, 42, 0.8);
+            border-color: rgba(148, 163, 184, 0.7);
+            color: rgba(226, 232, 240, 0.96);
+        }
+
+        .badge-approver--owner {
+            border-color: rgba(22, 163, 74, 0.7);
+            background: rgba(22, 163, 74, 0.1);
+            color: #166534;
+        }
+
+        body[data-theme="dark"] .badge-approver--owner {
+            background: rgba(22, 163, 74, 0.22);
+            color: rgba(187, 247, 208, 0.98);
+        }
+
+        .badge-approver--admin {
+            border-color: rgba(59, 130, 246, 0.7);
+            background: rgba(59, 130, 246, 0.1);
+            color: #1d4ed8;
+        }
+
+        body[data-theme="dark"] .badge-approver--admin {
+            background: rgba(59, 130, 246, 0.22);
+            color: rgba(191, 219, 254, 0.98);
+        }
+
+        .badge-approver-dot {
+            width: 8px;
+            height: 8px;
+            border-radius: 999px;
+            background: currentColor;
+        }
+
         .pill-label {
             font-size: .72rem;
             text-transform: uppercase;
@@ -61,16 +110,7 @@
 
         .text-mono {
             font-variant-numeric: tabular-nums;
-            font-family: ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, "Liberation Mono", "Courier New", monospace;
-        }
-
-        .muted-note {
-            font-size: .82rem;
-            color: #64748b;
-        }
-
-        body[data-theme="dark"] .muted-note {
-            color: rgba(148, 163, 184, .95);
+            font-family: ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, "Courier New", monospace;
         }
 
         .table-wrap {
@@ -230,11 +270,10 @@
         $user = auth()->user();
         $canApprove =
             $user &&
-            ($user->role ?? null) === 'owner' &&
+            in_array($user->role ?? null, ['owner', 'admin'], true) &&
             method_exists($adjustment, 'canApprove') &&
             $adjustment->canApprove();
 
-        // Dari controller (fallback aman)
         $summary = $summary ?? [
             'total_in_qty' => 0,
             'total_out_qty_abs' => 0,
@@ -261,6 +300,34 @@
         $net = (float) ($summary['net_value'] ?? 0);
         $netClass = $net >= 0 ? 'diff-plus' : 'diff-minus';
         $netPillText = $net >= 0 ? 'NET MASUK' : 'NET KELUAR';
+
+        $totalInQty = (float) ($summary['total_in_qty'] ?? 0);
+        $totalOutQtyAbs = (float) ($summary['total_out_qty_abs'] ?? 0);
+        $netQtyRaw = $totalInQty - $totalOutQtyAbs;
+        $netQtySign = $netQtyRaw > 0 ? '+' : ($netQtyRaw < 0 ? '-' : '');
+        $netQtyAbs = abs($netQtyRaw);
+
+        $totalInVal = (float) ($summary['total_in_value'] ?? 0);
+        $totalOutVal = (float) ($summary['total_out_value'] ?? 0);
+        $netVal = (float) ($summary['net_value'] ?? 0);
+
+        // ✅ Badge "Approved by Admin / Owner"
+        $approverRole = $adjustment->approver?->role ?? null;
+        $approverBadgeText = null;
+        $approverBadgeClass = 'badge-approver';
+
+        if ($adjustment->status === InventoryAdjustment::STATUS_APPROVED && $approverRole) {
+            if ($approverRole === 'owner') {
+                $approverBadgeText = 'Approved by Owner';
+                $approverBadgeClass .= ' badge-approver--owner';
+            } elseif ($approverRole === 'admin') {
+                $approverBadgeText = 'Approved by Admin';
+                $approverBadgeClass .= ' badge-approver--admin';
+            } else {
+                // fallback kalau ada role lain
+                $approverBadgeText = 'Approved by ' . ucfirst($approverRole);
+            }
+        }
     @endphp
 
     <div class="page-wrap">
@@ -274,22 +341,34 @@
                     Inventory Adjustment • {{ $adjustment->code }}
                 </h1>
                 <p class="text-muted mb-0" style="font-size: .86rem;">
-                    Dokumen penyesuaian stok gudang (selisih fisik vs sistem).
+                    Dokumen penyesuaian stok gudang.
                 </p>
             </div>
 
             <div class="text-end">
-                <span class="{{ $statusClass }}">{{ ucfirst($adjustment->status) }}</span>
+                <div class="d-flex flex-column align-items-end gap-1">
+                    <div>
+                        <span class="{{ $statusClass }}">{{ ucfirst($adjustment->status) }}</span>
 
-                @if ($canApprove)
-                    <form action="{{ route('inventory.adjustments.approve', $adjustment) }}" method="POST" class="mt-2"
-                        onsubmit="return confirm('Approve adjustment ini? Stok akan dikoreksi sesuai baris di bawah.');">
-                        @csrf
-                        <button class="btn btn-sm btn-success">
-                            Approve & Eksekusi Stok
-                        </button>
-                    </form>
-                @endif
+                        {{-- ✅ Badge siapa yang approve (Owner vs Admin) --}}
+                        @if ($approverBadgeText)
+                            <span class="{{ $approverBadgeClass }} ms-1">
+                                <span class="badge-approver-dot"></span>
+                                {{ $approverBadgeText }}
+                            </span>
+                        @endif
+                    </div>
+
+                    @if ($canApprove)
+                        <form action="{{ route('inventory.adjustments.approve', $adjustment) }}" method="POST"
+                            onsubmit="return confirm('Approve adjustment ini? Stok akan dikoreksi sesuai baris di bawah.');">
+                            @csrf
+                            <button class="btn btn-sm btn-success mt-1">
+                                Approve & Eksekusi Stok
+                            </button>
+                        </form>
+                    @endif
+                </div>
             </div>
         </div>
 
@@ -309,10 +388,10 @@
             </div>
         @endif
 
-        {{-- INFO HEADER --}}
+        {{-- INFO HEADER + SUMMARY --}}
         <div class="card card-main mb-3">
             <div class="card-body">
-                <div class="row g-3">
+                <div class="row g-3 mb-3">
                     <div class="col-md-4">
                         <div class="pill-label">Gudang</div>
                         <div class="fw-semibold">{{ $adjustment->warehouse?->code ?? '-' }}</div>
@@ -336,14 +415,14 @@
                     <div class="col-md-4">
                         <div class="pill-label">Dibuat</div>
                         <div>{{ $adjustment->creator?->name ?? '-' }}</div>
-                        <small class="text-muted">
+                        <small class="text-muted d-block">
                             {{ $adjustment->created_at?->format('d M Y H:i') ?? '-' }}
                         </small>
 
                         @if ($adjustment->approved_by)
                             <div class="pill-label mt-3">Approved</div>
                             <div>{{ $adjustment->approver?->name ?? '-' }}</div>
-                            <small class="text-muted">
+                            <small class="text-muted d-block">
                                 {{ $adjustment->approved_at?->format('d M Y H:i') ?? '-' }}
                             </small>
                         @endif
@@ -352,7 +431,7 @@
 
                 @if ($adjustment->reason || $adjustment->notes)
                     <hr>
-                    <div class="row g-3">
+                    <div class="row g-3 mb-2">
                         <div class="col-md-6">
                             <div class="pill-label">Alasan</div>
                             <div>{{ $adjustment->reason }}</div>
@@ -366,18 +445,9 @@
 
                 <hr>
 
-                {{-- Penjelasan Nilai --}}
-                <div class="muted-note mb-2">
-                    <b>Nilai</b> dihitung dari <b>HPP × |Qty Selisih|</b>.
-                    @if ($isApproved)
-                        Karena sudah <b>Approved</b>, nilai mengambil data <b>kartu stok (mutasi)</b> sehingga konsisten.
-                    @elseif ($isPendingLike)
-                        Karena belum Approved, nilai ini masih <b>estimasi</b> (dari HPP aktif/snapshot/base).
-                    @endif
-                </div>
-
                 {{-- RINGKASAN (Qty + Nilai) --}}
                 <div class="summary-grid">
+                    {{-- Qty --}}
                     <div class="summary-card">
                         <div class="summary-title">
                             <div class="pill-label">Ringkasan Qty</div>
@@ -386,53 +456,60 @@
                             </span>
                         </div>
 
-                        <div class="summary-sub mt-1">Masuk / Keluar (qty selisih)</div>
-
                         <div class="summary-value text-mono">
-                            <span class="diff-plus">+{{ number_format((float) $summary['total_in_qty'], 2) }}</span>
+                            <span class="diff-plus">
+                                +{{ number_format($totalInQty, 2) }}
+                            </span>
                             <span class="mx-2" style="color:#94a3b8;">|</span>
-                            <span class="diff-minus">-{{ number_format((float) $summary['total_out_qty_abs'], 2) }}</span>
+                            <span class="diff-minus">
+                                -{{ number_format($totalOutQtyAbs, 2) }}
+                            </span>
                         </div>
 
                         <div class="summary-sub mt-2">
                             Net Qty:
                             <span class="text-mono {{ $netClass }}">
-                                {{ $net >= 0 ? '+' : '-' }}
-                                {{ number_format(abs((float) (($summary['total_in_qty'] ?? 0) - ($summary['total_out_qty_abs'] ?? 0))), 2) }}
+                                {{ $netQtySign }}{{ number_format($netQtyAbs, 2) }}
                             </span>
                         </div>
                     </div>
 
+                    {{-- Nilai Masuk --}}
                     <div class="summary-card">
                         <div class="summary-title">
                             <div class="pill-label">Nilai Masuk</div>
                             <span class="badge-dir badge-dir--in">MASUK</span>
                         </div>
 
-                        <div class="summary-sub mt-1">Total HPP untuk qty masuk</div>
                         <div class="summary-value text-mono diff-plus">
                             +{{ $summaryFmt['total_in_value'] }}
                         </div>
 
-                        <div class="summary-sub mt-2">
-                            (HPP × |Qty|)
+                        <div class="summary-sub mt-1">
+                            {{ $totalInVal == 0 ? 'Belum ada nilai masuk' : 'Total nilai stok yang bertambah' }}
                         </div>
                     </div>
 
+                    {{-- Nilai Keluar + Net Nilai --}}
                     <div class="summary-card">
                         <div class="summary-title">
                             <div class="pill-label">Nilai Keluar</div>
                             <span class="badge-dir badge-dir--out">KELUAR</span>
                         </div>
 
-                        <div class="summary-sub mt-1">Total HPP untuk qty keluar</div>
                         <div class="summary-value text-mono diff-minus">
                             -{{ $summaryFmt['total_out_value'] }}
                         </div>
 
+                        <div class="summary-sub mt-1">
+                            {{ $totalOutVal == 0 ? 'Belum ada nilai keluar' : 'Total nilai stok yang berkurang' }}
+                        </div>
+
                         <div class="summary-sub mt-2">
                             Net Nilai:
-                            <span class="text-mono {{ $netClass }}">{{ $summaryFmt['net_value'] }}</span>
+                            <span class="text-mono {{ $netClass }}">
+                                {{ $summaryFmt['net_value'] }}
+                            </span>
                         </div>
                     </div>
                 </div>
@@ -443,13 +520,9 @@
         {{-- DETAIL LINES --}}
         <div class="card card-main">
             <div class="card-body">
-                <div class="d-flex align-items-end justify-content-between gap-2">
+                <div class="d-flex align-items-end justify-content-between gap-2 mb-2">
                     <div>
                         <h2 class="h6 mb-1">Detail Baris Adjustment</h2>
-                        <div class="muted-note">
-                            <span class="diff-plus"><b>+ Masuk</b></span> = stok bertambah,
-                            <span class="diff-minus"><b>- Keluar</b></span> = stok berkurang.
-                        </div>
                     </div>
                 </div>
 
@@ -472,8 +545,6 @@
                             @forelse ($adjustment->lines as $i => $line)
                                 @php
                                     $dir = $line->direction === 'out' ? 'out' : 'in';
-
-                                    // qty_change boleh signed; tampilkan abs dengan prefix dari direction
                                     $qtySigned = (float) ($line->qty_change ?? 0);
                                     $qtyAbs = abs($qtySigned);
 
@@ -487,7 +558,8 @@
 
                                     <td data-label="Item">
                                         <b>{{ $line->item?->code ?? '-' }}</b>
-                                        <div class="text-muted" style="font-size:.83rem;">{{ $line->item?->name ?? '' }}
+                                        <div class="text-muted" style="font-size:.83rem;">
+                                            {{ $line->item?->name ?? '' }}
                                         </div>
                                     </td>
 
@@ -505,7 +577,9 @@
                                     <td data-label="HPP / Unit" class="text-end text-mono">
                                         {{ $unitCostFmt }}
                                         @if (!$isApproved)
-                                            <div class="muted-note" style="font-size:.74rem;">estimasi</div>
+                                            <div style="font-size:.74rem; color:#9ca3af;">
+                                                estimasi
+                                            </div>
                                         @endif
                                     </td>
 
@@ -536,14 +610,6 @@
                         </tbody>
                     </table>
                 </div>
-
-                @if ($isPendingLike)
-                    <div class="muted-note mt-3">
-                        <b>Catatan:</b> Setelah dokumen di-approve, sistem akan membuat mutasi stok dan nilai akan
-                        “terkunci”
-                        mengikuti unit_cost pada mutasi.
-                    </div>
-                @endif
 
             </div>
         </div>

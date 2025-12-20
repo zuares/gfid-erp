@@ -41,12 +41,15 @@ class StockOpnameController extends Controller
         // status: draft/counting/reviewed/finalized/all
         if ($request->filled('status')) {
             $status = $request->string('status')->toString();
-            if ($status !== 'all' && in_array($status, [
-                StockOpname::STATUS_DRAFT,
-                StockOpname::STATUS_COUNTING,
-                StockOpname::STATUS_REVIEWED,
-                StockOpname::STATUS_FINALIZED,
-            ], true)) {
+            if (
+                $status !== 'all'
+                && in_array($status, [
+                    StockOpname::STATUS_DRAFT,
+                    StockOpname::STATUS_COUNTING,
+                    StockOpname::STATUS_REVIEWED,
+                    StockOpname::STATUS_FINALIZED,
+                ], true)
+            ) {
                 $query->where('status', $status);
             }
         }
@@ -106,7 +109,11 @@ class StockOpnameController extends Controller
         ]);
 
         $type = $validated['type'] ?? StockOpname::TYPE_PERIODIC;
-        $autoGenerate = $request->boolean('auto_generate_lines', true);
+
+        // ✅ Hanya aktif kalau mode PERIODIC dan checkbox dicentang
+        $autoGenerate = $type === StockOpname::TYPE_PERIODIC
+        ? $request->boolean('auto_generate_lines')
+        : false;
 
         $opname = null;
 
@@ -123,7 +130,7 @@ class StockOpnameController extends Controller
             $opname->created_by = auth()->id();
             $opname->save();
 
-            if ($type === StockOpname::TYPE_PERIODIC && $autoGenerate) {
+            if ($autoGenerate) {
                 $this->stockOpnameService->generateLinesFromWarehouse(
                     opname: $opname,
                     warehouseId: $opname->warehouse_id,
@@ -147,6 +154,9 @@ class StockOpnameController extends Controller
         return view('inventory.stock_opnames.edit', ['opname' => $stockOpname]);
     }
 
+    /**
+     * Detail (read-only) + tombol Simpan & Selesai Hitung + Reopen.
+     */
     public function show(StockOpname $stockOpname): View
     {
         $stockOpname->load(['warehouse', 'lines.item', 'creator', 'reviewer', 'finalizer']);
@@ -187,6 +197,15 @@ class StockOpnameController extends Controller
 
     /**
      * Update hasil counting (physical_qty / unit_cost / notes).
+     *
+     * PERIODIK:
+     * - Baris yang tidak diisi di UI dianggap Qty Fisik = 0 (dan is_counted = true).
+     *
+     * OPENING:
+     * - Baris yang tidak diisi tetap physical_qty = null, is_counted = false.
+     *
+     * JUGA dipakai oleh:
+     * - tombol "Simpan & Selesai Hitung" di SHOW (mark_reviewed = 1, tanpa kirim lines).
      */
     public function update(Request $request, StockOpname $stockOpname): RedirectResponse
     {
@@ -207,8 +226,19 @@ class StockOpnameController extends Controller
         ]);
 
         $markReviewed = $request->boolean('mark_reviewed');
+        $isOpening = $stockOpname->isOpening();
 
-        DB::transaction(function () use ($stockOpname, $validated, $markReviewed) {
+        // ✅ Guard backend: siapa yang boleh tandai selesai hitung
+        if ($markReviewed) {
+            $userRole = auth()->user()->role ?? null;
+            if (!in_array($userRole, ['operating', 'admin', 'owner'], true)) {
+                throw ValidationException::withMessages([
+                    'mark_reviewed' => 'Anda tidak memiliki hak untuk menandai counting selesai.',
+                ]);
+            }
+        }
+
+        DB::transaction(function () use ($stockOpname, $validated, $markReviewed, $isOpening) {
             $stockOpname->notes = $validated['notes'] ?? $stockOpname->notes;
 
             if ($stockOpname->status === StockOpname::STATUS_DRAFT) {
@@ -218,7 +248,8 @@ class StockOpnameController extends Controller
             $linesInput = $validated['lines'] ?? [];
 
             if (!empty($linesInput)) {
-                $stockOpname->load('lines');
+                // ✅ sekaligus load relasi item agar bisa ambil base_unit_cost
+                $stockOpname->load('lines.item');
 
                 foreach ($linesInput as $lineId => $data) {
                     /** @var \App\Models\StockOpnameLine|null $line */
@@ -229,16 +260,34 @@ class StockOpnameController extends Controller
 
                     $systemQty = (float) ($line->system_qty ?? 0);
 
-                    $physicalQty = (($data['physical_qty'] ?? '') !== '')
-                    ? (float) $data['physical_qty']
-                    : null;
+                    // --- PERLAKUAN physical_qty ---
+                    // Opening: boleh null => belum dihitung
+                    // Periodik: kalau kosong, anggap 0 dan dianggap sudah dihitung
+                    $rawPhysical = $data['physical_qty'] ?? null;
+
+                    if ($rawPhysical === '' || $rawPhysical === null) {
+                        if ($isOpening) {
+                            $physicalQty = null;
+                        } else {
+                            $physicalQty = 0.0;
+                        }
+                    } else {
+                        $physicalQty = (float) $rawPhysical;
+                    }
 
                     $difference = 0.0;
                     $isCounted = false;
 
                     if ($physicalQty !== null) {
                         $difference = $physicalQty - $systemQty;
-                        $isCounted = true;
+                        // Periodik: semua baris dianggap counted (termasuk yang default 0)
+                        $isCounted = $isOpening ? true : true;
+                    }
+
+                    if ($isOpening && $physicalQty === null) {
+                        // Opening, belum diisi: jangan counted, selisih tetap 0
+                        $isCounted = false;
+                        $difference = 0.0;
                     }
 
                     $line->physical_qty = $physicalQty;
@@ -246,8 +295,20 @@ class StockOpnameController extends Controller
                     $line->is_counted = $isCounted;
                     $line->notes = $data['notes'] ?? $line->notes;
 
+                    // --- HPP / unit ---
                     if (array_key_exists('unit_cost', $data)) {
                         $line->unit_cost = $data['unit_cost'] !== null ? (float) $data['unit_cost'] : null;
+                    }
+
+                    // ✅ RULE BARU: khusus SO PERIODIK
+                    // Kalau HPP kosong / 0 => ambil dari master item (base_unit_cost)
+                    if (!$isOpening) {
+                        if ($line->unit_cost === null || $line->unit_cost <= 0) {
+                            $base = optional($line->item)->base_unit_cost;
+                            if ($base !== null && $base > 0) {
+                                $line->unit_cost = (float) $base;
+                            }
+                        }
                     }
 
                     $line->save();
@@ -273,21 +334,21 @@ class StockOpnameController extends Controller
             $stockOpname->save();
         });
 
-        // ✅ kalau klik tombol selesai counting
+        // ✅ kalau klik tombol selesai counting (dari edit/show)
         if ($request->boolean('mark_reviewed')) {
             return redirect()
                 ->route('inventory.stock_opnames.show', $stockOpname)
                 ->with('success', 'Counting selesai. Dokumen dikirim untuk review.');
         }
 
-        // ✅ kalau klik simpan biasa
+        // ✅ kalau klik simpan biasa (misalnya dari edit form)
         if ($request->boolean('save_and_view')) {
             return redirect()
                 ->route('inventory.stock_opnames.show', $stockOpname)
                 ->with('success', 'Perubahan berhasil disimpan.');
         }
 
-        // fallback default (kalau ada submit lain)
+        // fallback default
         return redirect()
             ->back()
             ->with('success', 'Perubahan berhasil disimpan.');
@@ -345,6 +406,12 @@ class StockOpnameController extends Controller
             ->with('message', 'Stock opname berhasil difinalkan.');
     }
 
+    /**
+     * Tambah / update baris opname via AJAX.
+     * Sekarang dipakai untuk:
+     * - OPENING: tambah item saldo awal
+     * - PERIODIK: tambah / update item hasil count (item manual di luar generate stok juga boleh)
+     */
     public function addLine(Request $request, StockOpname $stockOpname): RedirectResponse | \Illuminate\Http\JsonResponse
     {
         if (!$stockOpname->canModifyLines()) {
@@ -359,17 +426,7 @@ class StockOpnameController extends Controller
                 ->with('message', $message);
         }
 
-        if (!$stockOpname->isOpening()) {
-            $message = 'Penambahan item manual hanya diizinkan untuk mode Opening Balance.';
-            if ($request->ajax() || $request->wantsJson()) {
-                return response()->json(['status' => 'error', 'message' => $message], 422);
-            }
-
-            return redirect()
-                ->route('inventory.stock_opnames.edit', $stockOpname)
-                ->with('status', 'error')
-                ->with('message', $message);
-        }
+        $isOpening = $stockOpname->isOpening();
 
         $validated = $request->validate([
             'item_id' => ['required', 'exists:items,id'],
@@ -381,7 +438,7 @@ class StockOpnameController extends Controller
 
         $updateExisting = $request->boolean('update_existing');
 
-        DB::transaction(function () use ($stockOpname, $validated, $updateExisting) {
+        DB::transaction(function () use ($stockOpname, $validated, $updateExisting, $isOpening) {
             $itemId = (int) $validated['item_id'];
 
             $existingLine = $stockOpname->lines()->where('item_id', $itemId)->first();
@@ -392,9 +449,19 @@ class StockOpnameController extends Controller
                 ]);
             }
 
-            $physicalQty = array_key_exists('physical_qty', $validated) && $validated['physical_qty'] !== null
-            ? (float) $validated['physical_qty']
-            : null;
+            // PERLAKUAN physical_qty sama seperti di update():
+            // - Opening: boleh null (belum dihitung)
+            // - Periodik: kalau kosong, jadikan 0 dan counted
+            $rawPhysical = $validated['physical_qty'] ?? null;
+            if ($rawPhysical === '' || $rawPhysical === null) {
+                if ($isOpening) {
+                    $physicalQty = null;
+                } else {
+                    $physicalQty = 0.0;
+                }
+            } else {
+                $physicalQty = (float) $rawPhysical;
+            }
 
             $unitCost = array_key_exists('unit_cost', $validated) ? $validated['unit_cost'] : null;
             $notes = $validated['notes'] ?? null;
@@ -406,7 +473,12 @@ class StockOpnameController extends Controller
 
                 if ($physicalQty !== null) {
                     $difference = $physicalQty - $systemQty;
-                    $isCounted = true;
+                    $isCounted = $isOpening ? true : true;
+                }
+
+                if ($isOpening && $physicalQty === null) {
+                    $isCounted = false;
+                    $difference = 0.0;
                 }
 
                 $existingLine->physical_qty = $physicalQty;
@@ -416,13 +488,20 @@ class StockOpnameController extends Controller
                 $existingLine->notes = $notes ?? $existingLine->notes;
                 $existingLine->save();
             } else {
+                // Periodik: item baru manual yang tidak ada di generate
+                // dianggap stok sistem 0 (jadi selisih = Qty Fisik - 0)
                 $systemQty = 0.0;
                 $difference = 0.0;
                 $isCounted = false;
 
                 if ($physicalQty !== null) {
                     $difference = $physicalQty - $systemQty;
-                    $isCounted = true;
+                    $isCounted = $isOpening ? true : true;
+                }
+
+                if ($isOpening && $physicalQty === null) {
+                    $isCounted = false;
+                    $difference = 0.0;
                 }
 
                 $line = new StockOpnameLine();
@@ -439,13 +518,13 @@ class StockOpnameController extends Controller
         });
 
         if ($request->ajax() || $request->wantsJson()) {
-            return response()->json(['status' => 'ok', 'message' => 'Item saldo awal berhasil disimpan.']);
+            return response()->json(['status' => 'ok', 'message' => 'Item opname berhasil disimpan.']);
         }
 
         return redirect()
             ->route('inventory.stock_opnames.edit', $stockOpname)
             ->with('status', 'success')
-            ->with('message', 'Item saldo awal berhasil disimpan.');
+            ->with('message', 'Item opname berhasil disimpan.');
     }
 
     public function deleteLine(Request $request, StockOpname $stockOpname, StockOpnameLine $line)
@@ -527,5 +606,30 @@ class StockOpnameController extends Controller
         });
 
         return back()->with('status', 'success')->with('message', 'Semua baris berhasil dihapus. Anda dapat mulai input kembali.');
+    }
+
+    /**
+     * Reopen Counting:
+     * - hanya boleh kalau canReopen() = true (biasanya Owner & status REVIEWED)
+     * - tidak menghapus qty fisik, hanya buka status ke COUNTING lagi
+     */
+    public function reopen(StockOpname $stockOpname)
+    {
+        if (!$stockOpname->canReopen()) {
+            return back()
+                ->with('status', 'error')
+                ->with('message', 'Dokumen tidak bisa direopen.');
+        }
+
+        DB::transaction(function () use ($stockOpname) {
+            $stockOpname->status = StockOpname::STATUS_COUNTING;
+            $stockOpname->reviewed_by = null;
+            $stockOpname->reviewed_at = null;
+            $stockOpname->save();
+        });
+
+        return back()
+            ->with('status', 'success')
+            ->with('message', 'Stock Opname dibuka kembali untuk counting.');
     }
 }

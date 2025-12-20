@@ -86,6 +86,9 @@ Route::middleware(['web', 'auth', 'role:owner,admin,operating'])->group(function
                     Route::post('/{stockOpname}/reset-all-lines',
                         [StockOpnameController::class, 'resetAllLines']
                     )->name('reset_all_lines');
+                    Route::post('/{stockOpname}/reopen',
+                        [StockOpnameController::class, 'reopen']
+                    )->name('reopen');
                 });
 
             // ================== INVENTORY ADJUSTMENTS ==================

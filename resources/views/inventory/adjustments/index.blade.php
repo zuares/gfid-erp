@@ -1,4 +1,3 @@
-{{-- resources/views/inventory/inventory_adjustments/index.blade.php --}}
 @extends('layouts.app')
 
 @section('title', 'Inventory • Adjustments')
@@ -69,6 +68,36 @@
         .badge-status--void {
             background: rgba(239, 68, 68, 0.18);
             color: #b91c1c;
+        }
+
+        .badge-approver {
+            font-size: .68rem;
+            padding: .12rem .4rem;
+            border-radius: 999px;
+            font-weight: 600;
+            display: inline-flex;
+            align-items: center;
+            gap: .25rem;
+            margin-top: .1rem;
+        }
+
+        .badge-approver--owner {
+            background: rgba(22, 163, 74, 0.18);
+            color: #166534;
+            border: 1px solid rgba(22, 163, 74, 0.45);
+        }
+
+        .badge-approver--admin {
+            background: rgba(59, 130, 246, 0.18);
+            color: #1d4ed8;
+            border: 1px solid rgba(59, 130, 246, 0.45);
+        }
+
+        .badge-approver-dot {
+            width: 7px;
+            height: 7px;
+            border-radius: 999px;
+            background: currentColor;
         }
 
         .pill-label {
@@ -330,7 +359,6 @@
                         <tbody>
                             @forelse ($adjustments as $index => $adj)
                                 @php
-                                    // dd($adj);
                                     $statusClass = match ($adj->status) {
                                         'draft' => 'badge-status badge-status--draft',
                                         'pending' => 'badge-status badge-status--pending',
@@ -351,6 +379,20 @@
 
                                     $netClass = ((float) ($s['net_value'] ?? 0)) >= 0 ? 'diff-plus' : 'diff-minus';
                                     $source = $sourceLabel($adj);
+
+                                    // Badge "Approved by" di index
+                                    $approvalBadgeClass = null;
+                                    $approvalBadgeText = null;
+                                    if ($adj->approved_by && $adj->approver) {
+                                        $approverRole = $adj->approver->role ?? null;
+                                        if ($approverRole === 'owner') {
+                                            $approvalBadgeClass = 'badge-approver badge-approver--owner';
+                                            $approvalBadgeText = 'Approved by Owner';
+                                        } elseif ($approverRole === 'admin') {
+                                            $approvalBadgeClass = 'badge-approver badge-approver--admin';
+                                            $approvalBadgeText = 'Approved by Admin';
+                                        }
+                                    }
                                 @endphp
 
                                 <tr>
@@ -424,6 +466,13 @@
                                             @if ($adj->approved_by)
                                                 <br>
                                                 <span class="text-success">✔ {{ $adj->approver?->name ?? '' }}</span>
+                                                @if ($approvalBadgeClass && $approvalBadgeText)
+                                                    <br>
+                                                    <span class="{{ $approvalBadgeClass }}">
+                                                        <span class="badge-approver-dot"></span>
+                                                        {{ $approvalBadgeText }}
+                                                    </span>
+                                                @endif
                                             @endif
                                         </small>
                                     </td>

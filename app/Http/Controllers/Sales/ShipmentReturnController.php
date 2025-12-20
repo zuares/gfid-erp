@@ -325,7 +325,6 @@ class ShipmentReturnController extends Controller
             $totalQty = 0;
 
             foreach ($shipmentReturn->lines as $line) {
-                // ✅ pakai kolom yg bener: qty
                 $qty = (int) $line->qty;
 
                 if ($qty <= 0) {
@@ -334,7 +333,18 @@ class ShipmentReturnController extends Controller
 
                 $totalQty += $qty;
 
-                // ✅ Nambah stok FG ke WH-RTS
+                // ✅ Ambil HPP dari master item
+                $unitCost = optional($line->item)->hpp;
+
+                // Opsional: kalau HPP null atau <= 0, bisa fallback ke null
+                if ($unitCost !== null) {
+                    $unitCost = (float) $unitCost;
+                    if ($unitCost <= 0) {
+                        $unitCost = null;
+                    }
+                }
+
+                // ✅ Nambah stok FG ke WH-RTS dengan HPP dari item
                 $this->inventory->stockIn(
                     warehouseId: $warehouse->id,
                     itemId: $line->item_id,
@@ -345,8 +355,8 @@ class ShipmentReturnController extends Controller
                     notes: 'Retur shipment ' . ($shipmentReturn->code ?? $shipmentReturn->id) .
                     ' dari store ' . ($shipmentReturn->store->code ?? '-'),
                     lotId: null, // FG tidak pakai LOT
-                    unitCost: null, // biar pakai MA FG di WH-RTS
-                    affectLotCost: false, // jangan sentuh LotCost kain
+                    unitCost: $unitCost, // ⬅️ sekarang pakai kolom items.hpp
+                    affectLotCost: false, // tetap jangan sentuh LotCost kain
                 );
             }
 

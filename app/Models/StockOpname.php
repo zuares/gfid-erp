@@ -138,7 +138,10 @@ class StockOpname extends Model
      */
     public function canModifyLines(): bool
     {
-        return in_array($this->status, [self::STATUS_DRAFT, self::STATUS_COUNTING], true);
+        return !in_array($this->status, [
+            self::STATUS_REVIEWED,
+            self::STATUS_FINALIZED,
+        ]);
     }
 
     /**
@@ -163,5 +166,20 @@ class StockOpname extends Model
     public function getIsFinalizedAttribute(): bool
     {
         return $this->isFinalized();
+    }
+
+    public function canReopen(): bool
+    {
+        $user = auth()->user();
+        if (!$user) {
+            return false;
+        }
+
+        // hanya owner
+        if ($user->role !== 'owner') {
+            return false;
+        }
+
+        return $this->status === self::STATUS_REVIEWED;
     }
 }

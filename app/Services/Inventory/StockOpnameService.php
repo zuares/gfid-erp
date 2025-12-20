@@ -5,6 +5,7 @@ namespace App\Services\Inventory;
 use App\Models\InventoryAdjustment;
 use App\Models\InventoryAdjustmentLine;
 use App\Models\InventoryMutation;
+use App\Models\Item;
 use App\Models\ItemCostSnapshot;
 use App\Models\StockOpname;
 use App\Models\StockOpnameLine;
@@ -22,6 +23,7 @@ class StockOpnameService
      * Generate lines dari stok sistem gudang (periodic):
      * - SUM(qty_change) dari inventory_mutations per item
      * - Hanya item dengan stok != 0 kalau $onlyWithStock = true
+     * - SO Periodik: HPP awal diisi dari master item (kolom items.hpp)
      */
     public function generateLinesFromWarehouse(
         StockOpname $opname,
@@ -38,19 +40,40 @@ class StockOpnameService
 
         $stocks = $query->get();
 
+        // Cek tipe: opening / periodic
+        $isOpening = method_exists($opname, 'isOpening')
+        ? $opname->isOpening()
+        : ($opname->type === StockOpname::TYPE_OPENING);
+
+        // Ambil master item sekali saja
+        $itemIds = $stocks->pluck('item_id')->filter()->unique()->all();
+        $items = Item::whereIn('id', $itemIds)->get()->keyBy('id');
+
         $now = now();
         $rows = [];
 
         foreach ($stocks as $row) {
+            $itemId = (int) $row->item_id;
+            $item = $items->get($itemId);
+
+            // DEFAULT: null
+            $unitCost = null;
+
+            // ✅ Hanya untuk SO PERIODIK:
+            //    kalau ada HPP di master (kolom items.hpp), pakai itu
+            if (!$isOpening && $item && (float) $item->hpp > 0) {
+                $unitCost = (float) $item->hpp;
+            }
+
             $rows[] = [
                 'stock_opname_id' => $opname->id,
-                'item_id' => (int) $row->item_id,
+                'item_id' => $itemId,
                 'system_qty' => (float) $row->qty,
                 'physical_qty' => null,
                 'difference_qty' => 0,
                 'is_counted' => false,
                 'notes' => null,
-                'unit_cost' => null,
+                'unit_cost' => $unitCost, // ← sudah isi dari master HPP kalau Periodik
                 'created_at' => $now,
                 'updated_at' => $now,
             ];
@@ -228,9 +251,8 @@ class StockOpnameService
             }
 
             // ==========================================================
-            // PERIODIC: tetap seperti biasa
+            // PERIODIC: tetap seperti biasa, tapi sekarang kirim HPP ke mutasi
             // ==========================================================
-
             $adjustment = new InventoryAdjustment();
             $adjustment->code = $this->generateAdjustmentCodeForDate($date);
             $adjustment->date = $date;
@@ -261,26 +283,54 @@ class StockOpnameService
                 $difference = $physicalQty - $systemQty; // SIGNED
 
                 if (abs($difference) < 0.0000001) {
+                    // tetep simpan line biar audit kelihatan, tapi tidak perlu mutasi stok
+                    InventoryAdjustmentLine::create([
+                        'inventory_adjustment_id' => $adjustment->id,
+                        'item_id' => (int) $line->item_id,
+                        'qty_before' => $systemQty,
+                        'qty_after' => $physicalQty,
+                        'qty_change' => 0,
+                        'direction' => 'in',
+                        'notes' => $line->notes,
+                        'lot_id' => null,
+                    ]);
                     continue;
                 }
 
                 $direction = $difference >= 0 ? 'in' : 'out';
 
+                // Simpan ringkasan di adjustment line
                 InventoryAdjustmentLine::create([
                     'inventory_adjustment_id' => $adjustment->id,
                     'item_id' => (int) $line->item_id,
                     'qty_before' => $systemQty,
                     'qty_after' => $physicalQty,
-                    'qty_change' => $difference, // ✅ SIGNED
+                    'qty_change' => $difference, // SIGNED
                     'direction' => $direction,
                     'notes' => $line->notes,
                     'lot_id' => null,
                 ]);
 
+                // Kalau bukan owner → belum eksekusi stok, cuma bikin dokumen
                 if (!$isOwner) {
                     continue;
                 }
 
+                /**
+                 * ==== Resolve unit cost periodic ====
+                 * Urutan:
+                 * 1. Kalau SO Periodik punya unit_cost di baris item → pakai itu
+                 * 2. Kalau tidak, pakai HPP dari master item (kolom items.hpp)
+                 */
+                $unitCost = null;
+
+                if ($line->unit_cost !== null && (float) $line->unit_cost > 0) {
+                    $unitCost = (float) $line->unit_cost;
+                } elseif ($line->item && (float) $line->item->hpp > 0) {
+                    $unitCost = (float) $line->item->hpp;
+                }
+
+                // Sesuaikan stok ke qty fisik hasil SO
                 $this->inventory->adjustTo(
                     warehouseId: $warehouseId,
                     itemId: (int) $line->item_id,
@@ -290,8 +340,11 @@ class StockOpnameService
                     sourceId: $adjustment->id,
                     notes: $adjustment->reason,
                     lotId: null,
+                    unitCostOverride: $unitCost, // ✅ kunci supaya mutasi periodic ada HPP (dari items.hpp)
+                    affectLotCost: false,
                 );
 
+                // Snapshot periodic (pakai unitCost yg sama)
                 $this->snapshotPeriodicCost(
                     itemId: (int) $line->item_id,
                     warehouseId: $warehouseId,
@@ -363,6 +416,11 @@ class StockOpnameService
     // PERIODIC HELPERS
     // ==========================================================
 
+    /**
+     * Snapshot HPP untuk SO Periodik:
+     * - Prioritas 1: HPP di baris SO (unit_cost)
+     * - Prioritas 2: HPP di master item (kolom items.hpp)
+     */
     protected function snapshotPeriodicCost(
         int $itemId,
         int $warehouseId,
@@ -371,25 +429,33 @@ class StockOpnameService
         StockOpname $opname,
         ?string $notes
     ): void {
-        $active = ItemCostSnapshot::getActiveForItem($itemId, $warehouseId);
-
         $unitCost = 0.0;
 
-        if ($active && (float) $active->unit_cost > 0) {
-            $unitCost = (float) $active->unit_cost;
+        // Cari line SO untuk item ini
+        /** @var \App\Models\StockOpnameLine|null $line */
+        $line = $opname->lines->firstWhere('item_id', $itemId);
+
+        // 1) Kalau di SO Periodik sudah ada HPP (unit_cost) → pakai itu dulu
+        if ($line && $line->unit_cost !== null && (float) $line->unit_cost > 0) {
+            $unitCost = (float) $line->unit_cost;
         } else {
-            $item = $opname->lines->firstWhere('item_id', $itemId)?->item;
-            if ($item && (float) $item->base_unit_cost > 0) {
-                $unitCost = (float) $item->base_unit_cost;
+            // 2) Kalau belum ada HPP di line → ambil dari master item (kolom items.hpp)
+            $item = $line?->item ?: Item::find($itemId);
+
+            if ($item && (float) $item->hpp > 0) {
+                $unitCost = (float) $item->hpp;
             }
         }
 
+        // Kalau tetap tidak ada HPP yang valid → jangan bikin snapshot
         if ($unitCost <= 0) {
             return;
         }
 
+        // Matikan snapshot aktif sebelumnya
         $this->deactivateActiveSnapshots($itemId, $warehouseId);
 
+        // Buat snapshot periodic baru
         ItemCostSnapshot::create([
             'item_id' => $itemId,
             'warehouse_id' => $warehouseId,
