@@ -146,94 +146,85 @@
 @endpush
 
 <div class="lot-picker-wrap" id="cutting-pick-lot">
-    {{-- Header + select kain + tombol select all --}}
+    {{-- Header + tombol select all --}}
     <div class="lot-picker-header">
         <div>
             <div class="lot-picker-title">
                 Pilih LOT Kain
             </div>
             <p class="lot-picker-help mb-0">
-                Pilih <strong>item kain</strong> terlebih dahulu, lalu centang LOT yang akan dipakai.
+                Centang <strong>LOT kain</strong> yang ingin dipakai untuk Cutting Job ini.
             </p>
         </div>
 
         <div class="lot-picker-actions">
-            {{-- Select item kain --}}
-            <select name="fabric_item_id" id="fabric_item_id" class="form-select form-select-sm" style="min-width: 210px;">
-                <option value="">Pilih item kain…</option>
-                @foreach ($fabricItems as $item)
-                    <option value="{{ $item->id }}" @selected(old('fabric_item_id') == $item->id)>
-                        {{ $item->code }} — {{ $item->name }}
-                    </option>
-                @endforeach
-            </select>
-
-            {{-- Tombol select all / clear --}}
-            <div class="d-flex gap-1">
-                <button type="button" class="btn btn-outline-secondary btn-pill-sm" id="btn-select-all-lots" disabled>
-                    Centang semua
-                </button>
-                <button type="button" class="btn btn-outline-secondary btn-pill-sm" id="btn-unselect-all-lots"
-                    disabled>
-                    Hapus centang
-                </button>
-            </div>
+            <button type="button" class="btn btn-outline-secondary btn-pill-sm" id="btn-select-all-lots" disabled>
+                Centang semua
+            </button>
+            <button type="button" class="btn btn-outline-secondary btn-pill-sm" id="btn-unselect-all-lots" disabled>
+                Hapus centang
+            </button>
         </div>
     </div>
 
-    {{-- Hint di bawah (kondisional) --}}
-    <div id="lot-grid-hint" class="lot-empty-hint">
-        Pilih item kain terlebih dahulu untuk melihat daftar LOT.
-    </div>
+    {{-- Hint + GRID LOT --}}
+    @if ($lotStocks->isEmpty())
+        <div id="lot-grid-hint" class="lot-empty-hint">
+            Belum ada LOT kain yang siap dipakai. Cek stok di modul GRN / gudang RM.
+        </div>
+    @else
+        <div id="lot-grid-hint" class="lot-empty-hint">
+            Centang LOT yang ingin dipakai untuk Cutting Job. Bisa memilih lebih dari satu LOT.
+        </div>
 
-    {{-- GRID LOT --}}
-    <div class="lot-grid mt-2 d-none" id="lot-grid">
-        @foreach ($lotStocks as $row)
-            @php
-                $lot = $row->lot;
-                $item = $lot->item;
-                $wh = $row->warehouse;
-            @endphp
+        <div class="lot-grid mt-2" id="lot-grid">
+            @foreach ($lotStocks as $row)
+                @php
+                    $lot = $row->lot;
+                    $item = $lot->item;
+                    $wh = $row->warehouse;
+                @endphp
 
-            {{-- .lot-row tetap untuk kompat dengan JS lama --}}
-            <div class="lot-card-modern lot-row lot-card-item" data-lot-id="{{ $row->lot_id }}"
-                data-item-id="{{ $item->id }}" data-balance="{{ $row->qty_balance }}">
-                <div class="d-flex justify-content-between align-items-start gap-2">
-                    <div>
-                        <div class="fw-semibold mono lot-code">
-                            {{ $lot->code }}
-                        </div>
-                        <div class="small text-muted">
-                            {{ $item->code }}
-                        </div>
-                        @if ($wh?->code)
-                            <div class="small text-muted d-md-none mt-1">
-                                <span class="lot-card-badge">{{ $wh->code }}</span>
+                {{-- .lot-row tetap untuk kompat dengan JS lama --}}
+                <div class="lot-card-modern lot-row lot-card-item" data-lot-id="{{ $row->lot_id }}"
+                    data-balance="{{ $row->qty_balance }}">
+                    <div class="d-flex justify-content-between align-items-start gap-2">
+                        <div>
+                            <div class="fw-semibold mono lot-code">
+                                {{ $lot->code }}
                             </div>
-                        @endif
+                            <div class="small text-muted">
+                                {{ $item->code }} — {{ $item->name }}
+                            </div>
+                            @if ($wh?->code)
+                                <div class="small text-muted d-md-none mt-1">
+                                    <span class="lot-card-badge">{{ $wh->code }}</span>
+                                </div>
+                            @endif
+                        </div>
+                        <div class="text-end">
+                            <div class="fw-semibold mono">
+                                {{ number_format($row->qty_balance, 2, ',', '.') }}
+                            </div>
+                            @if ($wh?->code)
+                                <div class="small text-muted d-none d-md-block">
+                                    {{ $wh->code }}
+                                </div>
+                            @endif
+                        </div>
                     </div>
-                    <div class="text-end">
-                        <div class="fw-semibold mono">
-                            {{ number_format($row->qty_balance, 2, ',', '.') }}
+
+                    <div class="d-flex justify-content-between align-items-center mt-2">
+                        <div class="form-check">
+                            <input type="checkbox" class="form-check-input lot-checkbox" name="selected_lots[]"
+                                value="{{ $row->lot_id }}">
+                            <span class="ms-1 small">Pakai LOT ini</span>
                         </div>
-                        @if ($wh?->code)
-                            <div class="small text-muted d-none d-md-block">
-                                {{ $wh->code }}
-                            </div>
-                        @endif
                     </div>
                 </div>
-
-                <div class="d-flex justify-content-between align-items-center mt-2">
-                    <div class="form-check">
-                        <input type="checkbox" class="form-check-input lot-checkbox" name="selected_lots[]"
-                            value="{{ $row->lot_id }}">
-                        <span class="ms-1 small">Pakai LOT ini</span>
-                    </div>
-                </div>
-            </div>
-        @endforeach
-    </div>
+            @endforeach
+        </div>
+    @endif
 
     {{-- Footer info + tombol lanjut --}}
     <div class="d-flex justify-content-between align-items-center mt-3 lot-picker-footer">
@@ -249,50 +240,15 @@
 @push('scripts')
     <script>
         document.addEventListener('DOMContentLoaded', function() {
-            const fabricSelect = document.getElementById('fabric_item_id');
             const lotGrid = document.getElementById('lot-grid');
             const lotHint = document.getElementById('lot-grid-hint');
-            const lotCards = Array.from(document.querySelectorAll('.lot-card-item'));
+            const lotCards = lotGrid ? Array.from(lotGrid.querySelectorAll('.lot-card-item')) : [];
             const btnSelectAll = document.getElementById('btn-select-all-lots');
             const btnUnselectAll = document.getElementById('btn-unselect-all-lots');
 
             function updateButtonsState(hasLots) {
                 if (btnSelectAll) btnSelectAll.disabled = !hasLots;
                 if (btnUnselectAll) btnUnselectAll.disabled = !hasLots;
-            }
-
-            function applyFilter() {
-                if (!fabricSelect || !lotGrid || !lotHint) return;
-
-                const selectedId = parseInt(fabricSelect.value || '0', 10);
-                let anyShown = false;
-
-                lotCards.forEach(card => {
-                    const itemId = parseInt(card.dataset.itemId || '0', 10);
-                    if (!selectedId || itemId !== selectedId) {
-                        card.classList.add('d-none');
-                    } else {
-                        card.classList.remove('d-none');
-                        anyShown = true;
-                    }
-                });
-
-                if (!selectedId) {
-                    lotGrid.classList.add('d-none');
-                    lotHint.textContent = 'Pilih item kain terlebih dahulu untuk melihat daftar LOT.';
-                    updateButtonsState(false);
-                    return;
-                }
-
-                if (!anyShown) {
-                    lotGrid.classList.add('d-none');
-                    lotHint.textContent = 'Belum ada LOT untuk kain ini. Cek stok di modul GRN / gudang RM.';
-                    updateButtonsState(false);
-                } else {
-                    lotGrid.classList.remove('d-none');
-                    lotHint.textContent = 'Centang LOT yang ingin dipakai untuk Cutting Job.';
-                    updateButtonsState(true);
-                }
             }
 
             // Klik card = toggle checkbox + highlight
@@ -318,13 +274,9 @@
 
             if (btnSelectAll) {
                 btnSelectAll.addEventListener('click', function() {
-                    const selectedId = parseInt(fabricSelect.value || '0', 10);
-                    if (!selectedId) return;
-
                     lotCards.forEach(card => {
                         const checkbox = card.querySelector('.lot-checkbox');
-                        const itemId = parseInt(card.dataset.itemId || '0', 10);
-                        if (checkbox && itemId === selectedId && !checkbox.checked) {
+                        if (checkbox && !checkbox.checked) {
                             checkbox.checked = true;
                             checkbox.dispatchEvent(new Event('change', {
                                 bubbles: true
@@ -336,13 +288,9 @@
 
             if (btnUnselectAll) {
                 btnUnselectAll.addEventListener('click', function() {
-                    const selectedId = parseInt(fabricSelect.value || '0', 10);
-                    if (!selectedId) return;
-
                     lotCards.forEach(card => {
                         const checkbox = card.querySelector('.lot-checkbox');
-                        const itemId = parseInt(card.dataset.itemId || '0', 10);
-                        if (checkbox && itemId === selectedId && checkbox.checked) {
+                        if (checkbox && checkbox.checked) {
                             checkbox.checked = false;
                             checkbox.dispatchEvent(new Event('change', {
                                 bubbles: true
@@ -352,12 +300,8 @@
                 });
             }
 
-            if (fabricSelect) {
-                fabricSelect.addEventListener('change', applyFilter);
-            }
-
-            // INIT (support old() fabric_item_id)
-            applyFilter();
+            // INIT: enable/disable tombol sesuai jumlah LOT
+            updateButtonsState(lotCards.length > 0);
         });
     </script>
 @endpush

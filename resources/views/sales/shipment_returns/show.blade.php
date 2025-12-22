@@ -327,7 +327,7 @@
                             </div>
                         @else
                             <div style="font-size:.85rem; color:var(--muted);">-</div>
-                        @endif>
+                        @endif
                     </div>
 
                     <div class="col-md-6">

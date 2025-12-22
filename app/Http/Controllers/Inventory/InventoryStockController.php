@@ -97,13 +97,13 @@ class InventoryStockController extends Controller
 
         // Aggregate select
         $query->selectRaw('
-            inventory_stocks.item_id,
-            items.code AS item_code,
-            items.name AS item_name,
-            SUM(inventory_stocks.qty) AS total_qty,
-            SUM(CASE WHEN warehouses.code IN ("WH-RTS") THEN inventory_stocks.qty ELSE 0 END) AS fg_qty,
-            SUM(CASE WHEN warehouses.code LIKE "WIP-%" THEN inventory_stocks.qty ELSE 0 END) AS wip_qty
-        ')
+        inventory_stocks.item_id,
+        items.code AS item_code,
+        items.name AS item_name,
+        SUM(inventory_stocks.qty) AS total_qty,
+        SUM(CASE WHEN warehouses.code IN ("WH-RTS") THEN inventory_stocks.qty ELSE 0 END) AS fg_qty,
+        SUM(CASE WHEN warehouses.code LIKE "WIP-%" THEN inventory_stocks.qty ELSE 0 END) AS wip_qty
+    ')
             ->groupBy('inventory_stocks.item_id', 'items.code', 'items.name')
             ->orderBy('items.code');
 

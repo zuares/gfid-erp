@@ -198,7 +198,6 @@
         document.addEventListener('DOMContentLoaded', function() {
             const lotRows = Array.from(document.querySelectorAll('.lot-row'));
             const lotCheckboxes = Array.from(document.querySelectorAll('.lot-checkbox'));
-            const fabricSelect = document.getElementById('fabric_item_id');
             const btnSelectAllLots = document.getElementById('btn-select-all-lots');
             const btnUnselectAllLots = document.getElementById('btn-unselect-all-lots');
             const btnConfirmLots = document.getElementById('btn-confirm-lots');
@@ -226,7 +225,7 @@
             const lotInfoMap = {};
             lotRows.forEach(tr => {
                 const lotId = parseInt(tr.dataset.lotId, 10);
-                const itemId = parseInt(tr.dataset.itemId, 10);
+                const itemId = parseInt(tr.dataset.itemId || '0', 10);
                 const balance = parseFloat(tr.dataset.balance ?? '0');
                 const code = tr.querySelector('.lot-code')?.textContent?.trim() ?? '';
                 lotInfoMap[lotId] = {
@@ -283,19 +282,6 @@
             function unlockLotSelection() {
                 lotsLocked = false;
                 document.body.classList.remove('cutting-lots-locked');
-            }
-
-            function filterLotsByFabric() {
-                const selectedItemId = parseInt(fabricSelect?.value || '0', 10);
-
-                lotRows.forEach(tr => {
-                    const itemId = parseInt(tr.dataset.itemId, 10);
-                    if (!selectedItemId || itemId === selectedItemId) {
-                        tr.classList.remove('lot-hidden');
-                    } else {
-                        tr.classList.add('lot-hidden');
-                    }
-                });
             }
 
             function recalcLotBalanceFromCheckedLots() {
@@ -459,12 +445,13 @@
             }
 
             function updateCurrentLotSummary() {
-                const fabricText =
-                    fabricSelect?.options?.[fabricSelect.selectedIndex]?.text?.trim() || '-';
                 const lotCount = getCheckedLots().length;
                 const balance = parseFloat(lotBalanceInput.value || '0');
 
-                if (currentFabricLabel) currentFabricLabel.textContent = fabricText;
+                if (currentFabricLabel) {
+                    currentFabricLabel.textContent =
+                        lotCount > 0 ? 'Mengikuti LOT terpilih' : '-';
+                }
                 if (currentLotCount) currentLotCount.textContent = `${lotCount} LOT`;
                 if (currentLotBalance) currentLotBalance.textContent = balance.toFixed(2);
             }
@@ -552,11 +539,6 @@
                 }
             }
 
-            fabricSelect?.addEventListener('change', () => {
-                if (lotsLocked) return;
-                filterLotsByFabric();
-            });
-
             lotCheckboxes.forEach(cb => {
                 cb.addEventListener('change', () => {
                     if (lotsLocked) return;
@@ -585,13 +567,8 @@
 
             btnConfirmLots?.addEventListener('click', () => {
                 if (lotsLocked) {
+                    // kalau sudah pernah lock (user balik dari "Ubah LOT")
                     showMainContent();
-                    return;
-                }
-
-                if (!fabricSelect || !fabricSelect.value) {
-                    alert('Item kain wajib dipilih terlebih dahulu.');
-                    fabricSelect?.focus();
                     return;
                 }
 
@@ -619,7 +596,6 @@
             });
 
             // init awal
-            filterLotsByFabric();
             recalcLotBalanceFromCheckedLots();
             createBundleRow(false);
         });

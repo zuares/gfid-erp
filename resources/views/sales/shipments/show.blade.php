@@ -9,6 +9,7 @@
             max-width: 1150px;
             margin-inline: auto;
             padding: .75rem .75rem 3.5rem;
+            max-height: 100vh;
         }
 
         /* ========= GLOBAL BACKGROUND ========= */
@@ -235,35 +236,7 @@
             background: rgba(15, 23, 42, 0.9);
         }
 
-        /* ========= SCAN CARD ========= */
-        .scan-card {
-            border-radius: 14px;
-            border: 1px solid rgba(148, 163, 184, 0.2);
-            box-shadow: 0 2px 8px rgba(15, 23, 42, 0.04);
-            margin-bottom: 1.25rem;
-        }
-
-        .scan-card.scan-theme-default {
-            background: #eff6ff;
-        }
-
-        .scan-card.scan-theme-shopee {
-            background: #fef2f2;
-            border-color: #fecaca;
-        }
-
-        .scan-card.scan-theme-tiktok {
-            background: #ecfeff;
-            border-color: #bae6fd;
-        }
-
-        body[data-theme="dark"] .scan-card.scan-theme-default,
-        body[data-theme="dark"] .scan-card.scan-theme-shopee,
-        body[data-theme="dark"] .scan-card.scan-theme-tiktok {
-            background: #020617;
-            border-color: rgba(30, 64, 175, 0.7);
-        }
-
+        /* ========= SCAN INPUT ========= */
         .scan-input {
             font-size: 1.1rem;
             font-weight: 600;
@@ -299,9 +272,48 @@
             color: #e5e7eb;
         }
 
-        /* ========= TABLE & SCROLL ========= */
+        /* ========= INFO UTAMA LAYOUT ========= */
+        .info-main-col {
+            min-width: 260px;
+        }
+
+        .info-label {
+            font-size: .68rem;
+            text-transform: uppercase;
+            letter-spacing: .08em;
+            color: #9ca3af;
+        }
+
+        body[data-theme="dark"] .info-label {
+            color: #6b7280;
+        }
+
+        .scan-panel {
+            border-radius: 12px;
+            padding: .85rem .9rem;
+            background: rgba(248, 250, 252, 0.96);
+            border: 1px solid rgba(148, 163, 184, 0.35);
+        }
+
+        body[data-theme="dark"] .scan-panel {
+            background: rgba(15, 23, 42, 0.98);
+            border-color: rgba(30, 64, 175, 0.75);
+        }
+
+        @media (min-width: 768px) {
+            .info-main-col {
+                border-left: 1px solid rgba(148, 163, 184, 0.25);
+                padding-left: 1.25rem;
+            }
+
+            body[data-theme="dark"] .info-main-col {
+                border-left-color: rgba(51, 65, 85, 0.85);
+            }
+        }
+
+        /* ========= TABLE & SCROLL (KOTAK SCROLL KECIL) ========= */
         .lines-wrapper {
-            max-height: 360px;
+            max-height: 25vh;
             overflow-y: auto;
             overscroll-behavior: contain;
             scroll-behavior: smooth;
@@ -328,16 +340,26 @@
             }
         }
 
+        .table-responsive {
+            position: relative;
+            margin-bottom: 0;
+        }
+
+        .table-lines {
+            margin-bottom: 0;
+        }
+
+        /* THEAD sticky DI DALAM .lines-wrapper */
         .table-lines thead th {
+            position: sticky;
+            top: 0;
+            z-index: 6;
             border-bottom-width: 1px;
             font-size: .75rem;
             text-transform: uppercase;
             letter-spacing: .06em;
             color: #6b7280;
             background: rgba(248, 250, 252, 0.98);
-            position: sticky;
-            top: 0;
-            z-index: 5;
         }
 
         body[data-theme="dark"] .table-lines thead th {
@@ -458,11 +480,13 @@
             animation: rowPulseSoft 0.9s ease-out 1;
         }
 
-        /* ========= TOAST ========= */
+        /* ========= TOAST (ATAS TENGAH) ========= */
         .scan-toast {
             position: fixed;
-            right: 1.25rem;
-            bottom: 1.25rem;
+            top: 4rem;
+            /* di bawah navbar */
+            left: 50%;
+            transform: translateX(-50%);
             z-index: 1080;
             min-width: 220px;
             max-width: 320px;
@@ -473,6 +497,7 @@
             align-items: center;
             gap: .4rem;
             box-shadow: 0 12px 30px rgba(15, 23, 42, 0.35);
+            pointer-events: none;
         }
 
         .scan-toast-success {
@@ -483,6 +508,40 @@
         .scan-toast-error {
             background: #b91c1c;
             color: #fee2e2;
+        }
+
+        /* ========= BUTTON KE SCAN TERAKHIR ========= */
+        .btn-jump-last {
+            border-radius: 999px;
+            padding: .18rem .75rem;
+            font-size: .7rem;
+            letter-spacing: .08em;
+            text-transform: uppercase;
+            border: 1px dashed rgba(148, 163, 184, 0.9);
+            background: rgba(248, 250, 252, 0.96);
+            color: #4b5563;
+            display: inline-flex;
+            align-items: center;
+            gap: .25rem;
+        }
+
+        .btn-jump-last::before {
+            content: '⤵';
+            font-size: .8rem;
+        }
+
+        .btn-jump-last:hover {
+            background: rgba(219, 234, 254, 0.96);
+        }
+
+        body[data-theme="dark"] .btn-jump-last {
+            background: rgba(15, 23, 42, 0.98);
+            border-color: rgba(148, 163, 184, 0.9);
+            color: #e5e7eb;
+        }
+
+        .btn-jump-last-highlight {
+            box-shadow: 0 0 0 2px rgba(59, 130, 246, 0.65);
         }
     </style>
 @endpush
@@ -506,19 +565,16 @@
     @endphp
 
     <div class="page-wrap page-theme-{{ $scanTheme }}">
-        {{-- HEADER --}}
-        <div class="d-flex justify-content-between align-items-center mb-3">
+        {{-- HEADER MINIMALIS --}}
+        <div class="d-flex justify-content-between align-items-start mb-3 flex-wrap gap-2">
             <div>
                 <div class="meta-label mb-1">
-                    DETAIL SHIPMENT
+                    Shipment
                 </div>
-                <h1 class="h4 mb-1">
-                    {{ $shipment->code }}
-                </h1>
-                <div class="d-flex flex-wrap gap-2 align-items-center">
-                    <span class="text-muted small">
-                        Tanggal {{ id_date($shipment->date) }}
-                    </span>
+                <div class="d-flex flex-wrap align-items-center gap-2 mb-1">
+                    <h1 class="h5 mb-0">
+                        {{ $shipment->code }}
+                    </h1>
 
                     @if ($shipment->status === 'draft')
                         <span class="badge-status badge-status-draft">Draft</span>
@@ -528,58 +584,43 @@
                         <span class="badge-status badge-status-posted">Posted</span>
                     @endif
                 </div>
+
+                <div class="small text-muted">
+                    {{ id_date($shipment->date) }}
+
+                    @if ($shipment->store)
+                        &bull;
+                        {{ $shipment->store->name }}
+                        @if ($shipment->store->code ?? false)
+                            ({{ strtoupper($shipment->store->code) }})
+                        @endif
+                    @else
+                        &bull; Channel belum diisi
+                    @endif
+                </div>
             </div>
 
             <div class="text-end small text-muted">
-                Dibuat oleh <strong>{{ $shipment->creator?->name ?? '-' }}</strong><br>
-                <span class="text-muted">
+                <div class="meta-label mb-1">
+                    Dibuat oleh
+                </div>
+                <div class="fw-semibold">
+                    {{ $shipment->creator?->name ?? '-' }}
+                </div>
+                <div>
                     {{ id_datetime($shipment->created_at) }}
-                </span>
+                </div>
             </div>
         </div>
 
-        {{-- FLASH --}}
+        {{-- FLASH (AUTO HIDE) --}}
         @if (session('status') === 'error')
-            <div class="alert alert-danger">{{ session('message') }}</div>
+            <div class="alert alert-danger js-auto-hide-alert" role="alert">
+                {{ session('message') }}
+            </div>
         @elseif (session('status') === 'success')
-            <div class="alert alert-success">{{ session('message') }}</div>
-        @endif
-
-        {{-- SCAN AREA (hanya DRAFT) --}}
-        @if ($shipment->status === 'draft')
-            <div class="scan-card card scan-theme-{{ $scanTheme }}">
-                <div class="card-body">
-                    <div class="d-flex justify-content-between align-items-start mb-2">
-                        <div>
-                            <div class="meta-label mb-1">
-                                Scan Barang Keluar
-                            </div>
-                            <div class="scan-meta">
-                                Scan 1× menambah <strong>qty +1</strong>. Scanner biasanya kirim Enter otomatis.
-                            </div>
-                        </div>
-                        <div class="text-end">
-                            <div class="scan-meta">
-                                Shipment:
-                                <br>
-                                <span class="fw-semibold">{{ $shipment->code }}</span>
-                            </div>
-                        </div>
-                    </div>
-
-                    <form id="scanForm" method="POST" action="{{ route('sales.shipments.scan_item', $shipment) }}">
-                        @csrf
-                        <div class="mb-2">
-                            <label class="form-label small mb-1">Scan kode / barcode</label>
-                            <input type="text" name="scan_code" class="form-control scan-input" id="scanInput"
-                                placeholder="Fokuskan kursor di sini lalu scan..." autocomplete="off" required>
-                        </div>
-                    </form>
-
-                    <div class="scan-meta mt-2">
-                        Jika qty perlu koreksi, klik angka <strong>Qty</strong> di tabel.
-                    </div>
-                </div>
+            <div class="alert alert-success js-auto-hide-alert" role="alert">
+                {{ session('message') }}
             </div>
         @endif
 
@@ -587,51 +628,183 @@
         <div class="card card-main mb-3">
             <div class="card-body">
                 <div class="d-flex justify-content-between align-items-center mb-2">
-                    <div class="meta-label mb-0">
+                    <span class="meta-label">
                         Info Utama
-                    </div>
-
-                    @if ($lastScannedLineId)
-                        <button type="button" class="btn btn-link btn-sm text-decoration-none px-1" id="btnJumpLast">
-                            Ke scan terakhir
-                        </button>
-                    @endif
+                    </span>
                 </div>
 
-                <div class="row g-3">
-                    <div class="col-md-4">
-                        <div class="meta-label mb-1">
-                            Channel / Store
-                        </div>
-                        @if ($shipment->store)
-                            <div class="fw-semibold mb-1">
-                                {{ $shipment->store->name }}
+                @if ($shipment->status === 'draft')
+                    {{-- MODE DRAFT: SCAN KIRI, INFO KANAN --}}
+                    <div class="row g-3 align-items-stretch">
+                        {{-- KIRI: PANEL SCAN BARANG --}}
+                        <div class="col-md-5">
+                            <div class="scan-panel h-100 d-flex flex-column justify-content-between">
+                                <div class="mb-2">
+                                    <div class="info-label mb-1">
+                                        Scan Barang Keluar
+                                    </div>
+                                    <div class="scan-meta mb-1">
+                                        Shipment:
+                                        <span class="fw-semibold">{{ $shipment->code }}</span>
+                                    </div>
+                                </div>
+
+                                <form id="scanForm" method="POST"
+                                    action="{{ route('sales.shipments.scan_item', $shipment) }}">
+                                    @csrf
+                                    <div class="mb-2">
+                                        <label class="form-label small mb-1">Scan kode / barcode</label>
+                                        <input type="text" name="scan_code" class="form-control scan-input"
+                                            id="scanInput" placeholder="Fokus di sini lalu scan..." autocomplete="off"
+                                            required>
+                                    </div>
+                                    <div class="scan-meta small">
+                                        Setelah scan, Qty akan otomatis bertambah pada baris yang sesuai.
+                                    </div>
+                                </form>
                             </div>
-                            @if ($shipment->store->code ?? false)
-                                <div class="store-badge">
-                                    {{ strtoupper($shipment->store->code) }}
+                        </div>
+
+                        {{-- KANAN: CHANNEL + CATATAN + TOMBOL KE SCAN TERAKHIR --}}
+                        <div class="col-md-7 info-main-col">
+                            {{-- Channel / Store --}}
+                            <div class="mb-3">
+                                <div class="info-label mb-1">
+                                    Channel / Store
+                                </div>
+
+                                @if ($shipment->store)
+                                    <div class="d-flex flex-wrap align-items-center gap-2">
+                                        <div class="fw-semibold">
+                                            {{ $shipment->store->name }}
+                                        </div>
+
+                                        @if ($shipment->store->code ?? false)
+                                            <div class="store-badge">
+                                                {{ strtoupper($shipment->store->code) }}
+                                            </div>
+                                        @endif
+                                    </div>
+                                @else
+                                    <div class="text-muted small">
+                                        Tidak diisi.
+                                    </div>
+                                @endif
+                            </div>
+
+                            {{-- Catatan --}}
+                            <div>
+                                <div class="info-label mb-1">
+                                    Catatan
+                                </div>
+
+                                @if ($shipment->notes)
+                                    <div class="small">
+                                        {!! nl2br(e($shipment->notes)) !!}
+                                    </div>
+                                @else
+                                    <div class="text-muted small">
+                                        Tidak ada catatan.
+                                    </div>
+                                @endif
+                            </div>
+
+                            {{-- Ke scan terakhir di bawah catatan --}}
+                            @if ($lastScannedLineId)
+                                <div class="d-flex justify-content-end mt-3">
+                                    <button type="button" class="btn btn-sm btn-jump-last" id="btnJumpLast">
+                                        Ke scan terakhir
+                                    </button>
                                 </div>
                             @endif
-                        @else
-                            <div class="text-muted small">Tidak diisi</div>
-                        @endif
-                    </div>
-
-                    <div class="col-md-8">
-                        <div class="meta-label mb-1">
-                            Catatan
                         </div>
-                        @if ($shipment->notes)
-                            <div class="small">
-                                {!! nl2br(e($shipment->notes)) !!}
-                            </div>
-                        @else
-                            <div class="text-muted small">
-                                Tidak ada catatan.
-                            </div>
-                        @endif
                     </div>
-                </div>
+                @else
+                    {{-- MODE SETELAH SUBMIT/POSTED: TANPA SCAN, INFO DETAIL FULL WIDTH --}}
+                    <div class="row">
+                        <div class="col-12 info-main-col">
+                            {{-- Channel / Store --}}
+                            <div class="mb-3">
+                                <div class="info-label mb-1">
+                                    Channel / Store
+                                </div>
+
+                                @if ($shipment->store)
+                                    <div class="d-flex flex-wrap align-items-center gap-2">
+                                        <div class="fw-semibold">
+                                            {{ $shipment->store->name }}
+                                        </div>
+
+                                        @if ($shipment->store->code ?? false)
+                                            <div class="store-badge">
+                                                {{ strtoupper($shipment->store->code) }}
+                                            </div>
+                                        @endif
+                                    </div>
+                                @else
+                                    <div class="text-muted small">
+                                        Tidak diisi.
+                                    </div>
+                                @endif
+                            </div>
+
+                            {{-- Catatan --}}
+                            <div class="mb-3">
+                                <div class="info-label mb-1">
+                                    Catatan
+                                </div>
+
+                                @if ($shipment->notes)
+                                    <div class="small">
+                                        {!! nl2br(e($shipment->notes)) !!}
+                                    </div>
+                                @else
+                                    <div class="text-muted small">
+                                        Tidak ada catatan.
+                                    </div>
+                                @endif
+                            </div>
+
+                            {{-- META DETAIL --}}
+                            <div class="row row-cols-1 row-cols-md-2 gy-2 small">
+                                <div>
+                                    <div class="info-label mb-1">Tanggal</div>
+                                    <div>{{ id_date($shipment->date) }}</div>
+                                </div>
+                                <div>
+                                    <div class="info-label mb-1">Status</div>
+                                    <div class="d-flex align-items-center gap-2">
+                                        <span class="text-capitalize">{{ $shipment->status }}</span>
+                                        @if ($shipment->status === 'submitted')
+                                            <span class="badge-status badge-status-submitted">Submitted</span>
+                                        @elseif ($shipment->status === 'posted')
+                                            <span class="badge-status badge-status-posted">Posted</span>
+                                        @endif
+                                    </div>
+                                </div>
+                                <div>
+                                    <div class="info-label mb-1">Total Baris</div>
+                                    <div>{{ number_format($totalLines, 0, ',', '.') }}</div>
+                                </div>
+                                <div>
+                                    <div class="info-label mb-1">Total Qty Scanned</div>
+                                    <div>{{ number_format($totalQty, 0, ',', '.') }}</div>
+                                </div>
+                                <div>
+                                    <div class="info-label mb-1">Dibuat oleh</div>
+                                    <div>{{ $shipment->creator?->name ?? '-' }}</div>
+                                </div>
+                                <div>
+                                    <div class="info-label mb-1">Dibuat / Terakhir diupdate</div>
+                                    <div>
+                                        {{ id_datetime($shipment->created_at) }}<br>
+                                        <span class="text-muted">Update: {{ id_datetime($shipment->updated_at) }}</span>
+                                    </div>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+                @endif
             </div>
         </div>
 
@@ -670,69 +843,68 @@
                     </div>
                 </div>
 
-                <div class="lines-wrapper" id="linesWrapper">
-                    <div class="table-responsive">
-                        <table class="table align-middle table-lines mb-0">
-                            <thead>
-                                <tr>
-                                    <th style="width: 40px;">#</th>
-                                    <th style="width: 140px;">Kode</th>
-                                    <th>Nama Barang</th>
-                                    <th style="width: 140px;" class="text-end">Qty</th>
-                                </tr>
-                            </thead>
-                            <tbody id="linesTbody">
-                                @forelse ($shipment->lines as $line)
-                                    <tr class="{{ $lastScannedLineId == $line->id ? 'last-scanned-row' : '' }}"
-                                        data-line-id="{{ $line->id }}">
-                                        <td class="text-muted small order-cell">
-                                            {{ $loop->iteration }}
-                                        </td>
-                                        <td>
-                                            <div class="item-code">
-                                                {{ $line->item?->code ?? '-' }}
+                {{-- KOTAK SCROLL KECIL + HEADER STICKY --}}
+                <div class="table-responsive lines-wrapper" id="linesWrapper">
+                    <table class="table align-middle table-lines">
+                        <thead>
+                            <tr>
+                                <th style="width: 40px;">#</th>
+                                <th style="width: 140px;">Kode</th>
+                                <th>Nama Barang</th>
+                                <th style="width: 140px;" class="text-end">Qty</th>
+                            </tr>
+                        </thead>
+                        <tbody id="linesTbody">
+                            @forelse ($shipment->lines as $line)
+                                <tr class="{{ $lastScannedLineId == $line->id ? 'last-scanned-row' : '' }}"
+                                    data-line-id="{{ $line->id }}">
+                                    <td class="text-muted small order-cell">
+                                        {{ $loop->iteration }}
+                                    </td>
+                                    <td>
+                                        <div class="item-code">
+                                            {{ $line->item?->code ?? '-' }}
+                                        </div>
+                                    </td>
+                                    <td>
+                                        <div class="small item-name">
+                                            {{ $line->item?->name ?? '-' }}
+                                        </div>
+                                        @if ($line->remarks)
+                                            <div class="small text-muted">
+                                                Catatan: {{ $line->remarks }}
                                             </div>
-                                        </td>
-                                        <td>
-                                            <div class="small item-name">
-                                                {{ $line->item?->name ?? '-' }}
-                                            </div>
-                                            @if ($line->remarks)
-                                                <div class="small text-muted">
-                                                    Catatan: {{ $line->remarks }}
-                                                </div>
-                                            @endif
-                                        </td>
-                                        <td class="text-end">
-                                            <span class="qty-display" data-line-id="{{ $line->id }}"
-                                                id="qty-display-{{ $line->id }}">
-                                                {{ number_format($line->qty_scanned, 0, ',', '.') }}
-                                            </span>
+                                        @endif
+                                    </td>
+                                    <td class="text-end">
+                                        <span class="qty-display" data-line-id="{{ $line->id }}"
+                                            id="qty-display-{{ $line->id }}">
+                                            {{ number_format($line->qty_scanned, 0, ',', '.') }}
+                                        </span>
 
-                                            <form action="{{ route('sales.shipments.update_line_qty', $line) }}"
-                                                method="POST" class="d-inline qty-edit-form d-none"
-                                                data-line-id="{{ $line->id }}">
-                                                @csrf
-                                                @method('PATCH')
-                                                <input type="number" name="qty"
-                                                    class="form-control form-control-sm qty-edit-input" min="0"
-                                                    value="{{ $line->qty_scanned }}">
-                                                <button type="submit" class="btn btn-primary btn-sm qty-edit-save-btn">
-                                                    ✔
-                                                </button>
-                                            </form>
-                                        </td>
-                                    </tr>
-                                @empty
-                                    <tr class="no-lines-row">
-                                        <td colspan="4" class="text-center text-muted py-4">
-                                            Belum ada item yang discan.
-                                        </td>
-                                    </tr>
-                                @endforelse
-                            </tbody>
-                        </table>
-                    </div>
+                                        <form action="{{ route('sales.shipments.update_line_qty', $line) }}"
+                                            method="POST" class="d-inline qty-edit-form d-none"
+                                            data-line-id="{{ $line->id }}">
+                                            @csrf
+                                            @method('PATCH')
+                                            <input type="number" name="qty"
+                                                class="form-control form-control-sm qty-edit-input" min="0"
+                                                value="{{ $line->qty_scanned }}">
+                                            <button type="submit" class="btn btn-primary btn-sm qty-edit-save-btn">
+                                                ✔
+                                            </button>
+                                        </form>
+                                    </td>
+                                </tr>
+                            @empty
+                                <tr class="no-lines-row">
+                                    <td colspan="4" class="text-center text-muted py-4">
+                                        Belum ada item yang discan.
+                                    </td>
+                                </tr>
+                            @endforelse
+                        </tbody>
+                    </table>
                 </div>
 
                 {{-- FOOTER + BUTTONS --}}
@@ -814,6 +986,22 @@
             const summaryTotalQty = document.getElementById('summaryTotalQty');
             const footerTotalQty = document.getElementById('footerTotalQty');
 
+            /* ===== AUTO HIDE FLASH ALERT ===== */
+            const autoAlerts = document.querySelectorAll('.js-auto-hide-alert');
+            if (autoAlerts.length) {
+                setTimeout(() => {
+                    autoAlerts.forEach((el) => {
+                        el.style.transition = 'opacity .4s ease';
+                        el.style.opacity = '0';
+                        setTimeout(() => {
+                            if (el && el.parentNode) {
+                                el.parentNode.removeChild(el);
+                            }
+                        }, 450);
+                    });
+                }, 2600); // 2.6 detik sebelum mulai fade
+            }
+
             function focusScan() {
                 if (scanInput) {
                     scanInput.focus();
@@ -859,8 +1047,16 @@
                 toastEl.className = 'scan-toast ' + (type === 'success' ? 'scan-toast-success' : 'scan-toast-error');
                 toastEl.textContent = message;
                 toastEl.style.display = 'flex';
+                toastEl.style.opacity = '1';
+
                 setTimeout(() => {
-                    toastEl.style.display = 'none';
+                    toastEl.style.transition = 'opacity .3s ease';
+                    toastEl.style.opacity = '0';
+                    setTimeout(() => {
+                        toastEl.style.display = 'none';
+                        toastEl.style.opacity = '1';
+                        toastEl.style.transition = '';
+                    }, 320);
                 }, 1300);
             }
 
@@ -1011,18 +1207,21 @@
             window.addEventListener('load', function() {
                 if (isDraft && scanInput) {
                     focusScan();
-                    const scanCard = document.querySelector('.scan-card');
-                    if (scanCard) {
-                        scanCard.addEventListener('click', focusScan);
-                    }
                 }
 
                 if (lastScannedLineId) {
                     scrollToRow(lastScannedLineId, true);
+
+                    if (btnJumpLast) {
+                        btnJumpLast.classList.add('btn-jump-last-highlight');
+                        setTimeout(() => {
+                            btnJumpLast.classList.remove('btn-jump-last-highlight');
+                        }, 2200);
+                    }
                 }
             });
 
-            // Ke scan terakhir
+            // Ke scan terakhir (hanya saat draft karena tombol cuma muncul di draft)
             if (btnJumpLast && linesWrapper) {
                 btnJumpLast.addEventListener('click', function() {
                     if (!lastScannedLineId) return;
@@ -1053,7 +1252,7 @@
                 });
             }
 
-            // SCAN VIA AJAX
+            // SCAN VIA AJAX (hanya draft)
             if (isDraft && scanForm && scanInput && linesTbody) {
                 scanForm.addEventListener('submit', function(e) {
                     e.preventDefault();
@@ -1102,7 +1301,7 @@
                             showToast('success', data.message || 'Berhasil scan.');
                         } else {
                             let row = linesTbody.querySelector('tr[data-line-id="' + line.id +
-                                '"]');
+                            '"]');
 
                             if (!row) {
                                 const emptyRow = linesTbody.querySelector('.no-lines-row');
@@ -1115,7 +1314,7 @@
                                 row = document.createElement('tr');
                                 row.setAttribute('data-line-id', line.id);
 
-                                row.innerHTML = '' +
+                                row.innerHTML =
                                     '<td class="text-muted small order-cell"></td>' +
                                     '<td><div class="item-code"></div></td>' +
                                     '<td>' +
@@ -1127,8 +1326,7 @@
                                     '" id="qty-display-' + line.id + '"></span>' +
                                     '<form action="' + updateUrl +
                                     '" method="POST" class="d-inline qty-edit-form d-none" data-line-id="' +
-                                    line.id +
-                                    '">' +
+                                    line.id + '">' +
                                     '<input type="hidden" name="_token" value="{{ csrf_token() }}">' +
                                     '<input type="hidden" name="_method" value="PATCH">' +
                                     '<input type="number" name="qty" class="form-control form-control-sm qty-edit-input" min="0" value="' +
