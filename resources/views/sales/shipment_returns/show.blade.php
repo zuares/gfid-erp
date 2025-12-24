@@ -18,11 +18,39 @@
             padding: 1rem .9rem 4.5rem;
         }
 
+        /* ========= GLOBAL BACKGROUND (LIGHT) ========= */
         body[data-theme="light"] .page-wrap {
             background: radial-gradient(circle at top left,
                     rgba(59, 130, 246, .10) 0,
                     rgba(45, 212, 191, .10) 28%,
                     #f9fafb 65%);
+        }
+
+        body[data-theme="light"] .page-wrap.page-theme-shopee {
+            background: #fff7ed;
+        }
+
+        body[data-theme="light"] .page-wrap.page-theme-tiktok {
+            background: #ecfeff;
+        }
+
+        /* ========= GLOBAL BACKGROUND (DARK) ========= */
+        body[data-theme="dark"] .page-wrap {
+            background: radial-gradient(circle at top left,
+                    rgba(15, 23, 42, 0.9) 0,
+                    #020617 65%);
+        }
+
+        body[data-theme="dark"] .page-wrap.page-theme-shopee {
+            background: radial-gradient(circle at top left,
+                    rgba(148, 27, 19, 0.8) 0,
+                    #020617 65%);
+        }
+
+        body[data-theme="dark"] .page-wrap.page-theme-tiktok {
+            background: radial-gradient(circle at top left,
+                    rgba(8, 47, 73, 0.85) 0,
+                    #020617 65%);
         }
 
         .card {
@@ -285,9 +313,18 @@
     @php
         $status = $shipmentReturn->status;
         $lastScannedId = session('last_scanned_return_line_id');
+
+        $store = $shipmentReturn->store;
+        $platform = $store->platform ?? ($store->sales_channel ?? null);
+
+        $pageTheme = match (strtolower((string) $platform)) {
+            'shopee' => 'page-theme-shopee',
+            'tiktok', 'tiktok_shop', 'tiktokshop' => 'page-theme-tiktok',
+            default => '',
+        };
     @endphp
 
-    <div class="page-wrap">
+    <div class="page-wrap {{ $pageTheme }}">
         <div class="card">
             {{-- HEADER --}}
             <div class="card-section">
@@ -327,7 +364,7 @@
                             </div>
                         @else
                             <div style="font-size:.85rem; color:var(--muted);">-</div>
-                        @endif
+                        @endif>
                     </div>
 
                     <div class="col-md-6">
@@ -541,11 +578,18 @@
             {{-- FOOTER ACTIONS --}}
             <div class="card-section">
                 <div class="actions-footer">
-                    <div>
+                    <div class="d-flex flex-wrap gap-2">
                         <a href="{{ route('sales.shipment_returns.index') }}"
                             class="btn btn-outline-soft btn-sm btn-outline-secondary">
                             ← Kembali ke daftar
                         </a>
+
+                        @if ($shipmentReturn->shipment)
+                            <a href="{{ route('sales.shipments.show', $shipmentReturn->shipment) }}"
+                                class="btn btn-outline-soft btn-sm btn-outline-secondary">
+                                Lihat Shipment Asal
+                            </a>
+                        @endif
                     </div>
 
                     <div class="d-flex flex-wrap gap-2">
@@ -591,6 +635,15 @@
                                 scanInput.select();
                             }, 150);
                         }
+                    });
+                }
+
+                // Scroll ke baris terakhir yang discan (mirip Shipments)
+                const lastRow = document.querySelector('tr.is-last-scanned');
+                if (lastRow) {
+                    lastRow.scrollIntoView({
+                        behavior: 'smooth',
+                        block: 'center'
                     });
                 }
             })();

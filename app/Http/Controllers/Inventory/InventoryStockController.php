@@ -3,11 +3,13 @@
 namespace App\Http\Controllers\Inventory;
 
 use App\Http\Controllers\Controller;
+use App\Models\InventoryMutation;
 use App\Models\InventoryStock;
 use App\Models\Item;
 use App\Models\Warehouse;
 use App\Services\Inventory\InventoryService;
 use Illuminate\Http\Request;
+use Illuminate\Support\Facades\DB;
 
 class InventoryStockController extends Controller
 {
@@ -53,40 +55,103 @@ class InventoryStockController extends Controller
     // ==========================================================
     // ✅ NEW (UPDATED) : STOK PER ITEM (AJAX + JSON pagination)
     // ==========================================================
+    // app/Http/Controllers/Inventory/InventoryStockController.php (misal)
     public function items(Request $request)
     {
         $user = auth()->user();
         $role = $user?->role ?? null;
 
-        $items = Item::where('active', 1)->orderBy('name')->get();
+        // Untuk dropdown filter item
+        $items = Item::where('active', 1)
+            ->orderBy('name')
+            ->get();
+
+        // Untuk dropdown gudang
         $warehouses = $this->getWarehousesForDropdown($role);
 
         // Filters
         $warehouseId = $request->input('warehouse_id');
         $itemId = $request->input('item_id');
         $search = trim((string) $request->input('search'));
-
-        // ✅ default: tampilkan semua (bukan hanya yang ada stok)
         $hasBalanceOnly = (bool) $request->boolean('has_balance_only', false);
 
-        // Base aggregate query
-        $query = InventoryStock::query()
-            ->join('items', 'items.id', '=', 'inventory_stocks.item_id')
-            ->join('warehouses', 'warehouses.id', '=', 'inventory_stocks.warehouse_id')
+        /**
+         * STEP 1: Subquery stok per (item, gudang) dari inventory_mutations
+         *
+         * - qty_change di datamu sudah plus/minus (out = -20, in = +20),
+         *   jadi langsung SUM(qty_change).
+         * - groupBy item_id + wh_code
+         * - di sini kita terapkan SCOPE ROLE berbasis kode gudang
+         */
+        $base = InventoryMutation::query()
+            ->join('warehouses', 'warehouses.id', '=', 'inventory_mutations.warehouse_id');
+
+        // 🔒 Scope per ROLE
+        if ($role === 'operating') {
+            // Operating: hanya WIP-% dan WH-PRD
+            $base->where(function ($q) {
+                $q->where('warehouses.code', 'WH-PRD')
+                    ->orWhere('warehouses.code', 'LIKE', 'WIP-%');
+            });
+        } elseif ($role === 'admin') {
+            // Admin: hanya WH-RTS
+            $base->where('warehouses.code', 'WH-RTS');
+        }
+        // Owner / user lain: tanpa pembatasan gudang (lihat semua)
+
+        // Filter gudang spesifik (kalau dipilih di filter)
+        if ($warehouseId) {
+            $base->where('inventory_mutations.warehouse_id', $warehouseId);
+        }
+
+        // Subquery stok per item+gudang
+        $base->selectRaw('
+        inventory_mutations.item_id,
+        warehouses.code AS wh_code,
+        SUM(inventory_mutations.qty_change) AS qty
+    ')
+            ->groupBy('inventory_mutations.item_id', 'warehouses.code');
+
+        /**
+         * STEP 2: Outer query agregasi per item
+         *
+         * - total_qty = SUM semua qty dari subquery (hanya gudang yang lolos scope role)
+         * - fg_qty    = SUM qty untuk wh_code LIKE 'WH-%'
+         * - wip_qty   = SUM qty untuk wh_code LIKE 'WIP-%'
+         */
+        $selectSql = <<<'SQL'
+s.item_id,
+items.code AS item_code,
+items.name AS item_name,
+
+COALESCE(SUM(s.qty), 0) AS total_qty,
+
+COALESCE(SUM(
+    CASE
+        WHEN s.wh_code LIKE 'WH-%' THEN s.qty
+        ELSE 0
+    END
+), 0) AS fg_qty,
+
+COALESCE(SUM(
+    CASE
+        WHEN s.wh_code LIKE 'WIP-%' THEN s.qty
+        ELSE 0
+    END
+), 0) AS wip_qty
+SQL;
+
+        $query = DB::query()
+            ->fromSub($base, 's')
+            ->join('items', 'items.id', '=', 's.item_id')
             ->where('items.active', 1);
 
-        // Role scope
-        $query = $this->scopeByRole($query, $role);
-
-        // Extra filters
-        if ($warehouseId) {
-            $query->where('inventory_stocks.warehouse_id', $warehouseId);
-        }
-
+        // Filter item (di outer, karena join items)
         if ($itemId) {
-            $query->where('inventory_stocks.item_id', $itemId);
+            $query->where('s.item_id', $itemId);
         }
 
+        // Filter search kode/nama
         if ($search !== '') {
             $like = '%' . $search . '%';
             $query->where(function ($q) use ($like) {
@@ -95,26 +160,19 @@ class InventoryStockController extends Controller
             });
         }
 
-        // Aggregate select
-        $query->selectRaw('
-        inventory_stocks.item_id,
-        items.code AS item_code,
-        items.name AS item_name,
-        SUM(inventory_stocks.qty) AS total_qty,
-        SUM(CASE WHEN warehouses.code IN ("WH-RTS") THEN inventory_stocks.qty ELSE 0 END) AS fg_qty,
-        SUM(CASE WHEN warehouses.code LIKE "WIP-%" THEN inventory_stocks.qty ELSE 0 END) AS wip_qty
-    ')
-            ->groupBy('inventory_stocks.item_id', 'items.code', 'items.name')
+        $query->selectRaw($selectSql)
+            ->groupBy('s.item_id', 'items.code', 'items.name')
             ->orderBy('items.code');
 
-        // Only if checkbox ON
+        // Checkbox "Hanya ada stok" -> hanya item dengan total_qty != 0
         if ($hasBalanceOnly) {
-            $query->havingRaw('SUM(ABS(inventory_stocks.qty)) <> 0');
+            $query->havingRaw('COALESCE(SUM(s.qty), 0) <> 0');
         }
 
+        // Pagination
         $stocks = $query->paginate(50)->appends($request->query());
 
-        // AJAX response (JSON)
+        // OPTIONAL: respon JSON untuk AJAX
         if ($request->expectsJson() || $request->ajax()) {
             $rows = $stocks->getCollection()->map(fn($r) => [
                 'item_id' => (int) $r->item_id,
@@ -139,7 +197,7 @@ class InventoryStockController extends Controller
             ]);
         }
 
-        // Normal render
+        // Normal render ke Blade
         return view('inventory.stocks.items', [
             'items' => $items,
             'warehouses' => $warehouses,
@@ -152,7 +210,6 @@ class InventoryStockController extends Controller
             ],
         ]);
     }
-
     // ==========================================================
     // ✅ OLD (LEGACY) : STOK PER ITEM (non-aggregate, per stock row)
     //    (Tidak dihapus, cuma dipindah jadi method lain)

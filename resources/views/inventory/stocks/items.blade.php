@@ -1,7 +1,7 @@
 {{-- resources/views/inventory/stocks/items.blade.php --}}
 @extends('layouts.app')
 
-@section('title', 'Inventory • Stok Finished Good per Item')
+@section('title', 'Inventory • Stok per Item')
 
 @push('head')
     <style>
@@ -43,18 +43,24 @@
         }
 
         body[data-theme="light"] .page-wrap {
-            background: radial-gradient(circle at top left, rgba(59, 130, 246, .12) 0, rgba(45, 212, 191, .10) 26%, #f9fafb 60%);
+            background: radial-gradient(circle at top left,
+                    rgba(59, 130, 246, .12) 0,
+                    rgba(45, 212, 191, .10) 26%,
+                    #f9fafb 60%);
         }
 
         body[data-theme="dark"] .page-wrap {
-            background: radial-gradient(circle at top left, rgba(15, 23, 42, .92) 0, #020617 65%);
+            background: radial-gradient(circle at top left,
+                    rgba(15, 23, 42, .92) 0,
+                    #020617 65%);
         }
 
         .card-main {
             background: var(--card);
             border-radius: var(--card-r);
             border: 1px solid var(--br);
-            box-shadow: 0 10px 26px rgba(15, 23, 42, .08), 0 0 0 1px rgba(148, 163, 184, .10);
+            box-shadow: 0 10px 26px rgba(15, 23, 42, .08),
+                0 0 0 1px rgba(148, 163, 184, .10);
         }
 
         .meta {
@@ -110,23 +116,30 @@
             padding: .35rem 1rem;
         }
 
-        .item-code-link {
+        .item-toggle-btn {
             padding: 0;
             border: none;
             background: none;
             color: #2563eb;
-            font-weight: 800;
+            font-weight: 700;
+            display: inline-flex;
+            align-items: center;
+            gap: .3rem;
         }
 
-        .item-code-link:hover {
-            text-decoration: underline;
+        .item-toggle-btn .toggle-icon {
+            transition: transform .16s ease-out;
         }
 
-        body[data-theme="dark"] .item-code-link {
+        .item-row.is-open .toggle-icon {
+            transform: rotate(90deg);
+        }
+
+        body[data-theme="dark"] .item-toggle-btn {
             color: #93c5fd;
         }
 
-        /* FILTER compact + sejajar */
+        /* FILTER */
         .filter-grid {
             display: grid;
             grid-template-columns: 1fr 1fr;
@@ -195,7 +208,7 @@
             }
         }
 
-        /* Mobile list */
+        /* MOBILE LIST */
         @media (max-width: 576px) {
             .page-wrap {
                 padding: .8rem .7rem 4.4rem;
@@ -207,7 +220,7 @@
 
             .row-card {
                 border-top: 1px solid rgba(148, 163, 184, .22);
-                padding: .55rem .65rem;
+                padding: .65rem .7rem;
             }
 
             .row-card:first-child {
@@ -225,12 +238,12 @@
                 color: var(--muted);
                 font-size: .82rem;
                 line-height: 1.2;
-                margin-top: .2rem;
+                margin-top: .25rem;
             }
 
             .row-metrics {
                 display: flex;
-                gap: .5rem;
+                gap: .45rem;
                 margin-top: .45rem;
                 flex-wrap: wrap;
             }
@@ -239,7 +252,7 @@
                 display: inline-flex;
                 align-items: center;
                 gap: .35rem;
-                padding: .18rem .55rem;
+                padding: .2rem .6rem;
                 border-radius: 999px;
                 border: 1px solid rgba(148, 163, 184, .28);
                 background: rgba(148, 163, 184, .10);
@@ -251,11 +264,72 @@
                 border-color: rgba(148, 163, 184, .22);
                 background: rgba(148, 163, 184, .10);
             }
+
+            .card-toggle-btn {
+                padding: 0;
+                border: none;
+                background: none;
+                display: flex;
+                width: 100%;
+                justify-content: space-between;
+                align-items: flex-start;
+                text-align: left;
+            }
+
+            .card-toggle-btn .toggle-icon {
+                transition: transform .16s ease-out;
+            }
+
+            .item-card.is-open .toggle-icon {
+                transform: rotate(90deg);
+            }
         }
 
-        .skeleton {
-            opacity: .7;
-            filter: saturate(.9);
+        /* DETAIL DROPDOWN */
+        .detail-row {
+            background: rgba(148, 163, 184, .06);
+        }
+
+        body[data-theme="dark"] .detail-row {
+            background: rgba(15, 23, 42, .9);
+        }
+
+        .detail-inner {
+            padding: .6rem .75rem .7rem;
+            font-size: .78rem;
+        }
+
+        .detail-inner-header {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            gap: .5rem;
+            margin-bottom: .35rem;
+            color: var(--muted);
+            font-size: .76rem;
+        }
+
+        .detail-locations-table {
+            width: 100%;
+            border-collapse: collapse;
+        }
+
+        .detail-locations-table td {
+            padding: .25rem .2rem;
+            font-size: .78rem;
+        }
+
+        .detail-locations-table tr+tr td {
+            border-top: 1px dashed rgba(148, 163, 184, .4);
+        }
+
+        .detail-empty {
+            font-size: .78rem;
+            color: var(--muted);
+        }
+
+        .row-detail {
+            font-size: .78rem;
         }
     </style>
 @endpush
@@ -286,14 +360,14 @@
         $hideItemSelectOnMobile = in_array($role, ['admin', 'operating'], true);
     @endphp
 
-    <div class="page-wrap">
+    <div class="page-wrap" data-stockcard-base-url="{{ route('inventory.stock_card.index') }}">
         <div class="d-flex flex-column flex-md-row align-items-md-center justify-content-between gap-2 mb-3">
             <div>
                 <div class="meta mb-1 d-flex flex-wrap align-items-center gap-2">
-                    <span>Inventory • Stok per Item (FG)</span>
+                    <span>Inventory • Stok per Item</span>
                     <span class="{{ $modeClass }}"><i class="bi bi-shield-check"></i>{{ $modeText }}</span>
                 </div>
-                <h5 class="mb-0">📦 Stok Finished Good per Item</h5>
+                <h5 class="mb-0">📦 Stok Barang per Item (FG &amp; WIP)</h5>
             </div>
 
             <ul class="nav nav-pills small">
@@ -311,11 +385,11 @@
             <div class="card-body">
                 <div class="meta mb-2">Filter</div>
 
-                <form id="filterForm" method="GET" action="{{ route('inventory.stocks.items') }}">
+                <form method="GET" action="{{ route('inventory.stocks.items') }}">
                     <div class="filter-grid">
                         <div class="filter-field">
                             <div class="filter-label">Gudang</div>
-                            <select name="warehouse_id" class="form-select form-select-sm" id="warehouse_id">
+                            <select name="warehouse_id" class="form-select form-select-sm">
                                 <option value="">Semua Gudang</option>
                                 @foreach ($warehouses as $wh)
                                     <option value="{{ $wh->id }}" @selected(($filters['warehouse_id'] ?? null) == $wh->id)>
@@ -327,7 +401,7 @@
 
                         <div class="filter-field {{ $hideItemSelectOnMobile ? 'd-none d-md-block' : '' }}">
                             <div class="filter-label">Item FG</div>
-                            <select name="item_id" class="form-select form-select-sm" id="item_id">
+                            <select name="item_id" class="form-select form-select-sm">
                                 <option value="">Semua Item FG</option>
                                 @foreach ($items as $item)
                                     <option value="{{ $item->id }}" @selected(($filters['item_id'] ?? null) == $item->id)>
@@ -339,7 +413,7 @@
 
                         <div class="filter-field">
                             <div class="filter-label">Cari</div>
-                            <input type="text" name="search" id="search" value="{{ $filters['search'] ?? '' }}"
+                            <input type="text" name="search" value="{{ $filters['search'] ?? '' }}"
                                 class="form-control form-control-sm" placeholder="Kode / nama...">
                         </div>
 
@@ -348,15 +422,19 @@
                             <div class="filter-check">
                                 <input class="form-check-input" type="checkbox" id="has_balance_only"
                                     name="has_balance_only" value="1" @checked($filters['has_balance_only'] ?? false)>
-                                <label class="form-check-label" for="has_balance_only">Hanya ada stok</label>
+                                <label class="form-check-label" for="has_balance_only">
+                                    Hanya ada stok
+                                </label>
                             </div>
                         </div>
                     </div>
 
                     <div class="filter-actions mt-2">
-                        <button type="submit" class="btn btn-primary btn-sm btn-chip w-100" id="btnApply">Filter</button>
+                        <button type="submit" class="btn btn-primary btn-sm btn-chip w-100">
+                            Filter
+                        </button>
                         <a href="{{ route('inventory.stocks.items') }}"
-                            class="btn btn-outline-secondary btn-sm btn-chip w-100" id="btnReset">
+                            class="btn btn-outline-secondary btn-sm btn-chip w-100">
                             Reset
                         </a>
                     </div>
@@ -366,7 +444,7 @@
 
         {{-- Summary --}}
         <div class="mb-2 d-flex flex-wrap align-items-center gap-2" style="color:var(--muted);font-size:.82rem;">
-            <span id="summaryTotal">Menampilkan <strong>{{ $stocks->total() }}</strong> item.</span>
+            <span>Menampilkan <strong>{{ $stocks->total() }}</strong> item.</span>
 
             @if ($activeWarehouse)
                 <span class="chip"><i class="bi bi-building"></i>{{ $activeWarehouse->code }}</span>
@@ -377,10 +455,8 @@
             @if ($activeSearch)
                 <span class="chip"><i class="bi bi-search"></i>{{ $activeSearch }}</span>
             @endif
-            <span class="chip"><i class="bi bi-filter"></i>{{ $hasBalance ? 'Ada stok' : 'All' }}</span>
-
-            <span id="ajaxState" class="chip" style="display:none;">
-                <i class="bi bi-arrow-repeat"></i>Loading
+            <span class="chip">
+                <i class="bi bi-filter"></i>{{ $hasBalance ? 'Ada stok' : 'All' }}
             </span>
         </div>
 
@@ -394,33 +470,43 @@
                             <thead>
                                 <tr>
                                     <th style="width:1%">#</th>
-                                    <th>Kode</th>
+                                    <th>Kode Barang</th>
                                     <th>Nama Item</th>
                                     <th class="text-end">Total</th>
-                                    <th class="text-end">FG</th>
-                                    <th class="text-end">WIP</th>
+                                    <th class="text-end">Barang Jadi</th>
+                                    <th class="text-end">Sedang diproses</th>
                                 </tr>
                             </thead>
                             <tbody id="desktopTbody">
-                                @forelse($stocks as $index => $row)
-                                    <tr>
-                                        <td class="text-muted small">{{ $stocks->firstItem() + $index }}</td>
+                                @forelse ($stocks as $index => $row)
+                                    <tr class="item-row" data-item-id="{{ $row->item_id }}"
+                                        data-item-code="{{ $row->item_code }}" data-item-name="{{ $row->item_name }}"
+                                        data-locations-url="{{ route('inventory.stocks.item_locations', $row->item_id) }}">
+                                        <td class="text-muted small">
+                                            {{ $stocks->firstItem() + $index }}
+                                        </td>
                                         <td class="mono">
-                                            <button type="button" class="item-code-link"
-                                                data-item-id="{{ $row->item_id }}" data-item-code="{{ $row->item_code }}"
-                                                data-item-name="{{ $row->item_name }}"
-                                                data-locations-url="{{ route('inventory.stocks.item_locations', $row->item_id) }}">
-                                                {{ $row->item_code }}
+                                            <button type="button" class="item-toggle-btn js-row-toggle">
+                                                <i class="bi bi-caret-right-fill toggle-icon"></i>
+                                                <span>{{ $row->item_code }}</span>
                                             </button>
                                         </td>
                                         <td>{{ $row->item_name }}</td>
-                                        <td class="text-end mono">{{ number_format($row->total_qty, 2, ',', '.') }}</td>
-                                        <td class="text-end mono">{{ number_format($row->fg_qty, 2, ',', '.') }}</td>
-                                        <td class="text-end mono">{{ number_format($row->wip_qty, 2, ',', '.') }}</td>
+                                        <td class="text-end mono">
+                                            {{ number_format($row->total_qty, 2, ',', '.') }}
+                                        </td>
+                                        <td class="text-end mono">
+                                            {{ number_format($row->fg_qty, 2, ',', '.') }}
+                                        </td>
+                                        <td class="text-end mono">
+                                            {{ number_format($row->wip_qty, 2, ',', '.') }}
+                                        </td>
                                     </tr>
                                 @empty
                                     <tr>
-                                        <td colspan="6" class="text-center py-4 text-muted">Tidak ada data.</td>
+                                        <td colspan="6" class="text-center py-4 text-muted">
+                                            Tidak ada data.
+                                        </td>
                                     </tr>
                                 @endforelse
                             </tbody>
@@ -430,74 +516,58 @@
 
                 {{-- Mobile Cards --}}
                 <div class="d-sm-none" id="mobileList">
-                    @forelse($stocks as $index => $row)
-                        <div class="row-card">
+                    @forelse ($stocks as $index => $row)
+                        <div class="row-card item-card" data-item-id="{{ $row->item_id }}"
+                            data-item-code="{{ $row->item_code }}" data-item-name="{{ $row->item_name }}"
+                            data-locations-url="{{ route('inventory.stocks.item_locations', $row->item_id) }}">
                             <div class="row-title">
-                                <div class="mono">
-                                    <span class="text-muted small me-2">#{{ $stocks->firstItem() + $index }}</span>
-                                    <button type="button" class="item-code-link" data-item-id="{{ $row->item_id }}"
-                                        data-item-code="{{ $row->item_code }}" data-item-name="{{ $row->item_name }}"
-                                        data-locations-url="{{ route('inventory.stocks.item_locations', $row->item_id) }}">
-                                        {{ $row->item_code }}
-                                    </button>
-                                </div>
-                                <div class="mono fw-semibold">{{ number_format($row->total_qty, 2, ',', '.') }}</div>
+                                <button type="button" class="card-toggle-btn js-card-toggle">
+                                    <div class="mono">
+                                        <span class="text-muted small me-2">
+                                            #{{ $stocks->firstItem() + $index }}
+                                        </span>
+                                        <span>{{ $row->item_code }}</span>
+                                    </div>
+                                    <div class="d-flex align-items-center gap-2">
+                                        <div class="mono fw-semibold">
+                                            {{ number_format($row->total_qty, 2, ',', '.') }}
+                                        </div>
+                                        <i class="bi bi-caret-right-fill toggle-icon"></i>
+                                    </div>
+                                </button>
                             </div>
                             <div class="name">{{ $row->item_name }}</div>
                             <div class="row-metrics">
-                                <span class="m-pill"><span class="mono">FG</span> <span
-                                        class="mono">{{ number_format($row->fg_qty, 2, ',', '.') }}</span></span>
-                                <span class="m-pill"><span class="mono">WIP</span> <span
-                                        class="mono">{{ number_format($row->wip_qty, 2, ',', '.') }}</span></span>
-                                <span class="m-pill"><span class="mono">Total</span> <span
-                                        class="mono">{{ number_format($row->total_qty, 2, ',', '.') }}</span></span>
+                                <span class="m-pill">
+                                    <span class="mono">FG</span>
+                                    <span class="mono">
+                                        {{ number_format($row->fg_qty, 2, ',', '.') }}
+                                    </span>
+                                </span>
+                                <span class="m-pill">
+                                    <span class="mono">WIP</span>
+                                    <span class="mono">
+                                        {{ number_format($row->wip_qty, 2, ',', '.') }}
+                                    </span>
+                                </span>
+                                <span class="m-pill">
+                                    <span class="mono">Total</span>
+                                    <span class="mono">
+                                        {{ number_format($row->total_qty, 2, ',', '.') }}
+                                    </span>
+                                </span>
                             </div>
+                            <div class="row-detail mt-2" style="display:none;"></div>
                         </div>
                     @empty
-                        <div class="text-center py-4 text-muted">Tidak ada data.</div>
+                        <div class="text-center py-4 text-muted">
+                            Tidak ada data.
+                        </div>
                     @endforelse
                 </div>
 
-                <div class="p-2 border-top" id="paginationWrap">
-                    {!! $stocks->hasPages() ? $stocks->links() : '' !!}
-                </div>
-            </div>
-        </div>
-    </div>
-
-    {{-- Modal Lokasi Item --}}
-    <div class="modal fade" id="itemLocationsModal" tabindex="-1" aria-labelledby="itemLocationsModalLabel"
-        aria-hidden="true" data-stockcard-base-url="{{ route('inventory.stock_card.index') }}">
-        <div class="modal-dialog modal-dialog-scrollable modal-lg">
-            <div class="modal-content">
-                <div class="modal-header">
-                    <div>
-                        <h6 class="modal-title mb-0" id="itemLocationsModalLabel">Posisi Stok Item</h6>
-                        <div class="small text-muted" id="itemLocationsSubtitle"></div>
-                    </div>
-                    <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Tutup"></button>
-                </div>
-
-                <div class="modal-body">
-                    <div id="itemLocationsLoading" class="small text-muted mb-2" style="display:none;">Mengambil data...
-                    </div>
-                    <div class="table-responsive">
-                        <table class="table table-sm align-middle mb-0">
-                            <thead>
-                                <tr>
-                                    <th style="width:1%">#</th>
-                                    <th>Gudang</th>
-                                    <th class="text-end">Qty</th>
-                                    <th style="width:1%"></th>
-                                </tr>
-                            </thead>
-                            <tbody id="itemLocationsTbody"></tbody>
-                        </table>
-                    </div>
-                </div>
-
-                <div class="modal-footer small">
-                    <button type="button" class="btn btn-secondary btn-sm" data-bs-dismiss="modal">Tutup</button>
+                <div class="p-2 border-top">
+                    {!! $stocks->links() !!}
                 </div>
             </div>
         </div>
@@ -507,261 +577,190 @@
 @push('scripts')
     <script>
         document.addEventListener('DOMContentLoaded', () => {
-            const form = document.getElementById('filterForm');
-            const ajaxState = document.getElementById('ajaxState');
-            const summaryTotal = document.getElementById('summaryTotal');
-
-            const desktopTbody = document.getElementById('desktopTbody');
-            const mobileList = document.getElementById('mobileList');
-            const paginationWrap = document.getElementById('paginationWrap');
-
-            const modalEl = document.getElementById('itemLocationsModal');
-            const tbodyLoc = document.getElementById('itemLocationsTbody');
-            const subtitleEl = document.getElementById('itemLocationsSubtitle');
-            const loadingLoc = document.getElementById('itemLocationsLoading');
-            const stockCardBaseUrl = modalEl?.dataset.stockcardBaseUrl || '';
-            const bsModal = modalEl ? new bootstrap.Modal(modalEl) : null;
+            const pageWrap = document.querySelector('.page-wrap');
+            const stockCardBaseUrl = pageWrap?.dataset.stockcardBaseUrl || '';
 
             const fmt = (n) => new Intl.NumberFormat('id-ID', {
                 minimumFractionDigits: 2,
                 maximumFractionDigits: 2
             }).format(Number(n || 0));
+
             const esc = (s) => String(s ?? '')
-                .replaceAll('&', '&amp;').replaceAll('<', '&lt;').replaceAll('>', '&gt;')
-                .replaceAll('"', '&quot;').replaceAll("'", '&#039;');
+                .replaceAll('&', '&amp;')
+                .replaceAll('<', '&lt;')
+                .replaceAll('>', '&gt;')
+                .replaceAll('"', '&quot;')
+                .replaceAll("'", '&#039;');
 
-            const setLoading = (on) => {
-                if (ajaxState) ajaxState.style.display = on ? 'inline-flex' : 'none';
-                if (desktopTbody) desktopTbody.classList.toggle('skeleton', on);
-                if (mobileList) mobileList.classList.toggle('skeleton', on);
-            };
-
-            const buildQueryFromForm = () => {
-                const fd = new FormData(form);
-                const params = new URLSearchParams();
-                for (const [k, v] of fd.entries()) {
-                    if (v === '' || v === null) continue;
-                    // checkbox: kalau tidak dicentang, FormData tidak mengirim -> aman
-                    params.set(k, v);
-                }
-                return params.toString();
-            };
-
-            const pushUrl = (qs) => {
-                const base = form.getAttribute('action') || window.location.pathname;
-                const url = qs ? `${base}?${qs}` : base;
-                window.history.pushState({}, '', url);
-            };
-
-            const renderRows = (rows, meta) => {
-                // Desktop
-                if (desktopTbody) {
-                    if (!rows.length) {
-                        desktopTbody.innerHTML =
-                            `<tr><td colspan="6" class="text-center py-4 text-muted">Tidak ada data.</td></tr>`;
-                    } else {
-                        const startNo = ((meta.current_page - 1) * meta.per_page) + 1;
-                        desktopTbody.innerHTML = rows.map((r, i) => `
-                    <tr>
-                        <td class="text-muted small">${startNo + i}</td>
-                        <td class="mono">
-                            <button type="button" class="item-code-link"
-                                data-item-id="${r.item_id}"
-                                data-item-code="${esc(r.item_code)}"
-                                data-item-name="${esc(r.item_name)}"
-                                data-locations-url="${esc(r.locations_url)}">${esc(r.item_code)}</button>
-                        </td>
-                        <td>${esc(r.item_name)}</td>
-                        <td class="text-end mono">${fmt(r.total_qty)}</td>
-                        <td class="text-end mono">${fmt(r.fg_qty)}</td>
-                        <td class="text-end mono">${fmt(r.wip_qty)}</td>
-                    </tr>
-                `).join('');
-                    }
+            const buildLocationsHtml = (locations, itemId) => {
+                if (!locations.length) {
+                    return `<div class="detail-empty">Tidak ada stok di gudang manapun.</div>`;
                 }
 
-                // Mobile
-                if (mobileList) {
-                    if (!rows.length) {
-                        mobileList.innerHTML = `<div class="text-center py-4 text-muted">Tidak ada data.</div>`;
-                    } else {
-                        const startNo = ((meta.current_page - 1) * meta.per_page) + 1;
-                        mobileList.innerHTML = rows.map((r, i) => `
-                    <div class="row-card">
-                        <div class="row-title">
-                            <div class="mono">
-                                <span class="text-muted small me-2">#${startNo + i}</span>
-                                <button type="button" class="item-code-link"
-                                    data-item-id="${r.item_id}"
-                                    data-item-code="${esc(r.item_code)}"
-                                    data-item-name="${esc(r.item_name)}"
-                                    data-locations-url="${esc(r.locations_url)}">${esc(r.item_code)}</button>
-                            </div>
-                            <div class="mono fw-semibold">${fmt(r.total_qty)}</div>
-                        </div>
-                        <div class="name">${esc(r.item_name)}</div>
-                        <div class="row-metrics">
-                            <span class="m-pill"><span class="mono">FG</span> <span class="mono">${fmt(r.fg_qty)}</span></span>
-                            <span class="m-pill"><span class="mono">WIP</span> <span class="mono">${fmt(r.wip_qty)}</span></span>
-                            <span class="m-pill"><span class="mono">Total</span> <span class="mono">${fmt(r.total_qty)}</span></span>
-                        </div>
-                    </div>
-                `).join('');
-                    }
-                }
-            };
+                const rows = locations.map((loc, idx) => {
+                    const whId = loc.id;
+                    const whCode = esc(loc.code || '-');
+                    const whName = esc(loc.name || '-');
+                    const qty = fmt(loc.qty || 0);
 
-            const loadPage = async (qs, {
-                push = true
-            } = {}) => {
-                setLoading(true);
+                    const stockCardUrl = stockCardBaseUrl ?
+                        `${stockCardBaseUrl}?item_id=${encodeURIComponent(itemId)}&warehouse_id=${encodeURIComponent(whId)}` :
+                        '#';
 
-                const base = form.getAttribute('action') || window.location.pathname;
-                const url = qs ? `${base}?${qs}` : base;
+                    return `
+                        <tr>
+                            <td class="text-muted small">${idx + 1}</td>
+                            <td>
+                                <div class="fw-semibold">${whCode}</div>
+                                <div class="small text-muted">${whName}</div>
+                            </td>
+                            <td class="text-end mono">${qty}</td>
+                            <td class="text-end">
+                                <a href="${stockCardUrl}"
+                                   class="btn btn-outline-secondary btn-sm py-0 px-2"
+                                   title="Stock Card">
+                                    <i class="bi bi-journal-text"></i>
+                                </a>
+                            </td>
+                        </tr>
+                    `;
+                }).join('');
 
-                try {
-                    const res = await fetch(url, {
-                        headers: {
-                            'Accept': 'application/json',
-                            'X-Requested-With': 'XMLHttpRequest',
-                        }
-                    });
-                    const json = await res.json();
-
-                    if (!json?.ok) throw new Error('Bad response');
-
-                    if (push) pushUrl(qs);
-
-                    renderRows(json.rows || [], json.meta || {
-                        current_page: 1,
-                        per_page: 50
-                    });
-                    if (summaryTotal) summaryTotal.innerHTML =
-                        `Menampilkan <strong>${json.meta?.total ?? 0}</strong> item.`;
-                    if (paginationWrap) paginationWrap.innerHTML = json.pagination_html || '';
-
-                } catch (e) {
-                    // fallback: kalau error, refresh normal
-                    window.location.href = url;
-                    return;
-                } finally {
-                    setLoading(false);
-                }
-            };
-
-            // Submit filter => AJAX
-            form?.addEventListener('submit', (e) => {
-                e.preventDefault();
-                const qs = buildQueryFromForm();
-                // reset page ketika filter berubah
-                const params = new URLSearchParams(qs);
-                params.delete('page');
-                loadPage(params.toString(), {
-                    push: true
-                });
-            });
-
-            // Pagination click => AJAX
-            document.addEventListener('click', (e) => {
-                const a = e.target.closest('#paginationWrap a');
-                if (!a) return;
-                const href = a.getAttribute('href');
-                if (!href) return;
-                e.preventDefault();
-
-                const u = new URL(href, window.location.origin);
-                const qs = u.searchParams.toString();
-                loadPage(qs, {
-                    push: true
-                });
-            });
-
-            // Back/forward browser => AJAX reload current qs
-            window.addEventListener('popstate', () => {
-                const qs = window.location.search.replace(/^\?/, '');
-                loadPage(qs, {
-                    push: false
-                });
-            });
-
-            // Modal lokasi item (tetap AJAX)
-            const setLoadingLoc = (on) => {
-                if (loadingLoc) loadingLoc.style.display = on ? 'block' : 'none';
-            };
-            const renderEmptyLoc = (msg) => {
-                if (!tbodyLoc) return;
-                tbodyLoc.innerHTML =
-                    `<tr><td colspan="4" class="text-center text-muted py-3">${esc(msg)}</td></tr>`;
-            };
-
-            async function loadLocations({
-                itemId,
-                itemCode,
-                itemName,
-                url
-            }) {
-                if (!itemId || !url || !bsModal) return;
-
-                if (subtitleEl) subtitleEl.textContent = `${itemCode} — ${itemName}`;
-                if (tbodyLoc) tbodyLoc.innerHTML = '';
-                setLoadingLoc(true);
-                bsModal.show();
-
-                try {
-                    const res = await fetch(url, {
-                        headers: {
-                            'Accept': 'application/json',
-                            'X-Requested-With': 'XMLHttpRequest'
-                        }
-                    });
-                    const data = await res.json();
-                    const locations = data.locations || [];
-
-                    setLoadingLoc(false);
-
-                    if (!locations.length) return renderEmptyLoc('Tidak ada stok di gudang manapun.');
-
-                    tbodyLoc.innerHTML = locations.map((loc, idx) => {
-                        const whId = loc.id;
-                        const whCode = loc.code || '-';
-                        const whName = loc.name || '-';
-                        const qty = loc.qty || 0;
-
-                        const stockCardUrl = stockCardBaseUrl ?
-                            `${stockCardBaseUrl}?item_id=${encodeURIComponent(itemId)}&warehouse_id=${encodeURIComponent(whId)}` :
-                            '#';
-
-                        return `
-                    <tr>
-                        <td class="text-muted small">${idx + 1}</td>
-                        <td>
-                            <div class="fw-semibold">${esc(whCode)}</div>
-                            <div class="small text-muted">${esc(whName)}</div>
-                        </td>
-                        <td class="text-end mono">${fmt(qty)}</td>
-                        <td class="text-end">
-                            <a href="${stockCardUrl}" class="btn btn-outline-secondary btn-sm py-0 px-2" title="Stock Card">
-                                <i class="bi bi-journal-text"></i>
-                            </a>
-                        </td>
-                    </tr>
+                // Tanpa thead, hanya tbody
+                return `
+                    <table class="detail-locations-table">
+                        <tbody>
+                            ${rows}
+                        </tbody>
+                    </table>
                 `;
-                    }).join('');
-                } catch (e) {
-                    setLoadingLoc(false);
-                    renderEmptyLoc('Gagal mengambil data posisi stok.');
+            };
+
+            const fetchLocations = async (url) => {
+                const res = await fetch(url, {
+                    headers: {
+                        'Accept': 'application/json',
+                        'X-Requested-With': 'XMLHttpRequest',
+                    }
+                });
+                const data = await res.json();
+                return data.locations || [];
+            };
+
+            // Desktop toggle
+            const handleDesktopToggle = async (btn) => {
+                const row = btn.closest('.item-row');
+                if (!row) return;
+
+                const alreadyOpen = row.classList.contains('is-open');
+                const next = row.nextElementSibling;
+
+                if (alreadyOpen && next && next.classList.contains('detail-row')) {
+                    next.remove();
+                    row.classList.remove('is-open');
+                    return;
                 }
-            }
+
+                if (next && next.classList.contains('detail-row')) {
+                    next.remove();
+                }
+
+                const itemId = row.dataset.itemId;
+                const url = row.dataset.locationsUrl || '';
+                if (!itemId || !url) return;
+
+                row.classList.add('is-open');
+
+                const detailTr = document.createElement('tr');
+                detailTr.className = 'detail-row';
+                detailTr.innerHTML = `
+                    <td colspan="6">
+                        <div class="detail-inner">
+
+                            <div class="detail-body">Mengambil data...</div>
+                        </div>
+                    </td>
+                `;
+                row.insertAdjacentElement('afterend', detailTr);
+
+                const detailBody = detailTr.querySelector('.detail-body');
+
+                try {
+                    const locations = await fetchLocations(url);
+                    detailBody.innerHTML = buildLocationsHtml(locations, itemId);
+                } catch (err) {
+                    detailBody.innerHTML =
+                        `<div class="detail-empty">Gagal mengambil data posisi stok.</div>`;
+                }
+            };
+
+            // Mobile toggle
+            const handleMobileToggle = async (btn) => {
+                const card = btn.closest('.item-card');
+                if (!card) return;
+
+                const rowDetail = card.querySelector('.row-detail');
+                if (!rowDetail) return;
+
+                const isOpen = card.classList.contains('is-open');
+
+                if (isOpen) {
+                    card.classList.remove('is-open');
+                    rowDetail.style.display = 'none';
+                    rowDetail.innerHTML = '';
+                    return;
+                }
+
+                const itemId = card.dataset.itemId;
+                const url = card.dataset.locationsUrl || '';
+                if (!itemId || !url) return;
+
+                card.classList.add('is-open');
+                rowDetail.style.display = 'block';
+                rowDetail.innerHTML =
+                    `<div class="detail-empty">Mengambil data posisi stok...</div>`;
+
+                try {
+                    const locations = await fetchLocations(url);
+
+                    rowDetail.innerHTML = `
+                        <div class="detail-inner">
+                            <div class="detail-inner-header">
+                                <div class="small text-muted">Posisi stok per gudang</div>
+                            </div>
+                            ${buildLocationsHtml(locations, itemId)}
+                        </div>
+                    `;
+                } catch (err) {
+                    rowDetail.innerHTML =
+                        `<div class="detail-empty">Gagal mengambil data posisi stok.</div>`;
+                }
+            };
 
             document.addEventListener('click', (e) => {
-                const btn = e.target.closest('.item-code-link');
-                if (!btn) return;
-                loadLocations({
-                    itemId: btn.dataset.itemId,
-                    itemCode: btn.dataset.itemCode || '',
-                    itemName: btn.dataset.itemName || '',
-                    url: btn.dataset.locationsUrl
-                });
+                const desktopBtn = e.target.closest('.js-row-toggle');
+                if (desktopBtn) {
+                    e.preventDefault();
+                    handleDesktopToggle(desktopBtn);
+                    return;
+                }
+
+                const row = e.target.closest('tr.item-row');
+                if (row && !e.target.closest('a') && !e.target.closest('button')) {
+                    const toggleBtn = row.querySelector('.js-row-toggle');
+                    if (toggleBtn) {
+                        e.preventDefault();
+                        handleDesktopToggle(toggleBtn);
+                    }
+                    return;
+                }
+
+                const mobileBtn = e.target.closest('.js-card-toggle');
+                if (mobileBtn) {
+                    e.preventDefault();
+                    handleMobileToggle(mobileBtn);
+                    return;
+                }
             });
         });
     </script>

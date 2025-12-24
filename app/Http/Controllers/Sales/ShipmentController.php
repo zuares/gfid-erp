@@ -340,6 +340,104 @@ class ShipmentController extends Controller
             ->with('message', 'Shipment berhasil diposting & stok berkurang dari WH-RTS.');
     }
 
+    public function exportLines(Shipment $shipment)
+    {
+        // Load relasi yang dibutuhkan
+        $shipment->load(['store', 'lines.item']);
+
+        if ($shipment->lines->isEmpty()) {
+            return back()
+                ->with('status', 'error')
+                ->with('message', 'Tidak ada item di shipment ini untuk diekspor.');
+        }
+
+        $fileName = 'shipment_' . $shipment->code . '_items_' . now()->format('Ymd_His') . '.csv';
+
+        $headers = [
+            'Content-Type' => 'text/csv; charset=UTF-8',
+            'Content-Disposition' => 'attachment; filename="' . $fileName . '"',
+        ];
+
+        $callback = function () use ($shipment) {
+            $handle = fopen('php://output', 'w');
+
+            // Supaya Excel Windows baca UTF-8 dengan benar
+            fprintf($handle, chr(0xEF) . chr(0xBB) . chr(0xBF));
+
+            // Header kolom (bisa kamu ubah sesuai kebutuhan)
+            fputcsv($handle, [
+                'Shipment Code',
+                'Tanggal',
+                'Store Name',
+                'Store Code',
+                'Item Code',
+                'Item Name',
+                'Qty Scanned',
+                'Catatan Line',
+            ], ';'); // pakai ; supaya aman kalau nama ada koma
+
+            foreach ($shipment->lines as $line) {
+                $item = $line->item;
+                $store = $shipment->store;
+
+                fputcsv($handle, [
+                    $shipment->code,
+                    optional($shipment->date)->format('Y-m-d'),
+                    $store?->name ?? '',
+                    $store?->code ?? '',
+                    $item?->code ?? '',
+                    $item?->name ?? '',
+                    (int) $line->qty_scanned,
+                    $line->remarks ?? '',
+                ], ';');
+            }
+
+            fclose($handle);
+        };
+
+        return response()->streamDownload($callback, $fileName, $headers);
+    }
+
+    public function destroyLine(Request $request, ShipmentLine $line)
+    {
+        $shipment = $line->shipment;
+
+        if (!$shipment || $shipment->status !== 'draft') {
+            $message = 'Shipment sudah tidak draft, baris tidak bisa dihapus.';
+
+            if ($request->expectsJson() || $request->ajax()) {
+                return response()->json([
+                    'status' => 'error',
+                    'message' => $message,
+                ], 409);
+            }
+
+            return back()->with('status', 'error')->with('message', $message);
+        }
+
+        DB::transaction(function () use ($line) {
+            $line->delete();
+        });
+
+        $totalQty = (int) ShipmentLine::where('shipment_id', $shipment->id)->sum('qty_scanned');
+        $totalLines = (int) ShipmentLine::where('shipment_id', $shipment->id)->count();
+
+        if ($request->expectsJson() || $request->ajax()) {
+            return response()->json([
+                'status' => 'ok',
+                'message' => 'Baris berhasil dihapus.',
+                'totals' => [
+                    'total_qty' => $totalQty,
+                    'total_lines' => $totalLines,
+                ],
+            ]);
+        }
+
+        return back()
+            ->with('status', 'success')
+            ->with('message', 'Baris berhasil dihapus.');
+    }
+
     /**
      * Inline update qty (support AJAX).
      */

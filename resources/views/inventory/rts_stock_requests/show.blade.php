@@ -25,6 +25,12 @@
                     #f9fafb 65%);
         }
 
+        body[data-theme="dark"] .page-wrap {
+            background: radial-gradient(circle at top left,
+                    rgba(15, 23, 42, 0.9) 0,
+                    #020617 65%);
+        }
+
         .card {
             background: var(--card);
             border-radius: 14px;
@@ -159,9 +165,8 @@
         }
 
         /* =========================
-                   TABLE (DESKTOP) + STACK (MOBILE)
-                   Columns: No | Item | Status | Req | Kirim | Terima
-                ========================== */
+                  TABLE (DESKTOP) + STACK (MOBILE)
+               ========================== */
         .table-wrap {
             overflow: auto;
             -webkit-overflow-scrolling: touch;
@@ -320,9 +325,8 @@
         }
 
         /* =====================================================
-                   RTS DIRECT PICKUP MODAL (DESKTOP CENTER + MOBILE SHEET)
-                   - Namespace-safe: rtsDp*
-                ====================================================== */
+                  RTS DIRECT PICKUP MODAL
+               ====================================================== */
         #rtsDpOverlay {
             position: fixed;
             inset: 0;
@@ -531,6 +535,15 @@
                 $outCls = 'chip warn';
                 $outLabel = 'BUTUH';
             }
+
+            // Keterangan status global RTS
+            $statusNote = match ($stockRequest->status) {
+                'submitted' => 'RTS menunggu proses dari produksi / gudang asal. Belum ada barang dikirim.',
+                'shipped' => 'Sebagian / seluruh permintaan sudah dikirim dari produksi dan sedang dalam Transit.',
+                'partial' => 'Sebagian permintaan sudah diterima RTS, masih ada barang Transit atau Sisa RTS.',
+                'completed' => 'Semua permintaan sudah terpenuhi. RTS selesai.',
+                default => null,
+            };
         @endphp
 
         <div class="card">
@@ -552,21 +565,77 @@
             <div
                 style="margin-top:.6rem;display:flex;justify-content:space-between;gap:.6rem;flex-wrap:wrap;align-items:center">
                 <div class="chips">
-                    <span class="{{ $outCls }}">{{ $outLabel }} · Sisa <span
-                            class="mono">{{ $outRtsTotal }}</span></span>
+                    {{-- Badge kondisi sisa RTS --}}
+                    <span class="{{ $outCls }}">
+                        {{ $outLabel }} · Sisa
+                        <span class="mono">{{ $outRtsTotal }}</span>
+                    </span>
+
+                    {{-- Badge status permintaan dikirim --}}
+                    @if ($dispTotal > 0.0000001)
+                        <span class="chip ok">
+                            Permintaan dikirim · Transit
+                            <span class="mono">{{ $inTransitTotal }}</span>
+                        </span>
+                    @else
+                        <span class="chip">
+                            Belum ada kirim dari produksi
+                        </span>
+                    @endif
+
+                    {{-- Badge Direct Pickup jika terpakai --}}
+                    @if ($pickTotal > 0.0000001)
+                        <span class="chip warn">
+                            Direct Pickup · Pickup
+                            <span class="mono">{{ $pickTotal }}</span>
+                        </span>
+                    @endif
                 </div>
 
+                {{-- Aksi dinamis --}}
                 <div class="actions">
-                    @if (in_array($stockRequest->status, ['submitted', 'shipped', 'partial']))
-                        <a href="{{ route('rts.stock-requests.confirm', $stockRequest) }}" class="btn btn-primary">
-                            Terima (Transit → RTS)
-                        </a>
-                        <button type="button" class="btn btn-outline" data-rts-dp-open>
-                            Direct Pickup
-                        </button>
+                    @php
+                        // Boleh terima dari Transit kalau:
+                        // - status sudah 'shipped' / 'partial' (produksi sudah proses)
+                        // - masih ada qty Transit
+                        $canReceive =
+                            in_array($stockRequest->status, ['shipped', 'partial'], true) &&
+                            $inTransitTotal > 0.0000001;
+
+                        // Boleh Direct Pickup kalau:
+                        // - status minimal 'submitted'
+                        // - masih ada Sisa RTS
+                        $canPickup =
+                            in_array($stockRequest->status, ['submitted', 'shipped', 'partial'], true) &&
+                            $outRtsTotal > 0.0000001;
+                    @endphp
+
+                    @if ($canReceive || $canPickup)
+                        @if ($canReceive)
+                            <a href="{{ route('rts.stock-requests.confirm', $stockRequest) }}" class="btn btn-primary">
+                                Terima (Transit → RTS)
+                            </a>
+                        @endif
+
+                        @if ($canPickup)
+                            <button type="button" class="btn btn-outline" data-rts-dp-open>
+                                Ambil Dari Penjahit (Direct Pickup)
+                            </button>
+                        @endif
+                    @else
+                        <span class="chip ok">
+                            RTS selesai · tidak ada sisa permintaan
+                        </span>
                     @endif
                 </div>
             </div>
+
+            {{-- Keterangan status di bawah summary --}}
+            @if ($statusNote)
+                <div class="meta" style="margin-top:.5rem">
+                    Keterangan: {{ $statusNote }}
+                </div>
+            @endif
 
             @if ($stockRequest->notes)
                 <div class="line"></div>
@@ -595,6 +664,7 @@
                             <th class="td-right">Req</th>
                             <th class="td-right">Kirim</th>
                             <th class="td-right">Terima</th>
+                            <th class="td-right">Sisa RTS</th>
                         </tr>
                     </thead>
                     <tbody>
@@ -659,6 +729,7 @@
                                 <td class="td-right mono" data-k="Req">{{ $req }}</td>
                                 <td class="td-right mono" data-k="Kirim">{{ $disp }}</td>
                                 <td class="td-right mono" data-k="Terima">{{ $recv }}</td>
+                                <td class="td-right mono" data-k="Sisa RTS">{{ $outRts }}</td>
                             </tr>
                         @endforeach
                     </tbody>
@@ -667,7 +738,7 @@
         </div>
 
         {{-- =======================
-            DIRECT PICKUP MODAL (SEWING/WIP → RTS | FIFO by operator + tanggal pickup)
+            DIRECT PICKUP MODAL
         ======================== --}}
         <div id="rtsDpOverlay" aria-hidden="true">
             <div class="rts-dp-panel" role="dialog" aria-modal="true" aria-label="Direct Pickup">

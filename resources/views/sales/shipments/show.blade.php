@@ -818,6 +818,9 @@
                         </div>
                         <div class="small text-muted">
                             Klik angka <strong>Qty</strong> untuk mengedit jumlah.
+                            @if ($shipment->status === 'draft')
+                                Klik ikon 🗑 untuk menghapus baris.
+                            @endif
                         </div>
                     </div>
 
@@ -852,6 +855,7 @@
                                 <th style="width: 140px;">Kode</th>
                                 <th>Nama Barang</th>
                                 <th style="width: 140px;" class="text-end">Qty</th>
+                                <th style="width: 60px;"></th>
                             </tr>
                         </thead>
                         <tbody id="linesTbody">
@@ -882,23 +886,39 @@
                                             {{ number_format($line->qty_scanned, 0, ',', '.') }}
                                         </span>
 
-                                        <form action="{{ route('sales.shipments.update_line_qty', $line) }}"
-                                            method="POST" class="d-inline qty-edit-form d-none"
-                                            data-line-id="{{ $line->id }}">
-                                            @csrf
-                                            @method('PATCH')
-                                            <input type="number" name="qty"
-                                                class="form-control form-control-sm qty-edit-input" min="0"
-                                                value="{{ $line->qty_scanned }}">
-                                            <button type="submit" class="btn btn-primary btn-sm qty-edit-save-btn">
-                                                ✔
-                                            </button>
-                                        </form>
+                                        @if ($shipment->status === 'draft')
+                                            <form action="{{ route('sales.shipments.update_line_qty', $line) }}"
+                                                method="POST" class="d-inline qty-edit-form d-none"
+                                                data-line-id="{{ $line->id }}">
+                                                @csrf
+                                                @method('PATCH')
+                                                <input type="number" name="qty"
+                                                    class="form-control form-control-sm qty-edit-input" min="0"
+                                                    value="{{ $line->qty_scanned }}">
+                                                <button type="submit" class="btn btn-primary btn-sm qty-edit-save-btn">
+                                                    ✔
+                                                </button>
+                                            </form>
+                                        @endif
+                                    </td>
+                                    <td class="text-end">
+                                        @if ($shipment->status === 'draft')
+                                            <form action="{{ route('sales.shipments.destroy_line', $line) }}"
+                                                method="POST" class="d-inline js-delete-line-form"
+                                                data-line-id="{{ $line->id }}">
+                                                @csrf
+                                                @method('DELETE')
+                                                <button type="submit" class="btn btn-sm btn-outline-danger"
+                                                    title="Hapus baris">
+                                                    🗑
+                                                </button>
+                                            </form>
+                                        @endif
                                     </td>
                                 </tr>
                             @empty
                                 <tr class="no-lines-row">
-                                    <td colspan="4" class="text-center text-muted py-4">
+                                    <td colspan="5" class="text-center text-muted py-4">
                                         Belum ada item yang discan.
                                     </td>
                                 </tr>
@@ -917,12 +937,19 @@
                             {{ number_format($totalQty, 0, ',', '.') }}
                         </span>
                     </div>
-
                     <div class="d-flex flex-wrap gap-2">
                         {{-- Kembali ke list --}}
                         <a href="{{ route('sales.shipments.index') }}" class="btn btn-theme-outline">
                             &larr; Kembali ke list
                         </a>
+
+                        {{-- Export barang yang dikirim (CSV) --}}
+                        @if ($shipment->lines->isNotEmpty())
+                            <a href="{{ route('sales.shipments.export_lines', $shipment) }}"
+                                class="btn btn-theme-outline">
+                                Export Barang (CSV)
+                            </a>
+                        @endif
 
                         {{-- 🔥 Tombol Invoice (dari Shipment) --}}
                         @if ($shipment->status === 'posted')
@@ -958,6 +985,7 @@
                             </form>
                         @endif
                     </div>
+
                 </div>
             </div>
         </div>
@@ -985,6 +1013,9 @@
             const summaryTotalLines = document.getElementById('summaryTotalLines');
             const summaryTotalQty = document.getElementById('summaryTotalQty');
             const footerTotalQty = document.getElementById('footerTotalQty');
+
+            // Template URL untuk delete line (ganti placeholder pakai line.id)
+            const deleteUrlTemplate = @json(route('sales.shipments.destroy_line', ['line' => '__LINE_ID__']));
 
             /* ===== AUTO HIDE FLASH ALERT ===== */
             const autoAlerts = document.querySelectorAll('.js-auto-hide-alert');
@@ -1195,11 +1226,73 @@
                 qtyEl.dataset.boundClick = '1';
             }
 
+            function bindDeleteForm(form) {
+                if (!form || form.dataset.boundDelete === '1') return;
+
+                form.addEventListener('submit', function(e) {
+                    e.preventDefault();
+
+                    if (!confirm('Hapus baris ini?')) return;
+
+                    const lineId = form.dataset.lineId;
+
+                    fetch(form.action, {
+                        method: 'POST',
+                        headers: {
+                            'Accept': 'application/json',
+                            'X-Requested-With': 'XMLHttpRequest',
+                        },
+                        body: new FormData(form),
+                    }).then(async (res) => {
+                        let data = null;
+                        try {
+                            data = await res.json();
+                        } catch (e) {
+                            form.submit(); // fallback
+                            return;
+                        }
+
+                        if (!res.ok || !data || data.status !== 'ok') {
+                            playErrorBeep();
+                            showToast('error', data.message || 'Gagal hapus baris.');
+                            return;
+                        }
+
+                        playSuccessBeep();
+
+                        const row = linesTbody.querySelector('tr[data-line-id="' + lineId + '"]');
+                        if (row) row.remove();
+
+                        renumberRows();
+
+                        const totals = data.totals || {};
+                        if (summaryTotalLines && typeof totals.total_lines !== 'undefined') {
+                            summaryTotalLines.textContent = totals.total_lines ?? 0;
+                        }
+
+                        if (typeof totals.total_qty !== 'undefined') {
+                            const f = new Intl.NumberFormat('id-ID').format(totals.total_qty);
+                            if (summaryTotalQty) summaryTotalQty.textContent = f;
+                            if (footerTotalQty) footerTotalQty.textContent = f;
+                        }
+
+                        showToast('success', data.message || 'Baris dihapus.');
+                    }).catch(() => form.submit());
+                });
+
+                form.dataset.boundDelete = '1';
+            }
+
             // Bind awal untuk semua row
             if (linesTbody) {
                 const rows = linesTbody.querySelectorAll('tr[data-line-id]');
                 for (let i = 0; i < rows.length; i++) {
                     bindQtyClickForRow(rows[i]);
+                }
+
+                if (isDraft) {
+                    const deleteForms = linesTbody.querySelectorAll('.js-delete-line-form');
+                    deleteForms.forEach(form => bindDeleteForm(form));
                 }
             }
 
@@ -1311,6 +1404,8 @@
 
                                 const updateUrl = line.update_qty_url ? line.update_qty_url : '';
 
+                                const deleteUrl = deleteUrlTemplate.replace('__LINE_ID__', line.id);
+
                                 row = document.createElement('tr');
                                 row.setAttribute('data-line-id', line.id);
 
@@ -1332,6 +1427,15 @@
                                     '<input type="number" name="qty" class="form-control form-control-sm qty-edit-input" min="0" value="' +
                                     (line.qty_scanned || 0) + '">' +
                                     '<button type="submit" class="btn btn-primary btn-sm qty-edit-save-btn">✔</button>' +
+                                    '</form>' +
+                                    '</td>' +
+                                    '<td class="text-end">' +
+                                    '<form action="' + deleteUrl +
+                                    '" method="POST" class="d-inline js-delete-line-form" data-line-id="' +
+                                    line.id + '">' +
+                                    '<input type="hidden" name="_token" value="{{ csrf_token() }}">' +
+                                    '<input type="hidden" name="_method" value="DELETE">' +
+                                    '<button type="submit" class="btn btn-sm btn-outline-danger" title="Hapus baris">🗑</button>' +
                                     '</form>' +
                                     '</td>';
 
@@ -1361,6 +1465,12 @@
                             }
 
                             bindQtyClickForRow(row);
+
+                            const deleteForm = row.querySelector('.js-delete-line-form');
+                            if (deleteForm) {
+                                bindDeleteForm(deleteForm);
+                            }
+
                             renumberRows();
 
                             if (typeof totals.total_lines !== 'undefined' && summaryTotalLines) {

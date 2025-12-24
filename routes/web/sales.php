@@ -69,8 +69,13 @@ Route::middleware(['web', 'auth', 'role:owner,admin'])->group(function () {
         Route::post('shipments/{shipment}/sync-scans', [ShipmentController::class, 'syncScans'])
             ->name('shipments.sync_scans');
 
+        Route::get('shipments/{shipment}/export-lines', [ShipmentController::class, 'exportLines'])
+            ->name('shipments.export_lines');
+
         Route::patch('shipments/lines/{line}', [ShipmentController::class, 'updateLineQty'])
             ->name('shipments.update_line_qty');
+        Route::delete('shipments/lines/{line}', [ShipmentController::class, 'destroyLine'])
+            ->name('shipments.destroy_line');
 
         /**
          * =========================

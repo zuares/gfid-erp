@@ -98,8 +98,8 @@
         }
 
         /* =========================
-               CLEAN SOFT BADGES + AUTO-HIDE ZERO (JS)
-            ========================== */
+                                                   CLEAN SOFT BADGES
+                                                ========================== */
         .badges {
             display: flex;
             flex-wrap: wrap;
@@ -120,7 +120,6 @@
             line-height: 1;
         }
 
-        /* small dot */
         .badge .dot {
             width: 8px;
             height: 8px;
@@ -129,55 +128,69 @@
             opacity: .75;
         }
 
-        /* neutral info */
         .badge.info {
             background: rgba(148, 163, 184, .14);
             border-color: rgba(148, 163, 184, .30);
             color: rgba(51, 65, 85, 1);
         }
 
-        /* OK */
         .badge.ok {
             background: rgba(16, 185, 129, .16);
             border-color: rgba(16, 185, 129, .35);
             color: rgba(4, 120, 87, 1);
         }
 
-        /* Warning */
         .badge.warn {
             background: rgba(245, 158, 11, .18);
             border-color: rgba(245, 158, 11, .40);
             color: rgba(146, 64, 14, 1);
         }
 
-        /* Danger */
         .badge.danger {
             background: rgba(239, 68, 68, .16);
             border-color: rgba(239, 68, 68, .40);
             color: rgba(153, 27, 27, 1);
         }
 
-        /* Muted */
         .badge.muted {
             background: rgba(100, 116, 139, .16);
             border-color: rgba(100, 116, 139, .35);
             color: rgba(51, 65, 85, 1);
         }
 
-        /* when hidden by JS */
         .badge.is-hidden {
             display: none !important;
         }
 
         /* =========================
-               TABLE (DESKTOP) + STACK (MOBILE)
-               Columns: No | Item(with badges) | Req | Kirim | Qty Receive
-            ========================== */
+                                                   TABLE (DESKTOP) + STACK (MOBILE)
+                                                ========================== */
         .table-wrap {
-            overflow: auto;
-            -webkit-overflow-scrolling: touch;
             border: 1px solid rgba(148, 163, 184, .22);
             border-radius: 12px;
+            max-height: 40vh;
+            /* ✅ max tinggi daftar item */
+            overflow-y: auto;
+            /* ✅ scroll vertikal (kanan) */
+            overflow-x: auto;
+            -webkit-overflow-scrolling: touch;
+            background: rgba(15, 23, 42, .01);
+        }
+
+        /* custom scrollbar (WebKit) */
+        .table-wrap::-webkit-scrollbar {
+            width: 8px;
+            height: 8px;
+        }
+
+        .table-wrap::-webkit-scrollbar-track {
+            background: rgba(15, 23, 42, .04);
+            border-radius: 999px;
+        }
+
+        .table-wrap::-webkit-scrollbar-thumb {
+            background: rgba(148, 163, 184, .75);
+            border-radius: 999px;
         }
 
         .tbl {
@@ -202,8 +215,9 @@
             font-size: .78rem;
             letter-spacing: .02em;
             text-transform: uppercase;
-            opacity: .75;
-            border-bottom: 1px solid rgba(148, 163, 184, .26);
+            opacity: 1;
+            /* ✅ tidak transparan lagi */
+            border-bottom: 1px solid rgba(148, 163, 184, .35);
         }
 
         .tbl tbody tr:hover {
@@ -249,6 +263,11 @@
             color: inherit;
         }
 
+        /* center khusus untuk qty receive */
+        .num.num-center {
+            text-align: center;
+        }
+
         .num.is-disabled {
             opacity: .6;
             cursor: not-allowed;
@@ -272,6 +291,7 @@
             .table-wrap {
                 border: none;
                 border-radius: 0;
+                max-height: none;
                 overflow: visible;
             }
 
@@ -335,6 +355,77 @@
                 padding: .75rem .75rem 5rem;
             }
         }
+
+        /* =========================
+                                                   SIMPLE CUSTOM MODAL (NO BOOTSTRAP JS)
+                                                ========================== */
+        .confirm-overlay {
+            position: fixed;
+            inset: 0;
+            background: rgba(15, 23, 42, .58);
+            display: none;
+            align-items: center;
+            justify-content: center;
+            z-index: 9999;
+            padding: 1.25rem;
+        }
+
+        .confirm-overlay.is-open {
+            display: flex;
+        }
+
+        .confirm-modal {
+            max-width: 780px;
+            width: 100%;
+            background: var(--card, #0f172a);
+            border-radius: 14px;
+            border: 1px solid rgba(148, 163, 184, .35);
+            box-shadow: 0 22px 45px rgba(15, 23, 42, .55);
+            display: flex;
+            flex-direction: column;
+            max-height: 90vh;
+        }
+
+        .confirm-modal-header,
+        .confirm-modal-footer {
+            padding: .75rem .9rem;
+            border-bottom: 1px solid rgba(148, 163, 184, .22);
+            display: flex;
+            align-items: center;
+            justify-content: space-between;
+            gap: .5rem;
+        }
+
+        .confirm-modal-header-title {
+            font-size: .95rem;
+            font-weight: 800;
+        }
+
+        .confirm-modal-body {
+            padding: .7rem .9rem .85rem;
+            font-size: .9rem;
+            overflow: auto;
+        }
+
+        .confirm-modal-footer {
+            border-top: 1px solid rgba(148, 163, 184, .22);
+            border-bottom: none;
+            justify-content: flex-end;
+        }
+
+        .confirm-close-btn {
+            border: none;
+            background: transparent;
+            font-size: 1.1rem;
+            line-height: 1;
+            padding: .15rem .35rem;
+            cursor: pointer;
+            opacity: .7;
+        }
+
+        .confirm-close-btn:hover {
+            opacity: 1;
+        }
     </style>
 @endpush
 
@@ -376,7 +467,8 @@
             </div>
         </div>
 
-        <form method="POST" action="{{ route('rts.stock-requests.finalize', $stockRequest) }}" style="margin-top:.85rem">
+        <form id="formReceive" method="POST" action="{{ route('rts.stock-requests.finalize', $stockRequest) }}"
+            style="margin-top:.85rem">
             @csrf
 
             <div class="card">
@@ -393,9 +485,9 @@
                             <tr>
                                 <th class="no">No</th>
                                 <th class="item-cell">Item</th>
-                                <th class="td-right">Req</th>
-                                <th class="td-right">Kirim</th>
-                                <th class="td-right">Qty Receive</th>
+                                <th class="td-right">Permintaan</th>
+                                <th class="td-right">Dikirim</th>
+                                <th class="td-center">Jumlah Diterima</th>
                             </tr>
                         </thead>
 
@@ -438,18 +530,11 @@
                                         <div class="item-code mono">{{ $line->item->code }}</div>
                                         <div class="item-name">{{ $line->item->name }}</div>
 
-                                        {{-- badges compact (auto-hide 0 via JS) --}}
+                                        {{-- badges: Pickup + Status --}}
                                         <div class="badges" data-badge-group>
                                             <span class="badge info js-hide-zero" data-zero="{{ $pick }}">
-                                                <span class="dot"></span> Pickup <b
-                                                    class="mono">{{ $pick }}</b>
-                                            </span>
-                                            <span class="badge info js-hide-zero" data-zero="{{ $maxReceivable }}">
-                                                <span class="dot"></span> Sisa <b
-                                                    class="mono">{{ $maxReceivable }}</b>
-                                            </span>
-                                            <span class="badge info js-hide-zero" data-zero="{{ $liveTransit }}">
-                                                <span class="dot"></span> Live <b class="mono">{{ $liveTransit }}</b>
+                                                <span class="dot"></span> Pickup
+                                                <b class="mono">{{ $pick }}</b>
                                             </span>
 
                                             <span class="{{ $statusCls }}">
@@ -461,14 +546,17 @@
                                     <td class="td-right mono" data-k="Req">{{ $req }}</td>
                                     <td class="td-right mono" data-k="Kirim">{{ $disp }}</td>
 
-                                    <td class="td-right" data-k="Qty Receive">
-                                        <input class="num js-recv {{ $isDisabled ? 'is-disabled' : '' }}" type="number"
-                                            step="0.01" min="0" max="{{ $maxReceivable }}"
+                                    <td class="td-center" data-k="Qty Receive">
+                                        <input class="num num-center js-recv {{ $isDisabled ? 'is-disabled' : '' }}"
+                                            type="number" step="0.01" min="0" max="{{ $maxReceivable }}"
                                             name="lines[{{ $line->id }}][qty_received]"
                                             value="{{ $isDisabled ? 0 : $old }}" data-max="{{ $maxReceivable }}"
-                                            {{ $isDisabled ? 'disabled' : '' }}>
+                                            data-item-code="{{ $line->item->code }}"
+                                            data-item-name="{{ $line->item->name }}" {{ $isDisabled ? 'disabled' : '' }}>
 
-                                        <div class="hint">Max: <b class="mono">{{ $maxReceivable }}</b></div>
+                                        <div class="hint">
+                                            Max: <b class="mono">{{ $maxReceivable }}</b>
+                                        </div>
 
                                         @error("lines.{$line->id}.qty_received")
                                             <div class="err">{{ $message }}</div>
@@ -495,11 +583,42 @@
         </form>
     </div>
 
+    {{-- =======================
+        SIMPLE CUSTOM MODAL KONFIRMASI + DETAIL BARANG
+    ======================== --}}
+    <div id="confirmReceiveOverlay" class="confirm-overlay" aria-hidden="true">
+        <div class="confirm-modal">
+            <div class="confirm-modal-header">
+                <div class="confirm-modal-header-title">
+                    Konfirmasi Simpan Receive
+                </div>
+                <button type="button" class="confirm-close-btn" data-confirm-close>&times;</button>
+            </div>
+            <div class="confirm-modal-body">
+                <p style="margin-bottom:.4rem">
+                    Pastikan jumlah yang diterima sudah sesuai dengan fisik barang.
+                </p>
+                <p class="meta" style="margin-bottom:.5rem">
+                    Berikut ringkasan barang yang akan ditandai sebagai <b>diterima</b> untuk permintaan
+                    <span class="mono">{{ $stockRequest->code }}</span>:
+                </p>
+
+                {{-- diisi dinamis via JS --}}
+                <div id="confirmReceiveList"></div>
+            </div>
+            <div class="confirm-modal-footer">
+                <button type="button" class="btn btn-outline" data-confirm-close>Kembali</button>
+                <button type="button" class="btn btn-primary" id="btnConfirmReceive">
+                    Ya, Simpan Receive
+                </button>
+            </div>
+        </div>
+    </div>
+
     <script>
         (function() {
             // =========================
-            // Auto-hide zero badges (Pickup/Sisa/Live)
-            // - If ALL info badges hidden, hide whole group row except Status
+            // Utility
             // =========================
             function toNum(x) {
                 const n = parseFloat(String(x ?? '').replace(',', '.'));
@@ -510,17 +629,16 @@
                 return Math.abs(n) <= 0.0000001;
             }
 
+            // =========================
+            // Auto-hide zero badges (Pickup)
+            // =========================
             document.querySelectorAll('.js-hide-zero').forEach(b => {
                 const v = toNum(b.getAttribute('data-zero'));
                 if (isZero(v)) b.classList.add('is-hidden');
             });
 
-            // If a badge group ends up with only Status visible, keep it (clean).
-            // But if you want to also hide the "badges" wrapper when only 1 badge, you can tweak here.
-            // We'll keep it visible so Status always shows in same spot.
-
             // =========================
-            // Qty receive clamping + fill/clear
+            // Qty receive clamping + fill/clear + auto-select
             // =========================
             const inputs = Array.from(document.querySelectorAll('.js-recv'));
 
@@ -530,10 +648,32 @@
                 let v = parseFloat(el.value || '0');
                 if (Number.isNaN(v) || v < 0) v = 0;
                 if (v > max) v = max;
-                el.value = (Math.round(v * 100) / 100).toFixed(2).replace(/\.00$/, '');
+                el.value = (Math.round(v * 100) / 100)
+                    .toFixed(2)
+                    .replace(/\.00$/, '');
+            }
+
+            function selectAll(el) {
+                if (!el || el.disabled) return;
+                setTimeout(() => {
+                    try {
+                        el.select();
+                        if (el.setSelectionRange) {
+                            const len = el.value.length;
+                            el.setSelectionRange(0, len);
+                        }
+                    } catch (e) {}
+                }, 10);
             }
 
             inputs.forEach(i => {
+                if (i.disabled) return;
+                i.addEventListener('focus', (e) => selectAll(e.target));
+                i.addEventListener('click', (e) => {
+                    if (document.activeElement === e.target) {
+                        selectAll(e.target);
+                    }
+                });
                 i.addEventListener('blur', () => clampInput(i));
                 i.addEventListener('change', () => clampInput(i));
             });
@@ -554,6 +694,121 @@
                     clampInput(el);
                 });
             });
+
+            // =========================
+            // Build detail list untuk modal konfirmasi (tanpa kolom Max)
+            // =========================
+            const listEl = document.getElementById('confirmReceiveList');
+
+            function buildConfirmList() {
+                if (!listEl) return;
+
+                // pastikan sudah di-clamp sebelum show
+                inputs.forEach(el => clampInput(el));
+
+                const rows = [];
+                inputs.forEach(el => {
+                    if (el.disabled) return;
+                    const qty = toNum(el.value);
+                    if (isZero(qty)) return;
+
+                    const code = el.getAttribute('data-item-code') || '';
+                    const name = el.getAttribute('data-item-name') || '';
+
+                    rows.push({
+                        code,
+                        name,
+                        qty
+                    });
+                });
+
+                if (!rows.length) {
+                    listEl.innerHTML =
+                        '<p class="meta" style="margin-bottom:0">Belum ada qty receive &gt; 0. Jika memang tidak ada barang yang diterima, Anda tetap bisa melanjutkan.</p>';
+                    return;
+                }
+
+                let html = '';
+                html +=
+                    '<div style="max-height:260px;overflow:auto;border-radius:10px;border:1px solid rgba(148,163,184,.35);padding:.4rem .5rem;">';
+                html += '<table class="table table-sm mb-0" style="font-size:.8rem;">';
+                html += '<thead>';
+                html += '<tr>';
+                html += '<th style="width:40px;">No</th>';
+                html += '<th>Item</th>';
+                html += '<th class="text-center">Diterima</th>';
+                html += '</tr>';
+                html += '</thead><tbody>';
+
+                rows.forEach((row, idx) => {
+                    html += '<tr>';
+                    html += '<td class="text-center">' + (idx + 1) + '</td>';
+                    html += '<td>';
+                    html += '<div class="mono" style="font-weight:700;">' + row.code + '</div>';
+                    html += '<div style="opacity:.8;">' + row.name + '</div>';
+                    html += '</td>';
+                    html += '<td class="text-center mono" style="font-weight:700;">' + row.qty + '</td>';
+                    html += '</tr>';
+                });
+
+                html += '</tbody></table></div>';
+                listEl.innerHTML = html;
+            }
+
+            // =========================
+            // Custom modal open/close
+            // =========================
+            const overlay = document.getElementById('confirmReceiveOverlay');
+            const confirmBtn = document.getElementById('btnConfirmReceive');
+            const closeBtns = overlay ? overlay.querySelectorAll('[data-confirm-close]') : [];
+            const form = document.getElementById('formReceive');
+
+            function openConfirmModal() {
+                if (!overlay) return;
+                buildConfirmList();
+                overlay.classList.add('is-open');
+                document.body.style.overflow = 'hidden';
+            }
+
+            function closeConfirmModal() {
+                if (!overlay) return;
+                overlay.classList.remove('is-open');
+                document.body.style.overflow = '';
+            }
+
+            closeBtns.forEach(btn => {
+                btn.addEventListener('click', () => {
+                    closeConfirmModal();
+                });
+            });
+
+            if (overlay) {
+                overlay.addEventListener('click', (e) => {
+                    if (e.target === overlay) {
+                        closeConfirmModal();
+                    }
+                });
+            }
+
+            if (form) {
+                let isConfirmed = false;
+
+                form.addEventListener('submit', function(e) {
+                    if (isConfirmed) {
+                        return;
+                    }
+                    e.preventDefault();
+                    openConfirmModal();
+                });
+
+                if (confirmBtn) {
+                    confirmBtn.addEventListener('click', function() {
+                        closeConfirmModal();
+                        isConfirmed = true;
+                        form.submit();
+                    });
+                }
+            }
         })();
     </script>
 @endsection

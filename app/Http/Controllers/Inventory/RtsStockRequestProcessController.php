@@ -302,7 +302,7 @@ class RtsStockRequestProcessController extends Controller
         }
 
         return redirect()
-            ->route('prd.stock-requests.edit', $stockRequest)
+            ->route('prd.stock-requests.index', $stockRequest)
             ->with('status', 'Pengiriman PRD → TRANSIT berhasil diproses.');
     }
 }
