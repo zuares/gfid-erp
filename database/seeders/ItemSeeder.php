@@ -14,14 +14,14 @@ class ItemSeeder extends Seeder
     {
         $data = [
             'CRG' => [
-                'name' => 'Celana Cargo',
+                'name' => 'Jogger Pendek Cargo',
                 'items' => [
                     'C5BLK', 'C5MST', 'C5NVY',
                     'C7BLK', 'C7MST', 'C7NVY',
                 ],
             ],
             'LJR' => [
-                'name' => 'Jaket Layer',
+                'name' => 'Jogger Panjang Basic',
                 'items' => [
                     'J3ABT', 'J3BLK', 'J3MST', 'J3NVY',
                     'J5ABT', 'J5BLK', 'J5MST', 'J5NVY',
@@ -29,7 +29,7 @@ class ItemSeeder extends Seeder
                 ],
             ],
             'SJR' => [
-                'name' => 'Celana Jogger',
+                'name' => 'Jogger Pendek Basic',
                 'items' => [
                     'K1ABT', 'K1BLK', 'K1MST', 'K1NVY', 'K1WHT',
                     'K2ABT', 'K2BLK', 'K2MST', 'K2NVY',
@@ -40,7 +40,7 @@ class ItemSeeder extends Seeder
                 ],
             ],
             'LCG' => [
-                'name' => 'Legging',
+                'name' => 'Jogger Panjang Cargo',
                 'items' => [
                     'L1BLK', 'L1MST', 'L1NVY',
                     'L2BLK', 'L2MST', 'L2NVY',
@@ -48,7 +48,7 @@ class ItemSeeder extends Seeder
                 ],
             ],
             'SHT' => [
-                'name' => 'Short Pants',
+                'name' => 'Shot Boxer Brief',
                 'items' => [
                     'S2RDM', 'S2RDM-3', 'S2RDM-6',
                     'S3RDM', 'S3RDM-3', 'S3RDM-6',
@@ -57,7 +57,7 @@ class ItemSeeder extends Seeder
                 ],
             ],
             'TJR' => [
-                'name' => 'T-Shirt',
+                'name' => 'Celana Jogger Pendek Bodyfit',
                 'items' => [
                     'T1ABT', 'T1BLK', 'T1MST', 'T1NVY',
                     'T2ABT', 'T2BLK', 'T2MST', 'T2NVY',
@@ -151,22 +151,22 @@ class ItemSeeder extends Seeder
     private function generateName(string $catCode, string $code): string
     {
         $colors = [
-            'BLK' => 'Black',
-            'MST' => 'Mustard',
+            'BLK' => 'Hitam',
+            'MST' => 'Misty (Abu-Abu) M71',
             'NVY' => 'Navy',
-            'ABT' => 'Abu Tua',
+            'ABT' => 'Abu Tua M81',
             'BBL' => 'Baby Blue',
-            'WHT' => 'White',
-            'RDM' => 'Red Maroon',
+            'WHT' => 'Putih',
+            'RDM' => 'Random',
         ];
 
         $prefix = [
-            'CRG' => 'Cargo',
-            'LJR' => 'Jaket',
-            'SJR' => 'Jogger',
-            'LCG' => 'Legging',
-            'SHT' => 'Short',
-            'TJR' => 'T-Shirt',
+            'CRG' => 'Jogger Pendek Cargo',
+            'LJR' => 'Jogger Panjang Basic',
+            'SJR' => 'Jogger Pendek Basic',
+            'LCG' => 'Jogger Panjang Cargo',
+            'SHT' => 'Shot Boxer Brief',
+            'TJR' => 'Jogger Pendek Bodyfit',
         ];
 
         $manual = [
