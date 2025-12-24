@@ -22,3 +22,18 @@
 Homestead.json
 Homestead.yaml
 Thumbs.db
+
+
+# SQLite dev/prod
+database*.sqlite
+
+# Environment
+.env
+.env.*
+
+# File testing
+public/*test*.txt
+root-test.txt
+
+# Folder path hosting (kalau sempat ke-track)
+domains/
