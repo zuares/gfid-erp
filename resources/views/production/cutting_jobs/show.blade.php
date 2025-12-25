@@ -8,6 +8,8 @@
         .page-wrap {
             max-width: 1100px;
             margin-inline: auto;
+            padding: .75rem .75rem 4.5rem;
+            /* space bawah untuk floating actions + bottom nav */
         }
 
         .card {
@@ -58,8 +60,8 @@
         }
 
         /* ============================
-                       STATUS STEPPER DINAMIS
-                   ============================ */
+                   STATUS STEPPER DINAMIS
+               ============================ */
         .status-stepper {
             display: flex;
             align-items: center;
@@ -129,8 +131,8 @@
         }
 
         /* ============================
-                       DESKTOP ACTIONS STYLING
-                   ============================ */
+                   DESKTOP ACTIONS STYLING
+               ============================ */
         .cutting-actions-desktop .btn {
             border-radius: 999px;
         }
@@ -159,17 +161,50 @@
         }
 
         /* ============================
-                       MOBILE ACTIONS BAWAH
-                   ============================ */
+                   MOBILE FLOATING ACTIONS (RIGHT)
+               ============================ */
         @media (max-width: 767.98px) {
-            .cutting-mobile-actions .btn {
+            .cutting-mobile-actions {
+                position: fixed;
+                right: .9rem;
+                bottom: calc(env(safe-area-inset-bottom, 0px) + 88px);
+                /* di atas mobile bottom-nav */
+                z-index: 1040;
+                pointer-events: none;
+                /* container tidak terima klik */
+            }
+
+            .cutting-mobile-actions-inner {
+                pointer-events: auto;
+                /* isi bisa di-klik */
+                background: color-mix(in srgb, var(--card) 92%, rgba(15, 23, 42, 0.08));
+                border-radius: 18px;
+                box-shadow:
+                    0 12px 28px rgba(15, 23, 42, 0.35),
+                    0 0 0 1px rgba(148, 163, 184, 0.45);
+                padding: .38rem .45rem;
+                display: flex;
+                gap: .3rem;
+                align-items: center;
+                backdrop-filter: blur(10px);
+                max-width: 78vw;
+            }
+
+            .cutting-mobile-actions-inner .btn {
                 border-radius: 999px;
+                white-space: nowrap;
+                flex: 0 0 auto;
+                /* tidak full width */
+            }
+
+            .cutting-mobile-actions-inner .btn-primary {
+                box-shadow: 0 6px 18px rgba(37, 99, 235, 0.45);
             }
         }
 
         /* ============================
-                       BUNDLE INFO PILLS
-                   ============================ */
+                   BUNDLE INFO PILLS
+               ============================ */
         .bundle-info-pill {
             font-size: .72rem;
             font-weight: 700;
@@ -213,8 +248,8 @@
         }
 
         /* ============================
-                       BUNDLE PROGRESS BAR
-                   ============================ */
+                   BUNDLE PROGRESS BAR
+               ============================ */
         .bundle-progress {
             margin-top: .18rem;
         }
@@ -932,38 +967,35 @@
         </div>
 
         {{-- =========================
-             MOBILE: AKSI DI BAGIAN BAWAH
+             MOBILE: AKSI FLOATING DI KANAN BAWAH
         ========================== --}}
         @if (!$hasQcCutting)
-            <div class="card p-3 mb-4 d-block d-md-none cutting-mobile-actions">
-                <div class="d-grid gap-2">
+            <div class="cutting-mobile-actions d-block d-md-none">
+                <div class="cutting-mobile-actions-inner">
                     @if (in_array($job->status, ['draft', 'cut']))
-                        {{-- Edit Cutting (opsional di mobile) --}}
                         <a href="{{ route('production.cutting_jobs.edit', $job) }}"
-                            class="btn btn-sm btn-outline-primary w-100">
-                            Edit Cutting
+                            class="btn btn-sm btn-outline-primary">
+                            Edit
                         </a>
 
-                        {{-- Tombol utama: Kirim ke QC Cutting (inline-block penuh lebar) --}}
                         <form action="{{ route('production.cutting_jobs.send_to_qc', $job) }}" method="post">
                             @csrf
-                            <button type="submit" class="btn btn-sm btn-primary w-100">
-                                Kirim ke QC Cutting
+                            <button type="submit" class="btn btn-sm btn-primary">
+                                Kirim QC
                             </button>
                         </form>
                     @elseif (in_array($job->status, ['cut_sent_to_qc', 'sent_to_qc']))
                         @if (Route::has('production.qc.cutting.edit'))
-                            <a href="{{ route('production.qc.cutting.edit', $job) }}"
-                                class="btn btn-sm btn-primary w-100">
-                                Input QC Cutting
+                            <a href="{{ route('production.qc.cutting.edit', $job) }}" class="btn btn-sm btn-primary">
+                                Input QC
                             </a>
                         @else
-                            <button type="button" class="btn btn-sm btn-warning w-100" disabled>
-                                Menunggu hasil QC…
+                            <button type="button" class="btn btn-sm btn-warning" disabled>
+                                Menunggu QC…
                             </button>
                         @endif
                     @else
-                        <button type="button" class="btn btn-sm btn-warning w-100" disabled>
+                        <button type="button" class="btn btn-sm btn-warning" disabled>
                             Menunggu proses QC…
                         </button>
                     @endif

@@ -167,8 +167,8 @@
         }
 
         /* ============================
-               MOBILE: CUTTING JOB LIST
-            ============================ */
+                   MOBILE: CUTTING JOB LIST
+                ============================ */
         @media (max-width: 767.98px) {
             .cut-mobile-secondary {
                 font-size: .75rem;
@@ -284,22 +284,50 @@
 @endpush
 
 @section('content')
+    @php
+        $user = auth()->user();
+        $role = $user?->role ?? null;
+        $isOperating = $role === 'operating';
+
+        // Untuk operator, hanya tampilkan job yang BELUM dicek QC
+        // (status bukan qc_ok / qc_done / qc_mixed / qc_reject)
+        if ($isOperating) {
+            $displayJobs = $jobs->filter(function ($job) {
+                return !in_array($job->status, ['qc_ok', 'qc_done', 'qc_mixed', 'qc_reject']);
+            });
+        } else {
+            $displayJobs = $jobs;
+        }
+    @endphp
+
     <div class="cutting-overview-page">
         <div class="page-wrap">
             @php
-                $pageTotal = $jobs->count();
-                $pageDraft = $jobs->where('status', 'draft')->count();
-                $pageCut = $jobs->where('status', 'cut')->count();
-                $pageQcDone = $jobs->whereIn('status', ['qc_ok', 'qc_mixed', 'qc_reject', 'qc_done'])->count();
+                $pageTotal = $displayJobs->count();
+                $pageDraft = $displayJobs->where('status', 'draft')->count();
+                $pageCut = $displayJobs->where('status', 'cut')->count();
+                $pageQcDone = $displayJobs->whereIn('status', ['qc_ok', 'qc_mixed', 'qc_reject', 'qc_done'])->count();
             @endphp
 
             {{-- HEADER CARD --}}
             <div class="card-main p-3 mb-3">
                 <div class="header-stack">
                     <div>
-                        <h1 class="h5 mb-1">Cutting Jobs</h1>
+                        <h1 class="h5 mb-1">
+                            Cutting Jobs
+                            @if ($isOperating)
+                                <span class="badge-soft ms-1">
+                                    <span class="badge-label">Mode</span>
+                                    <span class="badge-value ms-1">Belum dicek QC</span>
+                                </span>
+                            @endif
+                        </h1>
                         <p class="text-muted small mb-0">
-                            Daftar cutting job produksi yang telah dibuat.
+                            @if ($isOperating)
+                                Menampilkan hanya cutting job yang belum selesai QC cutting.
+                            @else
+                                Daftar cutting job produksi yang telah dibuat.
+                            @endif
                         </p>
                     </div>
 
@@ -330,7 +358,7 @@
                             </tr>
                         </thead>
                         <tbody>
-                            @forelse ($jobs as $job)
+                            @forelse ($displayJobs as $job)
                                 @php
                                     $status = $job->status ?? 'draft';
 
@@ -437,7 +465,11 @@
                             @empty
                                 <tr>
                                     <td colspan="7" class="text-center text-muted py-4">
-                                        Belum ada cutting job.
+                                        @if ($isOperating)
+                                            Tidak ada cutting job yang menunggu QC.
+                                        @else
+                                            Belum ada cutting job.
+                                        @endif
                                     </td>
                                 </tr>
                             @endforelse
@@ -447,13 +479,17 @@
 
                 {{-- MOBILE: CARD LIST --}}
                 <div class="d-block d-md-none mono">
-                    @if ($jobs->isEmpty())
+                    @if ($displayJobs->isEmpty())
                         <div class="text-center text-muted small py-3">
-                            Belum ada cutting job.
+                            @if ($isOperating)
+                                Tidak ada cutting job yang menunggu QC.
+                            @else
+                                Belum ada cutting job.
+                            @endif
                         </div>
                     @else
                         <div class="cut-mobile-list">
-                            @foreach ($jobs as $job)
+                            @foreach ($displayJobs as $job)
                                 @php
                                     $status = $job->status ?? 'draft';
 
@@ -463,7 +499,7 @@
                                             'class' => 'status-draft',
                                         ],
                                         'cut' => [
-                                            'label' => 'Cutting',
+                                            'label' => 'Belum Cek QC',
                                             'class' => 'status-cut',
                                         ],
                                         'cut_sent_to_qc' => [
@@ -471,7 +507,7 @@
                                             'class' => 'status-sent-to-qc',
                                         ],
                                         'sent_to_qc' => [
-                                            'label' => 'Kirim QC',
+                                            'label' => 'Sedang Di Cek QC',
                                             'class' => 'status-sent-to-qc',
                                         ],
                                         'qc_ok' => [
