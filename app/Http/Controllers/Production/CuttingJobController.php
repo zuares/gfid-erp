@@ -30,6 +30,7 @@ class CuttingJobController extends Controller
                 'warehouse',
                 'lot.item',
                 'bundles.finishedItem',
+                'operator', // ⬅️ tambahkan ini (sesuaikan nama relasinya)
             ])
             ->withCount('bundles')
             ->orderByDesc('date')

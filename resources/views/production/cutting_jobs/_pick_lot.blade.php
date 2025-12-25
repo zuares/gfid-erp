@@ -216,10 +216,7 @@
             <div class="lot-picker-title">
                 Pilih LOT Kain
             </div>
-            <p class="lot-picker-help mb-0">
-                Step 1: Centang <strong>LOT kain</strong> yang ingin dipakai. LOT sudah dikelompokkan per
-                <strong>item / warna kain</strong>.
-            </p>
+
         </div>
 
         <div class="lot-picker-actions">
@@ -238,10 +235,6 @@
             Belum ada LOT kain yang siap dipakai. Cek stok di modul GRN / gudang RM.
         </div>
     @else
-        <div id="lot-grid-hint" class="lot-empty-hint">
-            LOT dikelompokkan per item / warna kain. Pilih satu atau beberapa LOT dalam grup yang sama.
-        </div>
-
         @php
             // Group berdasarkan item kain (warna)
             $groupedLots = $lotStocks->groupBy(fn($row) => $row->lot->item_id);

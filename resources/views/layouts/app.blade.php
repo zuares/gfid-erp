@@ -4,7 +4,7 @@
 <head>
     <meta charset="utf-8">
 
-    {{-- viewport: biarkan standar, jangan pakai maximum-scale kalau ga perlu --}}
+    {{-- viewport: standar, tanpa maximum-scale --}}
     <meta name="viewport" content="width=device-width, initial-scale=1, user-scalable=no">
 
     <meta name="csrf-token" content="{{ csrf_token() }}">
@@ -54,7 +54,7 @@
             --app-vh: 100vh;
             /* fallback awal */
             --vv-kbd: 0px;
-            /* untuk bottom-nav */
+            /* untuk bottom-nav (dorong balik dari keyboard) */
         }
 
         #app.app-root {
@@ -63,6 +63,19 @@
 
         /* ✅ Tambahan: ganjel konten di atas bottom nav khusus mobile */
         @media (max-width: 767.98px) {
+
+            /* Global anti horizontal scroll di mobile */
+            html,
+            body {
+                overflow-x: hidden;
+            }
+
+            .app-shell,
+            .app-main,
+            .app-main .page-wrap {
+                overflow-x: hidden;
+            }
+
             .app-main .page-wrap {
                 padding-bottom: 9rem;
                 /* > tinggi bottom nav */
@@ -79,12 +92,7 @@
 </head>
 
 <body>
-    {{-- ✅ HAPUS min-vh-100 supaya tidak “ketarik” keyboard --}}
-    <div id="app" class="d-flex flex-column" class="app-root">
-        {{-- (Bootstrap ga suka duplicate class attr) --}}
-    </div>
-
-    {{-- ✅ Render app root benar --}}
+    {{-- ✅ Satu root app saja, pakai app-root supaya --app-vh kepakai --}}
     <div id="app" class="app-root d-flex flex-column">
         {{-- NAVBAR --}}
         @include('layouts.partials.navbar')
@@ -114,7 +122,6 @@
                         </div>
                     @endif
 
-                    {{-- Error validasi (pakai ViewErrorBag) --}}
                     @php
                         $hasValidationErrors =
                             $errors instanceof \Illuminate\Support\ViewErrorBag ? $errors->any() : false;
@@ -167,7 +174,7 @@
         (function() {
             const root = document.documentElement;
 
-            // baseline height (ambil yang terbesar; jangan turun saat keyboard muncul)
+            // baseline height (ambil yang terbesar; jangan turun saat keyboard)
             let baselineInnerH = window.innerHeight;
             let baselineVvH = window.visualViewport ? window.visualViewport.height : null;
 

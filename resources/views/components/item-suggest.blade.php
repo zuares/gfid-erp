@@ -51,6 +51,12 @@
      *   ['warehouse_id' => $warehouseId, 'type' => 'material']
      */
     'extraParams' => [],
+
+    /**
+     * Default: WAJIB pilih item (item_id tidak boleh kosong).
+     * Kalau mau santai, bisa di-override di pemanggilan: :required="false"
+     */
+    'required' => true,
 ])
 
 @php
@@ -80,11 +86,13 @@
 <div class="item-suggest-wrap" data-type="{{ $type }}" data-item-category-id="{{ $itemCategoryId }}"
     data-min-chars="{{ $minChars }}" data-autofocus="{{ $autofocus ? '1' : '0' }}"
     data-display-mode="{{ $displayMode }}" data-show-name="{{ $showName ? '1' : '0' }}"
-    data-show-category="{{ $showCategory ? '1' : '0' }}" data-extra-params='@json($extraParams)'>
+    data-show-category="{{ $showCategory ? '1' : '0' }}" data-extra-params='@json($extraParams)'
+    data-required="{{ $required ? '1' : '0' }}">
 
     <input type="text" value="{{ strtoupper($displayValue) }}" autocomplete="off"
         class="form-control form-control-sm js-item-suggest-input" placeholder="{{ $placeholder }}"
-        data-items='@json($jsItems)' id="{{ $uid }}">
+        data-items='@json($jsItems)' id="{{ $uid }}"
+        @if ($required) required aria-required="true" @endif>
 
     <input type="hidden" name="{{ $idName }}" value="{{ $idValue }}" class="js-item-suggest-id">
 
@@ -92,6 +100,11 @@
         <input type="hidden" name="{{ $categoryName }}" value="{{ $categoryValue }}"
             class="js-item-suggest-category">
     @endif
+
+    {{-- Realtime warning di bawah input --}}
+    <div class="js-item-suggest-error invalid-feedback">
+        Item wajib dipilih.
+    </div>
 
     <div class="item-suggest-dropdown shadow-sm" style="display:none;"></div>
 </div>
@@ -141,6 +154,24 @@
                 font-size: .78rem;
                 color: #6b7280;
             }
+
+            /* Highlight input invalid */
+            .js-item-suggest-input.is-invalid {
+                border-color: #dc3545;
+            }
+
+            /* Realtime error text – default hidden */
+            .js-item-suggest-error {
+                display: none;
+                font-size: .75rem;
+                color: #dc3545;
+                margin-top: .15rem;
+            }
+
+            /* Tampilkan error saat input invalid */
+            .js-item-suggest-input.is-invalid+.js-item-suggest-error {
+                display: block;
+            }
         </style>
     @endpush
 
@@ -161,7 +192,6 @@
                 const rect = input.getBoundingClientRect();
                 const viewportHeight = window.innerHeight;
 
-                // default di bawah input
                 dropdown.style.top = "calc(100% + 4px)";
                 dropdown.style.bottom = "auto";
 
@@ -172,7 +202,6 @@
             }
 
             function isMobileViewport() {
-                // breakpoint sederhana: max-width 768px
                 return window.matchMedia("(max-width: 768px)").matches;
             }
 
@@ -188,12 +217,11 @@
                 const displayMode = wrap.dataset.displayMode;
                 const showName = wrap.dataset.showName === "1";
                 const showCategory = wrap.dataset.showCategory === "1";
+                const required = wrap.dataset.required === "1";
 
-                // baca filter dari data-attribute
                 const type = wrap.dataset.type || null;
                 const itemCategoryId = wrap.dataset.itemCategoryId || null;
 
-                // extra params (lot_id, warehouse_id, dll)
                 let extraParams = {};
                 try {
                     extraParams = JSON.parse(wrap.dataset.extraParams || '{}') || {};
@@ -201,7 +229,6 @@
                     extraParams = {};
                 }
 
-                // ✅ Fallback: items yang sudah dikirim dari server
                 let initialItems = [];
                 try {
                     const raw = input.getAttribute('data-items') || '[]';
@@ -210,7 +237,6 @@
                     initialItems = [];
                 }
 
-                // 🔤 selalu paksa uppercase di awal (kalau ada nilai awal)
                 if (input.value) {
                     input.value = input.value.toUpperCase();
                 }
@@ -220,6 +246,7 @@
                 let timer = null;
                 let lastItems = [];
                 let activeIndex = -1;
+                let isSelecting = false;
 
                 function isDropdownVisible() {
                     return dropdown.style.display !== "none";
@@ -273,7 +300,6 @@
                         return;
                     }
 
-                    // 🔢 LIMIT MAKSIMAL 4 ITEM DI DROPDOWN
                     items = items.slice(0, 4);
                     lastItems = items;
                     activeIndex = -1;
@@ -287,8 +313,6 @@
 
                         let html = `<div class='item-suggest-option-code'>${(item.code || '').toUpperCase()}</div>`;
 
-                        // 🔹 Desktop: boleh tampil nama + kategori
-                        // 🔹 Mobile: HANYA kode barang saja (tanpa nama & kategori)
                         if (!mobile) {
                             const sub = [];
                             if (showName && item.name) sub.push(item.name);
@@ -315,34 +339,37 @@
                     const mobile = isMobileViewport();
                     let text;
 
-                    // 📱 MOBILE: paksa selalu hanya kode
                     if (mobile) {
                         text = item.code || '';
                     } else {
-                        // 💻 DESKTOP: ikut displayMode (code / code-name)
                         text = item.code || '';
                         if (displayMode === "code-name" && item.name) {
                             text += " — " + item.name;
                         }
                     }
 
-                    // 🆙 paksa uppercase untuk tampilan di input
                     if (forceUppercase && text) {
                         text = text.toUpperCase();
                     }
 
+                    isSelecting = true;
                     input.value = text;
                     hiddenId.value = item.id;
                     if (hiddenCat) hiddenCat.value = item.item_category_id;
 
-                    // 🔔 penting: beri sinyal ke luar kalau item_id berubah
+                    // item sudah valid → hilangkan error
+                    input.classList.remove('is-invalid');
+
                     hiddenId.dispatchEvent(new Event('change', {
                         bubbles: true
                     }));
 
+                    setTimeout(() => {
+                        isSelecting = false;
+                    }, 0);
+
                     hide();
 
-                    // fokus ke input berikutnya (kalau perlu)
                     const next = wrap.closest("tr")?.querySelector(".bundle-qty, .line-qty, .js-next-focus");
                     if (next) {
                         next.focus();
@@ -366,7 +393,6 @@
                 function fetchData(q, force) {
                     q = q || '';
 
-                    // ✅ Kalau belum cukup karakter & ada initialItems dari server → pakai itu
                     if (!force && q.length < minChars && initialItems.length) {
                         buildDropdown(initialItems);
                         return;
@@ -386,7 +412,6 @@
                     if (type) params.set('type', type);
                     if (itemCategoryId) params.set('item_category_id', itemCategoryId);
 
-                    // 🔁 inject extraParams (lot_id, warehouse_id, dll)
                     if (extraParams && typeof extraParams === 'object') {
                         Object.keys(extraParams).forEach((key) => {
                             const value = extraParams[key];
@@ -403,7 +428,6 @@
                         .then(json => {
                             const data = json.data || [];
 
-                            // kalau API kosong tapi ada initialItems → fallback
                             if (!data.length && initialItems.length) {
                                 buildDropdown(initialItems);
                             } else {
@@ -411,7 +435,6 @@
                             }
                         })
                         .catch(() => {
-                            // kalau error, fallback ke initialItems kalau ada
                             if (initialItems.length) {
                                 buildDropdown(initialItems);
                             } else {
@@ -422,7 +445,6 @@
                 }
 
                 input.addEventListener("input", () => {
-                    // 🔤 paksa uppercase saat user mengetik
                     if (forceUppercase && input.value) {
                         const start = input.selectionStart;
                         const end = input.selectionEnd;
@@ -432,6 +454,19 @@
                             if (start !== null && end !== null) {
                                 input.setSelectionRange(start, end);
                             }
+                        }
+                    }
+
+                    // Realtime: kalau user ketik manual → anggap pilihan batal
+                    if (!isSelecting) {
+                        hiddenId.value = "";
+                        if (hiddenCat) hiddenCat.value = "";
+                        hiddenId.dispatchEvent(new Event('change', {
+                            bubbles: true
+                        }));
+
+                        if (required) {
+                            input.classList.add('is-invalid'); // langsung kasih warning realtime
                         }
                     }
 
@@ -447,7 +482,6 @@
 
                     input.select();
 
-                    // saat focus: kalau ada initialItems & belum ketik apa-apa → pakai initialItems
                     if (initialItems.length && input.value.trim() === '') {
                         buildDropdown(initialItems);
                     } else {
@@ -455,7 +489,6 @@
                     }
                 });
 
-                // 🔥 Keyboard navigation: Arrow Up/Down + Enter + Tab + ESC
                 input.addEventListener("keydown", (e) => {
                     const key = e.key;
 
@@ -490,7 +523,18 @@
                     }
                 });
 
-                // kalau butuh autofocus
+                // Blur: kalau required & masih kosong → tetap invalid
+                input.addEventListener("blur", () => {
+                    if (required) {
+                        if (!hiddenId.value) {
+                            input.classList.add('is-invalid');
+                        } else {
+                            input.classList.remove('is-invalid');
+                        }
+                    }
+                });
+
+                // autofocus kalau diminta
                 if (wrap.dataset.autofocus === "1") {
                     setTimeout(() => {
                         input.focus();
@@ -504,7 +548,6 @@
                     }, 150);
                 }
 
-                // klik di luar → tutup dropdown
                 document.addEventListener("click", (e) => {
                     if (!wrap.contains(e.target)) {
                         hide();
@@ -516,6 +559,35 @@
                         positionDropdown(input, dropdown);
                     }
                 });
+
+                // Validasi saat submit form
+                if (required) {
+                    const form = wrap.closest('form');
+                    if (form && !form.dataset.itemSuggestRequiredBound) {
+                        form.addEventListener('submit', function(e) {
+                            let firstInvalid = null;
+
+                            form.querySelectorAll('.item-suggest-wrap[data-required="1"]').forEach(w => {
+                                const hid = w.querySelector('.js-item-suggest-id');
+                                const inp = w.querySelector('.js-item-suggest-input');
+                                if (!hid || !inp) return;
+
+                                if (!hid.value) {
+                                    inp.classList.add('is-invalid');
+                                    if (!firstInvalid) firstInvalid = inp;
+                                }
+                            });
+
+                            if (firstInvalid) {
+                                e.preventDefault();
+                                firstInvalid.focus();
+                                if (firstInvalid.select) firstInvalid.select();
+                            }
+                        });
+
+                        form.dataset.itemSuggestRequiredBound = "1";
+                    }
+                }
             }
         </script>
     @endpush

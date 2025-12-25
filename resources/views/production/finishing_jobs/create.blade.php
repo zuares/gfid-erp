@@ -151,50 +151,6 @@
             padding: .32rem .48rem;
         }
 
-        .filter-bar {
-            display: flex;
-            flex-wrap: wrap;
-            gap: .45rem .75rem;
-            align-items: flex-end;
-            justify-content: space-between;
-            margin-top: .6rem;
-        }
-
-        .filter-bar-left {
-            display: flex;
-            flex-direction: column;
-            gap: .25rem;
-        }
-
-        .filter-label {
-            font-size: .72rem;
-            text-transform: uppercase;
-            letter-spacing: .08em;
-            color: var(--muted-foreground);
-        }
-
-        .filter-row {
-            display: flex;
-            flex-wrap: wrap;
-            gap: .4rem;
-        }
-
-        .filter-row .item-code-select-wrap {
-            min-width: 180px;
-            max-width: 260px;
-        }
-
-        .filter-row .item-search-wrap {
-            min-width: 180px;
-            max-width: 280px;
-        }
-
-        .item-search-wrap .form-control {
-            font-size: .8rem;
-            text-transform: uppercase;
-            letter-spacing: .05em;
-        }
-
         .filter-summary {
             font-size: .76rem;
             color: var(--fin-muted);
@@ -202,6 +158,7 @@
             flex-wrap: wrap;
             gap: .25rem .45rem;
             justify-content: flex-end;
+            margin-top: .4rem;
         }
 
         .filter-summary strong {
@@ -318,87 +275,124 @@
             padding-inline: 1rem;
         }
 
+        /* HEADER ala Sewing Return */
+        .fin-header .header-icon-circle {
+            width: 42px;
+            height: 42px;
+            margin-right: .75rem;
+        }
+
+        .fin-header .header-title h1 {
+            font-size: 1.15rem;
+            font-weight: 700;
+            margin: 0;
+        }
+
+        .fin-header .header-subtitle {
+            font-size: .82rem;
+            color: var(--fin-muted);
+        }
+
         @media (max-width: 767.98px) {
             .finishing-page .page-wrap {
                 padding-inline: .8rem;
-                padding-bottom: 7.4rem;
+                /* ruang untuk bottom-nav + tombol floating */
+                padding-bottom: calc(9.4rem + var(--vv-kbd));
             }
 
+            /* Saat keyboard terbuka, tambah ruang scroll */
             body.keyboard-open .finishing-page .page-wrap {
-                padding-bottom: 11.4rem;
+                padding-bottom: calc(11.4rem + var(--vv-kbd));
             }
 
             .card-section {
                 padding: .8rem .85rem;
             }
 
-            .header-row {
+            .fin-header .header-row {
                 flex-direction: column;
                 align-items: flex-start;
+                gap: .6rem;
             }
 
-            .meta-row .row.g-3 {
+            .fin-header .header-title h1 {
+                font-size: 1rem;
+            }
+
+            .fin-header .header-subtitle {
+                font-size: .78rem;
+            }
+
+            /* Sembunyikan CATATAN & SUMMARY di mobile */
+            .fin-notes-col {
                 display: none !important;
             }
 
-            .filter-bar {
-                margin-top: .4rem;
-                gap: .5rem;
-            }
-
-            .filter-bar-left {
-                width: 100%;
-            }
-
-            .filter-row {
-                flex-direction: row;
-                align-items: center;
-                gap: .4rem;
-            }
-
-            .item-code-select-wrap {
-                flex: 0 0 58%;
-            }
-
-            .item-search-wrap {
-                flex: 1;
-            }
-
-            .item-search-wrap .input-group-text {
-                border-radius: 999px 0 0 999px;
-                border-right: 0;
-                font-size: .7rem;
-                padding-inline: .5rem;
-                background: transparent;
-                border-color: rgba(148, 163, 184, 0.5);
-            }
-
-            .item-search-wrap .form-control {
-                font-size: .78rem;
-                text-transform: none;
-                letter-spacing: 0.02em;
-                border-radius: 0 999px 999px 0;
-                border-left: 0;
-                border-color: rgba(148, 163, 184, 0.5);
-                background: rgba(15, 23, 42, 0.01);
-            }
-
-            .item-search-wrap .form-control::placeholder {
-                color: rgba(148, 163, 184, 0.9);
-                font-weight: 400;
-            }
-
             .filter-summary {
-                justify-content: flex-start;
+                display: none !important;
             }
 
-            th.col-index,
+            /* Grid meta: tanggal + select sejajar, cari kode di baris bawah */
+            .meta-row .meta-grid .col-date,
+            .meta-row .meta-grid .col-select {
+                flex: 0 0 50%;
+                max-width: 50%;
+            }
+
+            .meta-row .meta-grid .col-search {
+                flex: 0 0 100%;
+                max-width: 100%;
+                margin-top: .25rem;
+            }
+
+            .meta-row .form-label-sm {
+                font-size: .75rem;
+            }
+
+            /* TABLE MOBILE FRIENDLY */
+            .finishing-table thead th {
+                font-size: .7rem;
+                padding: .4rem .4rem;
+            }
+
+            .finishing-table tbody td {
+                font-size: .8rem;
+                padding: .35rem .4rem;
+            }
+
+            /* Hilangkan kolom Alasan/Catatan di mobile saja */
             th.col-reason,
-            td.col-index,
             td.col-reason {
                 display: none !important;
             }
 
+            /* NOMOR BARIS MOBILE */
+            td.col-index {
+                width: 1%;
+                white-space: nowrap;
+            }
+
+            td.col-index span.mobile-index-pill {
+                display: inline-block;
+                min-width: 20px;
+                height: 20px;
+                padding: 0 .25rem;
+                border-radius: 999px;
+                background: rgba(59, 130, 246, .12);
+                border: 1px solid rgba(59, 130, 246, .35);
+                color: #1d4ed8;
+                font-size: .72rem;
+                font-weight: 700;
+                line-height: 18px;
+                text-align: center;
+            }
+
+            body[data-theme="dark"] td.col-index span.mobile-index-pill {
+                background: rgba(59, 130, 246, .25);
+                color: #e5edff;
+            }
+
+            /* Kode item: tampil kode saja (label panjang disembunyikan) */
             .item-label-main-desktop {
                 display: none;
             }
@@ -414,19 +408,39 @@
             .qty-reject-input {
                 text-align: center;
                 font-weight: 600;
-                padding-top: .45rem;
-                padding-bottom: .45rem;
-                font-size: .9rem;
+                padding-top: .4rem;
+                padding-bottom: .4rem;
+                font-size: .88rem;
             }
 
+            .finishing-table tbody tr td:first-child {
+                border-left: 0;
+            }
+
+            .finishing-table tbody tr td:last-child {
+                border-right: 0;
+            }
+
+            .finishing-table tbody tr+tr td {
+                border-top: 1px solid rgba(148, 163, 184, 0.35);
+            }
+
+            /* Floating footer-actions: aman dari bottom-nav */
             .footer-actions {
                 position: fixed;
-                left: .1rem;
+                left: .9rem;
                 right: .9rem;
-                bottom: 6rem;
+                bottom: calc(5.6rem + var(--vv-kbd));
                 z-index: 999;
                 justify-content: flex-end;
                 gap: .5rem;
+            }
+
+            /* Saat keyboard terbuka: jangan menghalangi input, ubah jadi layout biasa (non-fixed) */
+            body.keyboard-open .footer-actions {
+                position: static;
+                margin-top: 1.25rem;
+                box-shadow: none;
             }
 
             .footer-actions .btn {
@@ -479,7 +493,7 @@
             @endif
 
             {{-- HEADER --}}
-            <div class="card mb-2 header-card">
+            <div class="card mb-2 header-card fin-header">
                 <div class="card-section">
                     <div class="header-row">
                         <div class="d-flex align-items-center">
@@ -487,9 +501,9 @@
                                 <i class="bi bi-scissors"></i>
                             </div>
                             <div class="header-title d-flex flex-column gap-1">
-                                <h1>Halaman Finishing</h1>
+                                <h1>Finishing</h1>
                                 <div class="header-subtitle">
-                                    Proses WIP-FIN menjadi barang jadi, input Qty Proses & Reject per item.
+                                    Proses stok <b>WIP-FIN</b> menjadi barang jadi. Isi Qty Proses & Reject per item.
                                 </div>
                             </div>
                         </div>
@@ -533,32 +547,6 @@
                             ->values();
                     @endphp
 
-
-                    {{-- Flash / Errors --}}
-                    @if (session('status'))
-                        <div class="alert alert-success alert-dismissible fade show mb-3" role="alert">
-                            {{ session('status') }}
-                            <button type="button" class="btn-close" data-bs-dismiss="alert" aria-label="Close"></button>
-                        </div>
-                    @endif
-
-                    {{-- Error khusus Finishing Job (misal dari assertSewingReturnBalanceForFinishingJob) --}}
-                    @if ($errors->has('finishing_job'))
-                        <div class="alert alert-danger alert-dismissible fade show mb-3" role="alert">
-                            {{ $errors->first('finishing_job') }}
-                            <button type="button" class="btn-close" data-bs-dismiss="alert" aria-label="Close"></button>
-                        </div>
-                    @endif
-
-                    {{-- Error input form biasa --}}
-                    @if ($errors->any() && !$errors->has('finishing_job'))
-                        <div class="alert alert-danger alert-dismissible fade show mb-3" role="alert">
-                            <strong>Oops!</strong> Ada error input, cek form di bawah.
-                            <button type="button" class="btn-close" data-bs-dismiss="alert" aria-label="Close"></button>
-                        </div>
-                    @endif
-
-
                     {{-- HIDDEN GLOBAL OPERATOR --}}
                     <input type="hidden" name="operator_global_id" id="operator_global_id_hidden"
                         value="{{ old('operator_global_id', $defaultOperator) }}">
@@ -566,8 +554,9 @@
                     {{-- META + FILTER --}}
                     <div class="card-section">
                         <div class="meta-row">
-                            <div class="row g-3 align-items-end">
-                                <div class="col-6 col-md-3">
+                            <div class="row g-2 g-md-3 align-items-end meta-grid">
+                                {{-- Tanggal --}}
+                                <div class="col-6 col-md-3 col-date">
                                     <label class="form-label form-label-sm">Tanggal</label>
                                     <input type="date" name="date"
                                         class="form-control form-control-sm @error('date') is-invalid @enderror"
@@ -577,51 +566,56 @@
                                     @enderror
                                 </div>
 
-                                <div class="col-12 col-md-9">
+                                {{-- Filter kode item (select) --}}
+                                <div class="col-6 col-md-3 col-select">
+                                    <label class="form-label form-label-sm d-none d-md-block">Filter kode item</label>
+                                    <div class="item-code-select-wrap">
+                                        <select id="item-filter-select" class="form-select form-select-sm">
+                                            <option value="">Semua kode</option>
+                                            @foreach ($itemOptions as $opt)
+                                                <option value="{{ $opt['id'] }}">
+                                                    {{ $opt['code'] }}
+                                                </option>
+                                            @endforeach
+                                        </select>
+                                    </div>
+                                </div>
+
+                                {{-- Cari kode (input) --}}
+                                <div class="col-12 col-md-3 col-search">
+                                    <label class="form-label form-label-sm d-none d-md-block">Cari kode</label>
+                                    <div class="item-search-wrap">
+                                        <div class="input-group input-group-sm">
+                                            <span class="input-group-text border-end-0 bg-white">
+                                                <i class="bi bi-search text-muted"></i>
+                                            </span>
+                                            <input type="text" id="item-filter-input"
+                                                class="form-control form-control-sm border-start-0 text-uppercase"
+                                                placeholder="Cari kode item..." autocomplete="off">
+                                        </div>
+                                    </div>
+                                </div>
+
+                                {{-- Catatan global (desktop, mobile hide) --}}
+                                <div class="col-12 col-md-3 fin-notes-col">
                                     <label class="form-label form-label-sm">Catatan</label>
-                                    <textarea name="notes" rows="1" class="form-control form-control-sm" placeholder="Catatan (opsional)">{{ old('notes', '') }}</textarea>
+                                    <textarea name="notes" rows="1" class="form-control form-control-sm" placeholder="Catatan finishing (opsional)">{{ old('notes', '') }}</textarea>
                                     @error('notes')
                                         <div class="invalid-feedback">{{ $message }}</div>
                                     @enderror
                                 </div>
                             </div>
 
-                            <div class="filter-bar">
-                                <div class="filter-bar-left">
-                                    <div class="filter-label">Filter kode item</div>
-                                    <div class="filter-row">
-                                        <div class="item-code-select-wrap">
-                                            <select id="item-filter-select" class="form-select form-select-sm">
-                                                <option value="">Semua kode</option>
-                                                @foreach ($itemOptions as $opt)
-                                                    <option value="{{ $opt['id'] }}">
-                                                        {{ $opt['code'] }}
-                                                    </option>
-                                                @endforeach
-                                            </select>
-                                        </div>
-
-                                        <div class="item-search-wrap">
-                                            <div class="input-group input-group-sm">
-                                                <span class="input-group-text border-end-0 bg-white">
-                                                    <i class="bi bi-search text-muted"></i>
-                                                </span>
-                                                <input type="text" id="item-filter-input"
-                                                    class="form-control form-control-sm border-start-0 text-uppercase"
-                                                    placeholder="Cari kode item..." autocomplete="off">
-                                            </div>
-                                        </div>
-                                    </div>
-                                </div>
-
-                                <div class="filter-summary">
+                            {{-- Summary (desktop only, WIP-FIN disembunyikan untuk operating) --}}
+                            <div class="filter-summary">
+                                @if ($userRole !== 'operating')
                                     <span><strong>WIP-FIN:</strong> {{ number_format($grandWip, 0, ',', '.') }} pcs</span>
                                     <span class="filter-dot">•</span>
-                                    <span><strong>Item:</strong> {{ count($lines ?? []) }}</span>
-                                    <span class="filter-dot">•</span>
-                                    <span><strong>Tanggal:</strong>
-                                        {{ \Carbon\Carbon::parse($dateValue)->format('d M Y') }}</span>
-                                </div>
+                                @endif
+                                <span><strong>Item:</strong> {{ count($lines ?? []) }}</span>
+                                <span class="filter-dot">•</span>
+                                <span><strong>Tanggal:</strong>
+                                    {{ \Carbon\Carbon::parse($dateValue)->format('d M Y') }}</span>
                             </div>
                         </div>
                     </div>
@@ -635,7 +629,9 @@
                                         <tr>
                                             <th class="text-center col-index" style="width:5%;">No</th>
                                             <th class="col-item" style="width:32%;">Kode Item</th>
-                                            <th class="text-end col-wip" style="width:16%;">Total WIP-FIN</th>
+                                            @if ($userRole !== 'operating')
+                                                <th class="text-end col-wip" style="width:16%;">Total WIP-FIN</th>
+                                            @endif
                                             <th class="text-end col-ok" style="width:16%;">Proses</th>
                                             <th class="text-end col-reject" style="width:16%;">Reject</th>
                                             <th class="col-reason" style="width:17%;">Alasan / Catatan</th>
@@ -666,7 +662,9 @@
                                             <tr data-search="{{ strtolower($codeOnly . ' ' . $itemId) }}"
                                                 data-item-id="{{ $itemId }}">
                                                 <td class="text-center align-middle col-index">
-                                                    {{ $loop->iteration }}
+                                                    <span class="mobile-index-pill">
+                                                        {{ $loop->iteration }}
+                                                    </span>
                                                 </td>
 
                                                 <td class="col-item">
@@ -678,13 +676,15 @@
                                                     </div>
                                                 </td>
 
-                                                <td class="text-end align-middle col-wip">
-                                                    <span class="wip-badge">
-                                                        <i class="bi bi-arrow-up-circle"></i>
-                                                        <span>{{ number_format($totalWip, 0, ',', '.') }}</span>
-                                                        <small>pcs</small>
-                                                    </span>
-                                                </td>
+                                                @if ($userRole !== 'operating')
+                                                    <td class="text-end align-middle col-wip">
+                                                        <span class="wip-badge">
+                                                            <i class="bi bi-arrow-up-circle"></i>
+                                                            <span>{{ number_format($totalWip, 0, ',', '.') }}</span>
+                                                            <small>pcs</small>
+                                                        </span>
+                                                    </td>
+                                                @endif
 
                                                 {{-- Qty Proses (qty_in) --}}
                                                 <td class="text-end align-middle col-ok">
@@ -908,7 +908,7 @@
                     if (row.style.display === 'none') {
                         return;
                     }
-                    const cell = row.querySelector('td.col-index');
+                    const cell = row.querySelector('td.col-index span.mobile-index-pill');
                     if (cell) {
                         cell.textContent = counter++;
                     }

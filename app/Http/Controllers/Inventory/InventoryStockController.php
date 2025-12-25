@@ -365,24 +365,54 @@ SQL;
      */
     public function itemLocations(Item $item, Request $request)
     {
+        $user = auth()->user();
+        $role = $user?->role ?? null;
+
         $warehouseId = $request->input('warehouse_id');
 
         $rows = InventoryStock::query()
             ->join('warehouses', 'warehouses.id', '=', 'inventory_stocks.warehouse_id')
             ->where('inventory_stocks.item_id', $item->id)
+
+        // 🔒 Scope per ROLE (konsisten dengan items())
+            ->when($role === 'operating', function ($q) {
+                // Operating: hanya WH-PRD + WIP-%
+                $q->where(function ($q2) {
+                    $q2->where('warehouses.code', 'WH-PRD')
+                        ->orWhere('warehouses.code', 'LIKE', 'WIP-%');
+                });
+            })
+            ->when($role === 'admin', function ($q) {
+                // Admin: hanya WH-RTS
+                $q->where('warehouses.code', 'WH-RTS');
+            })
+        // Owner / role lain: tanpa pembatasan gudang
+
+        // Filter gudang spesifik dari request (kalau ada)
             ->when($warehouseId, fn($q) => $q->where('inventory_stocks.warehouse_id', $warehouseId))
+
             ->selectRaw('
-                warehouses.id,
-                warehouses.code,
-                warehouses.name,
-                SUM(inventory_stocks.qty) AS qty
-            ')
+            warehouses.id,
+            warehouses.code,
+            warehouses.name,
+            SUM(inventory_stocks.qty) AS qty
+        ')
             ->groupBy('warehouses.id', 'warehouses.code', 'warehouses.name')
             ->havingRaw('SUM(inventory_stocks.qty) <> 0')
             ->orderBy('warehouses.code')
-            ->get();
+            ->get()
+            ->map(function ($row) {
+                return [
+                    'id' => (int) $row->id,
+                    'code' => (string) $row->code,
+                    'name' => (string) $row->name,
+                    'qty' => (float) $row->qty,
+                ];
+            })
+            ->values();
 
         return response()->json([
+            'ok' => true,
             'item' => [
                 'id' => $item->id,
                 'code' => $item->code,
@@ -391,4 +421,5 @@ SQL;
             'locations' => $rows,
         ]);
     }
+
 }

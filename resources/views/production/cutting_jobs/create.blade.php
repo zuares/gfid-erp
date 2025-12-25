@@ -173,6 +173,29 @@
 
         /* ========== MOBILE TWEAKS ========== */
         @media (max-width: 767.98px) {
+
+            /* Kunci horizontal scroll seperti Sewing Return/QC */
+            html,
+            body {
+                overflow-x: hidden;
+            }
+
+            .cutting-create-page,
+            .cutting-create-page .page-wrap {
+                overflow-x: hidden;
+            }
+
+            /* Jangan paksa scroll X di wrapper bundles */
+            .bundles-table-wrap {
+                overflow-x: visible;
+            }
+
+            /* Gesture fokus ke scroll atas-bawah, bukan geser samping */
+            .bundles-table tbody tr,
+            .lot-list-table tbody tr {
+                touch-action: pan-y;
+            }
+
             .cutting-create-page .page-wrap {
                 padding: .5rem .75rem 2rem;
             }

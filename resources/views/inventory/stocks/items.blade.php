@@ -547,7 +547,9 @@
         $activeSearch = trim($filters['search'] ?? '');
     @endphp
 
-    <div class="page-wrap" data-stockcard-base-url="{{ route('inventory.stock_card.index') }}">
+    <div class="page-wrap" data-stockcard-base-url="{{ route('inventory.stock_card.index') }}"
+        data-role="{{ $role }}" data-hide-rts="{{ $role === 'operating' ? '1' : '0' }}">
+
         {{-- HEADER (desktop & tablet only) --}}
         <div class="page-header d-none d-sm-flex">
             <div class="page-header-main">
@@ -721,6 +723,8 @@
         document.addEventListener('DOMContentLoaded', () => {
             const pageWrap = document.querySelector('.page-wrap');
             const stockCardBaseUrl = pageWrap?.dataset.stockcardBaseUrl || '';
+            const userRole = pageWrap?.dataset.role || '';
+            const hideRtsWarehouse = pageWrap?.dataset.hideRts === '1';
 
             const fmt = (n) => new Intl.NumberFormat('id-ID', {
                 minimumFractionDigits: 2,
@@ -735,11 +739,19 @@
                 .replaceAll("'", '&#039;');
 
             const buildLocationsHtml = (locations, itemId) => {
-                if (!locations.length) {
+                // Filter WH-RTS untuk role operating (front-end guard)
+                const list = hideRtsWarehouse ?
+                    (locations || []).filter((loc) => {
+                        const code = (loc.code || '').toString().toUpperCase();
+                        return code !== 'WH-RTS';
+                    }) :
+                    (locations || []);
+
+                if (!list.length) {
                     return `<div class="detail-empty">Tidak ada stok di gudang manapun.</div>`;
                 }
 
-                const rows = locations.map((loc, idx) => {
+                const rows = list.map((loc, idx) => {
                     const whId = loc.id;
                     const whCode = esc(loc.code || '-');
                     const whName = esc(loc.name || '-');

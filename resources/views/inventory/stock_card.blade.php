@@ -1,3 +1,4 @@
+{{-- resources/views/inventory/stock_card/index.blade.php --}}
 @extends('layouts.app')
 
 @section('title', 'Kartu Stok')
@@ -35,8 +36,32 @@
             .value-sm {
                 font-size: .86rem;
             }
+
+            .chip-filter {
+                display: inline-flex;
+                align-items: center;
+                gap: .35rem;
+                border-radius: 999px;
+                padding: .18rem .6rem;
+                font-size: .72rem;
+                border: 1px solid rgba(148, 163, 184, .5);
+                background: color-mix(in srgb, var(--card) 92%, var(--bg) 8%);
+                color: var(--muted);
+            }
+
+            .chip-filter strong {
+                color: var(--fg);
+            }
         </style>
 
+        @php
+            $currentSort = $filters['sort'] ?? 'desc';
+            $sortDescUrl = request()->fullUrlWithQuery(['sort' => 'desc']);
+            $sortAscUrl = request()->fullUrlWithQuery(['sort' => 'asc']);
+
+            $selectedWarehouse = $warehouses->firstWhere('id', $filters['warehouse_id']);
+            $selectedLot = $lots->firstWhere('id', $filters['lot_id']);
+        @endphp
 
         {{-- =========================
              HEADER (judul, sort, export)
@@ -45,16 +70,55 @@
 
             <div>
                 <h1 class="h4 mb-1">Kartu Stok</h1>
-                <div class="small text-muted">Pantau pergerakan stok & nilai persediaan.</div>
+                <div class="small text-muted">
+                    Pantau pergerakan stok &amp; nilai persediaan untuk setiap item.
+                </div>
+
+                {{-- Ringkasan cepat filter aktif --}}
+                <div class="mt-2 d-flex flex-wrap gap-2">
+                    @if ($filters['item_id'] && $selectedItem)
+                        <span class="chip-filter">
+                            <span>Item:</span>
+                            <strong>{{ $selectedItem->code }}</strong>
+                            <span>— {{ $selectedItem->name }}</span>
+                        </span>
+                    @endif
+
+                    @if ($filters['warehouse_id'] && $selectedWarehouse)
+                        <span class="chip-filter">
+                            <span>Gudang:</span>
+                            <strong>{{ $selectedWarehouse->code }}</strong>
+                            <span>— {{ $selectedWarehouse->name }}</span>
+                        </span>
+                    @elseif($filters['item_id'])
+                        <span class="chip-filter">
+                            <span>Gudang:</span>
+                            <strong>Semua</strong>
+                        </span>
+                    @endif
+
+                    @if ($filters['lot_id'] && $selectedLot)
+                        <span class="chip-filter">
+                            <span>LOT:</span>
+                            <strong>{{ $selectedLot->code }}</strong>
+                        </span>
+                    @endif
+
+                    @if ($filters['from_date'] || $filters['to_date'])
+                        <span class="chip-filter">
+                            <span>Periode:</span>
+                            <strong>
+                                {{ $filters['from_date'] ?: 'awal' }}
+                                &ndash;
+                                {{ $filters['to_date'] ?: 'sekarang' }}
+                            </strong>
+                        </span>
+                    @endif
+                </div>
             </div>
 
-            @php
-                $currentSort = $filters['sort'] ?? 'desc';
-                $sortDescUrl = request()->fullUrlWithQuery(['sort' => 'desc']);
-                $sortAscUrl = request()->fullUrlWithQuery(['sort' => 'asc']);
-            @endphp
-
-            <div class="d-flex flex-wrap gap-2">
+            <div class="d-flex flex-wrap gap-2 align-items-center">
+                {{-- Sort tombol --}}
                 <div class="btn-group btn-group-sm">
                     <a href="{{ $sortDescUrl }}"
                         class="btn btn-outline-secondary {{ $currentSort === 'desc' ? 'active' : '' }}">↑ Terbaru</a>
@@ -62,10 +126,19 @@
                         class="btn btn-outline-secondary {{ $currentSort === 'asc' ? 'active' : '' }}">↓ Terlama</a>
                 </div>
 
+                {{-- Export hanya kalau item sudah dipilih --}}
                 @if ($filters['item_id'])
                     <a href="{{ route('inventory.stock_card.export', request()->query()) }}"
-                        class="btn btn-success btn-sm">Export</a>
+                        class="btn btn-success btn-sm">
+                        Export
+                    </a>
                 @endif
+
+                {{-- Opsional: tombol balik ke Stok per Item --}}
+                <a href="{{ route('inventory.stocks.items', ['search' => $selectedItem->code ?? null]) }}"
+                    class="btn btn-outline-secondary btn-sm">
+                    &larr; Stok per Item
+                </a>
             </div>
         </div>
 

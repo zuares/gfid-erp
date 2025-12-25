@@ -222,6 +222,12 @@
 @endpush
 
 @section('content')
+    @php
+        $user = auth()->user();
+        $role = $user?->role ?? null;
+        $isOperating = $role === 'operating';
+    @endphp
+
     <div class="finishing-index-page">
         <div class="page-wrap">
 
@@ -252,52 +258,55 @@
                 </div>
             @endif
 
-            {{-- FILTER CARD --}}
-            <div class="fin-card mb-3">
-                <div class="fin-card-header d-flex justify-content-between align-items-center">
-                    <span class="fin-filter-label">Filter</span>
+            {{-- FILTER CARD (hanya non-operating) --}}
+            @if (!$isOperating)
+                <div class="fin-card mb-3">
+                    <div class="fin-card-header d-flex justify-content-between align-items-center">
+                        <span class="fin-filter-label">Filter</span>
 
-                    @if ($search || $status || $rejectFlag)
-                        <a href="{{ route('production.finishing_jobs.index') }}"
-                            class="small text-muted text-decoration-none">
-                            Reset
-                        </a>
-                    @endif
+                        @if ($search || $status || $rejectFlag)
+                            <a href="{{ route('production.finishing_jobs.index') }}"
+                                class="small text-muted text-decoration-none">
+                                Reset
+                            </a>
+                        @endif
+                    </div>
+                    <div class="fin-card-body">
+                        <form method="GET" action="{{ route('production.finishing_jobs.index') }}" class="row g-2 g-md-3">
+                            <div class="col-12 col-md-5">
+                                <label class="form-label small mb-1">Cari (kode / catatan)</label>
+                                <input type="text" name="search" value="{{ $search }}"
+                                    class="form-control form-control-sm" placeholder="FIN-... atau catatan">
+                            </div>
+
+                            <div class="col-6 col-md-3">
+                                <label class="form-label small mb-1">Status</label>
+                                <select name="status" class="form-select form-select-sm">
+                                    <option value="">Semua</option>
+                                    <option value="draft" {{ $status === 'draft' ? 'selected' : '' }}>Draft</option>
+                                    <option value="posted" {{ $status === 'posted' ? 'selected' : '' }}>Posted</option>
+                                </select>
+                            </div>
+
+                            <div class="col-6 col-md-2">
+                                <label class="form-label small mb-1">Reject</label>
+                                <select name="reject" class="form-select form-select-sm">
+                                    <option value="">Semua</option>
+                                    <option value="yes" {{ $rejectFlag === 'yes' ? 'selected' : '' }}>Ada reject</option>
+                                    <option value="no" {{ $rejectFlag === 'no' ? 'selected' : '' }}>Tanpa reject
+                                    </option>
+                                </select>
+                            </div>
+
+                            <div class="col-12 col-md-2 d-flex align-items-end">
+                                <button type="submit" class="btn btn-success btn-sm w-100">
+                                    <i class="bi bi-search me-1"></i> Terapkan
+                                </button>
+                            </div>
+                        </form>
+                    </div>
                 </div>
-                <div class="fin-card-body">
-                    <form method="GET" action="{{ route('production.finishing_jobs.index') }}" class="row g-2 g-md-3">
-                        <div class="col-12 col-md-5">
-                            <label class="form-label small mb-1">Cari (kode / catatan)</label>
-                            <input type="text" name="search" value="{{ $search }}"
-                                class="form-control form-control-sm" placeholder="FIN-... atau catatan">
-                        </div>
-
-                        <div class="col-6 col-md-3">
-                            <label class="form-label small mb-1">Status</label>
-                            <select name="status" class="form-select form-select-sm">
-                                <option value="">Semua</option>
-                                <option value="draft" {{ $status === 'draft' ? 'selected' : '' }}>Draft</option>
-                                <option value="posted" {{ $status === 'posted' ? 'selected' : '' }}>Posted</option>
-                            </select>
-                        </div>
-
-                        <div class="col-6 col-md-2">
-                            <label class="form-label small mb-1">Reject</label>
-                            <select name="reject" class="form-select form-select-sm">
-                                <option value="">Semua</option>
-                                <option value="yes" {{ $rejectFlag === 'yes' ? 'selected' : '' }}>Ada reject</option>
-                                <option value="no" {{ $rejectFlag === 'no' ? 'selected' : '' }}>Tanpa reject</option>
-                            </select>
-                        </div>
-
-                        <div class="col-12 col-md-2 d-flex align-items-end">
-                            <button type="submit" class="btn btn-success btn-sm w-100">
-                                <i class="bi bi-search me-1"></i> Terapkan
-                            </button>
-                        </div>
-                    </form>
-                </div>
-            </div>
+            @endif
 
             {{-- MOBILE: tombol + --}}
             <div class="d-md-none mb-3">
@@ -439,11 +448,20 @@
                                     </tbody>
                                 </table>
                             </div>
-
-                            <div class="mt-3">
-                                {{ $finishingJobs->links() }}
-                            </div>
                         </div>
+
+                        {{-- PAGINATION (val
+id untuk desktop & mobile) --}}
+                        @if ($finishingJobs->hasPages())
+                            <div class="mt-3 d-flex justify-content-between align-items-center flex-wrap gap-2">
+                                <div class="small text-muted">
+                                    Halaman {{ $finishingJobs->currentPage() }} dari {{ $finishingJobs->lastPage() }}
+                                </div>
+                                <div>
+                                    {{ $finishingJobs->links() }}
+                                </div>
+                            </div>
+                        @endif
                     @endif
                 </div>
             </div>

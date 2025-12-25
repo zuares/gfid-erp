@@ -57,77 +57,37 @@
             }
         }
 
-        /* HEADER STYLE – mirip Sewing Return */
-        .header-row {
+        /* HEADER STYLE – disamakan dengan Sewing Return */
+        .hdr {
             display: flex;
             justify-content: space-between;
-            align-items: center;
             gap: .75rem;
-        }
-
-        .header-icon-circle {
-            width: 40px;
-            height: 40px;
-            border-radius: 999px;
-            display: flex;
+            flex-wrap: wrap;
             align-items: center;
-            justify-content: center;
-            font-size: 1.15rem;
-            margin-right: .75rem;
         }
 
-        .pickup-icon-circle {
-            background: rgba(37, 99, 235, 0.10);
-            color: #2563eb;
-            border: 1px solid rgba(37, 99, 235, 0.25);
-        }
-
-        body[data-theme="dark"] .pickup-icon-circle {
-            background: rgba(37, 99, 235, 0.25);
-            border-color: rgba(147, 197, 253, 0.45);
-            color: #bfdbfe;
-        }
-
-        .header-title h1 {
-            font-size: 1.1rem;
+        .hdr h1 {
+            font-size: 1.02rem;
+            font-weight: 900;
             margin: 0;
+            letter-spacing: -.01em;
         }
 
-        .header-subtitle {
-            font-size: .82rem;
+        .sub {
+            font-size: .8rem;
             color: var(--muted);
+            line-height: 1.35;
+            margin-top: .15rem;
         }
 
-        .btn-header-pill {
+        .btn-header-link {
             border-radius: 999px;
             padding: .32rem .9rem;
             font-size: .78rem;
             font-weight: 600;
         }
 
-        .btn-header-accent {
-            background: rgba(59, 130, 246, .12);
-            border: 1px solid rgba(59, 130, 246, .35);
-            color: #1d4ed8;
-        }
-
-        body[data-theme="dark"] .btn-header-accent {
-            background: rgba(59, 130, 246, .22);
-            border-color: rgba(147, 197, 253, .48);
-            color: #bfdbfe;
-        }
-
-        .btn-header-secondary {
-            border-radius: 999px;
-            font-size: .8rem;
-            padding-inline: .85rem;
-            padding-block: .25rem;
-        }
-
-        .btn-header-secondary i {
-            font-size: .9rem;
-        }
-
+        /* FIELD STYLE */
         .field-block {
             margin-bottom: .5rem;
         }
@@ -176,26 +136,60 @@
             cursor: not-allowed;
         }
 
+        /* kecilkan alert sedikit di halaman ini */
+        .sewing-pickup-page .alert {
+            font-size: .82rem;
+        }
+
+        .spin-slow {
+            animation: spin 1s linear infinite;
+        }
+
+        @keyframes spin {
+            to {
+                transform: rotate(360deg);
+            }
+        }
+
+        /* ===== MOBILE TWEAKS ===== */
         @media (max-width: 767.98px) {
+
+            /* Kunci halaman di sumbu X – tidak bisa geser kanan-kiri */
+            html,
+            body {
+                overflow-x: hidden;
+            }
+
+            .sewing-pickup-page {
+                overflow-x: hidden;
+            }
+
             .sewing-pickup-page .page-wrap {
                 padding-inline: .75rem;
             }
 
-            .header-row {
-                flex-direction: column;
+            /* Matikan horizontal scroll container di halaman ini */
+            .sewing-pickup-page .table-responsive,
+            .sewing-pickup-page .table-wrap {
+                overflow-x: visible;
+            }
+
+            /* Bantu gesture supaya fokus ke scroll vertikal */
+            .sewing-pickup-page table tbody tr {
+                touch-action: pan-y;
+            }
+
+            .hdr {
                 align-items: flex-start;
             }
 
-            .header-title h1 {
+            .hdr h1 {
                 font-size: 1rem;
             }
 
-            /* BUTTON SETOR JAHIT FULL WIDTH DI MOBILE */
-            .header-row .btn-header-pill {
-                align-self: stretch;
-                width: 100%;
-                display: inline-flex;
-                justify-content: center;
+            /* tombol header full width kalau mau, tapi tetap wrap bagus */
+            .hdr .btn-header-link {
+                align-self: flex-start;
             }
 
             .form-footer {
@@ -210,21 +204,6 @@
 
             .form-footer .btn-outline-secondary span {
                 display: inline;
-            }
-        }
-
-        /* kecilkan alert sedikit di halaman ini */
-        .sewing-pickup-page .alert {
-            font-size: .82rem;
-        }
-
-        .spin-slow {
-            animation: spin 1s linear infinite;
-        }
-
-        @keyframes spin {
-            to {
-                transform: rotate(360deg);
             }
         }
     </style>
@@ -259,33 +238,22 @@
                 $defaultWarehouse = $defaultWarehouseId ? $warehouses->firstWhere('id', $defaultWarehouseId) : null;
             @endphp
 
-            {{-- HEADER – mirip Sewing Return, tapi khas Sewing Pickup --}}
+            {{-- HEADER – disamakan gaya dengan Sewing Return --}}
             <div class="card mb-2">
                 <div class="card-section">
-                    <div class="header-row">
+                    <div class="hdr">
+                        <div>
+                            <h1>Ambil Jahit</h1>
+                            <div class="sub">
 
-                        {{-- KIRI: ICON + TITLE --}}
-                        <div class="d-flex align-items-center">
-                            <div class="header-icon-circle pickup-icon-circle">
-                                <i class="bi bi-bag-plus"></i>
-                            </div>
-
-                            <div class="header-title d-flex flex-column gap-1">
-                                <h1>Halaman Ambil Jahit</h1>
-                                <div class="header-subtitle">
-                                    Pilih bundle dari WIP Cutting dan masukkan jumlah yang akan dibawa untuk proses jahit.
-                                </div>
                             </div>
                         </div>
 
-                        {{-- KANAN: Aksi cepat --}}
-                        <div class="d-flex flex-column flex-md-row gap-2">
-                            <a href="{{ route('production.sewing_returns.create') }}"
-                                class="btn btn-sm btn-header-pill btn-header-accent d-flex align-items-center gap-2">
-                                <i class="bi bi-clipboard-check"></i>
-                                <span>Setor Jahit</span>
-                            </a>
-                        </div>
+                        <a href="{{ route('production.sewing_returns.create') }}"
+                            class="btn btn-sm btn-outline-primary btn-header-link d-flex align-items-center gap-2">
+                            <i class="bi bi-clipboard-check"></i>
+                            <span>Setor Jahit</span>
+                        </a>
                     </div>
                 </div>
             </div>

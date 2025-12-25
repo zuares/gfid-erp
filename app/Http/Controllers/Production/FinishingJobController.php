@@ -133,13 +133,9 @@ class FinishingJobController extends Controller
 
             $item = $items[$itemId] ?? null;
 
+            // ⬇️ UBAH DI SINI: label = kode saja
             $itemLabel = $item
-            ? trim(
-                ($item->code ?? '') .
-                ' — ' .
-                ($item->name ?? '') .
-                ($item->color ? ' (' . $item->color . ')' : '')
-            )
+            ? ($item->code ?? ('Item #' . $itemId))
             : 'Item #' . $itemId;
 
             $lines[] = [

@@ -1,20 +1,34 @@
+{{-- resources/views/production/cutting_jobs/index.blade.php --}}
 @extends('layouts.app')
 
 @section('title', 'Produksi • Cutting Jobs')
 
 @push('head')
     <style>
+        .cutting-overview-page {
+            min-height: 100vh;
+        }
+
         .page-wrap {
             max-width: 1100px;
             margin-inline: auto;
-            padding-bottom: 3rem;
+            padding: 1rem 1rem 3rem;
         }
 
         body[data-theme="light"] .page-wrap {
-            background: radial-gradient(circle at top left,
+            background:
+                radial-gradient(circle at top left,
                     rgba(59, 130, 246, 0.12) 0,
                     rgba(45, 212, 191, 0.08) 28%,
                     #f9fafb 60%);
+        }
+
+        body[data-theme="dark"] .page-wrap {
+            background:
+                radial-gradient(circle at top left,
+                    rgba(59, 130, 246, 0.25) 0,
+                    rgba(45, 212, 191, 0.15) 26%,
+                    #020617 60%);
         }
 
         .card-main {
@@ -24,6 +38,13 @@
             box-shadow:
                 0 12px 30px rgba(15, 23, 42, 0.12),
                 0 0 0 1px rgba(148, 163, 184, 0.08);
+        }
+
+        body[data-theme="dark"] .card-main {
+            border-color: rgba(30, 64, 175, 0.55);
+            box-shadow:
+                0 16px 40px rgba(0, 0, 0, 0.75),
+                0 0 0 1px rgba(15, 23, 42, 0.8);
         }
 
         .mono {
@@ -103,22 +124,21 @@
             border-top-color: rgba(148, 163, 184, 0.18);
         }
 
-        .code-link a {
-            text-decoration: none;
-        }
-
-        .code-link a:hover {
-            text-decoration: underline;
-        }
-
         .btn-primary {
             border-radius: 999px;
             padding-inline: 1rem;
         }
 
+        .header-stack {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            gap: .75rem;
+        }
+
         @media (max-width: 767.98px) {
             .page-wrap {
-                padding-inline: .5rem;
+                padding-inline: .75rem;
             }
 
             .header-stack {
@@ -145,177 +165,421 @@
                 overflow-x: auto;
             }
         }
+
+        /* ============================
+               MOBILE: CUTTING JOB LIST
+            ============================ */
+        @media (max-width: 767.98px) {
+            .cut-mobile-secondary {
+                font-size: .75rem;
+                color: var(--muted);
+            }
+
+            .chip-soft {
+                display: inline-flex;
+                align-items: center;
+                border-radius: 999px;
+                padding: .08rem .5rem;
+                border: 1px solid rgba(148, 163, 184, 0.55);
+                background: rgba(15, 23, 42, 0.02);
+                font-size: .72rem;
+                max-width: 100%;
+                white-space: nowrap;
+                text-overflow: ellipsis;
+                overflow: hidden;
+            }
+
+            .chip-soft .sub {
+                opacity: .8;
+                margin-left: .25rem;
+            }
+
+            .cut-mobile-list {
+                display: flex;
+                flex-direction: column;
+                gap: .6rem;
+            }
+
+            .cut-mobile-card {
+                border-radius: 16px;
+                padding: .7rem .8rem;
+                background:
+                    radial-gradient(circle at top left,
+                        rgba(148, 163, 184, 0.22) 0,
+                        color-mix(in srgb, var(--card) 92%, var(--line) 8%) 52%);
+                border: 1px solid color-mix(in srgb, var(--line) 75%, transparent 25%);
+                box-shadow:
+                    0 10px 25px rgba(15, 23, 42, 0.18),
+                    0 0 0 1px rgba(15, 23, 42, 0.03);
+                cursor: pointer;
+                transition: transform 90ms ease-out, box-shadow 90ms ease-out, background 120ms ease-out;
+            }
+
+            body[data-theme="dark"] .cut-mobile-card {
+                box-shadow:
+                    0 14px 40px rgba(0, 0, 0, 0.78),
+                    0 0 0 1px rgba(15, 23, 42, 0.7);
+            }
+
+            .cut-mobile-card:hover {
+                transform: translateY(-1px);
+                box-shadow:
+                    0 14px 32px rgba(15, 23, 42, 0.22),
+                    0 0 0 1px rgba(15, 23, 42, 0.06);
+            }
+
+            .cut-mobile-card:active {
+                transform: translateY(1px);
+                box-shadow:
+                    0 6px 16px rgba(15, 23, 42, 0.25),
+                    0 0 0 1px rgba(15, 23, 42, 0.09);
+            }
+
+            .cut-mobile-card-header {
+                display: flex;
+                justify-content: space-between;
+                align-items: center;
+                gap: .5rem;
+                margin-bottom: .35rem;
+            }
+
+            .cut-mobile-date-pill {
+                display: inline-flex;
+                align-items: center;
+                border-radius: 999px;
+                padding: .08rem .6rem;
+                font-size: .75rem;
+                font-weight: 600;
+                background: color-mix(in srgb, var(--card) 92%, var(--line) 8%);
+                border: 1px solid color-mix(in srgb, var(--line) 80%, transparent 20%);
+            }
+
+            .cut-mobile-status-pill {
+                font-size: .7rem;
+                border-radius: 999px;
+                padding: .12rem .6rem;
+            }
+
+            .cut-mobile-card-body {
+                display: flex;
+                flex-direction: column;
+                gap: .22rem;
+                font-size: .78rem;
+            }
+
+            .cut-mobile-row-line {
+                display: flex;
+                justify-content: space-between;
+                align-items: center;
+                gap: .5rem;
+                flex-wrap: wrap;
+            }
+
+            .cut-mobile-metadata {
+                font-size: .76rem;
+                font-weight: 600;
+            }
+        }
     </style>
 @endpush
 
 @section('content')
-    <div class="page-wrap">
-        @php
-            $pageTotal = $jobs->count();
-            $pageDraft = $jobs->where('status', 'draft')->count();
-            $pageCut = $jobs->where('status', 'cut')->count();
-            $pageQcDone = $jobs->whereIn('status', ['qc_ok', 'qc_mixed', 'qc_reject', 'qc_done'])->count();
-        @endphp
+    <div class="cutting-overview-page">
+        <div class="page-wrap">
+            @php
+                $pageTotal = $jobs->count();
+                $pageDraft = $jobs->where('status', 'draft')->count();
+                $pageCut = $jobs->where('status', 'cut')->count();
+                $pageQcDone = $jobs->whereIn('status', ['qc_ok', 'qc_mixed', 'qc_reject', 'qc_done'])->count();
+            @endphp
 
-        {{-- HEADER --}}
-        <div class="d-flex justify-content-between align-items-center mb-3 header-stack">
-            <div>
-                <h1 class="h4 mb-1">Cutting Jobs</h1>
-                <p class="text-muted small mb-0">
-                    Daftar job cutting per lot sebelum dikirim ke proses QC & Sewing.
-                </p>
+            {{-- HEADER CARD --}}
+            <div class="card-main p-3 mb-3">
+                <div class="header-stack">
+                    <div>
+                        <h1 class="h5 mb-1">Cutting Jobs</h1>
+                        <p class="text-muted small mb-0">
+                            Daftar cutting job produksi yang telah dibuat.
+                        </p>
+                    </div>
 
-                {{-- KPI kecil --}}
-                <div class="d-flex flex-wrap gap-2 mt-2 header-kpis">
-                    <span class="badge-soft">
-                        <span class="badge-label">Job di halaman ini</span>
-                        <span class="badge-value ms-1">{{ $pageTotal }}</span>
-                    </span>
-                    <span class="badge-soft">
-                        <span class="badge-label">Belum QC</span>
-                        <span class="badge-value ms-1">{{ $pageCut + $pageDraft }}</span>
-                    </span>
-                    <span class="badge-soft">
-                        <span class="badge-label">Sudah QC</span>
-                        <span class="badge-value ms-1">{{ $pageQcDone }}</span>
-                    </span>
+                    <div>
+                        <a href="{{ route('production.cutting_jobs.create') }}" class="btn btn-primary">
+                            + Cutting Job Baru
+                        </a>
+                    </div>
                 </div>
             </div>
 
-            <div>
-                <a href="{{ route('production.cutting_jobs.create') }}" class="btn btn-primary">
-                    + Cutting Job Baru
-                </a>
-            </div>
-        </div>
+            {{-- LIST JOBS --}}
+            <div class="card-main p-3">
+                <h2 class="h6 mb-2">Daftar Cutting</h2>
 
-        {{-- LIST JOBS --}}
-        <div class="card-main p-3">
-            <div class="table-wrap">
-                <table class="table table-sm align-middle mono table-jobs">
-                    <thead>
-                        <tr>
-                            <th style="width: 120px;">Tanggal</th>
-                            <th>Kode Job</th>
-                            <th>LOT</th>
-                            <th>Gudang</th>
-                            <th style="width: 110px;" class="text-end">Bundles</th>
-                            <th style="width: 130px;">Status</th>
-                            <th style="width: 90px;"></th>
-                        </tr>
-                    </thead>
-                    <tbody>
-                        @forelse ($jobs as $job)
-                            @php
-                                $status = $job->status ?? 'draft';
+                {{-- DESKTOP: TABEL --}}
+                <div class="table-wrap d-none d-md-block">
+                    <table class="table table-sm align-middle mono table-jobs">
+                        <thead>
+                            <tr>
+                                <th style="width: 120px;">Tanggal</th>
+                                <th>Operator</th>
+                                <th>Item Kain</th>
+                                <th>Gudang</th>
+                                <th style="width: 110px;" class="text-end">Iket</th>
+                                <th style="width: 130px;">Status</th>
+                                <th style="width: 90px;"></th>
+                            </tr>
+                        </thead>
+                        <tbody>
+                            @forelse ($jobs as $job)
+                                @php
+                                    $status = $job->status ?? 'draft';
 
-                                $statusMap = [
-                                    'draft' => [
-                                        'label' => 'DRAFT',
+                                    $statusMap = [
+                                        'draft' => [
+                                            'label' => 'DRAFT',
+                                            'class' => 'status-draft',
+                                            'hint' => 'Belum proses cutting',
+                                        ],
+                                        'cut' => [
+                                            'label' => 'CUTTING',
+                                            'class' => 'status-cut',
+                                            'hint' => 'Sudah cutting, belum QC',
+                                        ],
+                                        'cut_sent_to_qc' => [
+                                            'label' => 'KIRIM QC',
+                                            'class' => 'status-sent-to-qc',
+                                            'hint' => 'Menunggu QC cutting',
+                                        ],
+                                        'sent_to_qc' => [
+                                            'label' => 'KIRIM QC',
+                                            'class' => 'status-sent-to-qc',
+                                            'hint' => 'Menunggu QC cutting',
+                                        ],
+                                        'qc_ok' => [
+                                            'label' => 'QC OK',
+                                            'class' => 'status-qc-ok',
+                                            'hint' => 'QC selesai, hasil OK',
+                                        ],
+                                        'qc_done' => [
+                                            'label' => 'QC SELESAI',
+                                            'class' => 'status-qc-ok',
+                                            'hint' => 'QC selesai',
+                                        ],
+                                        'qc_mixed' => [
+                                            'label' => 'QC MIXED',
+                                            'class' => 'status-qc-mixed',
+                                            'hint' => 'Ada OK & reject',
+                                        ],
+                                        'qc_reject' => [
+                                            'label' => 'QC REJECT',
+                                            'class' => 'status-qc-reject',
+                                            'hint' => 'Banyak reject',
+                                        ],
+                                    ];
+
+                                    $cfg = $statusMap[$status] ?? [
+                                        'label' => strtoupper($status),
                                         'class' => 'status-draft',
-                                        'hint' => 'Belum proses cutting',
-                                    ],
-                                    'cut' => [
-                                        'label' => 'CUTTING',
-                                        'class' => 'status-cut',
-                                        'hint' => 'Sudah cutting, belum QC',
-                                    ],
-                                    'cut_sent_to_qc' => [
-                                        'label' => 'KIRIM QC',
-                                        'class' => 'status-sent-to-qc',
-                                        'hint' => 'Menunggu QC cutting',
-                                    ],
-                                    'sent_to_qc' => [
-                                        'label' => 'KIRIM QC',
-                                        'class' => 'status-sent-to-qc',
-                                        'hint' => 'Menunggu QC cutting',
-                                    ],
-                                    'qc_ok' => [
-                                        'label' => 'QC OK',
-                                        'class' => 'status-qc-ok',
-                                        'hint' => 'QC selesai, hasil OK',
-                                    ],
-                                    'qc_done' => [
-                                        'label' => 'QC SELESAI',
-                                        'class' => 'status-qc-ok',
-                                        'hint' => 'QC selesai',
-                                    ],
-                                    'qc_mixed' => [
-                                        'label' => 'QC MIXED',
-                                        'class' => 'status-qc-mixed',
-                                        'hint' => 'Ada OK & reject',
-                                    ],
-                                    'qc_reject' => [
-                                        'label' => 'QC REJECT',
-                                        'class' => 'status-qc-reject',
-                                        'hint' => 'Banyak reject',
-                                    ],
-                                ];
+                                        'hint' => '',
+                                    ];
 
-                                $cfg = $statusMap[$status] ?? [
-                                    'label' => strtoupper($status),
-                                    'class' => 'status-draft',
-                                    'hint' => '',
-                                ];
-                                $bundleCount = $job->bundles()->count();
-                            @endphp
+                                    $bundleCount = $job->bundles_count ?? $job->bundles()->count();
+                                @endphp
 
-                            <tr>
-                                <td>
-                                    {{ $job->date?->format('d M Y') ?? $job->date }}
-                                </td>
+                                <tr>
+                                    {{-- Tanggal --}}
+                                    <td>
+                                        {{ $job->date?->format('d M Y') ?? $job->date }}
+                                    </td>
 
-                                <td class="code-link">
-                                    <a href="{{ route('production.cutting_jobs.show', $job) }}">
-                                        {{ $job->code }}
-                                    </a>
-                                </td>
+                                    {{-- Operator cutting (siapa yang cutting) --}}
+                                    <td>
+                                        {{ $job->operator?->name ?? '-' }}
+                                    </td>
 
-                                <td>
-                                    {{ $job->lot?->code ?? '-' }}
-                                    <div class="small text-muted">
-                                        {{ $job->lot?->item?->code ?? '' }}
+                                    {{-- Item kain dari LOT (nama item, bukan kode LOT) --}}
+                                    <td>
+                                        @if ($job->lot && $job->lot->item)
+                                            {{ $job->lot->item->name ?? '-' }}
+                                        @else
+                                            -
+                                        @endif
+                                    </td>
+
+                                    {{-- Gudang --}}
+                                    <td>
+                                        {{ $job->warehouse?->code ?? '-' }}
+                                        <div class="small text-muted">
+                                            {{ $job->warehouse?->name ?? '' }}
+                                        </div>
+                                    </td>
+
+                                    {{-- Jumlah iket (bundles) --}}
+                                    <td class="text-end">
+                                        {{ $bundleCount }}
+                                    </td>
+
+                                    {{-- Status --}}
+                                    <td>
+                                        <span class="status-pill {{ $cfg['class'] }}" title="{{ $cfg['hint'] }}">
+                                            {{ $cfg['label'] }}
+                                        </span>
+                                    </td>
+
+                                    {{-- Aksi --}}
+                                    <td class="text-end">
+                                        <a href="{{ route('production.cutting_jobs.show', $job) }}"
+                                            class="btn btn-sm btn-outline-primary">
+                                            Detail
+                                        </a>
+                                    </td>
+                                </tr>
+                            @empty
+                                <tr>
+                                    <td colspan="7" class="text-center text-muted py-4">
+                                        Belum ada cutting job.
+                                    </td>
+                                </tr>
+                            @endforelse
+                        </tbody>
+                    </table>
+                </div>
+
+                {{-- MOBILE: CARD LIST --}}
+                <div class="d-block d-md-none mono">
+                    @if ($jobs->isEmpty())
+                        <div class="text-center text-muted small py-3">
+                            Belum ada cutting job.
+                        </div>
+                    @else
+                        <div class="cut-mobile-list">
+                            @foreach ($jobs as $job)
+                                @php
+                                    $status = $job->status ?? 'draft';
+
+                                    $statusMap = [
+                                        'draft' => [
+                                            'label' => 'Draft',
+                                            'class' => 'status-draft',
+                                        ],
+                                        'cut' => [
+                                            'label' => 'Cutting',
+                                            'class' => 'status-cut',
+                                        ],
+                                        'cut_sent_to_qc' => [
+                                            'label' => 'Kirim QC',
+                                            'class' => 'status-sent-to-qc',
+                                        ],
+                                        'sent_to_qc' => [
+                                            'label' => 'Kirim QC',
+                                            'class' => 'status-sent-to-qc',
+                                        ],
+                                        'qc_ok' => [
+                                            'label' => 'QC OK',
+                                            'class' => 'status-qc-ok',
+                                        ],
+                                        'qc_done' => [
+                                            'label' => 'QC Selesai',
+                                            'class' => 'status-qc-ok',
+                                        ],
+                                        'qc_mixed' => [
+                                            'label' => 'QC Mixed',
+                                            'class' => 'status-qc-mixed',
+                                        ],
+                                        'qc_reject' => [
+                                            'label' => 'QC Reject',
+                                            'class' => 'status-qc-reject',
+                                        ],
+                                    ];
+
+                                    $cfg = $statusMap[$status] ?? [
+                                        'label' => ucfirst($status),
+                                        'class' => 'status-draft',
+                                    ];
+
+                                    $bundleCount = $job->bundles_count ?? $job->bundles()->count();
+                                @endphp
+
+                                <div class="cut-mobile-card" data-href="{{ route('production.cutting_jobs.show', $job) }}">
+                                    <div class="cut-mobile-card-header">
+                                        <div class="cut-mobile-date-pill">
+                                            {{ $job->date?->format('Y-m-d') ?? $job->date }}
+                                        </div>
+                                        <div>
+                                            <span class="cut-mobile-status-pill status-pill {{ $cfg['class'] }}">
+                                                {{ $cfg['label'] }}
+                                            </span>
+                                        </div>
                                     </div>
-                                </td>
 
-                                <td>
-                                    {{ $job->warehouse?->code ?? '-' }}
-                                    <div class="small text-muted">
-                                        {{ $job->warehouse?->name ?? '' }}
+                                    <div class="cut-mobile-card-body">
+                                        {{-- Baris 1: Operator cutting --}}
+                                        <div class="cut-mobile-row-line">
+                                            <div class="cut-mobile-secondary">
+                                                @if ($job->operator)
+                                                    Operator:
+                                                    <strong>{{ $job->operator->name }}</strong>
+                                                @else
+                                                    Operator: <span class="text-muted">-</span>
+                                                @endif
+                                            </div>
+                                        </div>
+
+                                        {{-- Baris 2: Item kain (dari LOT) --}}
+                                        <div class="cut-mobile-row-line">
+                                            <div>
+                                                @if ($job->lot && $job->lot->item)
+                                                    <span class="chip-soft">
+                                                        {{ $job->lot->item->name ?? '-' }}
+                                                    </span>
+                                                @else
+                                                    <span class="cut-mobile-secondary">
+                                                        Item kain tidak diketahui
+                                                    </span>
+                                                @endif
+                                            </div>
+                                        </div>
+
+                                        {{-- Baris 3: Gudang & iket --}}
+                                        <div class="cut-mobile-row-line">
+                                            <div class="cut-mobile-secondary">
+                                                {{ $job->warehouse?->code ?? '-' }}
+                                                @if ($job->warehouse?->name)
+                                                    • {{ $job->warehouse->name }}
+                                                @endif
+                                            </div>
+                                            <div class="cut-mobile-metadata text-muted">
+                                                {{ $bundleCount }} Iket
+                                            </div>
+                                        </div>
                                     </div>
-                                </td>
+                                </div>
+                            @endforeach
+                        </div>
+                    @endif
+                </div>
 
-                                <td class="text-end">
-                                    {{ $bundleCount }}
-                                </td>
-
-                                <td>
-                                    <span class="status-pill {{ $cfg['class'] }}" title="{{ $cfg['hint'] }}">
-                                        {{ $cfg['label'] }}
-                                    </span>
-                                </td>
-
-                                <td class="text-end">
-                                    <a href="{{ route('production.cutting_jobs.show', $job) }}"
-                                        class="btn btn-sm btn-outline-primary">
-                                        Detail
-                                    </a>
-                                </td>
-                            </tr>
-                        @empty
-                            <tr>
-                                <td colspan="7" class="text-center text-muted py-4">
-                                    Belum ada cutting job.
-                                </td>
-                            </tr>
-                        @endforelse
-                    </tbody>
-                </table>
-            </div>
-
-            <div class="mt-3">
-                {{ $jobs->links() }}
+                {{-- PAGINATION (SAMA UNTUK DESKTOP & MOBILE) --}}
+                <div class="mt-3">
+                    {{ $jobs->links() }}
+                </div>
             </div>
         </div>
     </div>
 @endsection
+
+@push('scripts')
+    <script>
+        document.addEventListener('DOMContentLoaded', function() {
+            // MOBILE: klik card → detail cutting job
+            document.querySelectorAll('.cut-mobile-card').forEach(function(card) {
+                card.addEventListener('click', function() {
+                    const href = this.getAttribute('data-href');
+                    if (href) {
+                        window.location.href = href;
+                    }
+                });
+            });
+        });
+    </script>
+@endpush

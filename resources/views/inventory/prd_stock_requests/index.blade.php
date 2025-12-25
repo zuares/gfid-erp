@@ -359,7 +359,6 @@
         <div class="header-row">
             <div>
                 <h1 class="title">Proses Permintaan RTS (PRD)</h1>
-
             </div>
 
             {{-- Tombol ini disembunyikan untuk role operating --}}
@@ -402,26 +401,29 @@
 
         {{-- =======================
             FILTERS (status + periode)
+            Hanya non-operating
         ======================== --}}
-        <div class="filters">
-            <div class="filter-group">
-                @foreach ($statusOptions as $key => $label)
-                    <a href="{{ request()->fullUrlWithQuery(['status' => $key]) }}"
-                        class="{{ $currentStatus === $key ? 'active' : '' }}">
-                        {{ $label }}
-                    </a>
-                @endforeach
-            </div>
+        @unless ($isOperating)
+            <div class="filters">
+                <div class="filter-group">
+                    @foreach ($statusOptions as $key => $label)
+                        <a href="{{ request()->fullUrlWithQuery(['status' => $key]) }}"
+                            class="{{ $currentStatus === $key ? 'active' : '' }}">
+                            {{ $label }}
+                        </a>
+                    @endforeach
+                </div>
 
-            <div class="filter-group">
-                @foreach ($periodOptions as $pKey => $pLabel)
-                    <a href="{{ request()->fullUrlWithQuery(['period' => $pKey]) }}"
-                        class="{{ $period === $pKey ? 'active' : '' }}">
-                        {{ $pLabel }}
-                    </a>
-                @endforeach
+                <div class="filter-group">
+                    @foreach ($periodOptions as $pKey => $pLabel)
+                        <a href="{{ request()->fullUrlWithQuery(['period' => $pKey]) }}"
+                            class="{{ $period === $pKey ? 'active' : '' }}">
+                            {{ $pLabel }}
+                        </a>
+                    @endforeach
+                </div>
             </div>
-        </div>
+        @endunless
 
         {{-- =======================
             LIST

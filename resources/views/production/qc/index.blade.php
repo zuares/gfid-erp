@@ -140,8 +140,8 @@
         }
 
         /* ============================
-                                   MOBILE: QC CUTTING LIST
-                                ============================ */
+                                       MOBILE: QC CUTTING LIST
+                                    ============================ */
         @media (max-width: 767.98px) {
             .qc-mobile-secondary {
                 font-size: .75rem;
@@ -260,6 +260,33 @@
             .qc-mobile-metadata {
                 font-size: .76rem;
                 font-weight: 600;
+            }
+        }
+
+
+        @media (max-width: 767.98px) {
+
+            /* Kunci halaman di X seperti Sewing Return */
+            html,
+            body {
+                overflow-x: hidden;
+            }
+
+            .qc-overview-page,
+            .page-wrap {
+                overflow-x: hidden;
+            }
+
+            /* Matikan scroll horizontal wrapper */
+            .table-wrap,
+            .table-responsive {
+                overflow-x: visible;
+            }
+
+            /* Biar gesture fokus ke scroll atas-bawah */
+            .qc-overview-page table tbody tr,
+            .qc-mobile-card {
+                touch-action: pan-y;
             }
         }
     </style>

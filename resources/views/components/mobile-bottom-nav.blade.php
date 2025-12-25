@@ -237,8 +237,9 @@
                 ? route('production.reports.flow-dashboard')
                 : url('/production/reports/flow-dashboard');
 
-            $cuttingCreateHref = Route::has('production.cutting_jobs.create')
-                ? route('production.cutting_jobs.create')
+            // ✅ Cutting: ke INDEX, bukan CREATE
+            $cuttingIndexHref = Route::has('production.cutting_jobs.index')
+                ? route('production.cutting_jobs.index')
                 : '#';
 
             $qcIndexHref = Route::has('production.qc.index') ? route('production.qc.index') : '#';
@@ -252,8 +253,8 @@
                 : '#';
         @endphp
 
-        {{-- CUTTING (Create) --}}
-        <a href="{{ $cuttingCreateHref }}" class="nav-item {{ $isCuttingTab ? 'active' : '' }}">
+        {{-- CUTTING (Index) --}}
+        <a href="{{ $cuttingIndexHref }}" class="nav-item {{ $isCuttingTab ? 'active' : '' }}">
             <span class="icon">
                 <svg viewBox="0 0 24 24" xmlns="http://www.w3.org/2000/svg">
                     <circle cx="7" cy="8" r="2.5" />
