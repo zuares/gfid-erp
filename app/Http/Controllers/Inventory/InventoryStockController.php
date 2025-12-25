@@ -10,6 +10,7 @@ use App\Models\Warehouse;
 use App\Services\Inventory\InventoryService;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\DB;
+use Illuminate\Support\Str;
 
 class InventoryStockController extends Controller
 {
@@ -61,27 +62,28 @@ class InventoryStockController extends Controller
         $user = auth()->user();
         $role = $user?->role ?? null;
 
-        // Untuk dropdown filter item
+        // Untuk dropdown filter item (masih dipakai di view summary / nanti kalau mau dihidupin lagi)
         $items = Item::where('active', 1)
             ->orderBy('name')
             ->get();
 
-        // Untuk dropdown gudang
+        // Untuk dropdown gudang (role-based)
         $warehouses = $this->getWarehousesForDropdown($role);
 
         // Filters
         $warehouseId = $request->input('warehouse_id');
         $itemId = $request->input('item_id');
-        $search = trim((string) $request->input('search'));
+
+        // raw text dari request (buat dikirim balik ke view)
+        $searchRaw = trim((string) $request->input('search', ''));
+
+        // versi normalisasi (uppercase) untuk dipakai di LIKE
+        $search = Str::upper($searchRaw);
+
         $hasBalanceOnly = (bool) $request->boolean('has_balance_only', false);
 
         /**
          * STEP 1: Subquery stok per (item, gudang) dari inventory_mutations
-         *
-         * - qty_change di datamu sudah plus/minus (out = -20, in = +20),
-         *   jadi langsung SUM(qty_change).
-         * - groupBy item_id + wh_code
-         * - di sini kita terapkan SCOPE ROLE berbasis kode gudang
          */
         $base = InventoryMutation::query()
             ->join('warehouses', 'warehouses.id', '=', 'inventory_mutations.warehouse_id');
@@ -114,10 +116,6 @@ class InventoryStockController extends Controller
 
         /**
          * STEP 2: Outer query agregasi per item
-         *
-         * - total_qty = SUM semua qty dari subquery (hanya gudang yang lolos scope role)
-         * - fg_qty    = SUM qty untuk wh_code LIKE 'WH-%'
-         * - wip_qty   = SUM qty untuk wh_code LIKE 'WIP-%'
          */
         $selectSql = <<<'SQL'
 s.item_id,
@@ -151,13 +149,37 @@ SQL;
             $query->where('s.item_id', $itemId);
         }
 
-        // Filter search kode/nama
+        /**
+         * FILTER SEARCH: multi-term OR
+         * Contoh input:
+         * - "K7BLK K7WHT"
+         * - "K7BLK,K7WHT"
+         * - "K7BLK|K7WHT"
+         *
+         * Dipecah jadi beberapa term, lalu:
+         * (code LIKE %term1% OR name LIKE %term1%)
+         * OR
+         * (code LIKE %term2% OR name LIKE %term2%)
+         */
         if ($search !== '') {
-            $like = '%' . $search . '%';
-            $query->where(function ($q) use ($like) {
-                $q->where('items.code', 'like', $like)
-                    ->orWhere('items.name', 'like', $like);
-            });
+            // Pisah pakai spasi, koma, titik koma, atau pipe
+            $rawTerms = preg_split('/[\s,;|]+/', $search);
+
+            // Bersihkan kosong
+            $terms = array_values(array_filter($rawTerms, fn($t) => $t !== ''));
+
+            if (!empty($terms)) {
+                $query->where(function ($q) use ($terms) {
+                    foreach ($terms as $term) {
+                        $like = '%' . $term . '%';
+
+                        $q->orWhere(function ($q2) use ($like) {
+                            $q2->where('items.code', 'like', $like)
+                                ->orWhere('items.name', 'like', $like);
+                        });
+                    }
+                });
+            }
         }
 
         $query->selectRaw($selectSql)
@@ -191,6 +213,8 @@ SQL;
                     'per_page' => $stocks->perPage(),
                     'current_page' => $stocks->currentPage(),
                     'last_page' => $stocks->lastPage(),
+                    'from' => $stocks->firstItem() ?? 0,
+                    'to' => $stocks->lastItem() ?? 0,
                 ],
                 'rows' => $rows,
                 'pagination_html' => $stocks->hasPages() ? (string) $stocks->links() : '',
@@ -205,11 +229,14 @@ SQL;
             'filters' => [
                 'warehouse_id' => $warehouseId,
                 'item_id' => $itemId,
-                'search' => $search,
+                // pakai raw biar kalau nanti input belum full uppercase tetap
+                // tampil sesuai yang diketik user (meski di JS sudah di-upper)
+                'search' => $searchRaw,
                 'has_balance_only' => $hasBalanceOnly,
             ],
         ]);
     }
+
     // ==========================================================
     // ✅ OLD (LEGACY) : STOK PER ITEM (non-aggregate, per stock row)
     //    (Tidak dihapus, cuma dipindah jadi method lain)

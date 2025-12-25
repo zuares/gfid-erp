@@ -4,7 +4,6 @@ namespace App\Http\Controllers\Production;
 
 use App\Http\Controllers\Controller;
 use App\Models\CuttingJob;
-use App\Models\CuttingJobLot;
 use App\Models\Employee;
 use App\Models\Item;
 use App\Models\Lot;
@@ -179,6 +178,173 @@ class CuttingJobController extends Controller
      * - LOT di level header (lot_id) dibuat optional (bisa diisi LOT pertama).
      * - LOT utama untuk stok ada di cutting_job_bundles.lot_id.
      */
+    // public function store(Request $request)
+    // {
+    //     $validated = $request->validate([
+    //         'date' => ['required', 'date'],
+    //         'warehouse_id' => ['required', 'exists:warehouses,id'],
+    //         'lot_id' => ['nullable', 'integer', 'exists:lots,id'], // header lot opsional
+    //         'fabric_item_id' => ['required', 'integer', 'exists:items,id'],
+
+    //         'operator_id' => ['required', 'exists:employees,id'],
+    //         'notes' => ['nullable', 'string'],
+
+    //         // LOT yang dipakai (sudah di-hidden dari _form multi-LOT)
+    //         'selected_lots' => ['required', 'array', 'min:1'],
+    //         'selected_lots.*' => ['integer', 'exists:lots,id'],
+
+    //         // Bundles
+    //         'bundles' => ['required', 'array', 'min:1'],
+    //         'bundles.*.id' => ['nullable', 'integer'],
+    //         'bundles.*.bundle_no' => ['nullable', 'integer'],
+    //         'bundles.*.finished_item_id' => ['required', 'exists:items,id'],
+    //         'bundles.*.item_category_id' => ['nullable', 'integer', 'exists:item_categories,id'],
+    //         'bundles.*.qty_pcs' => ['required', 'numeric', 'min:0.01'],
+    //         'bundles.*.qty_used_fabric' => ['nullable', 'numeric', 'min:0'],
+    //         'bundles.*.notes' => ['nullable', 'string'],
+    //     ], [
+    //         'fabric_item_id.required' => 'Item kain wajib dipilih.',
+    //         'operator_id.required' => 'Operator cutting wajib dipilih.',
+    //         'selected_lots.required' => 'Minimal satu LOT harus dipilih.',
+    //         'bundles.*.finished_item_id.required' => 'Item jadi pada setiap baris wajib diisi.',
+    //         'bundles.*.qty_pcs.required' => 'Qty pcs pada setiap baris wajib diisi.',
+    //     ]);
+
+    //     // ================
+    //     // 1) LOT TERPILIH
+    //     // ================
+    //     $selectedLotIds = collect($validated['selected_lots'] ?? [])
+    //         ->map(fn($id) => (int) $id)
+    //         ->values()
+    //         ->all();
+
+    //     if (empty($selectedLotIds)) {
+    //         return back()
+    //             ->withErrors(['selected_lots' => 'Minimal satu LOT harus dipilih.'])
+    //             ->withInput();
+    //     }
+
+    //     $warehouseId = (int) $validated['warehouse_id'];
+    //     $fabricItemId = (int) $validated['fabric_item_id'];
+
+    //     // ==========================================
+    //     // 2) HITUNG SALDO PER LOT + TOTAL SALDO
+    //     // ==========================================
+    //     $lotBalances = [];
+    //     $totalLotBalance = 0.0;
+
+    //     foreach ($selectedLotIds as $lotId) {
+    //         // pakai InventoryService supaya ngikut semua mutasi (GRN, cutting, dsb)
+    //         $saldo = (float) $this->inventory->getLotBalance(
+    //             warehouseId: $warehouseId,
+    //             itemId: $fabricItemId,
+    //             lotId: $lotId,
+    //         );
+
+    //         // jaga-jaga kalau minus → anggap 0
+    //         if ($saldo < 0) {
+    //             $saldo = 0.0;
+    //         }
+
+    //         $lotBalances[$lotId] = $saldo;
+    //         $totalLotBalance += $saldo;
+    //     }
+
+    //     if ($totalLotBalance <= 0.000001) {
+    //         return back()
+    //             ->withErrors(['selected_lots' => 'Saldo kain di LOT yang dipilih sudah habis / 0.'])
+    //             ->withInput();
+    //     }
+
+    //     // LOT utama (untuk header) → pilih LOT pertama yang masih ada saldo, kalau nggak ada ya pakai index 0
+    //     $primaryLotId = collect($selectedLotIds)
+    //         ->first(fn($id) => ($lotBalances[$id] ?? 0) > 0) ?? $selectedLotIds[0];
+
+    //     // =========================
+    //     // 3) FILTER BUNDLE VALID
+    //     // =========================
+    //     $bundles = $validated['bundles'] ?? [];
+    //     $validBundles = [];
+
+    //     foreach ($bundles as $row) {
+    //         $qty = (float) ($row['qty_pcs'] ?? 0);
+
+    //         if (!empty($row['finished_item_id']) && $qty > 0) {
+    //             // Versi "medium" dulu:
+    //             // - semua bundle diarahkan ke LOT utama (supaya compatible dengan sistem sekarang)
+    //             // - nanti kalau mau advanced multi-LOT per bundle, tinggal ganti di sini
+    //             $row['lot_id'] = $primaryLotId;
+
+    //             $validBundles[] = $row;
+    //         }
+    //     }
+
+    //     if (count($validBundles) === 0) {
+    //         return back()
+    //             ->withErrors(['bundles' => 'Minimal 1 baris bundle harus diisi dengan item & qty pcs > 0.'])
+    //             ->withInput();
+    //     }
+
+    //     // =========================
+    //     // 4) HEADER lot_id & qty_used_fabric
+    //     // =========================
+
+    //     // Kalau header lot_id kosong → pakai LOT utama
+    //     if (empty($validated['lot_id']) && $primaryLotId) {
+    //         $validated['lot_id'] = $primaryLotId;
+    //     }
+
+    //     // Hitung qty_used_fabric per baris (estimasi, TOTAL kain dibagi jumlah bundle valid)
+    //     $countValid = count($validBundles);
+    //     $perRow = ($countValid > 0 && $totalLotBalance > 0)
+    //     ? round($totalLotBalance / $countValid, 2)
+    //     : 0.0;
+
+    //     foreach ($validBundles as $i => $row) {
+    //         $qty = (float) ($row['qty_pcs'] ?? 0);
+
+    //         if (!empty($row['finished_item_id']) && $qty > 0 && $perRow > 0) {
+    //             $validBundles[$i]['qty_used_fabric'] = $perRow;
+    //         } else {
+    //             $validBundles[$i]['qty_used_fabric'] = 0;
+    //         }
+    //     }
+
+    //     $validated['bundles'] = $validBundles;
+
+    //     // selected_lots tidak dipakai di CuttingService
+    //     unset($validated['selected_lots']);
+
+    //     // =========================
+    //     // 5) CREATE JOB
+    //     // =========================
+    //     $job = $this->cutting->create($validated);
+
+    //     // =========================
+    //     // 6) SIMPAN PIVOT LOTS
+    //     // =========================
+    //     foreach ($selectedLotIds as $lotId) {
+    //         $saldoLot = $lotBalances[$lotId] ?? 0.0;
+
+    //         // kalau saldo 0, skip saja
+    //         if ($saldoLot <= 0.000001) {
+    //             continue;
+    //         }
+
+    //         CuttingJobLot::create([
+    //             'cutting_job_id' => $job->id,
+    //             'lot_id' => $lotId,
+    //             // 🔥 sekarang planned_fabric_qty = SALDO REAL per LOT,
+    //             // bukan rata-rata / dibagi sama rata.
+    //             'planned_fabric_qty' => $saldoLot,
+    //         ]);
+    //     }
+
+    //     return redirect()
+    //         ->route('production.cutting_jobs.show', $job)
+    //         ->with('success', 'Cutting job berhasil dibuat.');
+    // }
+
     public function store(Request $request)
     {
         $validated = $request->validate([
@@ -190,7 +356,7 @@ class CuttingJobController extends Controller
             'operator_id' => ['required', 'exists:employees,id'],
             'notes' => ['nullable', 'string'],
 
-            // LOT yang dipakai (sudah di-hidden dari _form multi-LOT)
+            // LOT yang dipakai (hasil centang di kartu LOT)
             'selected_lots' => ['required', 'array', 'min:1'],
             'selected_lots.*' => ['integer', 'exists:lots,id'],
 
@@ -198,6 +364,8 @@ class CuttingJobController extends Controller
             'bundles' => ['required', 'array', 'min:1'],
             'bundles.*.id' => ['nullable', 'integer'],
             'bundles.*.bundle_no' => ['nullable', 'integer'],
+            // ⬇️ sekarang bundle WAJIB punya lot_id
+            'bundles.*.lot_id' => ['required', 'integer', 'exists:lots,id'],
             'bundles.*.finished_item_id' => ['required', 'exists:items,id'],
             'bundles.*.item_category_id' => ['nullable', 'integer', 'exists:item_categories,id'],
             'bundles.*.qty_pcs' => ['required', 'numeric', 'min:0.01'],
@@ -209,6 +377,7 @@ class CuttingJobController extends Controller
             'selected_lots.required' => 'Minimal satu LOT harus dipilih.',
             'bundles.*.finished_item_id.required' => 'Item jadi pada setiap baris wajib diisi.',
             'bundles.*.qty_pcs.required' => 'Qty pcs pada setiap baris wajib diisi.',
+            'bundles.*.lot_id.required' => 'LOT pada setiap baris bundle wajib dipilih.',
         ]);
 
         // ================
@@ -216,6 +385,7 @@ class CuttingJobController extends Controller
         // ================
         $selectedLotIds = collect($validated['selected_lots'] ?? [])
             ->map(fn($id) => (int) $id)
+            ->unique()
             ->values()
             ->all();
 
@@ -228,6 +398,30 @@ class CuttingJobController extends Controller
         $warehouseId = (int) $validated['warehouse_id'];
         $fabricItemId = (int) $validated['fabric_item_id'];
 
+        // ====================================================
+        // 1.a SAFETY: semua LOT harus item kain yang sama
+        //      dan harus sama dengan fabric_item_id
+        // ====================================================
+        $lotItems = \App\Models\Lot::query()
+            ->whereIn('id', $selectedLotIds)
+            ->pluck('item_id', 'id'); // [lot_id => item_id]
+
+        if ($lotItems->isEmpty()) {
+            return back()
+                ->withErrors(['selected_lots' => 'Data LOT tidak ditemukan.'])
+                ->withInput();
+        }
+
+        $uniqueItemIds = $lotItems->unique()->values();
+
+        if ($uniqueItemIds->count() !== 1 || (int) $uniqueItemIds->first() !== $fabricItemId) {
+            return back()
+                ->withErrors([
+                    'selected_lots' => 'Semua LOT yang dipilih harus untuk item kain yang sama dengan Item Kain header.',
+                ])
+                ->withInput();
+        }
+
         // ==========================================
         // 2) HITUNG SALDO PER LOT + TOTAL SALDO
         // ==========================================
@@ -235,14 +429,13 @@ class CuttingJobController extends Controller
         $totalLotBalance = 0.0;
 
         foreach ($selectedLotIds as $lotId) {
-            // pakai InventoryService supaya ngikut semua mutasi (GRN, cutting, dsb)
+            // pakai InventoryService supaya ngikut semua mutasi
             $saldo = (float) $this->inventory->getLotBalance(
                 warehouseId: $warehouseId,
                 itemId: $fabricItemId,
                 lotId: $lotId,
             );
 
-            // jaga-jaga kalau minus → anggap 0
             if ($saldo < 0) {
                 $saldo = 0.0;
             }
@@ -257,7 +450,7 @@ class CuttingJobController extends Controller
                 ->withInput();
         }
 
-        // LOT utama (untuk header) → pilih LOT pertama yang masih ada saldo, kalau nggak ada ya pakai index 0
+        // LOT utama (untuk header) → ambil LOT pertama yang punya saldo > 0
         $primaryLotId = collect($selectedLotIds)
             ->first(fn($id) => ($lotBalances[$id] ?? 0) > 0) ?? $selectedLotIds[0];
 
@@ -266,48 +459,73 @@ class CuttingJobController extends Controller
         // =========================
         $bundles = $validated['bundles'] ?? [];
         $validBundles = [];
+        $bundlesIndexByLot = []; // [lot_id => [index2, index7, ...]]
 
         foreach ($bundles as $row) {
             $qty = (float) ($row['qty_pcs'] ?? 0);
+            $lotId = !empty($row['lot_id']) ? (int) $row['lot_id'] : 0;
 
-            if (!empty($row['finished_item_id']) && $qty > 0) {
-                // Versi "medium" dulu:
-                // - semua bundle diarahkan ke LOT utama (supaya compatible dengan sistem sekarang)
-                // - nanti kalau mau advanced multi-LOT per bundle, tinggal ganti di sini
-                $row['lot_id'] = $primaryLotId;
-
-                $validBundles[] = $row;
+            if (empty($row['finished_item_id']) || $qty <= 0 || !$lotId) {
+                continue;
             }
+
+            // pastikan lot_id bundle termasuk LOT yang dipilih di kartu atas
+            if (!in_array($lotId, $selectedLotIds, true)) {
+                return back()
+                    ->withErrors(['bundles' => 'LOT pada baris bundle harus termasuk LOT yang dipilih di atas.'])
+                    ->withInput();
+            }
+
+            $idx = count($validBundles);
+            $validBundles[] = $row;
+            $bundlesIndexByLot[$lotId] = $bundlesIndexByLot[$lotId] ?? [];
+            $bundlesIndexByLot[$lotId][] = $idx;
         }
 
         if (count($validBundles) === 0) {
             return back()
-                ->withErrors(['bundles' => 'Minimal 1 baris bundle harus diisi dengan item & qty pcs > 0.'])
+                ->withErrors(['bundles' => 'Minimal 1 baris bundle harus diisi dengan item, LOT & qty pcs > 0.'])
                 ->withInput();
         }
 
         // =========================
-        // 4) HEADER lot_id & qty_used_fabric
+        // 4) HEADER lot_id
         // =========================
-
-        // Kalau header lot_id kosong → pakai LOT utama
         if (empty($validated['lot_id']) && $primaryLotId) {
             $validated['lot_id'] = $primaryLotId;
         }
 
-        // Hitung qty_used_fabric per baris (estimasi, TOTAL kain dibagi jumlah bundle valid)
-        $countValid = count($validBundles);
-        $perRow = ($countValid > 0 && $totalLotBalance > 0)
-        ? round($totalLotBalance / $countValid, 2)
-        : 0.0;
+        // =======================================================
+        // 5) HITUNG qty_used_fabric PER LOT (BUKAN GLOBAL)
+        //    + Rounding halus: baris terakhir ambil sisa
+        // =======================================================
+        foreach ($bundlesIndexByLot as $lotId => $indexes) {
+            $saldoLot = $lotBalances[$lotId] ?? 0.0;
 
-        foreach ($validBundles as $i => $row) {
-            $qty = (float) ($row['qty_pcs'] ?? 0);
+            if ($saldoLot <= 0.000001) {
+                return back()
+                    ->withErrors(['bundles' => "Saldo kain untuk LOT {$lotId} sudah habis / 0."])
+                    ->withInput();
+            }
 
-            if (!empty($row['finished_item_id']) && $qty > 0 && $perRow > 0) {
-                $validBundles[$i]['qty_used_fabric'] = $perRow;
-            } else {
-                $validBundles[$i]['qty_used_fabric'] = 0;
+            $countInLot = count($indexes);
+            if ($countInLot <= 0) {
+                continue;
+            }
+
+            // bagi rata per baris (dibulatkan), tapi jaga total supaya = saldoLot
+            $perRow = round($saldoLot / $countInLot, 2);
+            $usedSoFar = 0.0;
+
+            foreach ($indexes as $i => $idx) {
+                if ($i === $countInLot - 1) {
+                    // baris terakhir: ambil sisa supaya total pas = saldoLot
+                    $remaining = $saldoLot - $usedSoFar;
+                    $validBundles[$idx]['qty_used_fabric'] = max($remaining, 0);
+                } else {
+                    $validBundles[$idx]['qty_used_fabric'] = $perRow;
+                    $usedSoFar += $perRow;
+                }
             }
         }
 
@@ -317,26 +535,24 @@ class CuttingJobController extends Controller
         unset($validated['selected_lots']);
 
         // =========================
-        // 5) CREATE JOB
+        // 6) CREATE JOB
         // =========================
         $job = $this->cutting->create($validated);
 
         // =========================
-        // 6) SIMPAN PIVOT LOTS
+        // 7) SIMPAN PIVOT LOTS
         // =========================
         foreach ($selectedLotIds as $lotId) {
             $saldoLot = $lotBalances[$lotId] ?? 0.0;
 
-            // kalau saldo 0, skip saja
             if ($saldoLot <= 0.000001) {
                 continue;
             }
 
-            CuttingJobLot::create([
+            \App\Models\CuttingJobLot::create([
                 'cutting_job_id' => $job->id,
                 'lot_id' => $lotId,
-                // 🔥 sekarang planned_fabric_qty = SALDO REAL per LOT,
-                // bukan rata-rata / dibagi sama rata.
+                // planned_fabric_qty = saldo real per LOT
                 'planned_fabric_qty' => $saldoLot,
             ]);
         }

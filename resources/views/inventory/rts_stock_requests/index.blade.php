@@ -308,7 +308,13 @@
             HEADER
         ======================== --}}
         <div class="header-row">
-            <h1 class="title">Permintaan Replenish RTS</h1>
+            <div>
+                <h1 class="title">Permintaan Replenish RTS</h1>
+                <div class="subtitle">
+                    Setelah penerimaan dikonfirmasi, dokumen langsung selesai (completed) dan permintaan baru akan memakai
+                    nomor baru.
+                </div>
+            </div>
 
             <div class="header-actions">
                 <a href="{{ route('rts.stock-requests.today') }}" class="btn btn-primary">
@@ -319,6 +325,7 @@
                 </a>
             </div>
         </div>
+
 
         {{-- =======================
             STATS (ringkas)

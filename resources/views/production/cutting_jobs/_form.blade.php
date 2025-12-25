@@ -16,14 +16,44 @@
 
 @push('head')
     <style>
-        /* Biar dropdown item-suggest bisa "keluar" dari tabel/card tanpa kepotong */
         .cutting-card {
-            overflow: visible;
+            border-radius: 14px;
+            border: 1px solid rgba(148, 163, 184, 0.45);
+            background: var(--card);
+            margin-bottom: .75rem;
+        }
+
+        .cutting-card-header {
+            padding: .55rem .75rem .45rem;
+            border-bottom: 1px solid rgba(148, 163, 184, 0.35);
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            gap: .5rem;
+        }
+
+        .cutting-card-header h5 {
+            font-size: .9rem;
+            margin: 0;
         }
 
         .cutting-card-body {
+            padding: .6rem .75rem .6rem;
             overflow: visible;
             position: relative;
+        }
+
+        .badge-soft {
+            font-size: .7rem;
+            border-radius: 999px;
+            padding: .08rem .5rem;
+            border: 1px solid rgba(148, 163, 184, 0.6);
+            background: rgba(148, 163, 184, 0.14);
+        }
+
+        .mono {
+            font-variant-numeric: tabular-nums;
+            font-family: ui-monospace, SFMono-Regular, Menlo, Consolas, "Liberation Mono";
         }
 
         .bundles-table-wrap {
@@ -31,15 +61,51 @@
             position: relative;
         }
 
-        /* Tambah ruang di bawah table supaya dropdown tidak nempel tombol */
-        .cutting-card .bundles-table-wrap {
-            padding-bottom: .5rem;
-        }
-
-        /* Pastikan baris bundle tidak memaksa clipping */
         .bundles-table {
             border-collapse: separate;
             border-spacing: 0;
+        }
+
+        .bundle-notes-cell {
+            min-width: 140px;
+        }
+
+        .lot-summary-list {
+            list-style: none;
+            padding-left: 0;
+            margin-bottom: 0;
+        }
+
+        .lot-summary-list li {
+            display: flex;
+            justify-content: space-between;
+            align-items: baseline;
+            gap: .5rem;
+            font-size: .8rem;
+            padding: .1rem 0;
+        }
+
+        .lot-summary-list li span:first-child {
+            color: var(--muted);
+        }
+
+        .lot-summary-list li span:last-child {
+            font-weight: 600;
+        }
+
+        .cutting-actions {
+            gap: .5rem;
+        }
+
+        @media (max-width: 767.98px) {
+            .cutting-actions {
+                flex-direction: column-reverse;
+                align-items: stretch;
+            }
+
+            .cutting-actions .btn-primary {
+                width: 100%;
+            }
         }
     </style>
 @endpush
@@ -47,15 +113,24 @@
 <form action="{{ route('production.cutting_jobs.store') }}" method="POST" id="cutting-form">
     @csrf
 
-    {{-- dipakai untuk auto hitung kain pakai di backend --}}
+    {{-- dipakai untuk ringkasan / estimasi --}}
     <input type="hidden" name="lot_balance" id="lot_balance" value="{{ old('lot_balance', 0) }}">
 
-    {{-- CARD: PILIH KAIN & LOT (selalu tampil duluan) --}}
+    {{-- Item kain (auto dari LOT terpilih, diset via JS) --}}
+    <select name="fabric_item_id" id="fabric_item_id" class="d-none">
+        <option value="">- Pilih Item Kain -</option>
+        @foreach ($fabricItems as $item)
+            <option value="{{ $item->id }}" @selected(old('fabric_item_id') == $item->id)>
+                {{ $item->code }} — {{ $item->name }}
+            </option>
+        @endforeach
+    </select>
+
+    {{-- STEP 1: PILIH KAIN & LOT --}}
     @include('production.cutting_jobs._pick_lot')
 
-    {{-- KONTEN UTAMA: baru muncul setelah LOT disimpan --}}
+    {{-- STEP 2: KONTEN UTAMA (muncul setelah LOT disimpan) --}}
     <div id="cutting-main-content" class="cutting-main-content d-none">
-
         {{-- RINGKASAN LOT TERPILIH + TOMBOL UBAH LOT --}}
         <div class="cutting-card mb-2">
             <div class="cutting-card-body d-flex justify-content-between align-items-center flex-wrap gap-2">
@@ -93,7 +168,7 @@
             <div class="cutting-card-header">
                 <h5>Bundles</h5>
                 <span class="badge-soft">
-                    Step 2: Input baris bundles (LOT & kain pakai auto)
+                    Step 2: Input baris bundles (pilih LOT & item jadi per baris)
                 </span>
             </div>
             <div class="cutting-card-body">
@@ -103,14 +178,14 @@
                             <tr>
                                 <th style="width: 40px;">#</th>
                                 <th style="min-width: 120px;" class="bundle-lot-col">LOT</th>
-                                <th style="min-width: 120px;">Item Jadi</th>
+                                <th style="min-width: 140px;">Item Jadi</th>
                                 <th style="min-width: 90px;" class="text-end">Qty (pcs)</th>
                                 <th style="min-width: 150px;" class="bundle-notes-header">Catatan</th>
                                 <th style="width: 40px;"></th>
                             </tr>
                         </thead>
                         <tbody id="bundle-rows">
-                            {{-- Baris awal (1 row default) akan di-generate oleh JS --}}
+                            {{-- Baris awal digenerate via JS --}}
                         </tbody>
                         <tfoot>
                             <tr>
@@ -130,7 +205,7 @@
                     <tr class="bundle-row">
                         <td class="bundle-index mono">1</td>
                         <td class="bundle-lot-col">
-                            {{-- LOT di-auto oleh JS, user tidak perlu pilih manual --}}
+                            {{-- LOT dipilih per baris, wajib diisi --}}
                             <select class="form-select form-select-sm bundle-lot-select"
                                 name="bundles[__INDEX__][lot_id]">
                                 {{-- options diisi via JS berdasarkan LOT tercentang --}}
@@ -138,8 +213,8 @@
                         </td>
                         <td>
                             {{-- ITEM JADI pakai component item-suggest (idName wajib) --}}
-                            <x-item-suggest idName="bundles[__INDEX__][finished_item_id]" placeholder="- Input Item  -"
-                                type="finished_good" :extraParams="['lot_id' => null]" />
+                            <x-item-suggest idName="bundles[__INDEX__][finished_item_id]"
+                                placeholder="- Input Item Jadi -" type="finished_good" :extraParams="['lot_id' => null]" />
                         </td>
                         <td>
                             <x-number-input name="bundles[__INDEX__][qty_pcs]" step="0.01" min="0"
@@ -217,11 +292,14 @@
             const currentLotBalance = document.getElementById('current-lot-balance');
             const btnChangeLots = document.getElementById('btn-change-lots');
 
+            // hidden select untuk item kain (diset dari LOT)
+            const fabricSelect = document.getElementById('fabric_item_id');
+
             function isMobile() {
                 return window.matchMedia('(max-width: 767.98px)').matches;
             }
 
-            // map lot_id -> info
+            // map lot_id -> info (termasuk itemId biar bisa kunci 1 item kain)
             const lotInfoMap = {};
             lotRows.forEach(tr => {
                 const lotId = parseInt(tr.dataset.lotId, 10);
@@ -245,6 +323,17 @@
                     if (cb.checked) ids.push(parseInt(cb.value, 10));
                 });
                 return ids;
+            }
+
+            function getCheckedLotsWithInfo() {
+                const infos = [];
+                lotCheckboxes.forEach(cb => {
+                    if (!cb.checked) return;
+                    const lotId = parseInt(cb.value, 10);
+                    const info = lotInfoMap[lotId];
+                    if (info) infos.push(info);
+                });
+                return infos;
             }
 
             function showMainContent() {
@@ -297,7 +386,7 @@
                 lotBalanceInput.value = total.toFixed(2);
             }
 
-            // 🔧 helper: update data-extra-params (lot_id) untuk item-suggest di baris tertentu
+            // helper: update data-extra-params (lot_id) untuk item-suggest di baris tertentu
             function updateRowItemSuggestExtraParams(tr) {
                 if (!tr) return;
                 const select = tr.querySelector('.bundle-lot-select');
@@ -316,17 +405,24 @@
                 wrap.dataset.extraParams = JSON.stringify(extraParams);
             }
 
+            // ⚙️ REBUILD LOT OPTIONS PER ROW, AUTO ROUND-ROBIN
             function rebuildLotOptionsForAllRows() {
                 const checkedLotIds = getCheckedLots();
-                const selects = bundlesTbody.querySelectorAll('.bundle-lot-select');
+                const rows = Array.from(bundlesTbody.querySelectorAll('.bundle-row'));
 
-                selects.forEach(select => {
-                    const currentVal = parseInt(select.value || '0', 10);
+                rows.forEach((tr, rowIndex) => {
+                    const select = tr.querySelector('.bundle-lot-select');
+                    if (!select) return;
+
+                    const prevVal = select.value ? parseInt(select.value, 10) : null;
+
+                    // clear options
                     while (select.firstChild) select.removeChild(select.firstChild);
 
                     const optPlaceholder = document.createElement('option');
                     optPlaceholder.value = '';
-                    optPlaceholder.textContent = checkedLotIds.length ? '- LOT auto -' :
+                    optPlaceholder.textContent = checkedLotIds.length ?
+                        '- Pilih LOT -' :
                         'Tidak ada LOT terpilih';
                     select.appendChild(optPlaceholder);
 
@@ -339,14 +435,18 @@
                         select.appendChild(opt);
                     });
 
-                    if (checkedLotIds.length > 0 && !currentVal) {
-                        select.value = checkedLotIds[0];
-                    } else if (currentVal && checkedLotIds.includes(currentVal)) {
-                        select.value = currentVal;
+                    if (prevVal && checkedLotIds.includes(prevVal)) {
+                        // kalau sebelumnya sudah ada dan masih valid, pakai yang lama
+                        select.value = String(prevVal);
+                    } else if (checkedLotIds.length > 0) {
+                        // AUTO: bagi rata LOT berdasarkan index baris
+                        const chosenLotId = checkedLotIds[rowIndex % checkedLotIds.length];
+                        select.value = String(chosenLotId);
+                    } else {
+                        select.value = '';
                     }
 
-                    const row = select.closest('.bundle-row');
-                    updateRowItemSuggestExtraParams(row);
+                    updateRowItemSuggestExtraParams(tr);
                 });
             }
 
@@ -449,9 +549,22 @@
                 const balance = parseFloat(lotBalanceInput.value || '0');
 
                 if (currentFabricLabel) {
-                    currentFabricLabel.textContent =
-                        lotCount > 0 ? 'Mengikuti LOT terpilih' : '-';
+                    let fabricText = '-';
+
+                    if (fabricSelect && fabricSelect.value) {
+                        const opt = fabricSelect.options[fabricSelect.selectedIndex];
+                        if (opt && opt.text) {
+                            fabricText = opt.text.trim();
+                        } else if (lotCount > 0) {
+                            fabricText = 'Mengikuti LOT terpilih';
+                        }
+                    } else if (lotCount > 0) {
+                        fabricText = 'Mengikuti LOT terpilih';
+                    }
+
+                    currentFabricLabel.textContent = fabricText;
                 }
+
                 if (currentLotCount) currentLotCount.textContent = `${lotCount} LOT`;
                 if (currentLotBalance) currentLotBalance.textContent = balance.toFixed(2);
             }
@@ -464,6 +577,74 @@
                         block: 'center'
                     });
                 }, 80);
+            }
+
+            // 🔒 Pastikan semua LOT terpilih punya item kain yang sama
+            function enforceSingleFabricForCheckedLots(changedCb = null) {
+                const infos = getCheckedLotsWithInfo();
+
+                if (infos.length === 0) {
+                    if (fabricSelect) {
+                        fabricSelect.value = '';
+                    }
+                    updateCurrentLotSummary();
+                    return true;
+                }
+
+                const firstItemId = infos[0].itemId || 0;
+                if (!firstItemId) {
+                    return true;
+                }
+
+                let hasConflict = false;
+                infos.forEach(info => {
+                    if ((info.itemId || 0) !== firstItemId) {
+                        hasConflict = true;
+                    }
+                });
+
+                if (hasConflict) {
+                    if (changedCb) {
+                        changedCb.checked = false;
+                    } else {
+                        lotCheckboxes.forEach(cb => {
+                            const lotId = parseInt(cb.value, 10);
+                            const info = lotInfoMap[lotId];
+                            if (!info) return;
+                            if ((info.itemId || 0) !== firstItemId) {
+                                cb.checked = false;
+                            }
+                        });
+                    }
+
+                    alert('Semua LOT yang dipilih harus dari item kain yang sama.');
+                    recalcLotBalanceFromCheckedLots();
+                    recalcLotSummary();
+                    updateCurrentLotSummary();
+                    return false;
+                }
+
+                // Set fabric_item_id dari itemId LOT pertama
+                if (fabricSelect) {
+                    let foundOption = false;
+                    Array.from(fabricSelect.options).forEach(opt => {
+                        if (parseInt(opt.value || '0', 10) === firstItemId) {
+                            fabricSelect.value = opt.value;
+                            foundOption = true;
+                        }
+                    });
+
+                    if (!foundOption) {
+                        const opt = document.createElement('option');
+                        opt.value = firstItemId;
+                        opt.textContent = infos[0].code ? `${infos[0].code} (auto)` : `Item #${firstItemId}`;
+                        opt.selected = true;
+                        fabricSelect.appendChild(opt);
+                    }
+                }
+
+                updateCurrentLotSummary();
+                return true;
             }
 
             function createBundleRow(autoFocusItem = false) {
@@ -506,6 +687,7 @@
                         tr.remove();
                         updateBundleRowIndices();
                         recalcLotSummary();
+                        rebuildLotOptionsForAllRows();
                     });
                 }
 
@@ -515,7 +697,6 @@
                     window.initItemSuggestInputs(tr);
                 }
 
-                // scroll behavior saat input item difokus
                 const itemCell = tr.querySelector('td:nth-child(3)');
                 const itemInput = itemCell ? itemCell.querySelector('input[type="text"]') : null;
                 if (itemInput) {
@@ -539,35 +720,53 @@
                 }
             }
 
+            // =======================
+            // EVENT: pilih LOT
+            // =======================
             lotCheckboxes.forEach(cb => {
                 cb.addEventListener('change', () => {
                     if (lotsLocked) return;
+
+                    const ok = enforceSingleFabricForCheckedLots(cb);
+                    if (!ok) return;
+
                     recalcLotBalanceFromCheckedLots();
+                    rebuildLotOptionsForAllRows();
                     recalcLotSummary();
                 });
             });
 
             btnSelectAllLots?.addEventListener('click', () => {
                 if (lotsLocked) return;
+
                 lotCheckboxes.forEach(cb => {
                     if (!cb.closest('.lot-row')?.classList.contains('lot-hidden')) {
                         cb.checked = true;
                     }
                 });
+
+                enforceSingleFabricForCheckedLots();
                 recalcLotBalanceFromCheckedLots();
+                rebuildLotOptionsForAllRows();
                 recalcLotSummary();
             });
 
             btnUnselectAllLots?.addEventListener('click', () => {
                 if (lotsLocked) return;
+
                 lotCheckboxes.forEach(cb => cb.checked = false);
                 recalcLotBalanceFromCheckedLots();
                 recalcLotSummary();
+                if (fabricSelect) {
+                    fabricSelect.value = '';
+                }
+                updateCurrentLotSummary();
+                rebuildLotOptionsForAllRows();
             });
 
             btnConfirmLots?.addEventListener('click', () => {
                 if (lotsLocked) {
-                    // kalau sudah pernah lock (user balik dari "Ubah LOT")
+                    // user habis klik "Ubah LOT" lalu balik lagi
                     showMainContent();
                     return;
                 }
@@ -577,6 +776,9 @@
                     alert('Pilih minimal satu LOT terlebih dahulu.');
                     return;
                 }
+
+                const ok = enforceSingleFabricForCheckedLots();
+                if (!ok) return;
 
                 recalcLotBalanceFromCheckedLots();
                 rebuildLotOptionsForAllRows();
@@ -595,8 +797,9 @@
                 createBundleRow(true);
             });
 
-            // init awal
+            // INIT
             recalcLotBalanceFromCheckedLots();
+            updateCurrentLotSummary();
             createBundleRow(false);
         });
     </script>

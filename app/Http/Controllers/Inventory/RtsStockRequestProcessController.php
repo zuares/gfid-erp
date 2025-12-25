@@ -22,7 +22,31 @@ class RtsStockRequestProcessController extends Controller
 
     public function index(Request $request): View
     {
-        $statusFilter = $request->input('status', 'all');
+        $user = auth()->user();
+        $role = $user?->role;
+        $isOperating = $role === 'operating';
+
+        // =========================
+        // STATUS FILTER (ROLE AWARE)
+        // =========================
+        $rawStatus = $request->input('status');
+
+        if ($isOperating) {
+            // Untuk operating: default = submitted (Menunggu)
+            $statusFilter = $rawStatus ?: 'submitted';
+
+            // Batasi hanya ke status yang dipakai di UI operating
+            if (!in_array($statusFilter, ['submitted', 'shipped', 'partial', 'completed'], true)) {
+                $statusFilter = 'submitted';
+            }
+        } else {
+            // Role lain: default = all (seperti sebelumnya)
+            $statusFilter = $rawStatus ?: 'all';
+        }
+
+        // =========================
+        // PERIOD FILTER
+        // =========================
         $period = $request->input('period', 'today');
 
         $dateFrom = null;
@@ -57,12 +81,15 @@ class RtsStockRequestProcessController extends Controller
             return $query;
         };
 
+        // =========================
+        // BASE QUERY + STATS BASE
+        // =========================
         $baseQuery = StockRequest::rtsReplenish()
             ->with(['destinationWarehouse', 'sourceWarehouse'])
             ->withSum('lines as total_requested_qty', 'qty_request')
             ->withSum('lines as total_dispatched_qty', 'qty_dispatched')
             ->withSum('lines as total_received_qty', 'qty_received')
-            ->withSum('lines as total_picked_qty', 'qty_picked'); // boleh tetap ditampilkan, tapi PRD outstanding tidak pakai picked
+            ->withSum('lines as total_picked_qty', 'qty_picked'); // PRD outstanding tidak pakai picked
 
         $baseQuery = $applyDateFilter($baseQuery);
 
@@ -79,7 +106,7 @@ class RtsStockRequestProcessController extends Controller
         $stats['pending'] = $stats['submitted'] + $stats['shipped'] + $stats['partial'];
 
         /**
-         * ✅ FINAL (sesuai jawaban kamu #10 = C)
+         * ✅ FINAL
          * Outstanding PRD = requested - dispatched - received
          * - dispatched: PRD -> TRANSIT
          * - received: TRANSIT -> RTS (barang benar-benar sudah sampai)
@@ -97,6 +124,9 @@ class RtsStockRequestProcessController extends Controller
                 return max($reqQty - $dispQty - $recvQty, 0);
             });
 
+        // =========================
+        // LIST QUERY (PAKAI STATUS)
+        // =========================
         $listQuery = clone $baseQuery;
 
         switch ($statusFilter) {
@@ -111,7 +141,11 @@ class RtsStockRequestProcessController extends Controller
                 break;
             case 'all':
             default:
-                $statusFilter = 'all';
+                // Untuk operating tidak akan pernah masuk ke 'all' karena sudah dibatasi di atas
+                $statusFilter = $isOperating ? 'submitted' : 'all';
+                if ($isOperating) {
+                    $listQuery->where('status', 'submitted');
+                }
                 break;
         }
 

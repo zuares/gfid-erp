@@ -26,8 +26,23 @@ class RtsStockRequestController extends Controller
 
     public function index(Request $request): View
     {
-        $statusFilter = $request->input('status', 'all'); // submitted|shipped|partial|completed|pending|all
+        $user = $request->user();
+        $role = $user?->role;
+        $isOperating = $role === 'operating';
+
+        // Status filter:
+        // - Operating: default = submitted (Menunggu)
+        // - Non-operating: default = all
+        $statusFilter = $request->input('status', $isOperating ? 'submitted' : 'all'); // submitted|shipped|partial|completed|pending|all
         $period = $request->input('period', 'today'); // today|week|month|all
+
+        // Batasi status yang boleh dipakai oleh role operating
+        if ($isOperating) {
+            $allowedOperatingStatuses = ['submitted', 'shipped', 'completed'];
+            if (!in_array($statusFilter, $allowedOperatingStatuses, true)) {
+                $statusFilter = 'submitted';
+            }
+        }
 
         $dateFrom = null;
         $dateTo = null;
@@ -109,7 +124,11 @@ class RtsStockRequestController extends Controller
                 break;
             case 'all':
             default:
-                $statusFilter = 'all';
+                $statusFilter = $isOperating ? 'submitted' : 'all'; // jaga-jaga kalau masuk sini
+                if (!$isOperating) {
+                    // hanya non-operating yang boleh benar-benar lihat semua
+                    // operating sudah dibatasi di atas
+                }
                 break;
         }
 
@@ -391,6 +410,11 @@ class RtsStockRequestController extends Controller
     /**
      * RTS RECEIVE: TRANSIT → RTS
      * TRANSIT tidak boleh minus.
+     *
+     * ✅ NEW BEHAVIOR:
+     * - Kalau ada qty diterima (anyReceived = true) maka dokumen LANGSUNG completed.
+     * - Tidak peduli masih ada selisih antara request vs (received + picked),
+     *   dokumen dianggap selesai dan tidak akan dipakai lagi untuk append request.
      */
     public function finalize(Request $request, StockRequest $stockRequest): RedirectResponse
     {
@@ -450,34 +474,20 @@ class RtsStockRequestController extends Controller
             }
 
             if (!$anyReceived) {
+                // Tidak ada qty diisi → jangan ubah status apa pun
                 return;
             }
 
-            // refresh lines biar hitungan konsisten
-            $stockRequest->load('lines');
+            // =======================
+            // ✅ NEW: sekali RTS terima → dokumen ditutup (completed)
+            // =======================
+            $stockRequest->load('lines'); // kalau mau dicek/ dipakai logika lain
 
-            $anyOutstanding = $stockRequest->lines->contains(function ($l) {
-                $req = (float) $l->qty_request;
-                $rec = (float) $l->qty_received;
-                $pick = (float) $l->qty_picked;
-                return max($req - $rec - $pick, 0) > 0;
-            });
+            $stockRequest->status = 'completed';
 
-            $totalDispatched = (float) $stockRequest->lines->sum('qty_dispatched');
-            $totalFulfilled = (float) $stockRequest->lines->sum(fn($l) => (float) $l->qty_received + (float) $l->qty_picked);
-
-            if ($totalDispatched <= 0 && $totalFulfilled <= 0) {
-                $stockRequest->status = 'submitted';
-            } elseif ($totalFulfilled <= 0) {
-                $stockRequest->status = 'shipped';
-            } elseif ($anyOutstanding) {
-                $stockRequest->status = 'partial';
-            } else {
-                // ✅ completed hanya ketika barang benar-benar sudah sampai RTS (received+picked == request)
-                $stockRequest->status = 'completed';
-                $stockRequest->received_by_user_id = $stockRequest->received_by_user_id ?? Auth::id();
-                $stockRequest->received_at = $stockRequest->received_at ?? now();
-            }
+            // Isi siapa & kapan terima pertama kali
+            $stockRequest->received_by_user_id = $stockRequest->received_by_user_id ?? Auth::id();
+            $stockRequest->received_at = $stockRequest->received_at ?? now();
 
             $stockRequest->save();
         });
@@ -488,7 +498,7 @@ class RtsStockRequestController extends Controller
 
         return redirect()
             ->route('rts.stock-requests.show', $stockRequest)
-            ->with('status', 'Penerimaan RTS berhasil (TRANSIT → RTS).');
+            ->with('status', 'Penerimaan RTS berhasil. Dokumen ini sudah selesai (completed) dan permintaan baru akan memakai nomor baru.');
     }
 
     /**

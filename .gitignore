@@ -37,3 +37,9 @@ root-test.txt
 
 # Folder path hosting (kalau sempat ke-track)
 domains/
+
+# ignore all rollback backups
+storage/backups/before_rollback_*.sqlite
+
+# ignore dev snapshot database
+storage/backups/snapshot_dev.sqlite

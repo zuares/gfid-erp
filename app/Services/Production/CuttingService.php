@@ -272,8 +272,8 @@ class CuttingService
      */
     protected function consumeFabricFromLots(CuttingJob $job): void
     {
-        // Pastikan relasi bundles ke lot bisa diakses kalau dibutuhkan
-        $job->loadMissing(['bundles']);
+        // Pastikan relasi bundles + lots (cutting_job_lots) ke-load
+        $job->loadMissing(['bundles', 'lots']); // kalau relasinya beda, ganti 'lots' sesuai nama relasimu
 
         $fabricItemId = $job->fabric_item_id;
         $warehouseId = $job->warehouse_id;
@@ -283,7 +283,138 @@ class CuttingService
             return;
         }
 
-        // Group pemakaian kain per LOT
+        // ============================
+        // 1. TOTAL PEMAKAIAN DARI BUNDLES
+        // ============================
+        $totalUsed = 0.0;
+
+        foreach ($job->bundles as $bundle) {
+            /** @var CuttingJobBundle $bundle */
+            $qtyUsed = $this->num($bundle->qty_used_fabric ?? 0);
+            if ($qtyUsed > 0) {
+                $totalUsed += $qtyUsed;
+            }
+        }
+
+        if ($totalUsed <= 0) {
+            // tidak ada pemakaian kain yang valid
+            return;
+        }
+
+        // ============================
+        // 2. Coba pakai cutting_job_lots sebagai dasar distribusi
+        // ============================
+        $lotPlans = $job->lots; // relasi ke tabel cutting_job_lots (id, lot_id, planned_fabric_qty, used_fabric_qty, ...)
+
+        if ($lotPlans && $lotPlans->count() > 0) {
+            $totalPlanned = (float) $lotPlans->sum('planned_fabric_qty');
+
+            // Kalau tidak ada planned, bagi rata ke semua LOT
+            if ($totalPlanned <= 0) {
+                $perLot = $totalUsed / max(1, $lotPlans->count());
+                $perLot = $this->num($perLot);
+
+                $remaining = $totalUsed;
+                foreach ($lotPlans as $index => $plan) {
+                    /** @var \App\Models\CuttingJobLot $plan */
+                    $qtyOut = $perLot;
+
+                    // LOT terakhir dapat sisa supaya total pas
+                    if ($index === $lotPlans->count() - 1) {
+                        $qtyOut = $this->num($remaining);
+                    }
+
+                    if ($qtyOut <= 0) {
+                        $plan->used_fabric_qty = 0;
+                        $plan->save();
+                        continue;
+                    }
+
+                    $this->inventory->stockOut(
+                        warehouseId: $warehouseId,
+                        itemId: $fabricItemId,
+                        qty: $qtyOut,
+                        date: $job->date,
+                        sourceType: 'cutting_job',
+                        sourceId: $job->id,
+                        notes: "Pemakaian kain untuk Cutting {$job->code} (LOT {$plan->lot_id})",
+                        allowNegative: false,
+                        lotId: $plan->lot_id,
+                        unitCostOverride: null,
+                        affectLotCost: true, // tetap pakai LotCost (moving average per LOT)
+                    );
+
+                    $plan->used_fabric_qty = $qtyOut;
+                    $plan->save();
+
+                    $remaining -= $qtyOut;
+                    if ($remaining <= 0) {
+                        break;
+                    }
+                }
+
+                return;
+            }
+
+            // ============================
+            // 3. Distribusi proporsional terhadap planned_fabric_qty
+            // ============================
+            $remaining = $totalUsed;
+
+            foreach ($lotPlans as $index => $plan) {
+                /** @var \App\Models\CuttingJobLot $plan */
+                $planned = (float) $plan->planned_fabric_qty;
+
+                if ($planned <= 0) {
+                    $plan->used_fabric_qty = 0;
+                    $plan->save();
+                    continue;
+                }
+
+                // porsi ideal berdasarkan proporsi planned
+                $portion = ($planned / $totalPlanned) * $totalUsed;
+                $portion = $this->num($portion);
+
+                // LOT terakhir ambil semua sisa supaya pas
+                if ($index === $lotPlans->count() - 1) {
+                    $portion = $this->num($remaining);
+                }
+
+                if ($portion <= 0) {
+                    $plan->used_fabric_qty = 0;
+                    $plan->save();
+                    continue;
+                }
+
+                $this->inventory->stockOut(
+                    warehouseId: $warehouseId,
+                    itemId: $fabricItemId,
+                    qty: $portion,
+                    date: $job->date,
+                    sourceType: 'cutting_job',
+                    sourceId: $job->id,
+                    notes: "Pemakaian kain untuk Cutting {$job->code} (LOT {$plan->lot_id})",
+                    allowNegative: false,
+                    lotId: $plan->lot_id,
+                    unitCostOverride: null,
+                    affectLotCost: true,
+                );
+
+                $plan->used_fabric_qty = $portion;
+                $plan->save();
+
+                $remaining -= $portion;
+                if ($remaining <= 0) {
+                    break;
+                }
+            }
+
+            return;
+        }
+
+        // ============================
+        // 4. Fallback ke LOGIC LAMA (kalau belum pakai cutting_job_lots)
+        // ============================
         $byLot = [];
 
         foreach ($job->bundles as $bundle) {
@@ -306,7 +437,6 @@ class CuttingService
         }
 
         if (empty($byLot)) {
-            // tidak ada pemakaian kain yang valid
             return;
         }
 
@@ -314,10 +444,6 @@ class CuttingService
             if ($qtyUsedTotal <= 0) {
                 continue;
             }
-
-            // Opsional: bisa cek saldo dulu kalau mau ekstra safety
-            // $saldoLot = $this->inventory->getLotBalance($warehouseId, $fabricItemId, $lotId);
-            // if ($saldoLot < $qtyUsedTotal) { ... }
 
             $this->inventory->stockOut(
                 warehouseId: $warehouseId,
@@ -330,7 +456,7 @@ class CuttingService
                 allowNegative: false,
                 lotId: $lotId,
                 unitCostOverride: null,
-                affectLotCost: true, // pakai LotCost (moving average per LOT)
+                affectLotCost: true,
             );
         }
     }
