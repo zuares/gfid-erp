@@ -9,7 +9,7 @@
             max-width: 1150px;
             margin-inline: auto;
             padding: .75rem .75rem 3.5rem;
-            max-height: 100vh;
+            min-height: 100vh;
         }
 
         /* ========= GLOBAL BACKGROUND ========= */
@@ -143,140 +143,6 @@
             color: #0f766e;
         }
 
-        /* ========= BUTTONS ========= */
-        .btn-theme-main,
-        .btn-theme-outline {
-            border-radius: 999px;
-            font-size: .78rem;
-            letter-spacing: .06em;
-            text-transform: uppercase;
-            padding-inline: 1rem;
-            padding-block: .35rem;
-            border-width: 1px;
-        }
-
-        .btn-theme-main {
-            transition: background .12s ease, border-color .12s ease, color .12s ease, box-shadow .12s ease;
-        }
-
-        .btn-theme-outline {
-            background: transparent;
-            transition: background .12s ease, border-color .12s ease, color .12s ease;
-        }
-
-        .page-theme-default .btn-theme-main {
-            background: #2563eb;
-            border-color: #2563eb;
-            color: #eff6ff;
-            box-shadow: 0 6px 16px rgba(37, 99, 235, 0.30);
-        }
-
-        .page-theme-default .btn-theme-main:hover {
-            background: #1d4ed8;
-            border-color: #1d4ed8;
-        }
-
-        .page-theme-default .btn-theme-outline {
-            border-color: rgba(148, 163, 184, 0.7);
-            color: #4b5563;
-        }
-
-        .page-theme-default .btn-theme-outline:hover {
-            background: rgba(226, 232, 240, 0.7);
-        }
-
-        .page-theme-shopee .btn-theme-main {
-            background: #f97316;
-            border-color: #f97316;
-            color: #fff7ed;
-            box-shadow: 0 6px 16px rgba(248, 113, 113, 0.35);
-        }
-
-        .page-theme-shopee .btn-theme-main:hover {
-            background: #ea580c;
-            border-color: #ea580c;
-        }
-
-        .page-theme-shopee .btn-theme-outline {
-            border-color: rgba(248, 113, 113, 0.9);
-            color: #b91c1c;
-        }
-
-        .page-theme-shopee .btn-theme-outline:hover {
-            background: rgba(254, 226, 226, 0.9);
-        }
-
-        .page-theme-tiktok .btn-theme-main {
-            background: #0f766e;
-            border-color: #0f766e;
-            color: #e0f2fe;
-            box-shadow: 0 6px 16px rgba(45, 212, 191, 0.4);
-        }
-
-        .page-theme-tiktok .btn-theme-main:hover {
-            background: #0e7490;
-            border-color: #0e7490;
-        }
-
-        .page-theme-tiktok .btn-theme-outline {
-            border-color: rgba(45, 212, 191, 0.8);
-            color: #0f766e;
-        }
-
-        .page-theme-tiktok .btn-theme-outline:hover {
-            background: rgba(224, 242, 254, 0.9);
-        }
-
-        body[data-theme="dark"] .btn-theme-outline {
-            color: #e5e7eb;
-            border-color: rgba(148, 163, 184, 0.6);
-        }
-
-        body[data-theme="dark"] .btn-theme-outline:hover {
-            background: rgba(15, 23, 42, 0.9);
-        }
-
-        /* ========= SCAN INPUT ========= */
-        .scan-input {
-            font-size: 1.1rem;
-            font-weight: 600;
-            letter-spacing: .12em;
-            padding: .7rem .9rem;
-            text-transform: uppercase;
-            border-radius: 12px;
-            border-width: 2px;
-        }
-
-        .scan-input::placeholder {
-            text-transform: none;
-            letter-spacing: normal;
-            font-weight: 400;
-            color: #9ca3af;
-        }
-
-        body[data-theme="dark"] .scan-input::placeholder {
-            color: #6b7280;
-        }
-
-        .scan-input:focus {
-            border-color: rgba(59, 130, 246, 0.9);
-            box-shadow: 0 0 0 1px rgba(59, 130, 246, 0.15);
-        }
-
-        .scan-meta {
-            font-size: .78rem;
-            color: #4b5563;
-        }
-
-        body[data-theme="dark"] .scan-meta {
-            color: #e5e7eb;
-        }
-
-        /* ========= INFO UTAMA LAYOUT ========= */
-        .info-main-col {
-            min-width: 260px;
-        }
-
         .info-label {
             font-size: .68rem;
             text-transform: uppercase;
@@ -288,32 +154,42 @@
             color: #6b7280;
         }
 
-        .scan-panel {
-            border-radius: 12px;
-            padding: .85rem .9rem;
-            background: rgba(248, 250, 252, 0.96);
+        /* ========= INFO PILL MINIMAL ========= */
+        .info-pill {
+            display: inline-flex;
+            flex-direction: column;
+            justify-content: center;
+            padding: .25rem .7rem;
+            border-radius: 999px;
             border: 1px solid rgba(148, 163, 184, 0.35);
+            font-size: .75rem;
+            background: rgba(248, 250, 252, 0.96);
         }
 
-        body[data-theme="dark"] .scan-panel {
+        .info-pill-label {
+            font-size: .64rem;
+            text-transform: uppercase;
+            letter-spacing: .08em;
+            color: #9ca3af;
+        }
+
+        .info-pill-value {
+            font-size: .8rem;
+        }
+
+        body[data-theme="dark"] .info-pill {
             background: rgba(15, 23, 42, 0.98);
             border-color: rgba(30, 64, 175, 0.75);
+            color: #e5e7eb;
         }
 
-        @media (min-width: 768px) {
-            .info-main-col {
-                border-left: 1px solid rgba(148, 163, 184, 0.25);
-                padding-left: 1.25rem;
-            }
-
-            body[data-theme="dark"] .info-main-col {
-                border-left-color: rgba(51, 65, 85, 0.85);
-            }
+        body[data-theme="dark"] .info-pill-label {
+            color: #6b7280;
         }
 
-        /* ========= TABLE & SCROLL (KOTAK SCROLL KECIL) ========= */
+        /* ========= TABLE ========= */
         .lines-wrapper {
-            max-height: 25vh;
+            max-height: 50vh;
             overflow-y: auto;
             overscroll-behavior: contain;
             scroll-behavior: smooth;
@@ -334,22 +210,10 @@
             border-radius: 999px;
         }
 
-        @media (max-width: 768px) {
-            .lines-wrapper {
-                max-height: 320px;
-            }
-        }
-
-        .table-responsive {
-            position: relative;
-            margin-bottom: 0;
-        }
-
         .table-lines {
             margin-bottom: 0;
         }
 
-        /* THEAD sticky DI DALAM .lines-wrapper */
         .table-lines thead th {
             position: sticky;
             top: 0;
@@ -396,161 +260,23 @@
             color: #e5e7eb;
         }
 
-        /* ========= QTY DISPLAY ========= */
-        .qty-display {
-            display: inline-flex;
-            align-items: center;
-            justify-content: center;
-            min-width: 64px;
-            padding: .25rem .7rem;
-            border-radius: 999px;
-            border: 1px solid rgba(148, 163, 184, 0.55);
-            font-weight: 600;
-            font-size: .9rem;
-            cursor: pointer;
-            background: rgba(248, 250, 252, 0.96);
-            transition: background .12s ease, transform .12s ease, box-shadow .1s ease;
-        }
-
-        .qty-display:hover {
-            background: rgba(239, 246, 255, 0.96);
-            box-shadow: 0 0 0 1px rgba(59, 130, 246, 0.2);
-            transform: translateY(-1px);
-        }
-
-        body[data-theme="dark"] .qty-display {
-            background: rgba(15, 23, 42, 0.98);
-            border-color: rgba(148, 163, 184, 0.65);
-            color: #e5e7eb;
-        }
-
-        body[data-theme="dark"] .qty-display:hover {
-            background: rgba(30, 64, 175, 0.55);
-            box-shadow: 0 0 0 1px rgba(56, 189, 248, 0.65);
-        }
-
-        .qty-edit-form {
-            display: inline-flex;
-            align-items: center;
-            gap: .25rem;
-        }
-
-        .qty-edit-input {
-            width: 80px;
-            text-align: right;
-            padding-right: .4rem;
-        }
-
-        .qty-edit-save-btn {
-            border-radius: 999px;
-            padding-inline: .4rem;
-            padding-block: .15rem;
-            font-size: .75rem;
-            line-height: 1;
-        }
-
-        /* ========= LAST SCANNED ========= */
-        .last-scanned-row td {
-            background: rgba(254, 243, 199, 0.96) !important;
-        }
-
-        .last-scanned-row td:first-child {
-            border-left: 3px solid rgba(234, 88, 12, 0.9);
-        }
-
-        body[data-theme="dark"] .last-scanned-row td {
-            background: rgba(30, 64, 175, 0.70) !important;
-        }
-
-        body[data-theme="dark"] .last-scanned-row td:first-child {
-            border-left-color: #38bdf8;
-        }
-
-        @keyframes rowPulseSoft {
-            0% {
-                box-shadow: 0 0 0 0 rgba(234, 88, 12, 0.35);
-            }
-
-            100% {
-                box-shadow: 0 0 0 12px rgba(234, 88, 12, 0);
-            }
-        }
-
-        .last-scanned-pulse {
-            animation: rowPulseSoft 0.9s ease-out 1;
-        }
-
-        /* ========= TOAST (ATAS TENGAH) ========= */
-        .scan-toast {
-            position: fixed;
-            top: 4rem;
-            left: 50%;
-            transform: translateX(-50%);
-            z-index: 1080;
-            min-width: 220px;
-            max-width: 320px;
-            border-radius: 999px;
-            padding: .5rem .9rem;
-            font-size: .82rem;
-            display: none;
-            align-items: center;
-            gap: .4rem;
-            box-shadow: 0 12px 30px rgba(15, 23, 42, 0.35);
-            pointer-events: none;
-        }
-
-        .scan-toast-success {
-            background: #16a34a;
-            color: #ecfdf5;
-        }
-
-        .scan-toast-error {
-            background: #b91c1c;
-            color: #fee2e2;
-        }
-
-        /* ========= BUTTON KE SCAN TERAKHIR ========= */
-        .btn-jump-last {
-            border-radius: 999px;
-            padding: .18rem .75rem;
-            font-size: .7rem;
-            letter-spacing: .08em;
+        /* ========= RINGKASAN PER KATEGORI ========= */
+        .category-summary-table thead th {
+            font-size: .72rem;
             text-transform: uppercase;
-            border: 1px dashed rgba(148, 163, 184, 0.9);
-            background: rgba(248, 250, 252, 0.96);
-            color: #4b5563;
-            display: inline-flex;
-            align-items: center;
-            gap: .25rem;
+            letter-spacing: .06em;
         }
 
-        .btn-jump-last::before {
-            content: '⤵';
-            font-size: .8rem;
-        }
-
-        .btn-jump-last:hover {
-            background: rgba(219, 234, 254, 0.96);
-        }
-
-        body[data-theme="dark"] .btn-jump-last {
-            background: rgba(15, 23, 42, 0.98);
-            border-color: rgba(148, 163, 184, 0.9);
-            color: #e5e7eb;
-        }
-
-        .btn-jump-last-highlight {
-            box-shadow: 0 0 0 2px rgba(59, 130, 246, 0.65);
+        .category-summary-table tbody td {
+            font-size: .82rem;
+            vertical-align: middle;
         }
     </style>
 @endpush
 
 @section('content')
     @php
-        $totalQty = $shipment->lines->sum('qty_scanned');
-        $totalLines = $shipment->lines->count();
-        $lastScannedLineId = session('last_scanned_line_id');
-
+        // totalQty, totalLines, totalHpp, summaryPerCategory sudah dikirim dari controller
         $storeName = $shipment->store->name ?? '';
         $storeCode = $shipment->store->code ?? '';
         $storeKey = strtoupper($storeCode . ' ' . $storeName);
@@ -561,14 +287,10 @@
         } elseif (str_contains($storeKey, 'TTK') || str_contains($storeKey, 'TIKTOK')) {
             $scanTheme = 'tiktok';
         }
-
-        // data preview import (opsional, diisi oleh ShipmentController@importPreview)
-        $importPreview = $importPreview ?? null;
-        $importPreviewSummary = $importPreviewSummary ?? null;
     @endphp
 
     <div class="page-wrap page-theme-{{ $scanTheme }}">
-        {{-- HEADER MINIMALIS --}}
+        {{-- HEADER --}}
         <div class="d-flex justify-content-between align-items-start mb-3 flex-wrap gap-2">
             <div>
                 <div class="meta-label mb-1">
@@ -616,7 +338,7 @@
             </div>
         </div>
 
-        {{-- FLASH (AUTO HIDE) --}}
+        {{-- FLASH --}}
         @if (session('status') === 'error')
             <div class="alert alert-danger js-auto-hide-alert" role="alert">
                 {{ session('message') }}
@@ -627,191 +349,157 @@
             </div>
         @endif
 
-        {{-- INFO UTAMA --}}
+        {{-- INFO UTAMA (MINIMAL) --}}
         <div class="card card-main mb-3">
             <div class="card-body">
                 <div class="d-flex justify-content-between align-items-center mb-2">
                     <span class="meta-label">
                         Info Utama
                     </span>
+                    @if ($shipment->status === 'draft')
+                        <a href="{{ route('sales.shipments.edit', $shipment) }}" class="btn btn-sm btn-outline-primary">
+                            Edit &amp; Scan
+                        </a>
+                    @endif
                 </div>
 
-                @if ($shipment->status === 'draft')
-                    {{-- MODE DRAFT: SCAN KIRI, INFO KANAN --}}
-                    <div class="row g-3 align-items-stretch">
-                        {{-- KIRI: PANEL SCAN BARANG --}}
-                        <div class="col-md-5">
-                            <div class="scan-panel h-100 d-flex flex-column justify-content-between">
-                                <div class="mb-2">
-                                    <div class="info-label mb-1">
-                                        Scan Barang Keluar
-                                    </div>
-                                    <div class="scan-meta mb-1">
-                                        Shipment:
-                                        <span class="fw-semibold">{{ $shipment->code }}</span>
-                                    </div>
-                                </div>
-
-                                <form id="scanForm" method="POST"
-                                    action="{{ route('sales.shipments.scan_item', $shipment) }}">
-                                    @csrf
-                                    <div class="mb-2">
-                                        <label class="form-label small mb-1">Scan / Input kode</label>
-                                        <input type="text" name="scan_code" class="form-control scan-input"
-                                            id="scanInput" placeholder="Fokus di sini lalu scan..." autocomplete="off"
-                                            required>
-                                    </div>
-                                    <div class="scan-meta small">
-                                        Qty bertambah otomatis pada baris yang cocok.
-                                    </div>
-                                </form>
-                            </div>
+                {{-- Baris 1: Channel + creator (kanan) --}}
+                <div class="d-flex flex-wrap justify-content-between align-items-start gap-3 mb-2">
+                    <div>
+                        <div class="info-label mb-1">
+                            Channel / Store
                         </div>
 
-                        {{-- KANAN: CHANNEL + CATATAN + TOMBOL KE SCAN TERAKHIR --}}
-                        <div class="col-md-7 info-main-col">
-                            {{-- Channel / Store --}}
-                            <div class="mb-3">
-                                <div class="info-label mb-1">
-                                    Channel / Store
+                        @if ($shipment->store)
+                            <div class="d-flex flex-wrap align-items-center gap-2">
+                                <div class="fw-semibold">
+                                    {{ $shipment->store->name }}
                                 </div>
 
-                                @if ($shipment->store)
-                                    <div class="d-flex flex-wrap align-items-center gap-2">
-                                        <div class="fw-semibold">
-                                            {{ $shipment->store->name }}
-                                        </div>
-
-                                        @if ($shipment->store->code ?? false)
-                                            <div class="store-badge">
-                                                {{ strtoupper($shipment->store->code) }}
-                                            </div>
-                                        @endif
-                                    </div>
-                                @else
-                                    <div class="text-muted small">
-                                        Tidak diisi.
+                                @if ($shipment->store->code ?? false)
+                                    <div class="store-badge">
+                                        {{ strtoupper($shipment->store->code) }}
                                     </div>
                                 @endif
                             </div>
-
-                            {{-- Catatan --}}
-                            <div>
-                                <div class="info-label mb-1">
-                                    Catatan
-                                </div>
-
-                                @if ($shipment->notes)
-                                    <div class="small">
-                                        {!! nl2br(e($shipment->notes)) !!}
-                                    </div>
-                                @else
-                                    <div class="text-muted small">
-                                        Tidak ada catatan.
-                                    </div>
-                                @endif
+                        @else
+                            <div class="text-muted small">
+                                Tidak diisi.
                             </div>
+                        @endif
+                    </div>
 
-                            {{-- Ke scan terakhir --}}
-                            @if ($lastScannedLineId)
-                                <div class="d-flex justify-content-end mt-3">
-                                    <button type="button" class="btn btn-sm btn-jump-last" id="btnJumpLast">
-                                        Ke scan terakhir
-                                    </button>
-                                </div>
-                            @endif
+                    <div class="small text-muted text-end">
+                        <div class="info-label mb-1">Dibuat / Update</div>
+                        <div>
+                            {{ id_datetime($shipment->created_at) }}<br>
+                            <span class="text-muted">Update: {{ id_datetime($shipment->updated_at) }}</span>
                         </div>
                     </div>
-                @else
-                    {{-- MODE SETELAH SUBMIT/POSTED: TANPA SCAN, INFO DETAIL FULL WIDTH --}}
-                    <div class="row">
-                        <div class="col-12 info-main-col">
-                            {{-- Channel / Store --}}
-                            <div class="mb-3">
-                                <div class="info-label mb-1">
-                                    Channel / Store
-                                </div>
+                </div>
 
-                                @if ($shipment->store)
-                                    <div class="d-flex flex-wrap align-items-center gap-2">
-                                        <div class="fw-semibold">
-                                            {{ $shipment->store->name }}
-                                        </div>
+                {{-- Baris 2: Catatan --}}
+                <div class="mb-2">
+                    <div class="info-label mb-1">
+                        Catatan
+                    </div>
 
-                                        @if ($shipment->store->code ?? false)
-                                            <div class="store-badge">
-                                                {{ strtoupper($shipment->store->code) }}
-                                            </div>
-                                        @endif
-                                    </div>
-                                @else
-                                    <div class="text-muted small">
-                                        Tidak diisi.
-                                    </div>
-                                @endif
-                            </div>
-
-                            {{-- Catatan --}}
-                            <div class="mb-3">
-                                <div class="info-label mb-1">
-                                    Catatan
-                                </div>
-
-                                @if ($shipment->notes)
-                                    <div class="small">
-                                        {!! nl2br(e($shipment->notes)) !!}
-                                    </div>
-                                @else
-                                    <div class="text-muted small">
-                                        Tidak ada catatan.
-                                    </div>
-                                @endif
-                            </div>
-
-                            {{-- META DETAIL --}}
-                            <div class="row row-cols-1 row-cols-md-2 gy-2 small">
-                                <div>
-                                    <div class="info-label mb-1">Tanggal</div>
-                                    <div>{{ id_date($shipment->date) }}</div>
-                                </div>
-                                <div>
-                                    <div class="info-label mb-1">Status</div>
-                                    <div class="d-flex align-items-center gap-2">
-                                        <span class="text-capitalize">{{ $shipment->status }}</span>
-                                        @if ($shipment->status === 'submitted')
-                                            <span class="badge-status badge-status-submitted">Submitted</span>
-                                        @elseif ($shipment->status === 'posted')
-                                            <span class="badge-status badge-status-posted">Posted</span>
-                                        @endif
-                                    </div>
-                                </div>
-                                <div>
-                                    <div class="info-label mb-1">Total Baris</div>
-                                    <div>{{ number_format($totalLines, 0, ',', '.') }}</div>
-                                </div>
-                                <div>
-                                    <div class="info-label mb-1">Total Qty Scanned</div>
-                                    <div>{{ number_format($totalQty, 0, ',', '.') }}</div>
-                                </div>
-                                <div>
-                                    <div class="info-label mb-1">Dibuat oleh</div>
-                                    <div>{{ $shipment->creator?->name ?? '-' }}</div>
-                                </div>
-                                <div>
-                                    <div class="info-label mb-1">Dibuat / Terakhir diupdate</div>
-                                    <div>
-                                        {{ id_datetime($shipment->created_at) }}<br>
-                                        <span class="text-muted">Update: {{ id_datetime($shipment->updated_at) }}</span>
-                                    </div>
-                                </div>
-                            </div>
+                    @if ($shipment->notes)
+                        <div class="small">
+                            {!! nl2br(e($shipment->notes)) !!}
                         </div>
+                    @else
+                        <div class="text-muted small">
+                            Tidak ada catatan.
+                        </div>
+                    @endif
+                </div>
+
+                {{-- Baris 3: meta ringkas dalam pill --}}
+                <div class="d-flex flex-wrap gap-2">
+                    <span class="info-pill">
+                        <span class="info-pill-label">Tanggal</span>
+                        <span class="info-pill-value">{{ id_date($shipment->date) }}</span>
+                    </span>
+
+                    <span class="info-pill">
+                        <span class="info-pill-label">Status</span>
+                        <span class="info-pill-value text-capitalize">
+                            {{ $shipment->status }}
+                        </span>
+                    </span>
+
+                    <span class="info-pill">
+                        <span class="info-pill-label">Total Baris</span>
+                        <span class="info-pill-value">
+                            {{ number_format($totalLines, 0, ',', '.') }}
+                        </span>
+                    </span>
+
+                    <span class="info-pill">
+                        <span class="info-pill-label">Total Qty</span>
+                        <span class="info-pill-value">
+                            {{ number_format($totalQty, 0, ',', '.') }}
+                        </span>
+                    </span>
+
+                    <span class="info-pill">
+                        <span class="info-pill-label">Total HPP</span>
+                        <span class="info-pill-value">
+                            Rp {{ number_format($totalHpp, 0, ',', '.') }}
+                        </span>
+                    </span>
+                </div>
+            </div>
+        </div>
+
+        {{-- RINGKASAN PER KATEGORI --}}
+        <div class="card card-main mb-3">
+            <div class="card-body">
+                <div class="d-flex justify-content-between align-items-center mb-2">
+                    <span class="meta-label">Ringkasan per Kategori</span>
+                </div>
+
+                @if ($summaryPerCategory->isNotEmpty())
+                    <div class="table-responsive">
+                        <table class="table table-sm align-middle mb-0 category-summary-table">
+                            <thead>
+                                <tr class="text-muted">
+                                    <th style="width: 40px;">#</th>
+                                    <th>Kategori</th>
+                                    <th class="text-end" style="width: 110px;">Baris</th>
+                                    <th class="text-end" style="width: 130px;">Total Qty</th>
+                                    <th class="text-end" style="width: 160px;">Total HPP (Rp)</th>
+                                </tr>
+                            </thead>
+                            <tbody>
+                                @foreach ($summaryPerCategory as $idx => $cat)
+                                    <tr>
+                                        <td class="text-muted">{{ $idx + 1 }}</td>
+                                        <td>{{ $cat['category_name'] }}</td>
+                                        <td class="text-end">
+                                            {{ number_format($cat['total_lines'], 0, ',', '.') }}
+                                        </td>
+                                        <td class="text-end">
+                                            {{ number_format($cat['total_qty'], 0, ',', '.') }}
+                                        </td>
+                                        <td class="text-end">
+                                            {{ number_format($cat['total_hpp'], 0, ',', '.') }}
+                                        </td>
+                                    </tr>
+                                @endforeach
+                            </tbody>
+                        </table>
+                    </div>
+                @else
+                    <div class="text-muted small">
+                        Belum ada data kategori untuk shipment ini.
                     </div>
                 @endif
             </div>
         </div>
 
-        {{-- REKAP + LINES --}}
+        {{-- REKAP + LINES (READ ONLY) --}}
         <div class="card card-main">
             <div class="card-body">
                 <div class="d-flex justify-content-between align-items-center mb-2">
@@ -819,92 +507,44 @@
                         <div class="meta-label mb-1">
                             Daftar Barang Keluar
                         </div>
-                        {{-- hint text dihilangkan supaya lebih clean --}}
                     </div>
 
                     <div class="d-flex flex-wrap gap-2 align-items-center">
                         <div class="summary-pill">
                             Baris:
-                            <span class="fw-semibold ms-1" id="summaryTotalLines">{{ $totalLines }}</span>
+                            <span class="fw-semibold ms-1">{{ number_format($totalLines, 0, ',', '.') }}</span>
                         </div>
                         <div class="summary-pill">
                             Total qty (server):
-                            <span class="fw-semibold ms-1" id="summaryTotalQty">
+                            <span class="fw-semibold ms-1">
                                 {{ number_format($totalQty, 0, ',', '.') }}
                             </span>
                         </div>
-
-                        <div class="ms-2">
-                            <div class="input-group input-group-sm" style="width: 230px;">
-                                <span class="input-group-text">Cari</span>
-                                <input type="text" id="itemFilterInput" class="form-control"
-                                    placeholder="Kode / nama barang">
-                            </div>
+                        <div class="summary-pill">
+                            Total HPP (server):
+                            <span class="fw-semibold ms-1">
+                                Rp {{ number_format($totalHpp, 0, ',', '.') }}
+                            </span>
                         </div>
                     </div>
                 </div>
 
-                {{-- IMPORT DARI FILE (hanya draft) --}}
-                @if ($shipment->status === 'draft')
-                    <div class="mb-3">
-                        <div class="d-flex justify-content-between align-items-center mb-2 flex-wrap gap-2">
-                            <div class="d-flex align-items-center gap-2 flex-wrap">
-                                <span class="meta-label">
-                                    Import dari File
-                                </span>
-                                <span
-                                    class="badge rounded-pill bg-light text-muted border d-none d-sm-inline-flex align-items-center gap-1">
-                                    <span>CSV / TXT / XLSX</span>
-                                </span>
-                            </div>
-
-                            @if ($importPreview && is_array($importPreview) && count($importPreview))
-                                <button type="button" class="btn btn-sm btn-theme-outline" data-bs-toggle="modal"
-                                    data-bs-target="#importPreviewModal">
-                                    Lihat Preview Terakhir
-                                </button>
-                            @endif
-                        </div>
-
-                        {{-- Upload file untuk preview --}}
-                        <form method="POST" action="{{ route('sales.shipments.import_preview', $shipment) }}"
-                            enctype="multipart/form-data" class="row g-2 align-items-end">
-                            @csrf
-                            <div class="col-sm-8 col-md-6">
-                                <label class="form-label form-label-sm">File</label>
-                                <input type="file" name="file"
-                                    class="form-control form-control-sm @error('file') is-invalid @enderror"
-                                    accept=".csv,.txt,.xlsx,.xls" required>
-                                @error('file')
-                                    <div class="invalid-feedback">{{ $message }}</div>
-                                @enderror
-                            </div>
-                            <div class="col-sm-4 col-md-3">
-                                <button type="submit" class="btn btn-sm btn-theme-outline mt-3 mt-sm-0">
-                                    Upload &amp; Preview
-                                </button>
-                            </div>
-                        </form>
-                    </div>
-                @endif
-
-                {{-- KOTAK SCROLL KECIL + HEADER STICKY --}}
-                <div class="table-responsive lines-wrapper" id="linesWrapper">
+                <div class="lines-wrapper">
                     <table class="table align-middle table-lines">
                         <thead>
                             <tr>
                                 <th style="width: 40px;">#</th>
                                 <th style="width: 140px;">Kode</th>
                                 <th>Nama Barang</th>
-                                <th style="width: 140px;" class="text-end">Qty</th>
-                                <th style="width: 60px;"></th>
+                                <th style="width: 110px;" class="text-end">Qty</th>
+                                <th style="width: 130px;" class="text-end">HPP / Unit</th>
+                                <th style="width: 150px;" class="text-end">Total HPP</th>
                             </tr>
                         </thead>
-                        <tbody id="linesTbody">
+                        <tbody>
                             @forelse ($shipment->lines as $line)
-                                <tr class="{{ $lastScannedLineId == $line->id ? 'last-scanned-row' : '' }}"
-                                    data-line-id="{{ $line->id }}">
-                                    <td class="text-muted small order-cell">
+                                <tr>
+                                    <td class="text-muted small">
                                         {{ $loop->iteration }}
                                     </td>
                                     <td>
@@ -913,7 +553,7 @@
                                         </div>
                                     </td>
                                     <td>
-                                        <div class="small item-name">
+                                        <div class="small">
                                             {{ $line->item?->name ?? '-' }}
                                         </div>
                                         @if ($line->remarks)
@@ -923,44 +563,18 @@
                                         @endif
                                     </td>
                                     <td class="text-end">
-                                        <span class="qty-display" data-line-id="{{ $line->id }}"
-                                            id="qty-display-{{ $line->id }}">
-                                            {{ number_format($line->qty_scanned, 0, ',', '.') }}
-                                        </span>
-
-                                        @if ($shipment->status === 'draft')
-                                            <form action="{{ route('sales.shipments.update_line_qty', $line) }}"
-                                                method="POST" class="d-inline qty-edit-form d-none"
-                                                data-line-id="{{ $line->id }}">
-                                                @csrf
-                                                @method('PATCH')
-                                                <input type="number" name="qty"
-                                                    class="form-control form-control-sm qty-edit-input" min="0"
-                                                    value="{{ $line->qty_scanned }}">
-                                                <button type="submit" class="btn btn-primary btn-sm qty-edit-save-btn">
-                                                    ✔
-                                                </button>
-                                            </form>
-                                        @endif
+                                        {{ number_format($line->qty_scanned, 0, ',', '.') }}
                                     </td>
                                     <td class="text-end">
-                                        @if ($shipment->status === 'draft')
-                                            <form action="{{ route('sales.shipments.destroy_line', $line) }}"
-                                                method="POST" class="d-inline js-delete-line-form"
-                                                data-line-id="{{ $line->id }}">
-                                                @csrf
-                                                @method('DELETE')
-                                                <button type="submit" class="btn btn-sm btn-outline-danger"
-                                                    title="Hapus baris">
-                                                    🗑
-                                                </button>
-                                            </form>
-                                        @endif
+                                        Rp {{ number_format($line->unit_hpp ?? 0, 0, ',', '.') }}
+                                    </td>
+                                    <td class="text-end">
+                                        Rp {{ number_format($line->total_hpp ?? 0, 0, ',', '.') }}
                                     </td>
                                 </tr>
                             @empty
-                                <tr class="no-lines-row">
-                                    <td colspan="5" class="text-center text-muted py-4">
+                                <tr>
+                                    <td colspan="6" class="text-center text-muted py-4">
                                         Belum ada item yang discan.
                                     </td>
                                 </tr>
@@ -975,17 +589,19 @@
                         Dibuat: {{ id_datetime($shipment->created_at) }}<br>
                         Terakhir diupdate: {{ id_datetime($shipment->updated_at) }}<br>
                         Total qty keluar (server):
-                        <span class="fw-semibold" id="footerTotalQty">
+                        <span class="fw-semibold">
                             {{ number_format($totalQty, 0, ',', '.') }}
+                        </span><br>
+                        Total HPP (server):
+                        <span class="fw-semibold">
+                            Rp {{ number_format($totalHpp, 0, ',', '.') }}
                         </span>
                     </div>
                     <div class="d-flex flex-wrap gap-2">
-                        {{-- Kembali ke list --}}
                         <a href="{{ route('sales.shipments.index') }}" class="btn btn-theme-outline">
                             &larr; Kembali ke list
                         </a>
 
-                        {{-- Export barang yang dikirim (CSV) --}}
                         @if ($shipment->lines->isNotEmpty())
                             <a href="{{ route('sales.shipments.export_lines', $shipment) }}"
                                 class="btn btn-theme-outline">
@@ -993,7 +609,6 @@
                             </a>
                         @endif
 
-                        {{-- Tombol Invoice (dari Shipment) --}}
                         @if ($shipment->status === 'posted')
                             @if (empty($shipment->sales_invoice_id))
                                 <a href="{{ route('sales.invoices.create_from_shipment', $shipment) }}"
@@ -1007,166 +622,16 @@
                                 </a>
                             @endif
                         @endif
-
-                        {{-- Aksi status --}}
-                        @if ($shipment->status === 'draft')
-                            <form action="{{ route('sales.shipments.submit', $shipment) }}" method="POST"
-                                onsubmit="return confirm('Submit shipment ini? Setelah submit tidak bisa di-scan lagi.')">
-                                @csrf
-                                <button type="submit" class="btn btn-theme-main">
-                                    Submit Shipment
-                                </button>
-                            </form>
-                        @elseif ($shipment->status === 'submitted')
-                            <form action="{{ route('sales.shipments.post', $shipment) }}" method="POST"
-                                onsubmit="return confirm('Posting shipment ini dan kurangi stok WH-RTS?')">
-                                @csrf
-                                <button type="submit" class="btn btn-theme-main">
-                                    Posting &amp; Kurangi Stok
-                                </button>
-                            </form>
-                        @endif
                     </div>
-
                 </div>
             </div>
         </div>
     </div>
-
-    {{-- MODAL PREVIEW IMPORT (jika ada preview) --}}
-    @if ($shipment->status === 'draft' && $importPreview && is_array($importPreview) && count($importPreview))
-        <div class="modal fade" id="importPreviewModal" tabindex="-1" aria-hidden="true">
-            <div class="modal-dialog modal-xl modal-dialog-scrollable modal-fullscreen-sm-down">
-                <div class="modal-content">
-                    <div class="modal-header">
-                        <h5 class="modal-title">
-                            Preview Import Barang
-                        </h5>
-                        <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
-                    </div>
-                    <div class="modal-body">
-                        @if ($importPreviewSummary)
-                            <div class="d-flex flex-wrap gap-2 mb-3">
-                                <span class="summary-pill">
-                                    OK:
-                                    <span class="fw-semibold ms-1">
-                                        {{ $importPreviewSummary['ok_count'] ?? 0 }}
-                                    </span>
-                                </span>
-                                <span class="summary-pill">
-                                    Dilewati:
-                                    <span class="fw-semibold ms-1">
-                                        {{ $importPreviewSummary['skip_count'] ?? 0 }}
-                                    </span>
-                                </span>
-                                <span class="summary-pill">
-                                    Total Qty OK:
-                                    <span class="fw-semibold ms-1">
-                                        {{ number_format($importPreviewSummary['total_qty_ok'] ?? 0, 0, ',', '.') }}
-                                    </span>
-                                </span>
-                            </div>
-                        @endif
-
-                        <div class="table-responsive">
-                            <table class="table table-sm align-middle mb-0">
-                                <thead>
-                                    <tr class="small text-uppercase text-muted">
-                                        <th style="width:40px;">#</th>
-                                        <th style="width:140px;">Kode Barang</th>
-                                        <th style="width:110px;">Qty (File)</th>
-                                        <th style="width:110px;">Qty Import</th>
-                                        <th>Keterangan</th>
-                                    </tr>
-                                </thead>
-                                <tbody>
-                                    @foreach ($importPreview as $row)
-                                        @php $isOk = ($row['status'] ?? null) === 'ok'; @endphp
-                                        <tr class="small {{ $isOk ? '' : 'table-warning' }}">
-                                            <td>{{ $loop->iteration }}</td>
-                                            <td>
-                                                {{-- Hanya tampilkan kode barang, prioritaskan item_code --}}
-                                                {{ $row['item_code'] ?? ($row['raw_product'] ?? '') }}
-                                            </td>
-                                            <td>{{ $row['raw_qty'] ?? '' }}</td>
-                                            <td>
-                                                @if ($isOk)
-                                                    {{ number_format($row['parsed_qty'] ?? 0, 0, ',', '.') }}
-                                                @else
-                                                    -
-                                                @endif
-                                            </td>
-                                            <td>
-                                                @if ($isOk)
-                                                    <span class="text-success">OK</span>
-                                                @else
-                                                    <span class="text-danger">
-                                                        {{ $row['error'] ?? 'Tidak bisa diimport.' }}
-                                                    </span>
-                                                @endif
-                                            </td>
-                                        </tr>
-                                    @endforeach
-                                </tbody>
-
-                            </table>
-                        </div>
-                    </div>
-
-                    <div class="modal-footer">
-                        <button type="button" class="btn btn-sm btn-secondary" data-bs-dismiss="modal">
-                            Tutup
-                        </button>
-
-                        {{-- Form konfirmasi import: hanya kirim baris OK --}}
-                        <form method="POST" action="{{ route('sales.shipments.import_lines', $shipment) }}">
-                            @csrf
-                            @foreach ($importPreview as $i => $row)
-                                @if (($row['status'] ?? null) === 'ok')
-                                    <input type="hidden" name="rows[{{ $i }}][product_code]"
-                                        value="{{ $row['item_code'] }}">
-                                    <input type="hidden" name="rows[{{ $i }}][qty]"
-                                        value="{{ (int) ($row['parsed_qty'] ?? 0) }}">
-                                @endif
-                            @endforeach
-
-                            <button type="submit" class="btn btn-sm btn-theme-main">
-                                Import ke Shipment
-                            </button>
-                        </form>
-                    </div>
-                </div>
-            </div>
-        </div>
-    @endif
-
-    {{-- TOAST --}}
-    <div id="scanToast" class="scan-toast"></div>
 @endsection
 
 @push('scripts')
     <script>
         (function() {
-            console.log('GFID shipment scan script loaded');
-
-            const isDraft = {{ $shipment->status === 'draft' ? 'true' : 'false' }};
-            let lastScannedLineId = @json($lastScannedLineId);
-
-            const scanInput = document.getElementById('scanInput');
-            const scanForm = document.getElementById('scanForm');
-            const linesWrapper = document.getElementById('linesWrapper');
-            const itemFilterInput = document.getElementById('itemFilterInput');
-            const btnJumpLast = document.getElementById('btnJumpLast');
-            const linesTbody = document.getElementById('linesTbody');
-            const toastEl = document.getElementById('scanToast');
-            const summaryTotalLines = document.getElementById('summaryTotalLines');
-            const summaryTotalQty = document.getElementById('summaryTotalQty');
-            const footerTotalQty = document.getElementById('footerTotalQty');
-
-            // Template URL untuk delete line (ganti placeholder pakai line.id)
-            const deleteUrlTemplate = @json(route('sales.shipments.destroy_line', ['line' => '__LINE_ID__']));
-
-            /* ===== AUTO HIDE FLASH ALERT ===== */
             const autoAlerts = document.querySelectorAll('.js-auto-hide-alert');
             if (autoAlerts.length) {
                 setTimeout(() => {
@@ -1180,476 +645,6 @@
                         }, 450);
                     });
                 }, 2600);
-            }
-
-            function focusScan() {
-                if (scanInput) {
-                    scanInput.focus();
-                    scanInput.select();
-                }
-            }
-
-            // Uppercase input scan
-            if (scanInput) {
-                scanInput.addEventListener('input', function() {
-                    this.value = this.value.toUpperCase();
-                });
-            }
-
-            function playBeep(freq, duration = 0.15, volume = 0.2) {
-                try {
-                    const Ctx = window.AudioContext || window.webkitAudioContext;
-                    if (!Ctx) return;
-                    const ctx = new Ctx();
-                    const osc = ctx.createOscillator();
-                    const gain = ctx.createGain();
-                    osc.type = 'sine';
-                    osc.frequency.value = freq;
-                    osc.connect(gain);
-                    gain.connect(ctx.destination);
-                    gain.gain.setValueAtTime(volume, ctx.currentTime);
-                    gain.gain.exponentialRampToValueAtTime(0.001, ctx.currentTime + duration);
-                    osc.start();
-                    osc.stop(ctx.currentTime + duration);
-                } catch (e) {}
-            }
-
-            function playSuccessBeep() {
-                playBeep(1046);
-            }
-
-            function playErrorBeep() {
-                playBeep(220, 0.18, 0.25);
-            }
-
-            function showToast(type, message) {
-                if (!toastEl) return;
-                toastEl.className = 'scan-toast ' + (type === 'success' ? 'scan-toast-success' : 'scan-toast-error');
-                toastEl.textContent = message;
-                toastEl.style.display = 'flex';
-                toastEl.style.opacity = '1';
-
-                setTimeout(() => {
-                    toastEl.style.transition = 'opacity .3s ease';
-                    toastEl.style.opacity = '0';
-                    setTimeout(() => {
-                        toastEl.style.display = 'none';
-                        toastEl.style.opacity = '1';
-                        toastEl.style.transition = '';
-                    }, 320);
-                }, 1300);
-            }
-
-            function scrollToRow(lineId, withPulse = true) {
-                if (!linesWrapper) return;
-                const row = linesWrapper.querySelector('tr[data-line-id="' + lineId + '"]');
-                if (!row) return;
-
-                const prev = linesWrapper.querySelectorAll('.last-scanned-row');
-                for (let i = 0; i < prev.length; i++) {
-                    prev[i].classList.remove('last-scanned-row');
-                }
-                row.classList.add('last-scanned-row');
-
-                const wrapperRect = linesWrapper.getBoundingClientRect();
-                const rowRect = row.getBoundingClientRect();
-                const offsetInside = rowRect.top - wrapperRect.top;
-                const targetScrollTop = linesWrapper.scrollTop + offsetInside - (linesWrapper.clientHeight * 0.3);
-
-                linesWrapper.scrollTo({
-                    top: Math.max(targetScrollTop, 0),
-                    behavior: 'smooth'
-                });
-
-                if (withPulse) {
-                    row.classList.add('last-scanned-pulse');
-                    setTimeout(() => row.classList.remove('last-scanned-pulse'), 1200);
-                }
-            }
-
-            function renumberRows() {
-                if (!linesTbody) return;
-                let idx = 1;
-                const rows = linesTbody.querySelectorAll('tr[data-line-id]');
-                for (let i = 0; i < rows.length; i++) {
-                    const c = rows[i].querySelector('.order-cell');
-                    if (c) c.textContent = idx++;
-                }
-            }
-
-            function bindQtyClickForRow(row) {
-                const lineId = row.getAttribute('data-line-id');
-                const qtyEl = row.querySelector('.qty-display');
-                const form = row.querySelector('.qty-edit-form[data-line-id="' + lineId + '"]');
-                const input = form ? form.querySelector('.qty-edit-input') : null;
-
-                if (!qtyEl || !form || !input) return;
-                if (qtyEl.dataset.boundClick === '1') return;
-
-                qtyEl.addEventListener('click', function() {
-                    qtyEl.classList.add('d-none');
-                    form.classList.remove('d-none');
-                    input.focus();
-                    input.select();
-                });
-
-                form.addEventListener('submit', function(e) {
-                    e.preventDefault();
-
-                    const newQty = input.value.trim();
-                    if (newQty === '' || Number(newQty) < 0) {
-                        playErrorBeep();
-                        showToast('error', 'Qty tidak valid.');
-                        return;
-                    }
-
-                    const formData = new FormData(form);
-
-                    fetch(form.action, {
-                        method: 'POST',
-                        headers: {
-                            'Accept': 'application/json',
-                            'X-Requested-With': 'XMLHttpRequest',
-                        },
-                        body: formData,
-                    }).then(async (res) => {
-                        let data = null;
-                        try {
-                            data = await res.json();
-                        } catch (err) {
-                            form.submit();
-                            return;
-                        }
-
-                        if (!res.ok || !data || data.status !== 'ok') {
-                            const msg = data && data.message ? data.message : 'Gagal update qty.';
-                            playErrorBeep();
-                            showToast('error', msg);
-                            return;
-                        }
-
-                        playSuccessBeep();
-
-                        const totals = data.totals || {};
-
-                        if (data.deleted) {
-                            row.remove();
-                            renumberRows();
-                        } else {
-                            const qtyVal = typeof data.qty !== 'undefined' ?
-                                data.qty :
-                                Number(input.value) || 0;
-                            qtyEl.textContent = new Intl.NumberFormat('id-ID').format(qtyVal);
-                            form.classList.add('d-none');
-                            qtyEl.classList.remove('d-none');
-                        }
-
-                        if (typeof totals.total_lines !== 'undefined' && summaryTotalLines) {
-                            summaryTotalLines.textContent = totals.total_lines;
-                        }
-                        if (typeof totals.total_qty !== 'undefined') {
-                            const f = new Intl.NumberFormat('id-ID').format(totals.total_qty);
-                            if (summaryTotalQty) summaryTotalQty.textContent = f;
-                            if (footerTotalQty) footerTotalQty.textContent = f;
-                        }
-
-                        showToast('success', data.message || 'Qty berhasil diperbarui.');
-                    }).catch(() => {
-                        form.submit();
-                    });
-                });
-
-                input.addEventListener('keydown', function(e) {
-                    if (e.key === 'Enter') {
-                        e.preventDefault();
-                        form.dispatchEvent(new Event('submit', {
-                            cancelable: true
-                        }));
-                    } else if (e.key === 'Escape') {
-                        e.preventDefault();
-                        form.classList.add('d-none');
-                        qtyEl.classList.remove('d-none');
-                    }
-                });
-
-                qtyEl.dataset.boundClick = '1';
-            }
-
-            function bindDeleteForm(form) {
-                if (!form || form.dataset.boundDelete === '1') return;
-
-                form.addEventListener('submit', function(e) {
-                    e.preventDefault();
-
-                    if (!confirm('Hapus baris ini?')) return;
-
-                    const lineId = form.dataset.lineId;
-
-                    fetch(form.action, {
-                        method: 'POST',
-                        headers: {
-                            'Accept': 'application/json',
-                            'X-Requested-With': 'XMLHttpRequest',
-                        },
-                        body: new FormData(form),
-                    }).then(async (res) => {
-                        let data = null;
-                        try {
-                            data = await res.json();
-                        } catch (e) {
-                            form.submit();
-                            return;
-                        }
-
-                        if (!res.ok || !data || data.status !== 'ok') {
-                            playErrorBeep();
-                            showToast('error', data.message || 'Gagal hapus baris.');
-                            return;
-                        }
-
-                        playSuccessBeep();
-
-                        const row = linesTbody.querySelector('tr[data-line-id="' + lineId + '"]');
-                        if (row) row.remove();
-
-                        renumberRows();
-
-                        const totals = data.totals || {};
-                        if (summaryTotalLines && typeof totals.total_lines !== 'undefined') {
-                            summaryTotalLines.textContent = totals.total_lines ?? 0;
-                        }
-
-                        if (typeof totals.total_qty !== 'undefined') {
-                            const f = new Intl.NumberFormat('id-ID').format(totals.total_qty);
-                            if (summaryTotalQty) summaryTotalQty.textContent = f;
-                            if (footerTotalQty) footerTotalQty.textContent = f;
-                        }
-
-                        showToast('success', data.message || 'Baris dihapus.');
-                    }).catch(() => form.submit());
-                });
-
-                form.dataset.boundDelete = '1';
-            }
-
-            // Bind awal untuk semua row
-            if (linesTbody) {
-                const rows = linesTbody.querySelectorAll('tr[data-line-id]');
-                for (let i = 0; i < rows.length; i++) {
-                    bindQtyClickForRow(rows[i]);
-                }
-
-                if (isDraft) {
-                    const deleteForms = linesTbody.querySelectorAll('.js-delete-line-form');
-                    deleteForms.forEach(form => bindDeleteForm(form));
-                }
-            }
-
-            // Fokus & scroll awal
-            window.addEventListener('load', function() {
-                if (isDraft && scanInput) {
-                    focusScan();
-                }
-
-                if (lastScannedLineId) {
-                    scrollToRow(lastScannedLineId, true);
-
-                    if (btnJumpLast) {
-                        btnJumpLast.classList.add('btn-jump-last-highlight');
-                        setTimeout(() => {
-                            btnJumpLast.classList.remove('btn-jump-last-highlight');
-                        }, 2200);
-                    }
-                }
-
-                // Auto show modal preview import jika ada
-                const importPreviewModalEl = document.getElementById('importPreviewModal');
-                if (importPreviewModalEl && window.bootstrap && typeof window.bootstrap.Modal === 'function') {
-                    const modal = new bootstrap.Modal(importPreviewModalEl);
-                    modal.show();
-                }
-            });
-
-            // Ke scan terakhir
-            if (btnJumpLast && linesWrapper) {
-                btnJumpLast.addEventListener('click', function() {
-                    if (!lastScannedLineId) return;
-                    scrollToRow(lastScannedLineId, true);
-                });
-            }
-
-            // Filter cepat
-            if (itemFilterInput && linesWrapper) {
-                itemFilterInput.addEventListener('input', function() {
-                    const term = this.value.toLowerCase().trim();
-                    const rows = linesWrapper.querySelectorAll('tbody tr[data-line-id]');
-
-                    for (let i = 0; i < rows.length; i++) {
-                        const row = rows[i];
-                        const codeEl = row.querySelector('.item-code');
-                        const nameEl = row.querySelector('.item-name');
-
-                        const codeText = (codeEl ? codeEl.textContent : '').toLowerCase();
-                        const nameText = (nameEl ? nameEl.textContent : '').toLowerCase();
-
-                        if (!term || codeText.includes(term) || nameText.includes(term)) {
-                            row.style.display = '';
-                        } else {
-                            row.style.display = 'none';
-                        }
-                    }
-                });
-            }
-
-            // SCAN VIA AJAX (hanya draft)
-            if (isDraft && scanForm && scanInput && linesTbody) {
-                scanForm.addEventListener('submit', function(e) {
-                    e.preventDefault();
-
-                    const code = scanInput.value.trim();
-                    if (!code) {
-                        playErrorBeep();
-                        showToast('error', 'Kode kosong.');
-                        focusScan();
-                        return;
-                    }
-
-                    const formData = new FormData(scanForm);
-
-                    fetch(scanForm.action, {
-                        method: 'POST',
-                        headers: {
-                            'Accept': 'application/json',
-                            'X-Requested-With': 'XMLHttpRequest',
-                        },
-                        body: formData,
-                    }).then(async (res) => {
-                        let data = null;
-                        try {
-                            data = await res.json();
-                        } catch (err) {
-                            scanForm.submit();
-                            return;
-                        }
-
-                        if (!res.ok || !data || data.status !== 'ok') {
-                            const msg = data && data.message ? data.message : 'Gagal scan barang.';
-                            playErrorBeep();
-                            showToast('error', msg);
-                            scanInput.value = '';
-                            focusScan();
-                            return;
-                        }
-
-                        playSuccessBeep();
-
-                        const line = data.line;
-                        const totals = data.totals || {};
-
-                        if (!line || !line.id) {
-                            showToast('success', data.message || 'Berhasil scan.');
-                        } else {
-                            let row = linesTbody.querySelector('tr[data-line-id="' + line.id +
-                                '"]');
-
-                            if (!row) {
-                                const emptyRow = linesTbody.querySelector('.no-lines-row');
-                                if (emptyRow) {
-                                    emptyRow.remove();
-                                }
-
-                                const updateUrl = line.update_qty_url ? line.update_qty_url : '';
-                                const deleteUrl = deleteUrlTemplate.replace('__LINE_ID__', line.id);
-
-                                row = document.createElement('tr');
-                                row.setAttribute('data-line-id', line.id);
-
-                                row.innerHTML =
-                                    '<td class="text-muted small order-cell"></td>' +
-                                    '<td><div class="item-code"></div></td>' +
-                                    '<td>' +
-                                    '<div class="small item-name"></div>' +
-                                    '<div class="small text-muted remarks-wrap d-none"></div>' +
-                                    '</td>' +
-                                    '<td class="text-end">' +
-                                    '<span class="qty-display" data-line-id="' + line.id +
-                                    '" id="qty-display-' + line.id + '"></span>' +
-                                    '<form action="' + updateUrl +
-                                    '" method="POST" class="d-inline qty-edit-form d-none" data-line-id="' +
-                                    line.id + '">' +
-                                    '<input type="hidden" name="_token" value="{{ csrf_token() }}">' +
-                                    '<input type="hidden" name="_method" value="PATCH">' +
-                                    '<input type="number" name="qty" class="form-control form-control-sm qty-edit-input" min="0" value="' +
-                                    (line.qty_scanned || 0) + '">' +
-                                    '<button type="submit" class="btn btn-primary btn-sm qty-edit-save-btn">✔</button>' +
-                                    '</form>' +
-                                    '</td>' +
-                                    '<td class="text-end">' +
-                                    '<form action="' + deleteUrl +
-                                    '" method="POST" class="d-inline js-delete-line-form" data-line-id="' +
-                                    line.id + '">' +
-                                    '<input type="hidden" name="_token" value="{{ csrf_token() }}">' +
-                                    '<input type="hidden" name="_method" value="DELETE">' +
-                                    '<button type="submit" class="btn btn-sm btn-outline-danger" title="Hapus baris">🗑</button>' +
-                                    '</form>' +
-                                    '</td>';
-
-                                linesTbody.appendChild(row);
-                            }
-
-                            const codeEl = row.querySelector('.item-code');
-                            const nameEl = row.querySelector('.item-name');
-                            const remarksWrap = row.querySelector('.remarks-wrap');
-                            const qtyEl = row.querySelector('#qty-display-' + line.id);
-
-                            if (codeEl) codeEl.textContent = line.item_code || '-';
-                            if (nameEl) nameEl.textContent = line.item_name || '-';
-
-                            if (remarksWrap) {
-                                if (line.remarks) {
-                                    remarksWrap.textContent = 'Catatan: ' + line.remarks;
-                                    remarksWrap.classList.remove('d-none');
-                                } else {
-                                    remarksWrap.classList.add('d-none');
-                                }
-                            }
-
-                            if (qtyEl) {
-                                qtyEl.textContent = new Intl.NumberFormat('id-ID').format(line
-                                    .qty_scanned || 0);
-                            }
-
-                            bindQtyClickForRow(row);
-
-                            const deleteForm = row.querySelector('.js-delete-line-form');
-                            if (deleteForm) {
-                                bindDeleteForm(deleteForm);
-                            }
-
-                            renumberRows();
-
-                            if (typeof totals.total_lines !== 'undefined' && summaryTotalLines) {
-                                summaryTotalLines.textContent = totals.total_lines;
-                            }
-                            if (typeof totals.total_qty !== 'undefined') {
-                                const f = new Intl.NumberFormat('id-ID').format(totals.total_qty);
-                                if (summaryTotalQty) summaryTotalQty.textContent = f;
-                                if (footerTotalQty) footerTotalQty.textContent = f;
-                            }
-
-                            lastScannedLineId = line.id;
-                            scrollToRow(line.id, true);
-
-                            const msgItem = line.item_code ? '+1 ' + line.item_code : '+1 item';
-                            showToast('success', data.message || ('Berhasil ' + msgItem));
-                        }
-
-                        scanInput.value = '';
-                        focusScan();
-                    }).catch(() => {
-                        scanForm.submit();
-                    });
-                });
             }
         })();
     </script>

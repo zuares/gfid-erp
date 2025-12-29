@@ -38,7 +38,7 @@ class ShipmentController extends Controller
 
         $invoice = null;
 
-        // Terima dari query ?sales_invoice_id=... (dari "create invoice from shipment")
+        // Terima dari query ?sales_invoice_id=... (misal dari "create shipment from invoice")
         if ($request->filled('sales_invoice_id')) {
             $invoice = SalesInvoice::with('store')
                 ->find($request->sales_invoice_id);
@@ -72,12 +72,11 @@ class ShipmentController extends Controller
         $storeCode = strtoupper(trim($store->code ?? ''));
         $storeKey = $storeCode . ' ' . $storeName;
 
-        // Default prefix dari kode store (3 huruf pertama)
+        // Default prefix (kalau tidak ada rule khusus)
         $prefix = 'SHP';
 
-        // Kalau kode store ada, pakai 3 huruf pertama sebagai default
+        // Kalau ada kode store, pakai 3 huruf pertama
         if ($storeCode !== '') {
-            // Ambil hanya huruf/angka, lalu potong 3 karakter
             $cleanCode = preg_replace('/[^A-Z0-9]/', '', $storeCode);
             if ($cleanCode !== '') {
                 $prefix = substr($cleanCode, 0, 3);
@@ -104,21 +103,95 @@ class ShipmentController extends Controller
             'created_by' => Auth::id(),
         ]);
 
+        // Setelah dibuat → langsung ke halaman EDIT (scan)
         return redirect()
-            ->route('sales.shipments.show', $shipment)
+            ->route('sales.shipments.edit', $shipment)
             ->with('status', 'success')
             ->with('message', 'Shipment dibuat. Silakan scan barang.');
     }
 
+    /**
+     * DETAIL READ-ONLY
+     * - Untuk semua status: draft / submitted / posted
+     * - Tanpa form scan & import.
+     */
     public function show(Shipment $shipment)
     {
+        $shipment->load(['store', 'lines.item.category', 'creator', 'invoice']);
+
+        // Hitung HPP per line (unit_hpp & total_hpp) – sesuaikan sumber HPP di sini
+        $shipment->lines->each(function ($line) {
+            // Contoh fallback: pakai atribut di item jika ada
+            $unitHpp = 0;
+
+            if (isset($line->item)) {
+                // GANTI bagian ini sesuai struktur tabel kamu
+                $unitHpp = $line->item->latest_hpp ?? $line->item->hpp ?? $line->item->last_purchase_price ?? 0;
+            }
+
+            $line->unit_hpp = $unitHpp;
+            $line->total_hpp = $unitHpp * (int) $line->qty_scanned;
+        });
+
+        $totalQty = $shipment->lines->sum('qty_scanned');
+        $totalLines = $shipment->lines->count();
+        $totalHpp = $shipment->lines->sum('total_hpp');
+
+        // Ringkasan per kategori
+        $summaryPerCategory = $shipment->lines
+            ->groupBy(function ($line) {
+                return optional(optional($line->item)->category)->name ?: 'Tanpa Kategori';
+            })
+            ->map(function ($group, $categoryName) {
+                return [
+                    'category_name' => $categoryName,
+                    'total_lines' => $group->count(),
+                    'total_qty' => $group->sum('qty_scanned'),
+                    'total_hpp' => $group->sum('total_hpp'),
+                ];
+            })
+            ->values()
+            ->sortBy('category_name');
+
+        return view('sales.shipments.show', [
+            'shipment' => $shipment,
+            'totalQty' => $totalQty,
+            'totalLines' => $totalLines,
+            'totalHpp' => $totalHpp,
+            'summaryPerCategory' => $summaryPerCategory,
+        ]);
+    }
+
+    /**
+     * HALAMAN EDIT / SCAN
+     * - Hanya boleh diakses kalau status = draft
+     * - Menggunakan layout scan + import (edit.blade.php).
+     */
+    public function edit(Shipment $shipment)
+    {
+        if ($shipment->status !== 'draft') {
+            return redirect()
+                ->route('sales.shipments.show', $shipment)
+                ->with('status', 'error')
+                ->with('message', 'Shipment bukan draft, tidak bisa di-edit / discan lagi.');
+        }
+
         $shipment->load(['store', 'lines.item', 'creator', 'invoice']);
 
-        return view('sales.shipments.show', compact('shipment'));
+        // Import preview (jika dipanggil dari importPreview)
+        $importPreview = session('shipment_import_preview.' . $shipment->id . '.rows') ?? null;
+        $importPreviewSummary = session('shipment_import_preview.' . $shipment->id . '.summary') ?? null;
+
+        return view('sales.shipments.edit', [
+            'shipment' => $shipment,
+            'importPreview' => $importPreview,
+            'importPreviewSummary' => $importPreviewSummary,
+        ]);
     }
 
     /**
      * Scan item → tambah / update line.
+     * - Hanya untuk draft
      */
     public function scanItem(Request $request, Shipment $shipment)
     {
@@ -132,7 +205,8 @@ class ShipmentController extends Controller
                 ], 409);
             }
 
-            return back()
+            return redirect()
+                ->route('sales.shipments.show', $shipment)
                 ->with('status', 'error')
                 ->with('message', $message);
         }
@@ -167,7 +241,8 @@ class ShipmentController extends Controller
                 ], 422);
             }
 
-            return back()
+            return redirect()
+                ->route('sales.shipments.edit', $shipment)
                 ->with('status', 'error')
                 ->with('message', $message)
                 ->withInput();
@@ -229,7 +304,7 @@ class ShipmentController extends Controller
         }
 
         return redirect()
-            ->route('sales.shipments.show', $shipment)
+            ->route('sales.shipments.edit', $shipment)
             ->with('last_scanned_line_id', $line->id);
     }
 
@@ -239,24 +314,22 @@ class ShipmentController extends Controller
     public function submit(Request $request, Shipment $shipment)
     {
         if ($shipment->status !== 'draft') {
-            return back()
+            return redirect()
+                ->route('sales.shipments.show', $shipment)
                 ->with('status', 'error')
                 ->with('message', 'Hanya shipment draft yang bisa di-submit.');
         }
 
         if ($shipment->lines()->count() === 0) {
-            return back()
+            return redirect()
+                ->route('sales.shipments.edit', $shipment)
                 ->with('status', 'error')
                 ->with('message', 'Tidak ada item di shipment ini.');
         }
 
         $shipment->status = 'submitted';
-
-        // Kalau nanti sudah ada kolom submitted_at / submitted_by di DB + fillable,
-        // bisa dihidupkan lagi ini:
         $shipment->submitted_at = now();
         $shipment->submitted_by = auth()->id();
-
         $shipment->save();
 
         return redirect()
@@ -271,13 +344,15 @@ class ShipmentController extends Controller
     public function post(Request $request, Shipment $shipment)
     {
         if ($shipment->status === 'posted') {
-            return back()
+            return redirect()
+                ->route('sales.shipments.show', $shipment)
                 ->with('status', 'error')
                 ->with('message', 'Shipment sudah diposting sebelumnya.');
         }
 
         if ($shipment->status !== 'submitted') {
-            return back()
+            return redirect()
+                ->route('sales.shipments.show', $shipment)
                 ->with('status', 'error')
                 ->with('message', 'Shipment harus berstatus submitted sebelum diposting.');
         }
@@ -285,7 +360,8 @@ class ShipmentController extends Controller
         $shipment->load(['lines.item', 'store']);
 
         if ($shipment->lines->isEmpty()) {
-            return back()
+            return redirect()
+                ->route('sales.shipments.show', $shipment)
                 ->with('status', 'error')
                 ->with('message', 'Tidak ada item di shipment ini.');
         }
@@ -293,7 +369,8 @@ class ShipmentController extends Controller
         $warehouse = Warehouse::where('code', 'WH-RTS')->first();
 
         if (!$warehouse) {
-            return back()
+            return redirect()
+                ->route('sales.shipments.show', $shipment)
                 ->with('status', 'error')
                 ->with('message', 'Warehouse WH-RTS belum dikonfigurasi.');
         }
@@ -309,7 +386,7 @@ class ShipmentController extends Controller
 
                 $totalQty += $qty;
 
-                // Kurangi stok FG dari WH-RTS → SELARAS dengan InventoryService & laporan lain
+                // Kurangi stok FG dari WH-RTS
                 $this->inventory->stockOut(
                     warehouseId: $warehouse->id,
                     itemId: $line->item_id,
@@ -318,20 +395,15 @@ class ShipmentController extends Controller
                     sourceType: 'shipment',
                     sourceId: $shipment->id,
                     notes: 'Shipment ' . $shipment->code . ' ke store ' . ($shipment->store->code ?? '-'),
-                    allowNegative: true, // stok FG tidak boleh minus
+                    allowNegative: true, // stok FG boleh minus / sesuai kebijakan
                     lotId: null, // FG tidak pakai LOT
-                    unitCostOverride: null, // biarkan pakai avg cost FG di WH-RTS
-                    affectLotCost: false, // jangan sentuh LotCost (bukan kain mentah)
+                    unitCostOverride: null,
+                    affectLotCost: false,
                 );
             }
 
             $shipment->status = 'posted';
             $shipment->total_qty = $totalQty;
-
-            // Kalau nanti ada kolom posted_at / posted_by di DB:
-            // $shipment->posted_at = now();
-            // $shipment->posted_by = auth()->id();
-
             $shipment->save();
         });
 
@@ -343,11 +415,11 @@ class ShipmentController extends Controller
 
     public function exportLines(Shipment $shipment)
     {
-        // Load relasi yang dibutuhkan
         $shipment->load(['store', 'lines.item']);
 
         if ($shipment->lines->isEmpty()) {
-            return back()
+            return redirect()
+                ->route('sales.shipments.show', $shipment)
                 ->with('status', 'error')
                 ->with('message', 'Tidak ada item di shipment ini untuk diekspor.');
         }
@@ -365,7 +437,7 @@ class ShipmentController extends Controller
             // Supaya Excel Windows baca UTF-8 dengan benar
             fprintf($handle, chr(0xEF) . chr(0xBB) . chr(0xBF));
 
-            // Header kolom (bisa kamu ubah sesuai kebutuhan)
+            // Header kolom
             fputcsv($handle, [
                 'Shipment Code',
                 'Tanggal',
@@ -375,7 +447,7 @@ class ShipmentController extends Controller
                 'Item Name',
                 'Qty Scanned',
                 'Catatan Line',
-            ], ';'); // pakai ; supaya aman kalau nama ada koma
+            ], ';');
 
             foreach ($shipment->lines as $line) {
                 $item = $line->item;
@@ -399,6 +471,52 @@ class ShipmentController extends Controller
         return response()->streamDownload($callback, $fileName, $headers);
     }
 
+    /**
+     * Bersihkan semua baris (ShipmentLine) dalam 1 shipment draft.
+     */
+    public function clearLines(Request $request, Shipment $shipment)
+    {
+        if ($shipment->status !== 'draft') {
+            $message = 'Shipment sudah tidak draft, baris tidak bisa dibersihkan.';
+
+            if ($request->expectsJson() || $request->ajax()) {
+                return response()->json([
+                    'status' => 'error',
+                    'message' => $message,
+                ], 409);
+            }
+
+            return redirect()
+                ->route('sales.shipments.show', $shipment)
+                ->with('status', 'error')
+                ->with('message', $message);
+        }
+
+        DB::transaction(function () use ($shipment) {
+            ShipmentLine::where('shipment_id', $shipment->id)->delete();
+        });
+
+        // Bersihkan juga state bantuan di session
+        session()->forget('last_scanned_line_id');
+        session()->forget('shipment_import_preview.' . $shipment->id);
+
+        if ($request->expectsJson() || $request->ajax()) {
+            return response()->json([
+                'status' => 'ok',
+                'message' => 'Semua baris berhasil dibersihkan.',
+                'totals' => [
+                    'total_qty' => 0,
+                    'total_lines' => 0,
+                ],
+            ]);
+        }
+
+        return redirect()
+            ->route('sales.shipments.edit', $shipment)
+            ->with('status', 'success')
+            ->with('message', 'Semua baris shipment berhasil dibersihkan.');
+    }
+
     public function destroyLine(Request $request, ShipmentLine $line)
     {
         $shipment = $line->shipment;
@@ -413,7 +531,10 @@ class ShipmentController extends Controller
                 ], 409);
             }
 
-            return back()->with('status', 'error')->with('message', $message);
+            return redirect()
+                ->route('sales.shipments.show', $shipment?->id ?? null)
+                ->with('status', 'error')
+                ->with('message', $message);
         }
 
         DB::transaction(function () use ($line) {
@@ -434,7 +555,8 @@ class ShipmentController extends Controller
             ]);
         }
 
-        return back()
+        return redirect()
+            ->route('sales.shipments.edit', $shipment)
             ->with('status', 'success')
             ->with('message', 'Baris berhasil dihapus.');
     }
@@ -456,7 +578,8 @@ class ShipmentController extends Controller
                 ], 409);
             }
 
-            return back()
+            return redirect()
+                ->route('sales.shipments.show', $shipment?->id ?? null)
                 ->with('status', 'error')
                 ->with('message', $message);
         }
@@ -492,13 +615,14 @@ class ShipmentController extends Controller
             ]);
         }
 
-        return back()
+        return redirect()
+            ->route('sales.shipments.edit', $shipment)
             ->with('status', 'success')
             ->with('message', 'Qty berhasil diperbarui.');
     }
 
     /**
-     * Opsional: placeholder syncScans, kalau masih belum dipakai.
+     * Opsional: placeholder syncScans.
      */
     public function syncScans(Request $request, Shipment $shipment)
     {
@@ -507,9 +631,6 @@ class ShipmentController extends Controller
             ->with('message', 'Fitur sync scans belum diimplementasi.');
     }
 
-    /**
-     * Helper: parse quantity dengan format lokal (contoh: "2,00", "1.000,00").
-     */
     /**
      * Helper: parse quantity dengan format lokal (contoh: "2,00", "1.000,00").
      */
@@ -545,20 +666,13 @@ class ShipmentController extends Controller
     }
 
     /**
-     * Import lines dari tabel Product / Quantity (paste dari Excel / CSV sederhana).
-     *
-     * Format per baris, contoh:
-     *  Product[TAB]Quantity
-     *  K5BLK[TAB]10,00
-     *  K7BLK[TAB]6,00
-     */
-    /**
      * Konfirmasi import: tambah / update ShipmentLine dari hasil preview.
      */
     public function importLines(Request $request, Shipment $shipment)
     {
         if ($shipment->status !== 'draft') {
-            return back()
+            return redirect()
+                ->route('sales.shipments.show', $shipment)
                 ->with('status', 'error')
                 ->with('message', 'Hanya shipment draft yang bisa di-import.');
         }
@@ -570,7 +684,6 @@ class ShipmentController extends Controller
         ]);
 
         $rows = $data['rows'];
-
         $created = 0;
         $updated = 0;
         $skipped = 0;
@@ -632,16 +745,21 @@ class ShipmentController extends Controller
             }
         }
 
+        // Setelah import tetap di halaman edit (scan)
         return redirect()
-            ->route('sales.shipments.show', $shipment)
+            ->route('sales.shipments.edit', $shipment)
             ->with('status', 'success')
             ->with('message', $message);
     }
 
+    /**
+     * Preview import: simpan di session, lalu render di halaman edit.
+     */
     public function importPreview(Request $request, Shipment $shipment)
     {
         if ($shipment->status !== 'draft') {
-            return back()
+            return redirect()
+                ->route('sales.shipments.show', $shipment)
                 ->with('status', 'error')
                 ->with('message', 'Hanya shipment draft yang bisa di-import.');
         }
@@ -670,7 +788,6 @@ class ShipmentController extends Controller
                     $cols[] = is_null($value) ? '' : trim((string) $value);
                 }
 
-                // Skip baris kosong total
                 if (count(array_filter($cols, fn($v) => $v !== '')) === 0) {
                     continue;
                 }
@@ -682,7 +799,8 @@ class ShipmentController extends Controller
             $content = file_get_contents($file->getRealPath());
 
             if (trim($content) === '') {
-                return back()
+                return redirect()
+                    ->route('sales.shipments.edit', $shipment)
                     ->with('status', 'error')
                     ->with('message', 'File kosong, tidak ada data untuk dipreview.');
             }
@@ -702,7 +820,8 @@ class ShipmentController extends Controller
         }
 
         if (empty($rows)) {
-            return back()
+            return redirect()
+                ->route('sales.shipments.edit', $shipment)
                 ->with('status', 'error')
                 ->with('message', 'File kosong, tidak ada data untuk dipreview.');
         }
@@ -753,8 +872,8 @@ class ShipmentController extends Controller
             }
 
             // ✅ parse qty → integer
-            $parsedQtyRaw = $this->parseImportedQty($qtyRaw); // misal hasilnya 2.00
-            $parsedQty = (int) round($parsedQtyRaw); // jadi 2 (integer)
+            $parsedQtyRaw = $this->parseImportedQty($qtyRaw);
+            $parsedQty = (int) round($parsedQtyRaw);
 
             if ($parsedQty <= 0) {
                 $previewRows[] = [
@@ -800,7 +919,7 @@ class ShipmentController extends Controller
                 'row_number' => $index + 1,
                 'raw_product' => $productCode,
                 'raw_qty' => $qtyRaw,
-                'parsed_qty' => $parsedQty, // sudah integer
+                'parsed_qty' => $parsedQty,
                 'item_code' => $item->code,
                 'item_name' => $item->name,
                 'status' => 'ok',
@@ -810,20 +929,22 @@ class ShipmentController extends Controller
             $totalQtyOk += $parsedQty;
         }
 
-        // Load relasi seperti show()
-        $shipment->load(['store', 'lines.item', 'creator', 'invoice']);
-
+        // Simpan preview di session supaya bisa diambil di edit()
         $previewSummary = [
             'ok_count' => $okCount,
             'skip_count' => $skipCount,
             'total_qty_ok' => $totalQtyOk,
         ];
 
-        return view('sales.shipments.show', [
-            'shipment' => $shipment,
-            'importPreview' => $previewRows,
-            'importPreviewSummary' => $previewSummary,
+        session([
+            'shipment_import_preview.' . $shipment->id . '.rows' => $previewRows,
+            'shipment_import_preview.' . $shipment->id . '.summary' => $previewSummary,
         ]);
-    }
 
+        return redirect()
+            ->route('sales.shipments.edit', [
+                'shipment' => $shipment->id,
+                'show_preview' => 1, // <-- ini yang dibaca di Blade
+            ]);
+    }
 }

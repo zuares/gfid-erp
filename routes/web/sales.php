@@ -51,11 +51,16 @@ Route::middleware(['web', 'auth', 'role:owner,admin'])->group(function () {
         Route::get('shipments/create', [ShipmentController::class, 'create'])
             ->name('shipments.create');
 
+        Route::get('shipments/{shipment}/edit', [ShipmentController::class, 'edit'])
+            ->name('shipments.edit');
+
         Route::post('shipments', [ShipmentController::class, 'store'])
             ->name('shipments.store');
 
         Route::get('shipments/{shipment}', [ShipmentController::class, 'show'])
             ->name('shipments.show');
+        Route::post('/shipments/{shipment}/clear-lines', [ShipmentController::class, 'clearLines'])
+            ->name('shipments.clear_lines');
 
         Route::post('shipments/{shipment}/scan-item', [ShipmentController::class, 'scanItem'])
             ->name('shipments.scan_item');
