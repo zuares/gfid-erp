@@ -484,7 +484,6 @@
         .scan-toast {
             position: fixed;
             top: 4rem;
-            /* di bawah navbar */
             left: 50%;
             transform: translateX(-50%);
             z-index: 1080;
@@ -562,6 +561,10 @@
         } elseif (str_contains($storeKey, 'TTK') || str_contains($storeKey, 'TIKTOK')) {
             $scanTheme = 'tiktok';
         }
+
+        // data preview import (opsional, diisi oleh ShipmentController@importPreview)
+        $importPreview = $importPreview ?? null;
+        $importPreviewSummary = $importPreviewSummary ?? null;
     @endphp
 
     <div class="page-wrap page-theme-{{ $scanTheme }}">
@@ -653,13 +656,13 @@
                                     action="{{ route('sales.shipments.scan_item', $shipment) }}">
                                     @csrf
                                     <div class="mb-2">
-                                        <label class="form-label small mb-1">Scan kode / barcode</label>
+                                        <label class="form-label small mb-1">Scan / Input kode</label>
                                         <input type="text" name="scan_code" class="form-control scan-input"
                                             id="scanInput" placeholder="Fokus di sini lalu scan..." autocomplete="off"
                                             required>
                                     </div>
                                     <div class="scan-meta small">
-                                        Setelah scan, Qty akan otomatis bertambah pada baris yang sesuai.
+                                        Qty bertambah otomatis pada baris yang cocok.
                                     </div>
                                 </form>
                             </div>
@@ -709,7 +712,7 @@
                                 @endif
                             </div>
 
-                            {{-- Ke scan terakhir di bawah catatan --}}
+                            {{-- Ke scan terakhir --}}
                             @if ($lastScannedLineId)
                                 <div class="d-flex justify-content-end mt-3">
                                     <button type="button" class="btn btn-sm btn-jump-last" id="btnJumpLast">
@@ -816,12 +819,7 @@
                         <div class="meta-label mb-1">
                             Daftar Barang Keluar
                         </div>
-                        <div class="small text-muted">
-                            Klik angka <strong>Qty</strong> untuk mengedit jumlah.
-                            @if ($shipment->status === 'draft')
-                                Klik ikon 🗑 untuk menghapus baris.
-                            @endif
-                        </div>
+                        {{-- hint text dihilangkan supaya lebih clean --}}
                     </div>
 
                     <div class="d-flex flex-wrap gap-2 align-items-center">
@@ -845,6 +843,50 @@
                         </div>
                     </div>
                 </div>
+
+                {{-- IMPORT DARI FILE (hanya draft) --}}
+                @if ($shipment->status === 'draft')
+                    <div class="mb-3">
+                        <div class="d-flex justify-content-between align-items-center mb-2 flex-wrap gap-2">
+                            <div class="d-flex align-items-center gap-2 flex-wrap">
+                                <span class="meta-label">
+                                    Import dari File
+                                </span>
+                                <span
+                                    class="badge rounded-pill bg-light text-muted border d-none d-sm-inline-flex align-items-center gap-1">
+                                    <span>CSV / TXT / XLSX</span>
+                                </span>
+                            </div>
+
+                            @if ($importPreview && is_array($importPreview) && count($importPreview))
+                                <button type="button" class="btn btn-sm btn-theme-outline" data-bs-toggle="modal"
+                                    data-bs-target="#importPreviewModal">
+                                    Lihat Preview Terakhir
+                                </button>
+                            @endif
+                        </div>
+
+                        {{-- Upload file untuk preview --}}
+                        <form method="POST" action="{{ route('sales.shipments.import_preview', $shipment) }}"
+                            enctype="multipart/form-data" class="row g-2 align-items-end">
+                            @csrf
+                            <div class="col-sm-8 col-md-6">
+                                <label class="form-label form-label-sm">File</label>
+                                <input type="file" name="file"
+                                    class="form-control form-control-sm @error('file') is-invalid @enderror"
+                                    accept=".csv,.txt,.xlsx,.xls" required>
+                                @error('file')
+                                    <div class="invalid-feedback">{{ $message }}</div>
+                                @enderror
+                            </div>
+                            <div class="col-sm-4 col-md-3">
+                                <button type="submit" class="btn btn-sm btn-theme-outline mt-3 mt-sm-0">
+                                    Upload &amp; Preview
+                                </button>
+                            </div>
+                        </form>
+                    </div>
+                @endif
 
                 {{-- KOTAK SCROLL KECIL + HEADER STICKY --}}
                 <div class="table-responsive lines-wrapper" id="linesWrapper">
@@ -951,7 +993,7 @@
                             </a>
                         @endif
 
-                        {{-- 🔥 Tombol Invoice (dari Shipment) --}}
+                        {{-- Tombol Invoice (dari Shipment) --}}
                         @if ($shipment->status === 'posted')
                             @if (empty($shipment->sales_invoice_id))
                                 <a href="{{ route('sales.invoices.create_from_shipment', $shipment) }}"
@@ -990,6 +1032,113 @@
             </div>
         </div>
     </div>
+
+    {{-- MODAL PREVIEW IMPORT (jika ada preview) --}}
+    @if ($shipment->status === 'draft' && $importPreview && is_array($importPreview) && count($importPreview))
+        <div class="modal fade" id="importPreviewModal" tabindex="-1" aria-hidden="true">
+            <div class="modal-dialog modal-xl modal-dialog-scrollable modal-fullscreen-sm-down">
+                <div class="modal-content">
+                    <div class="modal-header">
+                        <h5 class="modal-title">
+                            Preview Import Barang
+                        </h5>
+                        <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
+                    </div>
+                    <div class="modal-body">
+                        @if ($importPreviewSummary)
+                            <div class="d-flex flex-wrap gap-2 mb-3">
+                                <span class="summary-pill">
+                                    OK:
+                                    <span class="fw-semibold ms-1">
+                                        {{ $importPreviewSummary['ok_count'] ?? 0 }}
+                                    </span>
+                                </span>
+                                <span class="summary-pill">
+                                    Dilewati:
+                                    <span class="fw-semibold ms-1">
+                                        {{ $importPreviewSummary['skip_count'] ?? 0 }}
+                                    </span>
+                                </span>
+                                <span class="summary-pill">
+                                    Total Qty OK:
+                                    <span class="fw-semibold ms-1">
+                                        {{ number_format($importPreviewSummary['total_qty_ok'] ?? 0, 0, ',', '.') }}
+                                    </span>
+                                </span>
+                            </div>
+                        @endif
+
+                        <div class="table-responsive">
+                            <table class="table table-sm align-middle mb-0">
+                                <thead>
+                                    <tr class="small text-uppercase text-muted">
+                                        <th style="width:40px;">#</th>
+                                        <th style="width:140px;">Kode Barang</th>
+                                        <th style="width:110px;">Qty (File)</th>
+                                        <th style="width:110px;">Qty Import</th>
+                                        <th>Keterangan</th>
+                                    </tr>
+                                </thead>
+                                <tbody>
+                                    @foreach ($importPreview as $row)
+                                        @php $isOk = ($row['status'] ?? null) === 'ok'; @endphp
+                                        <tr class="small {{ $isOk ? '' : 'table-warning' }}">
+                                            <td>{{ $loop->iteration }}</td>
+                                            <td>
+                                                {{-- Hanya tampilkan kode barang, prioritaskan item_code --}}
+                                                {{ $row['item_code'] ?? ($row['raw_product'] ?? '') }}
+                                            </td>
+                                            <td>{{ $row['raw_qty'] ?? '' }}</td>
+                                            <td>
+                                                @if ($isOk)
+                                                    {{ number_format($row['parsed_qty'] ?? 0, 0, ',', '.') }}
+                                                @else
+                                                    -
+                                                @endif
+                                            </td>
+                                            <td>
+                                                @if ($isOk)
+                                                    <span class="text-success">OK</span>
+                                                @else
+                                                    <span class="text-danger">
+                                                        {{ $row['error'] ?? 'Tidak bisa diimport.' }}
+                                                    </span>
+                                                @endif
+                                            </td>
+                                        </tr>
+                                    @endforeach
+                                </tbody>
+
+                            </table>
+                        </div>
+                    </div>
+
+                    <div class="modal-footer">
+                        <button type="button" class="btn btn-sm btn-secondary" data-bs-dismiss="modal">
+                            Tutup
+                        </button>
+
+                        {{-- Form konfirmasi import: hanya kirim baris OK --}}
+                        <form method="POST" action="{{ route('sales.shipments.import_lines', $shipment) }}">
+                            @csrf
+                            @foreach ($importPreview as $i => $row)
+                                @if (($row['status'] ?? null) === 'ok')
+                                    <input type="hidden" name="rows[{{ $i }}][product_code]"
+                                        value="{{ $row['item_code'] }}">
+                                    <input type="hidden" name="rows[{{ $i }}][qty]"
+                                        value="{{ (int) ($row['parsed_qty'] ?? 0) }}">
+                                @endif
+                            @endforeach
+
+                            <button type="submit" class="btn btn-sm btn-theme-main">
+                                Import ke Shipment
+                            </button>
+                        </form>
+                    </div>
+                </div>
+            </div>
+        </div>
+    @endif
 
     {{-- TOAST --}}
     <div id="scanToast" class="scan-toast"></div>
@@ -1030,7 +1179,7 @@
                             }
                         }, 450);
                     });
-                }, 2600); // 2.6 detik sebelum mulai fade
+                }, 2600);
             }
 
             function focusScan() {
@@ -1248,7 +1397,7 @@
                         try {
                             data = await res.json();
                         } catch (e) {
-                            form.submit(); // fallback
+                            form.submit();
                             return;
                         }
 
@@ -1312,9 +1461,16 @@
                         }, 2200);
                     }
                 }
+
+                // Auto show modal preview import jika ada
+                const importPreviewModalEl = document.getElementById('importPreviewModal');
+                if (importPreviewModalEl && window.bootstrap && typeof window.bootstrap.Modal === 'function') {
+                    const modal = new bootstrap.Modal(importPreviewModalEl);
+                    modal.show();
+                }
             });
 
-            // Ke scan terakhir (hanya saat draft karena tombol cuma muncul di draft)
+            // Ke scan terakhir
             if (btnJumpLast && linesWrapper) {
                 btnJumpLast.addEventListener('click', function() {
                     if (!lastScannedLineId) return;
@@ -1394,7 +1550,7 @@
                             showToast('success', data.message || 'Berhasil scan.');
                         } else {
                             let row = linesTbody.querySelector('tr[data-line-id="' + line.id +
-                            '"]');
+                                '"]');
 
                             if (!row) {
                                 const emptyRow = linesTbody.querySelector('.no-lines-row');
@@ -1403,7 +1559,6 @@
                                 }
 
                                 const updateUrl = line.update_qty_url ? line.update_qty_url : '';
-
                                 const deleteUrl = deleteUrlTemplate.replace('__LINE_ID__', line.id);
 
                                 row = document.createElement('tr');

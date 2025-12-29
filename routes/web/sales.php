@@ -76,6 +76,10 @@ Route::middleware(['web', 'auth', 'role:owner,admin'])->group(function () {
             ->name('shipments.update_line_qty');
         Route::delete('shipments/lines/{line}', [ShipmentController::class, 'destroyLine'])
             ->name('shipments.destroy_line');
+        Route::post('/shipments/{shipment}/import-lines', [ShipmentController::class, 'importLines'])
+            ->name('shipments.import_lines');
+        Route::post('/shipments/{shipment}/import-preview', [ShipmentController::class, 'importPreview'])
+            ->name('shipments.import_preview');
 
         /**
          * =========================

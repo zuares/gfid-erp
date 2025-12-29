@@ -13,6 +13,7 @@ use App\Services\Inventory\InventoryService;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Auth;
 use Illuminate\Support\Facades\DB;
+use PhpOffice\PhpSpreadsheet\IOFactory;
 
 class ShipmentController extends Controller
 {
@@ -505,4 +506,324 @@ class ShipmentController extends Controller
             ->with('status', 'error')
             ->with('message', 'Fitur sync scans belum diimplementasi.');
     }
+
+    /**
+     * Helper: parse quantity dengan format lokal (contoh: "2,00", "1.000,00").
+     */
+    /**
+     * Helper: parse quantity dengan format lokal (contoh: "2,00", "1.000,00").
+     */
+    protected function parseImportedQty(?string $raw): int
+    {
+        if ($raw === null) {
+            return 0;
+        }
+
+        // Trim & hapus non-breaking space
+        $value = trim(str_replace("\xc2\xa0", ' ', $raw));
+        if ($value === '') {
+            return 0;
+        }
+
+        // Hapus spasi di dalam angka
+        $value = str_replace(' ', '', $value);
+
+        // Hapus titik pemisah ribuan
+        $value = str_replace('.', '', $value);
+
+        // Ganti koma jadi titik (desimal)
+        $value = str_replace(',', '.', $value);
+
+        if (!is_numeric($value)) {
+            return 0;
+        }
+
+        $float = (float) $value;
+        $qty = (int) round($float);
+
+        return max(0, $qty);
+    }
+
+    /**
+     * Import lines dari tabel Product / Quantity (paste dari Excel / CSV sederhana).
+     *
+     * Format per baris, contoh:
+     *  Product[TAB]Quantity
+     *  K5BLK[TAB]10,00
+     *  K7BLK[TAB]6,00
+     */
+    /**
+     * Konfirmasi import: tambah / update ShipmentLine dari hasil preview.
+     */
+    public function importLines(Request $request, Shipment $shipment)
+    {
+        if ($shipment->status !== 'draft') {
+            return back()
+                ->with('status', 'error')
+                ->with('message', 'Hanya shipment draft yang bisa di-import.');
+        }
+
+        $data = $request->validate([
+            'rows' => ['required', 'array'],
+            'rows.*.product_code' => ['required', 'string', 'max:255'],
+            'rows.*.qty' => ['required', 'integer', 'min:1'],
+        ]);
+
+        $rows = $data['rows'];
+
+        $created = 0;
+        $updated = 0;
+        $skipped = 0;
+        $errors = [];
+
+        DB::transaction(function () use ($rows, $shipment, &$created, &$updated, &$skipped, &$errors) {
+            foreach ($rows as $idx => $row) {
+                $productCode = trim($row['product_code'] ?? '');
+                $qty = (int) ($row['qty'] ?? 0);
+
+                if ($productCode === '' || $qty <= 0) {
+                    $skipped++;
+                    $errors[] = "Baris " . ($idx + 1) . " tidak valid.";
+                    continue;
+                }
+
+                $item = Item::query()
+                    ->where('type', 'finished_good')
+                    ->where(function ($q) use ($productCode) {
+                        $q->where('code', $productCode)
+                            ->orWhere('barcode', $productCode);
+                    })
+                    ->first();
+
+                if (!$item) {
+                    $skipped++;
+                    $errors[] = "Baris " . ($idx + 1) . " item '{$productCode}' tidak ditemukan.";
+                    continue;
+                }
+
+                /** @var \App\Models\ShipmentLine|null $line */
+                $line = ShipmentLine::query()
+                    ->where('shipment_id', $shipment->id)
+                    ->where('item_id', $item->id)
+                    ->lockForUpdate()
+                    ->first();
+
+                if ($line) {
+                    // Tambah qty (bukan replace) → selaras dengan scan
+                    $line->qty_scanned = (int) $line->qty_scanned + $qty;
+                    $line->save();
+                    $updated++;
+                } else {
+                    ShipmentLine::create([
+                        'shipment_id' => $shipment->id,
+                        'item_id' => $item->id,
+                        'qty_scanned' => $qty,
+                    ]);
+                    $created++;
+                }
+            }
+        });
+
+        $message = "Import selesai. Baris baru: {$created}, diupdate: {$updated}, dilewati: {$skipped}.";
+        if (!empty($errors)) {
+            $message .= ' Beberapa catatan: ' . implode(' ', array_slice($errors, 0, 5));
+            if (count($errors) > 5) {
+                $message .= ' (dan ' . (count($errors) - 5) . ' error lainnya)';
+            }
+        }
+
+        return redirect()
+            ->route('sales.shipments.show', $shipment)
+            ->with('status', 'success')
+            ->with('message', $message);
+    }
+
+    public function importPreview(Request $request, Shipment $shipment)
+    {
+        if ($shipment->status !== 'draft') {
+            return back()
+                ->with('status', 'error')
+                ->with('message', 'Hanya shipment draft yang bisa di-import.');
+        }
+
+        $request->validate([
+            'file' => ['required', 'file', 'mimes:csv,txt,xlsx,xls'],
+        ]);
+
+        $file = $request->file('file');
+        $ext = strtolower($file->getClientOriginalExtension());
+
+        $rows = [];
+
+        if (in_array($ext, ['xlsx', 'xls'])) {
+            // 📄 Baca dari Excel (XLSX / XLS)
+            $spreadsheet = IOFactory::load($file->getRealPath());
+            $sheet = $spreadsheet->getActiveSheet();
+
+            foreach ($sheet->getRowIterator() as $rowIndex => $row) {
+                $cellIterator = $row->getCellIterator();
+                $cellIterator->setIterateOnlyExistingCells(false);
+
+                $cols = [];
+                foreach ($cellIterator as $cell) {
+                    $value = $cell->getValue();
+                    $cols[] = is_null($value) ? '' : trim((string) $value);
+                }
+
+                // Skip baris kosong total
+                if (count(array_filter($cols, fn($v) => $v !== '')) === 0) {
+                    continue;
+                }
+
+                $rows[] = $cols;
+            }
+        } else {
+            // 📄 Baca dari CSV / TXT
+            $content = file_get_contents($file->getRealPath());
+
+            if (trim($content) === '') {
+                return back()
+                    ->with('status', 'error')
+                    ->with('message', 'File kosong, tidak ada data untuk dipreview.');
+            }
+
+            $lines = preg_split("/\r\n|\n|\r/", trim($content));
+
+            foreach ($lines as $line) {
+                $row = trim($line);
+                if ($row === '') {
+                    continue;
+                }
+
+                // Pisah kolom: support TAB, titik koma, koma, atau pipe
+                $cols = preg_split('/\s*[\t;,\|]\s*/', $row);
+                $rows[] = $cols;
+            }
+        }
+
+        if (empty($rows)) {
+            return back()
+                ->with('status', 'error')
+                ->with('message', 'File kosong, tidak ada data untuk dipreview.');
+        }
+
+        $previewRows = [];
+        $okCount = 0;
+        $skipCount = 0;
+        $totalQtyOk = 0;
+
+        foreach ($rows as $index => $cols) {
+            // Minimal 2 kolom: Product, Qty
+            if (count($cols) < 2) {
+                $previewRows[] = [
+                    'row_number' => $index + 1,
+                    'raw_product' => isset($cols[0]) ? trim($cols[0]) : '',
+                    'raw_qty' => isset($cols[1]) ? $cols[1] : '',
+                    'parsed_qty' => 0,
+                    'item_code' => null,
+                    'item_name' => null,
+                    'status' => 'skip',
+                    'error' => 'Kolom kurang (butuh Product & Quantity).',
+                ];
+                $skipCount++;
+                continue;
+            }
+
+            $productCode = trim($cols[0] ?? '');
+            $qtyRaw = $cols[1] ?? '';
+
+            // Skip header
+            if (strtolower($productCode) === 'product' || strtolower($productCode) === 'kode') {
+                continue;
+            }
+
+            if ($productCode === '') {
+                $previewRows[] = [
+                    'row_number' => $index + 1,
+                    'raw_product' => $productCode,
+                    'raw_qty' => $qtyRaw,
+                    'parsed_qty' => 0,
+                    'item_code' => null,
+                    'item_name' => null,
+                    'status' => 'skip',
+                    'error' => 'Kode product kosong.',
+                ];
+                $skipCount++;
+                continue;
+            }
+
+            // ✅ parse qty → integer
+            $parsedQtyRaw = $this->parseImportedQty($qtyRaw); // misal hasilnya 2.00
+            $parsedQty = (int) round($parsedQtyRaw); // jadi 2 (integer)
+
+            if ($parsedQty <= 0) {
+                $previewRows[] = [
+                    'row_number' => $index + 1,
+                    'raw_product' => $productCode,
+                    'raw_qty' => $qtyRaw,
+                    'parsed_qty' => 0,
+                    'item_code' => null,
+                    'item_name' => null,
+                    'status' => 'skip',
+                    'error' => 'Qty tidak valid / <= 0.',
+                ];
+                $skipCount++;
+                continue;
+            }
+
+            // Cari item finished_good
+            $item = Item::query()
+                ->where('type', 'finished_good')
+                ->where(function ($q) use ($productCode) {
+                    $q->where('code', $productCode)
+                        ->orWhere('barcode', $productCode);
+                })
+                ->first();
+
+            if (!$item) {
+                $previewRows[] = [
+                    'row_number' => $index + 1,
+                    'raw_product' => $productCode,
+                    'raw_qty' => $qtyRaw,
+                    'parsed_qty' => $parsedQty,
+                    'item_code' => null,
+                    'item_name' => null,
+                    'status' => 'skip',
+                    'error' => "Item '{$productCode}' tidak ditemukan / bukan finished_good.",
+                ];
+                $skipCount++;
+                continue;
+            }
+
+            // OK
+            $previewRows[] = [
+                'row_number' => $index + 1,
+                'raw_product' => $productCode,
+                'raw_qty' => $qtyRaw,
+                'parsed_qty' => $parsedQty, // sudah integer
+                'item_code' => $item->code,
+                'item_name' => $item->name,
+                'status' => 'ok',
+                'error' => null,
+            ];
+            $okCount++;
+            $totalQtyOk += $parsedQty;
+        }
+
+        // Load relasi seperti show()
+        $shipment->load(['store', 'lines.item', 'creator', 'invoice']);
+
+        $previewSummary = [
+            'ok_count' => $okCount,
+            'skip_count' => $skipCount,
+            'total_qty_ok' => $totalQtyOk,
+        ];
+
+        return view('sales.shipments.show', [
+            'shipment' => $shipment,
+            'importPreview' => $previewRows,
+            'importPreviewSummary' => $previewSummary,
+        ]);
+    }
+
 }
