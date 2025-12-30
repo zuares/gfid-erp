@@ -17,7 +17,10 @@
     $salesInvoiceOpen = request()->routeIs('sales.invoices.*');
     $salesShipmentOpen = request()->routeIs('sales.shipments.*');
     $salesShipmentReturnOpen = request()->routeIs('sales.shipment_returns.*');
-    $salesReportOpen = request()->routeIs('sales.reports.*');
+
+    // ✅ buka group Sales kalau di halaman laporan pengiriman juga
+    $salesReportOpen = request()->routeIs('sales.reports.*') || request()->routeIs('sales.shipments.report');
+
     $salesOpen = $salesInvoiceOpen || $salesShipmentOpen || $salesShipmentReturnOpen || $salesReportOpen;
 
     $payrollOpen =
@@ -481,6 +484,17 @@
                     <a href="{{ route('sales.shipment_returns.create') }}"
                         class="sidebar-link sidebar-link-sub {{ request()->routeIs('sales.shipment_returns.create') ? 'active' : '' }}">
                         <span class="icon">＋</span><span>Retur Shipment Baru</span>
+                    </a>
+
+                    {{-- ✅ Sales Reports (Laporan Pengiriman) --}}
+                    <div class="px-3 pt-3 pb-1 text-uppercase"
+                        style="font-size:.68rem; letter-spacing:.12em; color:var(--muted);">
+                        Sales Reports
+                    </div>
+
+                    <a href="{{ route('sales.shipments.report') }}"
+                        class="sidebar-link sidebar-link-sub {{ request()->routeIs('sales.shipments.report') ? 'active' : '' }}">
+                        <span class="icon">📊</span><span>Laporan Pengiriman</span>
                     </a>
                 </div>
             </li>

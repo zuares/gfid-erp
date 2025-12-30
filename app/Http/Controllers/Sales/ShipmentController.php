@@ -947,4 +947,95 @@ class ShipmentController extends Controller
                 'show_preview' => 1, // <-- ini yang dibaca di Blade
             ]);
     }
+
+    public function report(Request $request)
+    {
+        // Default: bulan berjalan
+        $dateFrom = $request->input('date_from');
+        $dateTo = $request->input('date_to');
+
+        if (!$dateFrom || !$dateTo) {
+            $dateFrom = now()->startOfMonth()->toDateString();
+            $dateTo = now()->toDateString();
+        }
+
+        $storeId = $request->input('store_id');
+        $status = $request->input('status');
+
+        $stores = Store::orderBy('code')->get();
+
+        $statusOptions = [
+            'draft' => 'Draft',
+            'submitted' => 'Submitted',
+            'posted' => 'Posted',
+        ];
+
+        $shipments = Shipment::query()
+            ->with(['store', 'lines.item'])
+        // ⚠️ pake whereDate supaya kalau kolom "date" ternyata DATETIME,
+        // shipment hari terakhir tetap ikut.
+            ->when($dateFrom && $dateTo, function ($q) use ($dateFrom, $dateTo) {
+                $q->whereDate('date', '>=', $dateFrom)
+                    ->whereDate('date', '<=', $dateTo);
+            })
+            ->when($storeId, function ($q) use ($storeId) {
+                $q->where('store_id', $storeId);
+            })
+            ->when($status, function ($q) use ($status) {
+                $q->where('status', $status);
+            })
+            ->orderBy('date')
+            ->orderBy('id')
+            ->get();
+
+        $rows = $shipments->map(function (Shipment $shipment) {
+            $totalQty = 0;
+            $totalHpp = 0;
+            $totalLines = 0;
+
+            foreach ($shipment->lines as $line) {
+                $qty = (int) $line->qty_scanned;
+                if ($qty <= 0) {
+                    continue;
+                }
+
+                $totalLines++;
+
+                $unitHpp = 0;
+                if ($line->item) {
+                    $unitHpp = $line->item->latest_hpp ?? $line->item->hpp ?? $line->item->last_purchase_price ?? 0;
+                }
+
+                $totalQty += $qty;
+                $totalHpp += $unitHpp * $qty;
+            }
+
+            return (object) [
+                'shipment' => $shipment,
+                'total_qty' => $totalQty,
+                'total_lines' => $totalLines,
+                'total_hpp' => $totalHpp,
+            ];
+        });
+
+        $summary = [
+            'total_shipments' => $rows->count(),
+            'total_qty' => $rows->sum('total_qty'),
+            'total_hpp' => $rows->sum('total_hpp'),
+        ];
+
+        return view('sales.shipments.report', [
+            'rows' => $rows,
+            'summary' => $summary,
+            'stores' => $stores,
+            'statusOptions' => $statusOptions,
+            'filters' => [
+                'date_from' => $dateFrom,
+                'date_to' => $dateTo,
+                'store_id' => $storeId,
+                'status' => $status,
+            ],
+        ]);
+    }
+
 }

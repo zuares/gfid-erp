@@ -1,4 +1,5 @@
 <?php
+
 use Illuminate\Support\Facades\Route;
 
 Route::middleware(['auth'])->group(function () {
@@ -6,13 +7,21 @@ Route::middleware(['auth'])->group(function () {
     Route::get('/dashboard', function () {
         $user = auth()->user();
 
-        // kalau operating → lempar ke Flow Dashboard
-        if ($user && $user->role === 'operating') {
-            return redirect()
-                ->route('production.reports.production_flow_dashboard');
+        if (!$user) {
+            return redirect()->route('login');
         }
 
-        // owner / admin → tetap dashboard biasa
+        // operating → Flow Dashboard produksi
+        if ($user->role === 'operating') {
+            return redirect()->route('production.reports.production_flow_dashboard');
+        }
+
+        // admin → langsung ke laporan shipment
+        if ($user->role === 'admin') {
+            return redirect()->route('sales.shipments.report');
+        }
+
+        // owner / role lain → dashboard biasa
         return view('dashboard.index');
     })->name('dashboard');
 
