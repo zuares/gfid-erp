@@ -193,11 +193,6 @@
             white-space: nowrap;
         }
 
-        /* Warna selisih:
-               < 0 = merah
-               = 0 = hijau
-               > 0 = kuning
-            */
         .diff-negative {
             color: #dc2626;
             font-weight: 800;
@@ -314,7 +309,6 @@
             font-size: .8rem;
         }
 
-        /* HELP BOX CARA PENGISIAN */
         .so-help {
             margin-top: .75rem;
             padding: .55rem .7rem;
@@ -339,7 +333,6 @@
             margin-bottom: .1rem;
         }
 
-        /* ACTION BAR BAWAH */
         .so-action-bottom-card {
             margin-top: .75rem;
         }
@@ -395,17 +388,18 @@
             </div>
         </div>
 
-        <div class="mobile-stack">
-            {{-- ================= META + FORM WRAPPER ================= --}}
-            <div class="section-meta">
-                <form id="soUpdateForm" action="{{ route('inventory.stock_opnames.update', $opname) }}" method="POST">
-                    @csrf
-                    @method('PUT')
+        {{-- FORM WRAPPER --}}
+        <form id="soUpdateForm" action="{{ route('inventory.stock_opnames.update', $opname) }}" method="POST">
+            @csrf
+            @method('PUT')
 
-                    {{-- kontrol mode submit --}}
-                    <input type="hidden" name="mark_reviewed" id="mark_reviewed" value="0">
-                    <input type="hidden" name="force_auto_fill" id="force_auto_fill" value="0">
+            {{-- kontrol mode submit --}}
+            <input type="hidden" name="mark_reviewed" id="mark_reviewed" value="0">
+            <input type="hidden" name="force_auto_fill" id="force_auto_fill" value="0">
 
+            <div class="mobile-stack">
+                {{-- ================= META ================= --}}
+                <div class="section-meta">
                     <div class="card card-main">
                         <div class="card-body">
                             <div class="row g-3 align-items-start">
@@ -469,373 +463,372 @@
                             @endif
                         </div>
                     </div>
-            </div>
+                </div>
 
-            {{-- ================= TAMBAH ITEM (OPENING & PERIODIK, AJAX) ================= --}}
-            <div class="section-add">
-                @if ($canModifyLines)
-                    {{-- MOBILE SIMPLE ADD --}}
-                    <div class="card card-main opening-add-simple">
-                        <div class="card-body">
-                            <div id="openingAddMobile"
-                                data-action="{{ route('inventory.stock_opnames.lines.store', $opname) }}">
-                                {{-- CSRF untuk AJAX --}}
-                                <input type="hidden" id="openingAddTokenMobile" value="{{ csrf_token() }}">
-                                <input type="hidden" name="_token" value="{{ csrf_token() }}">
+                {{-- ================= TAMBAH ITEM (OPENING & PERIODIK, AJAX) ================= --}}
+                <div class="section-add">
+                    @if ($canModifyLines)
+                        {{-- MOBILE SIMPLE ADD --}}
+                        <div class="card card-main opening-add-simple">
+                            <div class="card-body">
+                                <div id="openingAddMobile"
+                                    data-action="{{ route('inventory.stock_opnames.lines.store', $opname) }}">
+                                    {{-- CSRF untuk AJAX --}}
+                                    <input type="hidden" id="openingAddTokenMobile" value="{{ csrf_token() }}">
+                                    <input type="hidden" name="_token" value="{{ csrf_token() }}">
 
-                                <div class="opening-add-row">
-                                    <div id="opening-item-suggest-mobile">
-                                        <label class="pill-label mb-1">Item</label>
-                                        <x-item-suggest idName="item_id" :idValue="old('item_id')" :displayValue="''"
-                                            placeholder="Kode / nama" :autofocus="false" :autoSelectFirst="true" />
-                                    </div>
-
-                                    <div>
-                                        <label class="pill-label mb-1">Qty Fisik</label>
-                                        <x-number-input name="physical_qty" :value="old('physical_qty')" mode="integer" min="0"
-                                            class="text-end js-opening-qty-mobile" />
-                                    </div>
-
-                                    <div class="d-grid">
-                                        <button type="button" class="btn btn-sm btn-primary" style="height:34px;"
-                                            id="btnOpeningAddMobile">
-                                            Tambah
-                                        </button>
-                                    </div>
-                                </div>
-
-                                {{-- untuk opening & periodik: backend boleh abaikan/isi sendiri --}}
-                                <input type="hidden" name="unit_cost" value="{{ old('unit_cost', '') }}">
-                                <input type="hidden" name="notes" value="{{ old('notes', '') }}">
-                                <input type="hidden" name="update_existing" value="0">
-                            </div>
-                        </div>
-                    </div>
-
-                    {{-- DESKTOP FULL ADD --}}
-                    <div class="card card-main mb-3 opening-add-desktop">
-                        <div class="card-body">
-                            <div class="d-flex justify-content-between align-items-start gap-2 mb-2">
-                                <div class="pill-label">
-                                    {{ $isOpening ? 'Tambah item saldo awal' : 'Tambah item opname' }}
-                                </div>
-                                <span class="chip">{{ $isOpening ? 'Mode Opening' : 'Mode Periodik' }}</span>
-                            </div>
-
-                            <div id="openingAddDesktop"
-                                data-action="{{ route('inventory.stock_opnames.lines.store', $opname) }}">
-                                {{-- CSRF untuk AJAX --}}
-                                <input type="hidden" id="openingAddTokenDesktop" value="{{ csrf_token() }}">
-                                <input type="hidden" name="_token" value="{{ csrf_token() }}">
-
-                                <div class="opening-add-grid">
-                                    <div id="opening-item-suggest">
-                                        <label class="pill-label mb-1">Item</label>
-                                        <x-item-suggest idName="item_id" :idValue="old('item_id')" :displayValue="''"
-                                            placeholder="Kode / nama barang" :autofocus="true" :autoSelectFirst="true" />
-                                    </div>
-
-                                    <div>
-                                        <label class="pill-label mb-1">Qty Fisik</label>
-                                        <x-number-input name="physical_qty" :value="old('physical_qty')" mode="integer"
-                                            min="0" class="text-end js-opening-qty" />
-                                    </div>
-
-                                    @if ($isOpening)
-                                        <div>
-                                            <label class="pill-label mb-1">HPP / Unit</label>
-                                            <x-number-input name="unit_cost" :value="old('unit_cost')" mode="decimal"
-                                                :decimals="2" min="0" class="text-end" />
+                                    <div class="opening-add-row">
+                                        <div id="opening-item-suggest-mobile">
+                                            <label class="pill-label mb-1">Item</label>
+                                            <x-item-suggest idName="item_id" :idValue="old('item_id')" :displayValue="''"
+                                                placeholder="Kode / nama" :autofocus="false" :autoSelectFirst="false" />
                                         </div>
-                                    @else
-                                        {{-- Periodik: HPP diambil dari master item / sistem, user tidak perlu isi --}}
-                                        <div>
-                                            <label class="pill-label mb-1 text-muted">HPP / Unit</label>
-                                            <input type="text" class="form-control form-control-sm" value="Otomatis"
-                                                disabled>
-                                            <input type="hidden" name="unit_cost" value="{{ old('unit_cost', '') }}">
-                                        </div>
-                                    @endif
 
-                                    <div>
-                                        <label class="pill-label mb-1">Catatan</label>
-                                        <input type="text" name="notes" value="{{ old('notes') }}"
-                                            class="form-control form-control-sm">
+                                        <div>
+                                            <label class="pill-label mb-1">Qty Fisik</label>
+                                            <x-number-input name="physical_qty" :value="old('physical_qty')" mode="integer"
+                                                min="0" class="text-end js-opening-qty-mobile" />
+                                        </div>
+
+                                        <div class="d-grid">
+                                            <button type="button" class="btn btn-sm btn-primary" style="height:34px;"
+                                                id="btnOpeningAddMobile">
+                                                Tambah
+                                            </button>
+                                        </div>
                                     </div>
 
+                                    <input type="hidden" name="unit_cost" value="{{ old('unit_cost', '') }}">
+                                    <input type="hidden" name="notes" value="{{ old('notes', '') }}">
                                     <input type="hidden" name="update_existing" value="0">
+                                </div>
+                            </div>
+                        </div>
 
-                                    <div class="d-grid">
-                                        <button type="button" class="btn btn-sm btn-primary" id="btnOpeningAddDesktop">
-                                            + Tambah
-                                        </button>
+                        {{-- DESKTOP FULL ADD --}}
+                        <div class="card card-main mb-3 opening-add-desktop">
+                            <div class="card-body">
+                                <div class="d-flex justify-content-between align-items-start gap-2 mb-2">
+                                    <div class="pill-label">
+                                        {{ $isOpening ? 'Tambah item saldo awal' : 'Tambah item opname' }}
+                                    </div>
+                                    <span class="chip">{{ $isOpening ? 'Mode Opening' : 'Mode Periodik' }}</span>
+                                </div>
+
+                                <div id="openingAddDesktop"
+                                    data-action="{{ route('inventory.stock_opnames.lines.store', $opname) }}">
+                                    {{-- CSRF untuk AJAX --}}
+                                    <input type="hidden" id="openingAddTokenDesktop" value="{{ csrf_token() }}">
+                                    <input type="hidden" name="_token" value="{{ csrf_token() }}">
+
+                                    <div class="opening-add-grid">
+                                        <div id="opening-item-suggest">
+                                            <label class="pill-label mb-1">Item</label>
+                                            <x-item-suggest idName="item_id" :idValue="old('item_id')" :displayValue="''"
+                                                placeholder="Kode / nama barang" :autofocus="true" :autoSelectFirst="false" />
+                                        </div>
+
+                                        <div>
+                                            <label class="pill-label mb-1">Qty Fisik</label>
+                                            <x-number-input name="physical_qty" :value="old('physical_qty')" mode="integer"
+                                                min="0" class="text-end js-opening-qty" />
+                                        </div>
+
+                                        @if ($isOpening)
+                                            <div>
+                                                <label class="pill-label mb-1">HPP / Unit</label>
+                                                <x-number-input name="unit_cost" :value="old('unit_cost')" mode="decimal"
+                                                    :decimals="2" min="0" class="text-end" />
+                                            </div>
+                                        @else
+                                            <div>
+                                                <label class="pill-label mb-1 text-muted">HPP / Unit</label>
+                                                <input type="text" class="form-control form-control-sm"
+                                                    value="Otomatis" disabled>
+                                                <input type="hidden" name="unit_cost"
+                                                    value="{{ old('unit_cost', '') }}">
+                                            </div>
+                                        @endif
+
+                                        <div>
+                                            <label class="pill-label mb-1">Catatan</label>
+                                            <input type="text" name="notes" value="{{ old('notes') }}"
+                                                class="form-control form-control-sm">
+                                        </div>
+
+                                        <input type="hidden" name="update_existing" value="0">
+
+                                        <div class="d-grid">
+                                            <button type="button" class="btn btn-sm btn-primary"
+                                                id="btnOpeningAddDesktop">
+                                                + Tambah
+                                            </button>
+                                        </div>
                                     </div>
                                 </div>
-                            </div>
 
-                            @if ($errors->has('item_id') || $errors->has('physical_qty') || $errors->has('unit_cost'))
-                                <div class="mt-2">
-                                    @error('item_id')
-                                        <div class="text-danger small">{{ $message }}</div>
-                                    @enderror
-                                    @error('physical_qty')
-                                        <div class="text-danger small">{{ $message }}</div>
-                                    @enderror
-                                    @error('unit_cost')
-                                        <div class="text-danger small">{{ $message }}</div>
-                                    @enderror
+                                @if ($errors->has('item_id') || $errors->has('physical_qty') || $errors->has('unit_cost'))
+                                    <div class="mt-2">
+                                        @error('item_id')
+                                            <div class="text-danger small">{{ $message }}</div>
+                                        @enderror
+                                        @error('physical_qty')
+                                            <div class="text-danger small">{{ $message }}</div>
+                                        @enderror
+                                        @error('unit_cost')
+                                            <div class="text-danger small">{{ $message }}</div>
+                                        @enderror
+                                    </div>
+                                @endif
+                            </div>
+                        </div>
+                    @endif
+                </div>
+
+                {{-- ================= TABLE LINES ================= --}}
+                <div class="section-table">
+                    <div class="card card-main">
+                        <div class="card-body">
+                            <div class="d-flex justify-content-between align-items-center flex-wrap gap-2">
+                                <div class="pill-label">
+                                    {{ $isOpening ? 'Saldo awal per item' : 'Hasil hitung fisik per item' }}
                                 </div>
-                            @endif
-                        </div>
-                    </div>
-                @endif
-            </div>
-
-            {{-- ================= TABLE LINES (MASIH DI DALAM FORM) ================= --}}
-            <div class="section-table">
-                <div class="card card-main">
-                    <div class="card-body">
-                        <div class="d-flex justify-content-between align-items-center flex-wrap gap-2">
-                            <div class="pill-label">
-                                {{ $isOpening ? 'Saldo awal per item' : 'Hasil hitung fisik per item' }}
+                                <span class="chip">{{ $countedLines }} / {{ $totalLines }} terisi</span>
                             </div>
-                            <span class="chip">{{ $countedLines }} / {{ $totalLines }} terisi</span>
-                        </div>
 
-                        <div class="table-wrap" id="opname-lines-table"
-                            data-delete-url-template="{{ route('inventory.stock_opnames.lines.destroy', ['stockOpname' => $opname, 'line' => '__LINE_ID__']) }}">
-                            <table class="table table-sm mb-0 align-middle">
-                                <thead>
-                                    <tr>
-                                        <th style="width:40px;">#</th>
-                                        <th>Item</th>
-
-                                        @unless ($isOpOrAdmin)
-                                            <th class="text-end col-system">Qty Sistem</th>
-                                        @endunless
-
-                                        <th class="text-end">Qty Fisik</th>
-                                        <th class="text-end col-diff d-none d-md-table-cell">Selisih</th>
-
-                                        @if ($isOpening && !$isOpOrAdmin)
-                                            <th class="text-end col-unit">HPP / Unit</th>
-                                        @endif
-
-                                        @unless ($isOpOrAdmin)
-                                            <th class="col-notes d-none d-md-table-cell">Catatan</th>
-                                        @endunless
-
-                                        @if ($isOpening && $canModifyLines)
-                                            <th class="text-end" style="width:70px;">Aksi</th>
-                                        @endif
-                                    </tr>
-                                </thead>
-
-                                <tbody>
-                                    @foreach ($lines as $index => $line)
-                                        @php
-                                            $inputNamePrefix = "lines[{$line->id}]";
-
-                                            // Qty sistem selalu dari model (SO Periodik: seharusnya sudah terisi dari stok)
-                                            $rawSystemQty = $line->system_qty ?? 0;
-
-                                            // physical qty dari old() atau model
-                                            $rawPhysical = old($inputNamePrefix . '.physical_qty', $line->physical_qty);
-
-                                            $hasPhysicalValue = $rawPhysical !== null && $rawPhysical !== '';
-                                            if ($hasPhysicalValue) {
-                                                $rawPhysical = (float) $rawPhysical;
-                                            }
-
-                                            // PERIODIK: kalau belum ada input, default 0
-                                            if (!$isOpening && !$hasPhysicalValue) {
-                                                $rawPhysical = 0;
-                                                $hasPhysicalValue = true;
-                                            }
-
-                                            // selisih: pakai kolom difference kalau ada
-                                            $diffFromModel = $line->difference ?? ($line->difference_qty ?? null);
-                                            if ($diffFromModel !== null) {
-                                                $diff = (float) $diffFromModel;
-                                            } elseif ($hasPhysicalValue) {
-                                                $diff = $rawPhysical - $rawSystemQty;
-                                            } else {
-                                                $diff = 0;
-                                            }
-
-                                            $hasPhysicalForDisplay = $hasPhysicalValue;
-                                            $diffDisplay =
-                                                $diff > 0 ? '+' . number_format($diff, 2) : number_format($diff, 2);
-
-                                            // Warna selisih: <0 merah, ==0 hijau, >0 kuning
-                                            if ($hasPhysicalForDisplay) {
-                                                if ($diff < 0) {
-                                                    $diffClass = 'diff-negative';
-                                                } elseif ($diff > 0) {
-                                                    $diffClass = 'diff-positive';
-                                                } else {
-                                                    $diffClass = 'diff-zero';
-                                                }
-                                            } else {
-                                                $diffClass = '';
-                                            }
-
-                                            // HPP / Unit:
-                                            // - Kalau ada di request (old/unit_cost) pakai itu
-                                            // - Kalau kosong: pakai base_unit_cost dari master item (sementara)
-                                            $rawUnitCost = old($inputNamePrefix . '.unit_cost', $line->unit_cost);
-                                            $hasUnitCostValue = $rawUnitCost !== null && $rawUnitCost !== '';
-                                            if ($hasUnitCostValue) {
-                                                $rawUnitCost = (float) $rawUnitCost;
-                                            }
-
-                                            $fallbackUnitCost = null;
-                                            if (!$hasUnitCostValue && $line->item && $line->item->base_unit_cost > 0) {
-                                                $fallbackUnitCost = (float) $line->item->base_unit_cost;
-                                            }
-
-                                            $effectiveUnitCost = $hasUnitCostValue ? $rawUnitCost : $fallbackUnitCost;
-
-                                            $rowClasses = [];
-                                            $showNotCountedBadge = false;
-                                            if ($isOpening && !$hasPhysicalValue) {
-                                                $rowClasses[] = 'so-row-not-counted';
-                                                $showNotCountedBadge = true;
-                                            }
-                                        @endphp
-
-                                        <tr class="{{ implode(' ', $rowClasses) }}" data-item-id="{{ $line->item_id }}"
-                                            data-item-code="{{ $line->item?->code }}"
-                                            data-item-name="{{ $line->item?->name }}"
-                                            data-physical-qty="{{ $hasPhysicalValue ? $rawPhysical : '' }}">
-                                            <td>{{ $index + 1 }}</td>
-
-                                            <td>
-                                                <div class="fw-semibold">{{ $line->item?->code ?? '-' }}</div>
-                                                <div class="meta">{{ $line->item?->name ?? '' }}</div>
-
-                                                @if ($showNotCountedBadge)
-                                                    <div class="d-md-none mt-1">
-                                                        <span class="badge-not-counted">Belum dihitung</span>
-                                                    </div>
-                                                @endif
-                                            </td>
+                            <div class="table-wrap" id="opname-lines-table"
+                                data-delete-url-template="{{ route('inventory.stock_opnames.lines.destroy', ['stockOpname' => $opname, 'line' => '__LINE_ID__']) }}">
+                                <table class="table table-sm mb-0 align-middle">
+                                    <thead>
+                                        <tr>
+                                            <th style="width:40px;">#</th>
+                                            <th>Item</th>
 
                                             @unless ($isOpOrAdmin)
-                                                <td class="text-end text-mono col-system">
-                                                    {{ number_format($rawSystemQty, 2) }}
-                                                </td>
+                                                <th class="text-end col-system">Qty Sistem</th>
                                             @endunless
 
-                                            <td class="text-end">
-                                                @if ($isOpening)
-                                                    {{-- OPENING: kalau belum diisi, tampil "-" dan tidak kirim nilai --}}
-                                                    @if ($hasPhysicalForDisplay)
-                                                        <span
-                                                            class="text-mono">{{ number_format($rawPhysical, 2) }}</span>
-                                                        <input type="hidden" name="{{ $inputNamePrefix }}[physical_qty]"
-                                                            value="{{ $rawPhysical }}">
-                                                    @else
-                                                        <span class="meta">-</span>
-                                                    @endif
-                                                @else
-                                                    {{-- PERIODIK: selalu kirim physical_qty, default 0 --}}
-                                                    <span
-                                                        class="text-mono">{{ number_format($rawPhysical ?? 0, 2) }}</span>
-                                                    <input type="hidden" name="{{ $inputNamePrefix }}[physical_qty]"
-                                                        value="{{ $rawPhysical ?? 0 }}">
-                                                @endif
-                                            </td>
-
-                                            <td class="text-end text-mono col-diff d-none d-md-table-cell">
-                                                @if ($hasPhysicalForDisplay)
-                                                    <span class="{{ $diffClass }}">{{ $diffDisplay }}</span>
-                                                @else
-                                                    <span class="meta">-</span>
-                                                @endif
-                                            </td>
-
-                                            {{-- Selalu kirim unit_cost ke server (baik Opening maupun Periodik) --}}
-                                            <input type="hidden" name="{{ $inputNamePrefix }}[unit_cost]"
-                                                value="{{ $effectiveUnitCost !== null ? $effectiveUnitCost : '' }}">
+                                            <th class="text-end">Qty Fisik</th>
+                                            <th class="text-end col-diff d-none d-md-table-cell">Selisih</th>
 
                                             @if ($isOpening && !$isOpOrAdmin)
-                                                <td class="text-end col-unit">
-                                                    @if ($effectiveUnitCost && $effectiveUnitCost > 0)
-                                                        <span class="text-mono {{ $hasUnitCostValue ? '' : 'meta' }}">
-                                                            {{ number_format($effectiveUnitCost, 2) }}
-                                                        </span>
-                                                    @else
-                                                        <span class="meta">-</span>
-                                                    @endif
-                                                </td>
+                                                <th class="text-end col-unit">HPP / Unit</th>
                                             @endif
 
                                             @unless ($isOpOrAdmin)
-                                                <td class="col-notes d-none d-md-table-cell">
-                                                    <input type="text" name="{{ $inputNamePrefix }}[notes]"
-                                                        class="form-control form-control-sm"
-                                                        value="{{ old($inputNamePrefix . '.notes', $line->notes) }}"
-                                                        @if ($isReadonly) readonly @endif>
-                                                </td>
-                                            @else
-                                                <input type="hidden" name="{{ $inputNamePrefix }}[notes]"
-                                                    value="{{ old($inputNamePrefix . '.notes', $line->notes) }}">
+                                                <th class="col-notes d-none d-md-table-cell">Catatan</th>
                                             @endunless
 
                                             @if ($isOpening && $canModifyLines)
-                                                <td class="text-end">
-                                                    <button type="button"
-                                                        class="btn btn-sm btn-outline-danger js-delete-line"
-                                                        data-line-id="{{ $line->id }}">
-                                                        Hapus
-                                                    </button>
-                                                </td>
+                                                <th class="text-end" style="width:70px;">Aksi</th>
                                             @endif
                                         </tr>
-                                    @endforeach
-                                </tbody>
-                            </table>
+                                    </thead>
+
+                                    <tbody>
+                                        @foreach ($lines as $index => $line)
+                                            @php
+                                                $inputNamePrefix = "lines[{$line->id}]";
+
+                                                $rawSystemQty = $line->system_qty ?? 0;
+
+                                                $rawPhysical = old(
+                                                    $inputNamePrefix . '.physical_qty',
+                                                    $line->physical_qty,
+                                                );
+
+                                                $hasPhysicalValue = $rawPhysical !== null && $rawPhysical !== '';
+                                                if ($hasPhysicalValue) {
+                                                    $rawPhysical = (float) $rawPhysical;
+                                                }
+
+                                                if (!$isOpening && !$hasPhysicalValue) {
+                                                    $rawPhysical = 0;
+                                                    $hasPhysicalValue = true;
+                                                }
+
+                                                $diffFromModel = $line->difference ?? ($line->difference_qty ?? null);
+                                                if ($diffFromModel !== null) {
+                                                    $diff = (float) $diffFromModel;
+                                                } elseif ($hasPhysicalValue) {
+                                                    $diff = $rawPhysical - $rawSystemQty;
+                                                } else {
+                                                    $diff = 0;
+                                                }
+
+                                                $hasPhysicalForDisplay = $hasPhysicalValue;
+                                                $diffDisplay =
+                                                    $diff > 0 ? '+' . number_format($diff, 2) : number_format($diff, 2);
+
+                                                if ($hasPhysicalForDisplay) {
+                                                    if ($diff < 0) {
+                                                        $diffClass = 'diff-negative';
+                                                    } elseif ($diff > 0) {
+                                                        $diffClass = 'diff-positive';
+                                                    } else {
+                                                        $diffClass = 'diff-zero';
+                                                    }
+                                                } else {
+                                                    $diffClass = '';
+                                                }
+
+                                                $rawUnitCost = old($inputNamePrefix . '.unit_cost', $line->unit_cost);
+                                                $hasUnitCostValue = $rawUnitCost !== null && $rawUnitCost !== '';
+                                                if ($hasUnitCostValue) {
+                                                    $rawUnitCost = (float) $rawUnitCost;
+                                                }
+
+                                                $fallbackUnitCost = null;
+                                                if (
+                                                    !$hasUnitCostValue &&
+                                                    $line->item &&
+                                                    $line->item->base_unit_cost > 0
+                                                ) {
+                                                    $fallbackUnitCost = (float) $line->item->base_unit_cost;
+                                                }
+
+                                                $effectiveUnitCost = $hasUnitCostValue
+                                                    ? $rawUnitCost
+                                                    : $fallbackUnitCost;
+
+                                                $rowClasses = [];
+                                                $showNotCountedBadge = false;
+                                                if ($isOpening && !$hasPhysicalValue) {
+                                                    $rowClasses[] = 'so-row-not-counted';
+                                                    $showNotCountedBadge = true;
+                                                }
+                                            @endphp
+
+                                            <tr class="{{ implode(' ', $rowClasses) }}"
+                                                data-item-id="{{ $line->item_id }}"
+                                                data-item-code="{{ $line->item?->code }}"
+                                                data-item-name="{{ $line->item?->name }}"
+                                                data-physical-qty="{{ $hasPhysicalValue ? $rawPhysical : '' }}">
+                                                <td>{{ $index + 1 }}</td>
+
+                                                <td>
+                                                    <div class="fw-semibold">{{ $line->item?->code ?? '-' }}</div>
+                                                    <div class="meta">{{ $line->item?->name ?? '' }}</div>
+
+                                                    @if ($showNotCountedBadge)
+                                                        <div class="d-md-none mt-1">
+                                                            <span class="badge-not-counted">Belum dihitung</span>
+                                                        </div>
+                                                    @endif
+                                                </td>
+
+                                                @unless ($isOpOrAdmin)
+                                                    <td class="text-end text-mono col-system">
+                                                        {{ number_format($rawSystemQty, 2) }}
+                                                    </td>
+                                                @endunless
+
+                                                <td class="text-end">
+                                                    @if ($isOpening)
+                                                        @if ($hasPhysicalForDisplay)
+                                                            <span
+                                                                class="text-mono">{{ number_format($rawPhysical, 2) }}</span>
+                                                            <input type="hidden"
+                                                                name="{{ $inputNamePrefix }}[physical_qty]"
+                                                                value="{{ $rawPhysical }}">
+                                                        @else
+                                                            <span class="meta">-</span>
+                                                        @endif
+                                                    @else
+                                                        <span
+                                                            class="text-mono">{{ number_format($rawPhysical ?? 0, 2) }}</span>
+                                                        <input type="hidden" name="{{ $inputNamePrefix }}[physical_qty]"
+                                                            value="{{ $rawPhysical ?? 0 }}">
+                                                    @endif
+                                                </td>
+
+                                                <td class="text-end text-mono col-diff d-none d-md-table-cell">
+                                                    @if ($hasPhysicalForDisplay)
+                                                        <span class="{{ $diffClass }}">{{ $diffDisplay }}</span>
+                                                    @else
+                                                        <span class="meta">-</span>
+                                                    @endif
+                                                </td>
+
+                                                <input type="hidden" name="{{ $inputNamePrefix }}[unit_cost]"
+                                                    value="{{ $effectiveUnitCost !== null ? $effectiveUnitCost : '' }}">
+
+                                                @if ($isOpening && !$isOpOrAdmin)
+                                                    <td class="text-end col-unit">
+                                                        @if ($effectiveUnitCost && $effectiveUnitCost > 0)
+                                                            <span class="text-mono {{ $hasUnitCostValue ? '' : 'meta' }}">
+                                                                {{ number_format($effectiveUnitCost, 2) }}
+                                                            </span>
+                                                        @else
+                                                            <span class="meta">-</span>
+                                                        @endif
+                                                    </td>
+                                                @endif
+
+                                                @unless ($isOpOrAdmin)
+                                                    <td class="col-notes d-none d-md-table-cell">
+                                                        <input type="text" name="{{ $inputNamePrefix }}[notes]"
+                                                            class="form-control form-control-sm"
+                                                            value="{{ old($inputNamePrefix . '.notes', $line->notes) }}"
+                                                            @if ($isReadonly) readonly @endif>
+                                                    </td>
+                                                @else
+                                                    <input type="hidden" name="{{ $inputNamePrefix }}[notes]"
+                                                        value="{{ old($inputNamePrefix . '.notes', $line->notes) }}">
+                                                @endunless
+
+                                                @if ($isOpening && $canModifyLines)
+                                                    <td class="text-end">
+                                                        <button type="button"
+                                                            class="btn btn-sm btn-outline-danger js-delete-line"
+                                                            data-line-id="{{ $line->id }}">
+                                                            Hapus
+                                                        </button>
+                                                    </td>
+                                                @endif
+                                            </tr>
+                                        @endforeach
+                                    </tbody>
+                                </table>
+                            </div>
                         </div>
                     </div>
-                </div>
 
-                {{-- ACTION BAR BAWAH --}}
-                @if ($canModifyLines)
-                    <div class="card card-main so-action-bottom-card">
-                        <div class="card-body so-action-bottom-inner">
-                            <div class="so-action-bottom-meta">
-                                @if ($isOpening)
-                                    Mode Opening • Tambah / edit item di atas, lalu simpan di sini.
-                                @else
-                                    Mode Periodik • Tambah / edit Qty Fisik. Item tanpa input akan dianggap Qty Fisik = 0.
-                                @endif
-                            </div>
+                    {{-- ACTION BAR BAWAH --}}
+                    @if ($canModifyLines)
+                        <div class="card card-main so-action-bottom-card">
+                            <div class="card-body so-action-bottom-inner">
+                                <div class="so-action-bottom-meta">
+                                    @if ($isOpening)
+                                        Mode Opening • Tambah / edit item di atas, lalu simpan di sini.
+                                    @else
+                                        Mode Periodik • Tambah / edit Qty Fisik. Item tanpa input akan dianggap Qty Fisik =
+                                        0.
+                                    @endif
+                                </div>
 
-                            <div class="so-action-bottom-buttons">
-                                <button type="submit" name="save_and_view" value="1"
-                                    class="btn btn-sm btn-primary">
-                                    Simpan
-                                </button>
-
-                                @if (in_array($opname->status, [StockOpname::STATUS_DRAFT, StockOpname::STATUS_COUNTING], true))
-                                    <button type="button" class="btn btn-sm btn-outline-primary"
-                                        data-action="finish-counting-strict">
-                                        Simpan &amp; Tandai Selesai
+                                <div class="so-action-bottom-buttons">
+                                    <button type="submit" name="save_and_view" value="1"
+                                        class="btn btn-sm btn-primary">
+                                        Simpan
                                     </button>
-                                @endif
+
+                                    @if (in_array($opname->status, [StockOpname::STATUS_DRAFT, StockOpname::STATUS_COUNTING], true))
+                                        <button type="button" class="btn btn-sm btn-outline-primary"
+                                            data-action="finish-counting-strict">
+                                            Simpan &amp; Tandai Selesai
+                                        </button>
+                                    @endif
+                                </div>
                             </div>
                         </div>
-                    </div>
-                @endif
-
-                {{-- CLOSE UPDATE FORM --}}
-                </form>
-            </div>
-        </div>
+                    @endif
+                </div>
+            </div> {{-- .mobile-stack --}}
+        </form>
     </div>
 
-    {{-- MINI MODAL: KONFIRMASI DUPLIKAT ITEM (dipakai hanya untuk Opening) --}}
+    {{-- MINI MODAL: KONFIRMASI DUPLIKAT ITEM (Opening) --}}
     <div class="modal fade" id="duplicateItemModal" tabindex="-1" aria-labelledby="duplicateItemModalLabel"
         aria-hidden="true">
         <div class="modal-dialog modal-sm modal-dialog-centered">
@@ -912,7 +905,6 @@
             initDeleteLineAjax();
             focusBackAfterReload();
 
-            // wiring tombol selesai counting
             const soForm = document.getElementById('soUpdateForm');
             const markReviewedEl = document.getElementById('mark_reviewed');
             const forceAutoFillEl = document.getElementById('force_auto_fill');
@@ -999,12 +991,14 @@
                 itemSuggestInput.select && itemSuggestInput.select();
             }
 
-            if (itemIdField && qtyInput) {
-                itemIdField.addEventListener('change', function() {
-                    setTimeout(() => {
+            // Pindah fokus ke Qty hanya jika user tekan Enter di input item
+            if (itemSuggestInput && qtyInput) {
+                itemSuggestInput.addEventListener('keydown', function(e) {
+                    if (e.key === 'Enter') {
+                        e.preventDefault();
                         qtyInput.focus();
                         qtyInput.select && qtyInput.select();
-                    }, 60);
+                    }
                 });
             }
 
@@ -1047,8 +1041,7 @@
             const newQtyValue = qtyField.value;
 
             if (existingIds.has(itemId)) {
-                // Periodik  -> langsung update qty (tanpa modal)
-                // Opening   -> tetap pakai modal konfirmasi
+                // Periodik -> langsung update; Opening -> pakai modal
                 if (!window.IS_OPENING_MODE) {
                     updateExistingInput && (updateExistingInput.value = '1');
                     performOpeningAjaxSubmit(rootEl, {
@@ -1112,7 +1105,6 @@
                 return;
             }
 
-            // Ambil CSRF: dari opsi, hidden _token, atau meta
             let csrf = opts.csrf || '';
             if (!csrf) {
                 const tokenInput = rootEl.querySelector('input[name="_token"]');
@@ -1125,7 +1117,6 @@
 
             const formData = new FormData();
 
-            // Pastikan _token ada di body
             if (csrf) {
                 formData.append('_token', csrf);
             }
