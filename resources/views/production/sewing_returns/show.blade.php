@@ -216,7 +216,13 @@
                 return (float) ($pl->qty_direct_picked ?? 0);
             });
 
-        // ringkasan per item: Sisa(qty_ok), Reject, Dadakan, Belum Setor
+        /**
+         * Ringkasan per item:
+         * - SETOR = sum(qty_ok)
+         * - Reject = sum(qty_reject)
+         * - Dadakan = sum(qty_direct_picked) unik per pickup line
+         * - Belum Setor = pickup - (setor + reject + dadakan) per pickup line, lalu dijumlah
+         */
         $perItem = $lines
             ->groupBy(function ($l) {
                 return (int) ($l->item_id ?? (optional(optional($l->sewingPickupLine)->bundle)->finished_item_id ?? 0));
@@ -226,7 +232,7 @@
                 $bundle = optional($first->sewingPickupLine)->bundle;
                 $item = optional($bundle)->finishedItem;
 
-                $ok = (float) $group->sum('qty_ok'); // <- dipakai sebagai "Sisa" sesuai request
+                $setor = (float) $group->sum('qty_ok'); // ✅ SETOR (jahit OK)
                 $rj = (float) $group->sum('qty_reject');
 
                 $pickupLines = $group->pluck('sewingPickupLine')->filter()->unique('id');
@@ -247,7 +253,7 @@
                 return [
                     'code' => $item?->code ?? '-',
                     'name' => $item?->name ?? '',
-                    'ok' => $ok,
+                    'setor' => $setor,
                     'rj' => $rj,
                     'direct_pick' => $directPick,
                     'remaining' => $remaining,
@@ -323,11 +329,11 @@
                         <div class="summary-value mono">{{ number_format($totalPickup, 2, ',', '.') }}</div>
                     </div>
                     <div>
-                        <div class="summary-label">Setor (Sisa + Reject)</div>
+                        <div class="summary-label">Diproses (Setor + Reject)</div>
                         <div class="summary-value mono">{{ number_format($totalProcessed, 2, ',', '.') }}</div>
                     </div>
                     <div>
-                        <div class="summary-label">Sisa</div>
+                        <div class="summary-label">Setor</div>
                         <div class="summary-value summary-ok mono">{{ number_format($totalOk, 2, ',', '.') }}</div>
                     </div>
                     <div>
@@ -360,7 +366,7 @@
                             <th style="width:44px;">#</th>
                             <th style="width:140px;">Item</th>
                             <th>Nama</th>
-                            <th class="text-end" style="width:120px;">Sisa</th>
+                            <th class="text-end" style="width:120px;">Setor</th>
                             <th class="text-end" style="width:120px;">Reject</th>
                             <th class="text-end" style="width:130px;">Dadakan</th>
                             <th class="text-end" style="width:130px;">Belum Setor</th>
@@ -369,14 +375,14 @@
                     <tbody>
                         @forelse($perItem as $idx => $row)
                             <tr
-                                class="{{ $row['rj'] > 0 && $row['ok'] == 0 ? 'row-rj' : ($row['ok'] > 0 && $row['rj'] == 0 ? 'row-ok' : '') }}">
+                                class="{{ $row['rj'] > 0 && $row['setor'] == 0 ? 'row-rj' : ($row['setor'] > 0 && $row['rj'] == 0 ? 'row-ok' : '') }}">
                                 <td class="text-muted mono">{{ $idx + 1 }}</td>
 
                                 <td class="mono fw-bold">{{ $row['code'] }}</td>
                                 <td>{{ $row['name'] }}</td>
 
                                 <td class="text-end">
-                                    <span class="pill pill-ok mono">{{ number_format($row['ok'], 2, ',', '.') }}</span>
+                                    <span class="pill pill-ok mono">{{ number_format($row['setor'], 2, ',', '.') }}</span>
                                 </td>
 
                                 <td class="text-end">
@@ -418,7 +424,7 @@
                             <th style="width:40px;">#</th>
                             <th style="width:150px;">Item</th>
                             <th>Bundle / LOT</th>
-                            <th class="text-end" style="width:110px;">Sisa</th>
+                            <th class="text-end" style="width:110px;">Setor</th>
                             <th class="text-end" style="width:110px;">Reject</th>
                             <th class="text-end" style="width:110px;">Dadakan</th>
                             <th class="text-end" style="width:110px;">Belum Setor</th>
@@ -433,7 +439,7 @@
                                 $item = optional($bundle)->finishedItem;
                                 $lot = optional(optional($bundle)->cuttingJob)->lot;
 
-                                $ok = (float) $line->qty_ok; // <- tampil sebagai "Sisa"
+                                $setor = (float) $line->qty_ok; // ✅ SETOR (jahit OK)
                                 $rj = (float) $line->qty_reject;
 
                                 $qtyBundle = (float) ($pickupLine->qty_bundle ?? 0);
@@ -448,7 +454,7 @@
                                 );
                             @endphp
 
-                            <tr class="{{ $rj > 0 && $ok == 0 ? 'row-rj' : ($ok > 0 && $rj == 0 ? 'row-ok' : '') }}">
+                            <tr class="{{ $rj > 0 && $setor == 0 ? 'row-rj' : ($setor > 0 && $rj == 0 ? 'row-ok' : '') }}">
                                 <td class="text-muted">{{ $i + 1 }}</td>
                                 <td>
                                     <div class="fw-bold">{{ $item?->code ?? '-' }}</div>
@@ -466,7 +472,7 @@
                                     </div>
                                 </td>
 
-                                <td class="text-end">{{ number_format($ok, 2, ',', '.') }}</td>
+                                <td class="text-end">{{ number_format($setor, 2, ',', '.') }}</td>
                                 <td class="text-end">{{ number_format($rj, 2, ',', '.') }}</td>
                                 <td class="text-end">{{ number_format($directPick, 2, ',', '.') }}</td>
                                 <td class="text-end">{{ number_format($remainingRow, 2, ',', '.') }}</td>
