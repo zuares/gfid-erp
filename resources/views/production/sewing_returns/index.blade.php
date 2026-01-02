@@ -86,7 +86,6 @@
             vertical-align: middle;
         }
 
-        /* header + summary */
         .header-row {
             display: flex;
             justify-content: space-between;
@@ -120,7 +119,6 @@
             color: #0d6efd;
         }
 
-        /* mobile card layout */
         .sr-card-header {
             display: flex;
             justify-content: space-between;
@@ -130,8 +128,8 @@
         }
 
         .sr-code {
-            font-size: .92rem;
-            font-weight: 700;
+            font-size: .9rem;
+            font-weight: 600;
         }
 
         .sr-meta {
@@ -216,35 +214,61 @@
             'draft' => 'Draft',
         ];
 
-        // ringkasan halaman
-        $pageCount = $returns->count();
         $totalReturns = $returns->total();
-        $sumOkPage = $returns->sum('total_ok');
-        $sumRejectPage = $returns->sum('total_reject');
+
+        // Hitung ringkasan halaman: total pickup & total belum setor (OK - RJ - setoran dadakan)
+        $sumPickupPage = 0.0;
+        $sumRemainingPage = 0.0;
+
+        foreach ($returns as $ret) {
+            $lines = $ret->lines ?? collect();
+
+            $totalPickupRow = $lines->sum(function ($line) {
+                $pl = $line->sewingPickupLine;
+                return (float) ($pl->qty_bundle ?? 0);
+            });
+
+            $totalRemainingRow = $lines->sum(function ($line) {
+                $pl = $line->sewingPickupLine;
+                if (!$pl) {
+                    return 0;
+                }
+
+                $qtyBundle = (float) ($pl->qty_bundle ?? 0);
+                $returnedOk = (float) ($pl->qty_returned_ok ?? 0);
+                $returnedRej = (float) ($pl->qty_returned_reject ?? 0);
+                $directPick = (float) ($pl->qty_direct_picked ?? 0);
+
+                return max($qtyBundle - ($returnedOk + $returnedRej + $directPick), 0);
+            });
+
+            $sumPickupPage += $totalPickupRow;
+            $sumRemainingPage += $totalRemainingRow;
+        }
     @endphp
 
     <div class="sewing-return-page">
         <div class="page-wrap py-3 py-md-4">
 
-            {{-- HEADER + (FILTER non-operating) --}}
+            {{-- HEADER + FILTER --}}
             <div class="card-main p-3 p-md-4 mb-3">
                 <div class="header-row">
                     <div>
                         <h1 class="h5 mb-1">Setoran Jahit</h1>
                         <div class="help">
-                            Rekap semua setoran hasil jahit dari operator jahit.
+                            Rekap setoran jahit per operator, per hari.
                         </div>
 
                         @if ($totalReturns > 0)
                             <div class="summary-row mono">
                                 <span class="summary-pill">
-                                    {{ number_format($totalReturns, 0, ',', '.') }} return total
+                                    {{ number_format($totalReturns, 0, ',', '.') }} return
                                 </span>
                                 <span class="summary-pill">
-                                    {{ number_format($sumOkPage, 2, ',', '.') }} pcs OK (halaman ini)
+                                    {{ number_format($sumPickupPage, 2, ',', '.') }} pcs Pickup (halaman ini)
                                 </span>
-                                <span class="summary-pill {{ $sumRejectPage > 0 ? 'summary-pill-accent' : '' }}">
-                                    {{ number_format($sumRejectPage, 2, ',', '.') }} pcs Reject (halaman ini)
+                                <span class="summary-pill summary-pill-accent">
+                                    {{ number_format($sumRemainingPage, 2, ',', '.') }} pcs Belum Setor (halaman ini)
                                 </span>
                             </div>
                         @else
@@ -313,8 +337,7 @@
                                         <i class="bi bi-search"></i>
                                     </span>
                                     <input type="text" name="q" value="{{ $filters['q'] }}"
-                                        class="form-control border-start-0"
-                                        placeholder="Kode return / pickup / operator...">
+                                        class="form-control border-start-0" placeholder="Kode return / operator...">
                                     @if (array_filter($filters))
                                         <button class="btn btn-outline-secondary" type="button"
                                             onclick="window.location='{{ route('production.sewing_returns.index') }}'">
@@ -344,26 +367,41 @@
                     </div>
                 </div>
 
-                {{-- DESKTOP TABLE --}}
+                {{-- DESKTOP TABLE: Tanggal, Operator, Total Pickup, Belum Setor --}}
                 <div class="table-wrap d-none d-md-block">
                     <table class="table table-sm align-middle mono table-sewing-return-index mb-0">
                         <thead>
                             <tr>
                                 <th style="width:110px;">Tanggal</th>
-                                <th style="width:150px;">Kode</th>
-                                <th style="width:190px;">Operator</th>
-                                <th style="width:170px;">Pickup</th>
-                                <th style="width:110px;" class="text-end">Total OK</th>
-                                <th style="width:110px;" class="text-end">Total Reject</th>
-                                <th style="width:110px;">Status</th>
+                                <th style="width:220px;">Operator</th>
+                                <th class="text-end" style="width:140px;">Total Pickup</th>
+                                <th class="text-end" style="width:140px;">Belum Setor</th>
                                 <th style="width:90px;"></th>
                             </tr>
                         </thead>
                         <tbody>
                             @forelse ($returns as $ret)
                                 @php
-                                    $totalOk = (float) ($ret->total_ok ?? 0);
-                                    $totalReject = (float) ($ret->total_reject ?? 0);
+                                    $lines = $ret->lines ?? collect();
+
+                                    $totalPickupRow = $lines->sum(function ($line) {
+                                        $pl = $line->sewingPickupLine;
+                                        return (float) ($pl->qty_bundle ?? 0);
+                                    });
+
+                                    $totalRemainingRow = $lines->sum(function ($line) {
+                                        $pl = $line->sewingPickupLine;
+                                        if (!$pl) {
+                                            return 0;
+                                        }
+
+                                        $qtyBundle = (float) ($pl->qty_bundle ?? 0);
+                                        $returnedOk = (float) ($pl->qty_returned_ok ?? 0);
+                                        $returnedRej = (float) ($pl->qty_returned_reject ?? 0);
+                                        $directPick = (float) ($pl->qty_direct_picked ?? 0);
+
+                                        return max($qtyBundle - ($returnedOk + $returnedRej + $directPick), 0);
+                                    });
 
                                     $statusMap = [
                                         'draft' => ['label' => 'Draft', 'class' => 'secondary'],
@@ -374,15 +412,11 @@
                                         'label' => strtoupper($ret->status ?? '-'),
                                         'class' => 'secondary',
                                     ];
-
-                                    $pickupCode = $ret->pickup?->code ?? '-';
                                 @endphp
                                 <tr>
-                                    <td>{{ $ret->date?->format('Y-m-d') ?? $ret->date }}</td>
                                     <td>
-                                        <a href="{{ route('production.sewing_returns.show', $ret) }}">
-                                            {{ $ret->code }}
-                                        </a>
+                                        <div>{{ $ret->date?->format('Y-m-d') ?? $ret->date }}</div>
+                                        <div class="small text-muted">{{ $ret->code }}</div>
                                     </td>
                                     <td>
                                         @if ($ret->operator)
@@ -390,26 +424,17 @@
                                         @else
                                             <span class="text-muted">-</span>
                                         @endif
-                                    </td>
-                                    <td>
-                                        @if ($ret->pickup)
-                                            <a href="{{ route('production.sewing_pickups.show', $ret->pickup) }}">
-                                                {{ $pickupCode }}
-                                            </a>
-                                        @else
-                                            <span class="text-muted">-</span>
-                                        @endif
+                                        <div>
+                                            <span class="status-pill bg-{{ $cfg['class'] }} text-light">
+                                                {{ $cfg['label'] }}
+                                            </span>
+                                        </div>
                                     </td>
                                     <td class="text-end">
-                                        {{ number_format($totalOk, 2, ',', '.') }}
+                                        {{ number_format($totalPickupRow, 2, ',', '.') }}
                                     </td>
-                                    <td class="text-end {{ $totalReject > 0 ? 'text-danger' : '' }}">
-                                        {{ number_format($totalReject, 2, ',', '.') }}
-                                    </td>
-                                    <td>
-                                        <span class="status-pill bg-{{ $cfg['class'] }} text-light">
-                                            {{ $cfg['label'] }}
-                                        </span>
+                                    <td class="text-end {{ $totalRemainingRow > 0 ? 'text-warning' : 'text-muted' }}">
+                                        {{ number_format($totalRemainingRow, 2, ',', '.') }}
                                     </td>
                                     <td class="text-end">
                                         <a href="{{ route('production.sewing_returns.show', $ret) }}"
@@ -420,7 +445,7 @@
                                 </tr>
                             @empty
                                 <tr>
-                                    <td colspan="8" class="text-center text-muted small py-3">
+                                    <td colspan="5" class="text-center text-muted small py-3">
                                         Belum ada Sewing Return yang tersimpan.
                                     </td>
                                 </tr>
@@ -429,7 +454,7 @@
                     </table>
                 </div>
 
-                {{-- MOBILE CARD LIST --}}
+                {{-- MOBILE CARD LIST (Tanggal, Operator, Total Pickup, Belum Setor) --}}
                 <div class="d-block d-md-none">
                     @if ($returns->isEmpty())
                         <div class="text-center text-muted small py-3">
@@ -439,8 +464,26 @@
                         <div class="d-flex flex-column gap-2">
                             @foreach ($returns as $ret)
                                 @php
-                                    $totalOk = (float) ($ret->total_ok ?? 0);
-                                    $totalReject = (float) ($ret->total_reject ?? 0);
+                                    $lines = $ret->lines ?? collect();
+
+                                    $totalPickupRow = $lines->sum(function ($line) {
+                                        $pl = $line->sewingPickupLine;
+                                        return (float) ($pl->qty_bundle ?? 0);
+                                    });
+
+                                    $totalRemainingRow = $lines->sum(function ($line) {
+                                        $pl = $line->sewingPickupLine;
+                                        if (!$pl) {
+                                            return 0;
+                                        }
+
+                                        $qtyBundle = (float) ($pl->qty_bundle ?? 0);
+                                        $returnedOk = (float) ($pl->qty_returned_ok ?? 0);
+                                        $returnedRej = (float) ($pl->qty_returned_reject ?? 0);
+                                        $directPick = (float) ($pl->qty_direct_picked ?? 0);
+
+                                        return max($qtyBundle - ($returnedOk + $returnedRej + $directPick), 0);
+                                    });
 
                                     $statusMap = [
                                         'draft' => ['label' => 'Draft', 'class' => 'secondary'],
@@ -451,8 +494,6 @@
                                         'label' => ucfirst($ret->status ?? '-'),
                                         'class' => 'secondary',
                                     ];
-
-                                    $pickupCode = $ret->pickup?->code ?? '-';
                                 @endphp
 
                                 <div class="card-main p-2">
@@ -477,16 +518,16 @@
                                             Op: {{ $ret->operator?->code ?? '-' }}
                                         </span>
                                         <span class="sr-meta-chip">
-                                            Pickup: {{ $pickupCode }}
+                                            {{ $ret->operator?->name ?? '' }}
                                         </span>
                                     </div>
 
                                     <div class="sr-amounts">
                                         <span>
-                                            OK: {{ number_format($totalOk, 2, ',', '.') }}
+                                            Pickup: {{ number_format($totalPickupRow, 2, ',', '.') }}
                                         </span>
-                                        <span class="{{ $totalReject > 0 ? 'text-danger' : '' }}">
-                                            RJ: {{ number_format($totalReject, 2, ',', '.') }}
+                                        <span class="{{ $totalRemainingRow > 0 ? 'text-warning' : 'text-muted' }}">
+                                            Belum setor: {{ number_format($totalRemainingRow, 2, ',', '.') }}
                                         </span>
                                     </div>
 

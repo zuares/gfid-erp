@@ -759,6 +759,12 @@ class FinishingJobController extends Controller
     /**
      * Apply mutasi stok + snapshot HPP RM-only + update finished_qty sewing_return_lines.
      * Asumsi dipanggil DI DALAM TRANSACTION.
+     *
+     * Logika WIP:
+     * - Finishing POSTED mengonsumsi WIP-FIN per bundle sebesar (qty_ok + qty_reject)
+     *   → bundle.wip_qty -= (qty_ok + qty_reject)
+     * - Direct Pick WIP-FIN → RTS harus mengurangi wip_qty sendiri di modul DirectPickup.
+     *   → total global: wip_qty -= (ok + reject + direct_pick)
      */
     protected function applyPostingMovements(
         FinishingJob $job,
@@ -771,26 +777,41 @@ class FinishingJobController extends Controller
         $job->loadMissing(['lines.bundle', 'lines.item']);
 
         foreach ($job->lines as $line) {
-            $qtyIn = (float) ($line->qty_in ?? ((float) ($line->qty_ok ?? 0) + (float) ($line->qty_reject ?? 0)));
+            // Ambil qty OK & Reject dari line
             $qtyOk = (float) ($line->qty_ok ?? 0);
             $qtyReject = (float) ($line->qty_reject ?? 0);
 
-            if ($qtyIn <= 0.0000001 && $qtyOk <= 0.0000001 && $qtyReject <= 0.0000001) {
+            // Kalau ada field qty_in, tetap dibaca untuk fallback,
+            // tapi konsumsi WIP utama pakai (qty_ok + qty_reject).
+            $qtyInField = (float) ($line->qty_in ?? 0);
+
+            // Qty yang benar-benar mengurangi WIP-FIN (diproses finishing)
+            $qtyUsed = $qtyOk + $qtyReject;
+
+            // Fallback: kalau OK+Reject 0 tapi qty_in terisi, pakai qty_in
+            // (misal data lama / edge case, biar nggak ada line “menggantung”).
+            if ($qtyUsed <= 0.0000001 && $qtyInField > 0.0000001) {
+                $qtyUsed = $qtyInField;
+            }
+
+            // Kalau semua 0, skip saja
+            if ($qtyUsed <= 0.0000001 && $qtyOk <= 0.0000001 && $qtyReject <= 0.0000001) {
                 continue;
             }
 
+            // Ambil unit cost RM-only dari WIP-FIN
             $unitCostWipFin = $this->inventory->getItemIncomingUnitCost(
                 warehouseId: $wipFinWarehouseId,
                 itemId: $line->item_id,
             );
             $movementUnitCost = $unitCostWipFin > 0 ? $unitCostWipFin : null;
 
-            // OUT dari WIP-FIN: qty_in (OK + reject)
-            if ($qtyIn > 0.0000001) {
+            // 1️⃣ OUT dari WIP-FIN: sebesar qty_used (OK + Reject)
+            if ($qtyUsed > 0.0000001) {
                 $this->inventory->stockOut(
                     warehouseId: $wipFinWarehouseId,
                     itemId: $line->item_id,
-                    qty: $qtyIn,
+                    qty: $qtyUsed,
                     date: $movementDate,
                     sourceType: FinishingJob::class,
                     sourceId: $job->id,
@@ -802,7 +823,7 @@ class FinishingJobController extends Controller
                 );
             }
 
-            // IN ke WH-PRD: qty_ok
+            // 2️⃣ IN ke WH-PRD: qty_ok
             if ($qtyOk > 0.0000001) {
                 $this->inventory->stockIn(
                     warehouseId: $prodWarehouseId,
@@ -817,10 +838,11 @@ class FinishingJobController extends Controller
                     affectLotCost: false,
                 );
 
+                // Snapshot HPP RM-only (optional aktif / tidak)
                 if ($movementUnitCost !== null && $movementUnitCost > 0) {
                     $this->hpp->createSnapshot(
                         itemId: $line->item_id,
-                        warehouseId: null,
+                        warehouseId: null, // global snapshot (RM only)
                         snapshotDate: $movementDate->format('Y-m-d'),
                         referenceType: 'auto_hpp_rm_only_finishing',
                         referenceId: $job->id,
@@ -847,7 +869,7 @@ class FinishingJobController extends Controller
                 }
             }
 
-            // IN ke REJECT: qty_reject
+            // 3️⃣ IN ke REJECT: qty_reject
             if ($qtyReject > 0.0000001) {
                 $this->inventory->stockIn(
                     warehouseId: $rejectWarehouseId,
@@ -863,12 +885,16 @@ class FinishingJobController extends Controller
                 );
             }
 
-            // Kurangi WIP qty di bundle
-            if ($qtyIn > 0.0000001 && $line->bundle) {
+            // 4️⃣ Kurangi WIP qty di bundle sesuai konsumsi finishing (OK + Reject)
+            if ($line->bundle) {
                 $bundle = $line->bundle;
                 $current = (float) ($bundle->wip_qty ?? 0);
-                $bundle->wip_qty = max(0, $current - $qtyIn);
-                $bundle->save();
+                $usedFromBundle = $qtyOk + $qtyReject;
+
+                if ($usedFromBundle > 0.0000001) {
+                    $bundle->wip_qty = max(0, $current - $usedFromBundle);
+                    $bundle->save();
+                }
             }
         }
     }

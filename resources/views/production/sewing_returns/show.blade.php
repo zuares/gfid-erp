@@ -96,11 +96,6 @@
             border: 1px solid rgba(59, 130, 246, .4);
         }
 
-        .pill-muted {
-            background: rgba(148, 163, 184, .12);
-            color: #475569;
-        }
-
         .section-title {
             font-size: .9rem;
             font-weight: 900;
@@ -121,7 +116,7 @@
 
         @media(min-width:768px) {
             .summary-grid {
-                grid-template-columns: repeat(5, minmax(0, 1fr));
+                grid-template-columns: repeat(6, minmax(0, 1fr));
             }
         }
 
@@ -190,7 +185,6 @@
     @php
         $lines = $return->lines ?? collect();
         $hasReject = ((float) ($totalReject ?? 0)) > 0.000001;
-
         $status = $return->status ?? 'draft';
 
         try {
@@ -213,7 +207,16 @@
             $pickupDate = optional($return->pickup?->date)->format('d/m/Y') ?? '-';
         }
 
-        // Per item summary
+        // total direct pickup (unik per pickup line)
+        $totalDirectPick = $lines
+            ->pluck('sewingPickupLine')
+            ->filter()
+            ->unique('id')
+            ->sum(function ($pl) {
+                return (float) ($pl->qty_direct_picked ?? 0);
+            });
+
+        // ringkasan per item: Sisa(qty_ok), Reject, Dadakan, Belum Setor
         $perItem = $lines
             ->groupBy(function ($l) {
                 return (int) ($l->item_id ?? (optional(optional($l->sewingPickupLine)->bundle)->finished_item_id ?? 0));
@@ -223,11 +226,31 @@
                 $bundle = optional($first->sewingPickupLine)->bundle;
                 $item = optional($bundle)->finishedItem;
 
+                $ok = (float) $group->sum('qty_ok'); // <- dipakai sebagai "Sisa" sesuai request
+                $rj = (float) $group->sum('qty_reject');
+
+                $pickupLines = $group->pluck('sewingPickupLine')->filter()->unique('id');
+
+                $directPick = $pickupLines->sum(function ($pl) {
+                    return (float) ($pl->qty_direct_picked ?? 0);
+                });
+
+                $remaining = $pickupLines->sum(function ($pl) {
+                    $qtyBundle = (float) ($pl->qty_bundle ?? 0);
+                    $returnedOk = (float) ($pl->qty_returned_ok ?? 0);
+                    $returnedRej = (float) ($pl->qty_returned_reject ?? 0);
+                    $directPick = (float) ($pl->qty_direct_picked ?? 0);
+
+                    return max($qtyBundle - ($returnedOk + $returnedRej + $directPick), 0);
+                });
+
                 return [
                     'code' => $item?->code ?? '-',
                     'name' => $item?->name ?? '',
-                    'ok' => (float) $group->sum('qty_ok'),
-                    'rj' => (float) $group->sum('qty_reject'),
+                    'ok' => $ok,
+                    'rj' => $rj,
+                    'direct_pick' => $directPick,
+                    'remaining' => $remaining,
                 ];
             })
             ->sortBy('code')
@@ -245,20 +268,18 @@
                     </div>
 
                     <div class="small text-muted">
-                        Tanggal setor: <span class="mono">{{ $dateLabel }}</span>
+                        <span class="mono">{{ $dateLabel }}</span>
                         @if ($return->warehouse)
                             • Gudang: <span class="mono">{{ $return->warehouse->code }}</span>
                         @endif
                     </div>
 
                     <div class="small text-muted mt-1">
-                        Pickup: <span class="mono">{{ $return->pickup?->code ?? '-' }}</span>
-                        • {{ $pickupDate }}
+                        Pickup: <span class="mono">{{ $return->pickup?->code ?? '-' }}</span> • {{ $pickupDate }}
                     </div>
 
                     <div class="small text-muted mt-1">
-                        Operator (pickup):
-                        {{ $return->pickup?->operator?->code ?? '-' }}
+                        Operator: {{ $return->pickup?->operator?->code ?? '-' }}
                         — {{ $return->pickup?->operator?->name ?? '-' }}
                     </div>
                 </div>
@@ -271,7 +292,7 @@
                         @if ($hasReject)
                             <span class="badge-status badge-reject">ADA REJECT</span>
                         @else
-                            <span class="pill pill-ok">SEMUA OK</span>
+                            <span class="pill pill-ok">SEMUA AMAN</span>
                         @endif
                     </div>
 
@@ -291,31 +312,23 @@
             </div>
         </div>
 
-        {{-- SUMMARY (dari controller) --}}
+        {{-- SUMMARY --}}
         <div class="card mb-2">
             <div class="card-section">
-                <div class="section-title">Ringkasan Mutasi</div>
-                <div class="section-sub mb-2">
-                    Mutasi dari <span class="mono">{{ $return->warehouse?->code ?? 'WIP-SEW' }}</span> → WIP-FIN /
-                    REJ-SEW
-                    (Remaining sudah termasuk direct pickup).
-                </div>
+                <div class="section-title mb-2">Ringkasan</div>
 
                 <div class="summary-grid">
                     <div>
-                        <div class="summary-label">Total ambil (pickup)</div>
+                        <div class="summary-label">Pickup</div>
                         <div class="summary-value mono">{{ number_format($totalPickup, 2, ',', '.') }}</div>
-                        <div class="section-sub">Qty bundle dari pickup line.</div>
                     </div>
                     <div>
-                        <div class="summary-label">Total setor</div>
+                        <div class="summary-label">Setor (Sisa + Reject)</div>
                         <div class="summary-value mono">{{ number_format($totalProcessed, 2, ',', '.') }}</div>
-                        <div class="section-sub">OK + Reject yang diinput.</div>
                     </div>
                     <div>
-                        <div class="summary-label">OK</div>
+                        <div class="summary-label">Sisa</div>
                         <div class="summary-value summary-ok mono">{{ number_format($totalOk, 2, ',', '.') }}</div>
-                        <div class="section-sub">{{ number_format($okPercent, 1, ',', '.') }}%</div>
                     </div>
                     <div>
                         <div class="summary-label">Reject</div>
@@ -323,10 +336,14 @@
                         <div class="section-sub">{{ number_format($rejectPercent, 1, ',', '.') }}%</div>
                     </div>
                     <div>
-                        <div class="summary-label">Sisa belum setor</div>
+                        <div class="summary-label">Dadakan</div>
+                        <div class="summary-value summary-warn mono">{{ number_format($totalDirectPick, 2, ',', '.') }}
+                        </div>
+                    </div>
+                    <div>
+                        <div class="summary-label">Belum Setor</div>
                         <div class="summary-value summary-warn mono">{{ number_format($totalRemaining, 2, ',', '.') }}
                         </div>
-                        <div class="section-sub">bundle - returned - direct picked.</div>
                     </div>
                 </div>
             </div>
@@ -335,28 +352,33 @@
         {{-- PER ITEM --}}
         <div class="card mb-2">
             <div class="card-section">
-                <div class="section-title">Ringkasan per Item</div>
-                <div class="section-sub mb-2">Total OK masuk WIP-FIN dan Reject masuk REJ-SEW per item.</div>
+                <div class="section-title mb-2">Ringkasan per Item</div>
 
                 <table class="table table-sm align-middle mb-0">
                     <thead>
                         <tr>
+                            <th style="width:44px;">#</th>
                             <th style="width:140px;">Item</th>
                             <th>Nama</th>
-                            <th class="text-end" style="width:120px;">OK</th>
+                            <th class="text-end" style="width:120px;">Sisa</th>
                             <th class="text-end" style="width:120px;">Reject</th>
-                            <th class="text-end" style="width:120px;">Total</th>
+                            <th class="text-end" style="width:130px;">Dadakan</th>
+                            <th class="text-end" style="width:130px;">Belum Setor</th>
                         </tr>
                     </thead>
                     <tbody>
-                        @forelse($perItem as $row)
-                            @php $total = (float)$row['ok'] + (float)$row['rj']; @endphp
+                        @forelse($perItem as $idx => $row)
                             <tr
                                 class="{{ $row['rj'] > 0 && $row['ok'] == 0 ? 'row-rj' : ($row['ok'] > 0 && $row['rj'] == 0 ? 'row-ok' : '') }}">
+                                <td class="text-muted mono">{{ $idx + 1 }}</td>
+
                                 <td class="mono fw-bold">{{ $row['code'] }}</td>
                                 <td>{{ $row['name'] }}</td>
-                                <td class="text-end"><span
-                                        class="pill pill-ok mono">{{ number_format($row['ok'], 2, ',', '.') }}</span></td>
+
+                                <td class="text-end">
+                                    <span class="pill pill-ok mono">{{ number_format($row['ok'], 2, ',', '.') }}</span>
+                                </td>
+
                                 <td class="text-end">
                                     @if ($row['rj'] > 0)
                                         <span class="pill pill-rj mono">{{ number_format($row['rj'], 2, ',', '.') }}</span>
@@ -364,12 +386,20 @@
                                         <span class="text-muted mono">0,00</span>
                                     @endif
                                 </td>
-                                <td class="text-end"><span
-                                        class="pill pill-total mono">{{ number_format($total, 2, ',', '.') }}</span></td>
+
+                                <td class="text-end">
+                                    <span
+                                        class="pill pill-total mono">{{ number_format($row['direct_pick'], 2, ',', '.') }}</span>
+                                </td>
+
+                                <td class="text-end">
+                                    <span
+                                        class="pill pill-total mono">{{ number_format($row['remaining'], 2, ',', '.') }}</span>
+                                </td>
                             </tr>
                         @empty
                             <tr>
-                                <td colspan="5" class="text-center text-muted small py-3">Tidak ada data item.</td>
+                                <td colspan="7" class="text-center text-muted small py-3">Tidak ada data item.</td>
                             </tr>
                         @endforelse
                     </tbody>
@@ -380,8 +410,7 @@
         {{-- DETAIL --}}
         <div class="card mb-2">
             <div class="card-section">
-                <div class="section-title">Detail Baris</div>
-                <div class="section-sub mb-2">Per bundle yang disetor dari pickup.</div>
+                <div class="section-title mb-2">Detail Bundle</div>
 
                 <table class="table table-sm align-middle mono mb-0">
                     <thead>
@@ -389,9 +418,10 @@
                             <th style="width:40px;">#</th>
                             <th style="width:150px;">Item</th>
                             <th>Bundle / LOT</th>
-                            <th class="text-end" style="width:120px;">OK</th>
-                            <th class="text-end" style="width:120px;">Reject</th>
-                            <th class="text-end" style="width:120px;">Total</th>
+                            <th class="text-end" style="width:110px;">Sisa</th>
+                            <th class="text-end" style="width:110px;">Reject</th>
+                            <th class="text-end" style="width:110px;">Dadakan</th>
+                            <th class="text-end" style="width:110px;">Belum Setor</th>
                             <th style="width:220px;">Catatan</th>
                         </tr>
                     </thead>
@@ -403,9 +433,19 @@
                                 $item = optional($bundle)->finishedItem;
                                 $lot = optional(optional($bundle)->cuttingJob)->lot;
 
-                                $ok = (float) $line->qty_ok;
+                                $ok = (float) $line->qty_ok; // <- tampil sebagai "Sisa"
                                 $rj = (float) $line->qty_reject;
-                                $tot = $ok + $rj;
+
+                                $qtyBundle = (float) ($pickupLine->qty_bundle ?? 0);
+                                $returnedOkAll = (float) ($pickupLine->qty_returned_ok ?? 0);
+                                $returnedRejAll = (float) ($pickupLine->qty_returned_reject ?? 0);
+                                $directPickAll = (float) ($pickupLine->qty_direct_picked ?? 0);
+
+                                $directPick = $directPickAll;
+                                $remainingRow = max(
+                                    $qtyBundle - ($returnedOkAll + $returnedRejAll + $directPickAll),
+                                    0,
+                                );
                             @endphp
 
                             <tr class="{{ $rj > 0 && $ok == 0 ? 'row-rj' : ($ok > 0 && $rj == 0 ? 'row-ok' : '') }}">
@@ -422,19 +462,20 @@
                                         @endif
                                     </div>
                                     <div class="small text-muted mt-1">
-                                        Pickup qty_bundle:
-                                        <span
-                                            class="mono">{{ number_format((float) ($pickupLine->qty_bundle ?? 0), 2, ',', '.') }}</span>
+                                        Pickup: <span class="mono">{{ number_format($qtyBundle, 2, ',', '.') }}</span>
                                     </div>
                                 </td>
+
                                 <td class="text-end">{{ number_format($ok, 2, ',', '.') }}</td>
                                 <td class="text-end">{{ number_format($rj, 2, ',', '.') }}</td>
-                                <td class="text-end">{{ number_format($tot, 2, ',', '.') }}</td>
+                                <td class="text-end">{{ number_format($directPick, 2, ',', '.') }}</td>
+                                <td class="text-end">{{ number_format($remainingRow, 2, ',', '.') }}</td>
+
                                 <td>{{ $line->notes ?: '—' }}</td>
                             </tr>
                         @empty
                             <tr>
-                                <td colspan="7" class="text-center text-muted small py-3">Tidak ada detail.</td>
+                                <td colspan="8" class="text-center text-muted small py-3">Tidak ada detail.</td>
                             </tr>
                         @endforelse
                     </tbody>
@@ -443,7 +484,7 @@
                 @if ($return->notes)
                     <hr class="my-2">
                     <div class="small">
-                        <span class="text-muted">Catatan header:</span> {{ $return->notes }}
+                        <span class="text-muted">Catatan:</span> {{ $return->notes }}
                     </div>
                 @endif
             </div>

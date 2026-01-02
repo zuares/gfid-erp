@@ -41,9 +41,13 @@ class SewingReturnController extends Controller
         ];
 
         $query = SewingReturn::query()
-            ->with(['operator', 'warehouse', 'pickup'])
-            ->withSum('lines as total_ok', 'qty_ok')
-            ->withSum('lines as total_reject', 'qty_reject')
+            ->with([
+                'operator',
+                'warehouse',
+                'pickup',
+                // ⬇️ penting untuk hitung Total Pickup & Belum Setor di Blade
+                'lines.sewingPickupLine',
+            ])
             ->when($filters['status'], fn($q, $status) => $q->where('status', $status))
             ->when($filters['operator_id'], fn($q, $opId) => $q->where('operator_id', $opId))
             ->when($filters['from_date'], fn($q, $from) => $q->whereDate('date', '>=', $from))
@@ -89,17 +93,29 @@ class SewingReturnController extends Controller
 
         $lines = $return->lines ?? collect();
 
+        // Total bundle yang diambil (qty_bundle di pickup_line)
         $totalPickup = $lines->sum(function ($line) {
             $pickupLine = $line->sewingPickupLine;
             return (float) ($pickupLine->qty_bundle ?? 0);
         });
 
+        // Raw OK & Reject dari Sewing Return
         $totalOk = (float) $lines->sum('qty_ok');
         $totalReject = (float) $lines->sum('qty_reject');
         $totalProcessed = $totalOk + $totalReject;
 
+        // Persentase kualitas (pakai raw OK/Reject)
         $okPercent = $totalProcessed > 0 ? round(($totalOk / $totalProcessed) * 100, 1) : 0.0;
         $rejectPercent = $totalProcessed > 0 ? round(($totalReject / $totalProcessed) * 100, 1) : 0.0;
+
+        // ✅ Total Direct Pickup dari sisi Sewing Pickup (per line)
+        $totalDirectPick = $lines->sum(function ($line) {
+            $pickupLine = $line->sewingPickupLine;
+            return (float) ($pickupLine->qty_direct_picked ?? 0);
+        });
+
+        // ✅ OK Net (untuk laporan yang butuh "OK setelah dikurangi DP")
+        $totalOkNet = max($totalOk - $totalDirectPick, 0);
 
         // ✅ Remaining = bundle - (returned_ok + returned_reject + direct_picked)
         $totalRemaining = $lines->sum(function ($line) {
@@ -119,12 +135,14 @@ class SewingReturnController extends Controller
         return view('production.sewing_returns.show', [
             'return' => $return,
             'totalPickup' => $totalPickup,
-            'totalOk' => $totalOk,
+            'totalOk' => $totalOk, // raw OK (mutasi ke WIP-FIN)
+            'totalOkNet' => $totalOkNet, // OK setelah dikurangi Direct Pickup
             'totalReject' => $totalReject,
             'totalProcessed' => $totalProcessed,
             'okPercent' => $okPercent,
             'rejectPercent' => $rejectPercent,
             'totalRemaining' => $totalRemaining,
+            'totalDirectPick' => $totalDirectPick, // buat summary & detail
         ]);
     }
 
