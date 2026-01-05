@@ -88,7 +88,6 @@
     data-display-mode="{{ $displayMode }}" data-show-name="{{ $showName ? '1' : '0' }}"
     data-show-category="{{ $showCategory ? '1' : '0' }}" data-extra-params='@json($extraParams)'
     data-required="{{ $required ? '1' : '0' }}">
-
     <input type="text" value="{{ strtoupper($displayValue) }}" autocomplete="off"
         class="form-control form-control-sm js-item-suggest-input" placeholder="{{ $placeholder }}"
         data-items='@json($jsItems)' id="{{ $uid }}"
@@ -101,14 +100,8 @@
             class="js-item-suggest-category">
     @endif
 
-    {{-- Realtime warning di bawah input --}}
-    <div class="js-item-suggest-error invalid-feedback">
-        Item wajib dipilih.
-    </div>
-
     <div class="item-suggest-dropdown shadow-sm" style="display:none;"></div>
 </div>
-
 
 @once
     @push('head')
@@ -127,7 +120,6 @@
                 left: 0;
                 right: 0;
                 top: calc(100% + 4px);
-                /* default di bawah input */
                 background: var(--card, #fff);
                 border: 1px solid #e5e7eb;
                 border-radius: 6px;
@@ -155,22 +147,9 @@
                 color: #6b7280;
             }
 
-            /* Highlight input invalid */
+            /* Highlight input invalid (tanpa pesan teks) */
             .js-item-suggest-input.is-invalid {
                 border-color: #dc3545;
-            }
-
-            /* Realtime error text – default hidden */
-            .js-item-suggest-error {
-                display: none;
-                font-size: .75rem;
-                color: #dc3545;
-                margin-top: .15rem;
-            }
-
-            /* Tampilkan error saat input invalid */
-            .js-item-suggest-input.is-invalid+.js-item-suggest-error {
-                display: block;
             }
         </style>
     @endpush
@@ -237,9 +216,7 @@
                     initialItems = [];
                 }
 
-                if (input.value) {
-                    input.value = input.value.toUpperCase();
-                }
+                if (input.value) input.value = input.value.toUpperCase();
 
                 const forceUppercase = true;
 
@@ -265,9 +242,7 @@
 
                 function updateActiveClass() {
                     const options = dropdown.querySelectorAll('.item-suggest-option');
-                    options.forEach((opt, i) => {
-                        opt.classList.toggle('is-active', i === activeIndex);
-                    });
+                    options.forEach((opt, i) => opt.classList.toggle('is-active', i === activeIndex));
 
                     if (activeIndex >= 0 && activeIndex < options.length) {
                         options[activeIndex].scrollIntoView({
@@ -319,15 +294,11 @@
                             if (showCategory && (item.item_category_name || item.item_category)) {
                                 sub.push(item.item_category_name || item.item_category);
                             }
-
-                            if (sub.length) {
-                                html += `<div class='item-suggest-option-name'>${sub.join(" • ")}</div>`;
-                            }
+                            if (sub.length) html += `<div class='item-suggest-option-name'>${sub.join(" • ")}</div>`;
                         }
 
                         btn.innerHTML = html;
                         btn.addEventListener("click", () => selectItem(item));
-
                         dropdown.appendChild(btn);
                     });
 
@@ -343,21 +314,18 @@
                         text = item.code || '';
                     } else {
                         text = item.code || '';
-                        if (displayMode === "code-name" && item.name) {
-                            text += " — " + item.name;
-                        }
+                        if (displayMode === "code-name" && item.name) text += " — " + item.name;
                     }
 
-                    if (forceUppercase && text) {
-                        text = text.toUpperCase();
-                    }
+                    if (forceUppercase && text) text = text.toUpperCase();
 
                     isSelecting = true;
+
                     input.value = text;
                     hiddenId.value = item.id;
                     if (hiddenCat) hiddenCat.value = item.item_category_id;
 
-                    // item sudah valid → hilangkan error
+                    // valid
                     input.classList.remove('is-invalid');
 
                     hiddenId.dispatchEvent(new Event('change', {
@@ -381,13 +349,10 @@
                     if (!lastItems.length) return;
 
                     let idx = activeIndex;
-                    if (idx < 0 || idx >= lastItems.length) {
-                        idx = 0;
-                    }
+                    if (idx < 0 || idx >= lastItems.length) idx = 0;
+
                     const item = lastItems[idx];
-                    if (item) {
-                        selectItem(item);
-                    }
+                    if (item) selectItem(item);
                 }
 
                 function fetchData(q, force) {
@@ -415,9 +380,7 @@
                     if (extraParams && typeof extraParams === 'object') {
                         Object.keys(extraParams).forEach((key) => {
                             const value = extraParams[key];
-                            if (value !== null && value !== undefined && value !== '') {
-                                params.set(key, value);
-                            }
+                            if (value !== null && value !== undefined && value !== '') params.set(key, value);
                         });
                     }
 
@@ -427,17 +390,12 @@
                         .then(r => r.json())
                         .then(json => {
                             const data = json.data || [];
-
-                            if (!data.length && initialItems.length) {
-                                buildDropdown(initialItems);
-                            } else {
-                                buildDropdown(data);
-                            }
+                            if (!data.length && initialItems.length) buildDropdown(initialItems);
+                            else buildDropdown(data);
                         })
                         .catch(() => {
-                            if (initialItems.length) {
-                                buildDropdown(initialItems);
-                            } else {
+                            if (initialItems.length) buildDropdown(initialItems);
+                            else {
                                 dropdown.innerHTML = `<div class='p-2 text-danger'>Gagal memuat</div>`;
                                 show();
                             }
@@ -451,13 +409,11 @@
                         const upper = input.value.toUpperCase();
                         if (upper !== input.value) {
                             input.value = upper;
-                            if (start !== null && end !== null) {
-                                input.setSelectionRange(start, end);
-                            }
+                            if (start !== null && end !== null) input.setSelectionRange(start, end);
                         }
                     }
 
-                    // Realtime: kalau user ketik manual → anggap pilihan batal
+                    // kalau user ketik manual → anggap pilihan batal
                     if (!isSelecting) {
                         hiddenId.value = "";
                         if (hiddenCat) hiddenCat.value = "";
@@ -465,9 +421,8 @@
                             bubbles: true
                         }));
 
-                        if (required) {
-                            input.classList.add('is-invalid'); // langsung kasih warning realtime
-                        }
+                        // hanya border merah (tanpa pesan)
+                        if (required) input.classList.add('is-invalid');
                     }
 
                     const q = (input.value || '').trim();
@@ -476,17 +431,12 @@
                 });
 
                 input.addEventListener("focus", () => {
-                    if (forceUppercase && input.value) {
-                        input.value = input.value.toUpperCase();
-                    }
+                    if (forceUppercase && input.value) input.value = input.value.toUpperCase();
 
                     input.select();
 
-                    if (initialItems.length && input.value.trim() === '') {
-                        buildDropdown(initialItems);
-                    } else {
-                        fetchData(input.value.trim(), true);
-                    }
+                    if (initialItems.length && input.value.trim() === '') buildDropdown(initialItems);
+                    else fetchData(input.value.trim(), true);
                 });
 
                 input.addEventListener("keydown", (e) => {
@@ -494,20 +444,12 @@
 
                     if (key === "ArrowDown") {
                         e.preventDefault();
-
-                        if (!isDropdownVisible()) {
-                            fetchData(input.value.trim(), true);
-                        } else {
-                            moveActive(1);
-                        }
+                        if (!isDropdownVisible()) fetchData(input.value.trim(), true);
+                        else moveActive(1);
                     } else if (key === "ArrowUp") {
                         e.preventDefault();
-
-                        if (!isDropdownVisible()) {
-                            fetchData(input.value.trim(), true);
-                        } else {
-                            moveActive(-1);
-                        }
+                        if (!isDropdownVisible()) fetchData(input.value.trim(), true);
+                        else moveActive(-1);
                     } else if (key === "Enter") {
                         if (isDropdownVisible()) {
                             e.preventDefault();
@@ -523,15 +465,11 @@
                     }
                 });
 
-                // Blur: kalau required & masih kosong → tetap invalid
+                // Blur: kalau required & masih kosong → tetap invalid (border merah)
                 input.addEventListener("blur", () => {
-                    if (required) {
-                        if (!hiddenId.value) {
-                            input.classList.add('is-invalid');
-                        } else {
-                            input.classList.remove('is-invalid');
-                        }
-                    }
+                    if (!required) return;
+                    if (!hiddenId.value) input.classList.add('is-invalid');
+                    else input.classList.remove('is-invalid');
                 });
 
                 // autofocus kalau diminta
@@ -540,24 +478,17 @@
                         input.focus();
                         input.select();
 
-                        if (initialItems.length) {
-                            buildDropdown(initialItems);
-                        } else {
-                            fetchData("", true);
-                        }
+                        if (initialItems.length) buildDropdown(initialItems);
+                        else fetchData("", true);
                     }, 150);
                 }
 
                 document.addEventListener("click", (e) => {
-                    if (!wrap.contains(e.target)) {
-                        hide();
-                    }
+                    if (!wrap.contains(e.target)) hide();
                 });
 
                 window.addEventListener('resize', () => {
-                    if (isDropdownVisible()) {
-                        positionDropdown(input, dropdown);
-                    }
+                    if (isDropdownVisible()) positionDropdown(input, dropdown);
                 });
 
                 // Validasi saat submit form
