@@ -16,55 +16,42 @@
     'placeholder' => 'Kode / nama barang',
 
     // filter API
-    'type' => null, // contoh: 'finished_good', 'material'
-    'itemCategoryId' => null, // filter kategori item spesifik
+    'type' => null,
+    'itemCategoryId' => null,
 
     // minimal karakter sebelum fetch
     'minChars' => 1,
 
-    // jika true → auto focus + auto buka suggest saat page load
+    // autofocus
     'autofocus' => false,
 
-    /**
-     * Maksimal jumlah baris hasil yang DITAMPILKAN (visible rows) di dropdown.
-     * Data tetap bisa lebih banyak dan bisa discroll.
-     * Default 4 (backward compatible).
-     * Override di pemanggilan: :maxResults="3"
-     */
+    // dropdown visible rows
     'maxResults' => 4,
 
-    /**
-     * VARIAN UI
-     * - default  : kode + nama (+ kategori)
-     * - mini     : hanya kode (tanpa nama & kategori)
-     */
-    'variant' => 'default',
+    // UI variant
+    'variant' => 'default', // default | mini
 
-    /**
-     * Mode tampilan teks di input bagi user:
-     * - code-name  : "CODE — Nama item"
-     * - code       : "CODE" saja
-     */
-    'displayMode' => 'code-name',
+    // input display mode
+    'displayMode' => 'code-name', // code-name | code
 
-    // toggle elemen di dropdown (desktop)
+    // dropdown toggles (desktop)
     'showName' => true,
     'showCategory' => true,
 
-    /**
-     * extraParams:
-     * array param tambahan yang akan dikirim ke API suggest/index.
-     * Contoh:
-     *   ['lot_id' => $lotId]
-     *   ['warehouse_id' => $warehouseId, 'type' => 'material']
-     */
+    // extra params for API
     'extraParams' => [],
 
     /**
-     * Default: WAJIB pilih item (item_id tidak boleh kosong).
-     * Kalau mau santai, bisa di-override di pemanggilan: :required="false"
+     * ✅ DEFAULT: false (AMAN untuk block "Tambah item")
+     * Kalau benar-benar wajib sebelum submit form → set :required="true"
      */
-    'required' => true,
+    'required' => false,
+
+    /**
+     * ✅ DEFAULT: true (komponen tidak ikut validasi submit form utama)
+     * Kalau komponen bagian form utama (wajib dipilih) → set :skipSubmitValidation="false"
+     */
+    'skipSubmitValidation' => true,
 ])
 
 @php
@@ -92,15 +79,15 @@
 @endphp
 
 <div class="item-suggest-wrap" data-type="{{ $type }}" data-item-category-id="{{ $itemCategoryId }}"
-    data-min-chars="{{ $minChars }}" data-max-results="{{ (int) $maxResults }}"
+    data-min-chars="{{ (int) $minChars }}" data-max-results="{{ (int) $maxResults }}"
     data-autofocus="{{ $autofocus ? '1' : '0' }}" data-display-mode="{{ $displayMode }}"
     data-show-name="{{ $showName ? '1' : '0' }}" data-show-category="{{ $showCategory ? '1' : '0' }}"
-    data-extra-params='@json($extraParams)' data-required="{{ $required ? '1' : '0' }}">
-
+    data-extra-params='@json($extraParams)' data-required="{{ $required ? '1' : '0' }}"
+    data-skip-submit="{{ $skipSubmitValidation ? '1' : '0' }}">
     <input type="text" value="{{ strtoupper($displayValue) }}" autocomplete="off"
         class="form-control form-control-sm js-item-suggest-input" placeholder="{{ $placeholder }}"
-        data-items='@json($jsItems)' id="{{ $uid }}"
-        @if ($required) required aria-required="true" @endif>
+        data-items='@json($jsItems)' id="{{ $uid }}" {{-- ❌ JANGAN pakai required HTML5 di text input untuk komponen ini --}}
+        aria-autocomplete="list">
 
     <input type="hidden" name="{{ $idName }}" value="{{ $idValue }}" class="js-item-suggest-id">
 
@@ -115,7 +102,6 @@
 @once
     @push('head')
         <style>
-            /* Biar dropdown tidak kepotong dan bisa tampil di atas table */
             .table-responsive,
             table td,
             table th,
@@ -132,8 +118,7 @@
                 background: var(--card, #fff);
                 border: 1px solid #e5e7eb;
                 border-radius: 6px;
-                max-height: 200px;
-                /* akan dioverride oleh JS sesuai maxResults & viewport */
+                max-height: 240px;
                 overflow-y: auto;
                 z-index: 1000;
             }
@@ -157,7 +142,6 @@
                 color: #6b7280;
             }
 
-            /* Highlight input invalid (tanpa pesan teks) */
             .js-item-suggest-input.is-invalid {
                 border-color: #dc3545;
             }
@@ -173,7 +157,6 @@
                         wrap.dataset.suggestInited = "1";
                     });
                 };
-
                 window.initItemSuggestInputs();
             });
 
@@ -181,12 +164,6 @@
                 return window.matchMedia("(max-width: 768px)").matches;
             }
 
-            /**
-             * Hitung maxHeight berdasarkan:
-             * - jumlah baris visible (maxResults)
-             * - tinggi option item
-             * - batas viewport (spaceBelow)
-             */
             function positionDropdown(input, dropdown, maxVisibleRows = 4) {
                 const rect = input.getBoundingClientRect();
                 const viewportHeight = window.innerHeight;
@@ -197,13 +174,8 @@
                 const optionEl = dropdown.querySelector('.item-suggest-option');
                 const optionH = optionEl ? optionEl.getBoundingClientRect().height : 40;
 
-                // target tinggi berdasarkan jumlah baris yg ingin terlihat
                 const desiredByRows = optionH * Math.max(1, maxVisibleRows);
-
-                // jangan lebih dari 200, jangan kurang dari 80
-                const desired = Math.max(80, Math.min(desiredByRows, 200));
-
-                // pastikan tidak keluar viewport
+                const desired = Math.max(80, Math.min(desiredByRows, 240));
                 const spaceBelow = viewportHeight - rect.bottom - 6;
 
                 dropdown.style.maxHeight = Math.max(80, Math.min(desired, spaceBelow)) + "px";
@@ -220,10 +192,12 @@
                 const minChars = parseInt(wrap.dataset.minChars || "1", 10);
                 const maxResults = parseInt(wrap.dataset.maxResults || "4", 10);
 
-                const displayMode = wrap.dataset.displayMode;
+                const displayMode = wrap.dataset.displayMode || 'code-name';
                 const showName = wrap.dataset.showName === "1";
                 const showCategory = wrap.dataset.showCategory === "1";
+
                 const required = wrap.dataset.required === "1";
+                const skipSubmit = wrap.dataset.skipSubmit === "1";
 
                 const type = wrap.dataset.type || null;
                 const itemCategoryId = wrap.dataset.itemCategoryId || null;
@@ -237,26 +211,28 @@
 
                 let initialItems = [];
                 try {
-                    const raw = input.getAttribute('data-items') || '[]';
-                    initialItems = JSON.parse(raw);
+                    initialItems = JSON.parse(input.getAttribute('data-items') || '[]');
                 } catch (e) {
                     initialItems = [];
                 }
 
                 if (input.value) input.value = input.value.toUpperCase();
 
-                const forceUppercase = true;
-
                 let timer = null;
-                let lastItems = []; // simpan semua item (bukan dipotong)
+                let lastItems = [];
                 let activeIndex = -1;
                 let isSelecting = false;
+
+                function isDisabled() {
+                    return (input && input.disabled) || (hiddenId && hiddenId.disabled);
+                }
 
                 function isDropdownVisible() {
                     return dropdown.style.display !== "none";
                 }
 
                 function show() {
+                    if (isDisabled()) return;
                     dropdown.style.display = "block";
                     positionDropdown(input, dropdown, maxResults);
                 }
@@ -270,7 +246,6 @@
                 function updateActiveClass() {
                     const options = dropdown.querySelectorAll('.item-suggest-option');
                     options.forEach((opt, i) => opt.classList.toggle('is-active', i === activeIndex));
-
                     if (activeIndex >= 0 && activeIndex < options.length) {
                         options[activeIndex].scrollIntoView({
                             block: 'nearest'
@@ -282,18 +257,18 @@
                     const options = dropdown.querySelectorAll('.item-suggest-option');
                     if (!options.length) return;
 
-                    if (activeIndex === -1) {
-                        activeIndex = delta > 0 ? 0 : options.length - 1;
-                    } else {
+                    if (activeIndex === -1) activeIndex = delta > 0 ? 0 : options.length - 1;
+                    else {
                         activeIndex += delta;
                         if (activeIndex < 0) activeIndex = options.length - 1;
                         if (activeIndex >= options.length) activeIndex = 0;
                     }
-
                     updateActiveClass();
                 }
 
                 function buildDropdown(items) {
+                    if (isDisabled()) return;
+
                     dropdown.innerHTML = "";
 
                     if (!items.length) {
@@ -304,7 +279,6 @@
                         return;
                     }
 
-                    // ✅ simpan semua item supaya bisa scroll, arrow, dll
                     lastItems = items;
                     activeIndex = -1;
 
@@ -336,62 +310,49 @@
                 }
 
                 function selectItem(item) {
+                    if (isDisabled()) return;
+
                     const mobile = isMobileViewport();
-                    let text;
+                    let text = item.code || '';
 
-                    if (mobile) {
-                        text = item.code || '';
-                    } else {
-                        text = item.code || '';
-                        if (displayMode === "code-name" && item.name) text += " — " + item.name;
-                    }
-
-                    if (forceUppercase && text) text = text.toUpperCase();
+                    if (!mobile && displayMode === "code-name" && item.name) text += " — " + item.name;
+                    text = (text || '').toUpperCase();
 
                     isSelecting = true;
 
                     input.value = text;
-                    hiddenId.value = item.id;
-                    if (hiddenCat) hiddenCat.value = item.item_category_id;
+                    hiddenId.value = item.id || '';
+                    if (hiddenCat) hiddenCat.value = item.item_category_id || '';
 
-                    // valid
                     input.classList.remove('is-invalid');
 
                     hiddenId.dispatchEvent(new Event('change', {
                         bubbles: true
                     }));
-
                     setTimeout(() => {
                         isSelecting = false;
                     }, 0);
 
                     hide();
-
-                    const next = wrap.closest("tr")?.querySelector(".bundle-qty, .line-qty, .js-next-focus");
-                    if (next) {
-                        next.focus();
-                        if (next.select) next.select();
-                    }
                 }
 
                 function selectActiveOrFirst() {
+                    if (isDisabled()) return;
                     if (!lastItems.length) return;
 
                     let idx = activeIndex;
                     if (idx < 0 || idx >= lastItems.length) idx = 0;
-
-                    const item = lastItems[idx];
-                    if (item) selectItem(item);
+                    if (lastItems[idx]) selectItem(lastItems[idx]);
                 }
 
                 function fetchData(q, force) {
-                    q = q || '';
+                    if (isDisabled()) return;
+                    q = (q || '').trim();
 
                     if (!force && q.length < minChars && initialItems.length) {
                         buildDropdown(initialItems);
                         return;
                     }
-
                     if (!force && q.length < minChars && !initialItems.length) {
                         hide();
                         return;
@@ -413,12 +374,10 @@
                         });
                     }
 
-                    const url = `/api/v1/items/suggest?` + params.toString();
-
-                    fetch(url)
+                    fetch(`/api/v1/items/suggest?${params.toString()}`)
                         .then(r => r.json())
                         .then(json => {
-                            const data = json.data || [];
+                            const data = json?.data || [];
                             if (!data.length && initialItems.length) buildDropdown(initialItems);
                             else buildDropdown(data);
                         })
@@ -432,17 +391,17 @@
                 }
 
                 input.addEventListener("input", () => {
-                    if (forceUppercase && input.value) {
-                        const start = input.selectionStart;
-                        const end = input.selectionEnd;
-                        const upper = input.value.toUpperCase();
-                        if (upper !== input.value) {
-                            input.value = upper;
-                            if (start !== null && end !== null) input.setSelectionRange(start, end);
-                        }
+                    if (isDisabled()) return;
+
+                    const start = input.selectionStart;
+                    const end = input.selectionEnd;
+
+                    const upper = (input.value || '').toUpperCase();
+                    if (upper !== input.value) {
+                        input.value = upper;
+                        if (start !== null && end !== null) input.setSelectionRange(start, end);
                     }
 
-                    // kalau user ketik manual → anggap pilihan batal
                     if (!isSelecting) {
                         hiddenId.value = "";
                         if (hiddenCat) hiddenCat.value = "";
@@ -450,41 +409,38 @@
                             bubbles: true
                         }));
 
-                        // hanya border merah (tanpa pesan)
                         if (required) input.classList.add('is-invalid');
+                        else input.classList.remove('is-invalid');
                     }
 
-                    const q = (input.value || '').trim();
                     clearTimeout(timer);
-                    timer = setTimeout(() => fetchData(q, false), 200);
+                    timer = setTimeout(() => fetchData(input.value, false), 200);
                 });
 
                 input.addEventListener("focus", () => {
-                    if (forceUppercase && input.value) input.value = input.value.toUpperCase();
+                    if (isDisabled()) return;
 
-                    input.select();
+                    input.value = (input.value || '').toUpperCase();
+                    input.select && input.select();
 
                     if (initialItems.length && input.value.trim() === '') buildDropdown(initialItems);
-                    else fetchData(input.value.trim(), true);
+                    else fetchData(input.value, true);
                 });
 
                 input.addEventListener("keydown", (e) => {
+                    if (isDisabled()) return;
+
                     const key = e.key;
 
                     if (key === "ArrowDown") {
                         e.preventDefault();
-                        if (!isDropdownVisible()) fetchData(input.value.trim(), true);
+                        if (!isDropdownVisible()) fetchData(input.value, true);
                         else moveActive(1);
                     } else if (key === "ArrowUp") {
                         e.preventDefault();
-                        if (!isDropdownVisible()) fetchData(input.value.trim(), true);
+                        if (!isDropdownVisible()) fetchData(input.value, true);
                         else moveActive(-1);
-                    } else if (key === "Enter") {
-                        if (isDropdownVisible()) {
-                            e.preventDefault();
-                            selectActiveOrFirst();
-                        }
-                    } else if (key === "Tab") {
+                    } else if (key === "Enter" || key === "Tab") {
                         if (isDropdownVisible()) {
                             e.preventDefault();
                             selectActiveOrFirst();
@@ -494,18 +450,19 @@
                     }
                 });
 
-                // Blur: kalau required & masih kosong → tetap invalid (border merah)
                 input.addEventListener("blur", () => {
+                    if (isDisabled()) return;
                     if (!required) return;
+
                     if (!hiddenId.value) input.classList.add('is-invalid');
                     else input.classList.remove('is-invalid');
                 });
 
-                // autofocus kalau diminta
                 if (wrap.dataset.autofocus === "1") {
                     setTimeout(() => {
+                        if (isDisabled()) return;
                         input.focus();
-                        input.select();
+                        input.select && input.select();
 
                         if (initialItems.length) buildDropdown(initialItems);
                         else fetchData("", true);
@@ -515,33 +472,39 @@
                 document.addEventListener("click", (e) => {
                     if (!wrap.contains(e.target)) hide();
                 });
-
                 window.addEventListener('resize', () => {
                     if (isDropdownVisible()) positionDropdown(input, dropdown, maxResults);
                 });
 
-                // Validasi saat submit form
-                if (required) {
+                /**
+                 * ✅ Validasi submit form:
+                 * - hanya untuk required=1
+                 * - dan skip-submit=0
+                 * - dan tidak disabled
+                 */
+                if (required && !skipSubmit) {
                     const form = wrap.closest('form');
                     if (form && !form.dataset.itemSuggestRequiredBound) {
                         form.addEventListener('submit', function(e) {
                             let firstInvalid = null;
 
-                            form.querySelectorAll('.item-suggest-wrap[data-required="1"]').forEach(w => {
-                                const hid = w.querySelector('.js-item-suggest-id');
-                                const inp = w.querySelector('.js-item-suggest-input');
-                                if (!hid || !inp) return;
+                            form.querySelectorAll('.item-suggest-wrap[data-required="1"][data-skip-submit="0"]')
+                                .forEach(w => {
+                                    const hid = w.querySelector('.js-item-suggest-id');
+                                    const inp = w.querySelector('.js-item-suggest-input');
+                                    if (!hid || !inp) return;
+                                    if (inp.disabled || hid.disabled) return;
 
-                                if (!hid.value) {
-                                    inp.classList.add('is-invalid');
-                                    if (!firstInvalid) firstInvalid = inp;
-                                }
-                            });
+                                    if (!hid.value) {
+                                        inp.classList.add('is-invalid');
+                                        if (!firstInvalid) firstInvalid = inp;
+                                    }
+                                });
 
                             if (firstInvalid) {
                                 e.preventDefault();
                                 firstInvalid.focus();
-                                if (firstInvalid.select) firstInvalid.select();
+                                firstInvalid.select && firstInvalid.select();
                             }
                         });
 

@@ -176,7 +176,6 @@
             border: 1px solid rgba(148, 163, 184, .22);
             overflow-x: auto;
             overflow-y: auto;
-            /* ✅ vertical scroll */
             background: rgba(248, 250, 252, .9);
             max-height: 480px;
             /* fallback, akan di-set JS jadi ~10 row */
@@ -187,25 +186,28 @@
             border-color: rgba(51, 65, 85, .9);
         }
 
+        /* ✅ THEAD STICKY + TIDAK TRANSPARAN */
         .table thead th {
             position: sticky;
-            /* ✅ header sticky saat scroll */
             top: 0;
-            z-index: 2;
+            z-index: 3;
 
             font-size: .72rem;
             text-transform: uppercase;
             letter-spacing: .06em;
-            color: rgba(100, 116, 139, 1);
-            background: rgba(15, 23, 42, 0.02);
             white-space: nowrap;
+
+            /* penting: solid background */
             background: var(--card) !important;
             opacity: 1 !important;
+            color: rgba(100, 116, 139, 1);
+            box-shadow: inset 0 -1px 0 rgba(148, 163, 184, .22);
         }
 
         body[data-theme="dark"] .table thead th {
-            background: rgba(15, 23, 42, 0.95);
+            background: rgba(15, 23, 42, 0.98) !important;
             color: #e5e7eb;
+            box-shadow: inset 0 -1px 0 rgba(51, 65, 85, .9);
         }
 
         .table tbody td {
@@ -357,7 +359,7 @@
             color: #9ca3af;
         }
 
-        /* ✅ Highlight soft tapi KONTRAS (light & dark) */
+        /* ✅ Highlight row terakhir */
         .so-row-highlight {
             position: relative;
             animation: soRowPulseStrong 1.8s ease-out 1;
@@ -366,23 +368,17 @@
         @keyframes soRowPulseStrong {
             0% {
                 background-color: rgba(59, 130, 246, 0.00);
-                box-shadow:
-                    inset 0 0 0 0 rgba(59, 130, 246, 0),
-                    0 0 0 0 rgba(59, 130, 246, 0);
+                box-shadow: inset 0 0 0 0 rgba(59, 130, 246, 0), 0 0 0 0 rgba(59, 130, 246, 0);
             }
 
             25% {
                 background-color: rgba(59, 130, 246, 0.16);
-                box-shadow:
-                    inset 0 0 0 2px rgba(59, 130, 246, 0.35),
-                    0 4px 14px rgba(59, 130, 246, 0.25);
+                box-shadow: inset 0 0 0 2px rgba(59, 130, 246, 0.35), 0 4px 14px rgba(59, 130, 246, 0.25);
             }
 
             100% {
                 background-color: transparent;
-                box-shadow:
-                    inset 0 0 0 0 rgba(59, 130, 246, 0),
-                    0 0 0 0 rgba(59, 130, 246, 0);
+                box-shadow: inset 0 0 0 0 rgba(59, 130, 246, 0), 0 0 0 0 rgba(59, 130, 246, 0);
             }
         }
 
@@ -393,23 +389,17 @@
         @keyframes soRowPulseStrongDark {
             0% {
                 background-color: rgba(59, 130, 246, 0.00);
-                box-shadow:
-                    inset 0 0 0 0 rgba(59, 130, 246, 0),
-                    0 0 0 0 rgba(59, 130, 246, 0);
+                box-shadow: inset 0 0 0 0 rgba(59, 130, 246, 0), 0 0 0 0 rgba(59, 130, 246, 0);
             }
 
             25% {
                 background-color: rgba(59, 130, 246, 0.28);
-                box-shadow:
-                    inset 0 0 0 2px rgba(147, 197, 253, 0.45),
-                    0 6px 18px rgba(59, 130, 246, 0.35);
+                box-shadow: inset 0 0 0 2px rgba(147, 197, 253, 0.45), 0 6px 18px rgba(59, 130, 246, 0.35);
             }
 
             100% {
                 background-color: transparent;
-                box-shadow:
-                    inset 0 0 0 0 rgba(59, 130, 246, 0),
-                    0 0 0 0 rgba(59, 130, 246, 0);
+                box-shadow: inset 0 0 0 0 rgba(59, 130, 246, 0), 0 0 0 0 rgba(59, 130, 246, 0);
             }
         }
     </style>
@@ -930,7 +920,6 @@
 
 @push('scripts')
     <script>
-        // true jika mode Opening, false jika Periodik
         window.IS_OPENING_MODE = @json($isOpening);
     </script>
 
@@ -959,11 +948,9 @@
 
             initDeleteLineAjax();
             focusBackAfterReload();
-
-            // nomor rapi saat load awal
             renumberOpnameRows();
 
-            // ✅ set max-height table muat ~10 row (dinamis)
+            // ✅ max-height muat ~10 row
             setTableMaxHeight10Rows();
 
             // ✅ highlight + auto scroll ke row terakhir setelah reload
@@ -973,11 +960,22 @@
             const markReviewedEl = document.getElementById('mark_reviewed');
             const forceAutoFillEl = document.getElementById('force_auto_fill');
 
+            // ✅ Solusi rapi: saat submit form utama, disable blok add-item
+            if (soForm) {
+                soForm.addEventListener('submit', function() {
+                    disableOpeningAddInputsBeforeSubmit();
+                });
+            }
+
             if (soForm && markReviewedEl && forceAutoFillEl) {
                 const strictBtn = document.querySelector('[data-action="finish-counting-strict"]');
                 if (strictBtn) {
                     strictBtn.addEventListener('click', function(e) {
                         e.preventDefault();
+
+                        // sebelum submit juga disable add inputs
+                        disableOpeningAddInputsBeforeSubmit();
+
                         markReviewedEl.value = '1';
                         forceAutoFillEl.value = '0';
                         soForm.submit();
@@ -985,7 +983,6 @@
                 }
             }
 
-            // ✅ kalau window resize (tinggi row bisa berubah), set ulang max-height
             window.addEventListener('resize', debounce(() => {
                 setTableMaxHeight10Rows();
             }, 150));
@@ -1000,8 +997,28 @@
         }
 
         /**
-         * ✅ UPDATE PENOMORAN: kolom "#" selalu 1..N
+         * ✅ Solusi rapi:
+         * Disable semua input pada blok add-item (mobile & desktop)
+         * agar tidak memicu invalid HTML5 saat klik Simpan.
          */
+        function disableOpeningAddInputsBeforeSubmit() {
+            const blocks = ['#openingAddMobile', '#openingAddDesktop'];
+
+            blocks.forEach(sel => {
+                const root = document.querySelector(sel);
+                if (!root) return;
+
+                root.querySelectorAll('input, select, textarea, button').forEach(el => {
+                    // tombol tambah juga boleh disable biar tidak kepencet dobel saat submit
+                    el.disabled = true;
+                });
+
+                // jaga-jaga kalau input suggest ada di dalam
+                const suggest = root.querySelector('.js-item-suggest-input');
+                if (suggest) suggest.disabled = true;
+            });
+        }
+
         function renumberOpnameRows() {
             const tbody = document.querySelector('#opname-lines-table tbody');
             if (!tbody) return;
@@ -1013,10 +1030,6 @@
             });
         }
 
-        /**
-         * ✅ Set max-height wrapper agar muat ~10 baris (dinamis)
-         * Hitung tinggi row pertama + header
-         */
         function setTableMaxHeight10Rows() {
             const tableWrap = document.getElementById('opname-lines-table');
             if (!tableWrap) return;
@@ -1024,40 +1037,28 @@
             const table = tableWrap.querySelector('table');
             const thead = table ? table.querySelector('thead') : null;
             const firstRow = table ? table.querySelector('tbody tr') : null;
-
-            // kalau belum ada row, pakai fallback CSS
             if (!firstRow) return;
 
             const rowH = firstRow.getBoundingClientRect().height || 38;
             const headH = thead ? (thead.getBoundingClientRect().height || 34) : 34;
 
-            // 10 row + header + padding kecil
             const maxH = Math.ceil((rowH * 10) + headH + 8);
-
             tableWrap.style.maxHeight = maxH + 'px';
             tableWrap.style.overflowY = 'auto';
         }
 
-        /**
-         * ✅ Scroll row agar terlihat di dalam tableWrap (bukan scroll halaman)
-         */
         function scrollRowIntoTableWrap(row, tableWrap, behavior = 'smooth') {
             if (!row || !tableWrap) return;
-
             const rowTop = row.offsetTop;
             const rowH = row.offsetHeight || 32;
-
             const target = rowTop - (tableWrap.clientHeight / 2) + (rowH / 2);
+
             tableWrap.scrollTo({
                 top: Math.max(0, target),
                 behavior
             });
         }
 
-        /**
-         * ✅ Highlight + auto-scroll untuk baris terakhir (terbaru)
-         * Dipicu hanya kalau sebelumnya kita set flag di sessionStorage (set saat add/update OK).
-         */
         function highlightLastRowIfNeeded() {
             try {
                 const flag = sessionStorage.getItem('so_opening_highlight_last');
@@ -1074,13 +1075,9 @@
                 const row = tableWrap.querySelector('tr[data-line-id="' + lastId + '"]');
                 if (!row) return;
 
-                // pastikan wrapper sudah sesuai ~10 row
                 setTableMaxHeight10Rows();
-
-                // ✅ scroll di dalam wrapper
                 scrollRowIntoTableWrap(row, tableWrap, 'smooth');
 
-                // ✅ highlight
                 row.classList.add('so-row-highlight');
                 setTimeout(() => row.classList.remove('so-row-highlight'), 1800);
             } catch (e) {}
@@ -1154,7 +1151,6 @@
                 itemSuggestInput.select && itemSuggestInput.select();
             }
 
-            // Enter di item -> pindah fokus ke qty
             if (itemSuggestInput && qtyInput) {
                 itemSuggestInput.addEventListener('keydown', function(e) {
                     if (e.key === 'Enter') {
@@ -1165,7 +1161,6 @@
                 });
             }
 
-            // Enter di qty -> submit
             if (qtyInput) {
                 qtyInput.addEventListener('keydown', function(e) {
                     if (e.key === 'Enter') {
@@ -1205,7 +1200,6 @@
             const newQtyValue = qtyField.value;
 
             if (existingIds.has(itemId)) {
-                // Periodik -> langsung update; Opening -> pakai modal
                 if (!window.IS_OPENING_MODE) {
                     updateExistingInput && (updateExistingInput.value = '1');
                     performOpeningAjaxSubmit(rootEl, {
@@ -1314,7 +1308,6 @@
                     if (data.status === 'ok') {
                         try {
                             sessionStorage.setItem('so_opening_focus_back', '1');
-                            // ✅ flag untuk highlight + auto scroll setelah reload
                             sessionStorage.setItem('so_opening_highlight_last', '1');
                         } catch (e) {}
                         window.location.reload();
@@ -1401,10 +1394,7 @@
                                 const tr = btn.closest('tr');
                                 if (tr) tr.remove();
 
-                                // ✅ renumber setelah delete
                                 renumberOpnameRows();
-
-                                // ✅ set ulang tinggi max-height (tinggi row bisa berubah)
                                 setTableMaxHeight10Rows();
                             } else {
                                 alert(data.message || 'Gagal menghapus item.');

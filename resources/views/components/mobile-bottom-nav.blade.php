@@ -21,7 +21,7 @@
     $isCuttingTab = request()->routeIs('production.cutting_jobs.*');
     $isQcTab = request()->routeIs('production.qc.*');
     $isSewingTab =
-        request()->routeIs('production.sewing_pickups.*') || request()->routeIs('production.sewing_returns.*');
+        request()->routeIs('production.sewing.pickups.*') || request()->routeIs('production.sewing.returns.*');
     $isFinishingTab = request()->routeIs('production.finishing_jobs.*');
 @endphp
 
@@ -244,8 +244,8 @@
 
             $qcIndexHref = Route::has('production.qc.index') ? route('production.qc.index') : '#';
 
-            $sewingCreateHref = Route::has('production.sewing_returns.create')
-                ? route('production.sewing_returns.create')
+            $sewingCreateHref = Route::has('production.sewing.returns.create')
+                ? route('production.sewing.returns.create')
                 : '#';
 
             $finishingCreateHref = Route::has('production.finishing_jobs.create')
