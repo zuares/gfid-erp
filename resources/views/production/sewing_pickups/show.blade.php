@@ -249,6 +249,25 @@
             box-shadow: 0 0 0 1px rgba(74, 222, 128, .8), 0 8px 18px rgba(22, 163, 74, .35);
         }
 
+        .void-box {
+            border-radius: 14px;
+            border: 1px dashed rgba(239, 68, 68, .55);
+            background: rgba(239, 68, 68, .06);
+            padding: .75rem .9rem;
+        }
+
+        .void-title {
+            font-weight: 800;
+            color: #b91c1c;
+            letter-spacing: .03em;
+        }
+
+        .void-meta {
+            margin-top: .25rem;
+            font-size: .85rem;
+            color: rgba(75, 85, 99, .95);
+        }
+
         @media (max-width: 767.98px) {
             .card {
                 border-radius: 12px;
@@ -424,15 +443,22 @@
             'draft' => ['label' => 'DRAFT', 'class' => 'secondary'],
             'posted' => ['label' => 'POSTED', 'class' => 'primary'],
             'closed' => ['label' => 'CLOSED', 'class' => 'success'],
+
+            // ✅ tambahan sesuai data kamu
+            'partial' => ['label' => 'PARTIAL', 'class' => 'warning'],
+            'completed' => ['label' => 'COMPLETED', 'class' => 'success'],
+            'void' => ['label' => 'VOID', 'class' => 'danger'],
         ];
+
         $cfg = $statusMap[$pickup->status] ?? [
             'label' => strtoupper($pickup->status ?? '-'),
             'class' => 'secondary',
         ];
 
         $lines = $pickup->lines ?? collect();
+        $epsilon = 0.000001;
 
-        // ✅ Semua ringkasan dihitung di blade (tidak butuh variabel dari controller)
+        // Ringkasan
         $totalBundles = (int) $lines->count();
         $totalQtyPickup = (float) $lines->sum(fn($l) => (float) ($l->qty_bundle ?? 0));
         $totalReturnOk = (float) $lines->sum(fn($l) => (float) ($l->qty_returned_ok ?? 0));
@@ -440,7 +466,6 @@
         $totalDirectPick = (float) $lines->sum(fn($l) => (float) ($l->qty_direct_picked ?? 0));
         $totalProgressAdj = (float) $lines->sum(fn($l) => (float) ($l->qty_progress_adjusted ?? 0));
 
-        // ✅ aturan progress terbaru
         $totalProcessed = $totalReturnOk + $totalReturnReject + $totalDirectPick + $totalProgressAdj;
         $totalRemaining = max($totalQtyPickup - $totalProcessed, 0);
 
@@ -461,14 +486,17 @@
 
             $remain = max($qtyPickup - $processed, 0);
 
-            if ($processed <= 0.000001) {
+            if ($processed <= $epsilon) {
                 $notReturnedCount++;
-            } elseif ($remain > 0.000001) {
+            } elseif ($remain > $epsilon) {
                 $partialReturnedCount++;
             } else {
                 $fullReturnedCount++;
             }
         }
+
+        // ✅ aturan: tombol aktif hanya kalau belum ada proses lain
+        $canVoid = $pickup->status !== 'void' && $totalProcessed <= $epsilon;
     @endphp
 
     <div class="page-wrap">
@@ -519,6 +547,46 @@
                         </a>
                     </div>
                 </div>
+
+                {{-- ✅ VOID INFO --}}
+                @if ($pickup->status === 'void')
+                    <div class="void-box mt-3">
+                        <div class="void-title">
+                            <i class="bi bi-exclamation-octagon me-1"></i> DOKUMEN VOID
+                        </div>
+                        <div class="void-meta">
+                            <div>Alasan: <span class="mono">{{ $pickup->void_reason ?? '-' }}</span></div>
+                            <div>Waktu: <span
+                                    class="mono">{{ $pickup->voided_at ? \Carbon\Carbon::parse($pickup->voided_at)->format('Y-m-d H:i') : '-' }}</span>
+                            </div>
+                            <div>User: <span class="mono">{{ $pickup->voided_by ?? '-' }}</span></div>
+                        </div>
+                    </div>
+                @endif
+
+                {{-- ✅ TOMBOL VOID (selalu tampil jika belum void, disabled jika tidak bisa) --}}
+                @if ($pickup->status !== 'void')
+                    <form method="POST" action="{{ route('production.sewing.pickups.void', $pickup) }}"
+                        class="d-flex flex-wrap gap-2 mt-3 align-items-center">
+                        @csrf
+
+                        <input name="reason" required maxlength="150" class="form-control form-control-sm"
+                            style="min-width: 240px;" placeholder="Alasan VOID (wajib)" {{ $canVoid ? '' : 'disabled' }}>
+
+                        <button type="submit" class="btn btn-sm btn-outline-danger" {{ $canVoid ? '' : 'disabled' }}
+                            onclick="return confirm('Yakin VOID pickup ini? Stok akan dibalik ke WIP-CUT.')">
+                            <i class="bi bi-x-octagon me-1"></i> VOID
+                        </button>
+
+                        @if (!$canVoid)
+                            <span class="help">
+                                Tidak bisa VOID karena sudah ada proses (OK/RJ/DP/Adj).
+                                Total diproses: <span
+                                    class="mono">{{ number_format($totalProcessed, 2, ',', '.') }}</span>
+                            </span>
+                        @endif
+                    </form>
+                @endif
             </div>
         </div>
 
@@ -647,12 +715,12 @@
                                     $percentLine =
                                         $qtyPickup > 0 ? min(100, max(0, ($processed / $qtyPickup) * 100)) : 0;
 
-                                    if ($processed <= 0.000001) {
+                                    if ($processed <= $epsilon) {
                                         $lineStatusLabel = 'Belum Setor';
                                         $lineStatusClass = 'secondary';
                                         $lineProgressClass = 'empty';
                                         $lineStatusKey = 'not_returned';
-                                    } elseif ($remaining > 0.000001) {
+                                    } elseif ($remaining > $epsilon) {
                                         $lineStatusLabel = 'Parsial';
                                         $lineStatusClass = 'warning';
                                         $lineProgressClass = 'partial';

@@ -97,7 +97,7 @@ class SewingProgressAdjustmentController extends Controller
             'lines' => ['required', 'array', 'min:1'],
 
             'lines.*.sewing_pickup_line_id' => ['required', 'exists:sewing_pickup_lines,id'],
-            'lines.*.qty_adjust' => ['required', 'numeric', 'min:0.0001'],
+            'lines.*.qty_adjust' => ['required', 'numeric', 'min:0'],
             'lines.*.reason' => ['nullable', 'string', 'max:120'],
 
             'notes' => ['nullable', 'string'],

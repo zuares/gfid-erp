@@ -157,6 +157,7 @@ class SewingReturnController extends Controller
     {
         $pickups = SewingPickup::query()
             ->with(['operator', 'lines'])
+            ->whereNull('voided_at') // <-- HIDE VOID
             ->orderByDesc('date')
             ->orderByDesc('id')
             ->get();
@@ -181,6 +182,7 @@ class SewingReturnController extends Controller
                     'lines.bundle.finishedItem',
                     'lines.bundle.cuttingJob.lot',
                 ])
+                ->whereNull('voided_at') // <-- HIDE VOID
                 ->find($pickupId);
 
             if ($selectedPickup) {

@@ -301,7 +301,6 @@
                 position: fixed;
                 right: 1rem;
                 bottom: 5.2rem;
-                /* aman dari bottom nav */
                 left: auto;
                 z-index: 50;
                 padding: 0;
@@ -310,7 +309,6 @@
                 box-shadow: none;
                 justify-content: flex-end !important;
                 pointer-events: none;
-                /* hanya anak2 yg bisa diklik */
             }
 
             .floating-actions {
@@ -395,6 +393,17 @@
                 return '-';
             }
         };
+
+        // Helper: remaining pickup line (sinkron dengan controller)
+        $calcRemaining = function ($line) {
+            $qtyBundle = (float) ($line->qty_bundle ?? 0);
+            $returnedOk = (float) ($line->qty_returned_ok ?? 0);
+            $returnedRej = (float) ($line->qty_returned_reject ?? 0);
+            $directPick = (float) ($line->qty_direct_picked ?? 0);
+            $progressAdj = (float) ($line->qty_progress_adjusted ?? 0);
+
+            return max($qtyBundle - ($returnedOk + $returnedRej + $directPick + $progressAdj), 0);
+        };
     @endphp
 
     <div class="page-wrap">
@@ -405,9 +414,7 @@
                 <div class="hdr">
                     <div>
                         <h1>Setor Jahit</h1>
-                        <div class="sub">
-
-                        </div>
+                        <div class="sub"></div>
                     </div>
 
                     <a href="{{ route('production.sewing.pickups.create') }}"
@@ -444,22 +451,21 @@
 
                                 @foreach ($pickups as $pickup)
                                     @php
+                                        // ✅ SKIP PICKUP VOID
+                                        if (!empty($pickup->voided_at)) {
+                                            continue;
+                                        }
+
                                         $pickupLines = $pickup->lines ?? collect();
 
-                                        $totalRemaining = $pickupLines->sum(function ($line) {
-                                            $qtyBundle = (float) ($line->qty_bundle ?? 0);
-                                            $returnedOk = (float) ($line->qty_returned_ok ?? 0);
-                                            $returnedRej = (float) ($line->qty_returned_reject ?? 0);
-                                            $directPicked = (float) ($line->qty_direct_picked ?? 0);
-                                            return max($qtyBundle - ($returnedOk + $returnedRej + $directPicked), 0);
-                                        });
+                                        // ✅ totalRemaining sinkron dengan controller (incl progress_adjusted)
+                                        $totalRemaining = $pickupLines->sum(fn($line) => $calcRemaining($line));
 
                                         $pickupLabelDate = $fmtDay($pickup->date);
                                         $opName = $pickup->operator?->name ?? '(Tanpa operator)';
                                     @endphp
 
                                     @if ($totalRemaining > 0.000001)
-                                        {{-- tanpa kode pickup, hanya nama operator + tanggal --}}
                                         <option value="{{ $pickup->id }}"
                                             {{ (int) $selectedPickupId === (int) $pickup->id ? 'selected' : '' }}>
                                             {{ $opName }} — {{ $pickupLabelDate }}
@@ -585,28 +591,21 @@
                                                     </div>
 
                                                     @if ($bundle?->finishedItem?->name)
-                                                        <div class="mini mini-name">
-                                                            {{ $bundle->finishedItem->name }}
-                                                        </div>
+                                                        <div class="mini mini-name">{{ $bundle->finishedItem->name }}</div>
                                                     @endif
 
-                                                    {{-- mobile: hanya tanggal pickup --}}
-                                                    <div class="mini">
-                                                        {{ $pickupDateLabel ?: '-' }}
-                                                    </div>
+                                                    <div class="mini">{{ $pickupDateLabel ?: '-' }}</div>
                                                 </div>
 
                                                 <div class="qbox">
                                                     <div class="qinline">
                                                         <span class="chip belum">
-                                                            Belum
-                                                            <span
+                                                            Belum <span
                                                                 class="mono">{{ number_format($remainingPickup, 2, ',', '.') }}</span>
                                                         </span>
                                                         @if ($hasDirect)
                                                             <span class="chip dp">
-                                                                DP
-                                                                <span
+                                                                DP <span
                                                                     class="mono">{{ number_format($directPicked, 2, ',', '.') }}</span>
                                                             </span>
                                                         @endif
@@ -628,9 +627,7 @@
                                                 @endif
                                             </div>
                                             @if ($operatorCode)
-                                                <div class="text-muted small">
-                                                    {{ $operatorCode }}
-                                                </div>
+                                                <div class="text-muted small">{{ $operatorCode }}</div>
                                             @endif
                                         </td>
 
@@ -651,14 +648,12 @@
                                         <td class="align-top d-none d-md-table-cell">
                                             <div class="d-flex flex-wrap gap-1">
                                                 <span class="chip belum">
-                                                    Belum
-                                                    <span
+                                                    Belum <span
                                                         class="mono">{{ number_format($remainingPickup, 2, ',', '.') }}</span>
                                                 </span>
                                                 @if ($hasDirect)
                                                     <span class="chip dp">
-                                                        DP
-                                                        <span
+                                                        DP <span
                                                             class="mono">{{ number_format($directPicked, 2, ',', '.') }}</span>
                                                     </span>
                                                 @endif
@@ -749,9 +744,7 @@
                     <button type="submit" id="btn-submit-return" class="btn btn-success btn-sm btn-floating-submit"
                         disabled>
                         <i class="bi bi-check2 me-1"></i> Simpan
-                        <span class="btn-floating-meta" id="btn-submit-return-meta">
-                            Belum ada isi
-                        </span>
+                        <span class="btn-floating-meta" id="btn-submit-return-meta">Belum ada isi</span>
                     </button>
                 </div>
             </div>
@@ -814,9 +807,7 @@
                 clientErrorBox.classList.remove('d-none');
 
                 if (errTimer) clearTimeout(errTimer);
-                errTimer = setTimeout(() => {
-                    hideClientError();
-                }, 2200);
+                errTimer = setTimeout(() => hideClientError(), 2200);
             };
 
             const hideClientError = () => {
@@ -1000,7 +991,6 @@
                 }, {
                     passive: true
                 });
-
                 row.addEventListener('touchmove', function() {
                     touchMoved = true;
                 }, {
@@ -1012,7 +1002,6 @@
                         touchMoved = false;
                         return;
                     }
-
                     if (e.target.closest('input, select, textarea, button, a, label')) return;
 
                     const remaining = parseNum(row.dataset.remaining || '0');

@@ -701,4 +701,62 @@ class InventoryService
         return (float) ($stock?->qty ?? 0);
     }
 
+    public function reverseBySource(
+        array $originalSourceTypes,
+        int $originalSourceId,
+        string $voidSourceType,
+        int $voidSourceId,
+        ?string $notesPrefix = null,
+        string | \DateTimeInterface  | null $date = null,
+    ): void {
+        $date = $this->normalizeDate($date);
+
+        // Guard: jangan sampai double void
+        $already = InventoryMutation::query()
+            ->where('source_type', $voidSourceType)
+            ->where('source_id', $voidSourceId)
+            ->exists();
+
+        if ($already) {
+            throw new \RuntimeException("Sudah pernah di-reverse ({$voidSourceType} #{$voidSourceId}).");
+        }
+
+        $rows = InventoryMutation::query()
+            ->whereIn('source_type', $originalSourceTypes)
+            ->where('source_id', $originalSourceId)
+            ->orderBy('id')
+            ->lockForUpdate()
+            ->get();
+
+        if ($rows->isEmpty()) {
+            throw new \RuntimeException("Mutasi sumber tidak ditemukan untuk reverse.");
+        }
+
+        foreach ($rows as $m) {
+            $delta = -$this->num($m->qty_change); // reverse
+
+            $note = trim(
+                ($notesPrefix ? $notesPrefix . ' | ' : '')
+                . "reverse mut#{$m->id}"
+                . ($m->notes ? " | {$m->notes}" : '')
+            );
+
+            // ✅ penting: affectLotCost = false supaya void tidak ngacak moving average LOT kain
+            // ✅ unitCostOverride pakai unit_cost lama supaya total_cost balik dengan cost yang sama
+            $this->adjustByDifference(
+                warehouseId: (int) $m->warehouse_id,
+                itemId: (int) $m->item_id,
+                qtyChange: $delta,
+                date: $date,
+                sourceType: $voidSourceType,
+                sourceId: $voidSourceId,
+                notes: $note,
+                lotId: $m->lot_id ? (int) $m->lot_id : null,
+                allowNegative: false,
+                unitCostOverride: $m->unit_cost !== null ? (float) $m->unit_cost : null,
+                affectLotCost: false,
+            );
+        }
+    }
+
 }
