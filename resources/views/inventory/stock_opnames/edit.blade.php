@@ -169,12 +169,17 @@
             color: #15803d;
         }
 
+        /* ✅ TABLE WRAP: max-height ~10 row + scroll */
         .table-wrap {
             margin-top: .65rem;
             border-radius: 12px;
             border: 1px solid rgba(148, 163, 184, .22);
             overflow-x: auto;
+            overflow-y: auto;
+            /* ✅ vertical scroll */
             background: rgba(248, 250, 252, .9);
+            max-height: 480px;
+            /* fallback, akan di-set JS jadi ~10 row */
         }
 
         body[data-theme="dark"] .table-wrap {
@@ -183,16 +188,23 @@
         }
 
         .table thead th {
+            position: sticky;
+            /* ✅ header sticky saat scroll */
+            top: 0;
+            z-index: 2;
+
             font-size: .72rem;
             text-transform: uppercase;
             letter-spacing: .06em;
             color: rgba(100, 116, 139, 1);
             background: rgba(15, 23, 42, 0.02);
             white-space: nowrap;
+            background: var(--card) !important;
+            opacity: 1 !important;
         }
 
         body[data-theme="dark"] .table thead th {
-            background: rgba(15, 23, 42, 0.8);
+            background: rgba(15, 23, 42, 0.95);
             color: #e5e7eb;
         }
 
@@ -345,7 +357,6 @@
             color: #9ca3af;
         }
 
-        /* ✅ Highlight soft untuk row terbaru */
         /* ✅ Highlight soft tapi KONTRAS (light & dark) */
         .so-row-highlight {
             position: relative;
@@ -362,7 +373,6 @@
 
             25% {
                 background-color: rgba(59, 130, 246, 0.16);
-                /* 🔥 lebih kontras */
                 box-shadow:
                     inset 0 0 0 2px rgba(59, 130, 246, 0.35),
                     0 4px 14px rgba(59, 130, 246, 0.25);
@@ -376,7 +386,6 @@
             }
         }
 
-        /* 🌙 Dark mode tuning */
         body[data-theme="dark"] .so-row-highlight {
             animation: soRowPulseStrongDark 1.8s ease-out 1;
         }
@@ -391,7 +400,6 @@
 
             25% {
                 background-color: rgba(59, 130, 246, 0.28);
-                /* 🔥 kontras di dark */
                 box-shadow:
                     inset 0 0 0 2px rgba(147, 197, 253, 0.45),
                     0 6px 18px rgba(59, 130, 246, 0.35);
@@ -684,7 +692,6 @@
                                                     $inputNamePrefix . '.physical_qty',
                                                     $line->physical_qty,
                                                 );
-
                                                 $hasPhysicalValue = $rawPhysical !== null && $rawPhysical !== '';
                                                 if ($hasPhysicalValue) {
                                                     $rawPhysical = (float) $rawPhysical;
@@ -956,7 +963,10 @@
             // nomor rapi saat load awal
             renumberOpnameRows();
 
-            // ✅ highlight row terakhir setelah reload (jika barusan add/update)
+            // ✅ set max-height table muat ~10 row (dinamis)
+            setTableMaxHeight10Rows();
+
+            // ✅ highlight + auto scroll ke row terakhir setelah reload
             highlightLastRowIfNeeded();
 
             const soForm = document.getElementById('soUpdateForm');
@@ -974,7 +984,20 @@
                     });
                 }
             }
+
+            // ✅ kalau window resize (tinggi row bisa berubah), set ulang max-height
+            window.addEventListener('resize', debounce(() => {
+                setTableMaxHeight10Rows();
+            }, 150));
         });
+
+        function debounce(fn, wait = 150) {
+            let t = null;
+            return function(...args) {
+                clearTimeout(t);
+                t = setTimeout(() => fn.apply(this, args), wait);
+            };
+        }
 
         /**
          * ✅ UPDATE PENOMORAN: kolom "#" selalu 1..N
@@ -991,7 +1014,48 @@
         }
 
         /**
-         * ✅ Highlight soft untuk baris terakhir (terbaru)
+         * ✅ Set max-height wrapper agar muat ~10 baris (dinamis)
+         * Hitung tinggi row pertama + header
+         */
+        function setTableMaxHeight10Rows() {
+            const tableWrap = document.getElementById('opname-lines-table');
+            if (!tableWrap) return;
+
+            const table = tableWrap.querySelector('table');
+            const thead = table ? table.querySelector('thead') : null;
+            const firstRow = table ? table.querySelector('tbody tr') : null;
+
+            // kalau belum ada row, pakai fallback CSS
+            if (!firstRow) return;
+
+            const rowH = firstRow.getBoundingClientRect().height || 38;
+            const headH = thead ? (thead.getBoundingClientRect().height || 34) : 34;
+
+            // 10 row + header + padding kecil
+            const maxH = Math.ceil((rowH * 10) + headH + 8);
+
+            tableWrap.style.maxHeight = maxH + 'px';
+            tableWrap.style.overflowY = 'auto';
+        }
+
+        /**
+         * ✅ Scroll row agar terlihat di dalam tableWrap (bukan scroll halaman)
+         */
+        function scrollRowIntoTableWrap(row, tableWrap, behavior = 'smooth') {
+            if (!row || !tableWrap) return;
+
+            const rowTop = row.offsetTop;
+            const rowH = row.offsetHeight || 32;
+
+            const target = rowTop - (tableWrap.clientHeight / 2) + (rowH / 2);
+            tableWrap.scrollTo({
+                top: Math.max(0, target),
+                behavior
+            });
+        }
+
+        /**
+         * ✅ Highlight + auto-scroll untuk baris terakhir (terbaru)
          * Dipicu hanya kalau sebelumnya kita set flag di sessionStorage (set saat add/update OK).
          */
         function highlightLastRowIfNeeded() {
@@ -1010,16 +1074,14 @@
                 const row = tableWrap.querySelector('tr[data-line-id="' + lastId + '"]');
                 if (!row) return;
 
-                // scroll ke bawah supaya row terlihat (halus)
-                row.scrollIntoView({
-                    behavior: 'smooth',
-                    block: 'center'
-                });
+                // pastikan wrapper sudah sesuai ~10 row
+                setTableMaxHeight10Rows();
 
-                // kasih class highlight
+                // ✅ scroll di dalam wrapper
+                scrollRowIntoTableWrap(row, tableWrap, 'smooth');
+
+                // ✅ highlight
                 row.classList.add('so-row-highlight');
-
-                // bersihkan class setelah animasi selesai
                 setTimeout(() => row.classList.remove('so-row-highlight'), 1800);
             } catch (e) {}
         }
@@ -1215,7 +1277,6 @@
             }
 
             const formData = new FormData();
-
             if (csrf) formData.append('_token', csrf);
 
             rootEl.querySelectorAll('input[name]').forEach(inp => {
@@ -1253,7 +1314,7 @@
                     if (data.status === 'ok') {
                         try {
                             sessionStorage.setItem('so_opening_focus_back', '1');
-                            // ✅ flag untuk highlight baris terakhir setelah reload
+                            // ✅ flag untuk highlight + auto scroll setelah reload
                             sessionStorage.setItem('so_opening_highlight_last', '1');
                         } catch (e) {}
                         window.location.reload();
@@ -1342,6 +1403,9 @@
 
                                 // ✅ renumber setelah delete
                                 renumberOpnameRows();
+
+                                // ✅ set ulang tinggi max-height (tinggi row bisa berubah)
+                                setTableMaxHeight10Rows();
                             } else {
                                 alert(data.message || 'Gagal menghapus item.');
                             }

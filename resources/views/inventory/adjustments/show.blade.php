@@ -113,20 +113,41 @@
             font-family: ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, "Courier New", monospace;
         }
 
+        /* ✅ TABLE WRAP: scroll + max-height 7 baris (di-set via JS) */
         .table-wrap {
             margin-top: .75rem;
             border-radius: 12px;
             border: 1px solid rgba(148, 163, 184, .24);
-            overflow: hidden;
+            overflow-x: auto;
+            overflow-y: auto;
+            max-height: 420px;
+            /* fallback */
+            background: rgba(248, 250, 252, .92);
         }
 
+        body[data-theme="dark"] .table-wrap {
+            background: rgba(15, 23, 42, 0.92);
+            border-color: rgba(51, 65, 85, .9);
+        }
+
+        /* ✅ THEAD sticky + SOLID (tidak transparan) */
         .table thead th {
+            position: sticky;
+            top: 0;
+            z-index: 3;
+
             font-size: .75rem;
             text-transform: uppercase;
             letter-spacing: .06em;
             color: rgba(100, 116, 139, 1);
-            background: rgba(15, 23, 42, 0.02);
             white-space: nowrap;
+
+            background: #ffffff !important;
+        }
+
+        body[data-theme="dark"] .table thead th {
+            background: #0f172a !important;
+            color: #e5e7eb;
         }
 
         .diff-plus {
@@ -215,6 +236,7 @@
                 grid-template-columns: 1fr;
             }
 
+            /* Mobile: tetap layout card */
             .table thead {
                 display: none;
             }
@@ -242,6 +264,12 @@
                 content: attr(data-label);
                 font-weight: 600;
                 color: #64748b;
+            }
+
+            /* ✅ di mobile jangan dibatasi 7 baris */
+            .table-wrap {
+                max-height: none !important;
+                overflow-y: visible !important;
             }
         }
     </style>
@@ -291,11 +319,6 @@
         $lineTotals = $lineTotals ?? [];
 
         $isApproved = $adjustment->status === InventoryAdjustment::STATUS_APPROVED;
-        $isPendingLike = in_array(
-            $adjustment->status,
-            [InventoryAdjustment::STATUS_PENDING, InventoryAdjustment::STATUS_DRAFT],
-            true,
-        );
 
         $net = (float) ($summary['net_value'] ?? 0);
         $netClass = $net >= 0 ? 'diff-plus' : 'diff-minus';
@@ -309,7 +332,6 @@
 
         $totalInVal = (float) ($summary['total_in_value'] ?? 0);
         $totalOutVal = (float) ($summary['total_out_value'] ?? 0);
-        $netVal = (float) ($summary['net_value'] ?? 0);
 
         // ✅ Badge "Approved by Admin / Owner"
         $approverRole = $adjustment->approver?->role ?? null;
@@ -324,7 +346,6 @@
                 $approverBadgeText = 'Approved by Admin';
                 $approverBadgeClass .= ' badge-approver--admin';
             } else {
-                // fallback kalau ada role lain
                 $approverBadgeText = 'Approved by ' . ucfirst($approverRole);
             }
         }
@@ -350,7 +371,6 @@
                     <div>
                         <span class="{{ $statusClass }}">{{ ucfirst($adjustment->status) }}</span>
 
-                        {{-- ✅ Badge siapa yang approve (Owner vs Admin) --}}
                         @if ($approverBadgeText)
                             <span class="{{ $approverBadgeClass }} ms-1">
                                 <span class="badge-approver-dot"></span>
@@ -447,23 +467,16 @@
 
                 {{-- RINGKASAN (Qty + Nilai) --}}
                 <div class="summary-grid">
-                    {{-- Qty --}}
                     <div class="summary-card">
                         <div class="summary-title">
                             <div class="pill-label">Ringkasan Qty</div>
-                            <span class="net-pill {{ $netClass }}">
-                                {{ $netPillText }}
-                            </span>
+                            <span class="net-pill {{ $netClass }}">{{ $netPillText }}</span>
                         </div>
 
                         <div class="summary-value text-mono">
-                            <span class="diff-plus">
-                                +{{ number_format($totalInQty, 2) }}
-                            </span>
+                            <span class="diff-plus">+{{ number_format($totalInQty, 2) }}</span>
                             <span class="mx-2" style="color:#94a3b8;">|</span>
-                            <span class="diff-minus">
-                                -{{ number_format($totalOutQtyAbs, 2) }}
-                            </span>
+                            <span class="diff-minus">-{{ number_format($totalOutQtyAbs, 2) }}</span>
                         </div>
 
                         <div class="summary-sub mt-2">
@@ -474,7 +487,6 @@
                         </div>
                     </div>
 
-                    {{-- Nilai Masuk --}}
                     <div class="summary-card">
                         <div class="summary-title">
                             <div class="pill-label">Nilai Masuk</div>
@@ -490,7 +502,6 @@
                         </div>
                     </div>
 
-                    {{-- Nilai Keluar + Net Nilai --}}
                     <div class="summary-card">
                         <div class="summary-title">
                             <div class="pill-label">Nilai Keluar</div>
@@ -507,9 +518,7 @@
 
                         <div class="summary-sub mt-2">
                             Net Nilai:
-                            <span class="text-mono {{ $netClass }}">
-                                {{ $summaryFmt['net_value'] }}
-                            </span>
+                            <span class="text-mono {{ $netClass }}">{{ $summaryFmt['net_value'] }}</span>
                         </div>
                     </div>
                 </div>
@@ -526,7 +535,7 @@
                     </div>
                 </div>
 
-                <div class="table-wrap">
+                <div class="table-wrap" id="adj-lines-wrap">
                     <table class="table table-sm mb-0 align-middle">
                         <thead>
                             <tr>
@@ -577,9 +586,7 @@
                                     <td data-label="HPP / Unit" class="text-end text-mono">
                                         {{ $unitCostFmt }}
                                         @if (!$isApproved)
-                                            <div style="font-size:.74rem; color:#9ca3af;">
-                                                estimasi
-                                            </div>
+                                            <div style="font-size:.74rem; color:#9ca3af;">estimasi</div>
                                         @endif
                                     </td>
 
@@ -615,3 +622,44 @@
         </div>
     </div>
 @endsection
+
+@push('scripts')
+    <script>
+        document.addEventListener('DOMContentLoaded', function() {
+            setAdjMaxHeight7Rows();
+            window.addEventListener('resize', debounce(setAdjMaxHeight7Rows, 150));
+        });
+
+        function debounce(fn, wait) {
+            let t = null;
+            return function() {
+                clearTimeout(t);
+                t = setTimeout(fn, wait || 150);
+            };
+        }
+
+        /**
+         * ✅ max-height agar muat ~7 baris (nomor 1-7), sisanya scroll
+         * Desktop only (mobile disable di CSS)
+         */
+        function setAdjMaxHeight7Rows() {
+            const wrap = document.getElementById('adj-lines-wrap');
+            if (!wrap) return;
+
+            if (window.matchMedia("(max-width: 767.98px)").matches) return;
+
+            const table = wrap.querySelector('table');
+            const thead = table ? table.querySelector('thead') : null;
+            const firstRow = table ? table.querySelector('tbody tr') : null;
+            if (!firstRow) return;
+
+            const rowH = firstRow.getBoundingClientRect().height || 38;
+            const headH = thead ? (thead.getBoundingClientRect().height || 34) : 34;
+
+            // ✅ 7 baris
+            const maxH = Math.ceil((rowH * 7) + headH + 8);
+            wrap.style.maxHeight = maxH + 'px';
+            wrap.style.overflowY = 'auto';
+        }
+    </script>
+@endpush

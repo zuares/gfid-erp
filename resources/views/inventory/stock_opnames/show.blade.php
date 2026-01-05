@@ -37,12 +37,11 @@
 
     foreach ($opname->lines as $line) {
         $diff = (float) $line->difference; // accessor (physical - system)
-        $unitCost = (float) $line->effective_unit_cost; // accessor (HPP efektif: SO / snapshot / HPP master)
+        $unitCost = (float) $line->effective_unit_cost; // accessor (HPP efektif)
 
         // Hitung nilai selisih berbasis HPP efektif
         $diffValue = 0.0;
         if (abs($diff) >= 0.0000001 && $unitCost > 0) {
-            // diff > 0 → plus (masuk), diff < 0 → minus (keluar)
             $diffValue = $diff * $unitCost;
         }
 
@@ -51,17 +50,11 @@
         }
 
         if ($diff > 0) {
-            // Qty lebih → positif
             $totalPlusQty += $diff;
-
-            // Nilai lebih → simpan sebagai POSITIF
             $totalPlusValue += abs($diffValue);
         } else {
-            // Qty kurang → simpan negatif
-            $totalMinusQty += $diff;
-
-            // Nilai kurang → simpan NEGATIF
-            $totalMinusValue += $diffValue <= 0 ? $diffValue : -abs($diffValue);
+            $totalMinusQty += $diff; // negatif
+            $totalMinusValue += $diffValue <= 0 ? $diffValue : -abs($diffValue); // negatif
         }
     }
 
@@ -88,7 +81,7 @@
     // ✅ Role rule: admin/operating tidak boleh lihat / buka adjustment
     $canSeeAdjustmentLink = !$isOpOrAdmin;
 
-    // ✅ Siapa yang boleh tandai selesai hitung (hanya operating/admin, bukan owner) & belum ada adjustment
+    // ✅ Siapa yang boleh tandai selesai hitung (hanya operating/admin) & belum ada adjustment
     $canMarkReviewed =
         in_array($opname->status, [StockOpname::STATUS_DRAFT, StockOpname::STATUS_COUNTING], true) &&
         in_array($userRole, ['operating', 'admin'], true) &&
@@ -305,7 +298,6 @@
             font-weight: 800;
         }
 
-        /* tone untuk net total & detail */
         .diff-danger {
             color: #b91c1c;
             font-weight: 800;
@@ -333,20 +325,42 @@
             color: rgba(253, 230, 138, .98);
         }
 
+        /* ✅ DESKTOP TABLE: max-height 10 row + scroll + sticky solid thead */
         .table-wrap {
             margin-top: .65rem;
             border-radius: 12px;
             border: 1px solid rgba(148, 163, 184, .22);
-            overflow: hidden;
+            overflow-x: auto;
+            overflow-y: auto;
+            max-height: 520px;
+            /* fallback; JS akan hitung 10 row */
+            background: rgba(248, 250, 252, .9);
+        }
+
+        body[data-theme="dark"] .table-wrap {
+            background: rgba(15, 23, 42, 0.92);
+            border-color: rgba(51, 65, 85, .9);
         }
 
         .table thead th {
+            position: sticky;
+            top: 0;
+            z-index: 3;
+
             font-size: .72rem;
             text-transform: uppercase;
             letter-spacing: .06em;
-            color: rgba(100, 116, 139, 1);
-            background: rgba(15, 23, 42, 0.02);
             white-space: nowrap;
+
+            background: #fff !important;
+            /* ✅ SOLID */
+            color: rgba(100, 116, 139, 1);
+        }
+
+        body[data-theme="dark"] .table thead th {
+            background: #0f172a !important;
+            /* ✅ SOLID dark */
+            color: #e5e7eb;
         }
 
         .badge-counted {
@@ -406,13 +420,24 @@
             text-align: right;
         }
 
-        /* ================= MOBILE TABLE: 3 COL (# | ITEM | SELISIH) ================= */
+        /* ================= MOBILE TABLE: max-height 10 row + scroll + sticky solid thead ================= */
         .mobile-compact-table {
             display: none;
             margin-top: .65rem;
             border-radius: 12px;
             border: 1px solid rgba(148, 163, 184, .22);
-            overflow: hidden;
+
+            overflow-x: auto;
+            overflow-y: auto;
+            /* ✅ scroll vertical */
+            max-height: 520px;
+            /* fallback; JS akan hitung 10 row */
+            background: rgba(248, 250, 252, .9);
+        }
+
+        body[data-theme="dark"] .mobile-compact-table {
+            background: rgba(15, 23, 42, 0.92);
+            border-color: rgba(51, 65, 85, .9);
         }
 
         .mobile-compact-table .table {
@@ -422,12 +447,23 @@
         }
 
         .mobile-compact-table thead th {
-            background: rgba(15, 23, 42, 0.02);
+            position: sticky;
+            top: 0;
+            z-index: 3;
+
+            background: #fff !important;
+            /* ✅ SOLID */
             color: rgba(100, 116, 139, 1);
             text-transform: uppercase;
             letter-spacing: .06em;
             white-space: nowrap;
             font-size: .7rem;
+        }
+
+        body[data-theme="dark"] .mobile-compact-table thead th {
+            background: #0f172a !important;
+            /* ✅ SOLID dark */
+            color: #e5e7eb;
         }
 
         .mobile-compact-table th,
@@ -498,7 +534,6 @@
             font-weight: 900;
         }
 
-        /* tone: diff <0 danger, =0 success, >0 warning */
         .tone-danger {
             background: rgba(239, 68, 68, 0.12);
             border-color: rgba(239, 68, 68, 0.20);
@@ -588,7 +623,6 @@
                     <span class="{{ $typeClass }} ms-1">{{ $typeLabel }}</span>
                     <span class="{{ $statusClass }} ms-1">{{ ucfirst($opname->status) }}</span>
 
-                    {{-- ✅ chip Adj hanya untuk role non admin/operating --}}
                     @if ($adjustment && $canSeeAdjustmentLink)
                         <span class="chip ms-1">
                             Adj: {{ $adjustment->code }}
@@ -600,7 +634,6 @@
                     {{ $opname->warehouse?->code ?? '-' }} — {{ $opname->warehouse?->name ?? '-' }}
                 </div>
 
-                {{-- Badge kecil: Counting selesai oleh ... --}}
                 @if ($hasReviewedInfo)
                     <div class="badge-review mt-2">
                         <span class="badge-review-dot"></span>
@@ -614,7 +647,6 @@
             </div>
 
             <div class="text-end">
-                {{-- ✅ SEBELUM DI-ADJUST: Lanjut Counting + Simpan & Selesai Hitung (inline untuk non-owner) --}}
                 @if (!$adjustment && $canEdit)
                     <div class="d-flex flex-wrap justify-content-end gap-2 mb-1">
                         <a href="{{ route('inventory.stock_opnames.edit', $opname) }}"
@@ -638,7 +670,6 @@
                     </div>
                 @endif
 
-                {{-- Setelah Reviewed: tombol Finalize / Buka Adjustment --}}
                 @if ($canFinalize)
                     <form action="{{ route('inventory.stock_opnames.finalize', $opname) }}" method="POST" class="mt-2"
                         onsubmit="return confirm('Yakin finalize stock opname ini? Stok gudang akan dikoreksi sesuai hasil fisik.');">
@@ -649,7 +680,6 @@
                         </button>
                     </form>
                 @elseif ($opname->status === StockOpname::STATUS_FINALIZED)
-                    {{-- ✅ tombol Buka Adjustment hanya untuk role non admin/operating --}}
                     @if ($adjustment && $canSeeAdjustmentLink)
                         <a href="{{ route('inventory.adjustments.show', $adjustment) }}"
                             class="btn btn-sm btn-outline-secondary mt-2">
@@ -660,7 +690,6 @@
             </div>
         </div>
 
-        {{-- Error mark_reviewed kalau masih ada yang belum di-count --}}
         @if ($errors->has('mark_reviewed'))
             <div class="alert alert-warning py-2 px-3 mb-3" style="font-size:.82rem;">
                 {{ $errors->first('mark_reviewed') }}
@@ -696,7 +725,6 @@
                                 </div>
                             @endif
 
-                            {{-- ✅ adjustment info di card juga disembunyikan untuk admin/operating --}}
                             @if ($adjustment && $canSeeAdjustmentLink)
                                 <div class="k">Adjustment</div>
                                 <div class="v">
@@ -738,22 +766,18 @@
                     </div>
                 </div>
 
-                {{-- SUMMARY (DESKTOP TETAP) --}}
+                {{-- SUMMARY DESKTOP --}}
                 <div class="summary-grid">
                     <div class="sum-card">
                         <div class="sum-label">Selisih Qty</div>
                         <div style="font-size:.95rem;">
                             <div>
                                 Lebih:
-                                <span class="text-mono diff-plus">
-                                    +{{ number_format($totalPlusQty, 2) }}
-                                </span>
+                                <span class="text-mono diff-plus">+{{ number_format($totalPlusQty, 2) }}</span>
                             </div>
                             <div>
                                 Kurang:
-                                <span class="text-mono diff-minus">
-                                    {{ number_format($totalMinusQty, 2) }}
-                                </span>
+                                <span class="text-mono diff-minus">{{ number_format($totalMinusQty, 2) }}</span>
                             </div>
                         </div>
                     </div>
@@ -763,9 +787,8 @@
                         <div style="font-size:.95rem;">
                             <div>
                                 Lebih:
-                                <span class="text-mono diff-plus">
-                                    +Rp {{ number_format($totalPlusValue, 0, ',', '.') }}
-                                </span>
+                                <span class="text-mono diff-plus">+Rp
+                                    {{ number_format($totalPlusValue, 0, ',', '.') }}</span>
                             </div>
                             <div>
                                 Kurang:
@@ -777,7 +800,6 @@
                         </div>
                     </div>
 
-                    {{-- ✅ CARD KETIGA: TOTAL SELISIH (NET QTY + NET NILAI) --}}
                     <div class="sum-card">
                         <div class="sum-label">Total Selisih</div>
                         <div style="font-size:.95rem;">
@@ -806,7 +828,7 @@
                     </div>
                 </div>
 
-                {{-- SUMMARY MOBILE (1 BARIS: SELISIH QTY + NILAI) --}}
+                {{-- SUMMARY MOBILE --}}
                 <div class="sum-row">
                     <div class="cell">
                         <div class="label">Selisih Qty</div>
@@ -819,9 +841,7 @@
                     <div class="cell">
                         <div class="label">Nilai (Rp)</div>
                         <div class="value">
-                            <span class="diff-plus">
-                                +Rp {{ number_format($totalPlusValue, 0, ',', '.') }}
-                            </span>
+                            <span class="diff-plus">+Rp {{ number_format($totalPlusValue, 0, ',', '.') }}</span>
                             <span style="opacity:.55; padding:0 .35rem;">|</span>
                             <span class="diff-minus">
                                 Rp
@@ -843,7 +863,7 @@
                 </div>
 
                 {{-- DESKTOP TABLE --}}
-                <div class="table-wrap">
+                <div class="table-wrap" id="so-show-table-wrap">
                     <table class="table table-sm mb-0 align-middle">
                         <thead>
                             <tr>
@@ -866,7 +886,6 @@
                                     $diff = (float) $line->difference;
                                     $unitCost = (float) $line->effective_unit_cost;
 
-                                    // nilai selisih per baris
                                     $diffValue = 0.0;
                                     if (abs($diff) >= 0.0000001 && $unitCost > 0) {
                                         $diffValue = $diff * $unitCost;
@@ -883,31 +902,24 @@
                                     $showValue = !is_null($line->physical_qty) && $unitCost > 0;
 
                                     if (!is_null($line->physical_qty)) {
-                                        if ($diff < 0) {
-                                            $diffToneClass = 'diff-danger';
-                                        } elseif ($diff > 0) {
-                                            $diffToneClass = 'diff-warning';
-                                        } else {
-                                            $diffToneClass = 'diff-success';
-                                        }
+                                        $diffToneClass =
+                                            $diff < 0 ? 'diff-danger' : ($diff > 0 ? 'diff-warning' : 'diff-success');
                                     } else {
                                         $diffToneClass = '';
                                     }
                                 @endphp
 
                                 <tr>
-                                    <td data-label="#">{{ $index + 1 }}</td>
+                                    <td>{{ $index + 1 }}</td>
 
-                                    <td data-label="Item">
+                                    <td>
                                         <div class="fw-semibold">{{ $line->item?->code ?? '-' }}</div>
                                         <div class="meta">{{ $line->item?->name ?? '' }}</div>
                                     </td>
 
-                                    <td data-label="Sistem" class="text-end text-mono">
-                                        {{ number_format($system, 2) }}
-                                    </td>
+                                    <td class="text-end text-mono">{{ number_format($system, 2) }}</td>
 
-                                    <td data-label="Fisik" class="text-end text-mono">
+                                    <td class="text-end text-mono">
                                         @if (!is_null($line->physical_qty))
                                             {{ number_format($physical, 2) }}
                                         @else
@@ -915,8 +927,7 @@
                                         @endif
                                     </td>
 
-                                    <td data-label="Selisih"
-                                        class="text-end text-mono {{ $showDiff ? $diffToneClass : '' }}">
+                                    <td class="text-end text-mono {{ $showDiff ? $diffToneClass : '' }}">
                                         @if ($showDiff)
                                             {{ $diffText }}
                                         @else
@@ -924,7 +935,7 @@
                                         @endif
                                     </td>
 
-                                    <td data-label="HPP" class="text-end text-mono">
+                                    <td class="text-end text-mono">
                                         @if ($unitCost > 0)
                                             {{ number_format($unitCost, 2) }}
                                         @else
@@ -932,8 +943,7 @@
                                         @endif
                                     </td>
 
-                                    <td data-label="Nilai (Rp)"
-                                        class="text-end text-mono {{ $showValue ? $diffToneClass : '' }}">
+                                    <td class="text-end text-mono {{ $showValue ? $diffToneClass : '' }}">
                                         @if ($showValue)
                                             @if (abs($diffValue) < 0.0000001)
                                                 Rp 0
@@ -946,11 +956,11 @@
                                         @endif
                                     </td>
 
-                                    <td data-label="Hitung" class="text-center">
+                                    <td class="text-center">
                                         <span class="{{ $countedClass }}">{{ $counted ? 'Sudah' : 'Belum' }}</span>
                                     </td>
 
-                                    <td data-label="Catatan">
+                                    <td>
                                         <span style="font-size:.85rem;">{{ $line->notes }}</span>
                                     </td>
                                 </tr>
@@ -966,7 +976,7 @@
                 </div>
 
                 {{-- MOBILE TABLE (3 KOLOM) --}}
-                <div class="mobile-compact-table">
+                <div class="mobile-compact-table" id="so-show-mobile-table-wrap">
                     <table class="table table-sm align-middle">
                         <thead>
                             <tr>
@@ -1083,3 +1093,55 @@
 
     </div>
 @endsection
+
+@push('scripts')
+    <script>
+        document.addEventListener('DOMContentLoaded', function() {
+            setMaxHeight10RowsForShowTables();
+            window.addEventListener('resize', debounce(setMaxHeight10RowsForShowTables, 150));
+        });
+
+        function debounce(fn, wait) {
+            let t = null;
+            return function() {
+                const ctx = this,
+                    args = arguments;
+                clearTimeout(t);
+                t = setTimeout(function() {
+                    fn.apply(ctx, args);
+                }, wait || 150);
+            };
+        }
+
+        /**
+         * ✅ max-height agar muat ~10 baris (dinamis) untuk:
+         * - Desktop table (#so-show-table-wrap)
+         * - Mobile compact table (#so-show-mobile-table-wrap)
+         */
+        function setMaxHeight10RowsForShowTables() {
+            applyMaxHeight10Rows('#so-show-table-wrap');
+            applyMaxHeight10Rows('#so-show-mobile-table-wrap');
+        }
+
+        function applyMaxHeight10Rows(selector) {
+            const wrap = document.querySelector(selector);
+            if (!wrap) return;
+
+            const table = wrap.querySelector('table');
+            if (!table) return;
+
+            const thead = table.querySelector('thead');
+            const firstRow = table.querySelector('tbody tr');
+            if (!firstRow) return;
+
+            const rowH = firstRow.getBoundingClientRect().height || 38;
+            const headH = thead ? (thead.getBoundingClientRect().height || 34) : 34;
+
+            // 10 row + header + padding kecil
+            const maxH = Math.ceil((rowH * 10) + headH + 8);
+
+            wrap.style.maxHeight = maxH + 'px';
+            wrap.style.overflowY = 'auto';
+        }
+    </script>
+@endpush
