@@ -17,6 +17,7 @@ class SewingPickup extends Model
 
     protected $casts = [
         'date' => 'date',
+        'voided_at' => 'datetime',
     ];
 
     public function warehouse()
