@@ -21,9 +21,6 @@ class SewingPickupController extends Controller
         protected InventoryService $inventory,
     ) {}
 
-    /**
-     * Index Sewing Pickup.
-     */
     public function index(Request $request)
     {
         $pickups = SewingPickup::query()
@@ -42,9 +39,6 @@ class SewingPickupController extends Controller
         ]);
     }
 
-    /**
-     * Detail satu Sewing Pickup.
-     */
     public function show(SewingPickup $pickup): View
     {
         $pickup->load([
@@ -54,27 +48,39 @@ class SewingPickupController extends Controller
             'lines.bundle.cuttingJob.lot.item',
         ]);
 
+        $epsilon = 0.000001;
+
         $totalBundles = $pickup->lines->count();
         $totalQtyPickup = (float) $pickup->lines->sum('qty_bundle');
         $totalReturnOk = (float) $pickup->lines->sum('qty_returned_ok');
         $totalReturnReject = (float) $pickup->lines->sum('qty_returned_reject');
-        $totalReturnedAll = $totalReturnOk + $totalReturnReject;
+
+        $totalDirectPick = (float) $pickup->lines->sum(fn($l) => (float) ($l->qty_direct_picked ?? 0));
+        $totalProgressAdjusted = (float) $pickup->lines->sum(fn($l) => (float) ($l->qty_progress_adjusted ?? 0));
+
+        $totalProgressAll = $totalReturnOk + $totalReturnReject + $totalDirectPick + $totalProgressAdjusted;
 
         $overallProgress = $totalQtyPickup > 0
-        ? round(($totalReturnedAll / $totalQtyPickup) * 100, 1)
+        ? round(($totalProgressAll / $totalQtyPickup) * 100, 1)
         : 0.0;
 
-        $epsilon = 0.000001;
-
+        // Stats per line
         $notReturnedCount = $pickup->lines->filter(function ($l) use ($epsilon) {
-            $returned = (float) ($l->qty_returned_ok ?? 0) + (float) ($l->qty_returned_reject ?? 0);
-            return $returned <= $epsilon;
+            $progress = (float) ($l->qty_returned_ok ?? 0)
+             + (float) ($l->qty_returned_reject ?? 0)
+             + (float) ($l->qty_direct_picked ?? 0)
+             + (float) ($l->qty_progress_adjusted ?? 0);
+            return $progress <= $epsilon;
         })->count();
 
         $fullReturnedCount = $pickup->lines->filter(function ($l) use ($epsilon) {
             $picked = (float) ($l->qty_bundle ?? 0);
-            $returned = (float) ($l->qty_returned_ok ?? 0) + (float) ($l->qty_returned_reject ?? 0);
-            return $picked > 0 && ($picked - $returned) <= $epsilon;
+            $progress = (float) ($l->qty_returned_ok ?? 0)
+             + (float) ($l->qty_returned_reject ?? 0)
+             + (float) ($l->qty_direct_picked ?? 0)
+             + (float) ($l->qty_progress_adjusted ?? 0);
+
+            return $picked > 0 && ($picked - $progress) <= $epsilon;
         })->count();
 
         $partialReturnedCount = $totalBundles - $notReturnedCount - $fullReturnedCount;
@@ -85,7 +91,9 @@ class SewingPickupController extends Controller
             'totalQtyPickup' => $totalQtyPickup,
             'totalReturnOk' => $totalReturnOk,
             'totalReturnReject' => $totalReturnReject,
-            'totalReturnedAll' => $totalReturnedAll,
+            'totalDirectPick' => $totalDirectPick,
+            'totalProgressAdjusted' => $totalProgressAdjusted,
+            'totalProgressAll' => $totalProgressAll,
             'overallProgress' => $overallProgress,
             'notReturnedCount' => $notReturnedCount,
             'partialReturnedCount' => $partialReturnedCount,
@@ -338,7 +346,7 @@ class SewingPickupController extends Controller
         });
 
         return redirect()
-            ->route('production.sewing_returns.create')
+            ->route('production.sewing.returns.create')
             ->with('success', 'Sewing pickup berhasil dibuat. Stok sudah dipindahkan dari WIP-CUT ke gudang sewing.');
     }
 
@@ -428,7 +436,7 @@ class SewingPickupController extends Controller
             return (float) ($b->computed_qty_remain ?? 0);
         });
 
-        $html = view('production.sewing_pickups._bundle_picker_rows', [
+        $html = view('production.sewing.pickups._bundle_picker_rows', [
             'displayBundles' => $displayBundles,
             'oldLines' => [],
             'preselectedBundleId' => null,

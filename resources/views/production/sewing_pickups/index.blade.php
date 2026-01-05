@@ -1,3 +1,4 @@
+{{-- resources/views/production/sewing.pickups/index.blade.php --}}
 @extends('layouts.app')
 
 @section('title', 'Produksi • Sewing Pickup')
@@ -77,7 +78,6 @@
             gap: .4rem;
         }
 
-        /* Mini summary */
         .summary-row {
             display: flex;
             flex-wrap: wrap;
@@ -143,7 +143,6 @@
             }
         }
 
-        /* ================= MOBILE CARD LIST ================= */
         @media (max-width: 767.98px) {
             .pickup-mobile-list {
                 display: flex;
@@ -174,16 +173,10 @@
 
             .pickup-mobile-card:hover {
                 transform: translateY(-1px);
-                box-shadow:
-                    0 14px 32px rgba(15, 23, 42, 0.22),
-                    0 0 0 1px rgba(15, 23, 42, 0.06);
             }
 
             .pickup-mobile-card:active {
                 transform: translateY(1px);
-                box-shadow:
-                    0 6px 16px rgba(15, 23, 42, 0.25),
-                    0 0 0 1px rgba(15, 23, 42, 0.09);
             }
 
             .pickup-mobile-top {
@@ -219,10 +212,6 @@
                 margin-bottom: .15rem;
             }
 
-            .pickup-mobile-middle span.mono {
-                font-size: .8rem;
-            }
-
             .pickup-mobile-bottom {
                 display: flex;
                 justify-content: space-between;
@@ -246,16 +235,15 @@
         <div class="page-wrap py-3 py-md-4">
 
             @php
-                // mini summary (berdasarkan data di halaman ini)
                 $totalBundlesPage = 0;
                 $totalQtyPage = 0;
                 $todayPickups = 0;
                 $todayDate = now()->toDateString();
 
                 foreach ($pickups as $p) {
-                    $totalBundlesPage += $p->lines->count();
-                    $totalQtyPage += $p->lines->sum('qty_bundle');
-                    if (optional($p->date)?->format('Y-m-d') === $todayDate) {
+                    $totalBundlesPage += $p->lines?->count() ?? 0;
+                    $totalQtyPage += (float) ($p->lines?->sum('qty_bundle') ?? 0);
+                    if (($p->date?->format('Y-m-d') ?? (string) $p->date) === $todayDate) {
                         $todayPickups++;
                     }
                 }
@@ -264,6 +252,11 @@
                     $pickups instanceof \Illuminate\Pagination\AbstractPaginator
                         ? $pickups->total()
                         : $pickups->count();
+
+                $hasData =
+                    $pickups instanceof \Illuminate\Pagination\AbstractPaginator
+                        ? $pickups->count() > 0
+                        : $pickups->count() > 0;
             @endphp
 
             {{-- HEADER CARD --}}
@@ -274,34 +267,28 @@
 
                         @if ($totalPickups > 0)
                             <div class="summary-row">
-                                <span class="summary-pill mono">
-                                    {{ number_format($totalPickups, 0, ',', '.') }} pickup
-                                </span>
-                                <span class="summary-pill mono">
-                                    {{ number_format($totalBundlesPage, 0, ',', '.') }} bundle
-                                </span>
-                                <span class="summary-pill mono">
-                                    {{ number_format($totalQtyPage, 2, ',', '.') }} pcs
-                                </span>
+                                <span class="summary-pill mono">{{ number_format($totalPickups, 0, ',', '.') }}
+                                    pickup</span>
+                                <span class="summary-pill mono">{{ number_format($totalBundlesPage, 0, ',', '.') }}
+                                    bundle</span>
+                                <span class="summary-pill mono">{{ number_format($totalQtyPage, 2, ',', '.') }} pcs</span>
                                 @if ($todayPickups > 0)
-                                    <span class="summary-pill summary-pill-accent mono">
-                                        {{ number_format($todayPickups, 0, ',', '.') }} hari ini
-                                    </span>
+                                    <span
+                                        class="summary-pill summary-pill-accent mono">{{ number_format($todayPickups, 0, ',', '.') }}
+                                        hari ini</span>
                                 @endif
                             </div>
                         @else
-                            <div class="help mt-1">
-                                Belum ada sewing pickup tercatat.
-                            </div>
+                            <div class="help mt-1">Belum ada sewing pickup tercatat.</div>
                         @endif
                     </div>
 
                     <div class="header-actions">
-                        <a href="{{ route('production.sewing_pickups.bundles_ready') }}"
+                        <a href="{{ route('production.sewing.pickups.bundles_ready') }}"
                             class="btn btn-sm btn-outline-secondary d-inline-flex align-items-center justify-content-center">
                             Bundles Ready
                         </a>
-                        <a href="{{ route('production.sewing_pickups.create') }}"
+                        <a href="{{ route('production.sewing.pickups.create') }}"
                             class="btn btn-sm btn-primary d-inline-flex align-items-center justify-content-center">
                             + Sewing Pickup
                         </a>
@@ -313,52 +300,56 @@
             <div class="card-main p-3">
                 <h2 class="h6 mb-2">Daftar Sewing Pickup</h2>
 
-                {{-- DESKTOP: TABEL --}}
+                {{-- DESKTOP: TABLE --}}
                 <div class="table-wrap d-none d-md-block">
                     <table class="table table-sm align-middle mono table-pickups mb-0">
                         <thead>
                             <tr>
                                 <th style="width: 40px;">#</th>
-                                <th style="width: 130px;">Code</th>
-                                <th style="width: 100px;">Tanggal</th>
-                                <th style="width: 170px;">Operator</th>
-                                <th style="width: 150px;">Bundle / Qty</th>
-                                <th style="width: 110px;">Status</th>
+                                <th style="width: 150px;">Code</th>
+                                <th style="width: 110px;">Tanggal</th>
+                                <th style="width: 200px;">Operator</th>
+                                <th style="width: 170px;">Bundle / Qty</th>
+                                <th style="width: 120px;">Status</th>
                                 <th style="width: 90px;"></th>
                             </tr>
                         </thead>
                         <tbody>
                             @forelse ($pickups as $pickup)
                                 @php
-                                    $totalBundlesPickup = $pickup->lines->count();
-                                    $totalQtyPickup = $pickup->lines->sum('qty_bundle');
+                                    $totalBundlesPickup = $pickup->lines?->count() ?? 0;
+                                    $totalQtyPickup = (float) ($pickup->lines?->sum('qty_bundle') ?? 0);
 
+                                    // status sesuai model: draft/partial/completed
                                     $statusMap = [
                                         'draft' => ['label' => 'DRAFT', 'class' => 'secondary'],
+                                        'partial' => ['label' => 'PARTIAL', 'class' => 'warning'],
+                                        'completed' => ['label' => 'COMPLETED', 'class' => 'success'],
+
+                                        // fallback legacy (kalau masih ada di DB)
                                         'posted' => ['label' => 'POSTED', 'class' => 'primary'],
                                         'closed' => ['label' => 'CLOSED', 'class' => 'success'],
                                     ];
 
-                                    $cfg = $statusMap[$pickup->status] ?? [
-                                        'label' => strtoupper($pickup->status ?? '-'),
+                                    $st = (string) ($pickup->status ?? 'draft');
+                                    $cfg = $statusMap[$st] ?? [
+                                        'label' => strtoupper($st ?: '-'),
                                         'class' => 'secondary',
                                     ];
 
-                                    $showUrl = Route::has('production.sewing_pickups.show')
-                                        ? route('production.sewing_pickups.show', $pickup)
-                                        : null;
+                                    $showUrl = route('production.sewing.pickups.show', $pickup);
                                 @endphp
-                                <tr class="pickup-row"
-                                    @if ($showUrl) data-href="{{ $showUrl }}" @endif>
+
+                                <tr class="pickup-row" data-href="{{ $showUrl }}">
                                     <td>
-                                        {{ $loop->iteration + ($pickups->currentPage() - 1) * $pickups->perPage() }}
+                                        @if ($pickups instanceof \Illuminate\Pagination\AbstractPaginator)
+                                            {{ $loop->iteration + ($pickups->currentPage() - 1) * $pickups->perPage() }}
+                                        @else
+                                            {{ $loop->iteration }}
+                                        @endif
                                     </td>
-                                    <td>
-                                        {{ $pickup->code }}
-                                    </td>
-                                    <td>
-                                        {{ $pickup->date?->format('Y-m-d') ?? $pickup->date }}
-                                    </td>
+                                    <td class="fw-semibold">{{ $pickup->code }}</td>
+                                    <td>{{ $pickup->date?->format('Y-m-d') ?? $pickup->date }}</td>
                                     <td>
                                         @if ($pickup->operator)
                                             {{ $pickup->operator->code }} — {{ $pickup->operator->name }}
@@ -367,25 +358,22 @@
                                         @endif
                                     </td>
                                     <td>
-                                        {{ $totalBundlesPickup }} bundle /
+                                        {{ number_format($totalBundlesPickup, 0, ',', '.') }} bundle /
                                         {{ number_format($totalQtyPickup, 2, ',', '.') }} pcs
                                     </td>
                                     <td>
-                                        <span class="badge bg-{{ $cfg['class'] }}">
-                                            {{ $cfg['label'] }}
-                                        </span>
+                                        <span class="badge bg-{{ $cfg['class'] }}">{{ $cfg['label'] }}</span>
                                     </td>
                                     <td class="text-end">
-                                        @if ($showUrl)
-                                            <a href="{{ $showUrl }}" class="btn btn-sm btn-outline-primary">
-                                                Detail
-                                            </a>
-                                        @endif
+                                        <a href="{{ $showUrl }}" class="btn btn-sm btn-outline-primary"
+                                            onclick="event.stopPropagation();">
+                                            Detail
+                                        </a>
                                     </td>
                                 </tr>
                             @empty
                                 <tr>
-                                    <td colspan="7" class="text-center text-muted small">
+                                    <td colspan="7" class="text-center text-muted small py-3">
                                         Belum ada Sewing Pickup.
                                     </td>
                                 </tr>
@@ -396,7 +384,7 @@
 
                 {{-- MOBILE: CARD LIST --}}
                 <div class="d-block d-md-none mono">
-                    @if ($pickups->isEmpty())
+                    @if ($pickups instanceof \Illuminate\Pagination\AbstractPaginator ? $pickups->count() === 0 : $pickups->count() === 0)
                         <div class="text-center text-muted small py-3">
                             Belum ada Sewing Pickup.
                         </div>
@@ -404,41 +392,34 @@
                         <div class="pickup-mobile-list">
                             @foreach ($pickups as $pickup)
                                 @php
-                                    $totalBundlesPickup = $pickup->lines->count();
-                                    $totalQtyPickup = $pickup->lines->sum('qty_bundle');
+                                    $totalBundlesPickup = $pickup->lines?->count() ?? 0;
+                                    $totalQtyPickup = (float) ($pickup->lines?->sum('qty_bundle') ?? 0);
 
                                     $statusMap = [
                                         'draft' => ['label' => 'Draft', 'class' => 'secondary'],
+                                        'partial' => ['label' => 'Partial', 'class' => 'warning'],
+                                        'completed' => ['label' => 'Completed', 'class' => 'success'],
                                         'posted' => ['label' => 'Posted', 'class' => 'primary'],
                                         'closed' => ['label' => 'Closed', 'class' => 'success'],
                                     ];
 
-                                    $cfg = $statusMap[$pickup->status] ?? [
-                                        'label' => ucfirst($pickup->status ?? '-'),
-                                        'class' => 'secondary',
-                                    ];
+                                    $st = (string) ($pickup->status ?? 'draft');
+                                    $cfg = $statusMap[$st] ?? ['label' => ucfirst($st ?: '-'), 'class' => 'secondary'];
 
-                                    $showUrl = Route::has('production.sewing_pickups.show')
-                                        ? route('production.sewing_pickups.show', $pickup)
-                                        : null;
+                                    $showUrl = route('production.sewing.pickups.show', $pickup);
                                 @endphp
 
-                                <div class="pickup-mobile-card"
-                                    @if ($showUrl) data-href="{{ $showUrl }}" @endif>
+                                <div class="pickup-mobile-card" data-href="{{ $showUrl }}">
                                     <div class="pickup-mobile-top">
                                         <div>
-                                            <div class="pickup-mobile-code">
-                                                {{ $pickup->code }}
-                                            </div>
+                                            <div class="pickup-mobile-code">{{ $pickup->code }}</div>
                                             <div class="pickup-mobile-date-pill">
                                                 {{ $pickup->date?->format('Y-m-d') ?? $pickup->date }}
                                             </div>
                                         </div>
-                                        <div>
-                                            <span class="badge pickup-mobile-status-badge bg-{{ $cfg['class'] }}">
-                                                {{ $cfg['label'] }}
-                                            </span>
-                                        </div>
+                                        <span class="badge pickup-mobile-status-badge bg-{{ $cfg['class'] }}">
+                                            {{ $cfg['label'] }}
+                                        </span>
                                     </div>
 
                                     <div class="pickup-mobile-middle">
@@ -451,20 +432,16 @@
                                     </div>
 
                                     <div class="pickup-mobile-bottom">
-                                        <div>
-                                            <span class="mono">
-                                                {{ $totalBundlesPickup }} bundle /
-                                                {{ number_format($totalQtyPickup, 2, ',', '.') }} pcs
-                                            </span>
+                                        <div class="mono">
+                                            {{ number_format($totalBundlesPickup, 0, ',', '.') }} bundle /
+                                            {{ number_format($totalQtyPickup, 2, ',', '.') }} pcs
                                         </div>
 
-                                        @if ($showUrl)
-                                            <a href="{{ $showUrl }}"
-                                                class="btn btn-sm btn-outline-primary btn-detail-mobile"
-                                                onclick="event.stopPropagation();">
-                                                Detail
-                                            </a>
-                                        @endif
+                                        <a href="{{ $showUrl }}"
+                                            class="btn btn-sm btn-outline-primary btn-detail-mobile"
+                                            onclick="event.stopPropagation();">
+                                            Detail
+                                        </a>
                                     </div>
                                 </div>
                             @endforeach
@@ -473,9 +450,7 @@
                 </div>
 
                 @if ($pickups instanceof \Illuminate\Pagination\AbstractPaginator)
-                    <div class="mt-2">
-                        {{ $pickups->links() }}
-                    </div>
+                    <div class="mt-2">{{ $pickups->links() }}</div>
                 @endif
             </div>
 
@@ -486,26 +461,21 @@
 @push('scripts')
     <script>
         document.addEventListener('DOMContentLoaded', function() {
-            // DESKTOP: klik baris tabel
+            function go(url) {
+                if (url) window.location.assign(url);
+            }
+
             document.querySelectorAll('.pickup-row[data-href]').forEach(function(row) {
                 row.addEventListener('click', function(e) {
-                    if (e.target.closest('a, button')) {
-                        return;
-                    }
-                    const url = row.dataset.href;
-                    if (url) {
-                        window.location.href = url;
-                    }
+                    if (e.target.closest('a,button,input,label,select,textarea')) return;
+                    go(row.dataset.href);
                 });
             });
 
-            // MOBILE: klik card
             document.querySelectorAll('.pickup-mobile-card[data-href]').forEach(function(card) {
-                card.addEventListener('click', function() {
-                    const href = this.getAttribute('data-href');
-                    if (href) {
-                        window.location.href = href;
-                    }
+                card.addEventListener('click', function(e) {
+                    if (e.target.closest('a,button,input,label,select,textarea')) return;
+                    go(card.dataset.href);
                 });
             });
         });

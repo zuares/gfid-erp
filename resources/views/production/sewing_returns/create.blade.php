@@ -410,7 +410,7 @@
                         </div>
                     </div>
 
-                    <a href="{{ route('production.sewing_pickups.create') }}"
+                    <a href="{{ route('production.sewing.pickups.create') }}"
                         class="btn btn-sm btn-outline-success rounded-pill d-flex align-items-center gap-2">
                         <i class="bi bi-box-seam"></i><span>Ambil Jahit</span>
                     </a>
@@ -418,7 +418,7 @@
             </div>
         </div>
 
-        <form id="sewing-return-form" action="{{ route('production.sewing_returns.store') }}" method="POST">
+        <form id="sewing-return-form" action="{{ route('production.sewing.returns.store') }}" method="POST">
             @csrf
 
             {{-- Form header --}}
@@ -439,7 +439,7 @@
                             <div class="lbl mb-1">Pickup</div>
                             <select name="pickup_id"
                                 class="form-select form-select-sm @error('pickup_id') is-invalid @enderror"
-                                onchange="if(this.value){ window.location='{{ route('production.sewing_returns.create') }}?pickup_id=' + this.value; }">
+                                onchange="if(this.value){ window.location='{{ route('production.sewing.returns.create') }}?pickup_id=' + this.value; }">
                                 <option value="">Pilih pickup...</option>
 
                                 @foreach ($pickups as $pickup)
@@ -741,7 +741,7 @@
             {{-- Footer: 2 tombol (Batal + Simpan) --}}
             <div class="form-footer d-flex align-items-center">
                 <div class="floating-actions">
-                    <a href="{{ route('production.sewing_returns.index') }}"
+                    <a href="{{ route('production.sewing.returns.index') }}"
                         class="btn btn-outline-secondary btn-sm btn-floating-cancel">
                         <i class="bi bi-arrow-left"></i>
                     </a>

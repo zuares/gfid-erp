@@ -15,9 +15,7 @@
             background: var(--card);
             border: 1px solid var(--line);
             border-radius: 14px;
-            box-shadow:
-                0 8px 20px rgba(15, 23, 42, 0.06),
-                0 0 0 1px rgba(15, 23, 42, 0.02);
+            box-shadow: 0 8px 20px rgba(15, 23, 42, .06), 0 0 0 1px rgba(15, 23, 42, .02);
         }
 
         .card-section {
@@ -87,14 +85,10 @@
             align-items: center;
             justify-content: center;
             margin-right: .6rem;
-            background: radial-gradient(circle,
-                    rgba(59, 130, 246, 0.15) 0,
-                    rgba(59, 130, 246, 0.04) 60%,
-                    transparent 100%);
+            background: radial-gradient(circle, rgba(59, 130, 246, .15) 0, rgba(59, 130, 246, .04) 60%, transparent 100%);
             color: #2563eb;
         }
 
-        /* ====== OVERALL PROGRESS ====== */
         .overall-progress-wrap {
             margin-top: .55rem;
         }
@@ -105,32 +99,28 @@
             font-size: .76rem;
             color: var(--muted);
             margin-bottom: .25rem;
+            gap: .75rem;
+            flex-wrap: wrap;
         }
 
         .overall-progress {
             height: .65rem;
             border-radius: 999px;
             overflow: hidden;
-            background: linear-gradient(to right,
-                    rgba(226, 232, 240, 0.95),
-                    rgba(209, 213, 219, 0.98));
+            background: linear-gradient(to right, rgba(226, 232, 240, .95), rgba(209, 213, 219, .98));
         }
 
         .overall-progress-bar {
             height: 100%;
             border-radius: inherit;
             background: linear-gradient(135deg, #22c55e 0%, #16a34a 45%, #15803d 100%);
-            box-shadow:
-                0 0 0 1px rgba(22, 163, 74, 0.35),
-                0 4px 10px rgba(22, 163, 74, 0.35);
+            box-shadow: 0 0 0 1px rgba(22, 163, 74, .35), 0 4px 10px rgba(22, 163, 74, .35);
             transition: width .25s ease-out;
         }
 
         .overall-progress-bar.is-empty {
             background: linear-gradient(135deg, #e5e7eb 0%, #d1d5db 40%, #9ca3af 100%);
-            box-shadow:
-                0 0 0 1px rgba(148, 163, 184, 0.4),
-                0 3px 7px rgba(148, 163, 184, 0.25);
+            box-shadow: 0 0 0 1px rgba(148, 163, 184, .4), 0 3px 7px rgba(148, 163, 184, .25);
         }
 
         .summary-pill-row {
@@ -144,27 +134,21 @@
             border-radius: 999px;
             padding: .1rem .55rem;
             font-size: .7rem;
-            background: rgba(148, 163, 184, 0.12);
+            background: rgba(148, 163, 184, .12);
         }
 
-        .summary-pill-ok {
-            background: rgba(22, 163, 74, 0.12);
-            color: #166534;
-        }
-
-        .summary-pill-reject {
-            background: rgba(248, 113, 113, 0.16);
-            color: #b91c1c;
+        .summary-pill-warn {
+            background: rgba(245, 158, 11, .14);
+            color: #92400e;
         }
 
         .summary-pill-status {
-            background: rgba(59, 130, 246, 0.08);
+            background: rgba(59, 130, 246, .08);
             color: #1d4ed8;
         }
 
-        /* ====== TABLE / ROWS ====== */
         .pickup-line-row td {
-            border-top-color: rgba(148, 163, 184, 0.24) !important;
+            border-top-color: rgba(148, 163, 184, .24) !important;
         }
 
         .pickup-status-badge {
@@ -181,7 +165,7 @@
             width: 100%;
             height: .32rem;
             border-radius: 999px;
-            background: rgba(229, 231, 235, 0.95);
+            background: rgba(229, 231, 235, .95);
             overflow: hidden;
         }
 
@@ -199,7 +183,6 @@
             background: linear-gradient(90deg, #e5e7eb 0%, #d1d5db 50%);
         }
 
-        /* ====== STATUS CHIPS (FILTER) – mirip Cutting Show ====== */
         .status-chip-row {
             display: flex;
             flex-wrap: wrap;
@@ -220,19 +203,14 @@
             padding: .18rem .7rem;
             font-size: .74rem;
             font-weight: 600;
-            border: 1px solid rgba(148, 163, 184, 0.6);
-            background: rgba(248, 250, 252, 0.96);
+            border: 1px solid rgba(148, 163, 184, .6);
+            background: rgba(248, 250, 252, .96);
             color: #4b5563;
             cursor: pointer;
             display: inline-flex;
             align-items: center;
             gap: .25rem;
-            transition:
-                background-color .15s ease,
-                border-color .15s ease,
-                box-shadow .15s ease,
-                color .15s ease,
-                transform .08s ease;
+            transition: background-color .15s ease, border-color .15s ease, box-shadow .15s ease, color .15s ease, transform .08s ease;
         }
 
         .status-chip-count {
@@ -241,53 +219,36 @@
 
         .status-chip:hover {
             transform: translateY(-1px);
-            box-shadow:
-                0 6px 14px rgba(148, 163, 184, 0.35),
-                0 0 0 1px rgba(148, 163, 184, 0.2);
+            box-shadow: 0 6px 14px rgba(148, 163, 184, .35), 0 0 0 1px rgba(148, 163, 184, .2);
         }
 
         .status-chip.active-all {
-            border-color: rgba(59, 130, 246, 0.8);
-            background: radial-gradient(circle at top left,
-                    rgba(59, 130, 246, 0.15) 0,
-                    rgba(239, 246, 255, 0.96) 50%);
+            border-color: rgba(59, 130, 246, .8);
+            background: radial-gradient(circle at top left, rgba(59, 130, 246, .15) 0, rgba(239, 246, 255, .96) 50%);
             color: #1d4ed8;
-            box-shadow:
-                0 0 0 1px rgba(191, 219, 254, 0.9),
-                0 8px 18px rgba(59, 130, 246, 0.35);
+            box-shadow: 0 0 0 1px rgba(191, 219, 254, .9), 0 8px 18px rgba(59, 130, 246, .35);
         }
 
         .status-chip.active-not-returned {
-            border-color: rgba(148, 163, 184, 0.9);
-            background: radial-gradient(circle at top left,
-                    rgba(148, 163, 184, 0.16) 0,
-                    rgba(249, 250, 251, 0.98) 50%);
+            border-color: rgba(148, 163, 184, .9);
+            background: radial-gradient(circle at top left, rgba(148, 163, 184, .16) 0, rgba(249, 250, 251, .98) 50%);
             color: #111827;
         }
 
         .status-chip.active-partial {
-            border-color: rgba(245, 158, 11, 0.9);
-            background: radial-gradient(circle at top left,
-                    rgba(250, 204, 21, 0.20) 0,
-                    rgba(255, 251, 235, 0.98) 55%);
+            border-color: rgba(245, 158, 11, .9);
+            background: radial-gradient(circle at top left, rgba(250, 204, 21, .20) 0, rgba(255, 251, 235, .98) 55%);
             color: #92400e;
-            box-shadow:
-                0 0 0 1px rgba(250, 204, 21, 0.7),
-                0 8px 18px rgba(250, 204, 21, 0.25);
+            box-shadow: 0 0 0 1px rgba(250, 204, 21, .7), 0 8px 18px rgba(250, 204, 21, .25);
         }
 
         .status-chip.active-full {
-            border-color: rgba(22, 163, 74, 0.9);
-            background: radial-gradient(circle at top left,
-                    rgba(22, 163, 74, 0.22) 0,
-                    rgba(240, 253, 244, 0.98) 55%);
+            border-color: rgba(22, 163, 74, .9);
+            background: radial-gradient(circle at top left, rgba(22, 163, 74, .22) 0, rgba(240, 253, 244, .98) 55%);
             color: #166534;
-            box-shadow:
-                0 0 0 1px rgba(74, 222, 128, 0.8),
-                0 8px 18px rgba(22, 163, 74, 0.35);
+            box-shadow: 0 0 0 1px rgba(74, 222, 128, .8), 0 8px 18px rgba(22, 163, 74, .35);
         }
 
-        /* ====== MOBILE ====== */
         @media (max-width: 767.98px) {
             .card {
                 border-radius: 12px;
@@ -322,7 +283,7 @@
             }
 
             .status-chip-row::-webkit-scrollbar-thumb {
-                background: rgba(148, 163, 184, 0.6);
+                background: rgba(148, 163, 184, .6);
                 border-radius: 999px;
             }
 
@@ -338,21 +299,17 @@
             .table-pickup-lines tbody tr {
                 display: block;
                 border-radius: 14px;
-                border: 1px solid rgba(148, 163, 184, 0.25);
+                border: 1px solid rgba(148, 163, 184, .25);
                 padding: .55rem .75rem .65rem;
                 margin-bottom: .5rem;
                 background: #ffffff;
-                box-shadow:
-                    0 10px 22px rgba(15, 23, 42, 0.08),
-                    0 0 0 1px rgba(15, 23, 42, 0.02);
+                box-shadow: 0 10px 22px rgba(15, 23, 42, .08), 0 0 0 1px rgba(15, 23, 42, .02);
             }
 
             body[data-theme="dark"] .table-pickup-lines tbody tr {
-                background: rgba(15, 23, 42, 0.96);
-                border-color: rgba(30, 64, 175, 0.55);
-                box-shadow:
-                    0 12px 28px rgba(15, 23, 42, 0.9),
-                    0 0 0 1px rgba(15, 23, 42, 0.9);
+                background: rgba(15, 23, 42, .96);
+                border-color: rgba(30, 64, 175, .55);
+                box-shadow: 0 12px 28px rgba(15, 23, 42, .9), 0 0 0 1px rgba(15, 23, 42, .9);
             }
 
             .table-pickup-lines td {
@@ -397,23 +354,21 @@
                 font-weight: 800;
                 letter-spacing: .03em;
                 white-space: nowrap;
-                background: rgba(37, 99, 246, 0.1);
+                background: rgba(37, 99, 246, .1);
                 color: #1d4ed8;
-                border: 1px solid rgba(37, 99, 246, 0.35);
-                box-shadow:
-                    0 3px 7px rgba(37, 99, 246, 0.16),
-                    0 0 0 1px rgba(191, 219, 254, 0.7);
+                border: 1px solid rgba(37, 99, 246, .35);
+                box-shadow: 0 3px 7px rgba(37, 99, 246, .16), 0 0 0 1px rgba(191, 219, 254, .7);
             }
 
             body[data-theme="dark"] .mobile-item-code-chip {
-                background: rgba(37, 99, 235, 0.3);
+                background: rgba(37, 99, 235, .3);
                 color: #e5edff;
-                border-color: rgba(129, 140, 248, 0.8);
+                border-color: rgba(129, 140, 248, .8);
             }
 
             .mobile-card-right {
                 text-align: right;
-                min-width: 120px;
+                min-width: 140px;
             }
 
             .mobile-status-label {
@@ -465,25 +420,59 @@
 
 @section('content')
     @php
-        // Config status header
         $statusMap = [
             'draft' => ['label' => 'DRAFT', 'class' => 'secondary'],
             'posted' => ['label' => 'POSTED', 'class' => 'primary'],
             'closed' => ['label' => 'CLOSED', 'class' => 'success'],
         ];
-
         $cfg = $statusMap[$pickup->status] ?? [
             'label' => strtoupper($pickup->status ?? '-'),
             'class' => 'secondary',
         ];
 
-        $hasReturn = $totalReturnedAll > 0;
-        $overallPercent = min(max($overallProgress, 0), 100);
+        $lines = $pickup->lines ?? collect();
+
+        // ✅ Semua ringkasan dihitung di blade (tidak butuh variabel dari controller)
+        $totalBundles = (int) $lines->count();
+        $totalQtyPickup = (float) $lines->sum(fn($l) => (float) ($l->qty_bundle ?? 0));
+        $totalReturnOk = (float) $lines->sum(fn($l) => (float) ($l->qty_returned_ok ?? 0));
+        $totalReturnReject = (float) $lines->sum(fn($l) => (float) ($l->qty_returned_reject ?? 0));
+        $totalDirectPick = (float) $lines->sum(fn($l) => (float) ($l->qty_direct_picked ?? 0));
+        $totalProgressAdj = (float) $lines->sum(fn($l) => (float) ($l->qty_progress_adjusted ?? 0));
+
+        // ✅ aturan progress terbaru
+        $totalProcessed = $totalReturnOk + $totalReturnReject + $totalDirectPick + $totalProgressAdj;
+        $totalRemaining = max($totalQtyPickup - $totalProcessed, 0);
+
+        $overallPercent = $totalQtyPickup > 0 ? min(100, max(0, ($totalProcessed / $totalQtyPickup) * 100)) : 0;
+
+        // Count status bundle
+        $notReturnedCount = 0;
+        $partialReturnedCount = 0;
+        $fullReturnedCount = 0;
+
+        foreach ($lines as $l) {
+            $qtyPickup = (float) ($l->qty_bundle ?? 0);
+            $processed =
+                (float) ($l->qty_returned_ok ?? 0) +
+                (float) ($l->qty_returned_reject ?? 0) +
+                (float) ($l->qty_direct_picked ?? 0) +
+                (float) ($l->qty_progress_adjusted ?? 0);
+
+            $remain = max($qtyPickup - $processed, 0);
+
+            if ($processed <= 0.000001) {
+                $notReturnedCount++;
+            } elseif ($remain > 0.000001) {
+                $partialReturnedCount++;
+            } else {
+                $fullReturnedCount++;
+            }
+        }
     @endphp
 
     <div class="page-wrap">
-
-        {{-- HEADER ATAS --}}
+        {{-- HEADER --}}
         <div class="card mb-3">
             <div class="card-section">
                 <div class="header-row">
@@ -525,7 +514,7 @@
                             {{ $cfg['label'] }}
                         </span>
 
-                        <a href="{{ route('production.sewing_pickups.index') }}" class="btn btn-sm btn-outline-secondary">
+                        <a href="{{ route('production.sewing.pickups.index') }}" class="btn btn-sm btn-outline-secondary">
                             <i class="bi bi-arrow-left me-1"></i> Kembali
                         </a>
                     </div>
@@ -533,7 +522,7 @@
             </div>
         </div>
 
-        {{-- SUMMARY + OVERALL PROGRESS --}}
+        {{-- SUMMARY --}}
         <div class="card mb-3">
             <div class="card-section">
                 <h2 class="h6 mb-2">Ringkasan Pickup & Progress Setor</h2>
@@ -541,29 +530,35 @@
                 <div class="row g-3">
                     <div class="col-6 col-md-3">
                         <div class="help mb-1">Jumlah Bundle</div>
-                        <div class="mono">{{ $totalBundles }}</div>
+                        <div class="mono">{{ number_format($totalBundles, 0, ',', '.') }}</div>
                     </div>
 
                     <div class="col-6 col-md-3">
                         <div class="help mb-1">Total Pickup (pcs)</div>
-                        <div class="mono">
-                            {{ number_format($totalQtyPickup, 2, ',', '.') }}
-                        </div>
+                        <div class="mono">{{ number_format($totalQtyPickup, 2, ',', '.') }}</div>
                     </div>
 
                     <div class="col-6 col-md-3">
                         <div class="help mb-1">Return OK (pcs)</div>
-                        <div class="mono">
-                            {{ number_format($totalReturnOk, 2, ',', '.') }}
-                        </div>
+                        <div class="mono">{{ number_format($totalReturnOk, 2, ',', '.') }}</div>
                     </div>
 
                     <div class="col-6 col-md-3">
                         <div class="help mb-1">Return Reject (pcs)</div>
-                        <div class="mono">
-                            {{ number_format($totalReturnReject, 2, ',', '.') }}
-                        </div>
+                        <div class="mono">{{ number_format($totalReturnReject, 2, ',', '.') }}</div>
                     </div>
+                </div>
+
+                <div class="summary-pill-row">
+                    <span class="summary-pill summary-pill-warn">
+                        Dadakan: <span class="mono">{{ number_format($totalDirectPick, 2, ',', '.') }}</span>
+                    </span>
+                    <span class="summary-pill summary-pill-warn">
+                        Adj Progress: <span class="mono">{{ number_format($totalProgressAdj, 2, ',', '.') }}</span>
+                    </span>
+                    <span class="summary-pill summary-pill-status">
+                        Belum setor (pcs): <span class="mono">{{ number_format($totalRemaining, 2, ',', '.') }}</span>
+                    </span>
                 </div>
 
                 <div class="overall-progress-wrap">
@@ -572,7 +567,7 @@
                         <span class="mono">
                             {{ number_format($overallPercent, 1, ',', '.') }}%
                             @if ($totalQtyPickup > 0)
-                                ({{ number_format($totalReturnedAll, 2, ',', '.') }} /
+                                ({{ number_format($totalProcessed, 2, ',', '.') }} /
                                 {{ number_format($totalQtyPickup, 2, ',', '.') }} pcs)
                             @endif
                         </span>
@@ -583,15 +578,9 @@
                     </div>
 
                     <div class="summary-pill-row">
-                        <span class="summary-pill summary-pill-status">
-                            Belum setor: {{ $notReturnedCount }} bundle
-                        </span>
-                        <span class="summary-pill summary-pill-status">
-                            Parsial: {{ $partialReturnedCount }} bundle
-                        </span>
-                        <span class="summary-pill summary-pill-status">
-                            Sudah penuh: {{ $fullReturnedCount }} bundle
-                        </span>
+                        <span class="summary-pill summary-pill-status">Belum setor: {{ $notReturnedCount }} bundle</span>
+                        <span class="summary-pill summary-pill-status">Parsial: {{ $partialReturnedCount }} bundle</span>
+                        <span class="summary-pill summary-pill-status">Sudah penuh: {{ $fullReturnedCount }} bundle</span>
                     </div>
                 </div>
             </div>
@@ -603,33 +592,22 @@
                 <div class="d-flex justify-content-between align-items-center mb-2 flex-wrap gap-2">
                     <h2 class="h6 mb-0">Detail Bundles</h2>
 
-                    {{-- CHIP FILTER STATUS --}}
                     <div class="status-chip-row" id="status-chip-row">
                         <span class="status-chip-label d-none d-md-inline">Filter:</span>
 
-                        <button type="button" class="status-chip active-all" data-status="all" id="chip-status-all">
-                            Semua
-                        </button>
+                        <button type="button" class="status-chip active-all" data-status="all"
+                            id="chip-status-all">Semua</button>
 
                         <button type="button" class="status-chip" data-status="not_returned" id="chip-status-not-returned">
-                            Belum Setor
-                            <span class="status-chip-count mono">
-                                {{ $notReturnedCount }}
-                            </span>
+                            Belum Setor <span class="status-chip-count mono">{{ $notReturnedCount }}</span>
                         </button>
 
                         <button type="button" class="status-chip" data-status="partial" id="chip-status-partial">
-                            Parsial
-                            <span class="status-chip-count mono">
-                                {{ $partialReturnedCount }}
-                            </span>
+                            Parsial <span class="status-chip-count mono">{{ $partialReturnedCount }}</span>
                         </button>
 
                         <button type="button" class="status-chip" data-status="full" id="chip-status-full">
-                            Sudah Penuh
-                            <span class="status-chip-count mono">
-                                {{ $fullReturnedCount }}
-                            </span>
+                            Sudah Penuh <span class="status-chip-count mono">{{ $fullReturnedCount }}</span>
                         </button>
                     </div>
                 </div>
@@ -642,15 +620,17 @@
                                 <th style="width: 130px;">Bundle</th>
                                 <th style="width: 160px;">Item Jadi</th>
                                 <th style="width: 170px;">Lot</th>
-                                <th style="width: 120px;">Qty Pickup</th>
-                                <th style="width: 120px;">Return OK</th>
-                                <th style="width: 120px;">Reject</th>
-                                <th style="width: 120px;">Sisa</th>
+                                <th class="text-end" style="width: 110px;">Qty</th>
+                                <th class="text-end" style="width: 110px;">OK</th>
+                                <th class="text-end" style="width: 110px;">RJ</th>
+                                <th class="text-end" style="width: 110px;">DP</th>
+                                <th class="text-end" style="width: 120px;">Adj</th>
+                                <th class="text-end" style="width: 120px;">Sisa</th>
                                 <th style="width: 110px;">Status</th>
                             </tr>
                         </thead>
                         <tbody>
-                            @forelse ($pickup->lines as $line)
+                            @forelse ($lines as $line)
                                 @php
                                     $bundle = $line->bundle;
                                     $lot = $bundle?->cuttingJob?->lot;
@@ -658,13 +638,16 @@
                                     $qtyPickup = (float) ($line->qty_bundle ?? 0);
                                     $returnedOk = (float) ($line->qty_returned_ok ?? 0);
                                     $returnedReject = (float) ($line->qty_returned_reject ?? 0);
-                                    $returnedTotal = $returnedOk + $returnedReject;
-                                    $remaining = max($qtyPickup - $returnedTotal, 0);
+                                    $directPick = (float) ($line->qty_direct_picked ?? 0);
+                                    $progressAdj = (float) ($line->qty_progress_adjusted ?? 0);
+
+                                    $processed = $returnedOk + $returnedReject + $directPick + $progressAdj;
+                                    $remaining = max($qtyPickup - $processed, 0);
 
                                     $percentLine =
-                                        $qtyPickup > 0 ? min(100, max(0, ($returnedTotal / $qtyPickup) * 100)) : 0;
+                                        $qtyPickup > 0 ? min(100, max(0, ($processed / $qtyPickup) * 100)) : 0;
 
-                                    if ($returnedTotal <= 0.000001) {
+                                    if ($processed <= 0.000001) {
                                         $lineStatusLabel = 'Belum Setor';
                                         $lineStatusClass = 'secondary';
                                         $lineProgressClass = 'empty';
@@ -675,14 +658,14 @@
                                         $lineProgressClass = 'partial';
                                         $lineStatusKey = 'partial';
                                     } else {
-                                        $lineStatusLabel = 'Sudah Setor';
+                                        $lineStatusLabel = 'Sudah Penuh';
                                         $lineStatusClass = 'success';
                                         $lineProgressClass = '';
                                         $lineStatusKey = 'full';
                                     }
                                 @endphp
+
                                 <tr class="pickup-line-row" data-line-status="{{ $lineStatusKey }}">
-                                    {{-- DESKTOP CELLS --}}
                                     <td class="td-desktop-only">{{ $loop->iteration }}</td>
 
                                     <td class="td-desktop-only">
@@ -692,36 +675,30 @@
                                     <td class="td-desktop-only">
                                         {{ $bundle?->finishedItem?->code ?? '-' }}
                                         @if ($bundle?->finishedItem?->name)
-                                            <div class="small text-muted">
-                                                {{ $bundle->finishedItem->name }}
-                                            </div>
+                                            <div class="small text-muted">{{ $bundle->finishedItem->name }}</div>
                                         @endif
                                     </td>
 
                                     <td class="td-desktop-only">
                                         @if ($lot)
                                             {{ $lot->item?->code ?? '-' }}
-                                            <span class="badge-soft bg-light border text-muted">
-                                                {{ $lot->code }}
-                                            </span>
+                                            <span class="badge-soft bg-light border text-muted">{{ $lot->code }}</span>
                                         @else
                                             -
                                         @endif
                                     </td>
 
-                                    <td class="td-desktop-only">
-                                        {{ number_format($qtyPickup, 2, ',', '.') }}
+                                    <td class="td-desktop-only text-end">{{ number_format($qtyPickup, 2, ',', '.') }}</td>
+                                    <td class="td-desktop-only text-end">{{ number_format($returnedOk, 2, ',', '.') }}
+                                    </td>
+                                    <td class="td-desktop-only text-end">{{ number_format($returnedReject, 2, ',', '.') }}
+                                    </td>
+                                    <td class="td-desktop-only text-end">{{ number_format($directPick, 2, ',', '.') }}
+                                    </td>
+                                    <td class="td-desktop-only text-end">{{ number_format($progressAdj, 2, ',', '.') }}
                                     </td>
 
-                                    <td class="td-desktop-only">
-                                        {{ number_format($returnedOk, 2, ',', '.') }}
-                                    </td>
-
-                                    <td class="td-desktop-only">
-                                        {{ number_format($returnedReject, 2, ',', '.') }}
-                                    </td>
-
-                                    <td class="td-desktop-only">
+                                    <td class="td-desktop-only text-end">
                                         {{ number_format($remaining, 2, ',', '.') }}
                                         <div class="line-progress-wrap">
                                             <div class="line-progress">
@@ -737,23 +714,22 @@
                                         </span>
                                     </td>
 
-                                    {{-- MOBILE CARD --}}
-                                    <td class="td-mobile-only" colspan="9">
+                                    {{-- MOBILE --}}
+                                    <td class="td-mobile-only" colspan="11">
                                         <div class="mobile-card-top">
                                             <div class="mobile-card-left">
                                                 <span class="mobile-row-index">#{{ $loop->iteration }}</span>
-                                                <span class="mobile-item-code-chip">
-                                                    {{ $bundle?->finishedItem?->code ?? '-' }}
-                                                </span>
+                                                <span
+                                                    class="mobile-item-code-chip">{{ $bundle?->finishedItem?->code ?? '-' }}</span>
                                             </div>
                                             <div class="mobile-card-right">
                                                 <div class="mobile-status-label">STATUS</div>
-                                                <span class="badge mobile-status-badge bg-{{ $lineStatusClass }}">
-                                                    {{ $lineStatusLabel }}
-                                                </span>
+                                                <span
+                                                    class="badge mobile-status-badge bg-{{ $lineStatusClass }}">{{ $lineStatusLabel }}</span>
+
                                                 <div class="mobile-progress-wrap">
                                                     <div class="mobile-progress-label">
-                                                        {{ number_format($returnedTotal, 2, ',', '.') }} /
+                                                        {{ number_format($processed, 2, ',', '.') }} /
                                                         {{ number_format($qtyPickup, 2, ',', '.') }} pcs
                                                     </div>
                                                     <div class="line-progress">
@@ -769,40 +745,31 @@
                                                 <div>{{ $bundle->finishedItem->name }}</div>
                                             @endif
                                             @if ($lot)
-                                                <div>
-                                                    LOT: <span class="mono">{{ $lot->code }}</span>
-                                                </div>
+                                                <div>LOT: <span class="mono">{{ $lot->code }}</span></div>
                                             @endif
                                             @if ($bundle?->bundle_code)
-                                                <div>
-                                                    Bundle: <span class="mono">{{ $bundle->bundle_code }}</span>
-                                                </div>
+                                                <div>Bundle: <span class="mono">{{ $bundle->bundle_code }}</span></div>
                                             @endif
                                         </div>
 
                                         <div class="mobile-qty-row">
-                                            Pickup:
-                                            <span class="mono">
-                                                {{ number_format($qtyPickup, 2, ',', '.') }} pcs
-                                            </span>
-                                            • OK:
-                                            <span class="mono">
-                                                {{ number_format($returnedOk, 2, ',', '.') }}
-                                            </span>
-                                            • RJ:
-                                            <span class="mono">
-                                                {{ number_format($returnedReject, 2, ',', '.') }}
-                                            </span>
-                                            • Sisa:
-                                            <span class="mono">
-                                                {{ number_format($remaining, 2, ',', '.') }}
-                                            </span>
+                                            Pickup: <span
+                                                class="mono">{{ number_format($qtyPickup, 2, ',', '.') }}</span> •
+                                            OK: <span class="mono">{{ number_format($returnedOk, 2, ',', '.') }}</span>
+                                            •
+                                            RJ: <span
+                                                class="mono">{{ number_format($returnedReject, 2, ',', '.') }}</span> •
+                                            DP: <span class="mono">{{ number_format($directPick, 2, ',', '.') }}</span>
+                                            •
+                                            Adj: <span
+                                                class="mono">{{ number_format($progressAdj, 2, ',', '.') }}</span> •
+                                            Sisa: <span class="mono">{{ number_format($remaining, 2, ',', '.') }}</span>
                                         </div>
                                     </td>
                                 </tr>
                             @empty
                                 <tr>
-                                    <td colspan="9" class="text-center text-muted small">
+                                    <td colspan="11" class="text-center text-muted small">
                                         Belum ada detail bundle untuk pickup ini.
                                     </td>
                                 </tr>
@@ -810,6 +777,7 @@
                         </tbody>
                     </table>
                 </div>
+
             </div>
         </div>
 
@@ -826,42 +794,27 @@
             function applyFilter() {
                 rows.forEach(row => {
                     const status = row.dataset.lineStatus || '';
-                    const show = (activeStatus === 'all') || (status === activeStatus);
-                    row.style.display = show ? '' : 'none';
+                    row.style.display = (activeStatus === 'all' || status === activeStatus) ? '' : 'none';
                 });
             }
 
             function clearChipStates() {
-                chips.forEach(chip => {
-                    chip.classList.remove(
-                        'active-all',
-                        'active-not-returned',
-                        'active-partial',
-                        'active-full'
-                    );
-                });
+                chips.forEach(chip => chip.classList.remove('active-all', 'active-not-returned', 'active-partial',
+                    'active-full'));
             }
 
             function activateChip(chip) {
                 const status = chip.dataset.status;
                 clearChipStates();
-
-                if (status === 'all') {
-                    chip.classList.add('active-all');
-                } else if (status === 'not_returned') {
-                    chip.classList.add('active-not-returned');
-                } else if (status === 'partial') {
-                    chip.classList.add('active-partial');
-                } else if (status === 'full') {
-                    chip.classList.add('active-full');
-                }
+                if (status === 'all') chip.classList.add('active-all');
+                else if (status === 'not_returned') chip.classList.add('active-not-returned');
+                else if (status === 'partial') chip.classList.add('active-partial');
+                else if (status === 'full') chip.classList.add('active-full');
             }
 
             chips.forEach(chip => {
                 chip.addEventListener('click', function() {
                     const status = this.dataset.status;
-
-                    // klik ulang chip yang sama → kembali ke "all"
                     if (activeStatus === status && status !== 'all') {
                         activeStatus = 'all';
                         const chipAll = document.getElementById('chip-status-all');
@@ -870,12 +823,10 @@
                         activeStatus = status;
                         activateChip(this);
                     }
-
                     applyFilter();
                 });
             });
 
-            // init
             applyFilter();
         });
     </script>

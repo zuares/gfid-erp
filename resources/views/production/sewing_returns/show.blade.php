@@ -207,21 +207,19 @@
             $pickupDate = optional($return->pickup?->date)->format('d/m/Y') ?? '-';
         }
 
-        // total direct pickup (unik per pickup line)
-        $totalDirectPick = $lines
+        // ✅ total direct pickup unik per pickup line (lebih akurat daripada sum per line return)
+        $totalDirectPickView = $lines
             ->pluck('sewingPickupLine')
             ->filter()
             ->unique('id')
-            ->sum(function ($pl) {
-                return (float) ($pl->qty_direct_picked ?? 0);
-            });
+            ->sum(fn($pl) => (float) ($pl->qty_direct_picked ?? 0));
 
         /**
          * Ringkasan per item:
-         * - SETOR = sum(qty_ok)
+         * - Setor = sum(qty_ok)
          * - Reject = sum(qty_reject)
-         * - Dadakan = sum(qty_direct_picked) unik per pickup line
-         * - Belum Setor = pickup - (setor + reject + dadakan) per pickup line, lalu dijumlah
+         * - Dadakan = sum(qty_direct_picked) (unik per pickup line)
+         * - Belum Setor = qty_bundle - (returned_ok + returned_reject + direct_pick + progress_adjusted) (per pickup line)
          */
         $perItem = $lines
             ->groupBy(function ($l) {
@@ -232,22 +230,21 @@
                 $bundle = optional($first->sewingPickupLine)->bundle;
                 $item = optional($bundle)->finishedItem;
 
-                $setor = (float) $group->sum('qty_ok'); // ✅ SETOR (jahit OK)
+                $setor = (float) $group->sum('qty_ok');
                 $rj = (float) $group->sum('qty_reject');
 
                 $pickupLines = $group->pluck('sewingPickupLine')->filter()->unique('id');
 
-                $directPick = $pickupLines->sum(function ($pl) {
-                    return (float) ($pl->qty_direct_picked ?? 0);
-                });
+                $directPick = $pickupLines->sum(fn($pl) => (float) ($pl->qty_direct_picked ?? 0));
 
                 $remaining = $pickupLines->sum(function ($pl) {
                     $qtyBundle = (float) ($pl->qty_bundle ?? 0);
                     $returnedOk = (float) ($pl->qty_returned_ok ?? 0);
                     $returnedRej = (float) ($pl->qty_returned_reject ?? 0);
                     $directPick = (float) ($pl->qty_direct_picked ?? 0);
+                    $progressAdj = (float) ($pl->qty_progress_adjusted ?? 0); // ✅ NEW
 
-                    return max($qtyBundle - ($returnedOk + $returnedRej + $directPick), 0);
+                    return max($qtyBundle - ($returnedOk + $returnedRej + $directPick + $progressAdj), 0);
                 });
 
                 return [
@@ -303,12 +300,12 @@
                     </div>
 
                     <div class="header-actions">
-                        <a href="{{ route('production.sewing_returns.index') }}"
+                        <a href="{{ route('production.sewing.returns.index') }}"
                             class="btn btn-outline-secondary btn-sm btn-pill">
                             <i class="bi bi-arrow-left"></i><span>Kembali</span>
                         </a>
                         @if ($return->pickup)
-                            <a href="{{ route('production.sewing_pickups.show', $return->pickup) }}"
+                            <a href="{{ route('production.sewing.pickups.show', $return->pickup) }}"
                                 class="btn btn-outline-primary btn-sm btn-pill">
                                 <i class="bi bi-box-seam"></i><span>Lihat Pickup</span>
                             </a>
@@ -326,29 +323,31 @@
                 <div class="summary-grid">
                     <div>
                         <div class="summary-label">Pickup</div>
-                        <div class="summary-value mono">{{ number_format($totalPickup, 2, ',', '.') }}</div>
+                        <div class="summary-value mono">{{ number_format($totalPickup ?? 0, 2, ',', '.') }}</div>
                     </div>
                     <div>
                         <div class="summary-label">Diproses (Setor + Reject)</div>
-                        <div class="summary-value mono">{{ number_format($totalProcessed, 2, ',', '.') }}</div>
+                        <div class="summary-value mono">{{ number_format($totalProcessed ?? 0, 2, ',', '.') }}</div>
                     </div>
                     <div>
                         <div class="summary-label">Setor</div>
-                        <div class="summary-value summary-ok mono">{{ number_format($totalOk, 2, ',', '.') }}</div>
+                        <div class="summary-value summary-ok mono">{{ number_format($totalOk ?? 0, 2, ',', '.') }}</div>
                     </div>
                     <div>
                         <div class="summary-label">Reject</div>
-                        <div class="summary-value summary-rj mono">{{ number_format($totalReject, 2, ',', '.') }}</div>
-                        <div class="section-sub">{{ number_format($rejectPercent, 1, ',', '.') }}%</div>
+                        <div class="summary-value summary-rj mono">{{ number_format($totalReject ?? 0, 2, ',', '.') }}
+                        </div>
+                        <div class="section-sub">{{ number_format($rejectPercent ?? 0, 1, ',', '.') }}%</div>
                     </div>
                     <div>
                         <div class="summary-label">Dadakan</div>
-                        <div class="summary-value summary-warn mono">{{ number_format($totalDirectPick, 2, ',', '.') }}
+                        <div class="summary-value summary-warn mono">
+                            {{ number_format($totalDirectPick ?? ($totalDirectPickView ?? 0), 2, ',', '.') }}
                         </div>
                     </div>
                     <div>
                         <div class="summary-label">Belum Setor</div>
-                        <div class="summary-value summary-warn mono">{{ number_format($totalRemaining, 2, ',', '.') }}
+                        <div class="summary-value summary-warn mono">{{ number_format($totalRemaining ?? 0, 2, ',', '.') }}
                         </div>
                     </div>
                 </div>
@@ -377,7 +376,6 @@
                             <tr
                                 class="{{ $row['rj'] > 0 && $row['setor'] == 0 ? 'row-rj' : ($row['setor'] > 0 && $row['rj'] == 0 ? 'row-ok' : '') }}">
                                 <td class="text-muted mono">{{ $idx + 1 }}</td>
-
                                 <td class="mono fw-bold">{{ $row['code'] }}</td>
                                 <td>{{ $row['name'] }}</td>
 
@@ -439,17 +437,17 @@
                                 $item = optional($bundle)->finishedItem;
                                 $lot = optional(optional($bundle)->cuttingJob)->lot;
 
-                                $setor = (float) $line->qty_ok; // ✅ SETOR (jahit OK)
+                                $setor = (float) $line->qty_ok;
                                 $rj = (float) $line->qty_reject;
 
                                 $qtyBundle = (float) ($pickupLine->qty_bundle ?? 0);
                                 $returnedOkAll = (float) ($pickupLine->qty_returned_ok ?? 0);
                                 $returnedRejAll = (float) ($pickupLine->qty_returned_reject ?? 0);
                                 $directPickAll = (float) ($pickupLine->qty_direct_picked ?? 0);
+                                $progressAdjAll = (float) ($pickupLine->qty_progress_adjusted ?? 0); // ✅ NEW
 
-                                $directPick = $directPickAll;
                                 $remainingRow = max(
-                                    $qtyBundle - ($returnedOkAll + $returnedRejAll + $directPickAll),
+                                    $qtyBundle - ($returnedOkAll + $returnedRejAll + $directPickAll + $progressAdjAll),
                                     0,
                                 );
                             @endphp
@@ -474,7 +472,7 @@
 
                                 <td class="text-end">{{ number_format($setor, 2, ',', '.') }}</td>
                                 <td class="text-end">{{ number_format($rj, 2, ',', '.') }}</td>
-                                <td class="text-end">{{ number_format($directPick, 2, ',', '.') }}</td>
+                                <td class="text-end">{{ number_format($directPickAll, 2, ',', '.') }}</td>
                                 <td class="text-end">{{ number_format($remainingRow, 2, ',', '.') }}</td>
 
                                 <td>{{ $line->notes ?: '—' }}</td>

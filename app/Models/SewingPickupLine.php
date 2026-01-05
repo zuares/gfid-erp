@@ -67,4 +67,9 @@ class SewingPickupLine extends Model
         return $this->hasMany(\App\Models\SewingReturnLine::class, 'sewing_pickup_line_id');
     }
 
+    public function progressAdjustments()
+    {
+        return $this->hasMany(SewingProgressAdjustmentLine::class);
+    }
+
 }

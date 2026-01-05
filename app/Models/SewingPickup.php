@@ -1,4 +1,5 @@
 <?php
+
 namespace App\Models;
 
 use Illuminate\Database\Eloquent\Model;
@@ -15,7 +16,7 @@ class SewingPickup extends Model
     ];
 
     protected $casts = [
-        'date' => 'date', // atau 'immutable_date' kalau mau
+        'date' => 'date',
     ];
 
     public function warehouse()
@@ -33,34 +34,39 @@ class SewingPickup extends Model
         return $this->hasMany(SewingPickupLine::class);
     }
 
+    /**
+     * Hitung status berdasarkan sisa qty di semua line.
+     * Status:
+     * - completed: semua line remaining = 0
+     * - partial: ada progress (return ok/reject/direct pick/adjust) tapi belum selesai
+     * - draft: belum ada progress sama sekali
+     */
     public function recalcStatus(): string
     {
-        $lines = $this->lines ?? $this->lines()->get();
+        $lines = $this->relationLoaded('lines') ? $this->lines : $this->lines()->get();
 
         $totalRemaining = $lines->sum(function ($l) {
             $qty = (float) ($l->qty_bundle ?? 0);
             $ok = (float) ($l->qty_returned_ok ?? 0);
             $rj = (float) ($l->qty_returned_reject ?? 0);
             $dp = (float) ($l->qty_direct_picked ?? 0);
-            return max($qty - ($ok + $rj + $dp), 0);
+            $adj = (float) ($l->qty_progress_adjusted ?? 0); // ✅ ikut adjustment
+
+            return max($qty - ($ok + $rj + $dp + $adj), 0);
         });
 
-        // mapping status (sesuaikan istilah kamu)
         if ($totalRemaining <= 0.000001) {
             return 'completed';
         }
 
-        if ($totalRemaining > 0.000001) {
-            // kalau ada progress (ok/rj/dp) -> partial, else draft
-            $progress = $lines->sum(fn($l) =>
-                (float) ($l->qty_returned_ok ?? 0) +
-                (float) ($l->qty_returned_reject ?? 0) +
-                (float) ($l->qty_direct_picked ?? 0)
-            );
-            return ($progress > 0.000001) ? 'partial' : 'draft';
-        }
+        $progress = $lines->sum(function ($l) {
+            return
+            (float) ($l->qty_returned_ok ?? 0) +
+            (float) ($l->qty_returned_reject ?? 0) +
+            (float) ($l->qty_direct_picked ?? 0) +
+            (float) ($l->qty_progress_adjusted ?? 0); // ✅ ikut adjustment
+        });
 
-        return 'draft';
+        return ($progress > 0.000001) ? 'partial' : 'draft';
     }
-
 }

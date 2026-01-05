@@ -1,4 +1,4 @@
-{{-- resources/views/production/sewing_pickups/create.blade.php --}}
+{{-- resources/views/production/sewing.pickups/create.blade.php --}}
 @extends('layouts.app')
 
 @section('title', 'Produksi • Sewing Pickup')
@@ -249,7 +249,7 @@
                             </div>
                         </div>
 
-                        <a href="{{ route('production.sewing_returns.create') }}"
+                        <a href="{{ route('production.sewing.returns.create') }}"
                             class="btn btn-sm btn-outline-primary btn-header-link d-flex align-items-center gap-2">
                             <i class="bi bi-clipboard-check"></i>
                             <span>Setor Jahit</span>
@@ -264,7 +264,7 @@
                 $selectedOperator = $operators->firstWhere('id', $autoDefaultOperatorId);
             @endphp
 
-            <form id="sewing-pickup-form" action="{{ route('production.sewing_pickups.store') }}" method="post"
+            <form id="sewing-pickup-form" action="{{ route('production.sewing.pickups.store') }}" method="post"
                 data-mobile-primary-form="1">
                 @csrf
 
