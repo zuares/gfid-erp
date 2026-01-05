@@ -34,12 +34,21 @@
     $countedLines = $linesCollection->whereNotNull('physical_qty')->count();
     $notCounted = max($totalLines - $countedLines, 0);
 
-    // Baris terbaru / terakhir diupdate muncul teratas
+    /**
+     * ✅ URUTAN: terbaru berada di urutan terakhir
+     * (terlama dulu, terbaru paling bawah)
+     */
     $lines = $linesCollection
-        ->sortByDesc(function ($line) {
+        ->sortBy(function ($line) {
             return $line->updated_at ?? ($line->created_at ?? $line->id);
         })
         ->values();
+
+    /**
+     * ✅ line terakhir (untuk highlight soft setelah add/update)
+     */
+    $lastLine = $lines->last();
+    $lastLineId = $lastLine?->id;
 @endphp
 
 @push('head')
@@ -309,30 +318,6 @@
             font-size: .8rem;
         }
 
-        .so-help {
-            margin-top: .75rem;
-            padding: .55rem .7rem;
-            border-radius: 10px;
-            border: 1px dashed rgba(148, 163, 184, .7);
-            background: rgba(248, 250, 252, .9);
-            font-size: .78rem;
-            color: #4b5563;
-        }
-
-        body[data-theme="dark"] .so-help {
-            background: rgba(15, 23, 42, .9);
-            border-color: rgba(75, 85, 99, .9);
-            color: #e5e7eb;
-        }
-
-        .so-help-title {
-            font-weight: 700;
-            text-transform: uppercase;
-            letter-spacing: .08em;
-            font-size: .7rem;
-            margin-bottom: .1rem;
-        }
-
         .so-action-bottom-card {
             margin-top: .75rem;
         }
@@ -358,6 +343,66 @@
 
         body[data-theme="dark"] .so-action-bottom-meta {
             color: #9ca3af;
+        }
+
+        /* ✅ Highlight soft untuk row terbaru */
+        /* ✅ Highlight soft tapi KONTRAS (light & dark) */
+        .so-row-highlight {
+            position: relative;
+            animation: soRowPulseStrong 1.8s ease-out 1;
+        }
+
+        @keyframes soRowPulseStrong {
+            0% {
+                background-color: rgba(59, 130, 246, 0.00);
+                box-shadow:
+                    inset 0 0 0 0 rgba(59, 130, 246, 0),
+                    0 0 0 0 rgba(59, 130, 246, 0);
+            }
+
+            25% {
+                background-color: rgba(59, 130, 246, 0.16);
+                /* 🔥 lebih kontras */
+                box-shadow:
+                    inset 0 0 0 2px rgba(59, 130, 246, 0.35),
+                    0 4px 14px rgba(59, 130, 246, 0.25);
+            }
+
+            100% {
+                background-color: transparent;
+                box-shadow:
+                    inset 0 0 0 0 rgba(59, 130, 246, 0),
+                    0 0 0 0 rgba(59, 130, 246, 0);
+            }
+        }
+
+        /* 🌙 Dark mode tuning */
+        body[data-theme="dark"] .so-row-highlight {
+            animation: soRowPulseStrongDark 1.8s ease-out 1;
+        }
+
+        @keyframes soRowPulseStrongDark {
+            0% {
+                background-color: rgba(59, 130, 246, 0.00);
+                box-shadow:
+                    inset 0 0 0 0 rgba(59, 130, 246, 0),
+                    0 0 0 0 rgba(59, 130, 246, 0);
+            }
+
+            25% {
+                background-color: rgba(59, 130, 246, 0.28);
+                /* 🔥 kontras di dark */
+                box-shadow:
+                    inset 0 0 0 2px rgba(147, 197, 253, 0.45),
+                    0 6px 18px rgba(59, 130, 246, 0.35);
+            }
+
+            100% {
+                background-color: transparent;
+                box-shadow:
+                    inset 0 0 0 0 rgba(59, 130, 246, 0),
+                    0 0 0 0 rgba(59, 130, 246, 0);
+            }
         }
     </style>
 @endpush
@@ -481,7 +526,8 @@
                                         <div id="opening-item-suggest-mobile">
                                             <label class="pill-label mb-1">Item</label>
                                             <x-item-suggest idName="item_id" :idValue="old('item_id')" :displayValue="''"
-                                                placeholder="Kode / nama" :autofocus="false" :autoSelectFirst="false" />
+                                                placeholder="Kode / nama" :autofocus="false" :autoSelectFirst="false"
+                                                :maxResults="3" />
                                         </div>
 
                                         <div>
@@ -525,7 +571,8 @@
                                         <div id="opening-item-suggest">
                                             <label class="pill-label mb-1">Item</label>
                                             <x-item-suggest idName="item_id" :idValue="old('item_id')" :displayValue="''"
-                                                placeholder="Kode / nama barang" :autofocus="true" :autoSelectFirst="false" />
+                                                placeholder="Kode / nama barang" :autofocus="true" :autoSelectFirst="false"
+                                                :maxResults="3" />
                                         </div>
 
                                         <div>
@@ -597,7 +644,8 @@
                             </div>
 
                             <div class="table-wrap" id="opname-lines-table"
-                                data-delete-url-template="{{ route('inventory.stock_opnames.lines.destroy', ['stockOpname' => $opname, 'line' => '__LINE_ID__']) }}">
+                                data-delete-url-template="{{ route('inventory.stock_opnames.lines.destroy', ['stockOpname' => $opname, 'line' => '__LINE_ID__']) }}"
+                                data-last-line-id="{{ $lastLineId ?? '' }}">
                                 <table class="table table-sm mb-0 align-middle">
                                     <thead>
                                         <tr>
@@ -700,7 +748,7 @@
                                             @endphp
 
                                             <tr class="{{ implode(' ', $rowClasses) }}"
-                                                data-item-id="{{ $line->item_id }}"
+                                                data-line-id="{{ $line->id }}" data-item-id="{{ $line->item_id }}"
                                                 data-item-code="{{ $line->item?->code }}"
                                                 data-item-name="{{ $line->item?->name }}"
                                                 data-physical-qty="{{ $hasPhysicalValue ? $rawPhysical : '' }}">
@@ -824,7 +872,7 @@
                         </div>
                     @endif
                 </div>
-            </div> {{-- .mobile-stack --}}
+            </div>
         </form>
     </div>
 
@@ -905,6 +953,12 @@
             initDeleteLineAjax();
             focusBackAfterReload();
 
+            // nomor rapi saat load awal
+            renumberOpnameRows();
+
+            // ✅ highlight row terakhir setelah reload (jika barusan add/update)
+            highlightLastRowIfNeeded();
+
             const soForm = document.getElementById('soUpdateForm');
             const markReviewedEl = document.getElementById('mark_reviewed');
             const forceAutoFillEl = document.getElementById('force_auto_fill');
@@ -921,6 +975,54 @@
                 }
             }
         });
+
+        /**
+         * ✅ UPDATE PENOMORAN: kolom "#" selalu 1..N
+         */
+        function renumberOpnameRows() {
+            const tbody = document.querySelector('#opname-lines-table tbody');
+            if (!tbody) return;
+
+            const rows = tbody.querySelectorAll('tr');
+            rows.forEach((tr, idx) => {
+                const firstCell = tr.querySelector('td');
+                if (firstCell) firstCell.textContent = String(idx + 1);
+            });
+        }
+
+        /**
+         * ✅ Highlight soft untuk baris terakhir (terbaru)
+         * Dipicu hanya kalau sebelumnya kita set flag di sessionStorage (set saat add/update OK).
+         */
+        function highlightLastRowIfNeeded() {
+            try {
+                const flag = sessionStorage.getItem('so_opening_highlight_last');
+                if (!flag) return;
+
+                sessionStorage.removeItem('so_opening_highlight_last');
+
+                const tableWrap = document.getElementById('opname-lines-table');
+                if (!tableWrap) return;
+
+                const lastId = tableWrap.dataset.lastLineId;
+                if (!lastId) return;
+
+                const row = tableWrap.querySelector('tr[data-line-id="' + lastId + '"]');
+                if (!row) return;
+
+                // scroll ke bawah supaya row terlihat (halus)
+                row.scrollIntoView({
+                    behavior: 'smooth',
+                    block: 'center'
+                });
+
+                // kasih class highlight
+                row.classList.add('so-row-highlight');
+
+                // bersihkan class setelah animasi selesai
+                setTimeout(() => row.classList.remove('so-row-highlight'), 1800);
+            } catch (e) {}
+        }
 
         function initDuplicateItemModal() {
             const modalEl = document.getElementById('duplicateItemModal');
@@ -983,7 +1085,6 @@
             const qtyInput = rootEl.querySelector(opts.qtySelector);
             const submitBtn = document.querySelector(opts.submitBtnSelector);
 
-            const itemIdField = rootEl.querySelector('input[name="item_id"]');
             const updateExistingInput = rootEl.querySelector('input[name="update_existing"]');
 
             if (itemSuggestInput && window.innerWidth >= 768 && opts.rootSelector === '#openingAddDesktop') {
@@ -991,7 +1092,7 @@
                 itemSuggestInput.select && itemSuggestInput.select();
             }
 
-            // Pindah fokus ke Qty hanya jika user tekan Enter di input item
+            // Enter di item -> pindah fokus ke qty
             if (itemSuggestInput && qtyInput) {
                 itemSuggestInput.addEventListener('keydown', function(e) {
                     if (e.key === 'Enter') {
@@ -1002,6 +1103,7 @@
                 });
             }
 
+            // Enter di qty -> submit
             if (qtyInput) {
                 qtyInput.addEventListener('keydown', function(e) {
                     if (e.key === 'Enter') {
@@ -1108,18 +1210,13 @@
             let csrf = opts.csrf || '';
             if (!csrf) {
                 const tokenInput = rootEl.querySelector('input[name="_token"]');
-                if (tokenInput && tokenInput.value) {
-                    csrf = tokenInput.value;
-                } else {
-                    csrf = getCsrfToken();
-                }
+                if (tokenInput && tokenInput.value) csrf = tokenInput.value;
+                else csrf = getCsrfToken();
             }
 
             const formData = new FormData();
 
-            if (csrf) {
-                formData.append('_token', csrf);
-            }
+            if (csrf) formData.append('_token', csrf);
 
             rootEl.querySelectorAll('input[name]').forEach(inp => {
                 if (inp.name === '_token') return;
@@ -1156,6 +1253,8 @@
                     if (data.status === 'ok') {
                         try {
                             sessionStorage.setItem('so_opening_focus_back', '1');
+                            // ✅ flag untuk highlight baris terakhir setelah reload
+                            sessionStorage.setItem('so_opening_highlight_last', '1');
                         } catch (e) {}
                         window.location.reload();
                     } else {
@@ -1240,6 +1339,9 @@
                             if (data.status === 'ok') {
                                 const tr = btn.closest('tr');
                                 if (tr) tr.remove();
+
+                                // ✅ renumber setelah delete
+                                renumberOpnameRows();
                             } else {
                                 alert(data.message || 'Gagal menghapus item.');
                             }

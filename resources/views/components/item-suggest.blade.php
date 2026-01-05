@@ -26,6 +26,14 @@
     'autofocus' => false,
 
     /**
+     * Maksimal jumlah baris hasil yang DITAMPILKAN (visible rows) di dropdown.
+     * Data tetap bisa lebih banyak dan bisa discroll.
+     * Default 4 (backward compatible).
+     * Override di pemanggilan: :maxResults="3"
+     */
+    'maxResults' => 4,
+
+    /**
      * VARIAN UI
      * - default  : kode + nama (+ kategori)
      * - mini     : hanya kode (tanpa nama & kategori)
@@ -84,10 +92,11 @@
 @endphp
 
 <div class="item-suggest-wrap" data-type="{{ $type }}" data-item-category-id="{{ $itemCategoryId }}"
-    data-min-chars="{{ $minChars }}" data-autofocus="{{ $autofocus ? '1' : '0' }}"
-    data-display-mode="{{ $displayMode }}" data-show-name="{{ $showName ? '1' : '0' }}"
-    data-show-category="{{ $showCategory ? '1' : '0' }}" data-extra-params='@json($extraParams)'
-    data-required="{{ $required ? '1' : '0' }}">
+    data-min-chars="{{ $minChars }}" data-max-results="{{ (int) $maxResults }}"
+    data-autofocus="{{ $autofocus ? '1' : '0' }}" data-display-mode="{{ $displayMode }}"
+    data-show-name="{{ $showName ? '1' : '0' }}" data-show-category="{{ $showCategory ? '1' : '0' }}"
+    data-extra-params='@json($extraParams)' data-required="{{ $required ? '1' : '0' }}">
+
     <input type="text" value="{{ strtoupper($displayValue) }}" autocomplete="off"
         class="form-control form-control-sm js-item-suggest-input" placeholder="{{ $placeholder }}"
         data-items='@json($jsItems)' id="{{ $uid }}"
@@ -124,6 +133,7 @@
                 border: 1px solid #e5e7eb;
                 border-radius: 6px;
                 max-height: 200px;
+                /* akan dioverride oleh JS sesuai maxResults & viewport */
                 overflow-y: auto;
                 z-index: 1000;
             }
@@ -167,21 +177,36 @@
                 window.initItemSuggestInputs();
             });
 
-            function positionDropdown(input, dropdown) {
+            function isMobileViewport() {
+                return window.matchMedia("(max-width: 768px)").matches;
+            }
+
+            /**
+             * Hitung maxHeight berdasarkan:
+             * - jumlah baris visible (maxResults)
+             * - tinggi option item
+             * - batas viewport (spaceBelow)
+             */
+            function positionDropdown(input, dropdown, maxVisibleRows = 4) {
                 const rect = input.getBoundingClientRect();
                 const viewportHeight = window.innerHeight;
 
                 dropdown.style.top = "calc(100% + 4px)";
                 dropdown.style.bottom = "auto";
 
-                const desired = Math.min(dropdown.scrollHeight, 200);
+                const optionEl = dropdown.querySelector('.item-suggest-option');
+                const optionH = optionEl ? optionEl.getBoundingClientRect().height : 40;
+
+                // target tinggi berdasarkan jumlah baris yg ingin terlihat
+                const desiredByRows = optionH * Math.max(1, maxVisibleRows);
+
+                // jangan lebih dari 200, jangan kurang dari 80
+                const desired = Math.max(80, Math.min(desiredByRows, 200));
+
+                // pastikan tidak keluar viewport
                 const spaceBelow = viewportHeight - rect.bottom - 6;
 
                 dropdown.style.maxHeight = Math.max(80, Math.min(desired, spaceBelow)) + "px";
-            }
-
-            function isMobileViewport() {
-                return window.matchMedia("(max-width: 768px)").matches;
             }
 
             function setupItemSuggest(wrap) {
@@ -193,6 +218,8 @@
                 dropdown.classList.add('list-group');
 
                 const minChars = parseInt(wrap.dataset.minChars || "1", 10);
+                const maxResults = parseInt(wrap.dataset.maxResults || "4", 10);
+
                 const displayMode = wrap.dataset.displayMode;
                 const showName = wrap.dataset.showName === "1";
                 const showCategory = wrap.dataset.showCategory === "1";
@@ -221,7 +248,7 @@
                 const forceUppercase = true;
 
                 let timer = null;
-                let lastItems = [];
+                let lastItems = []; // simpan semua item (bukan dipotong)
                 let activeIndex = -1;
                 let isSelecting = false;
 
@@ -231,7 +258,7 @@
 
                 function show() {
                     dropdown.style.display = "block";
-                    positionDropdown(input, dropdown);
+                    positionDropdown(input, dropdown, maxResults);
                 }
 
                 function hide() {
@@ -271,11 +298,13 @@
 
                     if (!items.length) {
                         dropdown.innerHTML = `<div class='p-2 text-muted'>Tidak ada hasil</div>`;
+                        lastItems = [];
+                        activeIndex = -1;
                         show();
                         return;
                     }
 
-                    items = items.slice(0, 4);
+                    // ✅ simpan semua item supaya bisa scroll, arrow, dll
                     lastItems = items;
                     activeIndex = -1;
 
@@ -488,7 +517,7 @@
                 });
 
                 window.addEventListener('resize', () => {
-                    if (isDropdownVisible()) positionDropdown(input, dropdown);
+                    if (isDropdownVisible()) positionDropdown(input, dropdown, maxResults);
                 });
 
                 // Validasi saat submit form
