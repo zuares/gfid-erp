@@ -497,7 +497,6 @@ class SewingReportController extends Controller
             ->orderBy('code')
             ->get();
 
-        // Item yang dipakai sebagai finished_item_id
         $items = Item::where('type', 'finished_good')
             ->orderBy('code')
             ->get();
@@ -519,7 +518,7 @@ class SewingReportController extends Controller
             $pickupQuery->where('sewing_pickup_lines.finished_item_id', $itemId);
         }
 
-        $totalPickup = $pickupQuery->sum('qty_bundle');
+        $totalPickup = (float) $pickupQuery->sum('qty_bundle');
 
         /*
         |--------------------------------------------------------------------------
@@ -535,48 +534,70 @@ class SewingReportController extends Controller
         }
 
         if ($itemId) {
-            // Join ke sewing_pickup_lines untuk filter item
             $returnBase->join('sewing_pickup_lines', 'sewing_return_lines.sewing_pickup_line_id', '=', 'sewing_pickup_lines.id')
                 ->where('sewing_pickup_lines.finished_item_id', $itemId);
         }
 
-        $totalReturnOk = (clone $returnBase)->sum('qty_ok');
-        $totalReject = (clone $returnBase)->sum('qty_reject');
+        $totalReturnOk = (float) (clone $returnBase)->sum('qty_ok');
+        $totalReject = (float) (clone $returnBase)->sum('qty_reject');
 
         /*
         |--------------------------------------------------------------------------
-        | 3. Outstanding WIP per Operator (tidak di-filter tanggal)
+        | 3A. Outstanding WIP Detail (Operator + Item) + Tanggal Ambil + Pickup total
+        |     Tidak difilter tanggal
         |--------------------------------------------------------------------------
          */
-        $linesQuery = SewingPickupLine::query()->with(['sewingPickup.operator']);
+        $outstandingExpr = '
+    (
+        SUM(sewing_pickup_lines.qty_bundle)
+        - SUM(COALESCE(sewing_pickup_lines.qty_returned_ok,0))
+        - SUM(COALESCE(sewing_pickup_lines.qty_returned_reject,0))
+    )
+    ';
+
+        $outstandingDetailQuery = SewingPickupLine::query()
+            ->join('sewing_pickups', 'sewing_pickup_lines.sewing_pickup_id', '=', 'sewing_pickups.id')
+            ->join('employees', 'sewing_pickups.operator_id', '=', 'employees.id')
+            ->join('items', 'sewing_pickup_lines.finished_item_id', '=', 'items.id')
+            ->whereNotNull('sewing_pickups.operator_id')
+            ->where('items.type', 'finished_good'); // kalau mau semua item, hapus baris ini
 
         if ($operatorId) {
-            $linesQuery->whereHas('sewingPickup', function ($q) use ($operatorId) {
-                $q->where('operator_id', $operatorId);
-            });
+            $outstandingDetailQuery->where('sewing_pickups.operator_id', $operatorId);
         }
 
         if ($itemId) {
-            $linesQuery->where('finished_item_id', $itemId);
+            $outstandingDetailQuery->where('sewing_pickup_lines.finished_item_id', $itemId);
         }
 
-        $outstandingPerLine = $linesQuery->get();
+        $outstandingDetail = $outstandingDetailQuery
+            ->select(
+                'employees.id as operator_id',
+                'employees.code as operator_code',
+                'employees.name as operator_name',
 
-        $outstanding = $outstandingPerLine
-            ->groupBy(fn($line) => $line->sewingPickup->operator->id ?? null)
-            ->map(function ($rows) {
-                $picked = $rows->sum('qty_bundle');
-                $returnedOk = $rows->sum('qty_returned_ok');
-                $returnedReject = $rows->sum('qty_returned_reject');
+                'items.id as item_id',
+                'items.code as item_code',
+                'items.name as item_name',
 
-                return max(0, $picked - $returnedOk - $returnedReject);
-            })
-            ->filter(fn($qty) => $qty > 0);
+                // Tanggal Ambil Jahit (paling awal dari group operator+item)
+                DB::raw('MIN(sewing_pickups.date) as tanggal_ambil'),
 
-        // Preload operator untuk map (hindari find berulang di Blade)
-        $operatorMap = Employee::whereIn('id', $outstanding->keys()->filter()->all())
-            ->get()
-            ->keyBy('id');
+                // Jumlah pickup (total qty_bundle group operator+item)
+                DB::raw('SUM(sewing_pickup_lines.qty_bundle) as picked_total'),
+
+                // Outstanding (SQLite-safe)
+                DB::raw("CASE WHEN {$outstandingExpr} > 0 THEN {$outstandingExpr} ELSE 0 END as outstanding")
+            )
+            ->groupBy(
+                'employees.id', 'employees.code', 'employees.name',
+                'items.id', 'items.code', 'items.name'
+            )
+            ->havingRaw("{$outstandingExpr} > 0")
+            ->orderByDesc('outstanding')
+            ->get();
+
+        $totalOutstanding = (int) $outstandingDetail->sum('outstanding');
 
         /*
         |--------------------------------------------------------------------------
@@ -612,34 +633,50 @@ class SewingReportController extends Controller
         |--------------------------------------------------------------------------
         | 5. WIP Terlama (aging dalam hari)
         |--------------------------------------------------------------------------
+        | Pakai query terpisah agar definisi "oldest pickup date" tetap jelas
          */
-        $agingCandidate = $outstandingPerLine
-            ->filter(function ($line) {
-                return (float) $line->qty_bundle > ((float) $line->qty_returned_ok + (float) $line->qty_returned_reject);
-            })
-            ->map(function ($line) {
-                $pickupDate = $line->sewingPickup->date
-                ? Carbon::parse($line->sewingPickup->date)->startOfDay()
-                : null;
+        $agingBase = SewingPickupLine::query()
+            ->join('sewing_pickups', 'sewing_pickup_lines.sewing_pickup_id', '=', 'sewing_pickups.id')
+            ->join('employees', 'sewing_pickups.operator_id', '=', 'employees.id')
+            ->whereNotNull('sewing_pickups.operator_id');
 
-                $agingDays = $pickupDate
-                ? $pickupDate->diffInDays(Carbon::today())
-                : null;
+        if ($operatorId) {
+            $agingBase->where('sewing_pickups.operator_id', $operatorId);
+        }
 
-                return [
-                    'operator' => $line->sewingPickup->operator,
-                    'aging' => $agingDays,
-                ];
-            })
-            ->filter(fn($row) => $row['operator'] && $row['aging'] !== null)
-            ->sortByDesc('aging')
+        if ($itemId) {
+            $agingBase->where('sewing_pickup_lines.finished_item_id', $itemId);
+        }
+
+        // yang masih outstanding per line: qty_bundle > returned_ok+returned_reject
+        $agingRow = $agingBase
+            ->select(
+                'employees.id as operator_id',
+                'employees.code as operator_code',
+                'employees.name as operator_name',
+                DB::raw('MIN(sewing_pickups.date) as oldest_pickup_date')
+            )
+            ->whereRaw('sewing_pickup_lines.qty_bundle > (COALESCE(sewing_pickup_lines.qty_returned_ok,0) + COALESCE(sewing_pickup_lines.qty_returned_reject,0))')
+            ->groupBy('employees.id', 'employees.code', 'employees.name')
+            ->orderBy('oldest_pickup_date', 'asc') // paling lama = paling kecil
             ->first();
 
-        $agingWip = $agingCandidate ?: null;
+        $agingWip = null;
+        if ($agingRow && $agingRow->oldest_pickup_date) {
+            $pickupDate = Carbon::parse($agingRow->oldest_pickup_date)->startOfDay();
+            $agingWip = [
+                'operator' => (object) [
+                    'id' => $agingRow->operator_id,
+                    'code' => $agingRow->operator_code,
+                    'name' => $agingRow->operator_name,
+                ],
+                'aging' => $pickupDate->diffInDays(Carbon::today()),
+            ];
+        }
 
         /*
         |--------------------------------------------------------------------------
-        | 6. Output OK per Jam (Chart Line) – tanggal terpilih
+        | 6. Output OK per Jam – tanggal terpilih
         |--------------------------------------------------------------------------
          */
         $hourlyRaw = SewingReturnLine::query()
@@ -666,6 +703,7 @@ class SewingReportController extends Controller
                     if (!$row->created_at) {
                         return false;
                     }
+
                     $created = Carbon::parse($row->created_at);
                     return (int) $created->format('H') === (int) $h;
                 })
@@ -687,7 +725,7 @@ class SewingReportController extends Controller
             ->join('sewing_returns', 'sewing_return_lines.sewing_return_id', '=', 'sewing_returns.id')
             ->join('sewing_pickup_lines', 'sewing_return_lines.sewing_pickup_line_id', '=', 'sewing_pickup_lines.id')
             ->join('items', 'sewing_pickup_lines.finished_item_id', '=', 'items.id')
-            ->where('items.type', 'finished_good') // wajib FG
+            ->where('items.type', 'finished_good')
             ->whereDate('sewing_returns.date', $dateString);
 
         if ($operatorId) {
@@ -712,15 +750,19 @@ class SewingReportController extends Controller
 
         return view('production.reports.sewing.dashboard', [
             'selectedDate' => $selectedDate,
+
             'totalPickupToday' => $totalPickup,
             'totalReturnOkToday' => $totalReturnOk,
             'totalRejectToday' => $totalReject,
-            'outstanding' => $outstanding,
-            'operatorMap' => $operatorMap,
+
+            'outstandingDetail' => $outstandingDetail,
+            'totalOutstanding' => $totalOutstanding,
+
             'topOperator' => $topOperator,
             'agingWip' => $agingWip,
             'hourlyOutput' => $hourlyOutput,
             'itemBreakdown' => $itemBreakdown,
+
             'operators' => $operators,
             'items' => $items,
             'selectedOperatorId' => $operatorId,

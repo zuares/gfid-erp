@@ -1,4 +1,4 @@
-{{-- resources/views/production/sewing/dashboard.blade.php --}}
+{{-- resources/views/production/reports/sewing/dashboard.blade.php --}}
 @extends('layouts.app')
 
 @section('title', 'Dashboard Harian Sewing')
@@ -220,7 +220,7 @@
             <div class="card stat-card">
                 <div class="stat-label">Outstanding WIP</div>
                 <div class="stat-value mono text-warning">
-                    {{ number_format($outstanding->sum()) }}
+                    {{ number_format($totalOutstanding ?? 0) }}
                 </div>
                 <div class="stat-sub">Masih dipegang operator (akumulasi)</div>
             </div>
@@ -306,7 +306,7 @@
             </div>
         </div>
 
-        {{-- Outstanding per Operator --}}
+        {{-- Outstanding per Operator (dengan detail barang + tanggal + pickup) --}}
         <div class="card p-3 mb-3">
             <div class="section-header">
                 <div class="section-title">
@@ -316,34 +316,47 @@
                 <span class="muted small">Total WIP yang masih dipegang (semua hari)</span>
             </div>
 
-            @if ($outstanding->isEmpty())
+            @if (($outstandingDetail ?? collect())->isEmpty())
                 <div class="text-muted small">Tidak ada WIP yang outstanding.</div>
             @else
                 <div class="table-wrap">
                     <table class="table table-sm align-middle mb-0">
                         <thead>
                             <tr>
+                                <th style="width:56px;">No</th>
                                 <th>Operator</th>
+                                <th>Kode Barang</th>
+                                <th>Tanggal Ambil Jahit</th>
+                                <th class="text-end">Pickup</th>
                                 <th class="text-end">Outstanding WIP (pcs)</th>
                             </tr>
                         </thead>
                         <tbody>
-                            @foreach ($outstanding as $opId => $qty)
+                            @foreach ($outstandingDetail as $i => $row)
                                 @php
-                                    $operator = $operatorMap[$opId] ?? null;
+                                    $tgl = $row->tanggal_ambil ? \Carbon\Carbon::parse($row->tanggal_ambil) : null;
                                 @endphp
-                                @if ($operator && $qty > 0)
-                                    <tr>
-                                        <td>
-                                            <div class="fw-semibold">
-                                                {{ $operator->code }} — {{ $operator->name }}
-                                            </div>
-                                        </td>
-                                        <td class="text-end mono">
-                                            {{ number_format($qty) }}
-                                        </td>
-                                    </tr>
-                                @endif
+                                <tr>
+                                    <td class="mono text-muted">{{ $i + 1 }}</td>
+                                    <td>
+                                        <div class="fw-semibold">
+                                            {{ $row->operator_code }} — {{ $row->operator_name }}
+                                        </div>
+                                    </td>
+                                    <td>
+                                        <div class="fw-semibold mono">{{ $row->item_code }}</div>
+                                        <div class="muted small">{{ $row->item_name }}</div>
+                                    </td>
+                                    <td class="mono">
+                                        {{ $tgl ? id_date($tgl) : '-' }}
+                                    </td>
+                                    <td class="text-end mono">
+                                        {{ number_format((int) $row->picked_total) }}
+                                    </td>
+                                    <td class="text-end mono">
+                                        {{ number_format((int) $row->outstanding) }}
+                                    </td>
+                                </tr>
                             @endforeach
                         </tbody>
                     </table>
