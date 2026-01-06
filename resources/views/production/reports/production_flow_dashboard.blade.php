@@ -377,7 +377,7 @@
             </a>
 
             {{-- WIP-SEW --}}
-            <a href="{{ route('production.sewing_pickups.index') }}" class="flow-summary-link">
+            <a href="{{ route('production.sewing.pickups.index') }}" class="flow-summary-link">
                 <div class="flow-summary-tile">
                     <div class="flow-summary-label">
                         <span class="flow-dot dot-sew"></span>JAHIT

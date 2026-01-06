@@ -78,7 +78,7 @@
                 </div>
             </div>
 
-            <a href="{{ route('production.reports.outstanding') }}" class="btn btn-outline-secondary btn-sm">
+            <a href="{{ route('production.sewing.reports.outstanding') }}" class="btn btn-outline-secondary btn-sm">
                 View outstanding detail
             </a>
         </div>
@@ -227,7 +227,7 @@
                                 </td>
                                 <td class="text-end d-none d-md-table-cell">
                                     @if ($row->total_outstanding > 0)
-                                        <a href="{{ route('production.reports.outstanding', [
+                                        <a href="{{ route('production.sewing.reports.outstanding', [
                                             'operator_id' => $row->operator_id,
                                             'date_from' => $dateFrom,
                                             'date_to' => $dateTo,

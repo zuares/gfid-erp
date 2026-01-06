@@ -92,17 +92,17 @@ Route::middleware(['web', 'auth', 'role:owner,operating'])
             });
 
             // ===== Sewing Reports =====
-            Route::prefix('reports')->name('reports.')->group(function () {
-                Route::get('/operators', [SewingReportController::class, 'operatorSummary'])->name('operators');
-                Route::get('/outstanding', [SewingReportController::class, 'outstanding'])->name('outstanding');
-                Route::get('/aging-wip-sew', [SewingReportController::class, 'agingWipSew'])->name('aging_wip_sew');
-                Route::get('/productivity', [SewingReportController::class, 'productivity'])->name('productivity');
-                Route::get('/partial-pickup', [SewingReportController::class, 'partialPickup'])->name('partial_pickup');
-                Route::get('/reject-analysis', [SewingReportController::class, 'rejectAnalysis'])->name('reject_analysis');
-                Route::get('/dashboard', [SewingReportController::class, 'dailyDashboard'])->name('dashboard');
-                Route::get('/lead-time', [SewingReportController::class, 'leadTime'])->name('lead_time');
-                Route::get('/operator-behavior', [SewingReportController::class, 'operatorBehavior'])->name('operator_behavior');
-            });
+            // Route::prefix('reports')->name('reports.')->group(function () {
+            //     Route::get('/operators', [SewingReportController::class, 'operatorSummary'])->name('operators');
+            //     Route::get('/outstanding', [SewingReportController::class, 'outstanding'])->name('outstanding');
+            //     Route::get('/aging-wip-sew', [SewingReportController::class, 'agingWipSew'])->name('aging_wip_sew');
+            //     Route::get('/productivity', [SewingReportController::class, 'productivity'])->name('productivity');
+            //     Route::get('/partial-pickup', [SewingReportController::class, 'partialPickup'])->name('partial_pickup');
+            //     Route::get('/reject-analysis', [SewingReportController::class, 'rejectAnalysis'])->name('reject_analysis');
+            //     Route::get('/dashboard', [SewingReportController::class, 'dailyDashboard'])->name('dashboard');
+            //     Route::get('/lead-time', [SewingReportController::class, 'leadTime'])->name('lead_time');
+            //     Route::get('/operator-behavior', [SewingReportController::class, 'operatorBehavior'])->name('operator_behavior');
+            // });
         });
 
         /*
@@ -161,4 +161,22 @@ Route::middleware(['web', 'auth', 'role:owner,operating'])
             Route::get('finishing-jobs', [ProductionReportController::class, 'finishingJobs'])->name('finishing_jobs');
             Route::get('flow-dashboard', [ProductionReportController::class, 'productionFlowDashboard'])->name('production_flow_dashboard');
         });
+
+        /*
+    |--------------------------------------------------------------------------
+    | SEWING REPORTS (named as production.reports.*)
+    |--------------------------------------------------------------------------
+     */
+        Route::prefix('sewing/reports')->name('reports.')->group(function () {
+            Route::get('/operators', [SewingReportController::class, 'operatorSummary'])->name('operators');
+            Route::get('/outstanding', [SewingReportController::class, 'outstanding'])->name('outstanding');
+            Route::get('/aging-wip-sew', [SewingReportController::class, 'agingWipSew'])->name('aging_wip_sew');
+            Route::get('/productivity', [SewingReportController::class, 'productivity'])->name('productivity');
+            Route::get('/partial-pickup', [SewingReportController::class, 'partialPickup'])->name('partial_pickup');
+            Route::get('/reject-analysis', [SewingReportController::class, 'rejectAnalysis'])->name('reject_analysis');
+            Route::get('/dashboard', [SewingReportController::class, 'dailyDashboard'])->name('dashboard');
+            Route::get('/lead-time', [SewingReportController::class, 'leadTime'])->name('lead_time');
+            Route::get('/operator-behavior', [SewingReportController::class, 'operatorBehavior'])->name('operator_behavior');
+        });
+
     });
