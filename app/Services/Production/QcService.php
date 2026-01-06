@@ -605,4 +605,67 @@ class QcService
         return (float) $value;
     }
 
+    public function cancelCuttingQc(CuttingJob $job): void
+    {
+        DB::transaction(function () use ($job) {
+
+            // pastikan memang ada QC cutting
+            $hasQc = QcResult::query()
+                ->where('stage', QcResult::STAGE_CUTTING)
+                ->where('cutting_job_id', $job->id)
+                ->exists();
+
+            if (!$hasQc) {
+                // tidak ada QC → tidak ada yang dibatalkan
+                return;
+            }
+
+            /**
+             * 1) Reverse mutasi WIP & REJECT hasil QC
+             * Mutasi original dibuat oleh createWipFromCuttingQc() dengan:
+             * - sourceType: 'cutting_wip'
+             * - sourceType: 'cutting_reject'
+             * - sourceId  : $job->id
+             *
+             * reverseBySource akan membuat mutasi lawan arah (qty_change dibalik)
+             * dan akan gagal otomatis kalau stok sudah tidak cukup (sudah kepakai sewing/finishing).
+             */
+            $this->inventory->reverseBySource(
+                originalSourceTypes: ['cutting_wip', 'cutting_reject'],
+                originalSourceId: $job->id,
+                voidSourceType: 'cutting_qc_void',
+                voidSourceId: $job->id,
+                notesPrefix: "VOID QC CUTTING {$job->code}",
+                date: now(), // atau pakai tanggal cancel
+            );
+
+            // 2) Reset bundle QC fields supaya bisa QC ulang
+            $job->loadMissing(['bundles']);
+
+            foreach ($job->bundles as $bundle) {
+                $bundle->qty_qc_ok = 0;
+                $bundle->qty_qc_reject = 0;
+                $bundle->status = 'cut';
+
+                // penting: supaya createWipFromCuttingQc() tidak skip
+                $bundle->wip_qty = 0;
+                $bundle->wip_warehouse_id = null;
+
+                $bundle->save();
+            }
+
+            // 3) Hapus QC results cutting
+            QcResult::query()
+                ->where('stage', QcResult::STAGE_CUTTING)
+                ->where('cutting_job_id', $job->id)
+                ->delete();
+
+            // 4) Update status header kembali ke antrian QC
+            $job->update([
+                'status' => 'sent_to_qc',
+                'updated_by' => auth()->id(),
+            ]);
+        });
+    }
+
 }

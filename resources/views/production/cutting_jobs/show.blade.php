@@ -60,8 +60,8 @@
         }
 
         /* ============================
-                   STATUS STEPPER DINAMIS
-               ============================ */
+                           STATUS STEPPER DINAMIS
+                       ============================ */
         .status-stepper {
             display: flex;
             align-items: center;
@@ -131,8 +131,8 @@
         }
 
         /* ============================
-                   DESKTOP ACTIONS STYLING
-               ============================ */
+                           DESKTOP ACTIONS STYLING
+                       ============================ */
         .cutting-actions-desktop .btn {
             border-radius: 999px;
         }
@@ -160,9 +160,18 @@
             border-color: rgba(148, 163, 184, 0.7);
         }
 
+        .cutting-actions-desktop .btn-outline-danger {
+            border-color: rgba(220, 38, 38, 0.55);
+            color: rgb(220, 38, 38);
+        }
+
+        .cutting-actions-desktop .btn-outline-danger:hover {
+            background: rgba(220, 38, 38, 0.06);
+        }
+
         /* ============================
-                   MOBILE FLOATING ACTIONS (RIGHT)
-               ============================ */
+                           MOBILE FLOATING ACTIONS (RIGHT)
+                       ============================ */
         @media (max-width: 767.98px) {
             .cutting-mobile-actions {
                 position: fixed;
@@ -188,13 +197,13 @@
                 align-items: center;
                 backdrop-filter: blur(10px);
                 max-width: 78vw;
+                flex-wrap: wrap;
             }
 
             .cutting-mobile-actions-inner .btn {
                 border-radius: 999px;
                 white-space: nowrap;
                 flex: 0 0 auto;
-                /* tidak full width */
             }
 
             .cutting-mobile-actions-inner .btn-primary {
@@ -203,8 +212,8 @@
         }
 
         /* ============================
-                   BUNDLE INFO PILLS
-               ============================ */
+                           BUNDLE INFO PILLS
+                       ============================ */
         .bundle-info-pill {
             font-size: .72rem;
             font-weight: 700;
@@ -248,8 +257,8 @@
         }
 
         /* ============================
-                   BUNDLE PROGRESS BAR
-               ============================ */
+                           BUNDLE PROGRESS BAR
+                       ============================ */
         .bundle-progress {
             margin-top: .18rem;
         }
@@ -324,12 +333,15 @@
                 return $b->qcResults->where('stage', 'cutting')->isNotEmpty();
             });
 
+        // role user login
+        $userRole = auth()->user()->role ?? null;
+        $canCancelQc = $userRole === 'owner' && $hasQcCutting && Route::has('production.qc.cutting.cancel');
+
         // Cari satu operator QC (ambil dari qc_results pertama yang ada)
         $qcOperator = null;
         if ($hasQcCutting) {
             foreach ($job->bundles as $b) {
                 $qc = $b->qcResults->where('stage', 'cutting')->sortByDesc('qc_date')->first();
-
                 if ($qc && $qc->operator) {
                     $qcOperator = $qc->operator;
                     break;
@@ -349,7 +361,6 @@
         if ($hasQcCutting) {
             foreach ($job->bundles as $b) {
                 $qc = $b->qcResults->where('stage', 'cutting')->sortByDesc('qc_date')->first();
-
                 if ($qc) {
                     $qcTotalOk += $qc->qty_ok ?? 0;
                     $qcTotalReject += $qc->qty_reject ?? 0;
@@ -367,7 +378,6 @@
             ];
 
             $cfg = $statusMap[$job->status] ?? ['label' => 'QC CUTTING', 'class' => 'info'];
-
             $statusLabel = $cfg['label'];
             $statusClass = $cfg['class'];
         } else {
@@ -383,14 +393,12 @@
         }
 
         // STEP DINAMIS CUTTING → KIRIM QC → QC CUTTING
-        // step 1: Cutting, step 2: Dikirim ke QC, step 3: QC Selesai
         $status = $job->status;
         $stepCurrent = 1;
 
         if (in_array($status, ['cut', 'cut_sent_to_qc', 'sent_to_qc'])) {
             $stepCurrent = 2;
         }
-
         if ($hasQcCutting || in_array($status, ['qc_done', 'qc_ok', 'qc_mixed', 'qc_reject'])) {
             $stepCurrent = 3;
         }
@@ -423,8 +431,7 @@
                             </div>
                             <div
                                 class="status-label {{ $step1State === 'current' ? 'current' : ($step1State === 'done' ? 'done' : '') }}">
-                                Cutting
-                            </div>
+                                Cutting</div>
                         </div>
                         <div class="status-separator"></div>
                         <div class="status-step">
@@ -433,8 +440,7 @@
                             </div>
                             <div
                                 class="status-label {{ $step2State === 'current' ? 'current' : ($step2State === 'done' ? 'done' : '') }}">
-                                Kirim ke QC
-                            </div>
+                                Kirim ke QC</div>
                         </div>
                         <div class="status-separator"></div>
                         <div class="status-step">
@@ -443,8 +449,7 @@
                             </div>
                             <div
                                 class="status-label {{ $step3State === 'current' ? 'current' : ($step3State === 'done' ? 'done' : '') }}">
-                                QC Cutting
-                            </div>
+                                QC Cutting</div>
                         </div>
                     </div>
                 </div>
@@ -454,7 +459,7 @@
                         {{ $statusLabel }}
                     </span>
 
-                    <div class="d-flex gap-2 cutting-actions-desktop">
+                    <div class="d-flex gap-2 cutting-actions-desktop flex-wrap justify-content-end">
                         <a href="{{ route('production.cutting_jobs.index') }}" class="btn btn-sm btn-outline-secondary">
                             Kembali
                         </a>
@@ -462,7 +467,6 @@
                         {{-- ACTION DINAMIS BERDASARKAN STATUS --}}
                         @if (!$hasQcCutting)
                             @if (in_array($job->status, ['draft', 'cut']))
-                                {{-- Belum QC, belum dikirim ke QC --}}
                                 <a href="{{ route('production.cutting_jobs.edit', $job) }}"
                                     class="btn btn-sm btn-outline-primary">
                                     Edit Cutting
@@ -476,36 +480,46 @@
                                     </button>
                                 </form>
                             @elseif (in_array($job->status, ['cut_sent_to_qc', 'sent_to_qc']))
-                                {{-- SUDAH DIKIRIM KE QC TAPI BELUM ADA INPUT QC --}}
                                 @if (Route::has('production.qc.cutting.edit'))
                                     <a href="{{ route('production.qc.cutting.edit', $job) }}"
                                         class="btn btn-sm btn-primary">
                                         Input QC Cutting
                                     </a>
                                 @else
-                                    <button class="btn btn-sm btn-warning" disabled>
-                                        Menunggu hasil QC…
-                                    </button>
+                                    <button class="btn btn-sm btn-warning" disabled>Menunggu hasil QC…</button>
                                 @endif
                             @else
-                                <button class="btn btn-sm btn-warning" disabled>
-                                    Menunggu proses QC…
-                                </button>
+                                <button class="btn btn-sm btn-warning" disabled>Menunggu proses QC…</button>
                             @endif
                         @else
-                            {{-- SUDAH ADA QC CUTTING --}}
                             @if (Route::has('production.qc.cutting.edit'))
                                 <a href="{{ route('production.qc.cutting.edit', $job) }}" class="btn btn-sm btn-primary">
                                     Lihat / Edit QC Cutting
                                 </a>
                             @else
-                                <button class="btn btn-sm btn-primary" disabled>
-                                    QC Cutting Tersimpan
-                                </button>
+                                <button class="btn btn-sm btn-primary" disabled>QC Cutting Tersimpan</button>
+                            @endif
+
+                            {{-- ✅ CANCEL QC (OWNER ONLY) --}}
+                            @if ($canCancelQc)
+                                <form action="{{ route('production.qc.cutting.cancel', $job) }}" method="post"
+                                    class="d-inline"
+                                    onsubmit="return confirm('Batalkan QC Cutting? Sistem akan reversal mutasi QC dan QC harus diinput ulang.')">
+                                    @csrf
+                                    <button type="submit" class="btn btn-sm btn-outline-danger">
+                                        Batalkan QC
+                                    </button>
+                                </form>
                             @endif
                         @endif
                     </div>
 
+                    @if ($hasQcCutting && $userRole !== 'owner')
+                        <div class="help text-end" style="max-width:420px;">
+                            QC sudah tersimpan. Jika ada salah input setelah QC done, minta <b>OWNER</b> untuk melakukan
+                            <b>Batalkan QC</b> lalu input QC ulang.
+                        </div>
+                    @endif
                 </div>
             </div>
         </div>
@@ -530,7 +544,6 @@
                 {{ $job->warehouse?->code ?? '-' }}
             </div>
 
-            {{-- Status stepper versi singkat --}}
             <div class="status-stepper mb-2">
                 <div class="status-step">
                     <div
@@ -538,8 +551,7 @@
                     </div>
                     <div
                         class="status-label {{ $step1State === 'current' ? 'current' : ($step1State === 'done' ? 'done' : '') }}">
-                        Cutting
-                    </div>
+                        Cutting</div>
                 </div>
                 <div class="status-step">
                     <div
@@ -547,8 +559,7 @@
                     </div>
                     <div
                         class="status-label {{ $step2State === 'current' ? 'current' : ($step2State === 'done' ? 'done' : '') }}">
-                        Kirim QC
-                    </div>
+                        Kirim QC</div>
                 </div>
                 <div class="status-step">
                     <div
@@ -556,12 +567,10 @@
                     </div>
                     <div
                         class="status-label {{ $step3State === 'current' ? 'current' : ($step3State === 'done' ? 'done' : '') }}">
-                        QC Cutting
-                    </div>
+                        QC Cutting</div>
                 </div>
             </div>
 
-            {{-- Tombol kembali di header --}}
             <div class="d-flex gap-2 flex-wrap">
                 <a href="{{ route('production.cutting_jobs.index') }}" class="btn btn-sm btn-outline-secondary flex-fill">
                     Kembali
@@ -578,19 +587,13 @@
             <div class="row g-3">
                 <div class="col-md-3 col-12">
                     <div class="help mb-1">LOT</div>
-                    <div class="fw-semibold">
-                        {{ $job->lot?->code ?? '-' }}
-                    </div>
-                    <div class="small text-muted">
-                        {{ $job->lot?->item?->code ?? '-' }}
-                    </div>
+                    <div class="fw-semibold">{{ $job->lot?->code ?? '-' }}</div>
+                    <div class="small text-muted">{{ $job->lot?->item?->code ?? '-' }}</div>
                 </div>
 
                 <div class="col-md-3 col-6">
                     <div class="help mb-1">Gudang</div>
-                    <div class="mono">
-                        {{ $job->warehouse?->code }} — {{ $job->warehouse?->name }}
-                    </div>
+                    <div class="mono">{{ $job->warehouse?->code }} — {{ $job->warehouse?->name }}</div>
                 </div>
 
                 <div class="col-md-3 col-6">
@@ -609,9 +612,7 @@
             </div>
 
             @if ($job->notes)
-                <div class="mt-2 text-muted small">
-                    Catatan: {{ $job->notes }}
-                </div>
+                <div class="mt-2 text-muted small">Catatan: {{ $job->notes }}</div>
             @endif
         </div>
 
@@ -629,16 +630,12 @@
 
                 <div class="col-md-3 col-6">
                     <div class="help mb-1">Total Qty Cutting (pcs)</div>
-                    <div class="mono">
-                        {{ number_format($totalQtyPcs, 2, ',', '.') }}
-                    </div>
+                    <div class="mono">{{ number_format($totalQtyPcs, 2, ',', '.') }}</div>
                 </div>
 
                 <div class="col-md-3 col-6">
                     <div class="help mb-1">Total Pemakaian Kain</div>
-                    <div class="mono">
-                        {{ number_format($totalUsedFabric, 2, ',', '.') }}
-                    </div>
+                    <div class="mono">{{ number_format($totalUsedFabric, 2, ',', '.') }}</div>
                 </div>
 
                 @if ($hasQcCutting)
@@ -714,7 +711,6 @@
                                 $wip = (float) ($row->wip_qty ?? 0);
                                 $picked = (float) ($row->sewing_picked_qty ?? 0);
 
-                                // gunakan accessor kalau ada, fallback ke qc/qty_pcs
                                 $qtyOkAccessor = $row->qty_cutting_ok ?? null;
                                 if ($qtyOkAccessor === null) {
                                     $qtyOkAccessor = $qc?->qty_ok ?? ($row->qty_pcs ?? 0);
@@ -747,20 +743,15 @@
                                     <td class="{{ ($qc?->qty_reject ?? 0) > 0 ? 'text-danger fw-semibold' : '' }}">
                                         {{ $qc ? number_format($qc->qty_reject ?? 0, 2, ',', '.') : '0,00' }}
                                     </td>
-                                    <td>
-                                        {{ $qc ? number_format($qc->qty_ok ?? 0, 2, ',', '.') : '0,00' }}
-                                    </td>
+                                    <td>{{ $qc ? number_format($qc->qty_ok ?? 0, 2, ',', '.') : '0,00' }}</td>
                                     <td>
                                         <div class="bundle-info-wrap mb-1">
-                                            <span class="bundle-info-pill pill-primary">
-                                                WIP {{ number_format($wip, 2, ',', '.') }}
-                                            </span>
-                                            <span class="bundle-info-pill pill-warning">
-                                                Picked {{ number_format($picked, 2, ',', '.') }}
-                                            </span>
-                                            <span class="bundle-info-pill pill-success">
-                                                Ready {{ number_format($ready, 2, ',', '.') }}
-                                            </span>
+                                            <span class="bundle-info-pill pill-primary">WIP
+                                                {{ number_format($wip, 2, ',', '.') }}</span>
+                                            <span class="bundle-info-pill pill-warning">Picked
+                                                {{ number_format($picked, 2, ',', '.') }}</span>
+                                            <span class="bundle-info-pill pill-success">Ready
+                                                {{ number_format($ready, 2, ',', '.') }}</span>
                                         </div>
 
                                         @if ($basis > 0)
@@ -774,12 +765,9 @@
                                                     </div>
                                                 </div>
                                                 <div class="bundle-progress-legend mt-1">
-                                                    <span class="me-2">
-                                                        <span class="legend-box legend-picked"></span>Picked
-                                                    </span>
-                                                    <span>
-                                                        <span class="legend-box legend-ready"></span>Ready
-                                                    </span>
+                                                    <span class="me-2"><span
+                                                            class="legend-box legend-picked"></span>Picked</span>
+                                                    <span><span class="legend-box legend-ready"></span>Ready</span>
                                                 </div>
                                             </div>
                                         @endif
@@ -794,15 +782,12 @@
                                     <td>{{ number_format($row->qty_used_fabric ?? 0, 2, ',', '.') }}</td>
                                     <td>
                                         <div class="bundle-info-wrap mb-1">
-                                            <span class="bundle-info-pill pill-primary">
-                                                WIP {{ number_format($wip, 2, ',', '.') }}
-                                            </span>
-                                            <span class="bundle-info-pill pill-warning">
-                                                Picked {{ number_format($picked, 2, ',', '.') }}
-                                            </span>
-                                            <span class="bundle-info-pill pill-success">
-                                                Ready {{ number_format($ready, 2, ',', '.') }}
-                                            </span>
+                                            <span class="bundle-info-pill pill-primary">WIP
+                                                {{ number_format($wip, 2, ',', '.') }}</span>
+                                            <span class="bundle-info-pill pill-warning">Picked
+                                                {{ number_format($picked, 2, ',', '.') }}</span>
+                                            <span class="bundle-info-pill pill-success">Ready
+                                                {{ number_format($ready, 2, ',', '.') }}</span>
                                         </div>
 
                                         @if ($basis > 0)
@@ -816,12 +801,9 @@
                                                     </div>
                                                 </div>
                                                 <div class="bundle-progress-legend mt-1">
-                                                    <span class="me-2">
-                                                        <span class="legend-box legend-picked"></span>Picked
-                                                    </span>
-                                                    <span>
-                                                        <span class="legend-box legend-ready"></span>Ready
-                                                    </span>
+                                                    <span class="me-2"><span
+                                                            class="legend-box legend-picked"></span>Picked</span>
+                                                    <span><span class="legend-box legend-ready"></span>Ready</span>
                                                 </div>
                                             </div>
                                         @endif
@@ -850,7 +832,6 @@
                 <table class="table table-sm align-middle mono">
                     <thead>
                         @if ($hasQcCutting)
-                            {{-- MOBILE: sudah QC → tampilkan kode + hasil OK/Reject --}}
                             <tr>
                                 <th style="width:50px;">#</th>
                                 <th>Kode Barang</th>
@@ -858,7 +839,6 @@
                                 <th style="width:80px;">Reject</th>
                             </tr>
                         @else
-                            {{-- MOBILE: BELUM QC → #, Kode Barang, Hasil (Cutting) --}}
                             <tr>
                                 <th style="width:50px;">#</th>
                                 <th>Kode Barang</th>
@@ -890,7 +870,6 @@
                                 $readyM = (float) $readyAccM;
 
                                 $basisM = max($qtyOkM, $wipM, $pickedM, $readyM);
-
                                 if ($basisM <= 0) {
                                     $pickedPercentM = 0;
                                     $readyPercentM = 0;
@@ -969,9 +948,9 @@
         {{-- =========================
              MOBILE: AKSI FLOATING DI KANAN BAWAH
         ========================== --}}
-        @if (!$hasQcCutting)
-            <div class="cutting-mobile-actions d-block d-md-none">
-                <div class="cutting-mobile-actions-inner">
+        <div class="cutting-mobile-actions d-block d-md-none">
+            <div class="cutting-mobile-actions-inner">
+                @if (!$hasQcCutting)
                     @if (in_array($job->status, ['draft', 'cut']))
                         <a href="{{ route('production.cutting_jobs.edit', $job) }}"
                             class="btn btn-sm btn-outline-primary">
@@ -980,9 +959,7 @@
 
                         <form action="{{ route('production.cutting_jobs.send_to_qc', $job) }}" method="post">
                             @csrf
-                            <button type="submit" class="btn btn-sm btn-primary">
-                                Kirim QC
-                            </button>
+                            <button type="submit" class="btn btn-sm btn-primary">Kirim QC</button>
                         </form>
                     @elseif (in_array($job->status, ['cut_sent_to_qc', 'sent_to_qc']))
                         @if (Route::has('production.qc.cutting.edit'))
@@ -990,20 +967,110 @@
                                 Input QC
                             </a>
                         @else
-                            <button type="button" class="btn btn-sm btn-warning" disabled>
-                                Menunggu QC…
-                            </button>
+                            <button type="button" class="btn btn-sm btn-warning" disabled>Menunggu QC…</button>
                         @endif
                     @else
-                        <button type="button" class="btn btn-sm btn-warning" disabled>
-                            Menunggu proses QC…
-                        </button>
+                        <button type="button" class="btn btn-sm btn-warning" disabled>Menunggu proses QC…</button>
                     @endif
-                </div>
+                @else
+                    @if (Route::has('production.qc.cutting.edit'))
+                        <a href="{{ route('production.qc.cutting.edit', $job) }}" class="btn btn-sm btn-primary">
+                            QC
+                        </a>
+                    @endif
+
+                    @if ($canCancelQc)
+                        <form action="{{ route('production.qc.cutting.cancel', $job) }}" method="post"
+                            onsubmit="return confirm('Batalkan QC Cutting? Sistem akan reversal mutasi QC dan QC harus diinput ulang.')">
+                            @csrf
+                            <button type="submit" class="btn btn-sm btn-outline-danger">
+                                Batalkan
+                            </button>
+                        </form>
+                    @endif
+                @endif
             </div>
-        @endif
+        </div>
 
     </div>
+
+    @if (session('qc_cancel_ui'))
+        @php($ui = session('qc_cancel_ui'))
+        @php($action = $ui['action'] ?? null)
+
+        {{-- Toast container --}}
+        <div class="toast-container position-fixed top-0 end-0 p-3" style="z-index: 2000;">
+            <div id="qcCancelToast" class="toast align-items-center text-bg-danger border-0" role="alert"
+                aria-live="assertive" aria-atomic="true" data-bs-autohide="false">
+                <div class="d-flex">
+                    <div class="toast-body">
+                        <div class="fw-semibold">{{ $ui['toast'] ?? 'Cancel QC gagal.' }}</div>
+                        <div class="small opacity-75">Klik Detail untuk lihat penyebab & solusi.</div>
+                    </div>
+
+                    <div class="d-flex align-items-center gap-2 pe-2">
+                        @if ($action)
+                            <a href="{{ route($action['route'], ...$action['params']) }}" class="btn btn-sm btn-light">
+                                Buka Sewing Pickup
+                            </a>
+                        @endif
+
+                        <button type="button" class="btn btn-sm btn-outline-light" data-bs-toggle="modal"
+                            data-bs-target="#qcCancelDetailModal">
+                            Detail
+                        </button>
+
+                        <button type="button" class="btn-close btn-close-white me-1 m-auto" data-bs-dismiss="toast"
+                            aria-label="Close"></button>
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        {{-- Modal detail --}}
+        <div class="modal fade" id="qcCancelDetailModal" tabindex="-1" aria-hidden="true">
+            <div class="modal-dialog modal-dialog-centered">
+                <div class="modal-content">
+                    <div class="modal-header">
+                        <h5 class="modal-title">{{ $ui['title'] ?? 'Detail Cancel QC' }}</h5>
+                        <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
+                    </div>
+
+                    <div class="modal-body">
+                        <ul class="mb-0">
+                            @foreach ($ui['lines'] ?? [] as $line)
+                                <li>{{ $line }}</li>
+                            @endforeach
+                        </ul>
+                    </div>
+
+                    <div class="modal-footer">
+                        @if ($action)
+                            <a href="{{ route($action['route'], ...$action['params']) }}" class="btn btn-primary">
+                                Buka Sewing Pickup
+                            </a>
+                        @endif
+                        <button type="button" class="btn btn-outline-secondary" data-bs-dismiss="modal">
+                            Tutup
+                        </button>
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        @push('scripts')
+            <script>
+                document.addEventListener('DOMContentLoaded', function() {
+                    const el = document.getElementById('qcCancelToast');
+                    if (!el) return;
+
+                    const toast = bootstrap.Toast.getOrCreateInstance(el);
+                    toast.show();
+                });
+            </script>
+        @endpush
+    @endif
+
 @endsection
 
 @push('scripts')

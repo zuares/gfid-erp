@@ -8,8 +8,10 @@ use App\Models\QcResult;
 use App\Models\SewingReturn;
 use App\Services\Production\CuttingService;
 use App\Services\Production\QcService;
+use Illuminate\Http\RedirectResponse;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Auth;
+use Illuminate\Support\Facades\DB;
 
 class QcController extends Controller
 {
@@ -181,6 +183,197 @@ class QcController extends Controller
         return redirect()
             ->route('production.cutting_jobs.show', $cuttingJob)
             ->with('success', 'QC Cutting berhasil disimpan & WIP-CUT sudah dibuat.');
+    }
+
+    public function cancelCutting(CuttingJob $cuttingJob): RedirectResponse
+    {
+        $role = Auth::user()->role ?? null;
+        if ($role !== 'owner') {
+            return back()->with('error', 'Hanya OWNER yang boleh membatalkan QC.');
+        }
+
+        try {
+            $this->qc->cancelCuttingQc($cuttingJob);
+        } catch (\Throwable $e) {
+            $payload = $this->buildCancelQcUiPayload($e, $cuttingJob);
+
+            // toast message singkat + data detail untuk modal
+            return back()
+                ->with('qc_cancel_ui', $payload)
+                ->with('error', $payload['toast'] ?? 'Cancel QC gagal.');
+        }
+
+        return redirect()
+            ->route('production.cutting_jobs.show', $cuttingJob)
+            ->with('success', 'QC Cutting dibatalkan. Silakan QC ulang.');
+    }
+
+    private function humanizeCancelCuttingQcError(\Throwable $e, CuttingJob $job): string
+    {
+        $raw = trim((string) $e->getMessage());
+
+        // Pola error inventory service kamu
+        $ok = preg_match(
+            '/Stok tidak mencukupi untuk item\s+(\d+)\s+di gudang\s+(\d+)\.\s*Stok:\s*([0-9\.,]+),\s*mau keluar:\s*([0-9\.,]+)/i',
+            $raw,
+            $m
+        );
+
+        // Kalau bukan kasus stok, fallback normal
+        if (!$ok) {
+            return "Cancel QC gagal: " . $raw;
+        }
+
+        [$all, $itemId, $warehouseId, $stok, $need] = $m;
+
+        // Cari "penyebab utama" yang paling membantu user:
+        // ambil transaksi Sewing Pickup yang BELUM VOID yang paling baru untuk warehouse+item ini
+        $pickup = DB::table('inventory_mutations as m')
+            ->join('sewing_pickups as sp', function ($j) {
+                $j->on('sp.id', '=', 'm.source_id')
+                    ->where('m.source_type', '=', 'App\Models\SewingPickup');
+            })
+            ->select([
+                'm.id',
+                'm.qty_change',
+                'm.notes',
+                'sp.code as pickup_code',
+                'sp.voided_at',
+            ])
+            ->where('m.warehouse_id', (int) $warehouseId)
+            ->where('m.item_id', (int) $itemId)
+            ->where('m.qty_change', '<', 0)
+            ->whereNull('sp.voided_at') // ✅ hanya yang BELUM VOID
+            ->orderByDesc('m.date')
+            ->orderByDesc('m.id')
+            ->first();
+
+        // Kalau tidak ada Sewing Pickup aktif, fallback cari transaksi aktif apa pun yang paling baru
+        $other = null;
+        if (!$pickup) {
+            $other = DB::table('inventory_mutations as m')
+                ->select(['m.source_type', 'm.source_id', 'm.qty_change', 'm.notes', 'm.id'])
+                ->where('m.warehouse_id', (int) $warehouseId)
+                ->where('m.item_id', (int) $itemId)
+                ->where('m.qty_change', '<', 0)
+                ->whereNotIn('m.source_type', ['cutting_wip', 'cutting_reject', 'cutting_qc_void'])
+                ->orderByDesc('m.date')
+                ->orderByDesc('m.id')
+                ->first();
+        }
+
+        // ✅ Pesan SIMPLE (satu layar)
+        $msg =
+            "Cancel QC gagal — hasil QC sudah dipakai\n\n"
+            . "Cutting Job: {$job->code}\n"
+            . "Gudang: {$warehouseId}\n"
+            . "Item: {$itemId}\n"
+            . "Stok tersedia: {$stok}\n"
+            . "Dibutuhkan: {$need}\n\n";
+
+        if ($pickup) {
+            $code = $pickup->pickup_code ?: '(kode tidak ditemukan)';
+            $msg .=
+                "Penyebab:\n"
+                . "Sewing Pickup {$code} (belum void)\n\n"
+                . "Solusi:\n"
+                . "1) Void Sewing Pickup {$code}\n"
+                . "2) Setelah stok kembali, ulangi Cancel QC";
+            return $msg;
+        }
+
+        if ($other) {
+            $label = "{$other->source_type} #{$other->source_id}";
+            $msg .=
+                "Penyebab:\n"
+                . "{$label}\n\n"
+                . "Solusi:\n"
+                . "1) Void / batalkan transaksi di atas\n"
+                . "2) Setelah stok kembali, ulangi Cancel QC";
+            return $msg;
+        }
+
+        // fallback paling aman
+        return "Cancel QC gagal: " . $raw;
+    }
+
+    private function buildCancelQcUiPayload(\Throwable $e, CuttingJob $job): array
+    {
+        $raw = trim((string) $e->getMessage());
+
+        $ok = preg_match(
+            '/Stok tidak mencukupi untuk item\s+(\d+)\s+di gudang\s+(\d+)\.\s*Stok:\s*([0-9\.,]+),\s*mau keluar:\s*([0-9\.,]+)/i',
+            $raw,
+            $m
+        );
+
+        // fallback kalau bukan kasus stok
+        if (!$ok) {
+            return [
+                'type' => 'error',
+                'toast' => 'Cancel QC gagal.',
+                'title' => 'Cancel QC gagal',
+                'lines' => [$raw],
+                'action' => null,
+            ];
+        }
+
+        [$all, $itemId, $warehouseId, $stok, $need] = $m;
+
+        // cari Sewing Pickup BELUM VOID paling baru yang menghabiskan stok item+warehouse ini
+        $pickup = DB::table('inventory_mutations as m')
+            ->join('sewing_pickups as sp', function ($j) {
+                $j->on('sp.id', '=', 'm.source_id')
+                    ->where('m.source_type', '=', 'App\Models\SewingPickup');
+            })
+            ->select([
+                'sp.id as pickup_id',
+                'sp.code as pickup_code',
+                'm.qty_change',
+                'm.notes',
+            ])
+            ->where('m.warehouse_id', (int) $warehouseId)
+            ->where('m.item_id', (int) $itemId)
+            ->where('m.qty_change', '<', 0)
+            ->whereNull('sp.voided_at')
+            ->orderByDesc('m.date')
+            ->orderByDesc('m.id')
+            ->first();
+
+        $toast = 'Cancel QC gagal — hasil QC sudah dipakai.';
+        $title = 'Cancel QC gagal';
+
+        $lines = [
+            "Cutting Job: {$job->code}",
+            "Gudang: {$warehouseId}",
+            "Item: {$itemId}",
+            "Stok tersedia: {$stok}",
+            "Dibutuhkan: {$need}",
+        ];
+
+        $action = null;
+
+        if ($pickup) {
+            $code = $pickup->pickup_code ?: "ID {$pickup->pickup_id}";
+            $lines[] = "Penyebab: Sewing Pickup {$code} (belum void)";
+            $lines[] = "Solusi: Void Sewing Pickup → lalu ulangi Cancel QC";
+
+            $action = [
+                'label' => "Buka {$code}",
+                'route' => 'production.sewing.pickups.show',
+                'params' => [$pickup->pickup_id],
+            ];
+        } else {
+            $lines[] = "Solusi: Void transaksi yang memakai stok item ini → lalu ulangi Cancel QC";
+        }
+
+        return [
+            'type' => 'error',
+            'toast' => $toast,
+            'title' => $title,
+            'lines' => $lines,
+            'action' => $action,
+        ];
     }
 
 }

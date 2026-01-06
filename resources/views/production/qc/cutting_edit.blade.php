@@ -198,7 +198,6 @@
                 display: none;
             }
 
-            /* LOT usage table putih di mobile juga */
             .lot-usage-table tbody tr {
                 background: #ffffff;
             }
@@ -231,7 +230,7 @@
         // untuk cek error bag
         $isErrorBag = $errors instanceof \Illuminate\Support\ViewErrorBag;
 
-        // default tanggal QC (kalau ada field di model, bisa ganti di sini)
+        // default tanggal QC
         $defaultQcDate = old('qc_date', optional($cuttingJob->qc_date ?? ($cuttingJob->date ?? now()))->toDateString());
 
         $statusClass =
@@ -256,6 +255,22 @@
         $step1State = $stepCurrent >= 1 ? ($stepCurrent === 1 ? 'current' : 'done') : '';
         $step2State = $stepCurrent >= 2 ? ($stepCurrent === 2 ? 'current' : 'done') : '';
         $step3State = $stepCurrent >= 3 ? ($stepCurrent === 3 ? 'current' : 'done') : '';
+
+        // ✅ deteksi sudah ada QC (berdasarkan status + rows)
+        $hasExistingQc = in_array($cuttingJob->status, ['qc_ok', 'qc_mixed', 'qc_reject', 'qc_done']);
+        if (!$hasExistingQc && isset($rows) && is_array($rows)) {
+            foreach ($rows as $r) {
+                $st = $r['status'] ?? null;
+                $ok = (float) ($r['qty_ok'] ?? 0);
+                $rej = (float) ($r['qty_reject'] ?? 0);
+                if (in_array($st, ['qc_ok', 'qc_mixed', 'qc_reject']) || $ok > 0 || $rej > 0) {
+                    $hasExistingQc = true;
+                    break;
+                }
+            }
+        }
+
+        $canCancelQc = $userRole === 'owner' && $hasExistingQc && Route::has('production.qc.cutting.cancel');
     @endphp
 
     <div class="qc-cutting-page">
@@ -293,8 +308,7 @@
                                 </div>
                                 <div
                                     class="status-label {{ $step1State === 'current' ? 'current' : ($step1State === 'done' ? 'done' : '') }}">
-                                    Cutting Selesai
-                                </div>
+                                    Cutting Selesai</div>
                             </div>
                             <div class="status-separator"></div>
                             <div class="status-step">
@@ -303,8 +317,7 @@
                                 </div>
                                 <div
                                     class="status-label {{ $step2State === 'current' ? 'current' : ($step2State === 'done' ? 'done' : '') }}">
-                                    Dikirim ke QC
-                                </div>
+                                    Dikirim ke QC</div>
                             </div>
                             <div class="status-separator"></div>
                             <div class="status-step">
@@ -313,8 +326,7 @@
                                 </div>
                                 <div
                                     class="status-label {{ $step3State === 'current' ? 'current' : ($step3State === 'done' ? 'done' : '') }}">
-                                    Hasil QC
-                                </div>
+                                    Hasil QC</div>
                             </div>
                         </div>
                     </div>
@@ -324,18 +336,35 @@
                             {{ strtoupper($cuttingJob->status) }}
                         </span>
 
-                        <div class="d-flex gap-2">
+                        <div class="d-flex gap-2 flex-wrap justify-content-end">
                             <a href="{{ route('production.cutting_jobs.show', $cuttingJob) }}"
                                 class="btn btn-sm btn-outline-secondary">
                                 Kembali
                             </a>
+
+                            {{-- ✅ CANCEL QC (OWNER ONLY) --}}
+                            @if ($canCancelQc)
+                                <form action="{{ route('production.qc.cutting.cancel', $cuttingJob) }}" method="post"
+                                    onsubmit="return confirm('Batalkan QC Cutting? Sistem akan reversal mutasi QC dan QC harus diinput ulang.')">
+                                    @csrf
+                                    <button type="submit" class="btn btn-sm btn-outline-danger">
+                                        Batalkan QC
+                                    </button>
+                                </form>
+                            @endif
                         </div>
+
+                        @if ($hasExistingQc && $userRole !== 'owner')
+                            <div class="small-muted text-end" style="max-width:420px;">
+                                QC sudah tersimpan. Jika ada salah input setelah QC done, minta <b>OWNER</b> untuk
+                                <b>Batalkan QC</b> lalu input QC ulang.
+                            </div>
+                        @endif
                     </div>
                 </div>
 
                 {{-- HEADER MOBILE --}}
                 <div class="d-block d-md-none">
-                    {{-- Baris utama: judul + kode + badge --}}
                     <div class="d-flex justify-content-between align-items-center mb-1">
                         <div>
                             <div class="small text-muted">QC Cutting</div>
@@ -346,7 +375,6 @@
                         </span>
                     </div>
 
-                    {{-- Info LOT & gudang satu baris --}}
                     <div class="small-muted mb-2">
                         LOT {{ $lot?->code ?? '-' }} • {{ $lot?->item?->code ?? '-' }}
                         @if ($warehouse)
@@ -354,7 +382,6 @@
                         @endif
                     </div>
 
-                    {{-- Stepper inline --}}
                     <div class="status-stepper mb-2">
                         <div class="status-step">
                             <div
@@ -362,8 +389,7 @@
                             </div>
                             <div
                                 class="status-label {{ $step1State === 'current' ? 'current' : ($step1State === 'done' ? 'done' : '') }}">
-                                Cutting
-                            </div>
+                                Cutting</div>
                         </div>
                         <div class="status-step">
                             <div
@@ -371,8 +397,7 @@
                             </div>
                             <div
                                 class="status-label {{ $step2State === 'current' ? 'current' : ($step2State === 'done' ? 'done' : '') }}">
-                                Kirim QC
-                            </div>
+                                Kirim QC</div>
                         </div>
                         <div class="status-step">
                             <div
@@ -380,17 +405,26 @@
                             </div>
                             <div
                                 class="status-label {{ $step3State === 'current' ? 'current' : ($step3State === 'done' ? 'done' : '') }}">
-                                Hasil QC
-                            </div>
+                                Hasil QC</div>
                         </div>
                     </div>
 
-                    {{-- Tombol kembali full width --}}
-                    <div class="d-flex gap-2">
+                    <div class="d-flex gap-2 flex-wrap">
                         <a href="{{ route('production.cutting_jobs.show', $cuttingJob) }}"
                             class="btn btn-sm btn-outline-secondary flex-fill">
                             Kembali
                         </a>
+
+                        @if ($canCancelQc)
+                            <form action="{{ route('production.qc.cutting.cancel', $cuttingJob) }}" method="post"
+                                class="flex-fill"
+                                onsubmit="return confirm('Batalkan QC Cutting? Sistem akan reversal mutasi QC dan QC harus diinput ulang.')">
+                                @csrf
+                                <button type="submit" class="btn btn-sm btn-outline-danger w-100">
+                                    Batalkan QC
+                                </button>
+                            </form>
+                        @endif
                     </div>
                 </div>
             </div>
@@ -412,19 +446,11 @@
                         <div class="d-flex justify-content-between align-items-center mb-2">
                             <div class="section-title mb-0">Header QC</div>
 
-                            {{-- Desktop summary --}}
                             <div class="d-none d-md-flex gap-2">
-                                <div class="pill">
-                                    <span>Total OK</span>
-                                    <span class="mono" id="sum-ok">0</span>
-                                </div>
-                                <div class="pill">
-                                    <span>Reject</span>
-                                    <span class="mono" id="sum-reject">0</span>
-                                </div>
+                                <div class="pill"><span>Total OK</span> <span class="mono" id="sum-ok">0</span></div>
+                                <div class="pill"><span>Reject</span> <span class="mono" id="sum-reject">0</span></div>
                             </div>
 
-                            {{-- Mobile summary inline --}}
                             <div class="d-block d-md-none text-end">
                                 <div class="qc-summary-inline justify-content-end">
                                     <span>Total OK <span class="mono" id="sum-ok-mobile">0</span></span>
@@ -450,12 +476,9 @@
 
                             <div class="col-md-4 col-12">
                                 <label class="field-label mb-1">Operator QC</label>
-
                                 <input type="hidden" name="operator_id" value="{{ $defaultOperatorId }}">
-
                                 <input type="text" class="form-control {{ $operatorError ? 'is-invalid' : '' }}"
                                     value="{{ $defaultOperatorLabel }}" disabled>
-
                                 @if ($operatorError)
                                     <div class="invalid-feedback d-block">{{ $operatorError }}</div>
                                 @endif
@@ -476,9 +499,8 @@
                     </div>
 
                     <div class="table-wrap">
-                        @php
-                            $hasAnyReject = false;
-                        @endphp
+                        @php $hasAnyReject = false; @endphp
+
                         <table class="table table-sm align-middle mono qc-table qc-table-mobile">
                             <thead>
                                 <tr>
@@ -517,6 +539,7 @@
                                         $reasonError = $isErrorBag ? $errors->first($fieldReason) : null;
                                         $notesError = $isErrorBag ? $errors->first($fieldNotes) : null;
                                     @endphp
+
                                     <tr class="{{ $qtyReject > 0 ? 'row-has-reject' : '' }}">
                                         <input type="hidden" name="results[{{ $i }}][cutting_job_bundle_id]"
                                             value="{{ $row['cutting_job_bundle_id'] }}">
@@ -525,9 +548,7 @@
                                             class="input-ok-hidden" value="{{ old("results.$i.qty_ok", $qtyOk) }}">
 
                                         <td class="qc-card-header">
-                                            <div class="fw-semibold mono">
-                                                #{{ $i + 1 }}
-                                            </div>
+                                            <div class="fw-semibold mono">#{{ $i + 1 }}</div>
                                             <div class="small-muted mono d-none d-md-block">
                                                 Bundle #{{ $row['bundle_no'] ?? '-' }}
                                                 {{ $row['bundle_code'] ? '· ' . $row['bundle_code'] : '' }}
@@ -536,28 +557,18 @@
 
                                         <td>
                                             <div class="d-none d-md-block">
-                                                <div class="fw-semibold mono">
-                                                    {{ $row['item_code'] }}
-                                                </div>
+                                                <div class="fw-semibold mono">{{ $row['item_code'] }}</div>
                                             </div>
-                                            <div class="d-block d-md-none">
-                                                {{ $row['item_code'] }}
-                                            </div>
+                                            <div class="d-block d-md-none">{{ $row['item_code'] }}</div>
                                         </td>
 
-                                        {{-- CUT integer --}}
+                                        <td class="text-end">{{ number_format($qtyBundle, 0, ',', '.') }}</td>
+
                                         <td class="text-end">
-                                            {{ number_format($qtyBundle, 0, ',', '.') }}
+                                            <span
+                                                class="cell-ok">{{ number_format(old("results.$i.qty_ok", $qtyOk), 0, ',', '.') }}</span>
                                         </td>
 
-                                        {{-- OK integer --}}
-                                        <td class="text-end">
-                                            <span class="cell-ok">
-                                                {{ number_format(old("results.$i.qty_ok", $qtyOk), 0, ',', '.') }}
-                                            </span>
-                                        </td>
-
-                                        {{-- REJECT: input number integer --}}
                                         <td class="text-center">
                                             <input type="number" step="1" min="0" inputmode="numeric"
                                                 pattern="\d*" name="results[{{ $i }}][qty_reject]"
@@ -590,9 +601,7 @@
                                                         'qc_mixed' => 'warning',
                                                     ][$st] ?? 'secondary';
                                             @endphp
-                                            <span class="badge-soft bg-{{ $cls }}">
-                                                {{ $st }}
-                                            </span>
+                                            <span class="badge-soft bg-{{ $cls }}">{{ $st }}</span>
                                         </td>
 
                                         <td class="d-none d-md-table-cell">
@@ -609,9 +618,7 @@
                         </table>
                     </div>
 
-                    @php
-                        $resultsError = $isErrorBag ? $errors->first('results') : null;
-                    @endphp
+                    @php $resultsError = $isErrorBag ? $errors->first('results') : null; @endphp
                     @if ($resultsError)
                         <div class="text-danger small mt-2">{{ $resultsError }}</div>
                     @endif
@@ -652,6 +659,7 @@
                                         @php
                                             $lotModel = $jobLot->lot;
                                             $planned = (float) $jobLot->planned_fabric_qty;
+
                                             $usedOld = old(
                                                 "lots.$i.used_fabric_qty",
                                                 $jobLot->used_fabric_qty ?: $planned,
@@ -663,6 +671,7 @@
                                             if ($planned > 0 && $used > $planned) {
                                                 $used = $planned;
                                             }
+
                                             $balance = $planned - $used;
 
                                             $fieldUsed = "lots.$i.used_fabric_qty";
@@ -674,24 +683,17 @@
                                                 value="{{ $jobLot->id }}">
 
                                             <td>
-                                                <div class="fw-semibold">
-                                                    {{ $lotModel?->code ?? 'LOT ?' }}
-                                                </div>
+                                                <div class="fw-semibold">{{ $lotModel?->code ?? 'LOT ?' }}</div>
                                                 <div class="small-muted d-none d-md-block">
-                                                    {{ $lotModel?->item?->code ?? '-' }}
-                                                </div>
+                                                    {{ $lotModel?->item?->code ?? '-' }}</div>
                                             </td>
 
                                             <td class="d-none d-md-table-cell">
                                                 <div>{{ $lotModel?->item?->name ?? '-' }}</div>
-                                                <div class="small-muted">
-                                                    Gudang {{ $warehouse?->code ?? '-' }}
-                                                </div>
+                                                <div class="small-muted">Gudang {{ $warehouse?->code ?? '-' }}</div>
                                             </td>
 
-                                            <td class="text-end">
-                                                {{ number_format($planned, 2, ',', '.') }}
-                                            </td>
+                                            <td class="text-end">{{ number_format($planned, 2, ',', '.') }}</td>
 
                                             <td class="text-end">
                                                 <x-number-input name="lots[{{ $i }}][used_fabric_qty]"
@@ -704,9 +706,8 @@
                                             </td>
 
                                             <td class="text-end d-none d-md-table-cell">
-                                                <span class="lot-balance-desktop">
-                                                    {{ number_format($balance, 2, ',', '.') }}
-                                                </span>
+                                                <span
+                                                    class="lot-balance-desktop">{{ number_format($balance, 2, ',', '.') }}</span>
                                             </td>
                                         </tr>
                                     @endforeach
@@ -714,9 +715,7 @@
                             </table>
                         </div>
 
-                        @php
-                            $lotsError = $isErrorBag ? $errors->first('lots') : null;
-                        @endphp
+                        @php $lotsError = $isErrorBag ? $errors->first('lots') : null; @endphp
                         @if ($lotsError)
                             <div class="text-danger small mt-2">{{ $lotsError }}</div>
                         @endif
@@ -728,7 +727,7 @@
                 @endif
 
                 {{-- ACTIONS DESKTOP --}}
-                <div class="d-none d-md-flex justify-content-end mb-5 gap-2">
+                <div class="d-none d-md-flex justify-content-end mb-5 gap-2 flex-wrap">
                     <a href="{{ route('production.cutting_jobs.show', $cuttingJob) }}" class="btn btn-outline-secondary">
                         Batal
                     </a>
@@ -750,6 +749,7 @@
                     </div>
                 </div>
             </form>
+
         </div>
     </div>
 @endsection
@@ -768,7 +768,6 @@
                 input.addEventListener('focus', function() {
                     setTimeout(() => this.select(), 0);
                 });
-
                 input.addEventListener('mouseup', function(e) {
                     e.preventDefault();
                 });
@@ -799,18 +798,14 @@
                     }
 
                     const ok = maxBundle - rej;
-
                     if (okHidden) okHidden.value = ok;
                     if (okCell) okCell.textContent = formatInt(Math.round(ok));
 
                     totalOk += ok;
                     totalReject += rej;
 
-                    if (rej > 0) {
-                        tr.classList.add('row-has-reject');
-                    } else {
-                        tr.classList.remove('row-has-reject');
-                    }
+                    if (rej > 0) tr.classList.add('row-has-reject');
+                    else tr.classList.remove('row-has-reject');
                 });
 
                 const okInt = Math.round(totalOk);
@@ -821,15 +816,12 @@
                 if (sumOkMobileSpan) sumOkMobileSpan.textContent = formatInt(okInt);
                 if (sumRejectMobileSpan) sumRejectMobileSpan.textContent = formatInt(rejInt);
 
-                if (warningEl) {
-                    warningEl.style.display = anyOver ? 'block' : 'none';
-                }
+                if (warningEl) warningEl.style.display = anyOver ? 'block' : 'none';
             }
 
             inputsReject.forEach(i => {
                 attachSelectAllOnFocus(i);
                 i.addEventListener('input', recalcTotals);
-
                 i.addEventListener('focus', () => {
                     i.scrollIntoView({
                         behavior: 'smooth',
@@ -879,15 +871,12 @@
                     if (!tr) return;
 
                     const balDesktop = tr.querySelector('.lot-balance-desktop');
-
                     const text = balance.toFixed(2).replace('.', ',');
 
                     if (balDesktop) balDesktop.textContent = text;
                 });
 
-                if (lotWarningEl) {
-                    lotWarningEl.style.display = anyOver ? 'block' : 'none';
-                }
+                if (lotWarningEl) lotWarningEl.style.display = anyOver ? 'block' : 'none';
             }
 
             lotInputs.forEach(input => {

@@ -45,6 +45,8 @@ Route::middleware(['web', 'auth', 'role:owner,operating'])
         Route::prefix('qc')->name('qc.')->group(function () {
             Route::get('/cutting/{cuttingJob}/edit', [QcController::class, 'editCutting'])->name('cutting.edit');
             Route::put('/cutting/{cuttingJob}', [QcController::class, 'updateCutting'])->name('cutting.update');
+            Route::post('/cutting/{cuttingJob}/cancel', [QcController::class, 'cancelCutting'])
+                ->name('cutting.cancel');
         });
 
         /*
