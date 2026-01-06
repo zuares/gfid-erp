@@ -109,7 +109,7 @@
 
         @media (min-width: 768px) {
             .kpi-grid {
-                grid-template-columns: repeat(4, minmax(0, 1fr));
+                grid-template-columns: repeat(5, minmax(0, 1fr));
             }
         }
     </style>
@@ -126,9 +126,7 @@
             <div>
                 <div class="d-flex align-items-center gap-2 mb-1">
                     <h1 class="h5 mb-0">Dashboard Harian Sewing</h1>
-                    <span class="badge-soft mono">
-                        {{ id_date($selectedDate) }}
-                    </span>
+                    <span class="badge-soft mono">{{ id_date($selectedDate) }}</span>
                 </div>
                 <div class="muted">
                     Ringkasan performa jahit & status WIP untuk tanggal yang dipilih.
@@ -139,9 +137,7 @@
                     <span class="chip-dot"></span>
                     <span class="mono small">Auto-refresh 10 menit</span>
                 </div>
-                <div class="muted small">
-                    Update terakhir: {{ now()->format('H:i') }}
-                </div>
+                <div class="muted small">Update terakhir: {{ now()->format('H:i') }}</div>
             </div>
         </div>
 
@@ -181,12 +177,9 @@
                 </div>
 
                 <div class="col-12 col-md-3 d-flex gap-2">
-                    <button type="submit" class="btn btn-sm btn-primary flex-grow-1">
-                        Terapkan Filter
-                    </button>
-                    <a href="{{ route('production.reports.dashboard') }}" class="btn btn-sm btn-outline-secondary">
-                        Reset
-                    </a>
+                    <button type="submit" class="btn btn-sm btn-primary flex-grow-1">Terapkan Filter</button>
+                    <a href="{{ route('production.reports.dashboard') }}"
+                        class="btn btn-sm btn-outline-secondary">Reset</a>
                 </div>
             </form>
         </div>
@@ -195,33 +188,31 @@
         <div class="kpi-grid mb-3">
             <div class="card stat-card">
                 <div class="stat-label">Pickup</div>
-                <div class="stat-value mono text-primary">
-                    {{ number_format($totalPickupToday) }}
-                </div>
+                <div class="stat-value mono text-primary">{{ number_format($totalPickupToday) }}</div>
                 <div class="stat-sub">Bundle/pcs diambil operator sewing</div>
             </div>
 
             <div class="card stat-card">
                 <div class="stat-label">Return OK</div>
-                <div class="stat-value mono text-success">
-                    {{ number_format($totalReturnOkToday) }}
-                </div>
+                <div class="stat-value mono text-success">{{ number_format($totalReturnOkToday) }}</div>
                 <div class="stat-sub">Selesai jahit & dinyatakan OK</div>
             </div>
 
             <div class="card stat-card">
+                <div class="stat-label">Masuk WIP-FIN (Setor)</div>
+                <div class="stat-value mono text-success">{{ number_format($wipFinInToday ?? 0) }}</div>
+                <div class="stat-sub">Barang OK yang disetor ke WIP-FIN</div>
+            </div>
+
+            <div class="card stat-card">
                 <div class="stat-label">Reject</div>
-                <div class="stat-value mono text-danger">
-                    {{ number_format($totalRejectToday) }}
-                </div>
+                <div class="stat-value mono text-danger">{{ number_format($totalRejectToday) }}</div>
                 <div class="stat-sub">Butuh rework / scrap</div>
             </div>
 
             <div class="card stat-card">
                 <div class="stat-label">Outstanding WIP</div>
-                <div class="stat-value mono text-warning">
-                    {{ number_format($totalOutstanding ?? 0) }}
-                </div>
+                <div class="stat-value mono text-warning">{{ number_format($totalOutstanding ?? 0) }}</div>
                 <div class="stat-sub">Masih dipegang operator (akumulasi)</div>
             </div>
         </div>
@@ -236,7 +227,7 @@
                             <span class="icon">📉</span>
                             <span>Output OK per Jam</span>
                         </div>
-                        <span class="muted small">Berdasarkan Sewing Return di tanggal terpilih</span>
+                        <span class="muted small">Berdasarkan Sewing Return (non-void)</span>
                     </div>
                     <div style="height: 260px;">
                         <canvas id="sewingHourlyChart"></canvas>
@@ -257,12 +248,8 @@
                     @if ($topOperator)
                         <div class="d-flex justify-content-between align-items-center">
                             <div>
-                                <div class="fw-semibold">
-                                    {{ $topOperator->code }} — {{ $topOperator->name }}
-                                </div>
-                                <div class="muted small">
-                                    Output OK terbanyak di tanggal ini
-                                </div>
+                                <div class="fw-semibold">{{ $topOperator->code }} — {{ $topOperator->name }}</div>
+                                <div class="muted small">Output OK terbanyak di tanggal ini</div>
                             </div>
                             <div class="text-end">
                                 <div class="stat-value mono text-success" style="font-size: 1.3rem;">
@@ -306,14 +293,14 @@
             </div>
         </div>
 
-        {{-- Outstanding per Operator (dengan detail barang + tanggal + pickup) --}}
+        {{-- Outstanding per Operator (detail barang + tanggal + pickup) --}}
         <div class="card p-3 mb-3">
             <div class="section-header">
                 <div class="section-title">
                     <span class="icon">🧵</span>
                     <span>Outstanding WIP per Operator</span>
                 </div>
-                <span class="muted small">Total WIP yang masih dipegang (semua hari)</span>
+                <span class="muted small">Tidak termasuk data void</span>
             </div>
 
             @if (($outstandingDetail ?? collect())->isEmpty())
@@ -328,7 +315,7 @@
                                 <th>Kode Barang</th>
                                 <th>Tanggal Ambil Jahit</th>
                                 <th class="text-end">Pickup</th>
-                                <th class="text-end">Outstanding WIP (pcs)</th>
+                                <th class="text-end">Outstanding (pcs)</th>
                             </tr>
                         </thead>
                         <tbody>
@@ -339,23 +326,16 @@
                                 <tr>
                                     <td class="mono text-muted">{{ $i + 1 }}</td>
                                     <td>
-                                        <div class="fw-semibold">
-                                            {{ $row->operator_code }} — {{ $row->operator_name }}
+                                        <div class="fw-semibold">{{ $row->operator_code }} — {{ $row->operator_name }}
                                         </div>
                                     </td>
                                     <td>
                                         <div class="fw-semibold mono">{{ $row->item_code }}</div>
                                         <div class="muted small">{{ $row->item_name }}</div>
                                     </td>
-                                    <td class="mono">
-                                        {{ $tgl ? id_date($tgl) : '-' }}
-                                    </td>
-                                    <td class="text-end mono">
-                                        {{ number_format((int) $row->picked_total) }}
-                                    </td>
-                                    <td class="text-end mono">
-                                        {{ number_format((int) $row->outstanding) }}
-                                    </td>
+                                    <td class="mono">{{ $tgl ? id_date($tgl) : '-' }}</td>
+                                    <td class="text-end mono">{{ number_format((int) $row->picked_total) }}</td>
+                                    <td class="text-end mono">{{ number_format((int) $row->outstanding) }}</td>
                                 </tr>
                             @endforeach
                         </tbody>
@@ -364,14 +344,14 @@
             @endif
         </div>
 
-        {{-- Breakdown per Item --}}
-        <div class="card p-3">
+        {{-- Breakdown per Item (OK & Reject) --}}
+        <div class="card p-3 mb-3">
             <div class="section-header">
                 <div class="section-title">
                     <span class="icon">📦</span>
                     <span>Breakdown per Item</span>
                 </div>
-                <span class="muted small">Rekap OK & reject item di tanggal terpilih</span>
+                <span class="muted small">Rekap OK & reject item (non-void) di tanggal terpilih</span>
             </div>
 
             <div class="table-wrap">
@@ -391,27 +371,56 @@
                             @endphp
                             <tr>
                                 <td>
-                                    <div class="fw-semibold mono">
-                                        {{ $row->code ?? '' }}
-                                    </div>
-                                    <div class="muted small">
-                                        {{ $row->name ?? '' }}
-                                    </div>
+                                    <div class="fw-semibold mono">{{ $row->code ?? '' }}</div>
+                                    <div class="muted small">{{ $row->name ?? '' }}</div>
                                 </td>
-                                <td class="text-end mono text-success">
-                                    {{ number_format($row->total_ok) }}
-                                </td>
-                                <td class="text-end mono text-danger">
-                                    {{ number_format($row->total_reject) }}
-                                </td>
-                                <td class="text-end mono">
-                                    {{ number_format($total) }}
-                                </td>
+                                <td class="text-end mono text-success">{{ number_format((int) $row->total_ok) }}</td>
+                                <td class="text-end mono text-danger">{{ number_format((int) $row->total_reject) }}</td>
+                                <td class="text-end mono">{{ number_format($total) }}</td>
                             </tr>
                         @empty
                             <tr>
                                 <td colspan="4" class="text-center text-muted py-3">
                                     Belum ada Sewing Return pada filter ini.
+                                </td>
+                            </tr>
+                        @endforelse
+                    </tbody>
+                </table>
+            </div>
+        </div>
+
+        {{-- Masuk WIP-FIN per Item (Setor OK) --}}
+        <div class="card p-3">
+            <div class="section-header">
+                <div class="section-title">
+                    <span class="icon">📥</span>
+                    <span>Masuk WIP-FIN per Item</span>
+                </div>
+                <span class="muted small">Setor OK (non-void) di tanggal terpilih</span>
+            </div>
+
+            <div class="table-wrap">
+                <table class="table table-sm align-middle mb-0">
+                    <thead>
+                        <tr>
+                            <th>Item</th>
+                            <th class="text-end">Masuk WIP-FIN (pcs)</th>
+                        </tr>
+                    </thead>
+                    <tbody>
+                        @forelse ($wipFinInBreakdown as $row)
+                            <tr>
+                                <td>
+                                    <div class="fw-semibold mono">{{ $row->code ?? '' }}</div>
+                                    <div class="muted small">{{ $row->name ?? '' }}</div>
+                                </td>
+                                <td class="text-end mono text-success">{{ number_format((int) $row->qty_in) }}</td>
+                            </tr>
+                        @empty
+                            <tr>
+                                <td colspan="2" class="text-center text-muted py-3">
+                                    Belum ada setor WIP-FIN pada filter ini.
                                 </td>
                             </tr>
                         @endforelse
@@ -431,7 +440,7 @@
                 window.location.reload();
             }, 10 * 60 * 1000);
 
-            // === Chart: Output OK per Jam (Line + area) ===
+            // === Chart: Output OK per Jam ===
             const ctx = document.getElementById('sewingHourlyChart');
             if (ctx) {
                 const hourlyData = @json($hourlyOutput);
@@ -459,7 +468,7 @@
                                 ticks: {
                                     maxRotation: 0,
                                     autoSkip: true,
-                                    maxTicksLimit: 8,
+                                    maxTicksLimit: 8
                                 }
                             },
                             y: {
@@ -483,7 +492,7 @@
                         },
                         elements: {
                             point: {
-                                radius: 2,
+                                radius: 2
                             }
                         }
                     }

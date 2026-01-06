@@ -11,6 +11,7 @@ use App\Models\SewingReturnLine;
 use Illuminate\Http\Request;
 use Illuminate\Support\Carbon;
 use Illuminate\Support\Facades\DB;
+use Illuminate\Support\Facades\Schema;
 use Illuminate\View\View;
 
 class SewingReportController extends Controller
@@ -487,8 +488,38 @@ class SewingReportController extends Controller
         ? Carbon::parse($dateInput)->startOfDay()
         : Carbon::today();
 
-        // Untuk dipakai di whereDate
         $dateString = $selectedDate->toDateString();
+
+        // ==========================
+        // Helper: exclude void (AUTO-DETECT, SQLite-safe)
+        // ==========================
+        $applyNotVoid = function ($q, string $table) {
+            // boolean-style columns
+            foreach (['is_void', 'is_voided', 'void', 'voided', 'is_canceled', 'is_cancelled'] as $col) {
+                if (Schema::hasColumn($table, $col)) {
+                    $q->where("$table.$col", 0);
+                    return;
+                }
+            }
+
+            // status-style columns
+            foreach (['status', 'state'] as $col) {
+                if (Schema::hasColumn($table, $col)) {
+                    $q->whereNotIn("$table.$col", ['void', 'VOID', 'canceled', 'CANCELED', 'cancelled', 'CANCELLED']);
+                    return;
+                }
+            }
+
+            // timestamp-style columns
+            foreach (['voided_at', 'canceled_at', 'cancelled_at'] as $col) {
+                if (Schema::hasColumn($table, $col)) {
+                    $q->whereNull("$table.$col");
+                    return;
+                }
+            }
+
+            // If nothing matches: do nothing (avoid SQL error)
+        };
 
         // ==========================
         // Dropdown data
@@ -503,31 +534,34 @@ class SewingReportController extends Controller
 
         /*
         |--------------------------------------------------------------------------
-        | 1. Total Pickup (qty_bundle) di tanggal terpilih
+        | 1) Total Pickup di tanggal terpilih (exclude void pickup)
         |--------------------------------------------------------------------------
          */
         $pickupQuery = SewingPickupLine::query()
             ->join('sewing_pickups', 'sewing_pickup_lines.sewing_pickup_id', '=', 'sewing_pickups.id')
             ->whereDate('sewing_pickups.date', $dateString);
 
+        $applyNotVoid($pickupQuery, 'sewing_pickups');
+
         if ($operatorId) {
             $pickupQuery->where('sewing_pickups.operator_id', $operatorId);
         }
-
         if ($itemId) {
             $pickupQuery->where('sewing_pickup_lines.finished_item_id', $itemId);
         }
 
-        $totalPickup = (float) $pickupQuery->sum('qty_bundle');
+        $totalPickup = (float) $pickupQuery->sum('sewing_pickup_lines.qty_bundle');
 
         /*
         |--------------------------------------------------------------------------
-        | 2. Total Return OK & Reject di tanggal terpilih
+        | 2) Total Return OK & Reject di tanggal terpilih (exclude void return)
         |--------------------------------------------------------------------------
          */
         $returnBase = SewingReturnLine::query()
             ->join('sewing_returns', 'sewing_return_lines.sewing_return_id', '=', 'sewing_returns.id')
             ->whereDate('sewing_returns.date', $dateString);
+
+        $applyNotVoid($returnBase, 'sewing_returns');
 
         if ($operatorId) {
             $returnBase->where('sewing_returns.operator_id', $operatorId);
@@ -538,13 +572,19 @@ class SewingReportController extends Controller
                 ->where('sewing_pickup_lines.finished_item_id', $itemId);
         }
 
-        $totalReturnOk = (float) (clone $returnBase)->sum('qty_ok');
-        $totalReject = (float) (clone $returnBase)->sum('qty_reject');
+        $totalReturnOk = (float) (clone $returnBase)->sum('sewing_return_lines.qty_ok');
+        $totalReject = (float) (clone $returnBase)->sum('sewing_return_lines.qty_reject');
 
         /*
         |--------------------------------------------------------------------------
-        | 3A. Outstanding WIP Detail (Operator + Item) + Tanggal Ambil + Pickup total
-        |     Tidak difilter tanggal
+        | 2B) Masuk WIP-FIN (Setor) = Return OK (non-void) di tanggal terpilih
+        |--------------------------------------------------------------------------
+         */
+        $wipFinInToday = (int) $totalReturnOk;
+
+        /*
+        |--------------------------------------------------------------------------
+        | 3) Outstanding WIP per Operator + Item (Detail tabel) (exclude void pickup)
         |--------------------------------------------------------------------------
          */
         $outstandingExpr = '
@@ -560,12 +600,13 @@ class SewingReportController extends Controller
             ->join('employees', 'sewing_pickups.operator_id', '=', 'employees.id')
             ->join('items', 'sewing_pickup_lines.finished_item_id', '=', 'items.id')
             ->whereNotNull('sewing_pickups.operator_id')
-            ->where('items.type', 'finished_good'); // kalau mau semua item, hapus baris ini
+            ->where('items.type', 'finished_good');
+
+        $applyNotVoid($outstandingDetailQuery, 'sewing_pickups');
 
         if ($operatorId) {
             $outstandingDetailQuery->where('sewing_pickups.operator_id', $operatorId);
         }
-
         if ($itemId) {
             $outstandingDetailQuery->where('sewing_pickup_lines.finished_item_id', $itemId);
         }
@@ -575,18 +616,11 @@ class SewingReportController extends Controller
                 'employees.id as operator_id',
                 'employees.code as operator_code',
                 'employees.name as operator_name',
-
                 'items.id as item_id',
                 'items.code as item_code',
                 'items.name as item_name',
-
-                // Tanggal Ambil Jahit (paling awal dari group operator+item)
                 DB::raw('MIN(sewing_pickups.date) as tanggal_ambil'),
-
-                // Jumlah pickup (total qty_bundle group operator+item)
                 DB::raw('SUM(sewing_pickup_lines.qty_bundle) as picked_total'),
-
-                // Outstanding (SQLite-safe)
                 DB::raw("CASE WHEN {$outstandingExpr} > 0 THEN {$outstandingExpr} ELSE 0 END as outstanding")
             )
             ->groupBy(
@@ -601,7 +635,7 @@ class SewingReportController extends Controller
 
         /*
         |--------------------------------------------------------------------------
-        | 4. Operator Terbaik (di tanggal terpilih + respect filter)
+        | 4) Operator Terbaik (exclude void return)
         |--------------------------------------------------------------------------
          */
         $topOperatorQuery = SewingReturnLine::query()
@@ -609,10 +643,11 @@ class SewingReportController extends Controller
             ->join('employees', 'sewing_returns.operator_id', '=', 'employees.id')
             ->whereDate('sewing_returns.date', $dateString);
 
+        $applyNotVoid($topOperatorQuery, 'sewing_returns');
+
         if ($operatorId) {
             $topOperatorQuery->where('sewing_returns.operator_id', $operatorId);
         }
-
         if ($itemId) {
             $topOperatorQuery->join('sewing_pickup_lines', 'sewing_return_lines.sewing_pickup_line_id', '=', 'sewing_pickup_lines.id')
                 ->where('sewing_pickup_lines.finished_item_id', $itemId);
@@ -623,7 +658,7 @@ class SewingReportController extends Controller
                 'employees.id',
                 'employees.code',
                 'employees.name',
-                DB::raw('SUM(sewing_return_lines.qty_ok) as total_ok')
+                DB::raw('SUM(COALESCE(sewing_return_lines.qty_ok,0)) as total_ok')
             )
             ->groupBy('employees.id', 'employees.code', 'employees.name')
             ->orderByDesc('total_ok')
@@ -631,24 +666,23 @@ class SewingReportController extends Controller
 
         /*
         |--------------------------------------------------------------------------
-        | 5. WIP Terlama (aging dalam hari)
+        | 5) WIP Terlama (exclude void pickup)
         |--------------------------------------------------------------------------
-        | Pakai query terpisah agar definisi "oldest pickup date" tetap jelas
          */
         $agingBase = SewingPickupLine::query()
             ->join('sewing_pickups', 'sewing_pickup_lines.sewing_pickup_id', '=', 'sewing_pickups.id')
             ->join('employees', 'sewing_pickups.operator_id', '=', 'employees.id')
             ->whereNotNull('sewing_pickups.operator_id');
 
+        $applyNotVoid($agingBase, 'sewing_pickups');
+
         if ($operatorId) {
             $agingBase->where('sewing_pickups.operator_id', $operatorId);
         }
-
         if ($itemId) {
             $agingBase->where('sewing_pickup_lines.finished_item_id', $itemId);
         }
 
-        // yang masih outstanding per line: qty_bundle > returned_ok+returned_reject
         $agingRow = $agingBase
             ->select(
                 'employees.id as operator_id',
@@ -658,7 +692,7 @@ class SewingReportController extends Controller
             )
             ->whereRaw('sewing_pickup_lines.qty_bundle > (COALESCE(sewing_pickup_lines.qty_returned_ok,0) + COALESCE(sewing_pickup_lines.qty_returned_reject,0))')
             ->groupBy('employees.id', 'employees.code', 'employees.name')
-            ->orderBy('oldest_pickup_date', 'asc') // paling lama = paling kecil
+            ->orderBy('oldest_pickup_date', 'asc')
             ->first();
 
         $agingWip = null;
@@ -676,23 +710,24 @@ class SewingReportController extends Controller
 
         /*
         |--------------------------------------------------------------------------
-        | 6. Output OK per Jam – tanggal terpilih
+        | 6) Output OK per Jam (exclude void return)
         |--------------------------------------------------------------------------
          */
-        $hourlyRaw = SewingReturnLine::query()
+        $hourlyQuery = SewingReturnLine::query()
             ->join('sewing_returns', 'sewing_return_lines.sewing_return_id', '=', 'sewing_returns.id')
             ->whereDate('sewing_returns.date', $dateString);
 
-        if ($operatorId) {
-            $hourlyRaw->where('sewing_returns.operator_id', $operatorId);
-        }
+        $applyNotVoid($hourlyQuery, 'sewing_returns');
 
+        if ($operatorId) {
+            $hourlyQuery->where('sewing_returns.operator_id', $operatorId);
+        }
         if ($itemId) {
-            $hourlyRaw->join('sewing_pickup_lines', 'sewing_return_lines.sewing_pickup_line_id', '=', 'sewing_pickup_lines.id')
+            $hourlyQuery->join('sewing_pickup_lines', 'sewing_return_lines.sewing_pickup_line_id', '=', 'sewing_pickup_lines.id')
                 ->where('sewing_pickup_lines.finished_item_id', $itemId);
         }
 
-        $hourlyRaw = $hourlyRaw
+        $hourlyRaw = $hourlyQuery
             ->select('sewing_return_lines.qty_ok', 'sewing_returns.created_at')
             ->get();
 
@@ -718,20 +753,21 @@ class SewingReportController extends Controller
 
         /*
         |--------------------------------------------------------------------------
-        | 7. Breakdown per Item – tanggal terpilih
+        | 7) Breakdown per Item (OK + Reject) di tanggal terpilih (exclude void return)
         |--------------------------------------------------------------------------
          */
         $itemBreakdownQuery = SewingReturnLine::query()
             ->join('sewing_returns', 'sewing_return_lines.sewing_return_id', '=', 'sewing_returns.id')
             ->join('sewing_pickup_lines', 'sewing_return_lines.sewing_pickup_line_id', '=', 'sewing_pickup_lines.id')
             ->join('items', 'sewing_pickup_lines.finished_item_id', '=', 'items.id')
-            ->where('items.type', 'finished_good')
-            ->whereDate('sewing_returns.date', $dateString);
+            ->whereDate('sewing_returns.date', $dateString)
+            ->where('items.type', 'finished_good');
+
+        $applyNotVoid($itemBreakdownQuery, 'sewing_returns');
 
         if ($operatorId) {
             $itemBreakdownQuery->where('sewing_returns.operator_id', $operatorId);
         }
-
         if ($itemId) {
             $itemBreakdownQuery->where('items.id', $itemId);
         }
@@ -741,11 +777,43 @@ class SewingReportController extends Controller
                 'items.id',
                 'items.code',
                 'items.name',
-                DB::raw('SUM(sewing_return_lines.qty_ok) as total_ok'),
-                DB::raw('SUM(sewing_return_lines.qty_reject) as total_reject')
+                DB::raw('SUM(COALESCE(sewing_return_lines.qty_ok,0)) as total_ok'),
+                DB::raw('SUM(COALESCE(sewing_return_lines.qty_reject,0)) as total_reject')
             )
             ->groupBy('items.id', 'items.code', 'items.name')
             ->orderByDesc('total_ok')
+            ->get();
+
+        /*
+        |--------------------------------------------------------------------------
+        | 7B) Breakdown Masuk WIP-FIN per Item (Setor OK) (exclude void return)
+        |--------------------------------------------------------------------------
+         */
+        $wipFinInBreakdownQuery = SewingReturnLine::query()
+            ->join('sewing_returns', 'sewing_return_lines.sewing_return_id', '=', 'sewing_returns.id')
+            ->join('sewing_pickup_lines', 'sewing_return_lines.sewing_pickup_line_id', '=', 'sewing_pickup_lines.id')
+            ->join('items', 'sewing_pickup_lines.finished_item_id', '=', 'items.id')
+            ->whereDate('sewing_returns.date', $dateString)
+            ->where('items.type', 'finished_good');
+
+        $applyNotVoid($wipFinInBreakdownQuery, 'sewing_returns');
+
+        if ($operatorId) {
+            $wipFinInBreakdownQuery->where('sewing_returns.operator_id', $operatorId);
+        }
+        if ($itemId) {
+            $wipFinInBreakdownQuery->where('items.id', $itemId);
+        }
+
+        $wipFinInBreakdown = $wipFinInBreakdownQuery
+            ->select(
+                'items.id',
+                'items.code',
+                'items.name',
+                DB::raw('SUM(COALESCE(sewing_return_lines.qty_ok,0)) as qty_in')
+            )
+            ->groupBy('items.id', 'items.code', 'items.name')
+            ->orderByDesc('qty_in')
             ->get();
 
         return view('production.reports.sewing.dashboard', [
@@ -755,11 +823,15 @@ class SewingReportController extends Controller
             'totalReturnOkToday' => $totalReturnOk,
             'totalRejectToday' => $totalReject,
 
+            'wipFinInToday' => $wipFinInToday,
+            'wipFinInBreakdown' => $wipFinInBreakdown,
+
             'outstandingDetail' => $outstandingDetail,
             'totalOutstanding' => $totalOutstanding,
 
             'topOperator' => $topOperator,
             'agingWip' => $agingWip,
+
             'hourlyOutput' => $hourlyOutput,
             'itemBreakdown' => $itemBreakdown,
 
