@@ -452,43 +452,40 @@ class SewingPickupController extends Controller
             'reason' => ['required', 'string', 'max:150'],
         ]);
 
-        $pickupId = $pickup->id;
+        $pickupId = (int) $pickup->id;
+        $epsilon = 0.000001;
 
-        DB::transaction(function () use ($pickupId, $validated) {
+        DB::transaction(function () use ($pickupId, $validated, $epsilon) {
 
             $wipCutWarehouseId = Warehouse::where('code', 'WIP-CUT')->value('id');
             if (!$wipCutWarehouseId) {
-                throw ValidationException::withMessages([
-                    'pickup' => 'Gudang WIP-CUT belum dikonfigurasi.',
-                ]);
+                throw ValidationException::withMessages(['pickup' => 'Gudang WIP-CUT belum dikonfigurasi.']);
             }
 
-            // lock header + lines
+            /** @var SewingPickup $pickup */
             $pickup = SewingPickup::with('lines')
                 ->lockForUpdate()
                 ->findOrFail($pickupId);
 
             if ($pickup->status === 'void') {
-                throw ValidationException::withMessages([
-                    'pickup' => 'Pickup sudah di-VOID.',
-                ]);
+                throw ValidationException::withMessages(['pickup' => 'Pickup sudah di-VOID.']);
             }
 
-            $epsilon = 0.000001;
-
-            // Validasi: belum kepakai proses lain
-            foreach ($pickup->lines as $line) {
+            // ✅ CHECK NGACU KE sewing_pickup_lines:
+            $hasUsedLine = $pickup->lines->contains(function ($line) use ($epsilon) {
                 $used =
                 (float) ($line->qty_returned_ok ?? 0) +
                 (float) ($line->qty_returned_reject ?? 0) +
                 (float) ($line->qty_direct_picked ?? 0) +
                 (float) ($line->qty_progress_adjusted ?? 0);
 
-                if ($used > $epsilon) {
-                    throw ValidationException::withMessages([
-                        'pickup' => "Pickup sudah dipakai proses lain (line #{$line->id}). Tidak bisa VOID.",
-                    ]);
-                }
+                return $used > $epsilon;
+            });
+
+            if ($hasUsedLine) {
+                throw ValidationException::withMessages([
+                    'pickup' => 'Tidak bisa VOID. Ada line pickup yang sudah setor/proses (OK/RJ/DP/Adj).',
+                ]);
             }
 
             $sewingWarehouseId = (int) $pickup->warehouse_id;
@@ -500,24 +497,19 @@ class SewingPickupController extends Controller
                     continue;
                 }
 
-                // lock bundle
-                $bundle = CuttingJobBundle::lockForUpdate()->findOrFail($line->cutting_job_bundle_id);
+                $bundle = CuttingJobBundle::lockForUpdate()->findOrFail((int) $line->cutting_job_bundle_id);
 
-                // Cek konsistensi supaya tidak minus
-                if ($qty > (float) $bundle->sewing_picked_qty + $epsilon) {
+                if ($qty > ((float) $bundle->sewing_picked_qty + $epsilon)) {
                     throw ValidationException::withMessages([
-                        'pickup' => "Data tidak konsisten (bundle {$bundle->bundle_code}). sewing_picked_qty lebih kecil dari qty pickup.",
+                        'pickup' => "Data tidak konsisten (bundle {$bundle->bundle_code}).",
                     ]);
                 }
 
-                // Reverse picked qty
-                $bundle->sewing_picked_qty = max(((float) $bundle->sewing_picked_qty) - $qty, 0);
+                $bundle->sewing_picked_qty = max(((float) $bundle->sewing_picked_qty) - $qty, 0.0);
                 $bundle->save();
 
-                // Reverse inventory movement: OUT dari WIP-SEW, IN ke WIP-CUT
                 $notes = "VOID Sewing pickup {$pickup->code} - bundle {$bundle->bundle_code}";
 
-                // gunakan unit_cost yang disimpan saat pickup dibuat
                 $unitCost = (float) ($line->unit_cost ?? 0);
                 if ($unitCost < 0) {
                     $unitCost = 0;
@@ -525,7 +517,7 @@ class SewingPickupController extends Controller
 
                 $this->inventory->stockOut(
                     warehouseId: $sewingWarehouseId,
-                    itemId: $line->finished_item_id,
+                    itemId: (int) $line->finished_item_id,
                     qty: $qty,
                     date: $date,
                     sourceType: SewingPickup::class,
@@ -538,8 +530,8 @@ class SewingPickupController extends Controller
                 );
 
                 $this->inventory->stockIn(
-                    warehouseId: $wipCutWarehouseId,
-                    itemId: $line->finished_item_id,
+                    warehouseId: (int) $wipCutWarehouseId,
+                    itemId: (int) $line->finished_item_id,
                     qty: $qty,
                     date: $date,
                     sourceType: SewingPickup::class,
@@ -550,12 +542,10 @@ class SewingPickupController extends Controller
                     affectLotCost: false,
                 );
 
-                // Mark line void
                 $line->status = 'void';
                 $line->save();
             }
 
-            // Mark header void (pastikan kolom ini ada di DB)
             $pickup->status = 'void';
             $pickup->void_reason = $validated['reason'];
             $pickup->voided_at = now();
@@ -565,7 +555,147 @@ class SewingPickupController extends Controller
 
         return redirect()
             ->route('production.sewing.pickups.show', $pickupId)
-            ->with('success', 'Pickup berhasil di-VOID. Stok sudah dibalik ke WIP-CUT.');
+            ->with('success', 'Pickup berhasil di-VOID. (Semua line belum setor) Stok dibalik ke WIP-CUT.');
+    }
+
+    public function voidLine(Request $request, SewingPickup $pickup, SewingPickupLine $line)
+    {
+        $validated = $request->validate([
+            'reason' => ['required', 'string', 'max:150'],
+        ]);
+
+        // pastikan line memang milik pickup ini (anti-inject URL)
+        if ((int) $line->sewing_pickup_id !== (int) $pickup->id) {
+            abort(404);
+        }
+
+        $pickupId = $pickup->id;
+        $lineId = $line->id;
+
+        DB::transaction(function () use ($pickupId, $lineId, $validated) {
+
+            $epsilon = 0.000001;
+
+            $wipCutWarehouseId = Warehouse::where('code', 'WIP-CUT')->value('id');
+            if (!$wipCutWarehouseId) {
+                throw ValidationException::withMessages([
+                    'pickup' => 'Gudang WIP-CUT belum dikonfigurasi.',
+                ]);
+            }
+
+            // lock pickup
+            $pickup = SewingPickup::lockForUpdate()->findOrFail($pickupId);
+
+            // lock line
+            $line = SewingPickupLine::lockForUpdate()->findOrFail($lineId);
+
+            if ($line->status === 'void') {
+                throw ValidationException::withMessages([
+                    'pickup' => "Line sudah di-VOID (line #{$line->id}).",
+                ]);
+            }
+
+            // validasi belum dipakai proses lain
+            $used =
+            (float) ($line->qty_returned_ok ?? 0) +
+            (float) ($line->qty_returned_reject ?? 0) +
+            (float) ($line->qty_direct_picked ?? 0) +
+            (float) ($line->qty_progress_adjusted ?? 0);
+
+            if ($used > $epsilon) {
+                throw ValidationException::withMessages([
+                    'pickup' => "Line sudah dipakai proses lain (line #{$line->id}). Tidak bisa VOID.",
+                ]);
+            }
+
+            $qty = (float) ($line->qty_bundle ?? 0);
+            if ($qty <= $epsilon) {
+                // qty 0 biasanya tidak perlu di-void, tapi kalau mau tetap boleh, silakan hapus block ini
+                throw ValidationException::withMessages([
+                    'pickup' => "Qty line 0, tidak ada yang perlu dibalik (line #{$line->id}).",
+                ]);
+            }
+
+            $sewingWarehouseId = (int) $pickup->warehouse_id;
+            $date = $pickup->date;
+
+            // lock bundle
+            $bundle = CuttingJobBundle::lockForUpdate()->findOrFail($line->cutting_job_bundle_id);
+
+            // konsistensi picked qty
+            if ($qty > (float) $bundle->sewing_picked_qty + $epsilon) {
+                throw ValidationException::withMessages([
+                    'pickup' => "Data tidak konsisten (bundle {$bundle->bundle_code}). sewing_picked_qty lebih kecil dari qty pickup.",
+                ]);
+            }
+
+            // reverse picked qty
+            $bundle->sewing_picked_qty = max(((float) $bundle->sewing_picked_qty) - $qty, 0);
+            $bundle->save();
+
+            $notes = "VOID LINE Sewing pickup {$pickup->code} - bundle {$bundle->bundle_code} - line {$line->id}";
+
+            $unitCost = (float) ($line->unit_cost ?? 0);
+            if ($unitCost < 0) {
+                $unitCost = 0;
+            }
+
+            // OUT dari WIP-SEW
+            $this->inventory->stockOut(
+                warehouseId: $sewingWarehouseId,
+                itemId: $line->finished_item_id,
+                qty: $qty,
+                date: $date,
+                sourceType: SewingPickup::class,
+                sourceId: $pickup->id,
+                notes: $notes,
+                allowNegative: false,
+                lotId: null,
+                unitCostOverride: $unitCost,
+                affectLotCost: false,
+            );
+
+            // IN ke WIP-CUT
+            $this->inventory->stockIn(
+                warehouseId: $wipCutWarehouseId,
+                itemId: $line->finished_item_id,
+                qty: $qty,
+                date: $date,
+                sourceType: SewingPickup::class,
+                sourceId: $pickup->id,
+                notes: $notes,
+                lotId: null,
+                unitCost: $unitCost,
+                affectLotCost: false,
+            );
+
+            // mark line void
+            $line->status = 'void';
+            $line->void_reason = $validated['reason'];
+            $line->voided_at = now();
+            $line->voided_by = auth()->id();
+            $line->save();
+
+            // OPTIONAL (rapi): kalau semua line sudah void, otomatis void header juga
+            $hasNonVoid = SewingPickupLine::where('sewing_pickup_id', $pickup->id)
+                ->where('status', '!=', 'void')
+                ->exists();
+
+            if (!$hasNonVoid) {
+                $pickup->status = 'void';
+                // kalau kamu mau simpan void header juga, pastikan kolomnya ada
+                if (Schema::hasColumn('sewing_pickups', 'void_reason')) {
+                    $pickup->void_reason = 'ALL LINES VOID';
+                    $pickup->voided_at = now();
+                    $pickup->voided_by = auth()->id();
+                }
+                $pickup->save();
+            }
+        });
+
+        return redirect()
+            ->route('production.sewing.pickups.show', $pickup)
+            ->with('success', 'Line berhasil di-VOID. Stok line sudah dibalik ke WIP-CUT.');
     }
 
 }

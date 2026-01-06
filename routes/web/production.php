@@ -67,6 +67,8 @@ Route::middleware(['web', 'auth', 'role:owner,operating'])
                 Route::put('/{pickup}', [SewingPickupController::class, 'update'])->name('update');
                 Route::delete('/{pickup}', [SewingPickupController::class, 'destroy'])->name('destroy');
                 Route::post('{pickup}/void', [SewingPickupController::class, 'void'])->name('void');
+                Route::post('/{pickup}/lines/{line}/void', [SewingPickupController::class, 'voidLine'])
+                    ->name('lines.void');
             });
 
             // ===== Sewing Returns =====
