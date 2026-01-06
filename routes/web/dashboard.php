@@ -11,9 +11,9 @@ Route::middleware(['auth'])->group(function () {
             return redirect()->route('login');
         }
 
-        // operating → Flow Dashboard produksi
+        // production → Dashboard Sewing (yang barusan dibuat)
         if ($user->role === 'operating') {
-            return redirect()->route('production.reports.production_flow_dashboard');
+            return redirect()->route('production.reports.dashboard');
         }
 
         // admin → langsung ke laporan shipment

@@ -17,29 +17,31 @@
         }
 
         .stat-card {
-            padding: 0.75rem 0.9rem;
+            padding: 0.7rem 0.85rem;
             border-radius: 14px;
             display: flex;
             flex-direction: column;
-            gap: 0.15rem;
+            gap: 0.1rem;
             height: 100%;
         }
 
         .stat-label {
-            font-size: .78rem;
+            font-size: .72rem;
             text-transform: uppercase;
             letter-spacing: .08em;
             color: var(--muted);
         }
 
         .stat-value {
-            font-size: 1.4rem;
-            font-weight: 600;
+            font-size: 1.25rem;
+            font-weight: 650;
+            line-height: 1.1;
         }
 
         .stat-sub {
-            font-size: .8rem;
+            font-size: .78rem;
             color: var(--muted);
+            line-height: 1.25;
         }
 
         .mono {
@@ -72,6 +74,7 @@
 
         .table-wrap {
             overflow-x: auto;
+            -webkit-overflow-scrolling: touch;
         }
 
         .section-header {
@@ -83,15 +86,15 @@
         }
 
         .section-title {
-            font-size: .9rem;
-            font-weight: 600;
+            font-size: .92rem;
+            font-weight: 650;
             display: flex;
             align-items: center;
             gap: .35rem;
         }
 
-        .section-title span.icon {
-            font-size: 1.1rem;
+        .section-title .icon {
+            font-size: 1.05rem;
         }
 
         .badge-soft {
@@ -102,15 +105,52 @@
             color: var(--muted);
         }
 
+        /* KPI grid: mobile 2 kolom, desktop 5 kolom */
         .kpi-grid {
             display: grid;
             gap: .55rem;
+            grid-template-columns: repeat(2, minmax(0, 1fr));
         }
 
         @media (min-width: 768px) {
             .kpi-grid {
                 grid-template-columns: repeat(5, minmax(0, 1fr));
             }
+        }
+
+        /* Mobile: ringkas spacing */
+        @media (max-width: 575.98px) {
+            .page-wrap {
+                padding-inline: .35rem;
+            }
+
+            .stat-card {
+                padding: .65rem .75rem;
+            }
+
+            .stat-value {
+                font-size: 1.15rem;
+            }
+
+            .muted {
+                font-size: .82rem;
+            }
+
+            .table td,
+            .table th {
+                padding-top: .45rem;
+                padding-bottom: .45rem;
+            }
+        }
+
+        /* Tabs compact */
+        .compact-tabs .nav-link {
+            padding: .35rem .6rem;
+            font-size: .85rem;
+        }
+
+        .compact-tabs .nav-link.active {
+            font-weight: 600;
         }
     </style>
 
@@ -128,9 +168,7 @@
                     <h1 class="h5 mb-0">Dashboard Harian Sewing</h1>
                     <span class="badge-soft mono">{{ id_date($selectedDate) }}</span>
                 </div>
-                <div class="muted">
-                    Ringkasan performa jahit & status WIP untuk tanggal yang dipilih.
-                </div>
+                <div class="muted">Ringkasan performa jahit & status WIP untuk tanggal yang dipilih.</div>
             </div>
             <div class="text-end">
                 <div class="chip mb-1">
@@ -177,130 +215,119 @@
                 </div>
 
                 <div class="col-12 col-md-3 d-flex gap-2">
-                    <button type="submit" class="btn btn-sm btn-primary flex-grow-1">Terapkan Filter</button>
+                    <button type="submit" class="btn btn-sm btn-primary flex-grow-1">Terapkan</button>
                     <a href="{{ route('production.reports.dashboard') }}"
                         class="btn btn-sm btn-outline-secondary">Reset</a>
                 </div>
             </form>
         </div>
+        @if (auth()->check() && auth()->user()->role !== 'operating')
+            {{-- KPI Utama (compact) --}}
+            <div class="kpi-grid mb-3">
+                <div class="card stat-card">
+                    <div class="stat-label">Pickup</div>
+                    <div class="stat-value mono text-primary">{{ number_format($totalPickupToday) }}</div>
+                    <div class="stat-sub">Diambil operator</div>
+                </div>
 
-        {{-- KPI Utama --}}
-        <div class="kpi-grid mb-3">
-            <div class="card stat-card">
-                <div class="stat-label">Pickup</div>
-                <div class="stat-value mono text-primary">{{ number_format($totalPickupToday) }}</div>
-                <div class="stat-sub">Bundle/pcs diambil operator sewing</div>
-            </div>
+                <div class="card stat-card">
+                    <div class="stat-label">Return OK</div>
+                    <div class="stat-value mono text-success">{{ number_format($totalReturnOkToday) }}</div>
+                    <div class="stat-sub">Selesai OK</div>
+                </div>
 
-            <div class="card stat-card">
-                <div class="stat-label">Return OK</div>
-                <div class="stat-value mono text-success">{{ number_format($totalReturnOkToday) }}</div>
-                <div class="stat-sub">Selesai jahit & dinyatakan OK</div>
-            </div>
+                <div class="card stat-card">
+                    <div class="stat-label">Setor WIP-FIN</div>
+                    <div class="stat-value mono text-success">{{ number_format($wipFinInToday ?? 0) }}</div>
+                    <div class="stat-sub">Masuk WIP-FIN</div>
+                </div>
 
-            <div class="card stat-card">
-                <div class="stat-label">Masuk WIP-FIN (Setor)</div>
-                <div class="stat-value mono text-success">{{ number_format($wipFinInToday ?? 0) }}</div>
-                <div class="stat-sub">Barang OK yang disetor ke WIP-FIN</div>
-            </div>
+                <div class="card stat-card">
+                    <div class="stat-label">Reject</div>
+                    <div class="stat-value mono text-danger">{{ number_format($totalRejectToday) }}</div>
+                    <div class="stat-sub">Rework / scrap</div>
+                </div>
 
-            <div class="card stat-card">
-                <div class="stat-label">Reject</div>
-                <div class="stat-value mono text-danger">{{ number_format($totalRejectToday) }}</div>
-                <div class="stat-sub">Butuh rework / scrap</div>
-            </div>
-
-            <div class="card stat-card">
-                <div class="stat-label">Outstanding WIP</div>
-                <div class="stat-value mono text-warning">{{ number_format($totalOutstanding ?? 0) }}</div>
-                <div class="stat-sub">Masih dipegang operator (akumulasi)</div>
-            </div>
-        </div>
-
-        {{-- Grafik & highlight --}}
-        <div class="row g-3 mb-3">
-            {{-- Grafik Line --}}
-            <div class="col-12 col-lg-7">
-                <div class="card p-3 h-100">
-                    <div class="section-header">
-                        <div class="section-title">
-                            <span class="icon">📉</span>
-                            <span>Output OK per Jam</span>
-                        </div>
-                        <span class="muted small">Berdasarkan Sewing Return (non-void)</span>
-                    </div>
-                    <div style="height: 260px;">
-                        <canvas id="sewingHourlyChart"></canvas>
-                    </div>
+                <div class="card stat-card">
+                    <div class="stat-label">Outstanding</div>
+                    <div class="stat-value mono text-warning">{{ number_format($totalOutstanding ?? 0) }}</div>
+                    <div class="stat-sub">Masih dipegang</div>
                 </div>
             </div>
 
-            {{-- Top Operator & Aging --}}
-            <div class="col-12 col-lg-5 d-flex flex-column gap-3">
-                <div class="card p-3">
-                    <div class="section-header">
-                        <div class="section-title">
-                            <span class="icon">🏅</span>
-                            <span>Operator Terbaik</span>
+            {{-- Grafik & highlight --}}
+            <div class="row g-3 mb-3">
+                {{-- Grafik Line --}}
+                <div class="col-12 col-lg-7">
+                    <div class="card p-3 h-100">
+                        <div class="section-header">
+                            <div class="section-title"><span class="icon">📉</span><span>Output OK per Jam</span></div>
+                            <span class="muted small d-none d-md-inline">Berdasarkan Sewing Return (non-void)</span>
+                        </div>
+                        <div style="height: 240px;">
+                            <canvas id="sewingHourlyChart"></canvas>
                         </div>
                     </div>
-
-                    @if ($topOperator)
-                        <div class="d-flex justify-content-between align-items-center">
-                            <div>
-                                <div class="fw-semibold">{{ $topOperator->code }} — {{ $topOperator->name }}</div>
-                                <div class="muted small">Output OK terbanyak di tanggal ini</div>
-                            </div>
-                            <div class="text-end">
-                                <div class="stat-value mono text-success" style="font-size: 1.3rem;">
-                                    {{ number_format($topOperator->total_ok) }}
-                                </div>
-                                <div class="muted small">pcs</div>
-                            </div>
-                        </div>
-                    @else
-                        <div class="text-muted small">Belum ada Sewing Return pada filter ini.</div>
-                    @endif
                 </div>
 
-                <div class="card p-3">
-                    <div class="section-header">
-                        <div class="section-title">
-                            <span class="icon">⏳</span>
-                            <span>WIP Terlama</span>
+                {{-- Top Operator & Aging --}}
+                <div class="col-12 col-lg-5 d-flex flex-column gap-3">
+                    <div class="card p-3">
+                        <div class="section-header">
+                            <div class="section-title"><span class="icon">🏅</span><span>Highlight</span></div>
+                            <span class="muted small">Hari ini</span>
+                        </div>
+
+                        <div class="d-flex flex-column gap-2">
+                            {{-- Top Operator --}}
+                            <div class="d-flex justify-content-between align-items-center">
+                                <div>
+                                    <div class="fw-semibold">Operator Terbaik</div>
+                                    @if ($topOperator)
+                                        <div class="muted small">{{ $topOperator->code }} — {{ $topOperator->name }}</div>
+                                    @else
+                                        <div class="muted small">Belum ada return</div>
+                                    @endif
+                                </div>
+                                <div class="text-end">
+                                    <div class="mono fw-semibold text-success">
+                                        {{ $topOperator ? number_format($topOperator->total_ok) : '0' }}
+                                    </div>
+                                    <div class="muted small">OK</div>
+                                </div>
+                            </div>
+
+                            <hr class="my-1">
+
+                            {{-- Aging --}}
+                            <div class="d-flex justify-content-between align-items-center">
+                                <div>
+                                    <div class="fw-semibold">WIP Terlama</div>
+                                    @if ($agingWip)
+                                        <div class="muted small">{{ $agingWip['operator']->code }} —
+                                            {{ $agingWip['operator']->name }}</div>
+                                    @else
+                                        <div class="muted small">Tidak ada</div>
+                                    @endif
+                                </div>
+                                <div class="text-end">
+                                    <div class="mono fw-semibold text-danger">
+                                        {{ $agingWip ? $agingWip['aging'] . ' hari' : '-' }}
+                                    </div>
+                                    <div class="muted small">sejak pickup</div>
+                                </div>
+                            </div>
                         </div>
                     </div>
-
-                    @if ($agingWip)
-                        <div class="d-flex justify-content-between align-items-center">
-                            <div>
-                                <div class="fw-semibold">
-                                    {{ $agingWip['operator']->code }} — {{ $agingWip['operator']->name }}
-                                </div>
-                                <div class="muted small">Masih memegang WIP sewing</div>
-                            </div>
-                            <div class="text-end">
-                                <div class="stat-value mono text-danger" style="font-size: 1.3rem;">
-                                    {{ $agingWip['aging'] }} hari
-                                </div>
-                                <div class="muted small">sejak tanggal pickup</div>
-                            </div>
-                        </div>
-                    @else
-                        <div class="text-muted small">Tidak ada WIP menggantung yang terdeteksi.</div>
-                    @endif
                 </div>
             </div>
-        </div>
+        @endif
 
-        {{-- Outstanding per Operator (detail barang + tanggal + pickup) --}}
+        {{-- Outstanding per Operator --}}
         <div class="card p-3 mb-3">
             <div class="section-header">
-                <div class="section-title">
-                    <span class="icon">🧵</span>
-                    <span>Outstanding WIP per Operator</span>
-                </div>
-                <span class="muted small">Tidak termasuk data void</span>
+                <div class="section-title"><span class="icon">🧵</span><span>Belum Setor Jahit</span></div>
+                <span class="muted small">Non-void</span>
             </div>
 
             @if (($outstandingDetail ?? collect())->isEmpty())
@@ -312,29 +339,31 @@
                             <tr>
                                 <th style="width:56px;">No</th>
                                 <th>Operator</th>
-                                <th>Kode Barang</th>
-                                <th>Tanggal Ambil Jahit</th>
-                                <th class="text-end">Pickup</th>
-                                <th class="text-end">Outstanding (pcs)</th>
+                                <th>Kode</th>
+                                <th class="d-none d-md-table-cell">Tanggal Ambil</th>
+                                <th class="text-end d-none d-md-table-cell">Pickup</th>
+                                <th class="text-end">Belum Setor</th>
                             </tr>
                         </thead>
                         <tbody>
                             @foreach ($outstandingDetail as $i => $row)
-                                @php
-                                    $tgl = $row->tanggal_ambil ? \Carbon\Carbon::parse($row->tanggal_ambil) : null;
-                                @endphp
+                                @php $tgl = $row->tanggal_ambil ? \Carbon\Carbon::parse($row->tanggal_ambil) : null; @endphp
                                 <tr>
                                     <td class="mono text-muted">{{ $i + 1 }}</td>
                                     <td>
-                                        <div class="fw-semibold">{{ $row->operator_code }} — {{ $row->operator_name }}
+                                        <div class="fw-semibold">{{ $row->operator_code }} —
+                                            {{ $row->operator_name }}
                                         </div>
+                                        <div class="muted small d-md-none">{{ $row->item_code }} •
+                                            {{ $tgl ? id_date($tgl) : '-' }}</div>
                                     </td>
-                                    <td>
-                                        <div class="fw-semibold mono">{{ $row->item_code }}</div>
-                                        <div class="muted small">{{ $row->item_name }}</div>
+                                    <td class="mono">
+                                        <div class="fw-semibold">{{ $row->item_code }}</div>
+                                        <div class="muted small d-none d-md-block">{{ $row->item_name }}</div>
                                     </td>
-                                    <td class="mono">{{ $tgl ? id_date($tgl) : '-' }}</td>
-                                    <td class="text-end mono">{{ number_format((int) $row->picked_total) }}</td>
+                                    <td class="mono d-none d-md-table-cell">{{ $tgl ? id_date($tgl) : '-' }}</td>
+                                    <td class="text-end mono d-none d-md-table-cell">
+                                        {{ number_format((int) $row->picked_total) }}</td>
                                     <td class="text-end mono">{{ number_format((int) $row->outstanding) }}</td>
                                 </tr>
                             @endforeach
@@ -343,89 +372,169 @@
                 </div>
             @endif
         </div>
-
-        {{-- Breakdown per Item (OK & Reject) --}}
-        <div class="card p-3 mb-3">
-            <div class="section-header">
-                <div class="section-title">
-                    <span class="icon">📦</span>
-                    <span>Breakdown per Item</span>
-                </div>
-                <span class="muted small">Rekap OK & reject item (non-void) di tanggal terpilih</span>
-            </div>
-
-            <div class="table-wrap">
-                <table class="table table-sm align-middle mb-0">
-                    <thead>
-                        <tr>
-                            <th>Item</th>
-                            <th class="text-end">OK (pcs)</th>
-                            <th class="text-end text-danger">Reject (pcs)</th>
-                            <th class="text-end">Total</th>
-                        </tr>
-                    </thead>
-                    <tbody>
-                        @forelse ($itemBreakdown as $row)
-                            @php
-                                $total = (int) $row->total_ok + (int) $row->total_reject;
-                            @endphp
-                            <tr>
-                                <td>
-                                    <div class="fw-semibold mono">{{ $row->code ?? '' }}</div>
-                                    <div class="muted small">{{ $row->name ?? '' }}</div>
-                                </td>
-                                <td class="text-end mono text-success">{{ number_format((int) $row->total_ok) }}</td>
-                                <td class="text-end mono text-danger">{{ number_format((int) $row->total_reject) }}</td>
-                                <td class="text-end mono">{{ number_format($total) }}</td>
-                            </tr>
-                        @empty
-                            <tr>
-                                <td colspan="4" class="text-center text-muted py-3">
-                                    Belum ada Sewing Return pada filter ini.
-                                </td>
-                            </tr>
-                        @endforelse
-                    </tbody>
-                </table>
-            </div>
-        </div>
-
-        {{-- Masuk WIP-FIN per Item (Setor OK) --}}
+        {{-- Breakdown (Pickup / Setor / WIP-FIN) - Compact tabs --}}
         <div class="card p-3">
             <div class="section-header">
-                <div class="section-title">
-                    <span class="icon">📥</span>
-                    <span>Masuk WIP-FIN per Item</span>
-                </div>
-                <span class="muted small">Setor OK (non-void) di tanggal terpilih</span>
+                <div class="section-title"><span class="icon">📊</span><span>Breakdown</span></div>
+                <span class="muted small d-none d-md-inline">Ringkasan per item</span>
             </div>
 
-            <div class="table-wrap">
-                <table class="table table-sm align-middle mb-0">
-                    <thead>
-                        <tr>
-                            <th>Item</th>
-                            <th class="text-end">Masuk WIP-FIN (pcs)</th>
-                        </tr>
-                    </thead>
-                    <tbody>
-                        @forelse ($wipFinInBreakdown as $row)
-                            <tr>
-                                <td>
-                                    <div class="fw-semibold mono">{{ $row->code ?? '' }}</div>
-                                    <div class="muted small">{{ $row->name ?? '' }}</div>
-                                </td>
-                                <td class="text-end mono text-success">{{ number_format((int) $row->qty_in) }}</td>
-                            </tr>
-                        @empty
-                            <tr>
-                                <td colspan="2" class="text-center text-muted py-3">
-                                    Belum ada setor WIP-FIN pada filter ini.
-                                </td>
-                            </tr>
-                        @endforelse
-                    </tbody>
-                </table>
+            <ul class="nav nav-pills compact-tabs mb-2" id="breakdownTabs" role="tablist">
+                <li class="nav-item" role="presentation">
+                    <button class="nav-link active" id="tab-pickup" data-bs-toggle="pill" data-bs-target="#pane-pickup"
+                        type="button" role="tab" aria-controls="pane-pickup" aria-selected="true">
+                        Ambil Jahit
+                    </button>
+                </li>
+                <li class="nav-item" role="presentation">
+                    <button class="nav-link" id="tab-setor" data-bs-toggle="pill" data-bs-target="#pane-setor"
+                        type="button" role="tab" aria-controls="pane-setor" aria-selected="false">
+                        Setor Jahit
+                    </button>
+                </li>
+                <li class="nav-item" role="presentation">
+                    <button class="nav-link" id="tab-wipfin" data-bs-toggle="pill" data-bs-target="#pane-wipfin"
+                        type="button" role="tab" aria-controls="pane-wipfin" aria-selected="false">
+                        Belum Packing
+                    </button>
+                </li>
+            </ul>
+
+            <div class="tab-content" id="breakdownTabsContent">
+                {{-- Pickup --}}
+                <div class="tab-pane fade show active" id="pane-pickup" role="tabpanel" aria-labelledby="tab-pickup">
+                    <div class="muted small mb-2">Tanggal pickup (non-void)</div>
+                    <div class="table-wrap">
+                        <table class="table table-sm align-middle mb-0">
+                            <thead>
+                                <tr>
+                                    <th style="width:56px;">No</th>
+                                    <th>Tgl</th>
+                                    <th>Operator</th>
+                                    <th>Kode</th>
+                                    <th class="text-end">Qty</th>
+                                </tr>
+                            </thead>
+                            <tbody>
+                                @forelse (($pickupBreakdown ?? collect()) as $i => $row)
+                                    @php
+                                        $tglPickup = $row->tanggal_pickup
+                                            ? \Carbon\Carbon::parse($row->tanggal_pickup)
+                                            : null;
+                                        $pickup = (int) ($row->qty_pickup ?? 0);
+                                    @endphp
+                                    <tr>
+                                        <td class="mono text-muted">{{ $i + 1 }}</td>
+                                        <td class="mono">{{ $tglPickup ? $tglPickup->format('d/m') : '-' }}</td>
+                                        <td>
+                                            <div class="fw-semibold">{{ $row->operator_code ?? '-' }}</div>
+                                            <div class="muted small">{{ $row->operator_name ?? '-' }}</div>
+                                        </td>
+                                        <td>
+                                            <div class="fw-semibold mono">{{ $row->item_code ?? '' }}</div>
+                                            <div class="muted small d-none d-md-block">{{ $row->item_name ?? '' }}
+                                            </div>
+                                        </td>
+                                        <td class="text-end mono text-primary">{{ number_format($pickup) }}</td>
+                                    </tr>
+                                @empty
+                                    <tr>
+                                        <td colspan="5" class="text-center text-muted py-3">
+                                            Belum ada Sewing Pickup pada filter ini.
+                                        </td>
+                                    </tr>
+                                @endforelse
+                            </tbody>
+                        </table>
+                    </div>
+                </div>
+
+                {{-- Setor --}}
+                <div class="tab-pane fade" id="pane-setor" role="tabpanel" aria-labelledby="tab-setor">
+                    <div class="muted small mb-2">Tanggal setor dari created_at return line (non-void)</div>
+                    <div class="table-wrap">
+                        <table class="table table-sm align-middle mb-0">
+                            <thead>
+                                <tr>
+                                    <th style="width:56px;">No</th>
+                                    <th>Tgl</th>
+                                    <th>Operator</th>
+                                    <th>Kode</th>
+                                    <th class="text-end">OK</th>
+                                    <th class="text-end text-danger">RJ</th>
+                                    <th class="text-end">Tot</th>
+                                </tr>
+                            </thead>
+                            <tbody>
+                                @forelse ($itemBreakdown as $i => $row)
+                                    @php
+                                        $tglSetor = $row->tanggal_setor
+                                            ? \Carbon\Carbon::parse($row->tanggal_setor)
+                                            : null;
+                                        $ok = (int) ($row->qty_ok ?? 0);
+                                        $reject = (int) ($row->qty_reject ?? 0);
+                                        $total = (int) ($row->qty_total ?? $ok + $reject);
+                                    @endphp
+                                    <tr>
+                                        <td class="mono text-muted">{{ $i + 1 }}</td>
+                                        <td class="mono">{{ $tglSetor ? $tglSetor->format('d/m') : '-' }}</td>
+                                        <td>
+                                            <div class="fw-semibold">{{ $row->operator_code ?? '-' }}</div>
+                                            <div class="muted small">{{ $row->operator_name ?? '-' }}</div>
+                                        </td>
+                                        <td>
+                                            <div class="fw-semibold mono">{{ $row->item_code ?? '' }}</div>
+                                            <div class="muted small d-none d-md-block">{{ $row->item_name ?? '' }}
+                                            </div>
+                                        </td>
+                                        <td class="text-end mono text-success">{{ number_format($ok) }}</td>
+                                        <td class="text-end mono text-danger">{{ number_format($reject) }}</td>
+                                        <td class="text-end mono">{{ number_format($total) }}</td>
+                                    </tr>
+                                @empty
+                                    <tr>
+                                        <td colspan="7" class="text-center text-muted py-3">
+                                            Belum ada Sewing Return pada filter ini.
+                                        </td>
+                                    </tr>
+                                @endforelse
+                            </tbody>
+                        </table>
+                    </div>
+                </div>
+
+                {{-- WIP-FIN --}}
+                <div class="tab-pane fade" id="pane-wipfin" role="tabpanel" aria-labelledby="tab-wipfin">
+                    <div class="muted small mb-2">Setor OK (non-void) di tanggal terpilih</div>
+                    <div class="table-wrap">
+                        <table class="table table-sm align-middle mb-0">
+                            <thead>
+                                <tr>
+                                    <th>Item</th>
+                                    <th class="text-end">Masuk</th>
+                                </tr>
+                            </thead>
+                            <tbody>
+                                @forelse ($wipFinInBreakdown as $row)
+                                    <tr>
+                                        <td>
+                                            <div class="fw-semibold mono">{{ $row->code ?? '' }}</div>
+                                            <div class="muted small">{{ $row->name ?? '' }}</div>
+                                        </td>
+                                        <td class="text-end mono text-success">{{ number_format((int) $row->qty_in) }}
+                                        </td>
+                                    </tr>
+                                @empty
+                                    <tr>
+                                        <td colspan="2" class="text-center text-muted py-3">
+                                            Belum ada setor WIP-FIN pada filter ini.
+                                        </td>
+                                    </tr>
+                                @endforelse
+                            </tbody>
+                        </table>
+                    </div>
+                </div>
             </div>
         </div>
 

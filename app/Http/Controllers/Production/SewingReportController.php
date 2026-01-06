@@ -753,17 +753,18 @@ class SewingReportController extends Controller
 
         /*
         |--------------------------------------------------------------------------
-        | 7) Breakdown per Item (OK + Reject) di tanggal terpilih (exclude void return)
+        | 7) Breakdown per Item (OK + Reject) per Tanggal Setor + Operator
         |--------------------------------------------------------------------------
          */
         $itemBreakdownQuery = SewingReturnLine::query()
             ->join('sewing_returns', 'sewing_return_lines.sewing_return_id', '=', 'sewing_returns.id')
+            ->join('employees', 'sewing_returns.operator_id', '=', 'employees.id')
             ->join('sewing_pickup_lines', 'sewing_return_lines.sewing_pickup_line_id', '=', 'sewing_pickup_lines.id')
             ->join('items', 'sewing_pickup_lines.finished_item_id', '=', 'items.id')
-            ->whereDate('sewing_returns.date', $dateString)
+            ->whereDate('sewing_return_lines.created_at', $dateString) // ✅ filter dari created_at line
             ->where('items.type', 'finished_good');
 
-        $applyNotVoid($itemBreakdownQuery, 'sewing_returns');
+        $applyNotVoid($itemBreakdownQuery, 'sewing_returns'); // void tetap cek header return
 
         if ($operatorId) {
             $itemBreakdownQuery->where('sewing_returns.operator_id', $operatorId);
@@ -774,14 +775,68 @@ class SewingReportController extends Controller
 
         $itemBreakdown = $itemBreakdownQuery
             ->select(
-                'items.id',
-                'items.code',
-                'items.name',
-                DB::raw('SUM(COALESCE(sewing_return_lines.qty_ok,0)) as total_ok'),
-                DB::raw('SUM(COALESCE(sewing_return_lines.qty_reject,0)) as total_reject')
+                DB::raw('DATE(sewing_return_lines.created_at) as tanggal_setor'),
+                'employees.id as operator_id',
+                'employees.code as operator_code',
+                'employees.name as operator_name',
+                'items.id as item_id',
+                'items.code as item_code',
+                'items.name as item_name',
+                DB::raw('SUM(COALESCE(sewing_return_lines.qty_ok,0)) as qty_ok'),
+                DB::raw('SUM(COALESCE(sewing_return_lines.qty_reject,0)) as qty_reject'),
+                DB::raw('SUM(COALESCE(sewing_return_lines.qty_ok,0) + COALESCE(sewing_return_lines.qty_reject,0)) as qty_total')
             )
-            ->groupBy('items.id', 'items.code', 'items.name')
-            ->orderByDesc('total_ok')
+            ->groupBy(
+                DB::raw('DATE(sewing_return_lines.created_at)'),
+                'employees.id', 'employees.code', 'employees.name',
+                'items.id', 'items.code', 'items.name'
+            )
+            ->orderBy('tanggal_setor', 'asc')
+            ->orderBy('employees.code', 'asc')
+            ->orderBy('items.code', 'asc')
+            ->get();
+
+        /*
+        |--------------------------------------------------------------------------
+        | 1B) Breakdown Pickup per Item (Tanggal Pickup + Operator + Item)
+        |--------------------------------------------------------------------------
+         */
+        $pickupBreakdownQuery = SewingPickupLine::query()
+            ->join('sewing_pickups', 'sewing_pickup_lines.sewing_pickup_id', '=', 'sewing_pickups.id')
+            ->join('employees', 'sewing_pickups.operator_id', '=', 'employees.id')
+            ->join('items', 'sewing_pickup_lines.finished_item_id', '=', 'items.id')
+            ->whereDate('sewing_pickup_lines.created_at', $dateString) // ✅ tanggal pickup dari created_at line
+            ->whereNotNull('sewing_pickups.operator_id')
+            ->where('items.type', 'finished_good');
+
+        $applyNotVoid($pickupBreakdownQuery, 'sewing_pickups');
+
+        if ($operatorId) {
+            $pickupBreakdownQuery->where('sewing_pickups.operator_id', $operatorId);
+        }
+        if ($itemId) {
+            $pickupBreakdownQuery->where('items.id', $itemId);
+        }
+
+        $pickupBreakdown = $pickupBreakdownQuery
+            ->select(
+                DB::raw('DATE(sewing_pickup_lines.created_at) as tanggal_pickup'),
+                'employees.id as operator_id',
+                'employees.code as operator_code',
+                'employees.name as operator_name',
+                'items.id as item_id',
+                'items.code as item_code',
+                'items.name as item_name',
+                DB::raw('SUM(COALESCE(sewing_pickup_lines.qty_bundle,0)) as qty_pickup')
+            )
+            ->groupBy(
+                DB::raw('DATE(sewing_pickup_lines.created_at)'),
+                'employees.id', 'employees.code', 'employees.name',
+                'items.id', 'items.code', 'items.name'
+            )
+            ->orderBy('tanggal_pickup', 'asc')
+            ->orderBy('employees.code', 'asc')
+            ->orderBy('items.code', 'asc')
             ->get();
 
         /*
@@ -839,6 +894,7 @@ class SewingReportController extends Controller
             'items' => $items,
             'selectedOperatorId' => $operatorId,
             'selectedItemId' => $itemId,
+            'pickupBreakdown' => $pickupBreakdown,
         ]);
     }
 
