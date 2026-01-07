@@ -444,12 +444,12 @@ class RtsStockRequestController extends Controller
                 }
 
                 // Guard: tidak boleh terima melebihi sisa dispatched yang belum diterima
-                $maxReceivable = max((float) $line->qty_dispatched - (float) $line->qty_received, 0);
-                if ($qty > $maxReceivable + 0.0000001) {
-                    throw ValidationException::withMessages([
-                        "lines.{$line->id}.qty_received" => "Qty diterima melebihi sisa yang tersedia di Transit (maks: {$maxReceivable}).",
-                    ]);
-                }
+                // $maxReceivable = max((float) $line->qty_dispatched - (float) $line->qty_received, 0);
+                // if ($qty > $maxReceivable + 0.0000001) {
+                //     throw ValidationException::withMessages([
+                //         "lines.{$line->id}.qty_received" => "Qty diterima melebihi sisa yang tersedia di Transit (maks: {$maxReceivable}).",
+                //     ]);
+                // }
 
                 $anyReceived = true;
 

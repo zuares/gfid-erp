@@ -282,13 +282,13 @@ class RtsStockRequestProcessController extends Controller
                 $picked = (float) ($line->qty_picked ?? 0);
                 $requested = (float) ($line->qty_request ?? 0);
 
-                $maxDispatch = max($requested - $alreadyDispatched - $alreadyReceived - $picked, 0);
+                // $maxDispatch = max($requested - $alreadyDispatched - $alreadyReceived - $picked, 0);
 
-                if ($qtyToDispatch > $maxDispatch + 0.0000001) {
-                    throw ValidationException::withMessages([
-                        "lines.{$lineId}.qty_issued" => "Qty kirim melebihi sisa kebutuhan (maks: {$maxDispatch}). Sudah ada receive / pickup / dispatch sebelumnya.",
-                    ]);
-                }
+                // if ($qtyToDispatch > $maxDispatch + 0.0000001) {
+                //     throw ValidationException::withMessages([
+                //         "lines.{$lineId}.qty_issued" => "Qty kirim melebihi sisa kebutuhan (maks: {$maxDispatch}). Sudah ada receive / pickup / dispatch sebelumnya.",
+                //     ]);
+                // }
 
                 $anyDispatched = true;
 

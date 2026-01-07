@@ -79,10 +79,6 @@
             letter-spacing: -.01em;
         }
 
-        .sub {
-            margin-top: .18rem;
-        }
-
         .actions {
             display: flex;
             gap: .5rem;
@@ -327,6 +323,14 @@
             cursor: not-allowed;
         }
 
+        .hint {
+            margin-top: .30rem;
+            font-size: .76rem;
+            opacity: .75;
+            text-align: right;
+            line-height: 1.1;
+        }
+
         .err {
             margin-top: .35rem;
             font-size: .82rem;
@@ -334,7 +338,7 @@
             text-align: right;
         }
 
-        /* highlight prioritas row */
+        /* highlight prioritas row (berdasarkan suggested outstanding, bukan batas input) */
         .tbl tr.is-priority {
             background: var(--priority-soft);
         }
@@ -448,7 +452,8 @@
         $recvTotal = (float) $stockRequest->lines->sum('qty_received');
         $pickTotal = (float) $stockRequest->lines->sum('qty_picked');
 
-        $maxKirimTotal = (float) $stockRequest->lines->sum(function ($l) {
+        // ✅ ini sekarang "suggested outstanding" (bukan batas input)
+        $suggestTotal = (float) $stockRequest->lines->sum(function ($l) {
             $req = (float) ($l->qty_request ?? 0);
             $disp = (float) ($l->qty_dispatched ?? 0);
             $recv = (float) ($l->qty_received ?? 0);
@@ -465,7 +470,6 @@
         {{-- HEADER (semua role) --}}
         <div class="header-row">
             <div class="header-left">
-                {{-- Tombol kembali ke list PRD --}}
                 <a href="{{ route('prd.stock-requests.index') }}" class="btn btn-outline btn-back">
                     ← <span>Kembali</span>
                 </a>
@@ -498,15 +502,14 @@
             </div>
         </div>
 
-        {{-- QUICK + SUMMARY: non-operating saja (supaya operator lebih simpel) --}}
+        {{-- QUICK + SUMMARY: non-operating saja --}}
         @unless ($isOperating)
-            {{-- QUICK ACTIONS --}}
             <div class="top-actions">
-                <button type="button" class="btn btn-outline" id="btnFillAll">Isi Semua</button>
+                {{-- ✅ tombol "Isi Semua" sekarang isi "Suggested" (outstanding), bukan max-limit --}}
+                <button type="button" class="btn btn-outline" id="btnFillSuggested">Isi Suggested</button>
                 <button type="button" class="btn btn-outline" id="btnClearAll">Kosongkan</button>
             </div>
 
-            {{-- SUMMARY --}}
             <div class="card" style="margin-top:.6rem">
                 <div class="stats">
                     <div class="stat">
@@ -518,23 +521,29 @@
                         <div class="v mono">{{ $dispTotal }}</div>
                     </div>
                     <div class="stat">
-                        <div class="k">Sisa Kirim</div>
-                        <div class="v mono">{{ $maxKirimTotal }}</div>
+                        <div class="k">Suggested (Sisa Kebutuhan)</div>
+                        <div class="v mono">{{ $suggestTotal }}</div>
                     </div>
                 </div>
 
                 <div class="badge-scroll">
-                    <span class="badge info js-hide-zero" data-zero="{{ $inTransit }}"><span class="dot"></span>Transit
-                        <b class="mono">{{ $inTransit }}</b></span>
-                    <span class="badge info js-hide-zero" data-zero="{{ $outRts }}"><span class="dot"></span>Sisa RTS
-                        <b class="mono">{{ $outRts }}</b></span>
-                    <span class="badge info js-hide-zero" data-zero="{{ $pickTotal }}"><span class="dot"></span>Pickup
-                        <b class="mono">{{ $pickTotal }}</b></span>
+                    <span class="badge info js-hide-zero" data-zero="{{ $inTransit }}">
+                        <span class="dot"></span>Transit <b class="mono">{{ $inTransit }}</b>
+                    </span>
+                    <span class="badge info js-hide-zero" data-zero="{{ $outRts }}">
+                        <span class="dot"></span>Sisa RTS <b class="mono">{{ $outRts }}</b>
+                    </span>
+                    <span class="badge info js-hide-zero" data-zero="{{ $pickTotal }}">
+                        <span class="dot"></span>Pickup <b class="mono">{{ $pickTotal }}</b>
+                    </span>
+                    <span class="badge warn">
+                        <span class="dot"></span>Catatan: PRD boleh kirim &gt; permintaan
+                    </span>
                 </div>
             </div>
         @endunless
 
-        {{-- FORM (OPERATING: fokus utama di sini) --}}
+        {{-- FORM --}}
         <form method="POST" action="{{ route('prd.stock-requests.confirm', $stockRequest) }}" style="margin-top:.85rem">
             @csrf
 
@@ -566,17 +575,18 @@
                                     $recv = (float) ($line->qty_received ?? 0);
                                     $pick = (float) ($line->qty_picked ?? 0);
 
-                                    $maxKirim = max($req - $disp - $recv - $pick, 0);
-                                    $disabled = $maxKirim <= 0.0000001;
+                                    // ✅ suggested outstanding (bukan batas)
+                                    $suggest = max($req - $disp - $recv - $pick, 0);
 
-                                    $isPriority = !$disabled && $req > 0 && $maxKirim >= $req * 0.5;
+                                    // priority: kalau suggested masih besar
+                                    $isPriority = $suggest > 0.0000001 && $req > 0 && $suggest >= $req * 0.5;
 
                                     $old = old("lines.{$line->id}.qty_issued", null);
-                                    $val = $disabled ? 0 : (is_null($old) ? 0 : $old);
+                                    $val = is_null($old) ? 0 : $old;
 
-                                    if ($disabled) {
+                                    if ($suggest <= 0.0000001) {
                                         $stCls = 'badge ok';
-                                        $stLbl = 'Tuntas';
+                                        $stLbl = 'Suggested: 0';
                                     } elseif ($isPriority) {
                                         $stCls = 'badge warn';
                                         $stLbl = 'Prioritas';
@@ -585,7 +595,6 @@
                                         $stLbl = 'Proses';
                                     }
 
-                                    // catatan per line (support notes kolom lama & kolom notes baru)
                                     $note = trim((string) ($line->notes ?? ($line->note ?? '')));
                                 @endphp
 
@@ -596,27 +605,35 @@
                                         <div class="item-code mono">{{ $line->item->code }}</div>
                                         <div class="item-name">{{ $line->item->name }}</div>
 
-                                        {{-- BADGE DI ITEM --}}
                                         <div class="item-badges">
-                                            {{-- Status kecil (Tuntas / Prioritas / Proses) HANYA untuk non-operating --}}
                                             @unless ($isOperating)
                                                 <span class="{{ $stCls }}">
                                                     <span class="dot"></span>{{ $stLbl }}
                                                 </span>
                                             @endunless
 
-                                            {{-- Req & Disp tetap tampil untuk semua role --}}
                                             <span class="badge info">
-                                                <span class="dot"></span>Permintaan
-                                                <b class="mono">{{ $req }}</b>
+                                                <span class="dot"></span>Permintaan <b
+                                                    class="mono">{{ $req }}</b>
                                             </span>
                                             <span class="badge info js-hide-zero" data-zero="{{ $disp }}">
-                                                <span class="dot"></span>Disp
-                                                <b class="mono">{{ $disp }}</b>
+                                                <span class="dot"></span>Disp <b class="mono">{{ $disp }}</b>
+                                            </span>
+                                            <span class="badge info js-hide-zero" data-zero="{{ $recv }}">
+                                                <span class="dot"></span>Receive <b
+                                                    class="mono">{{ $recv }}</b>
+                                            </span>
+                                            <span class="badge info js-hide-zero" data-zero="{{ $pick }}">
+                                                <span class="dot"></span>Picked <b
+                                                    class="mono">{{ $pick }}</b>
+                                            </span>
+
+                                            <span class="badge info">
+                                                <span class="dot"></span>Suggested <b
+                                                    class="mono">{{ $suggest }}</b>
                                             </span>
                                         </div>
 
-                                        {{-- CATATAN --}}
                                         @if ($note !== '')
                                             <div class="item-note">
                                                 <div class="lbl">Catatan</div>
@@ -626,11 +643,12 @@
                                     </td>
 
                                     <td class="col-send">
+                                        {{-- ✅ max + data-max dihapus: tidak ada lagi batas kirim berdasarkan permintaan --}}
                                         <input class="num js-issue js-selectall" type="number" step="0.01"
-                                            min="0" max="{{ $maxKirim }}"
-                                            name="lines[{{ $line->id }}][qty_issued]" value="{{ $val }}"
-                                            data-max="{{ $maxKirim }}" {{ $disabled ? 'disabled' : '' }}
+                                            min="0" name="lines[{{ $line->id }}][qty_issued]"
+                                            value="{{ $val }}" data-suggest="{{ $suggest }}"
                                             inputmode="decimal" autocomplete="off">
+
 
                                         @error("lines.{$line->id}.qty_issued")
                                             <div class="err">{{ $message }}</div>
@@ -670,13 +688,12 @@
         (function() {
             const inputs = Array.from(document.querySelectorAll('.js-issue'));
 
-            function clampInput(el) {
-                if (el.disabled) return;
-                const max = parseFloat(el.dataset.max || el.max || '0') || 0;
+            function clampNonNegative(el) {
                 let v = parseFloat(el.value || '0');
                 if (Number.isNaN(v) || v < 0) v = 0;
-                if (v > max) v = max;
-                el.value = (Math.round(v * 100) / 100).toFixed(2).replace(/\.00$/, '');
+                // 2 decimal
+                v = Math.round(v * 100) / 100;
+                el.value = (v).toFixed(2).replace(/\.00$/, '');
             }
 
             function toNum(x) {
@@ -688,17 +705,15 @@
                 return Math.abs(n) <= 0.0000001;
             }
 
-            // hide zero badges (summary + Disp badge)
+            // hide zero badges
             document.querySelectorAll('.js-hide-zero').forEach(b => {
                 const v = toNum(b.getAttribute('data-zero'));
                 if (isZero(v)) b.classList.add('is-hidden');
             });
 
-            // auto select all text on focus/click (biar gampang overwrite angka)
             function selectAll(el) {
                 try {
                     el.focus();
-                    // delay kecil biar aman di mobile safari
                     setTimeout(() => {
                         try {
                             el.select();
@@ -712,27 +727,25 @@
             }
 
             inputs.forEach(i => {
-                i.addEventListener('blur', () => clampInput(i));
-                i.addEventListener('change', () => clampInput(i));
-
+                i.addEventListener('blur', () => clampNonNegative(i));
+                i.addEventListener('change', () => clampNonNegative(i));
                 i.addEventListener('focus', () => selectAll(i));
                 i.addEventListener('click', () => selectAll(i));
             });
 
-            document.getElementById('btnFillAll')?.addEventListener('click', () => {
+            // ✅ Isi Suggested (outstanding) sebagai rekomendasi cepat
+            document.getElementById('btnFillSuggested')?.addEventListener('click', () => {
                 inputs.forEach(el => {
-                    if (el.disabled) return;
-                    const max = parseFloat(el.dataset.max || el.max || '0') || 0;
-                    el.value = max > 0 ? max : 0;
-                    clampInput(el);
+                    const s = parseFloat(el.dataset.suggest || '0') || 0;
+                    el.value = s > 0 ? s : 0;
+                    clampNonNegative(el);
                 });
             });
 
             document.getElementById('btnClearAll')?.addEventListener('click', () => {
                 inputs.forEach(el => {
-                    if (el.disabled) return;
                     el.value = 0;
-                    clampInput(el);
+                    clampNonNegative(el);
                 });
             });
         })();

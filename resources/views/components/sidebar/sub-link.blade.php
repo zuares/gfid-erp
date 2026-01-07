@@ -1,4 +1,4 @@
-{{-- resources/views/components/sidebar/simple-link.blade.php --}}
+{{-- resources/views/components/sidebar/sub-link.blade.php --}}
 @props([
     'href',
     'icon' => '',
@@ -6,13 +6,13 @@
 
     // ✅ dot-only badge
     'dotOnly' => false,
-    'badgeTone' => 'warn', // warn|ok|danger|info|muted
-    'badgeTitle' => null, // tooltip
+    'badgeTone' => 'warn',
+    'badgeTitle' => null,
 ])
 
 <a href="{{ $href }}"
     {{ $attributes->merge([
-        'class' => 'sidebar-link ' . ($active ? 'active' : ''),
+        'class' => 'sidebar-link-sub ' . ($active ? 'active' : ''),
     ]) }}>
     @if ($icon)
         <span class="icon">{{ $icon }}</span>

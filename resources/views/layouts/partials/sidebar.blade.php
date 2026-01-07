@@ -1,5 +1,7 @@
 {{-- resources/views/layouts/partials/sidebar.blade.php --}}
 @php
+    use Illuminate\Support\Facades\DB;
+
     $userRole = auth()->user()->role ?? null;
 
     $isOwner = $userRole === 'owner';
@@ -20,7 +22,6 @@
 
     // ✅ buka group Sales kalau di halaman laporan pengiriman juga
     $salesReportOpen = request()->routeIs('sales.reports.*') || request()->routeIs('sales.shipments.report');
-
     $salesOpen = $salesInvoiceOpen || $salesShipmentOpen || $salesShipmentReturnOpen || $salesReportOpen;
 
     $payrollOpen =
@@ -30,7 +31,6 @@
         request()->routeIs('payroll.reports.*');
 
     $costingOpen = request()->routeIs('costing.hpp.*') || request()->routeIs('costing.production_cost_periods.*');
-    $financeReportsOpen = $salesReportOpen;
 
     $invStocksOpen = request()->routeIs('inventory.stocks.*');
     $invOpnameOpen = request()->routeIs('inventory.stock_opnames.*');
@@ -76,6 +76,41 @@
 
     // agregat: kalau salah satu menu produksi aktif, dropdown Production dibuka
     $prodOpen = $prodCutOpen || $prodSewOpen || $prodFinOpen || $prodPackOpen || $prodQcOpen || $prodReportOpen;
+
+    // =========================================================
+    // ✅ BADGE COUNTERS (DOT-ONLY + TOOLTIP ANGKA)
+    // =========================================================
+    // RTS: "Perlu diterima" = outstanding di TRANSIT (dispatched - received), untuk request yang belum completed
+    $rtsNeedReceiveQty = (float) DB::table('stock_request_lines as l')
+        ->join('stock_requests as r', 'r.id', '=', 'l.stock_request_id')
+        ->where('r.purpose', 'rts_replenish')
+        ->whereIn('r.status', ['submitted', 'shipped', 'partial'])
+        ->selectRaw(
+            'COALESCE(SUM(CASE WHEN (COALESCE(l.qty_dispatched,0) - COALESCE(l.qty_received,0)) > 0 THEN (COALESCE(l.qty_dispatched,0) - COALESCE(l.qty_received,0)) ELSE 0 END),0) as s',
+        )
+        ->value('s');
+
+    // PRD: "Perlu diproses" = outstanding PRD untuk dispatch (request - dispatched - received - picked)
+    // (picked dihitung supaya PRD tahu kebutuhan sudah terpenuhi via pickup)
+    $prdNeedProcessQty = (float) DB::table('stock_request_lines as l')
+        ->join('stock_requests as r', 'r.id', '=', 'l.stock_request_id')
+        ->where('r.purpose', 'rts_replenish')
+        ->whereIn('r.status', ['submitted', 'shipped', 'partial'])
+        ->selectRaw(
+            'COALESCE(SUM(CASE WHEN (COALESCE(l.qty_request,0) - COALESCE(l.qty_dispatched,0) - COALESCE(l.qty_received,0) - COALESCE(l.qty_picked,0)) > 0 THEN (COALESCE(l.qty_request,0) - COALESCE(l.qty_dispatched,0) - COALESCE(l.qty_received,0) - COALESCE(l.qty_picked,0)) ELSE 0 END),0) as s',
+        )
+        ->value('s');
+
+    $hasRtsNeedReceive = $rtsNeedReceiveQty > 0.000001;
+    $hasPrdNeedProcess = $prdNeedProcessQty > 0.000001;
+
+    $fmtQty = function ($n) {
+        $n = (float) $n;
+        return rtrim(rtrim(number_format($n, 2, '.', ''), '0'), '.');
+    };
+
+    $rtsBadgeTitle = 'Perlu diterima: ' . $fmtQty($rtsNeedReceiveQty);
+    $prdBadgeTitle = 'Perlu diproses: ' . $fmtQty($prdNeedProcessQty);
 @endphp
 
 <style>
@@ -157,6 +192,7 @@
         text-decoration: none;
         font-size: .93rem;
         transition: background .18s ease, box-shadow .18s ease, transform .12s ease, color .18s ease;
+        position: relative;
     }
 
     .sidebar-link .icon {
@@ -214,11 +250,18 @@
         padding: .4rem .9rem .4rem 2.3rem;
         opacity: .95;
         border-radius: 10px;
+        display: flex;
+        align-items: center;
+        gap: .55rem;
+        color: var(--text);
+        text-decoration: none;
+        transition: background .18s ease, box-shadow .18s ease, transform .12s ease, color .18s ease;
     }
 
     .sidebar-link-sub .icon {
         width: 18px;
         font-size: .9rem;
+        text-align: center;
     }
 
     .sidebar-link-sub:hover {
@@ -249,6 +292,38 @@
     .simple-group {
         margin-top: .4rem;
     }
+
+    /* ✅ DOT-ONLY BADGE (dipakai oleh component) */
+    .nav-dot {
+        width: 9px;
+        height: 9px;
+        border-radius: 999px;
+        display: inline-block;
+        margin-left: auto;
+        flex: 0 0 auto;
+        box-shadow: 0 0 0 2px color-mix(in srgb, var(--card) 70%, transparent 30%);
+        opacity: .95;
+    }
+
+    .nav-dot.warn {
+        background: rgba(245, 158, 11, 1);
+    }
+
+    .nav-dot.ok {
+        background: rgba(16, 185, 129, 1);
+    }
+
+    .nav-dot.danger {
+        background: rgba(239, 68, 68, 1);
+    }
+
+    .nav-dot.info {
+        background: rgba(59, 130, 246, 1);
+    }
+
+    .nav-dot.muted {
+        background: rgba(100, 116, 139, 1);
+    }
 </style>
 
 <aside class="sidebar-modern flex-column">
@@ -266,6 +341,7 @@
             ADMIN / OPERATING (NO DROPDOWN)
         ============================ --}}
         @if ($isAdmin || $isOperating)
+
             <x-sidebar.label text="Inventory" />
             <li class="simple-group">
                 <x-sidebar.simple-link href="{{ route('inventory.stocks.items') }}" icon="📦" :active="request()->routeIs('inventory.stocks.items')">
@@ -282,14 +358,14 @@
             <li class="simple-group">
                 @if ($isAdmin)
                     <x-sidebar.simple-link href="{{ route('rts.stock-requests.index') }}" icon="🛒"
-                        :active="request()->routeIs('rts.stock-requests.*')">
+                        :active="request()->routeIs('rts.stock-requests.*')" :dot-only="$hasRtsNeedReceive" badge-tone="warn" :badge-title="$rtsBadgeTitle">
                         Permintaan Stock (RTS)
                     </x-sidebar.simple-link>
                 @endif
 
                 @if ($isOperating)
                     <x-sidebar.simple-link href="{{ route('prd.stock-requests.index') }}" icon="🏭"
-                        :active="request()->routeIs('prd.stock-requests.*')">
+                        :active="request()->routeIs('prd.stock-requests.*')" :dot-only="$hasPrdNeedProcess" badge-tone="warn" :badge-title="$prdBadgeTitle">
                         Proses Stock Request (PRD)
                     </x-sidebar.simple-link>
                 @endif
@@ -319,19 +395,16 @@
                         Daftar Cutting Jobs
                     </x-sidebar.simple-link>
 
-                    {{-- ✅ UPDATED --}}
                     <x-sidebar.simple-link href="{{ route('production.sewing.pickups.index') }}" icon="🧵"
                         :active="request()->routeIs('production.sewing.pickups.*')">
                         Daftar Sewing Pickups
                     </x-sidebar.simple-link>
 
-                    {{-- ✅ UPDATED --}}
                     <x-sidebar.simple-link href="{{ route('production.sewing.returns.index') }}" icon="📥"
                         :active="request()->routeIs('production.sewing.returns.*')">
                         Daftar Sewing Returns
                     </x-sidebar.simple-link>
 
-                    {{-- ✅ NEW --}}
                     <x-sidebar.simple-link href="{{ route('production.sewing.adjustments.index') }}" icon="🧮"
                         :active="request()->routeIs('production.sewing.adjustments.*')">
                         Progress Adjustments
@@ -364,14 +437,12 @@
                 </button>
 
                 <div class="collapse {{ $masterOpen ? 'show' : '' }}" id="navMaster">
-                    <a href="{{ route('master.items.index') }}"
-                        class="sidebar-link sidebar-link-sub {{ request()->routeIs('master.items.*') ? 'active' : '' }}">
-                        <span class="icon">📦</span><span>Items</span>
-                    </a>
-                    <a href="{{ route('master.customers.index') }}"
-                        class="sidebar-link sidebar-link-sub {{ request()->routeIs('master.customers.*') ? 'active' : '' }}">
-                        <span class="icon">👤</span><span>Customers</span>
-                    </a>
+                    <x-sidebar.sub-link href="{{ route('master.items.index') }}" icon="📦" :active="request()->routeIs('master.items.*')">
+                        Items
+                    </x-sidebar.sub-link>
+                    <x-sidebar.sub-link href="{{ route('master.customers.index') }}" icon="👤" :active="request()->routeIs('master.customers.*')">
+                        Customers
+                    </x-sidebar.sub-link>
                 </div>
             </li>
 
@@ -387,14 +458,14 @@
                 </button>
 
                 <div class="collapse {{ $poOpen ? 'show' : '' }}" id="navPurchasingPO">
-                    <a href="{{ route('purchasing.purchase_orders.index') }}"
-                        class="sidebar-link sidebar-link-sub {{ request()->routeIs('purchasing.purchase_orders.index') ? 'active' : '' }}">
-                        <span class="icon">≡</span><span>Daftar PO</span>
-                    </a>
-                    <a href="{{ route('purchasing.purchase_orders.create') }}"
-                        class="sidebar-link sidebar-link-sub {{ request()->routeIs('purchasing.purchase_orders.create') ? 'active' : '' }}">
-                        <span class="icon">＋</span><span>PO Baru</span>
-                    </a>
+                    <x-sidebar.sub-link href="{{ route('purchasing.purchase_orders.index') }}" icon="≡"
+                        :active="request()->routeIs('purchasing.purchase_orders.index')">
+                        Daftar PO
+                    </x-sidebar.sub-link>
+                    <x-sidebar.sub-link href="{{ route('purchasing.purchase_orders.create') }}" icon="＋"
+                        :active="request()->routeIs('purchasing.purchase_orders.create')">
+                        PO Baru
+                    </x-sidebar.sub-link>
                 </div>
             </li>
 
@@ -408,14 +479,14 @@
                 </button>
 
                 <div class="collapse {{ $grnOpen ? 'show' : '' }}" id="navPurchasingGRN">
-                    <a href="{{ route('purchasing.purchase_receipts.index') }}"
-                        class="sidebar-link sidebar-link-sub {{ request()->routeIs('purchasing.purchase_receipts.index') ? 'active' : '' }}">
-                        <span class="icon">≡</span><span>Daftar GRN</span>
-                    </a>
-                    <a href="{{ route('purchasing.purchase_receipts.create') }}"
-                        class="sidebar-link sidebar-link-sub {{ request()->routeIs('purchasing.purchase_receipts.create') ? 'active' : '' }}">
-                        <span class="icon">＋</span><span>GRN Baru</span>
-                    </a>
+                    <x-sidebar.sub-link href="{{ route('purchasing.purchase_receipts.index') }}" icon="≡"
+                        :active="request()->routeIs('purchasing.purchase_receipts.index')">
+                        Daftar GRN
+                    </x-sidebar.sub-link>
+                    <x-sidebar.sub-link href="{{ route('purchasing.purchase_receipts.create') }}" icon="＋"
+                        :active="request()->routeIs('purchasing.purchase_receipts.create')">
+                        GRN Baru
+                    </x-sidebar.sub-link>
                 </div>
             </li>
 
@@ -431,14 +502,14 @@
                 </button>
 
                 <div class="collapse {{ $marketplaceOpen ? 'show' : '' }}" id="navMarketplace">
-                    <a href="{{ route('marketplace.orders.index') }}"
-                        class="sidebar-link sidebar-link-sub {{ request()->routeIs('marketplace.orders.index') ? 'active' : '' }}">
-                        <span class="icon">≡</span><span>Daftar Order</span>
-                    </a>
-                    <a href="{{ route('marketplace.orders.create') }}"
-                        class="sidebar-link sidebar-link-sub {{ request()->routeIs('marketplace.orders.create') ? 'active' : '' }}">
-                        <span class="icon">＋</span><span>Order Manual</span>
-                    </a>
+                    <x-sidebar.sub-link href="{{ route('marketplace.orders.index') }}" icon="≡"
+                        :active="request()->routeIs('marketplace.orders.index')">
+                        Daftar Order
+                    </x-sidebar.sub-link>
+                    <x-sidebar.sub-link href="{{ route('marketplace.orders.create') }}" icon="＋"
+                        :active="request()->routeIs('marketplace.orders.create')">
+                        Order Manual
+                    </x-sidebar.sub-link>
                 </div>
             </li>
 
@@ -452,52 +523,51 @@
                 </button>
 
                 <div class="collapse {{ $salesOpen ? 'show' : '' }}" id="navSales">
-                    <a href="{{ route('sales.invoices.index') }}"
-                        class="sidebar-link sidebar-link-sub {{ request()->routeIs('sales.invoices.index') ? 'active' : '' }}">
-                        <span class="icon">≡</span><span>Daftar Invoice</span>
-                    </a>
-                    <a href="{{ route('sales.invoices.create') }}"
-                        class="sidebar-link sidebar-link-sub {{ request()->routeIs('sales.invoices.create') ? 'active' : '' }}">
-                        <span class="icon">＋</span><span>Invoice Baru</span>
-                    </a>
+                    <x-sidebar.sub-link href="{{ route('sales.invoices.index') }}" icon="≡" :active="request()->routeIs('sales.invoices.index')">
+                        Daftar Invoice
+                    </x-sidebar.sub-link>
+                    <x-sidebar.sub-link href="{{ route('sales.invoices.create') }}" icon="＋"
+                        :active="request()->routeIs('sales.invoices.create')">
+                        Invoice Baru
+                    </x-sidebar.sub-link>
 
                     <div class="px-3 pt-2 pb-1 text-uppercase"
                         style="font-size:.68rem; letter-spacing:.12em; color:var(--muted);">
                         Shipments
                     </div>
 
-                    <a href="{{ route('sales.shipments.index') }}"
-                        class="sidebar-link sidebar-link-sub {{ request()->routeIs('sales.shipments.index') ? 'active' : '' }}">
-                        <span class="icon">🚚</span><span>Daftar Shipment</span>
-                    </a>
-                    <a href="{{ route('sales.shipments.create') }}"
-                        class="sidebar-link sidebar-link-sub {{ request()->routeIs('sales.shipments.create') ? 'active' : '' }}">
-                        <span class="icon">＋</span><span>Shipment Baru</span>
-                    </a>
+                    <x-sidebar.sub-link href="{{ route('sales.shipments.index') }}" icon="🚚"
+                        :active="request()->routeIs('sales.shipments.index')">
+                        Daftar Shipment
+                    </x-sidebar.sub-link>
+                    <x-sidebar.sub-link href="{{ route('sales.shipments.create') }}" icon="＋"
+                        :active="request()->routeIs('sales.shipments.create')">
+                        Shipment Baru
+                    </x-sidebar.sub-link>
 
                     <div class="px-3 pt-3 pb-1 text-uppercase"
                         style="font-size:.68rem; letter-spacing:.12em; color:var(--muted);">
                         Shipment Returns
                     </div>
 
-                    <a href="{{ route('sales.shipment_returns.index') }}"
-                        class="sidebar-link sidebar-link-sub {{ request()->routeIs('sales.shipment_returns.index') ? 'active' : '' }}">
-                        <span class="icon">🔁</span><span>Daftar Retur</span>
-                    </a>
-                    <a href="{{ route('sales.shipment_returns.create') }}"
-                        class="sidebar-link sidebar-link-sub {{ request()->routeIs('sales.shipment_returns.create') ? 'active' : '' }}">
-                        <span class="icon">＋</span><span>Retur Shipment Baru</span>
-                    </a>
+                    <x-sidebar.sub-link href="{{ route('sales.shipment_returns.index') }}" icon="🔁"
+                        :active="request()->routeIs('sales.shipment_returns.index')">
+                        Daftar Retur
+                    </x-sidebar.sub-link>
+                    <x-sidebar.sub-link href="{{ route('sales.shipment_returns.create') }}" icon="＋"
+                        :active="request()->routeIs('sales.shipment_returns.create')">
+                        Retur Shipment Baru
+                    </x-sidebar.sub-link>
 
                     <div class="px-3 pt-3 pb-1 text-uppercase"
                         style="font-size:.68rem; letter-spacing:.12em; color:var(--muted);">
                         Sales Reports
                     </div>
 
-                    <a href="{{ route('sales.shipments.report') }}"
-                        class="sidebar-link sidebar-link-sub {{ request()->routeIs('sales.shipments.report') ? 'active' : '' }}">
-                        <span class="icon">📊</span><span>Laporan Pengiriman</span>
-                    </a>
+                    <x-sidebar.sub-link href="{{ route('sales.shipments.report') }}" icon="📊"
+                        :active="request()->routeIs('sales.shipments.report')">
+                        Laporan Pengiriman
+                    </x-sidebar.sub-link>
                 </div>
             </li>
 
@@ -518,58 +588,58 @@
                         Stock
                     </div>
 
-                    <a href="{{ route('inventory.stocks.items') }}"
-                        class="sidebar-link sidebar-link-sub {{ request()->routeIs('inventory.stocks.items') ? 'active' : '' }}">
-                        <span class="icon">📦</span><span>Stok Barang</span>
-                    </a>
-                    <a href="{{ route('inventory.stocks.lots') }}"
-                        class="sidebar-link sidebar-link-sub {{ request()->routeIs('inventory.stocks.lots') ? 'active' : '' }}">
-                        <span class="icon">🎫</span><span>Stok per LOT</span>
-                    </a>
-                    <a href="{{ route('inventory.stock_card.index') }}"
-                        class="sidebar-link sidebar-link-sub {{ request()->routeIs('inventory.stock_card.*') ? 'active' : '' }}">
-                        <span class="icon">📋</span><span>Kartu Stok</span>
-                    </a>
-                    <a href="{{ route('inventory.transfers.index') }}"
-                        class="sidebar-link sidebar-link-sub {{ request()->routeIs('inventory.transfers.index') ? 'active' : '' }}">
-                        <span class="icon">🔁</span><span>Daftar Transfer</span>
-                    </a>
-                    <a href="{{ route('inventory.transfers.create') }}"
-                        class="sidebar-link sidebar-link-sub {{ request()->routeIs('inventory.transfers.create') ? 'active' : '' }}">
-                        <span class="icon">➕</span><span>Transfer Baru</span>
-                    </a>
-                    <a href="{{ route('inventory.adjustments.index') }}"
-                        class="sidebar-link sidebar-link-sub {{ request()->routeIs('inventory.adjustments.*') ? 'active' : '' }}">
-                        <span class="icon">⚖️</span><span>Inventory Adjustments</span>
-                    </a>
+                    <x-sidebar.sub-link href="{{ route('inventory.stocks.items') }}" icon="📦"
+                        :active="request()->routeIs('inventory.stocks.items')">
+                        Stok Barang
+                    </x-sidebar.sub-link>
+                    <x-sidebar.sub-link href="{{ route('inventory.stocks.lots') }}" icon="🎫"
+                        :active="request()->routeIs('inventory.stocks.lots')">
+                        Stok per LOT
+                    </x-sidebar.sub-link>
+                    <x-sidebar.sub-link href="{{ route('inventory.stock_card.index') }}" icon="📋"
+                        :active="request()->routeIs('inventory.stock_card.*')">
+                        Kartu Stok
+                    </x-sidebar.sub-link>
+                    <x-sidebar.sub-link href="{{ route('inventory.transfers.index') }}" icon="🔁"
+                        :active="request()->routeIs('inventory.transfers.index')">
+                        Daftar Transfer
+                    </x-sidebar.sub-link>
+                    <x-sidebar.sub-link href="{{ route('inventory.transfers.create') }}" icon="➕"
+                        :active="request()->routeIs('inventory.transfers.create')">
+                        Transfer Baru
+                    </x-sidebar.sub-link>
+                    <x-sidebar.sub-link href="{{ route('inventory.adjustments.index') }}" icon="⚖️"
+                        :active="request()->routeIs('inventory.adjustments.*')">
+                        Inventory Adjustments
+                    </x-sidebar.sub-link>
 
                     <div class="px-3 pt-3 pb-1 text-uppercase"
                         style="font-size:.68rem; letter-spacing:.12em; color:var(--muted);">
                         Opname
                     </div>
 
-                    <a href="{{ route('inventory.stock_opnames.index') }}"
-                        class="sidebar-link sidebar-link-sub {{ request()->routeIs('inventory.stock_opnames.*') ? 'active' : '' }}">
-                        <span class="icon">📊</span><span>Stock Opname</span>
-                    </a>
-                    <a href="{{ route('inventory.stock_opnames.create') }}"
-                        class="sidebar-link sidebar-link-sub {{ request()->routeIs('inventory.stock_opnames.create') ? 'active' : '' }}">
-                        <span class="icon">＋</span><span>Stock Opname Baru</span>
-                    </a>
+                    <x-sidebar.sub-link href="{{ route('inventory.stock_opnames.index') }}" icon="📊"
+                        :active="request()->routeIs('inventory.stock_opnames.*')">
+                        Stock Opname
+                    </x-sidebar.sub-link>
+                    <x-sidebar.sub-link href="{{ route('inventory.stock_opnames.create') }}" icon="＋"
+                        :active="request()->routeIs('inventory.stock_opnames.create')">
+                        Stock Opname Baru
+                    </x-sidebar.sub-link>
 
                     <div class="px-3 pt-3 pb-1 text-uppercase"
                         style="font-size:.68rem; letter-spacing:.12em; color:var(--muted);">
                         External
                     </div>
 
-                    <a href="{{ route('inventory.external_transfers.index') }}"
-                        class="sidebar-link sidebar-link-sub {{ request()->routeIs('inventory.external_transfers.index') ? 'active' : '' }}">
-                        <span class="icon">🚚</span><span>Daftar External TF</span>
-                    </a>
-                    <a href="{{ route('inventory.external_transfers.create') }}"
-                        class="sidebar-link sidebar-link-sub {{ request()->routeIs('inventory.external_transfers.create') ? 'active' : '' }}">
-                        <span class="icon">➕</span><span>External TF Baru</span>
-                    </a>
+                    <x-sidebar.sub-link href="{{ route('inventory.external_transfers.index') }}" icon="🚚"
+                        :active="request()->routeIs('inventory.external_transfers.index')">
+                        Daftar External TF
+                    </x-sidebar.sub-link>
+                    <x-sidebar.sub-link href="{{ route('inventory.external_transfers.create') }}" icon="➕"
+                        :active="request()->routeIs('inventory.external_transfers.create')">
+                        External TF Baru
+                    </x-sidebar.sub-link>
                 </div>
             </li>
 
@@ -585,14 +655,15 @@
                 </button>
 
                 <div class="collapse {{ $stockReqOpen ? 'show' : '' }}" id="navInventoryStockRequests">
-                    <a href="{{ route('rts.stock-requests.index') }}"
-                        class="sidebar-link sidebar-link-sub {{ request()->routeIs('rts.stock-requests.*') ? 'active' : '' }}">
-                        <span class="icon">🛒</span><span>Permintaan Stock (RTS)</span>
-                    </a>
-                    <a href="{{ route('prd.stock-requests.index') }}"
-                        class="sidebar-link sidebar-link-sub {{ request()->routeIs('prd.stock-requests.*') ? 'active' : '' }}">
-                        <span class="icon">🏭</span><span>Proses Stock Request (PRD)</span>
-                    </a>
+                    <x-sidebar.sub-link href="{{ route('rts.stock-requests.index') }}" icon="🛒"
+                        :active="request()->routeIs('rts.stock-requests.*')" :dot-only="$hasRtsNeedReceive" badge-tone="warn" :badge-title="$rtsBadgeTitle">
+                        Permintaan Stock (RTS)
+                    </x-sidebar.sub-link>
+
+                    <x-sidebar.sub-link href="{{ route('prd.stock-requests.index') }}" icon="🏭"
+                        :active="request()->routeIs('prd.stock-requests.*')" :dot-only="$hasPrdNeedProcess" badge-tone="warn" :badge-title="$prdBadgeTitle">
+                        Proses Stock Request (PRD)
+                    </x-sidebar.sub-link>
                 </div>
             </li>
 
@@ -613,135 +684,131 @@
                         Jobs
                     </div>
 
-                    <a href="{{ route('production.cutting_jobs.index') }}"
-                        class="sidebar-link sidebar-link-sub {{ request()->routeIs('production.cutting_jobs.*') ? 'active' : '' }}">
-                        <span class="icon">✂️</span><span>Cutting Jobs</span>
-                    </a>
+                    <x-sidebar.sub-link href="{{ route('production.cutting_jobs.index') }}" icon="✂️"
+                        :active="request()->routeIs('production.cutting_jobs.*')">
+                        Cutting Jobs
+                    </x-sidebar.sub-link>
 
-                    {{-- ✅ UPDATED --}}
-                    <a href="{{ route('production.sewing.pickups.index') }}"
-                        class="sidebar-link sidebar-link-sub {{ request()->routeIs('production.sewing.pickups.*') ? 'active' : '' }}">
-                        <span class="icon">🧵</span><span>Sewing Pickups</span>
-                    </a>
+                    <x-sidebar.sub-link href="{{ route('production.sewing.pickups.index') }}" icon="🧵"
+                        :active="request()->routeIs('production.sewing.pickups.*')">
+                        Sewing Pickups
+                    </x-sidebar.sub-link>
 
-                    {{-- ✅ UPDATED --}}
-                    <a href="{{ route('production.sewing.returns.index') }}"
-                        class="sidebar-link sidebar-link-sub {{ request()->routeIs('production.sewing.returns.*') ? 'active' : '' }}">
-                        <span class="icon">📥</span><span>Sewing Returns</span>
-                    </a>
+                    <x-sidebar.sub-link href="{{ route('production.sewing.returns.index') }}" icon="📥"
+                        :active="request()->routeIs('production.sewing.returns.*')">
+                        Sewing Returns
+                    </x-sidebar.sub-link>
 
-                    {{-- ✅ NEW --}}
-                    <a href="{{ route('production.sewing.adjustments.index') }}"
-                        class="sidebar-link sidebar-link-sub {{ request()->routeIs('production.sewing.adjustments.*') ? 'active' : '' }}">
-                        <span class="icon">🧮</span><span>Progress Adjustments</span>
-                    </a>
+                    <x-sidebar.sub-link href="{{ route('production.sewing.adjustments.index') }}" icon="🧮"
+                        :active="request()->routeIs('production.sewing.adjustments.*')">
+                        Progress Adjustments
+                    </x-sidebar.sub-link>
 
-                    <a href="{{ route('production.finishing_jobs.index') }}"
-                        class="sidebar-link sidebar-link-sub {{ request()->routeIs('production.finishing_jobs.*') ? 'active' : '' }}">
-                        <span class="icon">🧶</span><span>Finishing Jobs</span>
-                    </a>
+                    <x-sidebar.sub-link href="{{ route('production.finishing_jobs.index') }}" icon="🧶"
+                        :active="request()->routeIs('production.finishing_jobs.*')">
+                        Finishing Jobs
+                    </x-sidebar.sub-link>
 
-                    <a href="{{ route('production.packing_jobs.index') }}"
-                        class="sidebar-link sidebar-link-sub {{ request()->routeIs('production.packing_jobs.*') ? 'active' : '' }}">
-                        <span class="icon">📦</span><span>Packing Jobs</span>
-                    </a>
+                    <x-sidebar.sub-link href="{{ route('production.packing_jobs.index') }}" icon="📦"
+                        :active="request()->routeIs('production.packing_jobs.*')">
+                        Packing Jobs
+                    </x-sidebar.sub-link>
 
-                    <a href="{{ route('production.qc.index') }}"
-                        class="sidebar-link sidebar-link-sub {{ request()->routeIs('production.qc.*') ? 'active' : '' }}">
-                        <span class="icon">✅</span><span>QC Cutting</span>
-                    </a>
+                    <x-sidebar.sub-link href="{{ route('production.qc.index') }}" icon="✅" :active="request()->routeIs('production.qc.*')">
+                        QC Cutting
+                    </x-sidebar.sub-link>
 
-                    {{-- ✅ Sewing Reports (route baru: production.reports.*) --}}
+                    {{-- Sewing Reports --}}
                     <div class="px-3 pt-3 pb-1 text-uppercase"
                         style="font-size:.68rem; letter-spacing:.12em; color:var(--muted);">
                         Sewing Reports
                     </div>
 
-                    <a href="{{ route('production.reports.dashboard') }}"
-                        class="sidebar-link sidebar-link-sub {{ request()->routeIs('production.reports.dashboard') ? 'active' : '' }}">
-                        <span class="icon">📊</span><span>Sewing Dashboard</span>
-                    </a>
+                    <x-sidebar.sub-link href="{{ route('production.reports.dashboard') }}" icon="📊"
+                        :active="request()->routeIs('production.reports.dashboard')">
+                        Sewing Dashboard
+                    </x-sidebar.sub-link>
 
-                    <a href="{{ route('production.reports.operators') }}"
-                        class="sidebar-link sidebar-link-sub {{ request()->routeIs('production.reports.operators') ? 'active' : '' }}">
-                        <span class="icon">👥</span><span>Operator Summary</span>
-                    </a>
+                    <x-sidebar.sub-link href="{{ route('production.reports.operators') }}" icon="👥"
+                        :active="request()->routeIs('production.reports.operators')">
+                        Operator Summary
+                    </x-sidebar.sub-link>
 
-                    <a href="{{ route('production.reports.outstanding') }}"
-                        class="sidebar-link sidebar-link-sub {{ request()->routeIs('production.reports.outstanding') ? 'active' : '' }}">
-                        <span class="icon">⏳</span><span>Outstanding WIP-SEW</span>
-                    </a>
+                    <x-sidebar.sub-link href="{{ route('production.reports.outstanding') }}" icon="⏳"
+                        :active="request()->routeIs('production.reports.outstanding')">
+                        Outstanding WIP-SEW
+                    </x-sidebar.sub-link>
 
-                    <a href="{{ route('production.reports.aging_wip_sew') }}"
-                        class="sidebar-link sidebar-link-sub {{ request()->routeIs('production.reports.aging_wip_sew') ? 'active' : '' }}">
-                        <span class="icon">📆</span><span>Aging WIP-SEW</span>
-                    </a>
+                    <x-sidebar.sub-link href="{{ route('production.reports.aging_wip_sew') }}" icon="📆"
+                        :active="request()->routeIs('production.reports.aging_wip_sew')">
+                        Aging WIP-SEW
+                    </x-sidebar.sub-link>
 
-                    <a href="{{ route('production.reports.partial_pickup') }}"
-                        class="sidebar-link sidebar-link-sub {{ request()->routeIs('production.reports.partial_pickup') ? 'active' : '' }}">
-                        <span class="icon">🧩</span><span>Partial Pickup</span>
-                    </a>
+                    <x-sidebar.sub-link href="{{ route('production.reports.partial_pickup') }}" icon="🧩"
+                        :active="request()->routeIs('production.reports.partial_pickup')">
+                        Partial Pickup
+                    </x-sidebar.sub-link>
 
-                    <a href="{{ route('production.reports.productivity') }}"
-                        class="sidebar-link sidebar-link-sub {{ request()->routeIs('production.reports.productivity') ? 'active' : '' }}">
-                        <span class="icon">📈</span><span>Productivity</span>
-                    </a>
+                    <x-sidebar.sub-link href="{{ route('production.reports.productivity') }}" icon="📈"
+                        :active="request()->routeIs('production.reports.productivity')">
+                        Productivity
+                    </x-sidebar.sub-link>
 
-                    <a href="{{ route('production.reports.reject_analysis') }}"
-                        class="sidebar-link sidebar-link-sub {{ request()->routeIs('production.reports.reject_analysis') ? 'active' : '' }}">
-                        <span class="icon">🚫</span><span>Reject Analysis</span>
-                    </a>
+                    <x-sidebar.sub-link href="{{ route('production.reports.reject_analysis') }}" icon="🚫"
+                        :active="request()->routeIs('production.reports.reject_analysis')">
+                        Reject Analysis
+                    </x-sidebar.sub-link>
 
-                    <a href="{{ route('production.reports.lead_time') }}"
-                        class="sidebar-link sidebar-link-sub {{ request()->routeIs('production.reports.lead_time') ? 'active' : '' }}">
-                        <span class="icon">⏱️</span><span>Lead Time</span>
-                    </a>
+                    <x-sidebar.sub-link href="{{ route('production.reports.lead_time') }}" icon="⏱️"
+                        :active="request()->routeIs('production.reports.lead_time')">
+                        Lead Time
+                    </x-sidebar.sub-link>
 
-                    <a href="{{ route('production.reports.operator_behavior') }}"
-                        class="sidebar-link sidebar-link-sub {{ request()->routeIs('production.reports.operator_behavior') ? 'active' : '' }}">
-                        <span class="icon">👀</span><span>Operator Behavior</span>
-                    </a>
+                    <x-sidebar.sub-link href="{{ route('production.reports.operator_behavior') }}" icon="👀"
+                        :active="request()->routeIs('production.reports.operator_behavior')">
+                        Operator Behavior
+                    </x-sidebar.sub-link>
 
-                    {{-- Production-wide reports (tetap) --}}
+                    {{-- Chain / WIP Reports --}}
                     <div class="px-3 pt-3 pb-1 text-uppercase"
                         style="font-size:.68rem; letter-spacing:.12em; color:var(--muted);">
                         Chain / WIP Reports
                     </div>
 
-                    <a href="{{ route('production.reports.production_flow_dashboard') }}"
-                        class="sidebar-link sidebar-link-sub {{ request()->routeIs('production.reports.production_flow_dashboard') ? 'active' : '' }}">
-                        <span class="icon">🌀</span><span>Flow Dashboard</span>
-                    </a>
+                    <x-sidebar.sub-link href="{{ route('production.reports.production_flow_dashboard') }}"
+                        icon="🌀" :active="request()->routeIs('production.reports.production_flow_dashboard')">
+                        Flow Dashboard
+                    </x-sidebar.sub-link>
 
-                    <a href="{{ route('production.reports.daily_production') }}"
-                        class="sidebar-link sidebar-link-sub {{ request()->routeIs('production.reports.daily_production') ? 'active' : '' }}">
-                        <span class="icon">📅</span><span>Daily Production</span>
-                    </a>
+                    <x-sidebar.sub-link href="{{ route('production.reports.daily_production') }}" icon="📅"
+                        :active="request()->routeIs('production.reports.daily_production')">
+                        Daily Production
+                    </x-sidebar.sub-link>
 
-                    <a href="{{ route('production.reports.reject_detail') }}"
-                        class="sidebar-link sidebar-link-sub {{ request()->routeIs('production.reports.reject_detail') ? 'active' : '' }}">
-                        <span class="icon">🧾</span><span>Reject Detail</span>
-                    </a>
+                    <x-sidebar.sub-link href="{{ route('production.reports.reject_detail') }}" icon="🧾"
+                        :active="request()->routeIs('production.reports.reject_detail')">
+                        Reject Detail
+                    </x-sidebar.sub-link>
 
-                    <a href="{{ route('production.reports.wip_sewing_age') }}"
-                        class="sidebar-link sidebar-link-sub {{ request()->routeIs('production.reports.wip_sewing_age') ? 'active' : '' }}">
-                        <span class="icon">📆</span><span>WIP Sewing Age</span>
-                    </a>
+                    <x-sidebar.sub-link href="{{ route('production.reports.wip_sewing_age') }}" icon="📆"
+                        :active="request()->routeIs('production.reports.wip_sewing_age')">
+                        WIP Sewing Age
+                    </x-sidebar.sub-link>
 
-                    <a href="{{ route('production.reports.sewing_per_item') }}"
-                        class="sidebar-link sidebar-link-sub {{ request()->routeIs('production.reports.sewing_per_item') ? 'active' : '' }}">
-                        <span class="icon">🧵</span><span>Sewing per Item</span>
-                    </a>
+                    <x-sidebar.sub-link href="{{ route('production.reports.sewing_per_item') }}" icon="🧵"
+                        :active="request()->routeIs('production.reports.sewing_per_item')">
+                        Sewing per Item
+                    </x-sidebar.sub-link>
 
-                    <a href="{{ route('production.reports.finishing_jobs') }}"
-                        class="sidebar-link sidebar-link-sub {{ request()->routeIs('production.reports.finishing_jobs') ? 'active' : '' }}">
-                        <span class="icon">🧶</span><span>Finishing Jobs Report</span>
-                    </a>
+                    <x-sidebar.sub-link href="{{ route('production.reports.finishing_jobs') }}" icon="🧶"
+                        :active="request()->routeIs('production.reports.finishing_jobs')">
+                        Finishing Jobs Report
+                    </x-sidebar.sub-link>
 
-                    <a href="{{ route('production.finishing_jobs.report_per_item') }}"
-                        class="sidebar-link sidebar-link-sub {{ request()->routeIs('production.finishing_jobs.report_per_item*') ? 'active' : '' }}">
-                        <span class="icon">📦</span><span>Finishing per Item</span>
-                    </a>
+                    <x-sidebar.sub-link href="{{ route('production.finishing_jobs.report_per_item') }}"
+                        icon="📦" :active="request()->routeIs('production.finishing_jobs.report_per_item*')">
+                        Finishing per Item
+                    </x-sidebar.sub-link>
                 </div>
             </li>
 
@@ -757,18 +824,17 @@
                 </button>
 
                 <div class="collapse {{ $payrollOpen ? 'show' : '' }}" id="navFinancePayroll">
-                    <a href="{{ route('payroll.cutting.index') }}"
-                        class="sidebar-link sidebar-link-sub {{ request()->routeIs('payroll.cutting.*') ? 'active' : '' }}">
-                        <span class="icon">✂️</span><span>Cutting Payroll</span>
-                    </a>
-                    <a href="{{ route('payroll.sewing.index') }}"
-                        class="sidebar-link sidebar-link-sub {{ request()->routeIs('payroll.sewing.*') ? 'active' : '' }}">
-                        <span class="icon">🧵</span><span>Sewing Payroll</span>
-                    </a>
-                    <a href="{{ route('payroll.piece_rates.index') }}"
-                        class="sidebar-link sidebar-link-sub {{ request()->routeIs('payroll.piece_rates.*') ? 'active' : '' }}">
-                        <span class="icon">📑</span><span>Piece Rates</span>
-                    </a>
+                    <x-sidebar.sub-link href="{{ route('payroll.cutting.index') }}" icon="✂️"
+                        :active="request()->routeIs('payroll.cutting.*')">
+                        Cutting Payroll
+                    </x-sidebar.sub-link>
+                    <x-sidebar.sub-link href="{{ route('payroll.sewing.index') }}" icon="🧵" :active="request()->routeIs('payroll.sewing.*')">
+                        Sewing Payroll
+                    </x-sidebar.sub-link>
+                    <x-sidebar.sub-link href="{{ route('payroll.piece_rates.index') }}" icon="📑"
+                        :active="request()->routeIs('payroll.piece_rates.*')">
+                        Piece Rates
+                    </x-sidebar.sub-link>
                 </div>
             </li>
 
@@ -782,16 +848,16 @@
                 </button>
 
                 <div class="collapse {{ $costingOpen ? 'show' : '' }}" id="navFinanceCosting">
-                    <a href="{{ route('costing.hpp.index') }}"
-                        class="sidebar-link sidebar-link-sub {{ request()->routeIs('costing.hpp.*') ? 'active' : '' }}">
-                        <span class="icon">⚙️</span><span>HPP Finished Goods</span>
-                    </a>
-                    <a href="{{ route('costing.production_cost_periods.index') }}"
-                        class="sidebar-link sidebar-link-sub {{ request()->routeIs('costing.production_cost_periods.*') ? 'active' : '' }}">
-                        <span class="icon">📆</span><span>Production Cost Periods</span>
-                    </a>
+                    <x-sidebar.sub-link href="{{ route('costing.hpp.index') }}" icon="⚙️" :active="request()->routeIs('costing.hpp.*')">
+                        HPP Finished Goods
+                    </x-sidebar.sub-link>
+                    <x-sidebar.sub-link href="{{ route('costing.production_cost_periods.index') }}" icon="📆"
+                        :active="request()->routeIs('costing.production_cost_periods.*')">
+                        Production Cost Periods
+                    </x-sidebar.sub-link>
                 </div>
             </li>
+
         @endif
     </ul>
 </aside>
