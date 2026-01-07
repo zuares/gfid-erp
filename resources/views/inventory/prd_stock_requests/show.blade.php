@@ -90,8 +90,8 @@
         }
 
         /* =========================
-                                   SUMMARY (PRD OPERASIONAL)
-                                ========================== */
+               SUMMARY (PRD OPERASIONAL)
+            ========================== */
         .stats {
             display: grid;
             grid-template-columns: repeat(3, minmax(0, 1fr));
@@ -185,8 +185,25 @@
         }
 
         /* =========================
-                                   ITEMS TABLE (DESKTOP + MOBILE KEEP TABLE)
-                                ========================== */
+               DOT-ONLY BADGE (NO NUMBER)
+            ========================== */
+        .dot-badge {
+            width: 10px;
+            height: 10px;
+            border-radius: 999px;
+            display: inline-block;
+            box-shadow: 0 0 0 2px color-mix(in srgb, var(--card) 75%, transparent 25%);
+            border: 1px solid rgba(148, 163, 184, .28);
+        }
+
+        .dot-badge.warn {
+            background: rgba(245, 158, 11, 1);
+            border-color: rgba(245, 158, 11, .45);
+        }
+
+        /* =========================
+               ITEMS TABLE (DESKTOP + MOBILE KEEP TABLE)
+            ========================== */
         .table-wrap {
             overflow: auto;
             -webkit-overflow-scrolling: touch;
@@ -258,13 +275,11 @@
         }
 
         /* hide-only-on-mobile helper */
-        .col-hide-m {
-            /* default: visible */
-        }
+        .col-hide-m {}
 
         /* =========================
-                                   HISTORY TABLE
-                                ========================== */
+               HISTORY TABLE
+            ========================== */
         .hist {
             width: 100%;
             border-collapse: collapse;
@@ -318,23 +333,19 @@
         }
 
         /* =========================
-                                   RESPONSIVE
-                                ========================== */
+               RESPONSIVE
+            ========================== */
         @media (max-width: 980px) {
             .page-wrap {
                 padding: .75rem .75rem 5rem;
             }
 
-            /* summary: 2 kolom */
             .stats {
                 grid-template-columns: repeat(2, minmax(0, 1fr));
             }
         }
 
-        /* MOBILE: keep table (no card stacking) */
         @media (max-width: 780px) {
-
-            /* summary: biar PRD banget & gak rame */
             .stats {
                 grid-template-columns: repeat(2, minmax(0, 1fr));
             }
@@ -345,7 +356,6 @@
                 gap: .5rem;
             }
 
-            /* badges jadi 1 baris scroll */
             .badges {
                 flex-wrap: nowrap;
                 overflow-x: auto;
@@ -364,7 +374,6 @@
                 border-radius: 999px;
             }
 
-            /* items table: tetap table & ringkas */
             .table-wrap {
                 border: 1px solid rgba(148, 163, 184, .18);
                 border-radius: 12px;
@@ -386,7 +395,6 @@
                 font-size: .72rem;
             }
 
-            /* sembunyikan kolom non-esensial (mobile) */
             .col-hide-m {
                 display: none !important;
             }
@@ -397,7 +405,6 @@
 
             .item-name {
                 display: none;
-                /* mobile: cukup code + badges */
             }
 
             .item-badges .badge {
@@ -405,7 +412,6 @@
                 font-size: .72rem;
             }
 
-            /* history: tetap table & ringkas */
             .hist {
                 min-width: 0;
                 width: 100%;
@@ -417,7 +423,6 @@
                 font-size: .86rem;
             }
 
-            /* history: hide jam + catatan supaya clean */
             .hist .col-hide-m {
                 display: none !important;
             }
@@ -427,6 +432,38 @@
 
 @section('content')
     <div class="page-wrap">
+
+        @php
+            $reqTotal = (float) $stockRequest->lines->sum('qty_request');
+            $dispTotal = (float) $stockRequest->lines->sum('qty_dispatched');
+            $recvTotal = (float) $stockRequest->lines->sum('qty_received');
+            $pickTotal = (float) $stockRequest->lines->sum('qty_picked');
+
+            // Operasional PRD: Sisa Kirim PRD = req - (kirim + pickup)
+            $sisaKirimPrd = max($reqTotal - $dispTotal - $pickTotal, 0);
+
+            $inTransit = max($dispTotal - $recvTotal, 0);
+            $outRts = max($reqTotal - $recvTotal - $pickTotal, 0);
+
+            // tombol koreksi: hanya kalau ada dispatch & belum completed
+            $hasDispatched = $dispTotal > 0.0000001;
+            $canCorrection = $stockRequest->status !== 'completed' && $hasDispatched;
+
+            // tooltip outstanding: pakai Transit (inTransit) sebagai angka yang relevan utk “salah kirim”
+            // (kalau kamu mau pakai dispTotal atau selisih lain, tinggal ganti 1 baris ini)
+            $corrTipQty = $inTransit;
+
+            if ($sisaKirimPrd <= 0.0000001) {
+                $sCls = 'badge ok';
+                $sLbl = 'Tuntas';
+            } elseif ($sisaKirimPrd >= $reqTotal * 0.5 && $reqTotal > 0) {
+                $sCls = 'badge danger';
+                $sLbl = 'Prioritas';
+            } else {
+                $sCls = 'badge warn';
+                $sLbl = 'Sisa Kirim';
+            }
+        @endphp
 
         {{-- HEADER --}}
         <div class="header-row">
@@ -448,34 +485,21 @@
                         Proses / Kirim
                     </a>
                 @endif
+
+                {{-- ✅ NEW: Dispatch Correction --}}
+                @if ($canCorrection)
+                    <a href="{{ route('prd.stock-requests.dispatch_corrections.create', $stockRequest) }}"
+                        class="btn btn-outline"
+                        title="Buat Dispatch Correction (PRD salah input kirim). Outstanding Transit: {{ $corrTipQty }}">
+                        <span class="dot-badge warn" aria-hidden="true"
+                            style="margin-right:.35rem;vertical-align:middle"></span>
+                        Buat Dispatch Correction
+                    </a>
+                @endif
             </div>
         </div>
 
         {{-- SUMMARY --}}
-        @php
-            $reqTotal = (float) $stockRequest->lines->sum('qty_request');
-            $dispTotal = (float) $stockRequest->lines->sum('qty_dispatched');
-            $recvTotal = (float) $stockRequest->lines->sum('qty_received');
-            $pickTotal = (float) $stockRequest->lines->sum('qty_picked');
-
-            // Operasional PRD: Sisa Kirim PRD = req - (kirim + pickup)
-            $sisaKirimPrd = max($reqTotal - $dispTotal - $pickTotal, 0);
-
-            $inTransit = max($dispTotal - $recvTotal, 0);
-            $outRts = max($reqTotal - $recvTotal - $pickTotal, 0);
-
-            if ($sisaKirimPrd <= 0.0000001) {
-                $sCls = 'badge ok';
-                $sLbl = 'Tuntas';
-            } elseif ($sisaKirimPrd >= $reqTotal * 0.5 && $reqTotal > 0) {
-                $sCls = 'badge danger';
-                $sLbl = 'Prioritas';
-            } else {
-                $sCls = 'badge warn';
-                $sLbl = 'Sisa Kirim';
-            }
-        @endphp
-
         <div class="card" style="margin-top:.75rem">
             <div class="stats">
                 <div class="stat">
@@ -515,9 +539,15 @@
                     <span class="badge info js-hide-zero" data-zero="{{ $recvTotal }}">
                         <span class="dot"></span>Terima RTS <b class="mono">{{ $recvTotal }}</b>
                     </span>
+
+                    {{-- optional: badge koreksi (dot-only) di summary juga --}}
+                    @if ($canCorrection)
+                        <span class="badge warn"
+                            title="Ada dispatch yang bisa dikoreksi. Outstanding Transit: {{ $corrTipQty }}">
+                            <span class="dot"></span>Koreksi
+                        </span>
+                    @endif
                 </div>
-
-
             </div>
 
             @if (!empty($stockRequest->notes))
