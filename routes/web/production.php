@@ -6,10 +6,9 @@ use App\Http\Controllers\Production\PackingJobController;
 use App\Http\Controllers\Production\ProductionReportController;
 use App\Http\Controllers\Production\QcController;
 use App\Http\Controllers\Production\SewingPickupController;
-use App\Http\Controllers\Production\SewingProgressAdjustmentController;
 use App\Http\Controllers\Production\SewingReportController;
 use App\Http\Controllers\Production\SewingReturnController;
-use Illuminate\Support\Facades\Route;
+use App\Http\Controllers\Production\WipFinAdjustmentController;
 
 Route::middleware(['web', 'auth', 'role:owner,operating'])
     ->prefix('production')
@@ -81,14 +80,6 @@ Route::middleware(['web', 'auth', 'role:owner,operating'])
 
                 Route::get('/{return}', [SewingReturnController::class, 'show'])->name('show');
                 Route::delete('/{return}', [SewingReturnController::class, 'destroy'])->name('destroy');
-            });
-
-            // ✅ Sewing Progress Adjustments
-            Route::prefix('adjustments')->name('adjustments.')->group(function () {
-                Route::get('/', [SewingProgressAdjustmentController::class, 'index'])->name('index');
-                Route::get('/create', [SewingProgressAdjustmentController::class, 'create'])->name('create');
-                Route::post('/', [SewingProgressAdjustmentController::class, 'store'])->name('store');
-                Route::get('/{doc}', [SewingProgressAdjustmentController::class, 'show'])->name('show');
             });
 
             // ===== Sewing Reports =====
@@ -180,3 +171,16 @@ Route::middleware(['web', 'auth', 'role:owner,operating'])
         });
 
     });
+
+Route::middleware(['web', 'auth', 'role:owner,admin,operating'])->group(function () {
+    Route::prefix('production')->as('production.')->group(function () {
+        Route::resource('wip-fin-adjustments', WipFinAdjustmentController::class)
+            ->except(['destroy']);
+
+        Route::post('wip-fin-adjustments/{adjustment}/post', [WipFinAdjustmentController::class, 'post'])
+            ->name('wip-fin-adjustments.post');
+
+        Route::post('wip-fin-adjustments/{adjustment}/void', [WipFinAdjustmentController::class, 'void'])
+            ->name('wip-fin-adjustments.void');
+    });
+});

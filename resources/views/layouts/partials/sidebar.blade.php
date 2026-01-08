@@ -55,10 +55,14 @@
         request()->routeIs('production.sewing.adjustments.*') ||
         request()->routeIs('production.reports.*');
 
+    // ✅ NEW: WIP-FIN Adjustments (koreksi hasil hitung)
+    $prodWipFinAdjOpen = request()->routeIs('production.wip-fin-adjustments.*');
+
     $prodFinOpen =
         request()->routeIs('production.finishing_jobs.*') ||
         request()->routeIs('production.finishing_jobs.bundles_ready') ||
-        request()->routeIs('production.finishing_jobs.report_per_item*');
+        request()->routeIs('production.finishing_jobs.report_per_item*') ||
+        $prodWipFinAdjOpen; // ✅ include
 
     $prodPackOpen =
         request()->routeIs('production.packing_jobs.*') || request()->routeIs('production.packing_jobs.ready_items');
@@ -405,14 +409,16 @@
                         Daftar Sewing Returns
                     </x-sidebar.simple-link>
 
-                    <x-sidebar.simple-link href="{{ route('production.sewing.adjustments.index') }}" icon="🧮"
-                        :active="request()->routeIs('production.sewing.adjustments.*')">
-                        Progress Adjustments
-                    </x-sidebar.simple-link>
 
                     <x-sidebar.simple-link href="{{ route('production.finishing_jobs.index') }}" icon="🧶"
                         :active="request()->routeIs('production.finishing_jobs.*')">
                         Daftar Finishing
+                    </x-sidebar.simple-link>
+
+                    {{-- ✅ NEW: Koreksi WIP-FIN --}}
+                    <x-sidebar.simple-link href="{{ route('production.wip-fin-adjustments.index') }}" icon="🧾"
+                        :active="request()->routeIs('production.wip-fin-adjustments.*')">
+                        Koreksi WIP-FIN
                     </x-sidebar.simple-link>
 
                     <x-sidebar.simple-link href="{{ route('production.qc.index') }}" icon="✅" :active="request()->routeIs('production.qc.*')">
@@ -699,15 +705,19 @@
                         Sewing Returns
                     </x-sidebar.sub-link>
 
-                    <x-sidebar.sub-link href="{{ route('production.sewing.adjustments.index') }}" icon="🧮"
-                        :active="request()->routeIs('production.sewing.adjustments.*')">
-                        Progress Adjustments
-                    </x-sidebar.sub-link>
+
 
                     <x-sidebar.sub-link href="{{ route('production.finishing_jobs.index') }}" icon="🧶"
                         :active="request()->routeIs('production.finishing_jobs.*')">
                         Finishing Jobs
                     </x-sidebar.sub-link>
+
+                    {{-- ✅ NEW: Koreksi WIP-FIN --}}
+                    <x-sidebar.sub-link href="{{ route('production.wip-fin-adjustments.index') }}" icon="🧾"
+                        :active="request()->routeIs('production.wip-fin-adjustments.*')">
+                        Koreksi WIP-FIN
+                    </x-sidebar.sub-link>
+
 
                     <x-sidebar.sub-link href="{{ route('production.packing_jobs.index') }}" icon="📦"
                         :active="request()->routeIs('production.packing_jobs.*')">

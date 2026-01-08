@@ -61,10 +61,11 @@ class FinishingJobController extends Controller
             $query->whereNotNull('posted_at');
         }
 
+        // ✅ lebih aman daripada HAVING alias
         if ($rejectFlag === 'yes') {
-            $query->having('total_reject', '>', 0);
+            $query->whereHas('lines', fn($q) => $q->where('qty_reject', '>', 0));
         } elseif ($rejectFlag === 'no') {
-            $query->having('total_reject', '=', 0);
+            $query->whereDoesntHave('lines', fn($q) => $q->where('qty_reject', '>', 0));
         }
 
         $finishingJobs = $query->paginate(15)->withQueryString();
@@ -85,11 +86,10 @@ class FinishingJobController extends Controller
     public function create(Request $request): View
     {
         $today = Carbon::today()->toDateString();
-
         $wipFinWarehouseId = Warehouse::where('code', 'WIP-FIN')->value('id');
 
         $operators = Employee::query()
-            ->where('role', 'sewing') // sementara pakai role sewing dulu
+            ->where('role', 'sewing') // sementara
             ->orderBy('name')
             ->get();
 
@@ -107,9 +107,7 @@ class FinishingJobController extends Controller
 
         $bundlesQuery = CuttingJobBundle::query()
             ->readyForFinishing($wipFinWarehouseId)
-            ->when(!empty($bundleIds), function ($q) use ($bundleIds) {
-                $q->whereIn('id', $bundleIds);
-            });
+            ->when(!empty($bundleIds), fn($q) => $q->whereIn('id', $bundleIds));
 
         $itemsWip = $bundlesQuery
             ->selectRaw('finished_item_id as item_id, SUM(wip_qty) as total_wip')
@@ -129,11 +127,11 @@ class FinishingJobController extends Controller
 
         foreach ($itemsWip as $row) {
             $itemId = (int) $row->item_id;
-            $totalWip = (float) $row->total_wip;
+            $totalWip = (int) round((float) $row->total_wip); // ✅ integer
 
             $item = $items[$itemId] ?? null;
 
-            // ⬇️ UBAH DI SINI: label = kode saja
+            // label = kode saja
             $itemLabel = $item
             ? ($item->code ?? ('Item #' . $itemId))
             : 'Item #' . $itemId;
@@ -145,6 +143,7 @@ class FinishingJobController extends Controller
                 'qty_in' => null,
                 'qty_reject' => 0,
                 'reject_reason' => null,
+                'reject_notes' => null,
             ];
         }
 
@@ -156,7 +155,7 @@ class FinishingJobController extends Controller
     }
 
     /* ============================================================
-     * STORE
+     * STORE (INTEGER)
      * ============================================================
      */
 
@@ -171,20 +170,18 @@ class FinishingJobController extends Controller
             'lines' => ['required', 'array', 'min:1'],
             'lines.*.item_id' => ['required', 'integer', 'exists:items,id'],
 
-            'lines.*.qty_in' => ['nullable', 'numeric', 'min:0'],
-            'lines.*.qty_reject' => ['required', 'numeric', 'min:0'],
+            // ✅ integer qty
+            'lines.*.qty_in' => ['nullable', 'integer', 'min:0'],
+            'lines.*.qty_reject' => ['required', 'integer', 'min:0'],
             'lines.*.reject_reason' => ['nullable', 'string', 'max:100'],
             'lines.*.reject_notes' => ['nullable', 'string'],
         ]);
 
         $wipFinWarehouseId = Warehouse::where('code', 'WIP-FIN')->value('id');
-
         if (!$wipFinWarehouseId) {
-            return back()
-                ->withInput()
-                ->withErrors([
-                    'warehouse' => 'Gudang WIP-FIN belum dikonfigurasi. Silakan set warehouse dengan kode WIP-FIN terlebih dahulu.',
-                ]);
+            return back()->withInput()->withErrors([
+                'warehouse' => 'Gudang WIP-FIN belum dikonfigurasi. Silakan set warehouse dengan kode WIP-FIN terlebih dahulu.',
+            ]);
         }
 
         $globalOperatorId = $this->resolveGlobalOperatorId($validated['operator_global_id'] ?? null);
@@ -193,11 +190,11 @@ class FinishingJobController extends Controller
 
         foreach ($validated['lines'] as $index => $lineData) {
             $itemId = (int) $lineData['item_id'];
-            $qtyInRequested = (float) ($lineData['qty_in'] ?? 0);
-            $qtyReject = (float) ($lineData['qty_reject'] ?? 0);
+            $qtyInRequested = (int) ($lineData['qty_in'] ?? 0);
+            $qtyRejectRequested = (int) ($lineData['qty_reject'] ?? 0);
 
             $qtyInRequested = max(0, $qtyInRequested);
-            $qtyReject = max(0, $qtyReject);
+            $qtyRejectRequested = max(0, $qtyRejectRequested);
 
             $rejectReason = $lineData['reject_reason'] ?? null;
             $rejectNotes = $lineData['reject_notes'] ?? null;
@@ -210,47 +207,38 @@ class FinishingJobController extends Controller
                 ->orderBy('id')
                 ->get();
 
-            $totalWip = (float) $bundles->sum('wip_qty');
+            $totalWip = (int) round((float) $bundles->sum('wip_qty'));
 
-            if ($totalWip <= 0.0001) {
-                return back()
-                    ->withInput()
-                    ->withErrors([
-                        "lines.{$index}.item_id" =>
-                        'Tidak ada saldo WIP-FIN untuk item ini. Pastikan sudah ada Sewing Return ke WIP-FIN.',
-                    ]);
+            if ($totalWip <= 0) {
+                return back()->withInput()->withErrors([
+                    "lines.{$index}.item_id" => 'Tidak ada saldo WIP-FIN untuk item ini. Pastikan sudah ada Sewing Return ke WIP-FIN.',
+                ]);
             }
 
-            if ($qtyInRequested <= 0.0001) {
-                if ($qtyReject > 0.0001) {
-                    return back()
-                        ->withInput()
-                        ->withErrors([
-                            "lines.{$index}.qty_in" =>
-                            'Qty Proses harus lebih besar dari 0 jika ada Qty Reject.',
-                        ]);
+            if ($qtyInRequested <= 0) {
+                if ($qtyRejectRequested > 0) {
+                    return back()->withInput()->withErrors([
+                        "lines.{$index}.qty_in" => 'Qty Proses harus > 0 jika ada Qty Reject.',
+                    ]);
                 }
                 continue;
             }
 
             $qtyIn = min($qtyInRequested, $totalWip);
 
-            if ($qtyReject > $qtyIn + 0.0001) {
-                return back()
-                    ->withInput()
-                    ->withErrors([
-                        "lines.{$index}.qty_reject" =>
-                        'Qty Reject melebihi Qty Proses untuk item ini (' . $qtyIn . ').',
-                    ]);
+            if ($qtyRejectRequested > $qtyIn) {
+                return back()->withInput()->withErrors([
+                    "lines.{$index}.qty_reject" => "Qty Reject melebihi Qty Proses untuk item ini ({$qtyIn}).",
+                ]);
             }
 
-            $qtyOk = max(0, $qtyIn - $qtyReject);
+            $qtyOk = $qtyIn - $qtyRejectRequested;
 
             $perItemLines[] = [
                 'item_id' => $itemId,
                 'qty_in' => $qtyIn,
                 'qty_ok' => $qtyOk,
-                'qty_reject' => $qtyReject,
+                'qty_reject' => $qtyRejectRequested,
                 'reject_reason' => $rejectReason,
                 'reject_notes' => $rejectNotes,
                 'bundles' => $bundles,
@@ -259,16 +247,17 @@ class FinishingJobController extends Controller
         }
 
         if (empty($perItemLines)) {
-            return back()
-                ->withInput()
-                ->withErrors([
-                    'lines' => 'Isi minimal satu Qty Proses > 0 untuk membuat Finishing Job.',
-                ]);
+            return back()->withInput()->withErrors([
+                'lines' => 'Isi minimal satu Qty Proses > 0 untuk membuat Finishing Job.',
+            ]);
         }
 
         $job = null;
 
-        DB::transaction(function () use ($request, $validated, $perItemLines, $globalOperatorId, &$job) {
+        // ✅ cache nama operator sewing biar tidak N+1
+        $empNameCache = [];
+
+        DB::transaction(function () use ($request, $validated, $perItemLines, $globalOperatorId, &$job, &$empNameCache) {
             $code = CodeGenerator::generate('FIN');
 
             $jobLocal = FinishingJob::create([
@@ -282,8 +271,8 @@ class FinishingJobController extends Controller
 
             foreach ($perItemLines as $line) {
                 $itemId = (int) $line['item_id'];
-                $qtyInTotal = (float) $line['qty_in'];
-                $qtyRejectTotal = (float) $line['qty_reject'];
+                $qtyInTotal = (int) $line['qty_in'];
+                $qtyRejectTotal = (int) $line['qty_reject'];
 
                 $rejectReason = $line['reject_reason'];
                 $rejectNotes = $line['reject_notes'];
@@ -298,24 +287,20 @@ class FinishingJobController extends Controller
                         break;
                     }
 
-                    $bundleWip = (float) ($bundle->wip_qty ?? 0);
+                    $bundleWip = (int) round((float) ($bundle->wip_qty ?? 0));
                     if ($bundleWip <= 0) {
                         continue;
                     }
 
                     $takeIn = min($bundleWip, $remainingIn);
 
-                    $rejectForThisBundle = 0.0;
-                    if ($qtyRejectTotal > 0 && $qtyInTotal > 0) {
-                        $ratio = $takeIn / $qtyInTotal;
-                        $rejectForThisBundle = $qtyRejectTotal * $ratio;
-
-                        if ($bundle->is($bundles->last())) {
-                            $rejectForThisBundle = $remainingReject;
-                        }
+                    // ✅ reject integer: ambil dari sisa reject, tidak boleh > takeIn
+                    $takeReject = 0;
+                    if ($remainingReject > 0) {
+                        $takeReject = min($remainingReject, $takeIn);
                     }
 
-                    $qtyOkThisBundle = max(0, $takeIn - $rejectForThisBundle);
+                    $qtyOkThisBundle = $takeIn - $takeReject;
 
                     // Ambil sewing attribution dari SewingReturnLine terbaru untuk bundle + item ini
                     $sewingReturnLine = SewingReturnLine::query()
@@ -327,10 +312,10 @@ class FinishingJobController extends Controller
                         ->first();
 
                     $sewingOperatorId = $sewingReturnLine?->sewingPickupLine?->operator_id ?? null;
+
                     $sewingOperatorName = null;
                     if ($sewingOperatorId) {
-                        $emp = Employee::find($sewingOperatorId);
-                        $sewingOperatorName = $emp?->name;
+                        $sewingOperatorName = $empNameCache[$sewingOperatorId] ??= Employee::whereKey($sewingOperatorId)->value('name');
                     }
 
                     FinishingJobLine::create([
@@ -342,14 +327,21 @@ class FinishingJobController extends Controller
                         'item_id' => $itemId,
                         'qty_in' => $takeIn,
                         'qty_ok' => $qtyOkThisBundle,
-                        'qty_reject' => $rejectForThisBundle,
+                        'qty_reject' => $takeReject,
                         'reject_reason' => $rejectReason,
                         'reject_notes' => $rejectNotes,
                         'processed_at' => $validated['date'],
                     ]);
 
                     $remainingIn -= $takeIn;
-                    $remainingReject -= $rejectForThisBundle;
+                    $remainingReject -= $takeReject;
+                }
+
+                // kalau masih ada reject tersisa padahal qty_in sudah habis -> harusnya tidak terjadi
+                if ($remainingReject > 0) {
+                    throw ValidationException::withMessages([
+                        'finishing' => "Reject tersisa {$remainingReject} padahal Qty In habis. Cek input item {$itemId}.",
+                    ]);
                 }
             }
 
@@ -359,16 +351,14 @@ class FinishingJobController extends Controller
         $job->loadMissing('lines');
 
         $hasReject = $job->lines()
-            ->where('qty_reject', '>', 0.0001)
+            ->where('qty_reject', '>', 0)
             ->exists();
 
         if (!$hasReject) {
             try {
-                // Coba auto-post (langsung WIP-FIN → WH-PRD)
+                // auto-post jika 0 reject
                 return $this->post($job);
             } catch (ValidationException $e) {
-                // Kalau auto-post gagal (contoh: Sewing Return tidak cukup),
-                // job tetap ada sebagai draft, user diarahkan ke halaman SHOW
                 return redirect()
                     ->route('production.finishing_jobs.show', $job->id)
                     ->withErrors($e->errors())
@@ -378,8 +368,7 @@ class FinishingJobController extends Controller
 
         return redirect()
             ->route('production.finishing_jobs.show', $job->id)
-            ->with('status', 'Finishing Job (per item) berhasil dibuat sebagai draft (Qty proses bisa sebagian).');
-
+            ->with('status', 'Finishing Job berhasil dibuat sebagai draft (ADA REJECT).');
     }
 
     /* ============================================================
@@ -408,7 +397,7 @@ class FinishingJobController extends Controller
             ->get();
 
         $hasReject = $finishing_job->lines
-            ->contains(fn(FinishingJobLine $line) => (float) $line->qty_reject > 0.0001);
+            ->contains(fn(FinishingJobLine $line) => ((int) $line->qty_reject) > 0);
 
         $isAutoPost = $finishing_job->status === 'posted' && !$hasReject;
 
@@ -456,11 +445,14 @@ class FinishingJobController extends Controller
             'lines' => ['required', 'array', 'min:1'],
             'lines.*.bundle_id' => ['required', 'integer', 'exists:cutting_job_bundles,id'],
             'lines.*.item_id' => ['required', 'integer', 'exists:items,id'],
-            'lines.*.qty_in' => ['required', 'numeric', 'min:0'],
-            'lines.*.qty_ok' => ['required', 'numeric', 'min:0'],
-            'lines.*.qty_reject' => ['required', 'numeric', 'min:0'],
+            // ✅ integer qty
+            'lines.*.qty_in' => ['required', 'integer', 'min:0'],
+            'lines.*.qty_ok' => ['required', 'integer', 'min:0'],
+            'lines.*.qty_reject' => ['required', 'integer', 'min:0'],
             'lines.*.reject_reason' => ['nullable', 'string', 'max:255'],
         ]);
+
+        $empNameCache = [];
 
         DB::beginTransaction();
         try {
@@ -480,30 +472,30 @@ class FinishingJobController extends Controller
                     continue;
                 }
 
-                $qtyIn = (float) ($row['qty_in'] ?? 0);
-                $qtyOk = (float) ($row['qty_ok'] ?? 0);
-                $qtyReject = (float) ($row['qty_reject'] ?? 0);
+                $qtyIn = (int) ($row['qty_in'] ?? 0);
+                $qtyOk = (int) ($row['qty_ok'] ?? 0);
+                $qtyReject = (int) ($row['qty_reject'] ?? 0);
 
-                if ($qtyOk + $qtyReject > $qtyIn + 0.0001) {
+                if (($qtyOk + $qtyReject) > $qtyIn) {
                     DB::rollBack();
-                    return back()->withInput()
-                        ->withErrors([
-                            "lines.{$idx}.qty_ok" => 'Qty OK + Qty Reject melebihi Qty IN pada baris ini.',
-                        ]);
+                    return back()->withInput()->withErrors([
+                        "lines.{$idx}.qty_ok" => 'Qty OK + Qty Reject melebihi Qty IN pada baris ini.',
+                    ]);
                 }
 
                 $sewingReturnLine = SewingReturnLine::query()
-                    ->whereHas('sewingPickupLine', function ($q) use ($bundle) {
-                        $q->where('cutting_job_bundle_id', $bundle->id);
+                    ->whereHas('sewingPickupLine', function ($q) use ($bundle, $row) {
+                        $q->where('cutting_job_bundle_id', $bundle->id)
+                            ->where('finished_item_id', (int) $row['item_id']);
                     })
                     ->latest('id')
                     ->first();
 
                 $sewingOperatorId = $sewingReturnLine?->sewingPickupLine?->operator_id ?? null;
+
                 $sewingOperatorName = null;
                 if ($sewingOperatorId) {
-                    $emp = Employee::find($sewingOperatorId);
-                    $sewingOperatorName = $emp?->name;
+                    $sewingOperatorName = $empNameCache[$sewingOperatorId] ??= Employee::whereKey($sewingOperatorId)->value('name');
                 }
 
                 FinishingJobLine::create([
@@ -520,7 +512,7 @@ class FinishingJobController extends Controller
                     'processed_at' => $req->date,
                 ]);
 
-                if ($qtyReject > 0.0001) {
+                if ($qtyReject > 0) {
                     $hasReject = true;
                 }
 
@@ -540,17 +532,13 @@ class FinishingJobController extends Controller
                         ]);
                 }
 
-                $wipFinWarehouseId = $warehouses['WIP-FIN']->id;
-                $prodWarehouseId = $warehouses['WH-PRD']->id;
-                $rejectWarehouseId = $warehouses['REJECT']->id;
-
                 $movementDate = $this->resolveMovementDate($finishingJob);
 
                 $this->applyPostingMovements(
                     job: $finishingJob,
-                    wipFinWarehouseId: $wipFinWarehouseId,
-                    prodWarehouseId: $prodWarehouseId,
-                    rejectWarehouseId: $rejectWarehouseId,
+                    wipFinWarehouseId: $warehouses['WIP-FIN']->id,
+                    prodWarehouseId: $warehouses['WH-PRD']->id,
+                    rejectWarehouseId: $warehouses['REJECT']->id,
                     movementDate: $movementDate,
                     notesPrefix: 'Finishing ' . $finishingJob->code,
                 );
@@ -595,13 +583,12 @@ class FinishingJobController extends Controller
     }
 
     /* ============================================================
-     * POST (RESMI)
+     * POST
      * ============================================================
      */
 
     public function post(FinishingJob $finishing_job): RedirectResponse
     {
-        // Pakai satu variabel $job, dan sekalian load lines + bundle untuk loop validasi
         $job = $finishing_job->loadMissing(['lines']);
 
         if (!$job || !$job->id) {
@@ -616,34 +603,27 @@ class FinishingJobController extends Controller
                 ->with('status', 'Finishing Job ini sudah diposting sebelumnya.');
         }
 
-        // Pastikan warehouse wajib sudah ada
         $requiredCodes = ['WIP-FIN', 'WH-PRD', 'REJECT'];
         $warehouses = $this->getRequiredWarehouses($requiredCodes);
 
         $missing = array_diff($requiredCodes, $warehouses->keys()->all());
         if (!empty($missing)) {
             return back()->withErrors([
-                'warehouse' => 'Warehouse berikut belum dikonfigurasi: '
-                . implode(', ', $missing)
-                . '. Silakan setting dulu di Master Gudang.',
+                'warehouse' => 'Warehouse berikut belum dikonfigurasi: ' . implode(', ', $missing) . '. Silakan setting dulu di Master Gudang.',
             ]);
         }
 
-        $wipFinWarehouseId = $warehouses['WIP-FIN']->id;
-        $prodWarehouseId = $warehouses['WH-PRD']->id;
-        $rejectWarehouseId = $warehouses['REJECT']->id;
-
         $movementDate = $this->resolveMovementDate($job);
 
-        // ✅ VALIDASI: saldo Sewing Return cukup untuk semua finishing OK di job ini
+        // ✅ VALIDASI: saldo Sewing Return cukup utk qty_ok
         $this->assertSewingReturnBalanceForFinishingJob($job);
 
-        DB::transaction(function () use ($job, $wipFinWarehouseId, $prodWarehouseId, $rejectWarehouseId, $movementDate) {
+        DB::transaction(function () use ($job, $warehouses, $movementDate) {
             $this->applyPostingMovements(
                 job: $job,
-                wipFinWarehouseId: $wipFinWarehouseId,
-                prodWarehouseId: $prodWarehouseId,
-                rejectWarehouseId: $rejectWarehouseId,
+                wipFinWarehouseId: $warehouses['WIP-FIN']->id,
+                prodWarehouseId: $warehouses['WH-PRD']->id,
+                rejectWarehouseId: $warehouses['REJECT']->id,
                 movementDate: $movementDate,
                 notesPrefix: 'Finishing ' . $job->code,
             );
@@ -657,13 +637,8 @@ class FinishingJobController extends Controller
 
         return redirect()
             ->route('production.finishing_jobs.show', $job->id)
-            ->with('status', 'Finishing Job berhasil diposting, stok & HPP RM-only sudah dipindahkan dari WIP-FIN ke WH-PRD/REJECT.');
+            ->with('status', 'Finishing Job berhasil diposting (INTEGER), stok & HPP RM-only dipindahkan dari WIP-FIN ke WH-PRD/REJECT.');
     }
-
-    /* ============================================================
-     * FORCE POST (MANUAL OVERRIDE)
-     * ============================================================
-     */
 
     public function forcePost(FinishingJob $finishingJob): RedirectResponse
     {
@@ -685,19 +660,15 @@ class FinishingJobController extends Controller
             ]);
         }
 
-        $wipFinWarehouseId = $warehouses['WIP-FIN']->id;
-        $prodWarehouseId = $warehouses['WH-PRD']->id;
-        $rejectWarehouseId = $warehouses['REJECT']->id;
-
         $movementDate = $this->resolveMovementDate($job);
 
         DB::beginTransaction();
         try {
             $this->applyPostingMovements(
                 job: $job,
-                wipFinWarehouseId: $wipFinWarehouseId,
-                prodWarehouseId: $prodWarehouseId,
-                rejectWarehouseId: $rejectWarehouseId,
+                wipFinWarehouseId: $warehouses['WIP-FIN']->id,
+                prodWarehouseId: $warehouses['WH-PRD']->id,
+                rejectWarehouseId: $warehouses['REJECT']->id,
                 movementDate: $movementDate,
                 notesPrefix: 'ForcePost Finishing ' . $job->code,
             );
@@ -721,7 +692,7 @@ class FinishingJobController extends Controller
     }
 
     /* ============================================================
-     * HELPER INTERNAL
+     * HELPERS
      * ============================================================
      */
 
@@ -735,15 +706,7 @@ class FinishingJobController extends Controller
 
     protected function resolveGlobalOperatorId(?int $headerOperatorId): ?int
     {
-        if ($headerOperatorId) {
-            return $headerOperatorId;
-        }
-
-        $user = Auth::user();
-        if ($user && property_exists($user, 'employee_id')) {
-            return $user->employee_id;
-        }
-        return null;
+        return $headerOperatorId ?? (Auth::user()->employee_id ?? null);
     }
 
     protected function resolveMovementDate(FinishingJob $job): \DateTimeInterface
@@ -752,7 +715,6 @@ class FinishingJobController extends Controller
         if ($date instanceof \DateTimeInterface) {
             return $date;
         }
-
         return Carbon::parse($date ?? now());
     }
 
@@ -760,11 +722,8 @@ class FinishingJobController extends Controller
      * Apply mutasi stok + snapshot HPP RM-only + update finished_qty sewing_return_lines.
      * Asumsi dipanggil DI DALAM TRANSACTION.
      *
-     * Logika WIP:
-     * - Finishing POSTED mengonsumsi WIP-FIN per bundle sebesar (qty_ok + qty_reject)
-     *   → bundle.wip_qty -= (qty_ok + qty_reject)
-     * - Direct Pick WIP-FIN → RTS harus mengurangi wip_qty sendiri di modul DirectPickup.
-     *   → total global: wip_qty -= (ok + reject + direct_pick)
+     * INTEGER MODE:
+     * - qty_ok, qty_reject, qty_in, finished_qty, wip_qty = integer
      */
     protected function applyPostingMovements(
         FinishingJob $job,
@@ -777,40 +736,32 @@ class FinishingJobController extends Controller
         $job->loadMissing(['lines.bundle', 'lines.item']);
 
         foreach ($job->lines as $line) {
-            // Ambil qty OK & Reject dari line
-            $qtyOk = (float) ($line->qty_ok ?? 0);
-            $qtyReject = (float) ($line->qty_reject ?? 0);
+            $qtyOk = (int) ($line->qty_ok ?? 0);
+            $qtyReject = (int) ($line->qty_reject ?? 0);
+            $qtyInField = (int) ($line->qty_in ?? 0);
 
-            // Kalau ada field qty_in, tetap dibaca untuk fallback,
-            // tapi konsumsi WIP utama pakai (qty_ok + qty_reject).
-            $qtyInField = (float) ($line->qty_in ?? 0);
-
-            // Qty yang benar-benar mengurangi WIP-FIN (diproses finishing)
             $qtyUsed = $qtyOk + $qtyReject;
 
-            // Fallback: kalau OK+Reject 0 tapi qty_in terisi, pakai qty_in
-            // (misal data lama / edge case, biar nggak ada line “menggantung”).
-            if ($qtyUsed <= 0.0000001 && $qtyInField > 0.0000001) {
+            // fallback untuk data lama
+            if ($qtyUsed <= 0 && $qtyInField > 0) {
                 $qtyUsed = $qtyInField;
             }
 
-            // Kalau semua 0, skip saja
-            if ($qtyUsed <= 0.0000001 && $qtyOk <= 0.0000001 && $qtyReject <= 0.0000001) {
+            if ($qtyUsed <= 0 && $qtyOk <= 0 && $qtyReject <= 0) {
                 continue;
             }
 
-            // Ambil unit cost RM-only dari WIP-FIN
             $unitCostWipFin = $this->inventory->getItemIncomingUnitCost(
                 warehouseId: $wipFinWarehouseId,
-                itemId: $line->item_id,
+                itemId: (int) $line->item_id,
             );
             $movementUnitCost = $unitCostWipFin > 0 ? $unitCostWipFin : null;
 
-            // 1️⃣ OUT dari WIP-FIN: sebesar qty_used (OK + Reject)
-            if ($qtyUsed > 0.0000001) {
+            // 1) OUT WIP-FIN
+            if ($qtyUsed > 0) {
                 $this->inventory->stockOut(
                     warehouseId: $wipFinWarehouseId,
-                    itemId: $line->item_id,
+                    itemId: (int) $line->item_id,
                     qty: $qtyUsed,
                     date: $movementDate,
                     sourceType: FinishingJob::class,
@@ -823,11 +774,11 @@ class FinishingJobController extends Controller
                 );
             }
 
-            // 2️⃣ IN ke WH-PRD: qty_ok
-            if ($qtyOk > 0.0000001) {
+            // 2) IN WH-PRD (OK)
+            if ($qtyOk > 0) {
                 $this->inventory->stockIn(
                     warehouseId: $prodWarehouseId,
-                    itemId: $line->item_id,
+                    itemId: (int) $line->item_id,
                     qty: $qtyOk,
                     date: $movementDate,
                     sourceType: FinishingJob::class,
@@ -838,11 +789,10 @@ class FinishingJobController extends Controller
                     affectLotCost: false,
                 );
 
-                // Snapshot HPP RM-only (optional aktif / tidak)
                 if ($movementUnitCost !== null && $movementUnitCost > 0) {
                     $this->hpp->createSnapshot(
-                        itemId: $line->item_id,
-                        warehouseId: null, // global snapshot (RM only)
+                        itemId: (int) $line->item_id,
+                        warehouseId: null,
                         snapshotDate: $movementDate->format('Y-m-d'),
                         referenceType: 'auto_hpp_rm_only_finishing',
                         referenceId: $job->id,
@@ -858,22 +808,21 @@ class FinishingJobController extends Controller
                     );
                 }
 
-                // ✅ Update finished_qty pada SewingReturnLine (berbasis bundle + item)
                 if (!empty($line->bundle_id)) {
                     $this->allocateFinishedQtyFromSewingReturnByBundle(
                         bundleId: (int) $line->bundle_id,
                         itemId: (int) $line->item_id,
-                        qtyOkNeed: (float) $qtyOk,
+                        qtyOkNeed: $qtyOk,
                         jobCode: (string) $job->code,
                     );
                 }
             }
 
-            // 3️⃣ IN ke REJECT: qty_reject
-            if ($qtyReject > 0.0000001) {
+            // 3) IN REJECT
+            if ($qtyReject > 0) {
                 $this->inventory->stockIn(
                     warehouseId: $rejectWarehouseId,
-                    itemId: $line->item_id,
+                    itemId: (int) $line->item_id,
                     qty: $qtyReject,
                     date: $movementDate,
                     sourceType: FinishingJob::class,
@@ -885,13 +834,13 @@ class FinishingJobController extends Controller
                 );
             }
 
-            // 4️⃣ Kurangi WIP qty di bundle sesuai konsumsi finishing (OK + Reject)
+            // 4) Kurangi wip_qty bundle (OK + Reject)
             if ($line->bundle) {
                 $bundle = $line->bundle;
-                $current = (float) ($bundle->wip_qty ?? 0);
+                $current = (int) round((float) ($bundle->wip_qty ?? 0));
                 $usedFromBundle = $qtyOk + $qtyReject;
 
-                if ($usedFromBundle > 0.0000001) {
+                if ($usedFromBundle > 0) {
                     $bundle->wip_qty = max(0, $current - $usedFromBundle);
                     $bundle->save();
                 }
@@ -900,22 +849,19 @@ class FinishingJobController extends Controller
     }
 
     /**
-     * Allocate finished_qty pada sewing_return_lines berbasis bundle + item.
-     *
-     * Sumber bundle ditarik dari sewing_pickup_lines.bundle_id (FK ke cutting_job_bundles.id).
-     * FIFO by id. Lock row supaya aman di concurrency.
+     * Allocate finished_qty (INTEGER) pada sewing_return_lines berbasis bundle + item.
+     * FIFO by id, lock row untuk concurrency.
      */
     protected function allocateFinishedQtyFromSewingReturnByBundle(
         int $bundleId,
         int $itemId,
-        float $qtyOkNeed,
+        int $qtyOkNeed,
         string $jobCode
     ): void {
-        if ($qtyOkNeed <= 0.0000001) {
+        if ($qtyOkNeed <= 0) {
             return;
         }
 
-        // Fail-fast jika relasi belum dibuat di model (biar jelas)
         if (!method_exists(SewingReturnLine::class, 'sewingPickupLine')) {
             throw ValidationException::withMessages([
                 'sewing_balance' => 'Model SewingReturnLine belum memiliki relasi sewingPickupLine(). Tambahkan belongsTo ke SewingPickupLine.',
@@ -924,7 +870,6 @@ class FinishingJobController extends Controller
 
         $lines = SewingReturnLine::query()
             ->whereHas('sewingPickupLine', function ($q) use ($bundleId, $itemId) {
-                // 🔁 SAMA persis dengan query Tinker yang tadi berhasil
                 $q->where('cutting_job_bundle_id', $bundleId)
                     ->where('finished_item_id', $itemId);
             })
@@ -936,24 +881,27 @@ class FinishingJobController extends Controller
         $remaining = $qtyOkNeed;
 
         foreach ($lines as $rl) {
-            $avail = (float) $rl->qty_ok - (float) $rl->finished_qty;
-            if ($avail <= 0.0000001) {
+            $avail = (int) $rl->qty_ok - (int) $rl->finished_qty;
+            if ($avail <= 0) {
                 continue;
             }
 
-            $take = min($avail, $remaining);
+            $take = min($avail, $remaining); // ✅ integer
+            if ($take <= 0) {
+                continue;
+            }
 
-            // ⚠️ finished_qty kamu INTEGER. Kalau qty bisa desimal, sebaiknya ubah ke decimal nanti.
-            $rl->finished_qty = (int) ((float) $rl->finished_qty + $take);
+            $rl->finished_qty = (int) $rl->finished_qty + $take;
             $rl->save();
 
             $remaining -= $take;
-            if ($remaining <= 0.0000001) {
+            if ($remaining <= 0) {
                 break;
             }
+
         }
 
-        if ($remaining > 0.0000001) {
+        if ($remaining > 0) {
             throw ValidationException::withMessages([
                 'finishing' => "Sewing Return (bundle {$bundleId}, item {$itemId}) tidak cukup untuk finishing OK {$qtyOkNeed}. Kurang {$remaining}. Job: {$jobCode}",
             ]);
@@ -961,45 +909,37 @@ class FinishingJobController extends Controller
     }
 
     /**
-     * Pastikan total Finishing OK di job ini tidak melebihi saldo Sewing Return per bundle.
-     * Anchor ke bundle_id via relasi sewingPickupLine, bukan ke item_id langsung di sewing_return_lines.
+     * Pastikan total Finishing OK di job ini tidak melebihi saldo Sewing Return per bundle+item,
+     * dengan check fisik WIP bundle juga.
      */
     protected function assertSewingReturnBalanceForFinishingJob(FinishingJob $job): void
     {
-        // Pastikan lines sudah ke-load
         $job->loadMissing('lines');
 
-        // Group per bundle + item, dan hitung total qty_ok di job ini
         $lines = $job->lines()
             ->select('bundle_id', 'item_id', DB::raw('SUM(qty_ok) as qty_ok_total'))
             ->groupBy('bundle_id', 'item_id')
             ->get();
 
         foreach ($lines as $line) {
-            $bundleId = $line->bundle_id;
-            $itemId = $line->item_id;
-            $qtyOkJob = (float) $line->qty_ok_total;
+            $bundleId = (int) $line->bundle_id;
+            $itemId = (int) $line->item_id;
+            $qtyOkJob = (int) $line->qty_ok_total;
 
-            if ($qtyOkJob <= 0.0) {
+            if ($qtyOkJob <= 0) {
                 continue;
             }
 
-            // 🔍 Ambil WIP-FIN real per bundle (fisik)
             $bundle = CuttingJobBundle::find($bundleId);
-            $bundleWipQty = (float) ($bundle?->wip_qty ?? 0.0);
+            $bundleWipQty = (int) round((float) ($bundle?->wip_qty ?? 0));
 
-            // 🔢 Total OK dari Sewing Return utk bundle + item ini
-            // → pakai query yang tadi kamu pakai di Tinker (terbukti dapet 18)
-            $totalSewingOk = DB::table('sewing_return_lines as srl')
+            $totalSewingOk = (int) DB::table('sewing_return_lines as srl')
                 ->join('sewing_pickup_lines as spl', 'srl.sewing_pickup_line_id', '=', 'spl.id')
                 ->where('spl.cutting_job_bundle_id', $bundleId)
                 ->where('spl.finished_item_id', $itemId)
                 ->sum('srl.qty_ok');
 
-            $totalSewingOk = (float) $totalSewingOk;
-
-            // 🔢 Total Finishing OK yang SUDAH POSTED di job lain (bukan job ini)
-            $totalFinishingOkPosted = DB::table('finishing_job_lines as fjl')
+            $totalFinishingOkPosted = (int) DB::table('finishing_job_lines as fjl')
                 ->join('finishing_jobs as fj', 'fjl.finishing_job_id', '=', 'fj.id')
                 ->where('fjl.bundle_id', $bundleId)
                 ->where('fjl.item_id', $itemId)
@@ -1007,16 +947,12 @@ class FinishingJobController extends Controller
                 ->where('fj.id', '<>', $job->id)
                 ->sum('fjl.qty_ok');
 
-            $totalFinishingOkPosted = (float) $totalFinishingOkPosted;
+            $availableFromSew = max(0, $totalSewingOk - $totalFinishingOkPosted);
 
-            // "Logis" menurut Sewing Return:
-            $availableFromSew = max(0.0, $totalSewingOk - $totalFinishingOkPosted);
             $sewingDiff = $qtyOkJob - $availableFromSew;
-
-            // "Fisik" menurut WIP-FIN bundle:
             $wipDiff = $qtyOkJob - $bundleWipQty;
 
-            Log::info('DEBUG_FINISHING_GUARD', [
+            Log::info('DEBUG_FINISHING_GUARD_INT', [
                 'job_id' => $job->id,
                 'job_code' => $job->code,
                 'bundle_id' => $bundleId,
@@ -1030,48 +966,35 @@ class FinishingJobController extends Controller
                 'wipDiff' => $wipDiff,
             ]);
 
-            // ✅ CASE 1: Secara Sewing Return sudah cukup
-            if ($sewingDiff <= 0.0001) {
-                // Tapi kalau WIP-FIN fisik malah kurang, itu indikasi stok minus → wajib blokir
-                if ($wipDiff > 0.0001) {
-                    $short = $wipDiff;
-
+            // CASE 1: sewing cukup, tapi WIP fisik kurang => block
+            if ($sewingDiff <= 0) {
+                if ($wipDiff > 0) {
                     throw ValidationException::withMessages([
                         'finishing_job' =>
                         "WIP-FIN untuk bundle {$bundleId}, item {$itemId} tidak cukup untuk finishing OK {$qtyOkJob}. " .
-                        "Kurang {$short}. Job: {$job->code}",
+                        "Kurang {$wipDiff}. Job: {$job->code}",
                     ]);
                 }
-
                 continue;
             }
 
-            // ❗ Di titik ini: menurut Sewing Return, qty job ini melebihi saldo "logis".
-            // → cek WIP-FIN fisik per bundle.
-
-            // ✅ CASE 2: Sewing Return kurang, tapi WIP-FIN fisik masih cukup
-            //    → TOLERANSI (mungkin data lama / adjustment), jangan blokir, cuma log warning.
-            if ($bundleWipQty + 0.0001 >= $qtyOkJob) {
-                Log::warning('FINISHING_GUARD_SEWING_MISMATCH_WIP_OK', [
+            // CASE 2: sewing kurang, tapi fisik WIP masih cukup => toleransi + warning
+            if ($bundleWipQty >= $qtyOkJob) {
+                Log::warning('FINISHING_GUARD_INT_SEWING_MISMATCH_WIP_OK', [
                     'job_id' => $job->id,
                     'job_code' => $job->code,
                     'bundle_id' => $bundleId,
                     'item_id' => $itemId,
                     'qtyOkJob' => $qtyOkJob,
-                    'totalSewingOk' => $totalSewingOk,
                     'availableFromSew' => $availableFromSew,
                     'bundle_wip_qty' => $bundleWipQty,
-                    'note' => 'Sewing Return secara logis kurang, tapi stok WIP-FIN fisik masih cukup. Diizinkan dengan warning.',
+                    'note' => 'Sewing Return logis kurang, tapi stok fisik WIP-FIN cukup. Diizinkan dengan warning.',
                 ]);
-
                 continue;
             }
 
-            // ❌ CASE 3: Sewing Return kurang DAN WIP-FIN fisik juga kurang
-            // → ini benar-benar minus, wajib diblokir.
-            $shortLogical = max(0.0, $sewingDiff);
-            $shortPhysical = max(0.0, $wipDiff);
-            $short = max($shortLogical, $shortPhysical);
+            // CASE 3: sewing kurang & fisik kurang => block
+            $short = max($sewingDiff, $wipDiff);
 
             throw ValidationException::withMessages([
                 'finishing_job' =>

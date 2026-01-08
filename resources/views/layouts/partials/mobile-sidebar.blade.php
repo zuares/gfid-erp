@@ -599,12 +599,6 @@
                                 </a>
                             @endif
 
-                            @if (Route::has('production.sewing.adjustments.index'))
-                                <a href="{{ route('production.sewing.adjustments.index') }}"
-                                    class="mobile-sidebar-link mobile-sidebar-link-sub {{ request()->routeIs('production.sewing.adjustments.*') ? 'active' : '' }}">
-                                    <span class="icon">🧮</span><span>Progress Adjustments</span>
-                                </a>
-                            @endif
 
                             @if (Route::has('production.sewing.reports.dashboard'))
                                 <a href="{{ route('production.sewing.reports.dashboard') }}"
@@ -790,14 +784,7 @@
                             </li>
                         @endif
 
-                        @if (Route::has('production.sewing.adjustments.index'))
-                            <li>
-                                <a href="{{ route('production.sewing.adjustments.index') }}"
-                                    class="mobile-sidebar-link {{ request()->routeIs('production.sewing.adjustments.*') ? 'active' : '' }}">
-                                    <span class="icon">🧮</span><span>Progress Adjustments</span>
-                                </a>
-                            </li>
-                        @endif
+
 
                         @if (Route::has('production.finishing_jobs.index'))
                             <li>
