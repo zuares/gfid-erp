@@ -60,6 +60,9 @@ Route::middleware(['web', 'auth', 'role:owner,admin'])->group(function () {
             Route::post('/', [ShipmentController::class, 'store'])
                 ->name('store');
 
+            Route::delete('{shipment}', [ShipmentController::class, 'destroy'])
+                ->name('destroy');
+
             Route::get('{shipment}', [ShipmentController::class, 'show'])
                 ->name('show');
 
@@ -89,6 +92,9 @@ Route::middleware(['web', 'auth', 'role:owner,admin'])->group(function () {
 
             Route::post('{shipment}/import-preview', [ShipmentController::class, 'importPreview'])
                 ->name('import_preview');
+            Route::post('{shipment}/cancel', [ShipmentController::class, 'cancelPosted'])
+                ->name('cancel')
+                ->middleware('role:owner');
         });
 
         // Lines tetap dipisah karena parameternya langsung {line}

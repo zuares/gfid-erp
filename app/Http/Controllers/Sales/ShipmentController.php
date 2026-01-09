@@ -10,6 +10,7 @@ use App\Models\ShipmentLine;
 use App\Models\Store;
 use App\Models\Warehouse;
 use App\Services\Inventory\InventoryService;
+use Illuminate\Http\RedirectResponse;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Auth;
 use Illuminate\Support\Facades\DB;
@@ -23,14 +24,24 @@ class ShipmentController extends Controller
 
     public function index(Request $request)
     {
-        $shipments = Shipment::query()
+        // status filter: submitted | posted | cancelled | all
+        $statusFilter = $request->get('status', 'all');
+
+        $query = Shipment::query()
             ->with(['store', 'lines.item.category'])
             ->orderByDesc('date')
-            ->orderByDesc('id')
-            ->paginate(20);
+            ->orderByDesc('id');
+
+        if ($statusFilter === 'cancelled') {
+            $query->whereNotNull('cancelled_at');
+        } elseif (in_array($statusFilter, ['submitted', 'posted'], true)) {
+            $query->whereNull('cancelled_at')
+                ->where('status', $statusFilter);
+        } // all => no filter
+
+        $shipments = $query->paginate(20)->withQueryString();
 
         $shipments->getCollection()->transform(function (Shipment $shipment) {
-
             $totalQty = 0;
             $totalRp = 0;
             $cats = [];
@@ -72,7 +83,7 @@ class ShipmentController extends Controller
             return $shipment;
         });
 
-        return view('sales.shipments.index', compact('shipments'));
+        return view('sales.shipments.index', compact('shipments', 'statusFilter'));
     }
 
     public function create(Request $request)
@@ -1156,6 +1167,30 @@ class ShipmentController extends Controller
             ]);
     }
 
+    public function destroy(Shipment $shipment): RedirectResponse
+    {
+        // hanya draft boleh dibatalkan
+        if ($shipment->status !== 'draft') {
+            return redirect()
+                ->route('sales.shipments.show', $shipment)
+                ->with('status', 'error')
+                ->with('message', 'Hanya shipment berstatus draft yang bisa dibatalkan.');
+        }
+
+        DB::transaction(function () use ($shipment) {
+            // aman: hapus lines dulu (kalau FK belum cascade)
+            $shipment->lines()->delete();
+
+            // hapus header
+            $shipment->delete();
+        });
+
+        return redirect()
+            ->route('sales.shipments.index')
+            ->with('status', 'success')
+            ->with('message', 'Shipment draft berhasil dibatalkan.');
+    }
+
     public function report(Request $request)
     {
         // Default: bulan berjalan
@@ -1244,6 +1279,93 @@ class ShipmentController extends Controller
                 'status' => $status,
             ],
         ]);
+    }
+
+    public function cancelPosted(Request $request, Shipment $shipment): RedirectResponse
+    {
+        // ✅ route sudah middleware role:owner, tapi tetap guard
+        if ((auth()->user()->role ?? null) !== 'owner') {
+            abort(403);
+        }
+
+        $validated = $request->validate([
+            'cancel_reason' => ['required', 'string', 'max:255'],
+        ]);
+
+        $warehouse = Warehouse::where('code', 'WH-RTS')->first();
+        if (!$warehouse) {
+            return redirect()
+                ->route('sales.shipments.show', $shipment)
+                ->with('status', 'error')
+                ->with('message', 'Warehouse WH-RTS belum dikonfigurasi.');
+        }
+
+        try {
+            DB::transaction(function () use ($shipment, $warehouse, $validated) {
+
+                $locked = Shipment::whereKey($shipment->id)
+                    ->lockForUpdate()
+                    ->firstOrFail();
+
+                // ✅ idempotent: kalau sudah cancel, stop
+                if (!empty($locked->cancelled_at)) {
+                    return;
+                }
+
+                // ✅ hanya posted
+                if ($locked->status !== 'posted' || empty($locked->posted_at)) {
+                    throw new \RuntimeException('Hanya shipment status posted yang bisa dibatalkan.');
+                }
+
+                // ✅ opsional (aku sarankan): kalau sudah ada invoice, jangan boleh cancel
+                if (!empty($locked->sales_invoice_id)) {
+                    throw new \RuntimeException('Tidak bisa dibatalkan karena sudah dibuat invoice.');
+                }
+
+                $locked->load(['lines.item', 'store']);
+
+                foreach ($locked->lines as $line) {
+                    $qty = (int) ($line->qty_scanned ?? 0);
+                    if ($qty <= 0) {
+                        continue;
+                    }
+
+                    // pakai unit cost dari line kalau ada (biar nilai mutasi balik rapi)
+                    $unitCost = $line->unit_hpp ?? null;
+
+                    $this->inventory->stockIn(
+                        warehouseId: $warehouse->id,
+                        itemId: (int) $line->item_id,
+                        qty: $qty,
+                        date: $locked->date,
+                        sourceType: 'shipment_cancel',
+                        sourceId: (int) $locked->id,
+                        notes: 'Cancel Shipment ' . $locked->code . ' (balik dari store ' . ($locked->store->code ?? '-') . ')'
+                        . ($validated['cancel_reason'] ? ' • ' . $validated['cancel_reason'] : ''),
+                        lotId: null,
+                        unitCost: $unitCost,
+                        affectLotCost: false,
+                    );
+                }
+
+                // ✅ flag cancelled
+                $locked->cancelled_at = now();
+                $locked->cancelled_by = auth()->id();
+                $locked->cancel_reason = $validated['cancel_reason'];
+                $locked->save();
+            });
+
+        } catch (\Throwable $e) {
+            return redirect()
+                ->route('sales.shipments.show', $shipment)
+                ->with('status', 'error')
+                ->with('message', 'Gagal membatalkan shipment: ' . $e->getMessage());
+        }
+
+        return redirect()
+            ->route('sales.shipments.show', $shipment)
+            ->with('status', 'success')
+            ->with('message', 'Shipment posted berhasil dibatalkan & stok sudah dikembalikan ke WH-RTS.');
     }
 
 }

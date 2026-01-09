@@ -25,21 +25,15 @@
         }
 
         body[data-theme="dark"] .page-wrap {
-            background: radial-gradient(circle at top left,
-                    rgba(15, 23, 42, 0.9) 0,
-                    #020617 65%);
+            background: radial-gradient(circle at top left, rgba(15, 23, 42, 0.9) 0, #020617 65%);
         }
 
         body[data-theme="dark"] .page-wrap.page-theme-shopee {
-            background: radial-gradient(circle at top left,
-                    rgba(148, 27, 19, 0.9) 0,
-                    #020617 65%);
+            background: radial-gradient(circle at top left, rgba(148, 27, 19, 0.9) 0, #020617 65%);
         }
 
         body[data-theme="dark"] .page-wrap.page-theme-tiktok {
-            background: radial-gradient(circle at top left,
-                    rgba(8, 47, 73, 0.9) 0,
-                    #020617 65%);
+            background: radial-gradient(circle at top left, rgba(8, 47, 73, 0.9) 0, #020617 65%);
         }
 
         .card-main {
@@ -91,6 +85,13 @@
             border: 1px solid rgba(34, 197, 94, 0.25);
         }
 
+        /* ✅ cancelled badge */
+        .badge-status-cancelled {
+            background: rgba(239, 68, 68, 0.10);
+            color: #b91c1c;
+            border: 1px solid rgba(239, 68, 68, 0.28);
+        }
+
         body[data-theme="dark"] .badge-status-draft {
             background: rgba(251, 191, 36, 0.22);
             color: #fef9c3;
@@ -107,6 +108,12 @@
             background: rgba(34, 197, 94, 0.22);
             color: #bbf7d0;
             border-color: rgba(34, 197, 94, 0.65);
+        }
+
+        body[data-theme="dark"] .badge-status-cancelled {
+            background: rgba(239, 68, 68, 0.18);
+            color: #fecaca;
+            border-color: rgba(239, 68, 68, 0.55);
         }
 
         .summary-pill {
@@ -285,7 +292,7 @@
             vertical-align: middle;
         }
 
-        /* buttons (reuse from edit page) */
+        /* buttons */
         .btn-theme-outline,
         .btn-theme-main {
             border-radius: 999px;
@@ -300,8 +307,6 @@
         .btn-theme-outline {
             background: transparent;
         }
-
-        .btn-theme-main {}
 
         /* default theme */
         .page-theme-default .btn-theme-main {
@@ -358,6 +363,25 @@
         } elseif (str_contains($storeKey, 'TTK') || str_contains($storeKey, 'TIKTOK')) {
             $scanTheme = 'tiktok';
         }
+
+        $isOwner = (auth()->user()->role ?? null) === 'owner';
+        $isCancelled = !empty($shipment->cancelled_at);
+
+        // ✅ Pesan konfirmasi hapus draft (delete permanen)
+        $confirmDeleteMsg =
+            "⚠️ KONFIRMASI HAPUS\n\n" .
+            "Shipment {$shipment->code} akan DIHAPUS PERMANEN.\n" .
+            "Semua item scan/baris shipment juga akan ikut terhapus.\n" .
+            "Tindakan ini TIDAK BISA DIBATALKAN.\n\n" .
+            'Lanjutkan hapus?';
+
+        // ✅ Pesan konfirmasi cancel posted (reversal stok)
+        $confirmCancelMsg =
+            "⚠️ KONFIRMASI BATALKAN (POSTED)\n\n" .
+            "Shipment {$shipment->code} akan DIBATALKAN.\n" .
+            "Stok akan DIBALIKKAN ke WH-RTS.\n" .
+            "Tindakan ini tidak bisa dibatalkan dengan mudah.\n\n" .
+            'Lanjutkan batalkan?';
     @endphp
 
     <div class="page-wrap page-theme-{{ $scanTheme }}">
@@ -368,12 +392,16 @@
                 <div class="d-flex flex-wrap align-items-center gap-2 mb-1">
                     <h1 class="h5 mb-0">{{ $shipment->code }}</h1>
 
-                    @if ($shipment->status === 'draft')
-                        <span class="badge-status badge-status-draft">Draft</span>
-                    @elseif ($shipment->status === 'submitted')
-                        <span class="badge-status badge-status-submitted">Submitted</span>
+                    @if ($isCancelled)
+                        <span class="badge-status badge-status-cancelled">Cancelled</span>
                     @else
-                        <span class="badge-status badge-status-posted">Posted</span>
+                        @if ($shipment->status === 'draft')
+                            <span class="badge-status badge-status-draft">Draft</span>
+                        @elseif ($shipment->status === 'submitted')
+                            <span class="badge-status badge-status-submitted">Submitted</span>
+                        @else
+                            <span class="badge-status badge-status-posted">Posted</span>
+                        @endif
                     @endif
                 </div>
 
@@ -404,8 +432,18 @@
             <div class="alert alert-success js-auto-hide-alert" role="alert">{{ session('message') }}</div>
         @endif
 
+        {{-- NOTICE untuk CANCELLED --}}
+        @if ($isCancelled)
+            <div class="alert alert-warning mb-3" role="alert">
+                <b>DIBATALKAN:</b> {{ id_datetime($shipment->cancelled_at) }}
+                @if ($shipment->cancel_reason)
+                    <div class="small mt-1">Alasan: {{ $shipment->cancel_reason }}</div>
+                @endif
+            </div>
+        @endif
+
         {{-- NOTICE untuk SUBMITTED --}}
-        @if ($shipment->status === 'submitted')
+        @if (!$isCancelled && $shipment->status === 'submitted')
             <div class="notice-submitted mb-3">
                 <b>Submitted:</b> scan sudah dikunci. <b>Stok belum berkurang</b>.
                 Silakan klik <b>Posting Stok</b> untuk mengurangi stok dari WH-RTS.
@@ -419,16 +457,46 @@
                     <span class="meta-label">Info Utama</span>
 
                     <div class="d-flex gap-2 flex-wrap">
+                        {{-- DRAFT --}}
                         @if ($shipment->status === 'draft')
                             <a href="{{ route('sales.shipments.edit', $shipment) }}" class="btn btn-sm btn-theme-outline">
                                 Edit &amp; Scan
                             </a>
-                        @elseif ($shipment->status === 'submitted')
+
+                            <form action="{{ route('sales.shipments.destroy', $shipment) }}" method="POST"
+                                class="d-inline" onsubmit="return confirm(@js($confirmDeleteMsg));">
+                                @csrf
+                                @method('DELETE')
+                                <button type="submit" class="btn btn-sm btn-theme-main">
+                                    Batalkan (Hapus)
+                                </button>
+                            </form>
+                        @endif
+
+                        {{-- SUBMITTED --}}
+                        @if (!$isCancelled && $shipment->status === 'submitted')
                             <form action="{{ route('sales.shipments.post', $shipment) }}" method="POST"
                                 onsubmit="return confirm('Posting stok untuk shipment ini? Stok WH-RTS akan berkurang.')">
                                 @csrf
                                 <button type="submit" class="btn btn-sm btn-theme-main">
                                     Posting Stok
+                                </button>
+                            </form>
+                        @endif
+
+                        {{-- POSTED (CANCEL) - OWNER ONLY --}}
+                        @if (!$isCancelled && $shipment->status === 'posted' && $isOwner)
+                            <form action="{{ route('sales.shipments.cancel', $shipment) }}" method="POST" class="d-inline"
+                                onsubmit="
+                                    const reason = prompt('Masukkan alasan pembatalan (wajib):');
+                                    if (!reason) return false;
+                                    this.querySelector('input[name=cancel_reason]').value = reason;
+                                    return confirm(@js($confirmCancelMsg));
+                                ">
+                                @csrf
+                                <input type="hidden" name="cancel_reason" value="">
+                                <button type="submit" class="btn btn-sm btn-theme-main">
+                                    Batalkan Pengiriman (Owner)
                                 </button>
                             </form>
                         @endif
@@ -478,22 +546,33 @@
 
                     <span class="info-pill">
                         <span class="info-pill-label">Status</span>
-                        <span class="info-pill-value text-capitalize">{{ $shipment->status }}</span>
+                        <span class="info-pill-value text-capitalize">
+                            {{ $isCancelled ? 'cancelled' : $shipment->status }}
+                        </span>
                     </span>
 
                     @if ($shipment->status === 'submitted')
                         <span class="info-pill">
                             <span class="info-pill-label">Submitted At</span>
-                            <span
-                                class="info-pill-value">{{ $shipment->submitted_at ? id_datetime($shipment->submitted_at) : '-' }}</span>
+                            <span class="info-pill-value">
+                                {{ $shipment->submitted_at ? id_datetime($shipment->submitted_at) : '-' }}
+                            </span>
                         </span>
                     @endif
 
                     @if ($shipment->status === 'posted')
                         <span class="info-pill">
                             <span class="info-pill-label">Posted At</span>
-                            <span
-                                class="info-pill-value">{{ $shipment->posted_at ? id_datetime($shipment->posted_at) : '-' }}</span>
+                            <span class="info-pill-value">
+                                {{ $shipment->posted_at ? id_datetime($shipment->posted_at) : '-' }}
+                            </span>
+                        </span>
+                    @endif
+
+                    @if ($isCancelled)
+                        <span class="info-pill">
+                            <span class="info-pill-label">Cancelled At</span>
+                            <span class="info-pill-value">{{ id_datetime($shipment->cancelled_at) }}</span>
                         </span>
                     @endif
 
@@ -606,7 +685,8 @@
                                 </tr>
                             @empty
                                 <tr>
-                                    <td colspan="6" class="text-center text-muted py-4">Belum ada item yang discan.
+                                    <td colspan="6" class="text-center text-muted py-4">
+                                        Belum ada item yang discan.
                                     </td>
                                 </tr>
                             @endforelse
@@ -633,13 +713,32 @@
                             </a>
                         @endif
 
-                        {{-- POST button di footer juga (submitted) --}}
-                        @if ($shipment->status === 'submitted')
-                            <form action="{{ route('sales.shipments.post', $shipment) }}" method="POST"
-                                onsubmit="return confirm('Posting stok untuk shipment ini? Stok WH-RTS akan berkurang.')">
+                        {{-- Draft delete (footer) --}}
+                        @if ($shipment->status === 'draft')
+                            <form action="{{ route('sales.shipments.destroy', $shipment) }}" method="POST"
+                                class="d-inline" onsubmit="return confirm(@js($confirmDeleteMsg));">
                                 @csrf
+                                @method('DELETE')
                                 <button type="submit" class="btn btn-theme-main">
-                                    Posting Stok
+                                    Batalkan (Hapus)
+                                </button>
+                            </form>
+                        @endif
+
+                        {{-- Cancel posted (footer) - owner only --}}
+                        @if (!$isCancelled && $shipment->status === 'posted' && $isOwner)
+                            <form action="{{ route('sales.shipments.cancel', $shipment) }}" method="POST"
+                                class="d-inline"
+                                onsubmit="
+                                    const reason = prompt('Masukkan alasan pembatalan (wajib):');
+                                    if (!reason) return false;
+                                    this.querySelector('input[name=cancel_reason]').value = reason;
+                                    return confirm(@js($confirmCancelMsg));
+                                ">
+                                @csrf
+                                <input type="hidden" name="cancel_reason" value="">
+                                <button type="submit" class="btn btn-theme-main">
+                                    Batalkan Pengiriman (Owner)
                                 </button>
                             </form>
                         @endif
