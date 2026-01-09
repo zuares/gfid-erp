@@ -12,7 +12,6 @@
             min-height: 100vh;
         }
 
-        /* ========= GLOBAL BACKGROUND ========= */
         body[data-theme="light"] .page-wrap {
             background: #f3f4f6;
         }
@@ -154,7 +153,6 @@
             color: #6b7280;
         }
 
-        /* ========= INFO PILL MINIMAL ========= */
         .info-pill {
             display: inline-flex;
             flex-direction: column;
@@ -185,6 +183,22 @@
 
         body[data-theme="dark"] .info-pill-label {
             color: #6b7280;
+        }
+
+        /* ====== NOTICE (submitted) ====== */
+        .notice-submitted {
+            border-radius: 12px;
+            padding: .7rem .85rem;
+            border: 1px solid rgba(59, 130, 246, 0.28);
+            background: rgba(59, 130, 246, 0.06);
+            color: #1d4ed8;
+            font-size: .88rem;
+        }
+
+        body[data-theme="dark"] .notice-submitted {
+            border-color: rgba(59, 130, 246, 0.6);
+            background: rgba(59, 130, 246, 0.18);
+            color: #bfdbfe;
         }
 
         /* ========= TABLE ========= */
@@ -260,7 +274,6 @@
             color: #e5e7eb;
         }
 
-        /* ========= RINGKASAN PER KATEGORI ========= */
         .category-summary-table thead th {
             font-size: .72rem;
             text-transform: uppercase;
@@ -271,12 +284,70 @@
             font-size: .82rem;
             vertical-align: middle;
         }
+
+        /* buttons (reuse from edit page) */
+        .btn-theme-outline,
+        .btn-theme-main {
+            border-radius: 999px;
+            font-size: .78rem;
+            letter-spacing: .06em;
+            text-transform: uppercase;
+            padding-inline: 1rem;
+            padding-block: .35rem;
+            border-width: 1px;
+        }
+
+        .btn-theme-outline {
+            background: transparent;
+        }
+
+        .btn-theme-main {}
+
+        /* default theme */
+        .page-theme-default .btn-theme-main {
+            background: #2563eb;
+            border-color: #2563eb;
+            color: #eff6ff;
+        }
+
+        .page-theme-default .btn-theme-outline {
+            border-color: rgba(148, 163, 184, .7);
+            color: #4b5563;
+        }
+
+        /* shopee */
+        .page-theme-shopee .btn-theme-main {
+            background: #f97316;
+            border-color: #f97316;
+            color: #fff7ed;
+        }
+
+        .page-theme-shopee .btn-theme-outline {
+            border-color: rgba(248, 113, 113, .9);
+            color: #b91c1c;
+        }
+
+        /* tiktok */
+        .page-theme-tiktok .btn-theme-main {
+            background: #0f766e;
+            border-color: #0f766e;
+            color: #e0f2fe;
+        }
+
+        .page-theme-tiktok .btn-theme-outline {
+            border-color: rgba(45, 212, 191, .8);
+            color: #0f766e;
+        }
+
+        body[data-theme="dark"] .btn-theme-outline {
+            color: #e5e7eb;
+            border-color: rgba(148, 163, 184, .6);
+        }
     </style>
 @endpush
 
 @section('content')
     @php
-        // totalQty, totalLines, totalHpp, summaryPerCategory sudah dikirim dari controller
         $storeName = $shipment->store->name ?? '';
         $storeCode = $shipment->store->code ?? '';
         $storeKey = strtoupper($storeCode . ' ' . $storeName);
@@ -293,13 +364,9 @@
         {{-- HEADER --}}
         <div class="d-flex justify-content-between align-items-start mb-3 flex-wrap gap-2">
             <div>
-                <div class="meta-label mb-1">
-                    Shipment
-                </div>
+                <div class="meta-label mb-1">Shipment</div>
                 <div class="d-flex flex-wrap align-items-center gap-2 mb-1">
-                    <h1 class="h5 mb-0">
-                        {{ $shipment->code }}
-                    </h1>
+                    <h1 class="h5 mb-0">{{ $shipment->code }}</h1>
 
                     @if ($shipment->status === 'draft')
                         <span class="badge-status badge-status-draft">Draft</span>
@@ -312,10 +379,8 @@
 
                 <div class="small text-muted">
                     {{ id_date($shipment->date) }}
-
                     @if ($shipment->store)
-                        &bull;
-                        {{ $shipment->store->name }}
+                        &bull; {{ $shipment->store->name }}
                         @if ($shipment->store->code ?? false)
                             ({{ strtoupper($shipment->store->code) }})
                         @endif
@@ -326,66 +391,64 @@
             </div>
 
             <div class="text-end small text-muted">
-                <div class="meta-label mb-1">
-                    Dibuat oleh
-                </div>
-                <div class="fw-semibold">
-                    {{ $shipment->creator?->name ?? '-' }}
-                </div>
-                <div>
-                    {{ id_datetime($shipment->created_at) }}
-                </div>
+                <div class="meta-label mb-1">Dibuat oleh</div>
+                <div class="fw-semibold">{{ $shipment->creator?->name ?? '-' }}</div>
+                <div>{{ id_datetime($shipment->created_at) }}</div>
             </div>
         </div>
 
         {{-- FLASH --}}
         @if (session('status') === 'error')
-            <div class="alert alert-danger js-auto-hide-alert" role="alert">
-                {{ session('message') }}
-            </div>
+            <div class="alert alert-danger js-auto-hide-alert" role="alert">{{ session('message') }}</div>
         @elseif (session('status') === 'success')
-            <div class="alert alert-success js-auto-hide-alert" role="alert">
-                {{ session('message') }}
+            <div class="alert alert-success js-auto-hide-alert" role="alert">{{ session('message') }}</div>
+        @endif
+
+        {{-- NOTICE untuk SUBMITTED --}}
+        @if ($shipment->status === 'submitted')
+            <div class="notice-submitted mb-3">
+                <b>Submitted:</b> scan sudah dikunci. <b>Stok belum berkurang</b>.
+                Silakan klik <b>Posting Stok</b> untuk mengurangi stok dari WH-RTS.
             </div>
         @endif
 
-        {{-- INFO UTAMA (MINIMAL) --}}
+        {{-- INFO UTAMA --}}
         <div class="card card-main mb-3">
             <div class="card-body">
                 <div class="d-flex justify-content-between align-items-center mb-2">
-                    <span class="meta-label">
-                        Info Utama
-                    </span>
-                    @if ($shipment->status === 'draft')
-                        <a href="{{ route('sales.shipments.edit', $shipment) }}" class="btn btn-sm btn-outline-primary">
-                            Edit &amp; Scan
-                        </a>
-                    @endif
+                    <span class="meta-label">Info Utama</span>
+
+                    <div class="d-flex gap-2 flex-wrap">
+                        @if ($shipment->status === 'draft')
+                            <a href="{{ route('sales.shipments.edit', $shipment) }}" class="btn btn-sm btn-theme-outline">
+                                Edit &amp; Scan
+                            </a>
+                        @elseif ($shipment->status === 'submitted')
+                            <form action="{{ route('sales.shipments.post', $shipment) }}" method="POST"
+                                onsubmit="return confirm('Posting stok untuk shipment ini? Stok WH-RTS akan berkurang.')">
+                                @csrf
+                                <button type="submit" class="btn btn-sm btn-theme-main">
+                                    Posting Stok
+                                </button>
+                            </form>
+                        @endif
+                    </div>
                 </div>
 
-                {{-- Baris 1: Channel + creator (kanan) --}}
                 <div class="d-flex flex-wrap justify-content-between align-items-start gap-3 mb-2">
                     <div>
-                        <div class="info-label mb-1">
-                            Channel / Store
-                        </div>
+                        <div class="info-label mb-1">Channel / Store</div>
 
                         @if ($shipment->store)
                             <div class="d-flex flex-wrap align-items-center gap-2">
-                                <div class="fw-semibold">
-                                    {{ $shipment->store->name }}
-                                </div>
+                                <div class="fw-semibold">{{ $shipment->store->name }}</div>
 
                                 @if ($shipment->store->code ?? false)
-                                    <div class="store-badge">
-                                        {{ strtoupper($shipment->store->code) }}
-                                    </div>
+                                    <div class="store-badge">{{ strtoupper($shipment->store->code) }}</div>
                                 @endif
                             </div>
                         @else
-                            <div class="text-muted small">
-                                Tidak diisi.
-                            </div>
+                            <div class="text-muted small">Tidak diisi.</div>
                         @endif
                     </div>
 
@@ -398,24 +461,15 @@
                     </div>
                 </div>
 
-                {{-- Baris 2: Catatan --}}
                 <div class="mb-2">
-                    <div class="info-label mb-1">
-                        Catatan
-                    </div>
-
+                    <div class="info-label mb-1">Catatan</div>
                     @if ($shipment->notes)
-                        <div class="small">
-                            {!! nl2br(e($shipment->notes)) !!}
-                        </div>
+                        <div class="small">{!! nl2br(e($shipment->notes)) !!}</div>
                     @else
-                        <div class="text-muted small">
-                            Tidak ada catatan.
-                        </div>
+                        <div class="text-muted small">Tidak ada catatan.</div>
                     @endif
                 </div>
 
-                {{-- Baris 3: meta ringkas dalam pill --}}
                 <div class="d-flex flex-wrap gap-2">
                     <span class="info-pill">
                         <span class="info-pill-label">Tanggal</span>
@@ -424,30 +478,38 @@
 
                     <span class="info-pill">
                         <span class="info-pill-label">Status</span>
-                        <span class="info-pill-value text-capitalize">
-                            {{ $shipment->status }}
-                        </span>
+                        <span class="info-pill-value text-capitalize">{{ $shipment->status }}</span>
                     </span>
+
+                    @if ($shipment->status === 'submitted')
+                        <span class="info-pill">
+                            <span class="info-pill-label">Submitted At</span>
+                            <span
+                                class="info-pill-value">{{ $shipment->submitted_at ? id_datetime($shipment->submitted_at) : '-' }}</span>
+                        </span>
+                    @endif
+
+                    @if ($shipment->status === 'posted')
+                        <span class="info-pill">
+                            <span class="info-pill-label">Posted At</span>
+                            <span
+                                class="info-pill-value">{{ $shipment->posted_at ? id_datetime($shipment->posted_at) : '-' }}</span>
+                        </span>
+                    @endif
 
                     <span class="info-pill">
                         <span class="info-pill-label">Total Baris</span>
-                        <span class="info-pill-value">
-                            {{ number_format($totalLines, 0, ',', '.') }}
-                        </span>
+                        <span class="info-pill-value">{{ number_format($totalLines, 0, ',', '.') }}</span>
                     </span>
 
                     <span class="info-pill">
                         <span class="info-pill-label">Total Qty</span>
-                        <span class="info-pill-value">
-                            {{ number_format($totalQty, 0, ',', '.') }}
-                        </span>
+                        <span class="info-pill-value">{{ number_format($totalQty, 0, ',', '.') }}</span>
                     </span>
 
                     <span class="info-pill">
                         <span class="info-pill-label">Total HPP</span>
-                        <span class="info-pill-value">
-                            Rp {{ number_format($totalHpp, 0, ',', '.') }}
-                        </span>
+                        <span class="info-pill-value">Rp {{ number_format($totalHpp, 0, ',', '.') }}</span>
                     </span>
                 </div>
             </div>
@@ -477,54 +539,38 @@
                                     <tr>
                                         <td class="text-muted">{{ $idx + 1 }}</td>
                                         <td>{{ $cat['category_name'] }}</td>
-                                        <td class="text-end">
-                                            {{ number_format($cat['total_lines'], 0, ',', '.') }}
-                                        </td>
-                                        <td class="text-end">
-                                            {{ number_format($cat['total_qty'], 0, ',', '.') }}
-                                        </td>
-                                        <td class="text-end">
-                                            {{ number_format($cat['total_hpp'], 0, ',', '.') }}
-                                        </td>
+                                        <td class="text-end">{{ number_format($cat['total_lines'], 0, ',', '.') }}</td>
+                                        <td class="text-end">{{ number_format($cat['total_qty'], 0, ',', '.') }}</td>
+                                        <td class="text-end">{{ number_format($cat['total_hpp'], 0, ',', '.') }}</td>
                                     </tr>
                                 @endforeach
                             </tbody>
                         </table>
                     </div>
                 @else
-                    <div class="text-muted small">
-                        Belum ada data kategori untuk shipment ini.
-                    </div>
+                    <div class="text-muted small">Belum ada data kategori untuk shipment ini.</div>
                 @endif
             </div>
         </div>
 
-        {{-- REKAP + LINES (READ ONLY) --}}
+        {{-- LINES --}}
         <div class="card card-main">
             <div class="card-body">
                 <div class="d-flex justify-content-between align-items-center mb-2">
                     <div>
-                        <div class="meta-label mb-1">
-                            Daftar Barang Keluar
-                        </div>
+                        <div class="meta-label mb-1">Daftar Barang Keluar</div>
                     </div>
 
                     <div class="d-flex flex-wrap gap-2 align-items-center">
                         <div class="summary-pill">
-                            Baris:
-                            <span class="fw-semibold ms-1">{{ number_format($totalLines, 0, ',', '.') }}</span>
+                            Baris: <span class="fw-semibold ms-1">{{ number_format($totalLines, 0, ',', '.') }}</span>
                         </div>
                         <div class="summary-pill">
-                            Total qty (server):
-                            <span class="fw-semibold ms-1">
-                                {{ number_format($totalQty, 0, ',', '.') }}
-                            </span>
+                            Total qty: <span class="fw-semibold ms-1">{{ number_format($totalQty, 0, ',', '.') }}</span>
                         </div>
                         <div class="summary-pill">
-                            Total HPP (server):
-                            <span class="fw-semibold ms-1">
-                                Rp {{ number_format($totalHpp, 0, ',', '.') }}
-                            </span>
+                            Total HPP: <span class="fw-semibold ms-1">Rp
+                                {{ number_format($totalHpp, 0, ',', '.') }}</span>
                         </div>
                     </div>
                 </div>
@@ -544,38 +590,23 @@
                         <tbody>
                             @forelse ($shipment->lines as $line)
                                 <tr>
-                                    <td class="text-muted small">
-                                        {{ $loop->iteration }}
+                                    <td class="text-muted small">{{ $loop->iteration }}</td>
+                                    <td>
+                                        <div class="item-code">{{ $line->item?->code ?? '-' }}</div>
                                     </td>
                                     <td>
-                                        <div class="item-code">
-                                            {{ $line->item?->code ?? '-' }}
-                                        </div>
-                                    </td>
-                                    <td>
-                                        <div class="small">
-                                            {{ $line->item?->name ?? '-' }}
-                                        </div>
+                                        <div class="small">{{ $line->item?->name ?? '-' }}</div>
                                         @if ($line->remarks)
-                                            <div class="small text-muted">
-                                                Catatan: {{ $line->remarks }}
-                                            </div>
+                                            <div class="small text-muted">Catatan: {{ $line->remarks }}</div>
                                         @endif
                                     </td>
-                                    <td class="text-end">
-                                        {{ number_format($line->qty_scanned, 0, ',', '.') }}
-                                    </td>
-                                    <td class="text-end">
-                                        Rp {{ number_format($line->unit_hpp ?? 0, 0, ',', '.') }}
-                                    </td>
-                                    <td class="text-end">
-                                        Rp {{ number_format($line->total_hpp ?? 0, 0, ',', '.') }}
-                                    </td>
+                                    <td class="text-end">{{ number_format($line->qty_scanned, 0, ',', '.') }}</td>
+                                    <td class="text-end">Rp {{ number_format($line->unit_hpp ?? 0, 0, ',', '.') }}</td>
+                                    <td class="text-end">Rp {{ number_format($line->total_hpp ?? 0, 0, ',', '.') }}</td>
                                 </tr>
                             @empty
                                 <tr>
-                                    <td colspan="6" class="text-center text-muted py-4">
-                                        Belum ada item yang discan.
+                                    <td colspan="6" class="text-center text-muted py-4">Belum ada item yang discan.
                                     </td>
                                 </tr>
                             @endforelse
@@ -583,20 +614,13 @@
                     </table>
                 </div>
 
-                {{-- FOOTER + BUTTONS --}}
+                {{-- FOOTER BUTTONS --}}
                 <div class="mt-3 d-flex flex-wrap justify-content-between align-items-center small text-muted gap-2">
                     <div>
                         Dibuat: {{ id_datetime($shipment->created_at) }}<br>
-                        Terakhir diupdate: {{ id_datetime($shipment->updated_at) }}<br>
-                        Total qty keluar (server):
-                        <span class="fw-semibold">
-                            {{ number_format($totalQty, 0, ',', '.') }}
-                        </span><br>
-                        Total HPP (server):
-                        <span class="fw-semibold">
-                            Rp {{ number_format($totalHpp, 0, ',', '.') }}
-                        </span>
+                        Update: {{ id_datetime($shipment->updated_at) }}
                     </div>
+
                     <div class="d-flex flex-wrap gap-2">
                         <a href="{{ route('sales.shipments.index') }}" class="btn btn-theme-outline">
                             &larr; Kembali ke list
@@ -609,6 +633,18 @@
                             </a>
                         @endif
 
+                        {{-- POST button di footer juga (submitted) --}}
+                        @if ($shipment->status === 'submitted')
+                            <form action="{{ route('sales.shipments.post', $shipment) }}" method="POST"
+                                onsubmit="return confirm('Posting stok untuk shipment ini? Stok WH-RTS akan berkurang.')">
+                                @csrf
+                                <button type="submit" class="btn btn-theme-main">
+                                    Posting Stok
+                                </button>
+                            </form>
+                        @endif
+
+                        {{-- Invoice hanya untuk posted --}}
                         @if ($shipment->status === 'posted')
                             @if (empty($shipment->sales_invoice_id))
                                 <a href="{{ route('sales.invoices.create_from_shipment', $shipment) }}"
@@ -639,9 +675,7 @@
                         el.style.transition = 'opacity .4s ease';
                         el.style.opacity = '0';
                         setTimeout(() => {
-                            if (el && el.parentNode) {
-                                el.parentNode.removeChild(el);
-                            }
+                            if (el && el.parentNode) el.parentNode.removeChild(el);
                         }, 450);
                     });
                 }, 2600);

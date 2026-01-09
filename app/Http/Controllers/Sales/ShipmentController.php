@@ -532,7 +532,7 @@ class ShipmentController extends Controller
 
     public function exportLines(Shipment $shipment)
     {
-        $shipment->load(['store', 'lines.item']);
+        $shipment->load(['lines.item']);
 
         if ($shipment->lines->isEmpty()) {
             return redirect()
@@ -541,7 +541,7 @@ class ShipmentController extends Controller
                 ->with('message', 'Tidak ada item di shipment ini untuk diekspor.');
         }
 
-        $fileName = 'shipment_' . $shipment->code . '_items_' . now()->format('Ymd_His') . '.csv';
+        $fileName = 'shipment_' . $shipment->code . '_import_' . now()->format('Ymd_His') . '.csv';
 
         $headers = [
             'Content-Type' => 'text/csv; charset=UTF-8',
@@ -551,35 +551,26 @@ class ShipmentController extends Controller
         $callback = function () use ($shipment) {
             $handle = fopen('php://output', 'w');
 
-            // Supaya Excel Windows baca UTF-8 dengan benar
+            // BOM supaya Excel Windows baca UTF-8
             fprintf($handle, chr(0xEF) . chr(0xBB) . chr(0xBF));
 
-            // Header kolom
-            fputcsv($handle, [
-                'Shipment Code',
-                'Tanggal',
-                'Store Name',
-                'Store Code',
-                'Item Code',
-                'Item Name',
-                'Qty Scanned',
-                'Catatan Line',
-            ], ';');
+            // Header sesuai template marketplace
+            fputcsv($handle, ['Product', 'Quantity'], ';');
 
             foreach ($shipment->lines as $line) {
                 $item = $line->item;
-                $store = $shipment->store;
 
-                fputcsv($handle, [
-                    $shipment->code,
-                    optional($shipment->date)->format('Y-m-d'),
-                    $store?->name ?? '',
-                    $store?->code ?? '',
-                    $item?->code ?? '',
-                    $item?->name ?? '',
-                    (int) $line->qty_scanned,
-                    $line->remarks ?? '',
-                ], ';');
+                $product = $item?->code ?? '';
+                $qtyInt = (int) ($line->qty_scanned ?? 0);
+
+                if ($product === '' || $qtyInt <= 0) {
+                    continue;
+                }
+
+                // Format jadi "4,00"
+                $qtyFormatted = number_format($qtyInt, 2, ',', '.');
+
+                fputcsv($handle, [$product, $qtyFormatted], ';');
             }
 
             fclose($handle);
@@ -890,48 +881,68 @@ class ShipmentController extends Controller
 
         $rows = [];
 
-        if (in_array($ext, ['xlsx', 'xls'])) {
-            // 📄 Baca dari Excel (XLSX / XLS)
+        // ==============================
+        // 1) LOAD ROWS (XLSX/XLS or CSV/TXT)
+        // ==============================
+        if (in_array($ext, ['xlsx', 'xls'], true)) {
+            // Excel
             $spreadsheet = IOFactory::load($file->getRealPath());
             $sheet = $spreadsheet->getActiveSheet();
 
-            foreach ($sheet->getRowIterator() as $rowIndex => $row) {
+            foreach ($sheet->getRowIterator() as $row) {
                 $cellIterator = $row->getCellIterator();
                 $cellIterator->setIterateOnlyExistingCells(false);
 
                 $cols = [];
                 foreach ($cellIterator as $cell) {
                     $value = $cell->getValue();
-                    $cols[] = is_null($value) ? '' : trim((string) $value);
+
+                    // Convert to string safely (keep numeric as-is)
+                    if (is_null($value)) {
+                        $cols[] = '';
+                    } else {
+                        $cols[] = trim((string) $value);
+                    }
                 }
 
-                if (count(array_filter($cols, fn($v) => $v !== '')) === 0) {
+                // Skip fully empty row
+                if (count(array_filter($cols, fn($v) => trim((string) $v) !== '')) === 0) {
                     continue;
                 }
 
                 $rows[] = $cols;
             }
         } else {
-            // 📄 Baca dari CSV / TXT
+            // CSV / TXT
             $content = file_get_contents($file->getRealPath());
 
-            if (trim($content) === '') {
+            if (trim((string) $content) === '') {
                 return redirect()
                     ->route('sales.shipments.edit', $shipment)
                     ->with('status', 'error')
                     ->with('message', 'File kosong, tidak ada data untuk dipreview.');
             }
 
-            $lines = preg_split("/\r\n|\n|\r/", trim($content));
+            // Normalize line endings, keep lines
+            $lines = preg_split("/\r\n|\n|\r/", (string) $content);
 
             foreach ($lines as $line) {
-                $row = trim($line);
+                $row = trim((string) $line);
                 if ($row === '') {
                     continue;
                 }
 
-                // Pisah kolom: support TAB, titik koma, koma, atau pipe
+                // Remove UTF-8 BOM at beginning of file line
+                $row = preg_replace('/^\xEF\xBB\xBF/u', '', $row);
+
+                // Split columns: support TAB, semicolon, comma, pipe
                 $cols = preg_split('/\s*[\t;,\|]\s*/', $row);
+
+                // Skip fully empty row
+                if (count(array_filter($cols, fn($v) => trim((string) $v) !== '')) === 0) {
+                    continue;
+                }
+
                 $rows[] = $cols;
             }
         }
@@ -943,18 +954,109 @@ class ShipmentController extends Controller
                 ->with('message', 'File kosong, tidak ada data untuk dipreview.');
         }
 
+        // ==============================
+        // Helpers (local)
+        // ==============================
+        $stripBom = function (string $s): string {
+            $s = preg_replace('/^\xEF\xBB\xBF/u', '', $s);
+            // also remove zero-width characters that often sneak in
+            $s = preg_replace('/[\x{200B}-\x{200D}\x{FEFF}]/u', '', $s);
+            return $s ?? '';
+        };
+
+        $normProduct = function ($raw) use ($stripBom): string {
+            $s = trim((string) $raw);
+            $s = $stripBom($s);
+            // collapse whitespace
+            $s = preg_replace('/\s+/', ' ', $s);
+            $s = trim($s);
+            // many item codes are no-space; uncomment if you want to remove ALL spaces:
+            // $s = str_replace(' ', '', $s);
+
+            // uppercase for consistent matching
+            $s = mb_strtoupper($s);
+            return $s;
+        };
+
+        $isHeaderRow = function (string $product, string $qtyRaw): bool {
+            $p = strtolower(trim($product));
+            $q = strtolower(trim($qtyRaw));
+
+            $productHeaders = ['product', 'kode', 'kode barang', 'item', 'item code', 'sku'];
+            $qtyHeaders = ['quantity', 'qty', 'jumlah', 'kuantitas', 'quant'];
+
+            if (in_array($p, $productHeaders, true)) {
+                return true;
+            }
+
+            if (in_array($q, $qtyHeaders, true)) {
+                return true;
+            }
+
+            // sometimes header row is like: "Product\tQuantity\t\t"
+            if (str_contains($p, 'product') && str_contains($q, 'quant')) {
+                return true;
+            }
+
+            return false;
+        };
+
+        $findItem = function (string $productCode) {
+            $item = Item::query()
+                ->where('type', 'finished_good')
+                ->where(function ($q) use ($productCode) {
+                    $q->where('code', $productCode)
+                        ->orWhere('barcode', $productCode);
+                })
+                ->first();
+
+            // Fallback: handle codes like "S4RDM-6" -> try base "S4RDM"
+            if (!$item && str_contains($productCode, '-')) {
+                $base = trim(explode('-', $productCode, 2)[0] ?? '');
+                if ($base !== '') {
+                    $item = Item::query()
+                        ->where('type', 'finished_good')
+                        ->where(function ($q) use ($base) {
+                            $q->where('code', $base)
+                                ->orWhere('barcode', $base);
+                        })
+                        ->first();
+                }
+            }
+
+            return $item;
+        };
+
+        // ==============================
+        // 2) BUILD PREVIEW
+        // ==============================
         $previewRows = [];
         $okCount = 0;
         $skipCount = 0;
         $totalQtyOk = 0;
 
         foreach ($rows as $index => $cols) {
-            // Minimal 2 kolom: Product, Qty
-            if (count($cols) < 2) {
+            $rowNumber = $index + 1;
+
+            // Ensure min 2 cols
+            $rawProduct = $cols[0] ?? '';
+            $rawQty = $cols[1] ?? '';
+
+            $productCode = $normProduct($rawProduct);
+            $qtyRaw = trim((string) $rawQty);
+            $qtyRaw = $stripBom($qtyRaw);
+
+            // Skip header rows robustly
+            if ($isHeaderRow($productCode, $qtyRaw)) {
+                continue;
+            }
+
+            // If not enough columns (after we already extracted 0/1)
+            if (!array_key_exists(0, $cols) || !array_key_exists(1, $cols)) {
                 $previewRows[] = [
-                    'row_number' => $index + 1,
-                    'raw_product' => isset($cols[0]) ? trim($cols[0]) : '',
-                    'raw_qty' => isset($cols[1]) ? $cols[1] : '',
+                    'row_number' => $rowNumber,
+                    'raw_product' => trim((string) $rawProduct),
+                    'raw_qty' => (string) $rawQty,
                     'parsed_qty' => 0,
                     'item_code' => null,
                     'item_name' => null,
@@ -965,19 +1067,12 @@ class ShipmentController extends Controller
                 continue;
             }
 
-            $productCode = trim($cols[0] ?? '');
-            $qtyRaw = $cols[1] ?? '';
-
-            // Skip header
-            if (strtolower($productCode) === 'product' || strtolower($productCode) === 'kode') {
-                continue;
-            }
-
+            // Empty product
             if ($productCode === '') {
                 $previewRows[] = [
-                    'row_number' => $index + 1,
-                    'raw_product' => $productCode,
-                    'raw_qty' => $qtyRaw,
+                    'row_number' => $rowNumber,
+                    'raw_product' => trim((string) $rawProduct),
+                    'raw_qty' => (string) $rawQty,
                     'parsed_qty' => 0,
                     'item_code' => null,
                     'item_name' => null,
@@ -988,13 +1083,13 @@ class ShipmentController extends Controller
                 continue;
             }
 
-            // ✅ parse qty → integer
+            // Parse qty using your existing helper (supports "4,00", "1.000,00", etc.)
             $parsedQtyRaw = $this->parseImportedQty($qtyRaw);
-            $parsedQty = (int) round($parsedQtyRaw);
+            $parsedQty = (int) round((float) $parsedQtyRaw);
 
             if ($parsedQty <= 0) {
                 $previewRows[] = [
-                    'row_number' => $index + 1,
+                    'row_number' => $rowNumber,
                     'raw_product' => $productCode,
                     'raw_qty' => $qtyRaw,
                     'parsed_qty' => 0,
@@ -1007,18 +1102,12 @@ class ShipmentController extends Controller
                 continue;
             }
 
-            // Cari item finished_good
-            $item = Item::query()
-                ->where('type', 'finished_good')
-                ->where(function ($q) use ($productCode) {
-                    $q->where('code', $productCode)
-                        ->orWhere('barcode', $productCode);
-                })
-                ->first();
+            // Find item (with fallback "-suffix" support)
+            $item = $findItem($productCode);
 
             if (!$item) {
                 $previewRows[] = [
-                    'row_number' => $index + 1,
+                    'row_number' => $rowNumber,
                     'raw_product' => $productCode,
                     'raw_qty' => $qtyRaw,
                     'parsed_qty' => $parsedQty,
@@ -1033,7 +1122,7 @@ class ShipmentController extends Controller
 
             // OK
             $previewRows[] = [
-                'row_number' => $index + 1,
+                'row_number' => $rowNumber,
                 'raw_product' => $productCode,
                 'raw_qty' => $qtyRaw,
                 'parsed_qty' => $parsedQty,
@@ -1046,7 +1135,9 @@ class ShipmentController extends Controller
             $totalQtyOk += $parsedQty;
         }
 
-        // Simpan preview di session supaya bisa diambil di edit()
+        // ==============================
+        // 3) SAVE TO SESSION & REDIRECT
+        // ==============================
         $previewSummary = [
             'ok_count' => $okCount,
             'skip_count' => $skipCount,
@@ -1061,7 +1152,7 @@ class ShipmentController extends Controller
         return redirect()
             ->route('sales.shipments.edit', [
                 'shipment' => $shipment->id,
-                'show_preview' => 1, // <-- ini yang dibaca di Blade
+                'show_preview' => 1,
             ]);
     }
 
