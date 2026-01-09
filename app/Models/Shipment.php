@@ -29,6 +29,7 @@ class Shipment extends Model
 
     protected $casts = [
         'date' => 'date',
+        'submitted_at' => 'datetime',
         'posted_at' => 'datetime',
     ];
 

@@ -211,6 +211,30 @@
 @section('content')
     <div class="page-wrap">
         @php
+            use Illuminate\Support\Carbon;
+
+            /**
+             * Format date/time safely.
+             * - Accepts Carbon|DateTime|string|null
+             * - Returns '-' if invalid/empty
+             */
+            $fmtDate = function ($value, string $format = 'd M Y', string $fallback = '-') {
+                if (empty($value)) {
+                    return $fallback;
+                }
+
+                try {
+                    if ($value instanceof \DateTimeInterface) {
+                        return $value->format($format);
+                    }
+
+                    // string / int timestamp / etc
+                    return Carbon::parse($value)->format($format);
+                } catch (\Throwable $e) {
+                    return $fallback;
+                }
+            };
+
             // Controller index() idealnya sudah set:
             // total_qty_calc, total_rp_calc, category_count_calc
             $pageTotalQty = $shipments->getCollection()->sum('total_qty_calc');
@@ -302,19 +326,22 @@
                                         </td>
 
                                         <td class="small">
-                                            {{ $shipment->date?->format('d M Y') ?? '-' }}
+                                            {{ $fmtDate($shipment->date, 'd M Y') }}
                                         </td>
 
                                         <td>
                                             <a class="code-link" href="{{ route('sales.shipments.show', $shipment) }}">
                                                 {{ $shipment->code }}
                                             </a>
+
                                             @if (!empty($shipment->posted_at))
-                                                <div class="muted">Posted {{ $shipment->posted_at?->format('d M Y H:i') }}
+                                                <div class="muted">
+                                                    Posted {{ $fmtDate($shipment->posted_at, 'd M Y H:i') }}
                                                 </div>
                                             @elseif (!empty($shipment->submitted_at))
-                                                <div class="muted">Submitted
-                                                    {{ $shipment->submitted_at?->format('d M Y H:i') }}</div>
+                                                <div class="muted">
+                                                    Submitted {{ $fmtDate($shipment->submitted_at, 'd M Y H:i') }}
+                                                </div>
                                             @endif
                                         </td>
 
