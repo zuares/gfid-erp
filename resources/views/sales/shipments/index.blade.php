@@ -1,3 +1,4 @@
+{{-- resources/views/sales/shipments/index.blade.php --}}
 @extends('layouts.app')
 
 @section('title', 'Shipments • Keluar Barang')
@@ -5,220 +6,347 @@
 @push('head')
     <style>
         .page-wrap {
-            max-width: 1150px;
+            max-width: 1100px;
             margin-inline: auto;
-            padding: .75rem .75rem 4rem;
+            padding: .75rem .75rem 3.5rem;
         }
 
+        /* ===== LIGHT BG (clean) ===== */
         body[data-theme="light"] .page-wrap {
-            background: radial-gradient(circle at top left,
-                    rgba(59, 130, 246, 0.10) 0,
-                    rgba(45, 212, 191, 0.08) 26%,
-                    #f9fafb 60%);
+            background: #f8fafc;
         }
 
+        /* ===== CARD ===== */
         .card-main {
             background: var(--card);
             border-radius: 14px;
-            border: 1px solid rgba(148, 163, 184, 0.35);
-            box-shadow:
-                0 10px 30px rgba(15, 23, 42, 0.10),
-                0 0 0 1px rgba(148, 163, 184, 0.08);
+            border: 1px solid rgba(148, 163, 184, 0.28);
+            box-shadow: 0 10px 26px rgba(15, 23, 42, 0.06), 0 0 0 1px rgba(148, 163, 184, 0.06);
         }
 
-        .badge-soft {
-            border-radius: 999px;
-            padding: .25rem .8rem;
-            font-size: .75rem;
-            border: 1px solid rgba(148, 163, 184, 0.45);
-            background: rgba(15, 23, 42, 0.02);
+        /* ===== HEADER ===== */
+        .title {
+            font-weight: 700;
+            letter-spacing: -.01em;
         }
 
-        .badge-label {
-            text-transform: uppercase;
-            letter-spacing: .08em;
-            font-size: .68rem;
-            color: #9ca3af;
-        }
-
-        .badge-value {
-            font-weight: 600;
+        .sub {
+            color: #6b7280;
             font-size: .9rem;
         }
 
+        body[data-theme="dark"] .sub {
+            color: #9ca3af;
+        }
+
+        /* ===== KPI (minimal) ===== */
+        .kpi {
+            display: inline-flex;
+            align-items: baseline;
+            gap: .45rem;
+            border: 1px solid rgba(148, 163, 184, 0.28);
+            background: rgba(248, 250, 252, 0.9);
+            border-radius: 999px;
+            padding: .28rem .75rem;
+            font-size: .82rem;
+        }
+
+        body[data-theme="dark"] .kpi {
+            background: rgba(15, 23, 42, 0.96);
+            border-color: rgba(30, 64, 175, 0.7);
+        }
+
+        .kpi .lbl {
+            text-transform: uppercase;
+            letter-spacing: .08em;
+            font-size: .64rem;
+            color: #9ca3af;
+        }
+
+        .kpi .val {
+            font-weight: 700;
+        }
+
+        /* ===== BUTTON ===== */
+        .btn-pill {
+            border-radius: 999px;
+            padding-inline: 1rem;
+        }
+
+        /* ===== TABLE ===== */
+        .table-list {
+            margin-bottom: 0;
+        }
+
+        .table-list thead th {
+            border-bottom-width: 1px;
+            font-size: .7rem;
+            text-transform: uppercase;
+            letter-spacing: .08em;
+            color: #6b7280;
+            background: rgba(148, 163, 184, 0.06);
+        }
+
+        body[data-theme="dark"] .table-list thead th {
+            background: rgba(15, 23, 42, 0.96);
+            color: #9ca3af;
+            border-bottom-color: rgba(30, 64, 175, 0.6);
+        }
+
+        .table-list tbody td {
+            vertical-align: middle;
+            border-top-color: rgba(148, 163, 184, 0.18);
+            padding-top: .7rem;
+            padding-bottom: .7rem;
+        }
+
+        body[data-theme="dark"] .table-list tbody td {
+            border-top-color: rgba(51, 65, 85, 0.85);
+        }
+
+        .code-link {
+            font-weight: 700;
+            text-decoration: none;
+        }
+
+        .code-link:hover {
+            text-decoration: underline;
+        }
+
+        .muted {
+            font-size: .82rem;
+            color: #6b7280;
+        }
+
+        body[data-theme="dark"] .muted {
+            color: #9ca3af;
+        }
+
+        .store-name {
+            font-weight: 600;
+        }
+
+        /* ===== STATUS ===== */
         .badge-status {
             border-radius: 999px;
             padding: .18rem .7rem;
             font-size: .72rem;
             letter-spacing: .06em;
             text-transform: uppercase;
+            border: 1px solid transparent;
+            display: inline-flex;
+            align-items: center;
+            gap: .35rem;
         }
 
-        .badge-status-draft {
-            background: rgba(245, 158, 11, 0.08);
+        .badge-status::before {
+            content: '';
+            width: 7px;
+            height: 7px;
+            border-radius: 999px;
+            display: inline-block;
+        }
+
+        .st-draft {
+            background: rgba(245, 158, 11, 0.10);
             color: #92400e;
-            border: 1px solid rgba(245, 158, 11, 0.35);
+            border-color: rgba(245, 158, 11, 0.30);
         }
 
-        .badge-status-submitted {
+        .st-draft::before {
+            background: rgba(245, 158, 11, 0.95);
+        }
+
+        .st-submitted {
             background: rgba(34, 197, 94, 0.10);
             color: #166534;
-            border: 1px solid rgba(34, 197, 94, 0.35);
+            border-color: rgba(34, 197, 94, 0.30);
         }
 
-        .table-list thead th {
-            border-bottom-width: 1px;
-            font-size: .75rem;
-            text-transform: uppercase;
-            letter-spacing: .06em;
+        .st-submitted::before {
+            background: rgba(34, 197, 94, 0.95);
+        }
+
+        .st-posted {
+            background: rgba(37, 99, 235, 0.10);
+            color: #1e3a8a;
+            border-color: rgba(37, 99, 235, 0.30);
+        }
+
+        .st-posted::before {
+            background: rgba(37, 99, 235, 0.95);
+        }
+
+        body[data-theme="dark"] .st-draft {
+            background: rgba(245, 158, 11, 0.22);
+            color: #fef9c3;
+            border-color: rgba(245, 158, 11, 0.55);
+        }
+
+        body[data-theme="dark"] .st-submitted {
+            background: rgba(34, 197, 94, 0.22);
+            color: #dcfce7;
+            border-color: rgba(34, 197, 94, 0.55);
+        }
+
+        body[data-theme="dark"] .st-posted {
+            background: rgba(37, 99, 235, 0.22);
+            color: #dbeafe;
+            border-color: rgba(37, 99, 235, 0.55);
+        }
+
+        /* ===== EMPTY STATE ===== */
+        .empty {
+            padding: 2rem 1.25rem;
+            text-align: center;
             color: #6b7280;
-            background: rgba(15, 23, 42, 0.02);
         }
 
-        .table-list tbody td {
-            vertical-align: middle;
-            border-top-color: rgba(148, 163, 184, 0.18);
-        }
-
-        .shipment-no {
-            font-size: .95rem;
-            font-weight: 600;
-        }
-
-        .shipment-no a {
-            text-decoration: none;
-        }
-
-        .shipment-no a:hover {
-            text-decoration: underline;
-        }
-
-        .btn-primary {
-            border-radius: 999px;
-            padding-inline: 1rem;
+        body[data-theme="dark"] .empty {
+            color: #9ca3af;
         }
     </style>
 @endpush
 
 @section('content')
     <div class="page-wrap">
-
         @php
-            $pageTotalQty = $shipments->sum('total_items');
+            // Controller index() idealnya sudah set:
+            // total_qty_calc, total_rp_calc, category_count_calc
+            $pageTotalQty = $shipments->getCollection()->sum('total_qty_calc');
+            $pageTotalRp = $shipments->getCollection()->sum('total_rp_calc');
         @endphp
 
         {{-- HEADER --}}
-        <div class="d-flex justify-content-between align-items-center mb-3">
+        <div class="d-flex justify-content-between align-items-start mb-3 flex-wrap gap-2">
             <div>
-                <h1 class="h4 mb-1">
-                    Shipments Keluar Barang
-                </h1>
-                <p class="text-muted small mb-0">
-                    Rekap dokumen barang keluar dari gudang siap jual.
-                </p>
+                <div class="title h4 mb-1">Shipments Keluar Barang</div>
+                <div class="sub">Rekap dokumen barang keluar dari gudang siap jual.</div>
 
-                {{-- KPI HEADER --}}
                 <div class="d-flex flex-wrap gap-2 mt-2">
-                    <span class="badge-soft">
-                        <span class="badge-label">Total Shipment</span>
-                        <span class="badge-value ms-1">
-                            {{ number_format($shipments->total(), 0, ',', '.') }}
-                        </span>
+                    <span class="kpi">
+                        <span class="lbl">Total</span>
+                        <span class="val">{{ number_format($shipments->total(), 0, ',', '.') }}</span>
                     </span>
-                    <span class="badge-soft">
-                        <span class="badge-label">Di Halaman Ini</span>
-                        <span class="badge-value ms-1">
-                            {{ $shipments->count() }}
-                        </span>
+                    <span class="kpi">
+                        <span class="lbl">Halaman</span>
+                        <span class="val">{{ number_format($shipments->count(), 0, ',', '.') }}</span>
                     </span>
-                    <span class="badge-soft">
-                        <span class="badge-label">Total Qty (Halaman Ini)</span>
-                        <span class="badge-value ms-1">
-                            {{ number_format($pageTotalQty, 0, ',', '.') }}
-                        </span>
+                    <span class="kpi">
+                        <span class="lbl">Qty</span>
+                        <span class="val">{{ number_format($pageTotalQty, 0, ',', '.') }}</span>
+                    </span>
+                    <span class="kpi">
+                        <span class="lbl">Rp</span>
+                        <span class="val">Rp {{ number_format($pageTotalRp, 0, ',', '.') }}</span>
                     </span>
                 </div>
             </div>
 
-            <a href="{{ route('sales.shipments.create') }}" class="btn btn-primary">
+            <a href="{{ route('sales.shipments.create') }}" class="btn btn-primary btn-pill">
                 <i class="bi bi-upc-scan me-1"></i>
                 Shipment Baru
             </a>
         </div>
 
-        {{-- CARD LIST --}}
+        {{-- TABLE CARD --}}
         <div class="card card-main">
             <div class="card-body p-0">
-
                 @if ($shipments->count() === 0)
-                    <div class="p-4 text-center text-muted">
-                        Belum ada shipment. Buat dokumen baru dengan tombol
-                        <span class="fw-semibold">Shipment Baru</span> di kanan atas.
+                    <div class="empty">
+                        Belum ada shipment. Klik <span class="fw-semibold">Shipment Baru</span> untuk mulai scan.
                     </div>
                 @else
                     <div class="table-responsive">
-                        <table class="table table-hover align-middle table-list mb-0">
+                        <table class="table table-hover align-middle table-list">
                             <thead>
                                 <tr>
-                                    <th style="width: 40px;">#</th>
+                                    <th style="width: 44px;">#</th>
                                     <th style="width: 120px;">Tanggal</th>
-                                    <th>No Shipment</th>
+                                    <th style="width: 190px;">Shipment</th>
                                     <th>Store / Channel</th>
-                                    <th class="text-end" style="width: 130px;">Total Qty</th>
-                                    <th style="width: 120px;">Status</th>
-                                    <th style="width: 80px;"></th>
+                                    <th class="text-end" style="width: 110px;">Qty</th>
+                                    <th class="text-end" style="width: 160px;">Total Rp</th>
+                                    <th class="text-end" style="width: 105px;">Kategori</th>
+                                    <th style="width: 130px;">Status</th>
+                                    <th style="width: 84px;"></th>
                                 </tr>
                             </thead>
                             <tbody>
                                 @foreach ($shipments as $shipment)
+                                    @php
+                                        $storeName = $shipment->store->name ?? '-';
+                                        $storeCode = $shipment->store->code ?? '';
+                                        $channelLabel = $storeCode ? strtoupper($storeCode) : null;
+
+                                        $qty = (int) ($shipment->total_qty_calc ?? 0);
+                                        $totalRp = (float) ($shipment->total_rp_calc ?? 0);
+
+                                        $catCount = (int) ($shipment->category_count_calc ?? 0);
+
+                                        $status = $shipment->status ?? 'draft';
+                                        $statusClass =
+                                            $status === 'draft'
+                                                ? 'st-draft'
+                                                : ($status === 'submitted'
+                                                    ? 'st-submitted'
+                                                    : ($status === 'posted'
+                                                        ? 'st-posted'
+                                                        : 'st-submitted'));
+                                        $statusLabel = strtoupper($status);
+                                    @endphp
+
                                     <tr>
                                         <td class="text-muted small">
                                             {{ ($shipments->currentPage() - 1) * $shipments->perPage() + $loop->iteration }}
                                         </td>
 
                                         <td class="small">
-                                            {{ $shipment->date?->format('d M Y') }}
+                                            {{ $shipment->date?->format('d M Y') ?? '-' }}
                                         </td>
 
                                         <td>
-                                            <div class="shipment-no">
-                                                <a href="{{ route('sales.shipments.show', $shipment) }}">
-                                                    {{ $shipment->code }}
-                                                </a>
-                                            </div>
-                                        </td>
-
-                                        <td>
-                                            @if ($shipment->store)
-                                                <div class="small fw-semibold">
-                                                    {{ $shipment->store->name }}
+                                            <a class="code-link" href="{{ route('sales.shipments.show', $shipment) }}">
+                                                {{ $shipment->code }}
+                                            </a>
+                                            @if (!empty($shipment->posted_at))
+                                                <div class="muted">Posted {{ $shipment->posted_at?->format('d M Y H:i') }}
                                                 </div>
-                                            @else
-                                                <span class="small text-muted">-</span>
+                                            @elseif (!empty($shipment->submitted_at))
+                                                <div class="muted">Submitted
+                                                    {{ $shipment->submitted_at?->format('d M Y H:i') }}</div>
+                                            @endif
+                                        </td>
+
+                                        <td>
+                                            <div class="store-name">{{ $storeName }}</div>
+                                            @if ($channelLabel)
+                                                <div class="muted">{{ $channelLabel }}</div>
                                             @endif
                                         </td>
 
                                         <td class="text-end">
-                                            <span class="fw-semibold">
-                                                {{ number_format($shipment->total_items ?? 0, 0, ',', '.') }}
-                                            </span>
+                                            <span class="fw-semibold">{{ number_format($qty, 0, ',', '.') }}</span>
+                                        </td>
+
+                                        <td class="text-end">
+                                            <span class="fw-semibold">Rp {{ number_format($totalRp, 0, ',', '.') }}</span>
+                                        </td>
+
+                                        {{-- KATEGORI: hanya jumlah --}}
+                                        <td class="text-end">
+                                            <span class="fw-semibold">{{ number_format($catCount, 0, ',', '.') }}</span>
                                         </td>
 
                                         <td>
-                                            @if ($shipment->status === 'draft')
-                                                <span class="badge-status badge-status-draft">
-                                                    Draft
-                                                </span>
-                                            @else
-                                                <span class="badge-status badge-status-submitted">
-                                                    Submitted
-                                                </span>
-                                            @endif
+                                            <span class="badge-status {{ $statusClass }}">
+                                                {{ $statusLabel }}
+                                            </span>
                                         </td>
 
                                         <td class="text-end">
                                             <a href="{{ route('sales.shipments.show', $shipment) }}"
-                                                class="btn btn-sm btn-outline-primary">
+                                                class="btn btn-sm btn-outline-primary btn-pill">
                                                 Detail
                                             </a>
                                         </td>
@@ -233,7 +361,6 @@
                         {{ $shipments->links() }}
                     </div>
                 @endif
-
             </div>
         </div>
     </div>

@@ -23,10 +23,54 @@ class ShipmentController extends Controller
 
     public function index(Request $request)
     {
-        $shipments = Shipment::with('store')
+        $shipments = Shipment::query()
+            ->with(['store', 'lines.item.category'])
             ->orderByDesc('date')
             ->orderByDesc('id')
             ->paginate(20);
+
+        $shipments->getCollection()->transform(function (Shipment $shipment) {
+
+            $totalQty = 0;
+            $totalRp = 0;
+            $cats = [];
+
+            foreach ($shipment->lines as $line) {
+                $qty = (int) ($line->qty_scanned ?? 0);
+                if ($qty <= 0) {
+                    continue;
+                }
+
+                $totalQty += $qty;
+
+                $unitHpp = 0;
+                if ($line->item) {
+                    $unitHpp = $line->item->latest_hpp ?? $line->item->hpp ?? $line->item->last_purchase_price ?? 0;
+                }
+
+                $totalRp += ((float) $unitHpp) * $qty;
+
+                $catName = optional(optional($line->item)->category)->name ?: 'Tanpa Kategori';
+                $cats[$catName] = true;
+            }
+
+            $names = array_keys($cats);
+            sort($names);
+
+            $shipment->total_qty_calc = $totalQty;
+            $shipment->total_rp_calc = $totalRp;
+            $shipment->category_count_calc = count($names);
+
+            if (count($names) === 0) {
+                $shipment->categories_calc = '-';
+            } elseif (count($names) <= 2) {
+                $shipment->categories_calc = implode(', ', $names);
+            } else {
+                $shipment->categories_calc = $names[0] . ', ' . $names[1] . ' +' . (count($names) - 2);
+            }
+
+            return $shipment;
+        });
 
         return view('sales.shipments.index', compact('shipments'));
     }
@@ -327,47 +371,7 @@ class ShipmentController extends Controller
                 ->with('message', 'Tidak ada item di shipment ini.');
         }
 
-        $shipment->status = 'submitted';
-        $shipment->submitted_at = now();
-        $shipment->submitted_by = auth()->id();
-        $shipment->save();
-
-        return redirect()
-            ->route('sales.shipments.show', $shipment)
-            ->with('status', 'success')
-            ->with('message', 'Shipment disubmit. Tidak bisa discan lagi, siap untuk posting stok.');
-    }
-
-    /**
-     * Posting shipment → stock out dari WH-RTS.
-     */
-    public function post(Request $request, Shipment $shipment)
-    {
-        if ($shipment->status === 'posted') {
-            return redirect()
-                ->route('sales.shipments.show', $shipment)
-                ->with('status', 'error')
-                ->with('message', 'Shipment sudah diposting sebelumnya.');
-        }
-
-        if ($shipment->status !== 'submitted') {
-            return redirect()
-                ->route('sales.shipments.show', $shipment)
-                ->with('status', 'error')
-                ->with('message', 'Shipment harus berstatus submitted sebelum diposting.');
-        }
-
-        $shipment->load(['lines.item', 'store']);
-
-        if ($shipment->lines->isEmpty()) {
-            return redirect()
-                ->route('sales.shipments.show', $shipment)
-                ->with('status', 'error')
-                ->with('message', 'Tidak ada item di shipment ini.');
-        }
-
         $warehouse = Warehouse::where('code', 'WH-RTS')->first();
-
         if (!$warehouse) {
             return redirect()
                 ->route('sales.shipments.show', $shipment)
@@ -375,42 +379,155 @@ class ShipmentController extends Controller
                 ->with('message', 'Warehouse WH-RTS belum dikonfigurasi.');
         }
 
-        DB::transaction(function () use ($shipment, $warehouse) {
-            $totalQty = 0;
+        try {
+            DB::transaction(function () use ($shipment, $warehouse) {
 
-            foreach ($shipment->lines as $line) {
-                $qty = (int) $line->qty_scanned;
-                if ($qty <= 0) {
-                    continue;
+                // 🔒 lock shipment (anti double submit)
+                $locked = Shipment::whereKey($shipment->id)
+                    ->lockForUpdate()
+                    ->firstOrFail();
+
+                // ✅ kalau sudah pernah posted → STOP (anti dobel potong)
+                if (!empty($locked->posted_at)) {
+                    return;
                 }
 
-                $totalQty += $qty;
+                $locked->load(['lines.item', 'store']);
 
-                // Kurangi stok FG dari WH-RTS
-                $this->inventory->stockOut(
-                    warehouseId: $warehouse->id,
-                    itemId: $line->item_id,
-                    qty: $qty,
-                    date: $shipment->date,
-                    sourceType: 'shipment',
-                    sourceId: $shipment->id,
-                    notes: 'Shipment ' . $shipment->code . ' ke store ' . ($shipment->store->code ?? '-'),
-                    allowNegative: true, // stok FG boleh minus / sesuai kebijakan
-                    lotId: null, // FG tidak pakai LOT
-                    unitCostOverride: null,
-                    affectLotCost: false,
-                );
-            }
+                $totalQty = 0;
 
-            $shipment->status = 'posted';
-            $shipment->total_qty = $totalQty;
-            $shipment->save();
-        });
+                foreach ($locked->lines as $line) {
+                    $qty = (int) $line->qty_scanned;
+                    if ($qty <= 0) {
+                        continue;
+                    }
+
+                    $totalQty += $qty;
+
+                    $this->inventory->stockOut(
+                        warehouseId: $warehouse->id,
+                        itemId: $line->item_id,
+                        qty: $qty,
+                        date: $locked->date,
+                        sourceType: 'shipment',
+                        sourceId: $locked->id,
+                        notes: 'Shipment ' . $locked->code . ' ke store ' . ($locked->store->code ?? '-'),
+                        allowNegative: true, // ubah false kalau mau cegah minus
+                        lotId: null,
+                        unitCostOverride: null,
+                        affectLotCost: false,
+                    );
+                }
+
+                // tetap catat submit
+                $locked->submitted_at = now();
+                $locked->submitted_by = auth()->id();
+
+                // 🔐 FLAG FINAL (stok sudah dipotong)
+                $locked->posted_at = now();
+                $locked->posted_by = auth()->id();
+
+                $locked->status = 'posted';
+                $locked->total_qty = $totalQty;
+
+                $locked->save();
+            });
+        } catch (\Throwable $e) {
+            return redirect()
+                ->route('sales.shipments.edit', $shipment)
+                ->with('status', 'error')
+                ->with('message', 'Gagal submit & kurangi stok: ' . $e->getMessage());
+        }
 
         return redirect()
             ->route('sales.shipments.show', $shipment)
             ->with('status', 'success')
-            ->with('message', 'Shipment berhasil diposting & stok berkurang dari WH-RTS.');
+            ->with('message', 'Shipment berhasil disubmit & stok WH-RTS langsung berkurang.');
+    }
+
+    /**
+     * Posting shipment → stock out dari WH-RTS.
+     */
+    public function post(Request $request, Shipment $shipment)
+    {
+        // sudah pernah posted → STOP
+        if (!empty($shipment->posted_at)) {
+            return redirect()
+                ->route('sales.shipments.show', $shipment)
+                ->with('status', 'error')
+                ->with('message', 'Shipment sudah diposting sebelumnya.');
+        }
+
+        $warehouse = Warehouse::where('code', 'WH-RTS')->first();
+        if (!$warehouse) {
+            return redirect()
+                ->route('sales.shipments.show', $shipment)
+                ->with('status', 'error')
+                ->with('message', 'Warehouse WH-RTS belum dikonfigurasi.');
+        }
+
+        try {
+            DB::transaction(function () use ($shipment, $warehouse) {
+
+                $locked = Shipment::whereKey($shipment->id)
+                    ->lockForUpdate()
+                    ->firstOrFail();
+
+                // cek lagi di dalam transaksi
+                if (!empty($locked->posted_at)) {
+                    return;
+                }
+
+                if ($locked->status !== 'submitted') {
+                    throw new \RuntimeException('Shipment harus berstatus submitted.');
+                }
+
+                $locked->load(['lines.item', 'store']);
+
+                $totalQty = 0;
+
+                foreach ($locked->lines as $line) {
+                    $qty = (int) $line->qty_scanned;
+                    if ($qty <= 0) {
+                        continue;
+                    }
+
+                    $totalQty += $qty;
+
+                    $this->inventory->stockOut(
+                        warehouseId: $warehouse->id,
+                        itemId: $line->item_id,
+                        qty: $qty,
+                        date: $locked->date,
+                        sourceType: 'shipment',
+                        sourceId: $locked->id,
+                        notes: 'Shipment ' . $locked->code . ' ke store ' . ($locked->store->code ?? '-'),
+                        allowNegative: true,
+                        lotId: null,
+                        unitCostOverride: null,
+                        affectLotCost: false,
+                    );
+                }
+
+                // FLAG posted
+                $locked->posted_at = now();
+                $locked->posted_by = auth()->id();
+
+                $locked->status = 'posted';
+                $locked->total_qty = $totalQty;
+                $locked->save();
+            });
+        } catch (\Throwable $e) {
+            return redirect()
+                ->route('sales.shipments.show', $shipment)
+                ->with('status', 'error')
+                ->with('message', 'Gagal posting: ' . $e->getMessage());
+        }
+
+        return redirect()
+            ->route('sales.shipments.show', $shipment)
+            ->with('status', 'success')
+            ->with('message', 'Shipment berhasil diposting & stok berkurang.');
     }
 
     public function exportLines(Shipment $shipment)

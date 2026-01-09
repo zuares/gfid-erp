@@ -24,6 +24,7 @@ class Shipment extends Model
         'posted_at',
         'posted_by',
         'sales_invoice_id',
+
     ];
 
     protected $casts = [

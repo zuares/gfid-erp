@@ -857,7 +857,7 @@
                             onsubmit="return confirm('Submit shipment ini? Setelah submit tidak bisa di-scan lagi.')">
                             @csrf
                             <button type="submit" class="btn btn-theme-main">
-                                Submit Shipment
+                                Simpan & Kurangi Stok
                             </button>
                         </form>
                     </div>
