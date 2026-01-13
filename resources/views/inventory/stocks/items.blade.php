@@ -43,14 +43,13 @@
         }
 
         .page-wrap {
-            max-width: 1200px;
+            max-width: 1280px;
             margin-inline: auto;
             padding: 1rem .9rem 4.2rem;
         }
 
         body[data-theme="light"] .page-wrap {
-            background:
-                radial-gradient(circle at top left,
+            background: radial-gradient(circle at top left,
                     rgba(59, 130, 246, .10) 0,
                     rgba(45, 212, 191, .08) 22%,
                     #f8fafc 62%);
@@ -94,7 +93,7 @@
             font-family: ui-monospace, SFMono-Regular, Menlo, Consolas, "Liberation Mono";
         }
 
-        /* ===== Top bar (enterprise) ===== */
+        /* ===== Top bar ===== */
         .topbar {
             display: flex;
             flex-direction: column;
@@ -222,7 +221,7 @@
 
         @media (min-width: 768px) {
             .controls {
-                grid-template-columns: 1.5fr .8fr .5fr;
+                grid-template-columns: 1.6fr .9fr .6fr;
                 gap: .65rem;
             }
         }
@@ -283,6 +282,46 @@
         .metric .v {
             font-weight: 800;
             color: inherit;
+        }
+
+        /* ===== Mover badge (compact) ===== */
+        .badge-mover {
+            display: inline-flex;
+            align-items: center;
+            gap: .35rem;
+            padding: .14rem .5rem;
+            border-radius: 999px;
+            font-size: .68rem;
+            letter-spacing: .10em;
+            text-transform: uppercase;
+            border: 1px solid var(--br);
+            background: var(--soft2);
+            color: var(--muted);
+            white-space: nowrap;
+        }
+
+        .badge-fast {
+            border-color: rgba(34, 197, 94, .28);
+            background: rgba(34, 197, 94, .10);
+            color: rgba(22, 163, 74, 1);
+        }
+
+        .badge-med {
+            border-color: rgba(59, 130, 246, .28);
+            background: rgba(59, 130, 246, .10);
+            color: rgba(29, 78, 216, 1);
+        }
+
+        .badge-slow {
+            border-color: rgba(245, 158, 11, .28);
+            background: rgba(245, 158, 11, .10);
+            color: rgba(180, 83, 9, 1);
+        }
+
+        .badge-dead {
+            border-color: rgba(148, 163, 184, .32);
+            background: rgba(148, 163, 184, .10);
+            color: rgba(71, 85, 105, 1);
         }
 
         /* ===== Table ===== */
@@ -365,17 +404,6 @@
         }
 
         /* ===== Category card ===== */
-        .cat-head {
-            display: flex;
-            align-items: center;
-            justify-content: space-between;
-            gap: .75rem;
-        }
-
-        .cat-body {
-            margin-top: .6rem;
-        }
-
         .cat-table th,
         .cat-table td {
             padding: .55rem .55rem;
@@ -436,6 +464,7 @@
             background: rgba(2, 6, 23, .6);
         }
 
+        /* ===== Mobile ===== */
         @media (max-width: 576px) {
             .table thead {
                 display: none;
@@ -515,6 +544,13 @@
                 display: none;
                 margin-top: .65rem;
             }
+
+            .m-ads {
+                display: flex;
+                flex-direction: column;
+                align-items: flex-end;
+                gap: .3rem;
+            }
         }
     </style>
 @endpush
@@ -533,6 +569,19 @@
         $activeSearch = trim($filters['search'] ?? '');
         $sortVal = $filters['sort'] ?? 'code';
         $dirVal = $filters['dir'] ?? 'asc';
+
+        $moverMeta = function (float $ads): array {
+            if ($ads >= 2) {
+                return ['cls' => 'badge-fast', 'label' => 'FAST', 'icon' => 'bi bi-lightning-charge'];
+            }
+            if ($ads >= 0.5) {
+                return ['cls' => 'badge-med', 'label' => 'MED', 'icon' => 'bi bi-graph-up'];
+            }
+            if ($ads >= 0.1) {
+                return ['cls' => 'badge-slow', 'label' => 'SLOW', 'icon' => 'bi bi-hourglass-split'];
+            }
+            return ['cls' => 'badge-dead', 'label' => 'DEAD', 'icon' => 'bi bi-moon'];
+        };
     @endphp
 
     <div class="page-wrap" data-stockcard-base-url="{{ route('inventory.stock_card.index') }}"
@@ -544,9 +593,10 @@
                 <div class="title">
                     <h4>Inventory</h4>
                     <span class="pill"><i class="bi bi-shield-check"></i>{{ $modeText }}</span>
-                    <span class="pill pill--ok"><i class="bi bi-calculator"></i>HPP</span>
+                    <span class="pill pill--ok"><i class="bi bi-graph-up"></i>ADS</span>
+                    <span class="pill pill--ok"><i class="bi bi-hourglass-split"></i>Cover</span>
                 </div>
-                <div class="subtitle">Stock by item with FG / WIP, HPP and valuation.</div>
+                <div class="subtitle">Stock by item (FG / WIP) with HPP, valuation, ADS and coverage.</div>
             </div>
 
             <div class="d-flex align-items-center justify-content-between flex-wrap gap-2">
@@ -583,6 +633,8 @@
                                 <option value="total" @selected($sortVal === 'total')>Total</option>
                                 <option value="fg" @selected($sortVal === 'fg')>FG</option>
                                 <option value="wip" @selected($sortVal === 'wip')>WIP</option>
+                                <option value="ads" @selected($sortVal === 'ads')>ADS</option>
+                                <option value="cover" @selected($sortVal === 'cover')>Coverage</option>
                             </select>
                         </div>
 
@@ -603,11 +655,13 @@
                             id="sumValue">—</span></span>
                     <span class="metric"><span class="k">Avg HPP</span><span class="v mono"
                             id="sumAvgHpp">—</span></span>
+                    <span class="metric"><span class="k">Avg ADS</span><span class="v mono"
+                            id="sumAvgAds">—</span></span>
                 </div>
             </div>
         </div>
 
-        {{-- HPP by Category --}}
+        {{-- HPP by Category (optional) --}}
         <div class="cardx mb-3" id="hppCategoryCard">
             <div class="cardx-h">
                 <div>
@@ -646,10 +700,16 @@
                                     <th class="text-end">WIP</th>
                                     <th class="text-end">HPP</th>
                                     <th class="text-end">Value</th>
+                                    <th class="text-end">ADS</th>
+                                    <th class="text-end">Cover</th>
                                 </tr>
                             </thead>
                             <tbody id="desktopTbody">
                                 @forelse ($stocks as $index => $row)
+                                    @php
+                                        $ads = (float) ($row->ads ?? 0);
+                                        $mm = $moverMeta($ads);
+                                    @endphp
                                     <tr class="item-row" data-item-id="{{ $row->item_id }}"
                                         data-locations-url="{{ route('inventory.stocks.item_locations', $row->item_id) }}">
                                         <td class="text-muted small">{{ $stocks->firstItem() + $index }}</td>
@@ -667,10 +727,24 @@
                                             {{ number_format($row->hpp_per_unit ?? 0, 0, ',', '.') }}</td>
                                         <td class="text-end mono">{{ number_format($row->stock_value ?? 0, 0, ',', '.') }}
                                         </td>
+
+                                        {{-- ADS (merged with mover badge) --}}
+                                        <td class="text-end">
+                                            <div class="d-flex justify-content-end align-items-center gap-2">
+                                                <span class="mono">{{ number_format($ads, 2, ',', '.') }}</span>
+                                                <span class="badge-mover {{ $mm['cls'] }}">
+                                                    <i class="{{ $mm['icon'] }}"></i>{{ $mm['label'] }}
+                                                </span>
+                                            </div>
+                                        </td>
+
+                                        <td class="text-end mono">
+                                            {{ $row->coverage_days !== null ? number_format($row->coverage_days, 0, ',', '.') : '—' }}
+                                        </td>
                                     </tr>
                                 @empty
                                     <tr>
-                                        <td colspan="8" class="text-center py-4 text-muted">No data.</td>
+                                        <td colspan="10" class="text-center py-4 text-muted">No data.</td>
                                     </tr>
                                 @endforelse
                             </tbody>
@@ -681,6 +755,12 @@
                 {{-- Mobile cards --}}
                 <div class="d-sm-none" id="mobileList">
                     @forelse ($stocks as $index => $row)
+                        @php
+                            $ads = (float) ($row->ads ?? 0);
+                            $mm = $moverMeta($ads);
+                            $coverText =
+                                $row->coverage_days !== null ? number_format($row->coverage_days, 0, ',', '.') : '—';
+                        @endphp
                         <div class="mcard item-card" data-item-id="{{ $row->item_id }}"
                             data-locations-url="{{ route('inventory.stocks.item_locations', $row->item_id) }}">
                             <button type="button" class="mcard-btn js-card-toggle">
@@ -698,9 +778,25 @@
                                             <div class="v mono">{{ number_format($row->total_qty, 2, ',', '.') }}</div>
                                         </div>
                                         <div>
-                                            <div class="k">HPP</div>
-                                            <div class="v mono">{{ number_format($row->hpp_per_unit ?? 0, 0, ',', '.') }}
+                                            <div class="k">Value</div>
+                                            <div class="v mono">{{ number_format($row->stock_value ?? 0, 0, ',', '.') }}
                                             </div>
+                                        </div>
+
+                                        {{-- ADS merged with mover badge --}}
+                                        <div>
+                                            <div class="k">ADS</div>
+                                            <div class="m-ads">
+                                                <div class="v mono">{{ number_format($ads, 2, ',', '.') }}</div>
+                                                <span class="badge-mover {{ $mm['cls'] }}">
+                                                    <i class="{{ $mm['icon'] }}"></i>{{ $mm['label'] }}
+                                                </span>
+                                            </div>
+                                        </div>
+
+                                        <div>
+                                            <div class="k">Cover</div>
+                                            <div class="v mono">{{ $coverText }}</div>
                                         </div>
                                     </div>
                                     <i class="bi bi-caret-right-fill caret"></i>
@@ -743,6 +839,30 @@
                 .replaceAll('>', '&gt;')
                 .replaceAll('"', '&quot;')
                 .replaceAll("'", '&#039;');
+
+            const moverMeta = (ads) => {
+                const a = Number(ads || 0);
+                if (a >= 2) return {
+                    cls: 'badge-fast',
+                    label: 'FAST',
+                    icon: 'bi bi-lightning-charge'
+                };
+                if (a >= 0.5) return {
+                    cls: 'badge-med',
+                    label: 'MED',
+                    icon: 'bi bi-graph-up'
+                };
+                if (a >= 0.1) return {
+                    cls: 'badge-slow',
+                    label: 'SLOW',
+                    icon: 'bi bi-hourglass-split'
+                };
+                return {
+                    cls: 'badge-dead',
+                    label: 'DEAD',
+                    icon: 'bi bi-moon'
+                };
+            };
 
             const buildLocationsHtml = (locations, itemId) => {
                 const list = hideRtsWarehouse ?
@@ -815,7 +935,7 @@
                 const detailTr = document.createElement('tr');
                 detailTr.className = 'detail-row';
                 detailTr.innerHTML = `
-                    <td colspan="8">
+                    <td colspan="10">
                         <div class="detail-inner">
                             <div class="detail-body muted">Loading…</div>
                         </div>
@@ -880,6 +1000,7 @@
             const sumQty = document.getElementById('sumQty');
             const sumValue = document.getElementById('sumValue');
             const sumAvgHpp = document.getElementById('sumAvgHpp');
+            const sumAvgAds = document.getElementById('sumAvgAds');
 
             const hppCategoryBody = document.getElementById('hppCategoryBody');
             const toggleHppCatBtn = document.getElementById('toggleHppCatBtn');
@@ -893,7 +1014,7 @@
                 toggleHppCatBtn.querySelector('i')?.classList.toggle('bi-chevron-up', catCollapsed);
             });
 
-            const debounce = (fn, delay = 350) => {
+            const debounce = (fn, delay = 320) => {
                 let t;
                 return (...args) => {
                     clearTimeout(t);
@@ -914,11 +1035,22 @@
 
             const buildDesktopRow = (row, index, from) => {
                 const no = (from || 0) + index;
+
                 const total = fmtQty(row.total_qty);
                 const fg = fmtQty(row.fg_qty);
                 const wip = fmtQty(row.wip_qty);
+
                 const hpp = fmtMoney(row.hpp_per_unit || 0);
                 const val = fmtMoney(row.stock_value || 0);
+
+                const adsVal = Number(row.ads || 0);
+                const ads = fmtQty(adsVal);
+                const mm = moverMeta(adsVal);
+                const moverHtml =
+                    `<span class="badge-mover ${mm.cls}"><i class="${mm.icon}"></i>${mm.label}</span>`;
+
+                const cover = (row.coverage_days === null || row.coverage_days === undefined) ? '—' : fmtMoney(
+                    row.coverage_days);
 
                 const code = esc(row.item_code);
                 const name = esc(row.item_name);
@@ -939,14 +1071,31 @@
                         <td class="text-end mono">${wip}</td>
                         <td class="text-end mono">${hpp}</td>
                         <td class="text-end mono">${val}</td>
+                        <td class="text-end">
+                            <div class="d-flex justify-content-end align-items-center gap-2">
+                                <span class="mono">${ads}</span>
+                                ${moverHtml}
+                            </div>
+                        </td>
+                        <td class="text-end mono">${cover}</td>
                     </tr>
                 `;
             };
 
             const buildMobileCard = (row, index, from) => {
                 const no = (from || 0) + index;
+
                 const total = fmtQty(row.total_qty);
-                const hpp = fmtMoney(row.hpp_per_unit || 0);
+                const val = fmtMoney(row.stock_value || 0);
+
+                const adsVal = Number(row.ads || 0);
+                const ads = fmtQty(adsVal);
+                const mm = moverMeta(adsVal);
+                const moverHtml =
+                    `<span class="badge-mover ${mm.cls}"><i class="${mm.icon}"></i>${mm.label}</span>`;
+
+                const cover = (row.coverage_days === null || row.coverage_days === undefined) ? '—' : fmtMoney(
+                    row.coverage_days);
 
                 const code = esc(row.item_code);
                 const name = esc(row.item_name);
@@ -964,14 +1113,16 @@
                             </div>
                             <div class="m-right">
                                 <div class="m-metric">
+                                    <div><div class="k">Total</div><div class="v mono">${total}</div></div>
+                                    <div><div class="k">Value</div><div class="v mono">${val}</div></div>
                                     <div>
-                                        <div class="k">Total</div>
-                                        <div class="v mono">${total}</div>
+                                        <div class="k">ADS</div>
+                                        <div class="m-ads">
+                                            <div class="v mono">${ads}</div>
+                                            ${moverHtml}
+                                        </div>
                                     </div>
-                                    <div>
-                                        <div class="k">HPP</div>
-                                        <div class="v mono">${hpp}</div>
-                                    </div>
+                                    <div><div class="k">Cover</div><div class="v mono">${cover}</div></div>
                                 </div>
                                 <i class="bi bi-caret-right-fill caret"></i>
                             </div>
@@ -1028,11 +1179,26 @@
                 if (sumTotalItems && payload?.meta?.total !== undefined) {
                     sumTotalItems.textContent = String(payload.meta.total || 0);
                 }
+
                 const s = payload?.hpp_summary || null;
-                if (!s) return;
-                sumQty.textContent = fmtQty(s.total_qty || 0);
-                sumValue.textContent = fmtMoney(s.total_value || 0);
-                sumAvgHpp.textContent = fmtMoney(s.avg_hpp_weighted || 0);
+                if (s) {
+                    sumQty.textContent = fmtQty(s.total_qty || 0);
+                    sumValue.textContent = fmtMoney(s.total_value || 0);
+                    sumAvgHpp.textContent = fmtMoney(s.avg_hpp_weighted || 0);
+                } else {
+                    const rows = payload?.rows || [];
+                    const totalQty = rows.reduce((acc, r) => acc + Number(r.total_qty || 0), 0);
+                    const totalVal = rows.reduce((acc, r) => acc + Number(r.stock_value || 0), 0);
+                    const avgHpp = totalQty > 0 ? (totalVal / totalQty) : 0;
+                    sumQty.textContent = fmtQty(totalQty);
+                    sumValue.textContent = fmtMoney(totalVal);
+                    sumAvgHpp.textContent = fmtMoney(avgHpp);
+                }
+
+                const rows2 = payload?.rows || [];
+                const adsSum = rows2.reduce((acc, r) => acc + Number(r.ads || 0), 0);
+                const adsAvg = rows2.length ? (adsSum / rows2.length) : 0;
+                if (sumAvgAds) sumAvgAds.textContent = fmtQty(adsAvg);
             };
 
             const applyStocksData = (payload) => {
@@ -1044,7 +1210,7 @@
                 if (desktopTbody) {
                     desktopTbody.innerHTML = rows.length ?
                         rows.map((row, idx) => buildDesktopRow(row, idx, from)).join('') :
-                        `<tr><td colspan="8" class="text-center py-4 text-muted">No data.</td></tr>`;
+                        `<tr><td colspan="10" class="text-center py-4 text-muted">No data.</td></tr>`;
                 }
 
                 if (mobileList) {
@@ -1061,6 +1227,7 @@
 
             const fetchStocks = async (extraParams = {}) => {
                 if (!form) return;
+
                 const formData = new FormData(form);
                 const params = new URLSearchParams(formData);
 
@@ -1093,10 +1260,7 @@
                 page: 1
             }), 320);
 
-            // Search typing (no uppercase forcing, enterprise-like)
             searchInput?.addEventListener('input', () => fetchDebounced());
-
-            // Sort / dir
             sortSelect?.addEventListener('change', () => fetchStocks({
                 page: 1
             }));
@@ -1104,7 +1268,6 @@
                 page: 1
             }));
 
-            // Submit
             form?.addEventListener('submit', (e) => {
                 e.preventDefault();
                 fetchStocks({
@@ -1112,7 +1275,6 @@
                 });
             });
 
-            // Pagination via AJAX
             paginationWrap?.addEventListener('click', (e) => {
                 const a = e.target.closest('a[href]');
                 if (!a) return;
@@ -1124,7 +1286,6 @@
                 });
             });
 
-            // Click toggles
             document.addEventListener('click', (e) => {
                 const desktopBtn = e.target.closest('.js-row-toggle');
                 if (desktopBtn) {
@@ -1132,7 +1293,6 @@
                     handleDesktopToggle(desktopBtn);
                     return;
                 }
-
                 const mobileBtn = e.target.closest('.js-card-toggle');
                 if (mobileBtn) {
                     e.preventDefault();

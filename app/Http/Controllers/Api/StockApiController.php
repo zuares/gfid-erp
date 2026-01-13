@@ -66,55 +66,76 @@ class StockApiController extends Controller
             ], 422);
         }
 
-        // Ambil info item + HPP (items.hpp)
+        $user = auth()->user();
+        $role = strtolower((string) ($user?->role ?? ''));
+        $isOwner = $role === 'owner';
+
+        // item header
         $item = Item::select('id', 'code', 'name', 'hpp')->findOrFail($itemId);
         $hppPerUnit = (float) ($item->hpp ?? 0);
 
-        // Ambil stok per gudang dari inventory_stocks
-        $rows = DB::table('inventory_stocks as s')
-            ->join('warehouses as w', 'w.id', '=', 's.warehouse_id')
-            ->where('s.item_id', $itemId)
+        /**
+         * Stock per warehouse from inventory_mutations (source of truth)
+         * Filter:
+         * - m.item_id = itemId
+         * - group by warehouse
+         */
+        $rows = DB::table('inventory_mutations as m')
+            ->join('warehouses as w', 'w.id', '=', 'm.warehouse_id')
+            ->where('m.item_id', $itemId)
+            ->groupBy('w.id', 'w.code', 'w.name')
             ->orderBy('w.code')
-            ->get([
-                's.warehouse_id',
-                'w.code',
-                'w.name',
-                's.qty',
-            ]);
+            ->selectRaw('
+            w.id as warehouse_id,
+            w.code as code,
+            w.name as name,
+            COALESCE(SUM(m.qty_change), 0) as on_hand
+        ')
+            ->havingRaw('COALESCE(SUM(m.qty_change), 0) <> 0')
+            ->get();
 
-        $warehouses = $rows->map(function ($row) use ($hppPerUnit) {
-            $onHand = (float) ($row->qty ?? 0);
+        $warehouses = $rows->map(function ($row) use ($isOwner, $hppPerUnit) {
+            $onHand = (float) ($row->on_hand ?? 0);
 
-            return [
+            $payload = [
                 'warehouse_id' => (int) $row->warehouse_id,
                 'code' => (string) $row->code,
                 'name' => (string) $row->name,
                 'on_hand' => $onHand,
                 'reserved' => 0.0,
                 'available' => $onHand,
-
-                // ✅ HPP + Value
-                'hpp_per_unit' => $hppPerUnit,
-                'stock_value' => $onHand * $hppPerUnit,
             ];
+
+            // owner-only sensitive data
+            if ($isOwner) {
+                $payload['hpp_per_unit'] = $hppPerUnit;
+                $payload['stock_value'] = $onHand * $hppPerUnit;
+            }
+
+            return $payload;
         })->values();
 
         $totalQty = (float) $warehouses->sum('on_hand');
-        $totalValue = (float) $warehouses->sum('stock_value');
 
-        return response()->json([
+        $resp = [
             'item' => [
-                'id' => $item->id,
-                'code' => $item->code,
-                'name' => $item->name,
-                'hpp' => $hppPerUnit,
+                'id' => (int) $item->id,
+                'code' => (string) $item->code,
+                'name' => (string) $item->name,
             ],
             'totals' => [
                 'qty' => $totalQty,
-                'value' => $totalValue,
             ],
             'warehouses' => $warehouses->all(),
-        ]);
+        ];
+
+        if ($isOwner) {
+            $totalValue = (float) $warehouses->sum('stock_value');
+            $resp['item']['hpp'] = $hppPerUnit;
+            $resp['totals']['value'] = $totalValue;
+        }
+
+        return response()->json($resp);
     }
 
 }

@@ -3,15 +3,12 @@
 namespace App\Http\Controllers\Inventory;
 
 use App\Http\Controllers\Controller;
-use App\Models\InventoryMutation;
 use App\Models\InventoryStock;
 use App\Models\Item;
 use App\Models\Warehouse;
 use App\Services\Inventory\InventoryService;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\DB;
-use Illuminate\Support\Facades\Schema;
-use Illuminate\Support\Str;
 
 class InventoryStockController extends Controller
 {
@@ -62,145 +59,116 @@ class InventoryStockController extends Controller
     {
         $user = auth()->user();
         $role = $user?->role ?? null;
+        $roleNorm = strtolower((string) $role);
+        $isOwner = $roleNorm === 'owner';
 
-        // Dropdown filter item (kalau suatu saat dipakai lagi)
-        $items = Item::where('active', 1)->orderBy('name')->get();
-
-        // Dropdown gudang (role-based)
-        $warehouses = $this->getWarehousesForDropdown($role);
-
-        // Filters
-        $warehouseId = $request->input('warehouse_id');
-        $itemId = $request->input('item_id');
-
+        // =========================
+        // Filters & sorting
+        // =========================
         $searchRaw = trim((string) $request->input('search', ''));
-        $search = Str::upper($searchRaw);
+        $search = strtoupper($searchRaw);
 
-        $hasBalanceOnly = (bool) $request->boolean('has_balance_only', false);
-
-        // ✅ Sorting
-        $sort = (string) $request->input('sort', 'code'); // code | value | total | fg | wip
+        $sort = (string) $request->input('sort', 'code');
         $dir = strtolower((string) $request->input('dir', 'asc')) === 'desc' ? 'desc' : 'asc';
 
-        $allowedSort = ['code', 'value', 'total', 'fg', 'wip'];
+        $allowedSortOwner = ['code', 'value', 'total', 'fg', 'wip', 'ads', 'cover'];
+        $allowedSortNonOwner = ['code', 'total', 'fg', 'wip'];
+        $allowedSort = $isOwner ? $allowedSortOwner : $allowedSortNonOwner;
+
         if (!in_array($sort, $allowedSort, true)) {
             $sort = 'code';
         }
 
-        // ✅ Detect FK category (item_category_id atau category_id)
-        $catFk = null;
-        if (Schema::hasColumn('items', 'item_category_id')) {
-            $catFk = 'items.item_category_id';
-        } elseif (Schema::hasColumn('items', 'category_id')) {
-            $catFk = 'items.category_id';
-        }
-
-        /**
-         * STEP 1: Subquery stok per (item, gudang) dari inventory_mutations
-         */
-        $base = InventoryMutation::query()
-            ->join('warehouses', 'warehouses.id', '=', 'inventory_mutations.warehouse_id');
+        // =========================
+        // STEP 1: base stock per item + warehouse
+        // =========================
+        $base = DB::table('inventory_mutations as m')
+            ->join('warehouses as w', 'w.id', '=', 'm.warehouse_id');
 
         // 🔒 Role scope
-        if ($role === 'operating') {
+        if ($roleNorm === 'operating') {
             $base->where(function ($q) {
-                $q->where('warehouses.code', 'WH-PRD')
-                    ->orWhere('warehouses.code', 'LIKE', 'WIP-%');
+                $q->where('w.code', 'WH-PRD')
+                    ->orWhere('w.code', 'LIKE', 'WIP-%');
             });
-        } elseif ($role === 'admin') {
-            $base->where('warehouses.code', 'WH-RTS');
+        } elseif ($roleNorm === 'admin') {
+            $base->where('w.code', 'WH-RTS');
         }
 
-        // Filter gudang spesifik
-        if ($warehouseId) {
-            $base->where('inventory_mutations.warehouse_id', $warehouseId);
-        }
-
-        // stok per item+gudang
         $base->selectRaw('
-        inventory_mutations.item_id,
-        warehouses.code AS wh_code,
-        SUM(inventory_mutations.qty_change) AS qty
+        m.item_id,
+        w.code AS wh_code,
+        SUM(m.qty_change) AS qty
     ')
-            ->groupBy('inventory_mutations.item_id', 'warehouses.code');
+            ->groupBy('m.item_id', 'w.code');
 
-        /**
-         * STEP 2: Outer query agregasi per item + HPP + kategori + value
-         */
-        $selectSql = <<<'SQL'
-s.item_id,
-items.code AS item_code,
-items.name AS item_name,
-
-item_categories.id AS category_id,
-item_categories.name AS category_name,
-
-COALESCE(SUM(s.qty), 0) AS total_qty,
-
-COALESCE(SUM(
-    CASE WHEN s.wh_code LIKE 'WH-%' THEN s.qty ELSE 0 END
-), 0) AS fg_qty,
-
-COALESCE(SUM(
-    CASE WHEN s.wh_code LIKE 'WIP-%' THEN s.qty ELSE 0 END
-), 0) AS wip_qty,
-
-COALESCE(items.hpp, 0) AS hpp_per_unit,
-COALESCE(SUM(s.qty), 0) * COALESCE(items.hpp, 0) AS stock_value
-SQL;
-
+        // =========================
+        // STEP 2: aggregate per item + category
+        // =========================
         $query = DB::query()
             ->fromSub($base, 's')
             ->join('items', 'items.id', '=', 's.item_id')
+            ->leftJoin('item_categories', 'item_categories.id', '=', 'items.item_category_id') // ✅ FIX
             ->where('items.active', 1);
 
-        if ($catFk) {
-            $query->leftJoin('item_categories', 'item_categories.id', '=', DB::raw($catFk));
-        } else {
-            // fallback: keep null fields
-            $query->leftJoin('item_categories', function ($join) {
-                $join->on('item_categories.id', '=', DB::raw('NULL'));
+        // Search
+        if ($search !== '') {
+            $terms = array_values(array_filter(preg_split('/[\s,;|]+/', $search)));
+            $query->where(function ($q) use ($terms) {
+                foreach ($terms as $t) {
+                    $like = "%{$t}%";
+                    $q->orWhere('items.code', 'like', $like)
+                        ->orWhere('items.name', 'like', $like);
+                }
             });
         }
 
-        if ($itemId) {
-            $query->where('s.item_id', $itemId);
-        }
+        $query->selectRaw('
+        s.item_id,
+        items.code AS item_code,
+        items.name AS item_name,
 
-        // Search multi-term OR
-        if ($search !== '') {
-            $rawTerms = preg_split('/[\s,;|]+/', $search);
-            $terms = array_values(array_filter($rawTerms, fn($t) => $t !== ''));
+        item_categories.id AS category_id,
+        item_categories.name AS category_name,
 
-            if (!empty($terms)) {
-                $query->where(function ($q) use ($terms) {
-                    foreach ($terms as $term) {
-                        $like = '%' . $term . '%';
-                        $q->orWhere(function ($q2) use ($like) {
-                            $q2->where('items.code', 'like', $like)
-                                ->orWhere('items.name', 'like', $like);
-                        });
-                    }
-                });
-            }
-        }
+        COALESCE(SUM(s.qty),0) AS total_qty,
 
-        $query->selectRaw($selectSql)
+        COALESCE(SUM(
+            CASE WHEN s.wh_code LIKE \'WH-%\' THEN s.qty ELSE 0 END
+        ),0) AS fg_qty,
+
+        COALESCE(SUM(
+            CASE WHEN s.wh_code LIKE \'WIP-%\' THEN s.qty ELSE 0 END
+        ),0) AS wip_qty,
+
+        COALESCE(items.hpp,0) AS hpp_per_unit,
+        COALESCE(SUM(s.qty),0) * COALESCE(items.hpp,0) AS stock_value,
+
+        COALESCE(items.avg_daily_sales,0) AS ads,
+
+        CASE
+            WHEN COALESCE(items.avg_daily_sales,0) > 0
+            THEN COALESCE(SUM(s.qty),0) / COALESCE(items.avg_daily_sales,0)
+            ELSE NULL
+        END AS coverage_days
+    ')
             ->groupBy(
                 's.item_id',
                 'items.code',
                 'items.name',
                 'item_categories.id',
                 'item_categories.name',
-                'items.hpp'
+                'items.hpp',
+                'items.avg_daily_sales'
             );
 
-        if ($hasBalanceOnly) {
-            $query->havingRaw('COALESCE(SUM(s.qty), 0) <> 0');
-        }
-
-        // ✅ Apply sorting (by alias)
+        // =========================
+        // Sorting
+        // =========================
         switch ($sort) {
+            case 'value':
+                $query->orderBy('stock_value', $dir)->orderBy('items.code', 'asc');
+                break;
             case 'total':
                 $query->orderBy('total_qty', $dir)->orderBy('items.code', 'asc');
                 break;
@@ -210,8 +178,11 @@ SQL;
             case 'wip':
                 $query->orderBy('wip_qty', $dir)->orderBy('items.code', 'asc');
                 break;
-            case 'value':
-                $query->orderBy('stock_value', $dir)->orderBy('items.code', 'asc');
+            case 'ads':
+                $query->orderBy('ads', $dir)->orderBy('items.code', 'asc');
+                break;
+            case 'cover':
+                $query->orderBy('coverage_days', $dir)->orderBy('items.code', 'asc');
                 break;
             case 'code':
             default:
@@ -219,40 +190,28 @@ SQL;
                 break;
         }
 
+        // =========================
         // Pagination
+        // =========================
         $stocks = $query->paginate(50)->appends($request->query());
+        $collection = $stocks->getCollection();
 
-        // JSON/AJAX
-        if ($request->expectsJson() || $request->ajax()) {
-            $collection = $stocks->getCollection();
+        // =========================
+        // Owner-only summary (page current)
+        // =========================
+        $hppSummary = null;
+        $hppByCategory = [];
 
-            $rows = $collection->map(fn($r) => [
-                'item_id' => (int) $r->item_id,
-                'item_code' => (string) $r->item_code,
-                'item_name' => (string) $r->item_name,
-                'category' => [
-                    'id' => $r->category_id ? (int) $r->category_id : null,
-                    'name' => $r->category_name ? (string) $r->category_name : null,
-                ],
-                'total_qty' => (float) $r->total_qty,
-                'fg_qty' => (float) $r->fg_qty,
-                'wip_qty' => (float) $r->wip_qty,
-                'hpp_per_unit' => (float) $r->hpp_per_unit,
-                'stock_value' => (float) $r->stock_value,
-                'locations_url' => route('inventory.stocks.item_locations', $r->item_id),
-            ])->values();
-
-            // Summary (page current)
+        if ($isOwner) {
             $totalQty = (float) $collection->sum('total_qty');
             $totalValue = (float) $collection->sum('stock_value');
 
             $hppSummary = [
                 'total_qty' => $totalQty,
                 'total_value' => $totalValue,
-                'avg_hpp_weighted' => $totalQty != 0 ? ($totalValue / $totalQty) : 0.0,
+                'avg_hpp_weighted' => $totalQty > 0 ? ($totalValue / $totalQty) : 0.0,
             ];
 
-            // By category (page current)
             $hppByCategory = $collection
                 ->groupBy(fn($r) => $r->category_name ?? 'Uncategorized')
                 ->map(function ($grp, $catName) {
@@ -262,38 +221,81 @@ SQL;
                         'category' => (string) $catName,
                         'total_qty' => $qty,
                         'total_value' => $val,
-                        'avg_hpp_weighted' => $qty != 0 ? ($val / $qty) : 0.0,
+                        'avg_hpp_weighted' => $qty > 0 ? ($val / $qty) : 0.0,
                     ];
                 })
-                ->values();
+                ->values()
+                ->all();
 
-            return response()->json([
+            if (empty($hppByCategory)) {
+                $hppByCategory = [[
+                    'category' => 'Uncategorized',
+                    'total_qty' => 0.0,
+                    'total_value' => 0.0,
+                    'avg_hpp_weighted' => 0.0,
+                ]];
+            }
+        }
+
+        // =========================
+        // JSON (AJAX) – bulletproof
+        // =========================
+        $accept = (string) ($request->header('accept') ?? '');
+        $forceJson = str_contains(strtolower($accept), 'application/json');
+
+        if ($request->wantsJson() || $request->expectsJson() || $request->ajax() || $forceJson) {
+
+            $rows = $collection->map(function ($r) use ($isOwner) {
+                return [
+                    'item_id' => (int) $r->item_id,
+                    'item_code' => (string) $r->item_code,
+                    'item_name' => (string) $r->item_name,
+                    'category' => [
+                        'id' => $r->category_id ? (int) $r->category_id : null,
+                        'name' => $r->category_name ? (string) $r->category_name : null,
+                    ],
+                    'total_qty' => (float) $r->total_qty,
+                    'fg_qty' => (float) $r->fg_qty,
+                    'wip_qty' => (float) $r->wip_qty,
+
+                    // owner-only sensitive fields
+                    'hpp_per_unit' => $isOwner ? (float) $r->hpp_per_unit : null,
+                    'stock_value' => $isOwner ? (float) $r->stock_value : null,
+                    'ads' => $isOwner ? (float) $r->ads : null,
+                    'coverage_days' => $isOwner ? ($r->coverage_days !== null ? (float) $r->coverage_days : null) : null,
+
+                    'locations_url' => route('inventory.stocks.item_locations', $r->item_id),
+                ];
+            })->values()->all();
+
+            $resp = [
                 'ok' => true,
                 'meta' => [
                     'total' => $stocks->total(),
+                    'from' => $stocks->firstItem() ?? 0,
                     'per_page' => $stocks->perPage(),
                     'current_page' => $stocks->currentPage(),
                     'last_page' => $stocks->lastPage(),
-                    'from' => $stocks->firstItem() ?? 0,
-                    'to' => $stocks->lastItem() ?? 0,
                 ],
-                'hpp_summary' => $hppSummary,
-                'hpp_by_category' => $hppByCategory,
                 'rows' => $rows,
-                'pagination_html' => $stocks->hasPages() ? (string) $stocks->links() : '',
-            ]);
+                'pagination_html' => (string) $stocks->links(),
+            ];
+
+            if ($isOwner) {
+                $resp['hpp_summary'] = $hppSummary;
+                $resp['hpp_by_category'] = array_values($hppByCategory); // ✅ numeric array
+            }
+
+            return response()->json($resp);
         }
 
+        // =========================
         // Blade
+        // =========================
         return view('inventory.stocks.items', [
-            'items' => $items,
-            'warehouses' => $warehouses,
             'stocks' => $stocks,
             'filters' => [
-                'warehouse_id' => $warehouseId,
-                'item_id' => $itemId,
                 'search' => $searchRaw,
-                'has_balance_only' => $hasBalanceOnly,
                 'sort' => $sort,
                 'dir' => $dir,
             ],
