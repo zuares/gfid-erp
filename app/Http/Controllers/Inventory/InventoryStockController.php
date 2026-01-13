@@ -10,6 +10,7 @@ use App\Models\Warehouse;
 use App\Services\Inventory\InventoryService;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\DB;
+use Illuminate\Support\Facades\Schema;
 use Illuminate\Support\Str;
 
 class InventoryStockController extends Controller
@@ -62,25 +63,37 @@ class InventoryStockController extends Controller
         $user = auth()->user();
         $role = $user?->role ?? null;
 
-        // Untuk dropdown filter item (masih dipakai di view summary / nanti kalau mau dihidupin lagi)
-        $items = Item::where('active', 1)
-            ->orderBy('name')
-            ->get();
+        // Dropdown filter item (kalau suatu saat dipakai lagi)
+        $items = Item::where('active', 1)->orderBy('name')->get();
 
-        // Untuk dropdown gudang (role-based)
+        // Dropdown gudang (role-based)
         $warehouses = $this->getWarehousesForDropdown($role);
 
         // Filters
         $warehouseId = $request->input('warehouse_id');
         $itemId = $request->input('item_id');
 
-        // raw text dari request (buat dikirim balik ke view)
         $searchRaw = trim((string) $request->input('search', ''));
-
-        // versi normalisasi (uppercase) untuk dipakai di LIKE
         $search = Str::upper($searchRaw);
 
         $hasBalanceOnly = (bool) $request->boolean('has_balance_only', false);
+
+        // ✅ Sorting
+        $sort = (string) $request->input('sort', 'code'); // code | value | total | fg | wip
+        $dir = strtolower((string) $request->input('dir', 'asc')) === 'desc' ? 'desc' : 'asc';
+
+        $allowedSort = ['code', 'value', 'total', 'fg', 'wip'];
+        if (!in_array($sort, $allowedSort, true)) {
+            $sort = 'code';
+        }
+
+        // ✅ Detect FK category (item_category_id atau category_id)
+        $catFk = null;
+        if (Schema::hasColumn('items', 'item_category_id')) {
+            $catFk = 'items.item_category_id';
+        } elseif (Schema::hasColumn('items', 'category_id')) {
+            $catFk = 'items.category_id';
+        }
 
         /**
          * STEP 1: Subquery stok per (item, gudang) dari inventory_mutations
@@ -88,25 +101,22 @@ class InventoryStockController extends Controller
         $base = InventoryMutation::query()
             ->join('warehouses', 'warehouses.id', '=', 'inventory_mutations.warehouse_id');
 
-        // 🔒 Scope per ROLE
+        // 🔒 Role scope
         if ($role === 'operating') {
-            // Operating: hanya WIP-% dan WH-PRD
             $base->where(function ($q) {
                 $q->where('warehouses.code', 'WH-PRD')
                     ->orWhere('warehouses.code', 'LIKE', 'WIP-%');
             });
         } elseif ($role === 'admin') {
-            // Admin: hanya WH-RTS
             $base->where('warehouses.code', 'WH-RTS');
         }
-        // Owner / user lain: tanpa pembatasan gudang (lihat semua)
 
-        // Filter gudang spesifik (kalau dipilih di filter)
+        // Filter gudang spesifik
         if ($warehouseId) {
             $base->where('inventory_mutations.warehouse_id', $warehouseId);
         }
 
-        // Subquery stok per item+gudang
+        // stok per item+gudang
         $base->selectRaw('
         inventory_mutations.item_id,
         warehouses.code AS wh_code,
@@ -115,28 +125,28 @@ class InventoryStockController extends Controller
             ->groupBy('inventory_mutations.item_id', 'warehouses.code');
 
         /**
-         * STEP 2: Outer query agregasi per item
+         * STEP 2: Outer query agregasi per item + HPP + kategori + value
          */
         $selectSql = <<<'SQL'
 s.item_id,
 items.code AS item_code,
 items.name AS item_name,
 
+item_categories.id AS category_id,
+item_categories.name AS category_name,
+
 COALESCE(SUM(s.qty), 0) AS total_qty,
 
 COALESCE(SUM(
-    CASE
-        WHEN s.wh_code LIKE 'WH-%' THEN s.qty
-        ELSE 0
-    END
+    CASE WHEN s.wh_code LIKE 'WH-%' THEN s.qty ELSE 0 END
 ), 0) AS fg_qty,
 
 COALESCE(SUM(
-    CASE
-        WHEN s.wh_code LIKE 'WIP-%' THEN s.qty
-        ELSE 0
-    END
-), 0) AS wip_qty
+    CASE WHEN s.wh_code LIKE 'WIP-%' THEN s.qty ELSE 0 END
+), 0) AS wip_qty,
+
+COALESCE(items.hpp, 0) AS hpp_per_unit,
+COALESCE(SUM(s.qty), 0) * COALESCE(items.hpp, 0) AS stock_value
 SQL;
 
         $query = DB::query()
@@ -144,35 +154,28 @@ SQL;
             ->join('items', 'items.id', '=', 's.item_id')
             ->where('items.active', 1);
 
-        // Filter item (di outer, karena join items)
+        if ($catFk) {
+            $query->leftJoin('item_categories', 'item_categories.id', '=', DB::raw($catFk));
+        } else {
+            // fallback: keep null fields
+            $query->leftJoin('item_categories', function ($join) {
+                $join->on('item_categories.id', '=', DB::raw('NULL'));
+            });
+        }
+
         if ($itemId) {
             $query->where('s.item_id', $itemId);
         }
 
-        /**
-         * FILTER SEARCH: multi-term OR
-         * Contoh input:
-         * - "K7BLK K7WHT"
-         * - "K7BLK,K7WHT"
-         * - "K7BLK|K7WHT"
-         *
-         * Dipecah jadi beberapa term, lalu:
-         * (code LIKE %term1% OR name LIKE %term1%)
-         * OR
-         * (code LIKE %term2% OR name LIKE %term2%)
-         */
+        // Search multi-term OR
         if ($search !== '') {
-            // Pisah pakai spasi, koma, titik koma, atau pipe
             $rawTerms = preg_split('/[\s,;|]+/', $search);
-
-            // Bersihkan kosong
             $terms = array_values(array_filter($rawTerms, fn($t) => $t !== ''));
 
             if (!empty($terms)) {
                 $query->where(function ($q) use ($terms) {
                     foreach ($terms as $term) {
                         $like = '%' . $term . '%';
-
                         $q->orWhere(function ($q2) use ($like) {
                             $q2->where('items.code', 'like', $like)
                                 ->orWhere('items.name', 'like', $like);
@@ -183,28 +186,86 @@ SQL;
         }
 
         $query->selectRaw($selectSql)
-            ->groupBy('s.item_id', 'items.code', 'items.name')
-            ->orderBy('items.code');
+            ->groupBy(
+                's.item_id',
+                'items.code',
+                'items.name',
+                'item_categories.id',
+                'item_categories.name',
+                'items.hpp'
+            );
 
-        // Checkbox "Hanya ada stok" -> hanya item dengan total_qty != 0
         if ($hasBalanceOnly) {
             $query->havingRaw('COALESCE(SUM(s.qty), 0) <> 0');
+        }
+
+        // ✅ Apply sorting (by alias)
+        switch ($sort) {
+            case 'total':
+                $query->orderBy('total_qty', $dir)->orderBy('items.code', 'asc');
+                break;
+            case 'fg':
+                $query->orderBy('fg_qty', $dir)->orderBy('items.code', 'asc');
+                break;
+            case 'wip':
+                $query->orderBy('wip_qty', $dir)->orderBy('items.code', 'asc');
+                break;
+            case 'value':
+                $query->orderBy('stock_value', $dir)->orderBy('items.code', 'asc');
+                break;
+            case 'code':
+            default:
+                $query->orderBy('items.code', $dir);
+                break;
         }
 
         // Pagination
         $stocks = $query->paginate(50)->appends($request->query());
 
-        // OPTIONAL: respon JSON untuk AJAX
+        // JSON/AJAX
         if ($request->expectsJson() || $request->ajax()) {
-            $rows = $stocks->getCollection()->map(fn($r) => [
+            $collection = $stocks->getCollection();
+
+            $rows = $collection->map(fn($r) => [
                 'item_id' => (int) $r->item_id,
                 'item_code' => (string) $r->item_code,
                 'item_name' => (string) $r->item_name,
+                'category' => [
+                    'id' => $r->category_id ? (int) $r->category_id : null,
+                    'name' => $r->category_name ? (string) $r->category_name : null,
+                ],
                 'total_qty' => (float) $r->total_qty,
                 'fg_qty' => (float) $r->fg_qty,
                 'wip_qty' => (float) $r->wip_qty,
+                'hpp_per_unit' => (float) $r->hpp_per_unit,
+                'stock_value' => (float) $r->stock_value,
                 'locations_url' => route('inventory.stocks.item_locations', $r->item_id),
             ])->values();
+
+            // Summary (page current)
+            $totalQty = (float) $collection->sum('total_qty');
+            $totalValue = (float) $collection->sum('stock_value');
+
+            $hppSummary = [
+                'total_qty' => $totalQty,
+                'total_value' => $totalValue,
+                'avg_hpp_weighted' => $totalQty != 0 ? ($totalValue / $totalQty) : 0.0,
+            ];
+
+            // By category (page current)
+            $hppByCategory = $collection
+                ->groupBy(fn($r) => $r->category_name ?? 'Uncategorized')
+                ->map(function ($grp, $catName) {
+                    $qty = (float) $grp->sum('total_qty');
+                    $val = (float) $grp->sum('stock_value');
+                    return [
+                        'category' => (string) $catName,
+                        'total_qty' => $qty,
+                        'total_value' => $val,
+                        'avg_hpp_weighted' => $qty != 0 ? ($val / $qty) : 0.0,
+                    ];
+                })
+                ->values();
 
             return response()->json([
                 'ok' => true,
@@ -216,12 +277,14 @@ SQL;
                     'from' => $stocks->firstItem() ?? 0,
                     'to' => $stocks->lastItem() ?? 0,
                 ],
+                'hpp_summary' => $hppSummary,
+                'hpp_by_category' => $hppByCategory,
                 'rows' => $rows,
                 'pagination_html' => $stocks->hasPages() ? (string) $stocks->links() : '',
             ]);
         }
 
-        // Normal render ke Blade
+        // Blade
         return view('inventory.stocks.items', [
             'items' => $items,
             'warehouses' => $warehouses,
@@ -229,10 +292,10 @@ SQL;
             'filters' => [
                 'warehouse_id' => $warehouseId,
                 'item_id' => $itemId,
-                // pakai raw biar kalau nanti input belum full uppercase tetap
-                // tampil sesuai yang diketik user (meski di JS sudah di-upper)
                 'search' => $searchRaw,
                 'has_balance_only' => $hasBalanceOnly,
+                'sort' => $sort,
+                'dir' => $dir,
             ],
         ]);
     }

@@ -621,17 +621,26 @@ class QcService
             }
 
             /**
-             * 1) Reverse mutasi WIP & REJECT hasil QC
-             * Mutasi original dibuat oleh createWipFromCuttingQc() dengan:
-             * - sourceType: 'cutting_wip'
-             * - sourceType: 'cutting_reject'
-             * - sourceId  : $job->id
+             * 1) Reverse mutasi hasil QC
+             * Original dibuat oleh createWipFromCuttingQc():
+             * - cutting_wip
+             * - cutting_reject
              *
-             * reverseBySource akan membuat mutasi lawan arah (qty_change dibalik)
-             * dan akan gagal otomatis kalau stok sudah tidak cukup (sudah kepakai sewing/finishing).
+             * PLUS (opsional tapi recommended):
+             * - cutting_qc_adjust_in / cutting_qc_adjust_out (kalau kamu pakai adjustment QC)
+             *
+             * reverseBySource akan membuat mutasi lawan arah dan akan gagal
+             * kalau stok sudah kepakai (misal sudah di-pickup sewing).
              */
             $this->inventory->reverseBySource(
-                originalSourceTypes: ['cutting_wip', 'cutting_reject'],
+                originalSourceTypes: [
+                    'cutting_wip',
+                    'cutting_reject',
+
+                    // ✅ kalau kamu pakai QC Adjustment, ini bikin cancel lebih bersih
+                    'cutting_qc_adjust_in',
+                    'cutting_qc_adjust_out',
+                ],
                 originalSourceId: $job->id,
                 voidSourceType: 'cutting_qc_void',
                 voidSourceId: $job->id,
@@ -647,9 +656,13 @@ class QcService
                 $bundle->qty_qc_reject = 0;
                 $bundle->status = 'cut';
 
-                // penting: supaya createWipFromCuttingQc() tidak skip
+                // ✅ konsistensi baru:
+                // wip_qty selalu = qty_ok, jadi reset ke 0
                 $bundle->wip_qty = 0;
+
+                // reset info WIP posting
                 $bundle->wip_warehouse_id = null;
+                $bundle->wip_posted_at = null; // ✅ ini yang baru & wajib
 
                 $bundle->save();
             }
@@ -665,6 +678,182 @@ class QcService
                 'status' => 'sent_to_qc',
                 'updated_by' => auth()->id(),
             ]);
+        });
+    }
+
+    public function adjustCuttingBundleQc(
+        CuttingJobBundle $bundle,
+        string $qcDate,
+        float $newOk,
+        float $newReject = 0,
+        ?int $operatorId = null,
+        ?string $rejectReason = null,
+        ?string $notes = null,
+    ): void {
+        DB::transaction(function () use ($bundle, $qcDate, $newOk, $newReject, $operatorId, $rejectReason, $notes) {
+
+            // lock bundle + job supaya aman dari race condition
+            $bundle = CuttingJobBundle::query()
+                ->whereKey($bundle->id)
+                ->lockForUpdate()
+                ->firstOrFail();
+
+            $job = CuttingJob::query()
+                ->whereKey($bundle->cutting_job_id)
+                ->lockForUpdate()
+                ->firstOrFail();
+
+            // ✅ adjust hanya boleh jika sudah pernah posting WIP dari QC
+            if (empty($bundle->wip_posted_at)) {
+                throw new \RuntimeException('Bundle belum pernah posting WIP (wip_posted_at kosong). Lakukan QC normal dulu.');
+            }
+
+            // normalisasi
+            $newOk = max(0, (float) $newOk);
+            $newReject = max(0, (float) $newReject);
+
+            $bundleQty = (float) ($bundle->qty_pcs ?? 0);
+
+            // jaga-jaga: OK + Reject tidak boleh melebihi qty_pcs
+            if ($newOk + $newReject > $bundleQty) {
+                throw new \RuntimeException("QC tidak valid: OK({$newOk}) + Reject({$newReject}) > qty_pcs({$bundleQty}).");
+            }
+
+            // ambil QC record existing (kalau ada)
+            $qc = QcResult::query()
+                ->where('stage', QcResult::STAGE_CUTTING)
+                ->where('cutting_job_id', $job->id)
+                ->where('cutting_job_bundle_id', $bundle->id)
+                ->lockForUpdate()
+                ->first();
+
+            $oldOk = (float) ($qc?->qty_ok ?? $bundle->qty_qc_ok ?? 0);
+            $oldReject = (float) ($qc?->qty_reject ?? $bundle->qty_qc_reject ?? 0);
+
+            $deltaOk = $newOk - $oldOk; // (+) tambah WIP, (-) kurangi WIP
+            $deltaReject = $newReject - $oldReject; // (+) tambah REJ, (-) kurangi REJ
+
+            // warehouses
+            $wipCutWarehouseId = Warehouse::where('code', 'WIP-CUT')->value('id');
+            $rejCutWarehouseId = Warehouse::where('code', 'REJ-CUT')->value('id');
+
+            if (!$wipCutWarehouseId || !$rejCutWarehouseId) {
+                throw new \RuntimeException('Warehouse WIP-CUT / REJ-CUT belum dikonfigurasi.');
+            }
+
+            $itemId = (int) $bundle->finished_item_id;
+            if ($itemId <= 0) {
+                throw new \RuntimeException('finished_item_id bundle kosong.');
+            }
+
+            // gunakan wip_warehouse_id bundle jika ada
+            $bundleWipWarehouseId = $bundle->wip_warehouse_id ?: $wipCutWarehouseId;
+
+            // =========================
+            // 1) ADJUST STOCK WIP-CUT (OK)
+            // =========================
+            if ($deltaOk > 0) {
+                $this->inventory->stockIn(
+                    warehouseId: $bundleWipWarehouseId,
+                    itemId: $itemId,
+                    qty: $deltaOk,
+                    date: $qcDate,
+                    sourceType: 'cutting_qc_adjust_in',
+                    sourceId: $job->id,
+                    notes: "QC Adjust +OK {$deltaOk} pcs (bundle {$bundle->bundle_code}, job {$job->code})",
+                    lotId: null,
+                    unitCost: null,
+                    affectLotCost: false,
+                );
+            } elseif ($deltaOk < 0) {
+                // kalau sudah kepakai sewing, stok WIP-CUT bisa tidak cukup → InventoryService akan throw
+                $this->inventory->stockOut(
+                    warehouseId: $bundleWipWarehouseId,
+                    itemId: $itemId,
+                    qty: abs($deltaOk),
+                    date: $qcDate,
+                    sourceType: 'cutting_qc_adjust_out',
+                    sourceId: $job->id,
+                    notes: "QC Adjust -OK " . abs($deltaOk) . " pcs (bundle {$bundle->bundle_code}, job {$job->code})",
+                    allowNegative: false,
+                    lotId: null,
+                    unitCostOverride: null,
+                    affectLotCost: false,
+                );
+            }
+
+            // =========================
+            // 2) ADJUST STOCK REJ-CUT (Reject)
+            // =========================
+            if ($deltaReject > 0) {
+                $this->inventory->stockIn(
+                    warehouseId: $rejCutWarehouseId,
+                    itemId: $itemId,
+                    qty: $deltaReject,
+                    date: $qcDate,
+                    sourceType: 'cutting_qc_adjust_in',
+                    sourceId: $job->id,
+                    notes: "QC Adjust +REJ {$deltaReject} pcs (bundle {$bundle->bundle_code}, job {$job->code})",
+                    lotId: null,
+                    unitCost: null,
+                    affectLotCost: false,
+                );
+            } elseif ($deltaReject < 0) {
+                $this->inventory->stockOut(
+                    warehouseId: $rejCutWarehouseId,
+                    itemId: $itemId,
+                    qty: abs($deltaReject),
+                    date: $qcDate,
+                    sourceType: 'cutting_qc_adjust_out',
+                    sourceId: $job->id,
+                    notes: "QC Adjust -REJ " . abs($deltaReject) . " pcs (bundle {$bundle->bundle_code}, job {$job->code})",
+                    allowNegative: false,
+                    lotId: null,
+                    unitCostOverride: null,
+                    affectLotCost: false,
+                );
+            }
+
+            // =========================
+            // 3) UPDATE QC RESULT + BUNDLE
+            // =========================
+            $status = $this->resolveBundleStatus($newOk, $newReject, $bundleQty);
+
+            QcResult::updateOrCreate(
+                [
+                    'stage' => QcResult::STAGE_CUTTING,
+                    'cutting_job_id' => $job->id,
+                    'cutting_job_bundle_id' => $bundle->id,
+                ],
+                [
+                    'qc_date' => $qcDate,
+                    'qty_ok' => $newOk,
+                    'qty_reject' => $newReject,
+                    'reject_reason' => $rejectReason,
+                    'operator_id' => $operatorId,
+                    'status' => $status,
+                    'notes' => $notes,
+                ],
+            );
+
+            // ✅ aturan baru: wip_qty selalu sama dengan qty_ok
+            $bundle->qty_qc_ok = $newOk;
+            $bundle->qty_qc_reject = $newReject;
+            $bundle->status = $status;
+            $bundle->wip_qty = $newOk;
+            $bundle->save();
+
+            // header status tetap qc_done
+            if ($job->status !== 'qc_done') {
+                $job->update(['status' => 'qc_done']);
+            }
+
+            // =========================
+            // 4) SYNC PAYROLL (opsional)
+            // =========================
+            // Kalau payroll kamu sudah punya service sync, panggil di sini.
+            // Contoh:
+            // app(\App\Services\Payroll\PieceworkPayrollService::class)->syncCuttingFromQc($job, $qcDate);
         });
     }
 

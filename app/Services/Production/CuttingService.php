@@ -514,8 +514,8 @@ class CuttingService
             $totalOkAll += $qtyOk;
         }
 
-        if ($totalProcessedAll <= 0 || $totalOkAll <= 0) {
-            // tidak ada yang diproses / tidak ada OK → tidak ada WIP
+        // Kalau tidak ada yg diproses sama sekali → tidak ada movement
+        if ($totalProcessedAll <= 0) {
             return;
         }
 
@@ -528,19 +528,16 @@ class CuttingService
             ->where('direction', 'out')
             ->get();
 
-        $totalRmCost = (float) $rmMutations->sum('total_cost'); // negatif
-        $totalRmCost = abs($totalRmCost); // jadikan positif
+        $totalRmCost = abs((float) $rmMutations->sum('total_cost')); // jadikan positif
 
         // Kalau belum ada RM OUT (job lama?), jangan paksa costing
-        if ($totalRmCost <= 0) {
-            $unitCostPerPcs = null;
-        } else {
-            // 🔥 HPP RM per pcs (dibagi OK+REJECT)
-            $unitCostPerPcs = $totalRmCost / $totalProcessedAll;
-        }
+        $unitCostPerPcs = $totalRmCost > 0
+        ? ($totalRmCost / $totalProcessedAll) // 🔥 HPP RM per pcs (dibagi OK+REJECT)
+        : null;
 
         // ======================================================
         // 3) Loop bundle → buat WIP-CUT (OK) + REJ-CUT (Reject)
+        //    wip_qty = qty_ok, marker pakai wip_posted_at
         // ======================================================
         foreach ($job->bundles as $bundle) {
             /** @var CuttingJobBundle $bundle */
@@ -552,8 +549,14 @@ class CuttingService
                 continue;
             }
 
-            // kalau sudah pernah dibuat WIP (wip_qty > 0), anggap sudah di-post → skip
-            if ($this->num($bundle->wip_qty ?? 0) > 0) {
+            // ✅ marker: kalau sudah pernah posting WIP dari QC → skip
+            if (!empty($bundle->wip_posted_at)) {
+                // tetap pastikan konsistensi wip_qty = qty_ok (optional)
+                // kalau kamu mau auto-correct silent:
+                if ($this->num($bundle->wip_qty ?? 0) !== $qtyOk) {
+                    $bundle->wip_qty = $qtyOk;
+                    $bundle->save();
+                }
                 continue;
             }
 
@@ -573,13 +576,16 @@ class CuttingService
                     sourceId: $job->id,
                     notes: "WIP Cutting OK dari bundle {$bundle->bundle_code} (job {$job->code})",
                     lotId: null,
-                    unitCost: $unitCostPerPcs, // boleh null; InventoryService akan handle
+                    unitCost: $unitCostPerPcs, // boleh null
                     affectLotCost: false,
                 );
 
-                // update info WIP di bundle
+                // ✅ wip_qty selalu sama dengan qty_ok
                 $bundle->wip_warehouse_id = $bundleWipWarehouseId;
                 $bundle->wip_qty = $qtyOk;
+            } else {
+                // ✅ kalau OK = 0, tetap set wip_qty = 0 untuk konsistensi
+                $bundle->wip_qty = 0;
             }
 
             // ========================
@@ -599,6 +605,9 @@ class CuttingService
                     affectLotCost: false,
                 );
             }
+
+            // ✅ marker sudah posting (walaupun OK=0 tapi Reject>0 tetap dianggap posted)
+            $bundle->wip_posted_at = now();
 
             $bundle->save();
         }

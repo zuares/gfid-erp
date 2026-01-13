@@ -4,6 +4,9 @@ namespace App\Http\Controllers\Production;
 
 use App\Http\Controllers\Controller;
 use App\Models\CuttingJob;
+use App\Models\CuttingJobBundle;
+use App\Models\InventoryAdjustment;
+use App\Models\InventoryAdjustmentLine;
 use App\Models\QcResult;
 use App\Models\SewingReturn;
 use App\Services\Production\CuttingService;
@@ -374,6 +377,99 @@ class QcController extends Controller
             'lines' => $lines,
             'action' => $action,
         ];
+    }
+
+    public function adjustCuttingBundle(Request $request, CuttingJob $cuttingJob, CuttingJobBundle $bundle): RedirectResponse
+    {
+        // ✅ owner-only
+        if ((Auth::user()->role ?? null) !== 'owner') {
+            return back()->with('error', 'Hanya OWNER yang boleh melakukan adjustment QC.');
+        }
+
+        $validated = $request->validate([
+            'qc_date' => ['required', 'date'],
+            'qty_ok' => ['required', 'numeric', 'min:0'],
+            'qty_reject' => ['nullable', 'numeric', 'min:0'],
+            'reject_reason' => ['nullable', 'string', 'max:100'],
+            'notes' => ['nullable', 'string'],
+        ]);
+
+        $operatorId = Auth::user()->employee?->id;
+
+        try {
+            // ✅ ini method baru yang kamu tambahkan di QcService
+            $this->qc->adjustCuttingBundleQc(
+                bundle: $bundle,
+                qcDate: $validated['qc_date'],
+                newOk: (float) $validated['qty_ok'],
+                newReject: (float) ($validated['qty_reject'] ?? 0),
+                operatorId: $operatorId,
+                rejectReason: $validated['reject_reason'] ?? null,
+                notes: $validated['notes'] ?? null,
+            );
+        } catch (\Throwable $e) {
+            return back()
+                ->withInput()
+                ->with('error', 'Adjust QC gagal: ' . $e->getMessage());
+        }
+
+        return redirect()
+            ->route('production.cutting_jobs.show', $bundle->cutting_job_id)
+            ->with('success', 'QC bundle berhasil di-adjust.');
+    }
+
+    public function overproductionCuttingBundle(Request $request, CuttingJob $cuttingJob, CuttingJobBundle $bundle)
+    {
+        // pastikan bundle memang milik cutting job ini
+        abort_unless((int) $bundle->cutting_job_id === (int) $cuttingJob->id, 404);
+
+        $validated = $request->validate([
+            'date' => ['required', 'date'],
+            'qty_add' => ['required', 'numeric', 'gt:0'],
+            'warehouse_id' => ['required', 'exists:warehouses,id'],
+            'notes' => ['nullable', 'string', 'max:500'],
+        ]);
+
+        // item wajib ada
+        abort_unless((int) $bundle->finished_item_id > 0, 422);
+
+        $module = 'cutting_overproduction';
+
+        return DB::transaction(function () use ($validated, $bundle, $module) {
+
+            /** @var InventoryAdjustment $adj */
+            $adj = InventoryAdjustment::create([
+                'module' => $module,
+                'date' => $validated['date'] ?? now()->toDateString(), // kalau kamu punya kolom date
+                'warehouse_id' => (int) $validated['warehouse_id'], // asumsi header punya warehouse_id
+                'status' => 'draft',
+                'notes' => trim(
+                    ($validated['notes'] ?? '') .
+                    "\n[Auto] Cutting Overproduction | Bundle {$bundle->bundle_code}"
+                ),
+                'created_by' => auth()->id(),
+                'cutting_job_bundle_id' => $bundle->id, // header ref (kalau kamu jadiin)
+            ]);
+
+            $qtyAdd = (float) $validated['qty_add'];
+
+            InventoryAdjustmentLine::create([
+                'inventory_adjustment_id' => $adj->id,
+                'item_id' => $bundle->finished_item_id,
+                'lot_id' => null, // WIP/FG non-LOT
+                'qty_change' => $qtyAdd,
+                'direction' => 'in',
+                'notes' => "Overproduction dari Cutting bundle {$bundle->bundle_code}",
+                'cutting_job_bundle_id' => $bundle->id,
+            ]);
+
+            // opsi: langsung post biar sekali klik (atau biarkan draft dulu)
+            // $this->inventoryAdjustmentService->post($adj);
+
+            return redirect()
+                ->route('inventory.adjustments.show', $adj) // sesuaikan route show kamu
+                ->with('success', 'Draft Cutting Overproduction dibuat. Silakan POST untuk masuk audit trail stok.');
+        });
     }
 
 }

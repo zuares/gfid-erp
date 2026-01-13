@@ -37,6 +37,11 @@ class InventoryAdjustment extends Model
         'created_by',
         'approved_by',
         'approved_at',
+        'purpose',
+        'wip_stage',
+        'reference_type',
+        'reference_id',
+        'operator_id',
     ];
 
     protected $casts = [
@@ -151,4 +156,15 @@ class InventoryAdjustment extends Model
         return $this->source_type === StockOpname::class
         && $this->source?->type === StockOpname::TYPE_PERIODIC;
     }
+
+    public function isWip(): bool
+    {
+        return ($this->purpose ?? null) === 'wip';
+    }
+
+    public function isManual(): bool
+    {
+        return $this->source_type === null;
+    }
+
 }

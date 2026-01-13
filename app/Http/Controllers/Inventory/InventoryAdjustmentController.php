@@ -3,6 +3,7 @@
 namespace App\Http\Controllers\Inventory;
 
 use App\Http\Controllers\Controller;
+use App\Models\CuttingJob;
 use App\Models\InventoryAdjustment;
 use App\Models\InventoryMutation;
 use App\Models\InventoryStock;
@@ -20,10 +21,9 @@ use Illuminate\Support\Facades\DB;
 
 class InventoryAdjustmentController extends Controller
 {
-    public function __construct()
-    {
-        // $this->middleware('auth');
-    }
+    public function __construct(
+        protected InventoryService $inventory
+    ) {}
 
     /**
      * Daftar dokumen penyesuaian stok (Inventory Adjustment)
@@ -901,4 +901,219 @@ class InventoryAdjustmentController extends Controller
 
         return "ADJ-{$ymd}-{$seq}";
     }
+
+    public function post(InventoryAdjustment $adjustment)
+    {
+        abort_unless(in_array(auth()->user()->role ?? null, ['owner', 'admin']), 403);
+        abort_unless($adjustment->status === 'draft', 422);
+
+        $adjustment->loadMissing(['lines']);
+
+        return DB::transaction(function () use ($adjustment) {
+
+            // lock header biar gak double post
+            $adjustment = InventoryAdjustment::whereKey($adjustment->id)->lockForUpdate()->first();
+
+            if ($adjustment->status !== 'draft') {
+                abort(422, 'Adjustment sudah diposting.');
+            }
+
+            $warehouseId = (int) $adjustment->warehouse_id;
+
+            foreach ($adjustment->lines as $line) {
+                $itemId = (int) $line->item_id;
+                $qty = (float) $line->qty_change;
+
+                // ambil stok saat ini (qty_before)
+                $qtyBefore = (float) DB::table('inventory_mutations')
+                    ->where('warehouse_id', $warehouseId)
+                    ->where('item_id', $itemId)
+                    ->sum('qty_change');
+
+                $qtyAfter = $qtyBefore;
+
+                if ($line->direction === 'in') {
+                    $qtyAfter = $qtyBefore + $qty;
+                    // stockIn
+                    $this->inventory->stockIn(
+                        warehouseId: $warehouseId,
+                        itemId: $itemId,
+                        qty: $qty,
+                        date: $adjustment->date ?? now()->toDateString(),
+                        sourceType: 'inventory_adjustment_in',
+                        sourceId: $adjustment->id,
+                        notes: $line->notes ?? "Inventory Adjustment IN #{$adjustment->id}",
+                        lotId: $line->lot_id,
+                        unitCost: null,
+                        affectLotCost: false,
+                    );
+                } else {
+                    $qtyAfter = $qtyBefore - $qty;
+                    // stockOut
+                    $this->inventory->stockOut(
+                        warehouseId: $warehouseId,
+                        itemId: $itemId,
+                        qty: $qty,
+                        date: $adjustment->date ?? now()->toDateString(),
+                        sourceType: 'inventory_adjustment_out',
+                        sourceId: $adjustment->id,
+                        notes: $line->notes ?? "Inventory Adjustment OUT #{$adjustment->id}",
+                        allowNegative: false,
+                        lotId: $line->lot_id,
+                        unitCostOverride: null,
+                        affectLotCost: false,
+                    );
+                }
+
+                $line->update([
+                    'qty_before' => $qtyBefore,
+                    'qty_after' => $qtyAfter,
+                ]);
+            }
+
+            $adjustment->update([
+                'status' => \App\Models\InventoryAdjustment::STATUS_APPROVED,
+                'approved_by' => auth()->id(),
+                'approved_at' => now(),
+            ]);
+
+            return back()->with('success', 'Adjustment berhasil diposting (audit trail tercatat).');
+        });
+    }
+    public function cuttingOverproductionCreate(Request $request): View
+    {
+        abort_unless(in_array(auth()->user()->role ?? null, ['owner', 'admin']), 403);
+
+        $cuttingJobId = (int) $request->get('cutting_job_id');
+        abort_unless($cuttingJobId > 0, 404);
+
+        $job = CuttingJob::query()
+            ->with(['warehouse', 'bundles.finishedItem'])
+            ->findOrFail($cuttingJobId);
+
+        // ✅ 1) kalau job sudah punya wip_warehouse_id -> pakai itu
+        $warehouse = null;
+        if (!empty($job->wip_warehouse_id)) {
+            $warehouse = Warehouse::find($job->wip_warehouse_id);
+        }
+
+        // ✅ 2) fallback aman: cari gudang WIP by code (JANGAN fallback ke warehouse job)
+        if (!$warehouse) {
+            $warehouse = Warehouse::where('code', 'WIP-CUT')->first(); // <- sesuaikan kode
+        }
+
+        // ✅ 3) kalau tetap tidak ketemu -> hard error biar gak salah masuk RM
+        abort_if(!$warehouse, 422, 'Gudang WIP target belum diset. Set wip_warehouse_id pada cutting job atau buat gudang code WIP-CUT.');
+
+        $warehouseId = (int) $warehouse->id;
+
+        $lines = $job->bundles
+            ->groupBy('finished_item_id')
+            ->map(function ($bundles, $itemId) {
+                $item = $bundles->first()?->finishedItem;
+
+                return [
+                    'item_id' => (int) $itemId,
+                    'item_code' => $item?->code ?? '',
+                    'item_name' => $item?->name ?? '',
+                    'suggest_qty_in' => 0,
+                    'notes' => null,
+                ];
+            })
+            ->values();
+
+        // optional: kalau mau owner bisa pilih gudang (tapi tetap default WIP)
+        $warehouses = Warehouse::orderBy('code')->get();
+
+        return view('inventory.adjustments.cutting_overproduction.create', [
+            'job' => $job,
+            'warehouseId' => $warehouseId,
+            'warehouse' => $warehouse, // ✅ buat blade tampil kode/nama
+            'warehouses' => $warehouses, // ✅ kalau mau dropdown owner
+            'lines' => $lines,
+        ]);
+    }
+
+    public function cuttingOverproductionStore(Request $request): RedirectResponse
+    {
+        abort_unless(in_array(auth()->user()->role ?? null, ['owner', 'admin']), 403);
+
+        $validated = $request->validate([
+            'cutting_job_id' => ['required', 'integer'],
+            'warehouse_id' => ['required', 'exists:warehouses,id'],
+            'date' => ['required', 'date'],
+            'notes' => ['nullable', 'string'],
+            'lines' => ['required', 'array', 'min:1'],
+            'lines.*.item_id' => ['required', 'exists:items,id'],
+            'lines.*.qty_in' => ['required', 'numeric', 'min:0'],
+            'lines.*.notes' => ['nullable', 'string'],
+        ]);
+
+        $userId = auth()->id();
+
+        $adjustment = DB::transaction(function () use ($validated, $userId) {
+
+            $adj = new InventoryAdjustment();
+            $adj->code = $this->generateCodeForDate($validated['date']);
+            $adj->warehouse_id = (int) $validated['warehouse_id'];
+            $adj->date = $validated['date'];
+            $adj->reason = 'Cutting Overproduction Adjustment';
+            $adj->notes = $validated['notes'] ?? null;
+
+            // biar sesuai route post() kamu: draft dulu
+            $adj->status = InventoryAdjustment::STATUS_DRAFT;
+
+            $adj->created_by = $userId;
+
+            // optional: simpan relasi sumber ke cutting job
+            $adj->source_type = \App\Models\CuttingJob::class;
+            $adj->source_id = (int) $validated['cutting_job_id'];
+
+            $adj->save();
+
+            foreach ($validated['lines'] as $l) {
+                $qtyIn = (float) $l['qty_in'];
+                if ($qtyIn <= 0) {
+                    continue;
+                }
+
+                $adj->lines()->create([
+                    'item_id' => (int) $l['item_id'],
+                    'qty_before' => null,
+                    'qty_after' => null,
+                    'qty_change' => $qtyIn,
+                    'direction' => 'in',
+                    'notes' => $l['notes'] ?? null,
+                    'lot_id' => null,
+                ]);
+            }
+
+            return $adj;
+        });
+
+        return redirect()
+            ->route('inventory.adjustments.show', $adjustment)
+            ->with('status', 'success')
+            ->with('message', 'Overproduction Adjustment berhasil dibuat (draft). Silakan POST untuk eksekusi.');
+    }
+
+    public function cuttingOverproductionPost(InventoryAdjustment $adjustment): RedirectResponse
+    {
+        // reuse method post() yang sudah ada
+        return $this->post($adjustment);
+    }
+
+// kalau route kamu ada void:
+    public function cuttingOverproductionVoid(InventoryAdjustment $adjustment): RedirectResponse
+    {
+        abort_unless(in_array(auth()->user()->role ?? null, ['owner', 'admin']), 403);
+
+        abort_unless(in_array($adjustment->status, ['draft', 'pending'], true), 422);
+
+        $adjustment->status = InventoryAdjustment::STATUS_VOID;
+        $adjustment->save();
+
+        return back()->with('success', 'Adjustment di-VOID.');
+    }
+
 }

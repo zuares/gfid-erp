@@ -16,6 +16,11 @@ class InventoryAdjustmentLine extends Model
         'direction',
         'notes',
         'lot_id',
+
+        // ✅ WIP production refs
+        'cutting_job_bundle_id',
+        'sewing_pickup_line_id',
+        'finishing_job_line_id',
     ];
 
     protected $casts = [
@@ -32,5 +37,21 @@ class InventoryAdjustmentLine extends Model
     public function item(): BelongsTo
     {
         return $this->belongsTo(Item::class);
+    }
+
+    // ✅ Relations produksi
+    public function cuttingBundle(): BelongsTo
+    {
+        return $this->belongsTo(CuttingJobBundle::class, 'cutting_job_bundle_id');
+    }
+
+    public function sewingPickupLine(): BelongsTo
+    {
+        return $this->belongsTo(SewingPickupLine::class, 'sewing_pickup_line_id');
+    }
+
+    public function finishingLine(): BelongsTo
+    {
+        return $this->belongsTo(FinishingJobLine::class, 'finishing_job_line_id');
     }
 }

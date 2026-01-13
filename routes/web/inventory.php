@@ -10,6 +10,7 @@ use App\Http\Controllers\Inventory\RtsStockRequestProcessController;
 use App\Http\Controllers\Inventory\StockCardController;
 use App\Http\Controllers\Inventory\StockOpnameController;
 use App\Http\Controllers\Inventory\TransferController;
+use App\Http\Controllers\Inventory\WipAdjustmentController;
 
 // ✅ NEW (OPSI 1: PRD DISPATCH CORRECTION)
 use Illuminate\Support\Facades\Route;
@@ -191,4 +192,16 @@ Route::middleware(['web', 'auth', 'role:owner,admin,operating'])->group(function
         Route::get('/stock/available', [StockApiController::class, 'available'])->name('stock.available');
         Route::get('/stock/summary', [StockApiController::class, 'summary'])->name('stock.summary');
     });
+});
+
+Route::prefix('inventory/wip-adjustments')->name('inventory.wip_adjustments.')->group(function () {
+    Route::get('/', [WipAdjustmentController::class, 'index'])->name('index');
+    Route::get('/create', [WipAdjustmentController::class, 'create'])->name('create');
+    Route::post('/', [WipAdjustmentController::class, 'store'])->name('store');
+
+    Route::get('/ajax/items', [WipAdjustmentController::class, 'items'])->name('items');
+    Route::get('/ajax/bundles', [WipAdjustmentController::class, 'bundles'])->name('bundles');
+
+    Route::get('/{inventoryAdjustment}', [WipAdjustmentController::class, 'show'])->name('show');
+    Route::post('/{inventoryAdjustment}/approve', [WipAdjustmentController::class, 'approve'])->name('approve');
 });

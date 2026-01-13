@@ -66,11 +66,11 @@ class StockApiController extends Controller
             ], 422);
         }
 
-        // Ambil info item (buat header di modal)
-        $item = Item::select('id', 'code', 'name')->findOrFail($itemId);
+        // Ambil info item + HPP (items.hpp)
+        $item = Item::select('id', 'code', 'name', 'hpp')->findOrFail($itemId);
+        $hppPerUnit = (float) ($item->hpp ?? 0);
 
-        // 🔹 Ambil stok per gudang dari inventory_stocks
-        //    DI SINI KITA CUMA PAKAI s.qty supaya aman.
+        // Ambil stok per gudang dari inventory_stocks
         $rows = DB::table('inventory_stocks as s')
             ->join('warehouses as w', 'w.id', '=', 's.warehouse_id')
             ->where('s.item_id', $itemId)
@@ -79,30 +79,41 @@ class StockApiController extends Controller
                 's.warehouse_id',
                 'w.code',
                 'w.name',
-                's.qty', // pastikan kolom ini memang ada di tabel kamu
+                's.qty',
             ]);
 
-        // Mapping ke shape yang dipakai frontend
-        $warehouses = $rows->map(function ($row) {
+        $warehouses = $rows->map(function ($row) use ($hppPerUnit) {
             $onHand = (float) ($row->qty ?? 0);
 
             return [
                 'warehouse_id' => (int) $row->warehouse_id,
-                'code' => $row->code,
-                'name' => $row->name,
+                'code' => (string) $row->code,
+                'name' => (string) $row->name,
                 'on_hand' => $onHand,
-                'reserved' => 0.0, // sementara 0 dulu
-                'available' => $onHand, // sementara sama dengan on_hand
+                'reserved' => 0.0,
+                'available' => $onHand,
+
+                // ✅ HPP + Value
+                'hpp_per_unit' => $hppPerUnit,
+                'stock_value' => $onHand * $hppPerUnit,
             ];
-        })->values()->all();
+        })->values();
+
+        $totalQty = (float) $warehouses->sum('on_hand');
+        $totalValue = (float) $warehouses->sum('stock_value');
 
         return response()->json([
             'item' => [
                 'id' => $item->id,
                 'code' => $item->code,
                 'name' => $item->name,
+                'hpp' => $hppPerUnit,
             ],
-            'warehouses' => $warehouses,
+            'totals' => [
+                'qty' => $totalQty,
+                'value' => $totalValue,
+            ],
+            'warehouses' => $warehouses->all(),
         ]);
     }
 
