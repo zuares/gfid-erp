@@ -82,10 +82,8 @@ class CuttingPayrollGenerator
                     itemId: $row->item_id,
                     atDate: $atDate,
                 );
-
                 $amount = $rateValue * (float) $row->total_qty_ok;
                 $totalAmount += $amount;
-
                 PieceworkPayrollLine::create([
                     'payroll_period_id' => $period->id,
                     'employee_id' => $row->employee_id,
@@ -126,48 +124,61 @@ class CuttingPayrollGenerator
         ?int $itemId,
         string $atDate
     ): float {
-        $query = PieceRate::query()
+        $q = PieceRate::query()
             ->where('module', 'cutting')
             ->where('employee_id', $employeeId)
-        // masa berlaku (effective)
-            ->where('effective_from', '<=', $atDate)
-            ->where(function ($q) use ($atDate) {
-                $q->whereNull('effective_to')
-                    ->orWhere('effective_to', '>=', $atDate);
+            ->whereDate('effective_from', '<=', $atDate)
+            ->where(function ($qq) use ($atDate) {
+                $qq->whereNull('effective_to')
+                    ->orWhereDate('effective_to', '>=', $atDate);
             });
 
-        // Cari yang paling spesifik dulu: by item_id, kalau tidak ada jatuh ke category
-        $query->where(function ($q) use ($itemId, $itemCategoryId) {
-            if ($itemId) {
-                $q->where('item_id', $itemId);
+        // 1) paling spesifik: employee + item_id
+        if ($itemId) {
+            $rate = (clone $q)
+                ->where('item_id', $itemId)
+                ->first();
+
+            if ($rate) {
+                return (float) $rate->rate_per_pcs;
             }
 
-            if ($itemCategoryId) {
-                // rule kategori (item_id null, kategori cocok)
-                $q->orWhere(function ($q2) use ($itemCategoryId) {
-                    $q2->whereNull('item_id')
-                        ->where('item_category_id', $itemCategoryId);
-                });
-            }
-        });
-
-        // Urutkan supaya item_spesifik didahulukan
-        $pieceRate = $query
-            ->orderByDesc('item_id') // item_id NOT NULL lebih diutamakan
-            ->orderByDesc('item_category_id') // lalu kategori
-            ->first();
-
-        if ($pieceRate) {
-            return (float) $pieceRate->rate_per_pcs;
         }
 
-        // Fallback: default_piece_rate dari employees
+        // 2) fallback kategori: employee + category (item_id NULL atau 0)
+        if ($itemCategoryId) {
+            $rate = (clone $q)
+                ->where(function ($qq) {
+                    $qq->whereNull('item_id')->orWhere('item_id', 0);
+                })
+                ->where('item_category_id', $itemCategoryId)
+                ->first();
+
+            if ($rate) {
+                return (float) $rate->rate_per_pcs;
+            }
+
+        }
+
+        // 3) fallback global employee: (item_id NULL/0, category NULL)
+        $rate = (clone $q)
+            ->where(function ($qq) {
+                $qq->whereNull('item_id')->orWhere('item_id', 0);
+            })
+            ->whereNull('item_category_id')
+            ->first();
+
+        if ($rate) {
+            return (float) $rate->rate_per_pcs;
+        }
+
+        // 4) Fallback: default_piece_rate dari employees
         $employee = Employee::find($employeeId);
-        if ($employee && $employee->default_piece_rate) {
+        if ($employee && (float) $employee->default_piece_rate > 0) {
             return (float) $employee->default_piece_rate;
         }
 
-        // Terakhir: 0 kalau benar-benar tidak ada
         return 0.0;
     }
+
 }

@@ -187,14 +187,19 @@ class OpeningBalanceController extends Controller
                     ->with('message', 'Opening Balance sudah pernah di-VOID.');
             }
 
-            $locked->load('lines');
+            $locked->load('lines.account');
 
-            $cashLine = $locked->lines->first(fn($l) => (float) $l->debit > 0);
-            $equityLine = $locked->lines->first(fn($l) => (float) $l->credit > 0);
+            $cashLine = $locked->lines->first(fn($l) =>
+                $l->account?->is_cash && (float) $l->debit > 0 && (float) $l->credit == 0
+            );
+
+            $equityLine = $locked->lines->first(fn($l) =>
+                $l->account?->type === 'equity' && (float) $l->credit > 0 && (float) $l->debit == 0
+            );
 
             if (!$cashLine || !$equityLine) {
                 throw ValidationException::withMessages([
-                    'journal' => 'Format opening balance tidak valid (harus 2 baris: cash debit, equity credit).',
+                    'journal' => 'Format opening balance tidak valid (harus cash debit & equity credit).',
                 ]);
             }
 

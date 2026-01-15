@@ -30,7 +30,9 @@ class AccountSeeder extends Seeder
             // =====================================================
             // 2xxx LIABILITY
             // =====================================================
+            // 2xxx LIABILITY
             ['code' => '2101', 'name' => 'Hutang Dagang', 'type' => 'liability', 'is_cash' => false],
+            ['code' => '2102', 'name' => 'Hutang Upah Borongan (PCS)', 'type' => 'liability', 'is_cash' => false],
 
             // =====================================================
             // 3xxx EQUITY

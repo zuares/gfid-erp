@@ -1,9 +1,8 @@
 {{-- resources/views/layouts/partials/sidebar.blade.php --}}
 @php
     use Illuminate\Support\Facades\DB;
-    use Illuminate\Support\Facades\Route;
 
-    $user = auth()->user(); // ✅ avoid null explode
+    $user = auth()->user();
     $userRole = $user->role ?? null;
 
     $isOwner = $userRole === 'owner';
@@ -67,7 +66,10 @@
         request()->routeIs('production.reports.wip_sewing_age') ||
         request()->routeIs('production.reports.sewing_per_item') ||
         request()->routeIs('production.reports.finishing_jobs') ||
-        request()->routeIs('production.reports.production_flow_dashboard');
+        request()->routeIs('production.reports.production_flow_dashboard') ||
+        request()->routeIs('production.reports.dashboard') ||
+        request()->routeIs('production.reports.outstanding') ||
+        request()->routeIs('production.reports.aging_wip_sew');
 
     $prodOpen = $prodCutOpen || $prodSewOpen || $prodFinOpen || $prodPackOpen || $prodQcOpen || $prodReportOpen;
 
@@ -78,9 +80,9 @@
         request()->routeIs('accounting.journals.*') ||
         request()->routeIs('accounting.accounts.*');
 
+    // ✅ Payroll NEW ROUTES (piecework)
     $payrollOpen =
-        request()->routeIs('payroll.cutting.*') ||
-        request()->routeIs('payroll.sewing.*') ||
+        request()->routeIs('payroll.piecework.*') ||
         request()->routeIs('payroll.piece_rates.*') ||
         request()->routeIs('payroll.reports.*');
 
@@ -89,7 +91,6 @@
     // =========================================================
     // BADGE COUNTERS (DOT-ONLY)
     // =========================================================
-    // NOTE: Kalau guest, query ini bisa kamu skip. Sekarang kita jalankan only kalau user login.
     $rtsNeedReceiveQty = 0.0;
     $prdNeedProcessQty = 0.0;
 
@@ -103,9 +104,10 @@
             )
             ->value('s');
 
+        // ✅ kalau di sistem kamu purpose PRD sama dengan RTS, ganti 'prd_replenish' -> 'rts_replenish'
         $prdNeedProcessQty = (float) DB::table('stock_request_lines as l')
             ->join('stock_requests as r', 'r.id', '=', 'l.stock_request_id')
-            ->where('r.purpose', 'rts_replenish')
+            ->where('r.purpose', 'prd_replenish')
             ->whereIn('r.status', ['submitted', 'shipped', 'partial'])
             ->selectRaw(
                 'COALESCE(SUM(CASE WHEN (COALESCE(l.qty_request,0) - COALESCE(l.qty_dispatched,0) - COALESCE(l.qty_received,0) - COALESCE(l.qty_picked,0)) > 0 THEN (COALESCE(l.qty_request,0) - COALESCE(l.qty_dispatched,0) - COALESCE(l.qty_received,0) - COALESCE(l.qty_picked,0)) ELSE 0 END),0) as s',
@@ -124,11 +126,12 @@
     $rtsBadgeTitle = 'Perlu diterima: ' . $fmtQty($rtsNeedReceiveQty);
     $prdBadgeTitle = 'Perlu diproses: ' . $fmtQty($prdNeedProcessQty);
 
-    // Route guards (anti RouteNotFoundException)
-    $hasCashExpenses = Route::has('accounting.cash-expenses.index');
-    $hasOpeningBalances = Route::has('accounting.opening-balances.index');
-    $hasJournals = Route::has('accounting.journals.index');
-    $hasAccounts = Route::has('accounting.accounts.index');
+    // =========================================================
+    // Payroll active helpers (untuk menu)
+    // =========================================================
+    $activeModule = request()->route()?->parameter('module');
+    $pieceworkCuttingActive = request()->routeIs('payroll.piecework.*') && $activeModule === 'cutting';
+    $pieceworkSewingActive = request()->routeIs('payroll.piecework.*') && $activeModule === 'sewing';
 @endphp
 
 <style>
@@ -359,7 +362,7 @@
             GUEST SAFETY
         ============================ --}}
         @if (!$user)
-            {{-- Kalau halaman login masih render sidebar, stop di sini --}}
+            {{-- stop --}}
         @elseif ($isAdmin || $isOperating)
             {{-- ===========================
                 ADMIN / OPERATING (HARIAN)
@@ -444,31 +447,25 @@
 
             <x-sidebar.label text="Finance" />
             <li class="simple-group">
-                @if ($hasCashExpenses)
-                    <x-sidebar.simple-link href="{{ route('accounting.cash-expenses.index') }}" icon="💸"
-                        :active="request()->routeIs('accounting.cash-expenses.*')">
-                        Cash Expenses
-                    </x-sidebar.simple-link>
-                @endif
+                <x-sidebar.simple-link href="{{ route('accounting.cash-expenses.index') }}" icon="💸"
+                    :active="request()->routeIs('accounting.cash-expenses.*')">
+                    Cash Expenses
+                </x-sidebar.simple-link>
 
-                @if ($hasJournals)
-                    <x-sidebar.simple-link href="{{ route('accounting.journals.index') }}" icon="📓"
-                        :active="request()->routeIs('accounting.journals.*')">
-                        Journals
-                    </x-sidebar.simple-link>
-                @endif
+                <x-sidebar.simple-link href="{{ route('accounting.journals.index') }}" icon="📓"
+                    :active="request()->routeIs('accounting.journals.*')">
+                    Journals
+                </x-sidebar.simple-link>
 
-                @if ($hasAccounts)
-                    <x-sidebar.simple-link href="{{ route('accounting.accounts.index') }}" icon="🗂️"
-                        :active="request()->routeIs('accounting.accounts.*')">
-                        Accounts (COA)
-                    </x-sidebar.simple-link>
-                @endif
+                <x-sidebar.simple-link href="{{ route('accounting.accounts.index') }}" icon="🗂️"
+                    :active="request()->routeIs('accounting.accounts.*')">
+                    Accounts (COA)
+                </x-sidebar.simple-link>
             </li>
         @elseif ($isOwner)
             {{-- ===========================
                 OWNER (BISNIS)
-                Urutan: Master -> Purchasing -> Sales -> Inventory -> Production -> Finance
+                Urutan: Master -> Purchasing -> Sales -> Inventory -> Stock Requests -> Production -> Finance
             ============================ --}}
 
             {{-- MASTER --}}
@@ -804,6 +801,7 @@
             {{-- FINANCE --}}
             <x-sidebar.label text="Finance" />
 
+            {{-- Accounting --}}
             <li class="mb-1">
                 <button class="sidebar-link sidebar-toggle {{ $accountingOpen ? 'is-open' : '' }}" type="button"
                     data-bs-toggle="collapse" data-bs-target="#navAccounting"
@@ -814,33 +812,25 @@
                 </button>
 
                 <div class="collapse {{ $accountingOpen ? 'show' : '' }}" id="navAccounting">
-                    @if ($hasOpeningBalances)
-                        <x-sidebar.sub-link href="{{ route('accounting.opening-balances.index') }}" icon="🟢"
-                            :active="request()->routeIs('accounting.opening-balances.*')">
-                            Opening Balances
-                        </x-sidebar.sub-link>
-                    @endif
+                    <x-sidebar.sub-link href="{{ route('accounting.opening-balances.index') }}" icon="🟢"
+                        :active="request()->routeIs('accounting.opening-balances.*')">
+                        Opening Balances
+                    </x-sidebar.sub-link>
 
-                    @if ($hasCashExpenses)
-                        <x-sidebar.sub-link href="{{ route('accounting.cash-expenses.index') }}" icon="💸"
-                            :active="request()->routeIs('accounting.cash-expenses.*')">
-                            Cash Expenses
-                        </x-sidebar.sub-link>
-                    @endif
+                    <x-sidebar.sub-link href="{{ route('accounting.cash-expenses.index') }}" icon="💸"
+                        :active="request()->routeIs('accounting.cash-expenses.*')">
+                        Cash Expenses
+                    </x-sidebar.sub-link>
 
-                    @if ($hasJournals)
-                        <x-sidebar.sub-link href="{{ route('accounting.journals.index') }}" icon="📓"
-                            :active="request()->routeIs('accounting.journals.*')">
-                            Journals
-                        </x-sidebar.sub-link>
-                    @endif
+                    <x-sidebar.sub-link href="{{ route('accounting.journals.index') }}" icon="📓"
+                        :active="request()->routeIs('accounting.journals.*')">
+                        Journals
+                    </x-sidebar.sub-link>
 
-                    @if ($hasAccounts)
-                        <x-sidebar.sub-link href="{{ route('accounting.accounts.index') }}" icon="🗂️"
-                            :active="request()->routeIs('accounting.accounts.*')">
-                            Accounts (COA)
-                        </x-sidebar.sub-link>
-                    @endif
+                    <x-sidebar.sub-link href="{{ route('accounting.accounts.index') }}" icon="🗂️"
+                        :active="request()->routeIs('accounting.accounts.*')">
+                        Accounts (COA)
+                    </x-sidebar.sub-link>
                 </div>
             </li>
 
@@ -855,16 +845,24 @@
                 </button>
 
                 <div class="collapse {{ $payrollOpen ? 'show' : '' }}" id="navFinancePayroll">
-                    <x-sidebar.sub-link href="{{ route('payroll.cutting.index') }}" icon="✂️"
-                        :active="request()->routeIs('payroll.cutting.*')">
+                    <x-sidebar.sub-link href="{{ route('payroll.piecework.index', ['module' => 'cutting']) }}"
+                        icon="✂️" :active="$pieceworkCuttingActive">
                         Cutting Payroll
                     </x-sidebar.sub-link>
-                    <x-sidebar.sub-link href="{{ route('payroll.sewing.index') }}" icon="🧵" :active="request()->routeIs('payroll.sewing.*')">
+
+                    <x-sidebar.sub-link href="{{ route('payroll.piecework.index', ['module' => 'sewing']) }}"
+                        icon="🧵" :active="$pieceworkSewingActive">
                         Sewing Payroll
                     </x-sidebar.sub-link>
+
                     <x-sidebar.sub-link href="{{ route('payroll.piece_rates.index') }}" icon="📑"
                         :active="request()->routeIs('payroll.piece_rates.*')">
                         Piece Rates
+                    </x-sidebar.sub-link>
+
+                    <x-sidebar.sub-link href="{{ route('payroll.reports.operators') }}" icon="📊"
+                        :active="request()->routeIs('payroll.reports.*')">
+                        Reports
                     </x-sidebar.sub-link>
                 </div>
             </li>
@@ -883,13 +881,13 @@
                     <x-sidebar.sub-link href="{{ route('costing.hpp.index') }}" icon="⚙️" :active="request()->routeIs('costing.hpp.*')">
                         HPP Finished Goods
                     </x-sidebar.sub-link>
+
                     <x-sidebar.sub-link href="{{ route('costing.production_cost_periods.index') }}" icon="📆"
                         :active="request()->routeIs('costing.production_cost_periods.*')">
                         Production Cost Periods
                     </x-sidebar.sub-link>
                 </div>
             </li>
-
         @endif
     </ul>
 </aside>

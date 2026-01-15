@@ -1,92 +1,171 @@
 <?php
 
-namespace Database\Seeders;
+namespace App\Http\Controllers\Accounting;
 
+use App\Http\Controllers\Controller;
 use App\Models\Account;
-use Illuminate\Database\Seeder;
-use Illuminate\Support\Facades\DB;
+use App\Models\CashExpense;
+use App\Services\Accounting\CashExpenseService;
+use Illuminate\Http\Request;
+use Illuminate\Support\Facades\Auth;
 
-class AccountSeeder extends Seeder
+class CashExpenseController extends Controller
 {
-    public function run(): void
+    public function index(Request $request)
     {
-        $accounts = [
-            // =====================================================
-            // 1xxx - ASSET
-            // =====================================================
+        $q = CashExpense::query()
+            ->with(['expenseAccount', 'cashAccount', 'journal'])
+            ->orderByDesc('date')
+            ->orderByDesc('id');
 
-            // 1100 - Cash & Bank
-            ['code' => '1101', 'name' => 'Kas Tunai', 'type' => 'asset', 'is_cash' => true],
-            ['code' => '1111', 'name' => 'Bank Jago (Bisnis)', 'type' => 'asset', 'is_cash' => true],
-            ['code' => '1112', 'name' => 'Bank BCA (Transit TikTok / Tarik Bahan)', 'type' => 'asset', 'is_cash' => true],
-            ['code' => '1113', 'name' => 'Bank SeaBank (Transit Shopee)', 'type' => 'asset', 'is_cash' => true],
-            ['code' => '1114', 'name' => 'DANA (Transit Gaji)', 'type' => 'asset', 'is_cash' => true],
+        if ($request->filled('status')) {
+            $q->where('status', $request->string('status')->toString());
+        }
 
-            // 1200 - Inventory
-            ['code' => '1201', 'name' => 'Persediaan Bahan Baku', 'type' => 'asset', 'is_cash' => false],
-            ['code' => '1202', 'name' => 'Persediaan WIP', 'type' => 'asset', 'is_cash' => false],
-            ['code' => '1203', 'name' => 'Persediaan Barang Jadi', 'type' => 'asset', 'is_cash' => false],
+        if ($request->filled('from')) {
+            $q->whereDate('date', '>=', $request->date('from'));
+        }
 
-            // =====================================================
-            // 2xxx - LIABILITY
-            // =====================================================
-            ['code' => '2101', 'name' => 'Hutang Dagang', 'type' => 'liability', 'is_cash' => false],
+        if ($request->filled('to')) {
+            $q->whereDate('date', '<=', $request->date('to'));
+        }
 
-            // =====================================================
-            // 3xxx - EQUITY
-            // =====================================================
-            ['code' => '3101', 'name' => 'Modal Pemilik', 'type' => 'equity', 'is_cash' => false],
-            ['code' => '3201', 'name' => 'Laba Ditahan', 'type' => 'equity', 'is_cash' => false],
-            // optional kalau suatu saat mau pisahin ambil pribadi:
-            // ['code' => '3301', 'name' => 'Prive Pemilik', 'type' => 'equity', 'is_cash' => false],
+        $cashExpenses = $q->paginate(25)->withQueryString();
 
-            // =====================================================
-            // 4xxx - REVENUE
-            // =====================================================
-            ['code' => '4101', 'name' => 'Penjualan', 'type' => 'revenue', 'is_cash' => false],
-            ['code' => '4111', 'name' => 'Penjualan Shopee', 'type' => 'revenue', 'is_cash' => false],
-            ['code' => '4112', 'name' => 'Penjualan TikTok', 'type' => 'revenue', 'is_cash' => false],
+        return view('accounting.cash_expenses.index', compact('cashExpenses'));
+    }
 
-            // =====================================================
-            // 5xxx - COGS
-            // =====================================================
-            ['code' => '5101', 'name' => 'HPP', 'type' => 'expense', 'is_cash' => false],
+    public function create()
+    {
+        // 🔽 kamu bisa filter akun disini kalau punya kolom type/is_cash
+        // contoh:
+        // $expenseAccounts = Account::where('type', 'expense')->orderBy('name')->get();
+        // $cashAccounts = Account::where('is_cash', 1)->orderBy('name')->get();
 
-            // =====================================================
-            // 6xxx - EXPENSE
-            // =====================================================
+        $expenseAccounts = Account::orderBy('name')->get();
+        $cashAccounts = Account::orderBy('name')->get();
 
-            // 6100 - Operasional
-            ['code' => '6101', 'name' => 'Biaya Operasional Umum', 'type' => 'expense', 'is_cash' => false],
-            ['code' => '6102', 'name' => 'Biaya Listrik', 'type' => 'expense', 'is_cash' => false],
-            ['code' => '6103', 'name' => 'Biaya Internet', 'type' => 'expense', 'is_cash' => false],
-            ['code' => '6104', 'name' => 'Biaya Transport / Ongkir', 'type' => 'expense', 'is_cash' => false],
-            ['code' => '6105', 'name' => 'Biaya Gaji', 'type' => 'expense', 'is_cash' => false],
+        return view('accounting.cash_expenses.create', compact('expenseAccounts', 'cashAccounts'));
+    }
 
-            // 6200 - Marketplace Fees
-            ['code' => '6201', 'name' => 'Biaya Admin Marketplace', 'type' => 'expense', 'is_cash' => false],
-            ['code' => '6202', 'name' => 'Biaya Layanan Marketplace', 'type' => 'expense', 'is_cash' => false],
-            ['code' => '6203', 'name' => 'Biaya Proses Pesanan', 'type' => 'expense', 'is_cash' => false],
-            ['code' => '6204', 'name' => 'Komisi Marketplace (AMS)', 'type' => 'expense', 'is_cash' => false],
-        ];
+    public function store(Request $request)
+    {
+        $data = $request->validate([
+            'date' => ['required', 'date'],
+            'amount' => ['required', 'numeric', 'min:0.01'],
+            'expense_account_id' => ['required', 'integer', 'exists:accounts,id'],
+            'cash_account_id' => ['required', 'integer', 'exists:accounts,id'],
+            'description' => ['nullable', 'string', 'max:255'],
+            'reference' => ['nullable', 'string', 'max:100'],
+            'notes' => ['nullable', 'string'],
+        ]);
 
-        DB::transaction(function () use ($accounts) {
-            foreach ($accounts as $acc) {
-                Account::updateOrCreate(
-                    ['code' => $acc['code']],
-                    [
-                        'name' => $acc['name'],
-                        'type' => $acc['type'],
-                        'is_cash' => (bool) $acc['is_cash'],
-                        'is_active' => true,
-                    ]
-                );
-            }
+        if ((int) $data['expense_account_id'] === (int) $data['cash_account_id']) {
+            return back()->withInput()->with('status', 'error')->with('message', 'Akun biaya dan akun kas/bank tidak boleh sama.');
+        }
 
-            // ✅ default aman: jangan nonaktifkan yang lain (biar gak ganggu kalau kamu nambah akun manual)
-            // Kalau kamu ingin auto-bersihin akun yang gak ada di list, aktifkan ini:
-            // $codes = collect($accounts)->pluck('code')->all();
-            // Account::whereNotIn('code', $codes)->update(['is_active' => false]);
-        });
+        $data['status'] = 'draft';
+        $data['created_by'] = Auth::id();
+
+        $expense = CashExpense::create($data);
+
+        return redirect()
+            ->route('accounting.cash-expenses.show', $expense)
+            ->with('status', 'ok')
+            ->with('message', 'Pengeluaran tersimpan (DRAFT).');
+    }
+
+    public function show(CashExpense $cashExpense)
+    {
+        $cashExpense->load(['expenseAccount', 'cashAccount', 'journal.lines.account']);
+
+        return view('accounting.cash_expenses.show', compact('cashExpense'));
+    }
+
+    public function edit(CashExpense $cashExpense)
+    {
+        if ($cashExpense->status !== 'draft') {
+            return redirect()
+                ->route('accounting.cash-expenses.show', $cashExpense)
+                ->with('status', 'error')
+                ->with('message', 'Hanya DRAFT yang bisa diedit.');
+        }
+
+        $expenseAccounts = Account::orderBy('name')->get();
+        $cashAccounts = Account::orderBy('name')->get();
+
+        return view('accounting.cash_expenses.edit', compact('cashExpense', 'expenseAccounts', 'cashAccounts'));
+    }
+
+    public function update(Request $request, CashExpense $cashExpense)
+    {
+        if ($cashExpense->status !== 'draft') {
+            return redirect()
+                ->route('accounting.cash-expenses.show', $cashExpense)
+                ->with('status', 'error')
+                ->with('message', 'Hanya DRAFT yang bisa diupdate.');
+        }
+
+        $data = $request->validate([
+            'date' => ['required', 'date'],
+            'amount' => ['required', 'numeric', 'min:0.01'],
+            'expense_account_id' => ['required', 'integer', 'exists:accounts,id'],
+            'cash_account_id' => ['required', 'integer', 'exists:accounts,id'],
+            'description' => ['nullable', 'string', 'max:255'],
+            'reference' => ['nullable', 'string', 'max:100'],
+            'notes' => ['nullable', 'string'],
+        ]);
+
+        if ((int) $data['expense_account_id'] === (int) $data['cash_account_id']) {
+            return back()->withInput()->with('status', 'error')->with('message', 'Akun biaya dan akun kas/bank tidak boleh sama.');
+        }
+
+        $cashExpense->update($data);
+
+        return redirect()
+            ->route('accounting.cash-expenses.show', $cashExpense)
+            ->with('status', 'ok')
+            ->with('message', 'Pengeluaran DRAFT berhasil diupdate.');
+    }
+
+    public function destroy(CashExpense $cashExpense)
+    {
+        if ($cashExpense->status !== 'draft') {
+            return redirect()
+                ->route('accounting.cash-expenses.show', $cashExpense)
+                ->with('status', 'error')
+                ->with('message', 'Hanya DRAFT yang bisa dihapus.');
+        }
+
+        $cashExpense->delete();
+
+        return redirect()
+            ->route('accounting.cash-expenses.index')
+            ->with('status', 'ok')
+            ->with('message', 'Pengeluaran DRAFT berhasil dihapus.');
+    }
+
+    public function post(CashExpense $cashExpense, CashExpenseService $service)
+    {
+        $service->post($cashExpense);
+
+        return redirect()
+            ->route('accounting.cash-expenses.show', $cashExpense)
+            ->with('status', 'ok')
+            ->with('message', 'Pengeluaran berhasil di-POST (Journal dibuat).');
+    }
+
+    public function void(Request $request, CashExpense $cashExpense, CashExpenseService $service)
+    {
+        $data = $request->validate([
+            'reason' => ['nullable', 'string', 'max:255'],
+        ]);
+
+        $service->void($cashExpense, $data['reason'] ?? null);
+
+        return redirect()
+            ->route('accounting.cash-expenses.show', $cashExpense)
+            ->with('status', 'ok')
+            ->with('message', 'Pengeluaran berhasil di-VOID (Reversal journal dibuat).');
     }
 }

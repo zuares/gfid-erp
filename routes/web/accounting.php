@@ -7,6 +7,10 @@ use App\Http\Controllers\Accounting\OpeningBalanceController;
 
 Route::middleware(['auth'])->prefix('accounting')->name('accounting.')->group(function () {
 
+    // ✅ Ledger per Account (HARUS sebelum resource accounts)
+    Route::get('accounts/{account}/ledger', [AccountController::class, 'ledger'])
+        ->name('accounts.ledger');
+
     // ✅ COA (Master Accounts)
     Route::resource('accounts', AccountController::class);
 
@@ -19,15 +23,9 @@ Route::middleware(['auth'])->prefix('accounting')->name('accounting.')->group(fu
     Route::get('journals', [JournalController::class, 'index'])->name('journals.index');
     Route::get('journals/{journal}', [JournalController::class, 'show'])->name('journals.show');
 
-    Route::get('opening-balances', [OpeningBalanceController::class, 'index'])
-        ->name('opening-balances.index');
-
-    Route::get('opening-balances/create', [OpeningBalanceController::class, 'create'])
-        ->name('opening-balances.create');
-
-    Route::post('opening-balances', [OpeningBalanceController::class, 'store'])
-        ->name('opening-balances.store');
-
-    Route::post('opening-balances/{journal}/void', [OpeningBalanceController::class, 'void'])
-        ->name('opening-balances.void');
+    // ✅ Opening Balances
+    Route::get('opening-balances', [OpeningBalanceController::class, 'index'])->name('opening-balances.index');
+    Route::get('opening-balances/create', [OpeningBalanceController::class, 'create'])->name('opening-balances.create');
+    Route::post('opening-balances', [OpeningBalanceController::class, 'store'])->name('opening-balances.store');
+    Route::post('opening-balances/{journal}/void', [OpeningBalanceController::class, 'void'])->name('opening-balances.void');
 });

@@ -3,6 +3,7 @@
 namespace App\Models;
 
 use Illuminate\Database\Eloquent\Model;
+use Illuminate\Database\Eloquent\Relations\HasMany;
 
 class Account extends Model
 {
@@ -18,4 +19,9 @@ class Account extends Model
         'is_cash' => 'boolean',
         'is_active' => 'boolean',
     ];
+
+    public function journalLines(): HasMany
+    {
+        return $this->hasMany(\App\Models\JournalLine::class, 'account_id');
+    }
 }
