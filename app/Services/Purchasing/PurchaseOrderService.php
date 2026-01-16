@@ -13,27 +13,6 @@ class PurchaseOrderService
 {
     /**
      * Create Purchase Order baru + detail lines.
-     *
-     * $payload contoh:
-     * [
-     *   'date'          => '2025-11-21',
-     *   'supplier_id'   => 1,
-     *   'discount'      => 0,          // diskon header (nominal)
-     *   'tax_percent'   => 11,         // PPN dalam %
-     *   'shipping_cost' => 25000,
-     *   'notes'         => 'Catatan PO',
-     *   'created_by'    => 1,
-     *   'lines' => [
-     *      [
-     *          'item_id'    => 1,
-     *          'qty'        => 100,
-     *          'unit_price' => 12000,
-     *          'discount'   => 0,      // diskon per baris (nominal)
-     *          'notes'      => 'Keterangan',
-     *      ],
-     *      // ...
-     *   ],
-     * ]
      */
     public function create(array $payload): PurchaseOrder
     {
@@ -41,12 +20,15 @@ class PurchaseOrderService
             $linesData = $payload['lines'] ?? [];
             unset($payload['lines']);
 
+            // ✅ whitelist header fields (biar aman)
+            $payload = $this->onlyHeaderFields($payload);
+
             // Generate kode jika belum diisi
             if (empty($payload['code'] ?? null)) {
                 $payload['code'] = CodeGenerator::generate('PO');
             }
 
-            // Set default angka
+            // Default angka (dinormalisasi)
             $payload['subtotal'] = 0;
             $payload['discount'] = $this->toNumber($payload['discount'] ?? 0);
             $payload['tax_percent'] = $this->toNumber($payload['tax_percent'] ?? 0);
@@ -60,20 +42,22 @@ class PurchaseOrderService
             /** @var PurchaseOrder $order */
             $order = PurchaseOrder::create($payload);
 
-            // Simpan detail + hitung subtotal
-            $subtotal = $this->syncLines($order, $linesData);
+            // Sync detail & hitung subtotal
+            $subtotal = $this->syncLines($order, is_array($linesData) ? $linesData : []);
 
             // Hitung total header
             $this->recalculateTotals($order, $subtotal);
 
-            return $order->fresh(['lines', 'supplier']);
+            return $order->fresh([
+                'lines.item',
+                'supplier',
+                'paymentMethod',
+            ]);
         });
     }
 
     /**
      * Update Purchase Order + detail lines.
-     *
-     * $payload struktur sama dengan create()
      */
     public function update(PurchaseOrder $order, array $payload): PurchaseOrder
     {
@@ -81,7 +65,10 @@ class PurchaseOrderService
             $linesData = $payload['lines'] ?? [];
             unset($payload['lines']);
 
-            // Kalau code dikosongkan, biarkan kode lama (tidak diubah)
+            // ✅ whitelist header fields (hindari field liar)
+            $payload = $this->onlyHeaderFields($payload);
+
+            // code tidak boleh berubah lewat update (kalau mau, buat fitur khusus)
             unset($payload['code']);
 
             // Update field header yang boleh diubah
@@ -90,6 +77,9 @@ class PurchaseOrderService
             }
             if (array_key_exists('supplier_id', $payload)) {
                 $order->supplier_id = $payload['supplier_id'];
+            }
+            if (array_key_exists('payment_method_id', $payload)) {
+                $order->payment_method_id = $payload['payment_method_id']; // ✅ NEW
             }
             if (array_key_exists('discount', $payload)) {
                 $order->discount = $this->toNumber($payload['discount']);
@@ -104,63 +94,130 @@ class PurchaseOrderService
                 $order->notes = $payload['notes'];
             }
 
+            // status biasanya dipaksa draft oleh controller
+            if (array_key_exists('status', $payload)) {
+                $order->status = $payload['status'];
+            }
+
             $order->save();
 
             // Sync detail & hitung subtotal
-            $subtotal = $this->syncLines($order, $linesData);
+            $subtotal = $this->syncLines($order, is_array($linesData) ? $linesData : []);
 
             // Hitung ulang total header
             $this->recalculateTotals($order, $subtotal);
 
-            return $order->fresh(['lines', 'supplier']);
+            return $order->fresh([
+                'lines.item',
+                'supplier',
+                'paymentMethod',
+            ]);
         });
     }
 
     /**
      * Force hitung ulang subtotal, tax, grand_total dari database.
-     * Bisa dipakai kalau suatu saat ada perubahan di lines langsung.
      */
     public function recalculate(PurchaseOrder $order): PurchaseOrder
     {
         return DB::transaction(function () use ($order) {
-            $subtotal = $order->lines()->sum('line_total');
+            $subtotal = (float) $order->lines()->sum('line_total');
 
             $this->recalculateTotals($order, $subtotal);
 
-            return $order->fresh(['lines', 'supplier']);
+            return $order->fresh([
+                'lines.item',
+                'supplier',
+                'paymentMethod',
+            ]);
         });
     }
 
     // ======================================================================
-    // HELPER INTERNAL
+    // APPROVE / CANCEL
+    // ======================================================================
+
+    public function approve(PurchaseOrder $order, int $approvedBy): PurchaseOrder
+    {
+        return DB::transaction(function () use ($order, $approvedBy) {
+            if ($order->status !== 'draft') {
+                return $order->fresh(['supplier', 'lines', 'paymentMethod']);
+            }
+
+            $order->status = 'approved';
+            $order->approved_by = $approvedBy;
+            $order->approved_at = now();
+            $order->save();
+
+            return $order->fresh(['supplier', 'lines', 'paymentMethod']);
+        });
+    }
+
+    public function cancel(PurchaseOrder $order, int $cancelledBy): PurchaseOrder
+    {
+        return DB::transaction(function () use ($order, $cancelledBy) {
+            if (!in_array($order->status, ['draft', 'approved'], true)) {
+                return $order->fresh(['supplier', 'lines', 'paymentMethod']);
+            }
+
+            if ($order->purchaseReceipts()->exists()) {
+                return $order->fresh(['supplier', 'lines', 'purchaseReceipts', 'paymentMethod']);
+            }
+
+            $order->status = 'cancelled';
+            $order->cancelled_by = $cancelledBy;
+            $order->cancelled_at = now();
+            $order->save();
+
+            return $order->fresh(['supplier', 'lines', 'cancelledBy', 'paymentMethod']);
+        });
+    }
+
+    // ======================================================================
+    // INTERNAL HELPERS
     // ======================================================================
 
     /**
-     * Simpan ulang detail lines.
-     * Saat ini implementasi sederhana: hapus semua lalu insert ulang.
-     * Nanti kalau mau lebih advanced bisa di-update per-line (by id).
-     *
-     * @param  PurchaseOrder $order
-     * @param  array $linesData
-     * @return float subtotal
+     * Field header yang diizinkan lewat service.
+     */
+    protected function onlyHeaderFields(array $payload): array
+    {
+        $allowed = [
+            'code',
+            'date',
+            'supplier_id',
+            'payment_method_id', // ✅ NEW
+            'discount',
+            'tax_percent',
+            'shipping_cost',
+            'notes',
+            'created_by',
+            'status',
+        ];
+
+        return array_intersect_key($payload, array_flip($allowed));
+    }
+
+    /**
+     * Simpan ulang detail lines: hapus semua lalu insert ulang.
+     * Return subtotal.
      */
     protected function syncLines(PurchaseOrder $order, array $linesData): float
     {
-        // Hapus semua detail lama
         $order->lines()->delete();
 
         $subtotal = 0.0;
 
         foreach ($linesData as $row) {
             $itemId = $row['item_id'] ?? null;
+
             $qty = $this->toNumber($row['qty'] ?? 0);
             $unitPrice = $this->toNumber($row['unit_price'] ?? 0);
-            $discount = $this->toNumber($row['discount'] ?? 0); // diskon nominal per baris
+            $discount = $this->toNumber($row['discount'] ?? 0);
             $notes = $row['notes'] ?? null;
             $lotId = $row['lot_id'] ?? null;
 
             if (!$itemId || $qty <= 0) {
-                // skip baris kosong
                 continue;
             }
 
@@ -168,9 +225,9 @@ class PurchaseOrderService
             $lineTotal = round($lineTotal, 2);
 
             /** @var PurchaseOrderLine $line */
-            $line = $order->lines()->create([
-                'item_id' => $itemId,
-                'lot_id' => $lotId,
+            $order->lines()->create([
+                'item_id' => (int) $itemId,
+                'lot_id' => $lotId ? (int) $lotId : null,
                 'qty' => $qty,
                 'unit_price' => $unitPrice,
                 'discount' => $discount,
@@ -180,8 +237,7 @@ class PurchaseOrderService
 
             $subtotal += $lineTotal;
 
-            // Update harga terakhir per item & supplier
-            $this->touchLastPrices($order, $itemId, $unitPrice);
+            $this->touchLastPrices($order, (int) $itemId, (float) $unitPrice);
         }
 
         return round($subtotal, 2);
@@ -216,13 +272,10 @@ class PurchaseOrderService
     {
         $unitPrice = round($unitPrice, 2);
 
-        // Update cache di master item
-        /** @var Item|null $item */
-        $item = Item::find($itemId);
-        if ($item) {
-            $item->last_purchase_price = $unitPrice;
-            $item->save();
-        }
+        // Update master item (tanpa load besar)
+        Item::whereKey($itemId)->update([
+            'last_purchase_price' => $unitPrice,
+        ]);
 
         // Update / insert harga terakhir per supplier
         SupplierPrice::updateOrCreate(
@@ -237,8 +290,7 @@ class PurchaseOrderService
     }
 
     /**
-     * Normalisasi angka (bisa dipakai kalau input dari form,
-     * kadang ada koma / string).
+     * Normalisasi angka (menerima string indo / numeric).
      */
     protected function toNumber($value): float
     {
@@ -246,73 +298,24 @@ class PurchaseOrderService
             return 0.0;
         }
 
-        // Kalau sudah numeric (hasil validasi / cast Laravel), langsung saja
         if (is_int($value) || is_float($value)) {
             return (float) $value;
         }
 
-        // Pastikan string
         $value = trim((string) $value);
         $value = str_replace(' ', '', $value);
 
-        // Kalau ada koma → anggap format Indonesia: "1.234,56" / "24,00"
         if (strpos($value, ',') !== false) {
-            // Hilangkan titik ribuan
             $value = str_replace('.', '', $value);
-            // Ganti koma jadi titik desimal
             $value = str_replace(',', '.', $value);
             return (float) $value;
         }
 
-        // Kalau tidak ada koma, tapi pola ribuan: "1.234" atau "1.234.567"
         if (preg_match('/^\d{1,3}(\.\d{3})+$/', $value)) {
             $value = str_replace('.', '', $value);
             return (float) $value;
         }
 
-        // Default: biarkan Laravel terjemahkan (mis. "1234.56")
         return (float) $value;
     }
-
-    public function approve(PurchaseOrder $order, int $approvedBy): PurchaseOrder
-    {
-        return DB::transaction(function () use ($order, $approvedBy) {
-
-            // Safety check
-            if ($order->status !== 'draft') {
-                return $order->fresh(['supplier', 'lines']);
-            }
-
-            $order->status = 'approved';
-            $order->approved_by = $approvedBy;
-            $order->approved_at = now(); // ← NEW
-            $order->save();
-
-            return $order->fresh(['supplier', 'lines']);
-        });
-    }
-
-    public function cancel(PurchaseOrder $order, int $cancelledBy): PurchaseOrder
-    {
-        return DB::transaction(function () use ($order, $cancelledBy) {
-
-            // Hanya boleh cancel kalau status draft / approved
-            if (!in_array($order->status, ['draft', 'approved'], true)) {
-                return $order->fresh(['supplier', 'lines']);
-            }
-
-            // Dilarang cancel kalau sudah ada GRN
-            if ($order->purchaseReceipts()->exists()) {
-                return $order->fresh(['supplier', 'lines', 'purchaseReceipts']);
-            }
-
-            $order->status = 'cancelled';
-            $order->cancelled_by = $cancelledBy;
-            $order->cancelled_at = now();
-            $order->save();
-
-            return $order->fresh(['supplier', 'lines', 'cancelledBy']);
-        });
-    }
-
 }

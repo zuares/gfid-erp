@@ -12,6 +12,7 @@ class PurchaseOrder extends Model
         'code',
         'date',
         'supplier_id',
+        'payment_method_id', // ✅
         'subtotal',
         'discount',
         'tax_percent',
@@ -50,6 +51,11 @@ class PurchaseOrder extends Model
         return $this->belongsTo(Supplier::class);
     }
 
+    public function paymentMethod(): BelongsTo
+    {
+        return $this->belongsTo(PaymentMethod::class);
+    }
+
     public function createdBy(): BelongsTo
     {
         return $this->belongsTo(User::class, 'created_by');
@@ -72,12 +78,12 @@ class PurchaseOrder extends Model
 
     public function purchaseReceipts(): HasMany
     {
-        return $this->hasMany(PurchaseReceipt::class);
+        return $this->hasMany(PurchaseReceipt::class, 'purchase_order_id');
     }
 
     /*
     |--------------------------------------------------------------------------
-    | HELPER STATUS
+    | HELPERS
     |--------------------------------------------------------------------------
      */
 
@@ -96,8 +102,17 @@ class PurchaseOrder extends Model
         return $this->status === 'cancelled';
     }
 
-    public function receipts()
+    public function payments()
     {
-        return $this->hasMany(PurchaseReceipt::class, 'purchase_order_id');
+        return $this->hasMany(\App\Models\PurchasePayment::class, 'purchase_order_id')
+            ->orderByDesc('date')
+            ->orderByDesc('id');
     }
+
+    public function activePayments()
+    {
+        return $this->hasMany(\App\Models\PurchasePayment::class, 'purchase_order_id')
+            ->whereNull('voided_at');
+    }
+
 }

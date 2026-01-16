@@ -9,9 +9,6 @@ use Illuminate\Routing\Exceptions\UrlGenerationException;
 
 class JournalController extends Controller
 {
-    /**
-     * Map source_type -> label manusia (awam-friendly).
-     */
     private function sourceTypeLabel(?string $type): string
     {
         return match ($type) {
@@ -21,21 +18,21 @@ class JournalController extends Controller
             'opening_balance' => 'Saldo Awal',
             'opening_balance_void' => 'Pembatalan Saldo Awal',
 
-            // Sales / shipment (kalau ada)
             'shipment' => 'Pengiriman',
             'shipment_void' => 'Pembatalan Pengiriman',
 
-            // ✅ Payroll borongan (masuk HPP)
             'piecework_payroll' => 'Payroll Borongan (HPP)',
             'piecework_payroll_void' => 'Pembatalan Payroll Borongan',
+
+            // ✅ PURCHASING
+            'purchase_payment' => 'Pembayaran Pembelian (DP / Pelunasan)',
+            'purchase_receipt_post' => 'GRN Posted (Persediaan vs Hutang)',
+            'purchase_dp_apply' => 'Apply DP ke Hutang',
 
             default => $type ?: 'Lainnya',
         };
     }
 
-    /**
-     * Build options untuk dropdown source_type.
-     */
     private function buildSourceTypeOptions($sourceTypes)
     {
         return $sourceTypes->mapWithKeys(function ($st) {
@@ -43,10 +40,6 @@ class JournalController extends Controller
         });
     }
 
-    /**
-     * Helper aman untuk bikin route URL tanpa Route::has().
-     * Kalau route belum ada / param gak cocok -> return null (biar view aman).
-     */
     private function safeRoute(string $name, mixed $param = null): ?string
     {
         try {
@@ -65,7 +58,6 @@ class JournalController extends Controller
             ->orderByDesc('date')
             ->orderByDesc('id');
 
-        // ===== Filters =====
         if ($request->filled('source_type')) {
             $q->where('source_type', $request->string('source_type')->toString());
         }
@@ -78,7 +70,6 @@ class JournalController extends Controller
             $q->whereDate('date', '<=', $request->date('to'));
         }
 
-        // status = final | draft | voided
         if ($request->filled('status')) {
             $status = $request->string('status')->toString();
 
@@ -91,7 +82,6 @@ class JournalController extends Controller
             }
         }
 
-        // Search
         if ($request->filled('q')) {
             $term = trim($request->string('q')->toString());
 
@@ -100,7 +90,6 @@ class JournalController extends Controller
                     ->orWhere('source_type', 'like', "%{$term}%")
                     ->orWhere('source_id', 'like', "%{$term}%");
 
-                // cari berdasarkan nama/kode akun di lines
                 $w->orWhereHas('lines.account', function ($wa) use ($term) {
                     $wa->where('name', 'like', "%{$term}%")
                         ->orWhere('code', 'like', "%{$term}%");
@@ -108,7 +97,6 @@ class JournalController extends Controller
             });
         }
 
-        // dropdown options (source type)
         $rawSourceTypes = Journal::query()
             ->select('source_type')
             ->whereNotNull('source_type')
@@ -134,34 +122,33 @@ class JournalController extends Controller
         $sourceUrl = null;
         $sourceLabel = null;
 
-        // label manusia untuk show page
         $sourceTypeLabel = $this->sourceTypeLabel($journal->source_type);
 
-        // ===== Link ke sumber kalau tersedia (tanpa Route::has) =====
-
-        // Cash Expense
         if (in_array($journal->source_type, ['cash_expense', 'cash_expense_void'], true) && $journal->source_id) {
             $sourceUrl = $this->safeRoute('accounting.cash-expenses.show', $journal->source_id);
             $sourceLabel = $sourceUrl ? 'Buka Pengeluaran' : null;
         }
 
-        // Opening Balance
         if (in_array($journal->source_type, ['opening_balance', 'opening_balance_void'], true)) {
             $sourceUrl = $this->safeRoute('accounting.opening-balances.index');
             $sourceLabel = $sourceUrl ? 'Buka Saldo Awal' : null;
         }
 
-        // ✅ Piecework Payroll (Cutting/Sewing) — sesuaikan route kamu
-        // Misal kamu punya route show period payroll: payroll.sewing.show / payroll.cutting.show
-        // dan period id disimpan di source_id
         if ($journal->source_type === 'piecework_payroll' && $journal->source_id) {
-            // opsi 1: kalau kamu simpan module di description (tidak ideal)
-            // opsi 2: route tunggal payroll.piecework.show
-            // aku buat aman: coba 2 route, yang berhasil dipakai.
             $sourceUrl = $this->safeRoute('payroll.sewing.show', $journal->source_id) ?? $this->safeRoute('payroll.cutting.show', $journal->source_id);
 
             $sourceLabel = $sourceUrl ? 'Buka Payroll Borongan' : null;
         }
+
+        // ✅ Purchasing: (opsional) link ke PO atau GRN kalau route kamu ada
+        // - purchase_receipt_post / purchase_dp_apply: source_id = GRN id
+        if (in_array($journal->source_type, ['purchase_receipt_post', 'purchase_dp_apply'], true) && $journal->source_id) {
+            $sourceUrl = $this->safeRoute('purchasing.purchase_receipts.show', $journal->source_id);
+            $sourceLabel = $sourceUrl ? 'Buka GRN' : null;
+        }
+
+        // - purchase_payment: source_id = payment id (route khusus payment tidak ada)
+        // bisa link ke PO lewat pencarian manual nanti, tapi tidak wajib.
 
         return view('accounting.journals.show', compact(
             'journal',

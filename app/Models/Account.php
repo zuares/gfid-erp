@@ -24,4 +24,5 @@ class Account extends Model
     {
         return $this->hasMany(\App\Models\JournalLine::class, 'account_id');
     }
+
 }

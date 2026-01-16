@@ -3,47 +3,26 @@
 namespace App\Services\Purchasing;
 
 use App\Helpers\CodeGenerator;
+use App\Models\Account;
 use App\Models\Item;
 use App\Models\Lot;
 use App\Models\PurchaseReceipt;
 use App\Models\PurchaseReceiptLine;
 use App\Models\SupplierPrice;
+use App\Services\Accounting\JournalService;
 use App\Services\Inventory\InventoryService;
 use Illuminate\Support\Facades\DB;
+use Illuminate\Validation\ValidationException;
 
 class GoodsReceiptService
 {
     public function __construct(
         protected InventoryService $inventory,
-    ) {
-    }
+        protected JournalService $journal,
+    ) {}
 
     /**
      * Buat GRN baru (status: draft).
-     *
-     * $payload contoh:
-     * [
-     *   'date'            => '2025-11-21',
-     *   'supplier_id'     => 1,
-     *   'warehouse_id'    => 1,
-     *   'purchase_order_id' => 1,  // optional
-     *   'discount'        => 0,
-     *   'tax_percent'     => 11,
-     *   'shipping_cost'   => 25000,
-     *   'notes'           => 'Barang datang dari PO 001',
-     *   'created_by'      => 1,
-     *   'lines' => [
-     *      [
-     *          'item_id'       => 1,
-     *          'qty_received'  => 100,
-     *          'qty_reject'    => 0,
-     *          'unit_price'    => 12000,
-     *          'unit'          => 'kg',
-     *          'notes'         => 'Roll 1-5',
-     *          'lot_id'        => null, // optional
-     *      ],
-     *   ],
-     * ]
      */
     public function create(array $payload): PurchaseReceipt
     {
@@ -51,12 +30,10 @@ class GoodsReceiptService
             $linesData = $payload['lines'] ?? [];
             unset($payload['lines']);
 
-            // generate kode GRN kalau belum ada
             if (empty($payload['code'] ?? null)) {
                 $payload['code'] = CodeGenerator::generate('GRN');
             }
 
-            // set default angka
             $payload['subtotal'] = 0;
             $payload['discount'] = $this->num($payload['discount'] ?? 0);
             $payload['tax_percent'] = $this->num($payload['tax_percent'] ?? 0);
@@ -68,13 +45,10 @@ class GoodsReceiptService
             /** @var PurchaseReceipt $grn */
             $grn = PurchaseReceipt::create($payload);
 
-            // simpan detail + hitung subtotal
             $subtotal = $this->syncLines($grn, $linesData);
-
-            // hitung total header
             $this->recalcTotals($grn, $subtotal);
 
-            return $grn->fresh(['lines', 'supplier', 'warehouse']);
+            return $grn->fresh(['lines.item', 'supplier', 'warehouse']);
         });
     }
 
@@ -89,9 +63,8 @@ class GoodsReceiptService
             }
 
             $linesData = $payload['lines'] ?? [];
-            unset($payload['lines'], $payload['code']); // kode tidak diubah
+            unset($payload['lines'], $payload['code']);
 
-            // update header field yang boleh berubah
             $allowedFields = [
                 'date',
                 'supplier_id',
@@ -104,57 +77,66 @@ class GoodsReceiptService
             ];
 
             foreach ($allowedFields as $field) {
-                if (array_key_exists($field, $payload)) {
-                    if (in_array($field, ['discount', 'tax_percent', 'shipping_cost'])) {
-                        $grn->{$field} = $this->num($payload[$field]);
-                    } else {
-                        $grn->{$field} = $payload[$field];
-                    }
+                if (!array_key_exists($field, $payload)) {
+                    continue;
+                }
+
+                if (in_array($field, ['discount', 'tax_percent', 'shipping_cost'], true)) {
+                    $grn->{$field} = $this->num($payload[$field]);
+                } else {
+                    $grn->{$field} = $payload[$field];
                 }
             }
 
             $grn->save();
 
-            // sync ulang lines
             $subtotal = $this->syncLines($grn, $linesData);
-
-            // hitung ulang totals
             $this->recalcTotals($grn, $subtotal);
 
-            return $grn->fresh(['lines', 'supplier', 'warehouse']);
+            return $grn->fresh(['lines.item', 'supplier', 'warehouse']);
         });
     }
 
     /**
-     * POST GRN → stok masuk ke gudang + update LOT & moving average.
+     * POST GRN → stock in + jurnal GRN + apply DP (1151)
+     * Tanpa pakai journal_id & posted_at (biar aman ke schema kamu sekarang).
      */
     public function post(PurchaseReceipt $grn): PurchaseReceipt
     {
         return DB::transaction(function () use ($grn) {
+
             if ($grn->status !== 'draft') {
                 throw new \RuntimeException("Goods Receipt tidak dalam status draft.");
             }
-
             if (!$grn->warehouse_id) {
                 throw new \RuntimeException("Goods Receipt belum punya gudang tujuan.");
             }
 
-            // muat lines + item untuk keamanan
-            $grn->loadMissing('lines.item');
+            // load order untuk apply DP (kalau GRN terkait PO)
+            $grn->loadMissing(['lines.item', 'supplier', 'order']);
 
+            if ($grn->lines->count() === 0) {
+                throw ValidationException::withMessages(['grn' => 'GRN tidak punya line.']);
+            }
+
+            // total jurnal: kamu bisa pilih subtotal atau grand_total
+            $totalForJournal = (float) $grn->grand_total;
+            if ($totalForJournal <= 0) {
+                throw ValidationException::withMessages(['grn' => 'Total GRN harus > 0.']);
+            }
+
+            // ==========================
+            // 1) STOCK IN (LOT + moving average)
+            // ==========================
             foreach ($grn->lines as $line) {
-                if ($line->qty_received <= 0) {
+                if ((float) $line->qty_received <= 0) {
                     continue;
                 }
 
-                // ==========================
-                // 1. Pastikan LOT ada
-                // ==========================
+                // Pastikan LOT ada
                 if ($line->lot_id) {
-                    // kalau dari form sudah diset lot_id
                     $lot = $line->lot ?? Lot::findOrFail($line->lot_id);
                 } else {
-                    // kalau belum ada lot_id → buat LOT baru per baris item
                     $lot = Lot::create([
                         'code' => CodeGenerator::generate('LOT'),
                         'item_id' => $line->item_id,
@@ -170,116 +152,157 @@ class GoodsReceiptService
                     $line->save();
                 }
 
-                // ==========================
-                // 2. Stok masuk via InventoryService + LOT & unit_cost
-                // ==========================
                 $this->inventory->stockIn(
-                    warehouseId: $grn->warehouse_id,
-                    itemId: $line->item_id,
-                    qty: $line->qty_received,
+                    warehouseId: (int) $grn->warehouse_id,
+                    itemId: (int) $line->item_id,
+                    qty: (float) $line->qty_received,
                     date: $grn->date,
                     sourceType: 'purchase_receipt',
-                    sourceId: $grn->id,
+                    sourceId: (int) $grn->id,
                     notes: "GRN {$grn->code} line {$line->id}",
-                    lotId: $lot->id, // <<— kunci LOT
-                    unitCost: $line->unit_price, // <<— unit cost untuk moving average
+                    lotId: (int) $lot->id,
+                    unitCost: (float) $line->unit_price,
                 );
 
-                // ==========================
-                // 3. Update harga terakhir item & supplier
-                // ==========================
-                $this->touchLastPrices($grn, $line->item_id, $line->unit_price);
+                $this->touchLastPrices($grn, (int) $line->item_id, (float) $line->unit_price);
             }
 
+            // ==========================
+            // 2) SET STATUS POSTED
+            // ==========================
             $grn->status = 'posted';
             $grn->save();
 
-            return $grn->fresh(['lines', 'supplier', 'warehouse']);
+            // ==========================
+            // 3) Resolve akun via CODE (tanpa env)
+            // ==========================
+            $inventoryCode = (string) (config('accounting.inventory_account_code') ?: '1201');
+            $apCode = (string) (config('accounting.ap_account_code') ?: '2101');
+            $advanceCode = '1151';
+
+            $inventoryAccountId = Account::where('code', $inventoryCode)->value('id');
+            $apAccountId = Account::where('code', $apCode)->value('id');
+            $advanceAccountId = Account::where('code', $advanceCode)->value('id');
+
+            if (!$inventoryAccountId || !$apAccountId || !$advanceAccountId) {
+                throw ValidationException::withMessages([
+                    'grn' => "Akun tidak lengkap. Pastikan ada COA: Inventory {$inventoryCode}, AP {$apCode}, Uang Muka {$advanceCode}.",
+                ]);
+            }
+
+            // ==========================
+            // 4) POST JOURNAL GRN (Inventory vs AP)
+            // source_type = grn, source_id = grn->id
+            // ==========================
+            $this->journal->post(
+                date: $grn->date->format('Y-m-d'),
+                sourceType: 'grn',
+                sourceId: (int) $grn->id,
+                description: "GRN {$grn->code} - {$grn->supplier?->name}",
+                lines: [
+                    ['account_id' => (int) $inventoryAccountId, 'debit' => $totalForJournal, 'credit' => 0],
+                    ['account_id' => (int) $apAccountId, 'debit' => 0, 'credit' => $totalForJournal],
+                ]
+            );
+
+            // ==========================
+            // 5) APPLY DP (Uang Muka 1151 -> Hutang 2101)
+            // hanya kalau GRN terkait PO dan ada DP aktif
+            // ==========================
+            if ($grn->purchase_order_id && $grn->order) {
+                // asumsi ada scope/relasi activePayments() di PurchaseOrder
+                $dpTotal = (float) $grn->order->activePayments()
+                    ->where('type', 'dp')
+                    ->sum('amount');
+
+                if ($dpTotal > 0.0001) {
+                    $dpApplied = min($dpTotal, $totalForJournal);
+
+                    $this->journal->post(
+                        date: $grn->date->format('Y-m-d'),
+                        sourceType: 'grn_apply_dp',
+                        sourceId: (int) $grn->id,
+                        description: "Apply DP ke GRN {$grn->code}",
+                        lines: [
+                            ['account_id' => (int) $apAccountId, 'debit' => $dpApplied, 'credit' => 0],
+                            ['account_id' => (int) $advanceAccountId, 'debit' => 0, 'credit' => $dpApplied],
+                        ]
+                    );
+                }
+            }
+
+            return $grn->fresh(['lines.item', 'supplier', 'warehouse', 'order']);
         });
     }
 
     /**
-     * UNPOST GRN → stok dikurangi lagi (reverse) + rollback LOT cost.
+     * UNPOST GRN → reverse stock + void jurnal GRN + void jurnal apply DP
      */
     public function unpost(PurchaseReceipt $grn): PurchaseReceipt
     {
         return DB::transaction(function () use ($grn) {
+
             if ($grn->status !== 'posted') {
                 throw new \RuntimeException("Hanya GRN yang sudah posted yang bisa di-unpost.");
             }
-
             if (!$grn->warehouse_id) {
                 throw new \RuntimeException("Goods Receipt tidak punya gudang.");
             }
 
-            $grn->loadMissing('lines');
+            $grn->loadMissing(['lines']);
 
+            // ==========================
+            // 1) reverse stock
+            // ==========================
             foreach ($grn->lines as $line) {
-                if ($line->qty_received <= 0) {
+                if ((float) $line->qty_received <= 0) {
                     continue;
                 }
 
-                // Kalau belum pakai LOT (legacy), still jalan tapi tanpa cost accuracy
-                if (!$line->lot_id) {
-                    $this->inventory->stockOut(
-                        warehouseId: $grn->warehouse_id,
-                        itemId: $line->item_id,
-                        qty: $line->qty_received,
-                        date: now(),
-                        sourceType: 'purchase_receipt_reverse',
-                        sourceId: $grn->id,
-                        notes: "UNPOST GRN {$grn->code} line {$line->id}",
-                        allowNegative: false,
-                    );
-                    continue;
-                }
-
-                // Dengan LOT: cost & qty di LOT ikut rollback
                 $this->inventory->stockOut(
-                    warehouseId: $grn->warehouse_id,
-                    itemId: $line->item_id,
-                    qty: $line->qty_received,
+                    warehouseId: (int) $grn->warehouse_id,
+                    itemId: (int) $line->item_id,
+                    qty: (float) $line->qty_received,
                     date: now(),
                     sourceType: 'purchase_receipt_reverse',
-                    sourceId: $grn->id,
+                    sourceId: (int) $grn->id,
                     notes: "UNPOST GRN {$grn->code} line {$line->id}",
                     allowNegative: false,
-                    lotId: $line->lot_id, // <<— penting
+                    lotId: $line->lot_id ?: null,
                 );
             }
 
+            // ==========================
+            // 2) void journals by source
+            // ==========================
+            $this->journal->voidBySource('grn', (int) $grn->id);
+            $this->journal->voidBySource('grn_apply_dp', (int) $grn->id);
+
+            // ==========================
+            // 3) set back to draft
+            // ==========================
             $grn->status = 'draft';
             $grn->save();
 
-            return $grn->fresh(['lines', 'supplier', 'warehouse']);
+            return $grn->fresh(['lines.item', 'supplier', 'warehouse', 'order']);
         });
     }
 
-    /**
-     * Hitung ulang total dari detail (kalau ada perubahan manual).
-     */
     public function recalculate(PurchaseReceipt $grn): PurchaseReceipt
     {
         return DB::transaction(function () use ($grn) {
-            $subtotal = $grn->lines()->sum('line_total');
-
-            $this->recalcTotals($grn, (float) $subtotal);
-
-            return $grn->fresh(['lines', 'supplier', 'warehouse']);
+            $subtotal = (float) $grn->lines()->sum('line_total');
+            $this->recalcTotals($grn, $subtotal);
+            return $grn->fresh(['lines.item', 'supplier', 'warehouse']);
         });
     }
 
     // =====================================================================
-    // HELPER INTERNAL
+    // INTERNAL HELPERS
     // =====================================================================
 
-    /**
-     * Simpan ulang detail lines GRN.
-     * Sederhana: hapus semua lalu insert ulang.
-     */
     protected function syncLines(PurchaseReceipt $grn, array $linesData): float
     {
-        // Hapus semua line lama dulu (sederhana)
         $grn->lines()->delete();
 
         $subtotal = 0.0;
@@ -292,8 +315,6 @@ class GoodsReceiptService
             $unit = $row['unit'] ?? null;
             $notes = $row['notes'] ?? null;
             $lotId = $row['lot_id'] ?? null;
-
-            // ⬅️⬅️ INI YANG KURANG
             $poLineId = $row['purchase_order_line_id'] ?? null;
 
             if (!$itemId || $qtyReceived <= 0) {
@@ -302,12 +323,11 @@ class GoodsReceiptService
 
             $lineTotal = round($qtyReceived * $unitPrice, 2);
 
-            /** @var PurchaseReceiptLine $line */
-            $line = PurchaseReceiptLine::create([
+            PurchaseReceiptLine::create([
                 'purchase_receipt_id' => $grn->id,
-                'purchase_order_line_id' => $poLineId, // ⬅️ SIMPAN DI SINI
+                'purchase_order_line_id' => $poLineId,
 
-                'item_id' => $itemId,
+                'item_id' => (int) $itemId,
                 'lot_id' => $lotId,
                 'qty_received' => $qtyReceived,
                 'qty_reject' => $qtyReject,
@@ -318,16 +338,11 @@ class GoodsReceiptService
             ]);
 
             $subtotal += $lineTotal;
-
-            // update harga terakhir di master & supplier
-            $this->touchLastPrices($grn, $itemId, $unitPrice);
         }
 
         return round($subtotal, 2);
     }
-    /**
-     * Hitung subtotal, tax_amount, grand_total dan simpan ke header GRN.
-     */
+
     protected function recalcTotals(PurchaseReceipt $grn, float $subtotal): void
     {
         $discount = $this->num($grn->discount);
@@ -341,25 +356,17 @@ class GoodsReceiptService
         $grn->subtotal = round($subtotal, 2);
         $grn->tax_amount = $taxAmount;
         $grn->grand_total = round($grand, 2);
-
         $grn->save();
     }
 
-    /**
-     * Update:
-     *  - items.last_purchase_price
-     *  - supplier_prices.last_price
-     */
     protected function touchLastPrices(PurchaseReceipt $grn, int $itemId, float $unitPrice): void
     {
         $unitPrice = round($unitPrice, 2);
 
-        // update master item
         Item::where('id', $itemId)->update([
             'last_purchase_price' => $unitPrice,
         ]);
 
-        // update harga per supplier
         SupplierPrice::updateOrCreate(
             [
                 'supplier_id' => $grn->supplier_id,
@@ -371,40 +378,30 @@ class GoodsReceiptService
         );
     }
 
-    /**
-     * Normalisasi angka dari input (string format Indonesia, dll).
-     */
     protected function num($value): float
     {
         if ($value === null || $value === '') {
             return 0.0;
         }
 
-        // Kalau sudah numeric (hasil validasi / cast Laravel), langsung saja
         if (is_int($value) || is_float($value)) {
             return (float) $value;
         }
 
-        // Pastikan string
         $value = trim((string) $value);
         $value = str_replace(' ', '', $value);
 
-        // Kalau ada koma → anggap format Indonesia: "1.234,56" / "24,00"
         if (strpos($value, ',') !== false) {
-            // Hilangkan titik ribuan
             $value = str_replace('.', '', $value);
-            // Ganti koma jadi titik desimal
             $value = str_replace(',', '.', $value);
             return (float) $value;
         }
 
-        // Kalau tidak ada koma, tapi pola ribuan: "1.234" atau "1.234.567"
         if (preg_match('/^\d{1,3}(\.\d{3})+$/', $value)) {
             $value = str_replace('.', '', $value);
             return (float) $value;
         }
 
-        // Default: biarkan Laravel terjemahkan (mis. "1234.56")
         return (float) $value;
     }
 }

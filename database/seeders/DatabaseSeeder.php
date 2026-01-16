@@ -30,6 +30,7 @@ class DatabaseSeeder extends Seeder
             StoreSeeder::class,
             // InventoryTransferDemoSeeder::class,
             AccountSeeder::class,
+            PaymentMethodSeeder::class,
 
         ]);
     }

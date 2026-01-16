@@ -11,22 +11,21 @@ use App\Models\Supplier;
 use App\Models\Warehouse;
 use App\Services\Purchasing\GoodsReceiptService;
 use Illuminate\Http\Request;
+use Illuminate\Validation\ValidationException;
 
 class PurchaseReceiptController extends Controller
 {
-    protected GoodsReceiptService $service;
-
-    public function __construct(GoodsReceiptService $service)
-    {
-        $this->service = $service;
-    }
+    public function __construct(
+        protected GoodsReceiptService $service
+    ) {}
 
     /**
      * Index GRN (Goods Receipt).
      */
     public function index(Request $request)
     {
-        $q = PurchaseReceipt::with(['supplier', 'warehouse'])
+        $q = PurchaseReceipt::query()
+            ->with(['supplier', 'warehouse'])
             ->orderByDesc('date')
             ->orderByDesc('id');
 
@@ -38,16 +37,13 @@ class PurchaseReceiptController extends Controller
             $q->where('warehouse_id', $request->warehouse_id);
         }
 
-        // STATUS: default hanya 'posted' kalau user belum kirim parameter status
-        $status = $request->input('status', null);
-
+        // default: posted
+        $status = $request->input('status');
         if ($request->has('status')) {
-            // kalau form kirim status tapi kosong => "Semua"
             if ($status !== null && $status !== '') {
                 $q->where('status', $status);
             }
         } else {
-            // tidak ada parameter status sama sekali => default ke posted
             $q->where('status', 'posted');
             $status = 'posted';
         }
@@ -55,14 +51,13 @@ class PurchaseReceiptController extends Controller
         if ($request->filled('from_date')) {
             $q->whereDate('date', '>=', $request->from_date);
         }
-
         if ($request->filled('to_date')) {
             $q->whereDate('date', '<=', $request->to_date);
         }
 
         $receipts = $q->paginate(15)->withQueryString();
 
-        // SUMMARY mini dashboard
+        // Summary (clone query biar aman)
         $summary = (clone $q)
             ->selectRaw('COUNT(*) as total_receipts')
             ->selectRaw("SUM(CASE WHEN status = 'draft' THEN 1 ELSE 0 END) as draft_count")
@@ -71,17 +66,13 @@ class PurchaseReceiptController extends Controller
             ->selectRaw('MAX(date) as last_date')
             ->first();
 
-        // Data filter
         $suppliers = Supplier::orderBy('name')->get();
         $warehouses = Warehouse::orderBy('name')->get();
 
-        // Infinite scroll (AJAX)
         if ($request->ajax()) {
             $html = view('purchasing.purchase_receipts._rows', [
                 'receipts' => $receipts,
-                'startIndex' => method_exists($receipts, 'firstItem')
-                ? $receipts->firstItem()
-                : 1,
+                'startIndex' => method_exists($receipts, 'firstItem') ? ($receipts->firstItem() ?? 1) : 1,
             ])->render();
 
             return response()->json([
@@ -90,13 +81,13 @@ class PurchaseReceiptController extends Controller
             ]);
         }
 
-        return view('purchasing.purchase_receipts.index', [
-            'receipts' => $receipts,
-            'suppliers' => $suppliers,
-            'warehouses' => $warehouses,
-            'summary' => $summary,
-            'status' => $status,
-        ]);
+        return view('purchasing.purchase_receipts.index', compact(
+            'receipts',
+            'suppliers',
+            'warehouses',
+            'summary',
+            'status'
+        ));
     }
 
     /**
@@ -107,15 +98,13 @@ class PurchaseReceiptController extends Controller
         $suppliers = Supplier::orderBy('name')->get();
         $warehouses = Warehouse::orderBy('name')->get();
 
-        $order = null; // default: tidak dari PO tertentu
-
         $selectedSupplierId = $request->input('supplier_id');
 
-        $lines = PurchaseOrderLine::with(['item', 'purchaseOrder.supplier'])
-            ->withCount('draftReceiptLines') // hitung berapa line GRN draft terkait line ini
+        $lines = PurchaseOrderLine::query()
+            ->with(['item', 'purchaseOrder.supplier'])
+            ->withCount('draftReceiptLines')
             ->whereHas('purchaseOrder', function ($q) use ($selectedSupplierId) {
                 $q->where('status', 'approved');
-
                 if ($selectedSupplierId) {
                     $q->where('supplier_id', $selectedSupplierId);
                 }
@@ -124,10 +113,11 @@ class PurchaseReceiptController extends Controller
             ->orderBy('id')
             ->get();
 
-        // mapping count → boolean has_draft_grn supaya di Blade simpel
         $lines->each(function (PurchaseOrderLine $line) {
             $line->has_draft_grn = ($line->draft_receipt_lines_count ?? 0) > 0;
         });
+
+        $order = null;
 
         return view('purchasing.purchase_receipts.create', compact(
             'suppliers',
@@ -149,12 +139,10 @@ class PurchaseReceiptController extends Controller
                 ->with('error', 'GRN hanya bisa dibuat dari PO yang sudah di-approve.');
         }
 
-        // load supplier + lines + item + count draftReceiptLines per line
         $purchase_order->load([
             'supplier',
             'lines' => function ($q) {
-                $q->with('item')
-                    ->withCount('draftReceiptLines');
+                $q->with('item')->withCount('draftReceiptLines');
             },
         ]);
 
@@ -163,8 +151,6 @@ class PurchaseReceiptController extends Controller
         $items = Item::where('active', 1)->orderBy('name')->get();
 
         $lines = $purchase_order->lines;
-
-        // mapping ke has_draft_grn juga, biar Blade konsisten
         $lines->each(function (PurchaseOrderLine $line) {
             $line->has_draft_grn = ($line->draft_receipt_lines_count ?? 0) > 0;
         });
@@ -186,62 +172,15 @@ class PurchaseReceiptController extends Controller
      */
     public function store(Request $request)
     {
-        // Validasi header + struktur array detail dasar
-        $data = $this->validateData($request);
+        $data = $this->validateHeader($request);
 
-        // Ambil array paralel dari form
-        $poLineIds = $request->input('po_line_id', []); // hidden input di Blade
-        $itemIds = $request->input('item_id', []);
-        $qtyReceiveds = $request->input('qty_received', []);
-        $qtyRejects = $request->input('qty_reject', []);
-        $unitPrices = $request->input('unit_price', []);
-        $lineNotes = $request->input('line_notes', []);
-        $units = $request->input('unit', []);
+        // build lines dari input tabel
+        $lines = $this->buildLinesFromRequest($request, requireSelected: true);
 
-        // Checkbox selected[index] → hanya baris yang dicentang yang diproses
-        $selected = $request->input('selected', []); // key = index baris
-
-        $lines = [];
-
-        foreach ($itemIds as $i => $itemId) {
-            if (!$itemId) {
-                continue;
-            }
-
-            // kalau tidak dicentang, skip
-            if (!array_key_exists($i, $selected)) {
-                continue;
-            }
-
-            // normalisasi angka
-            $qtyRec = (float) str_replace(',', '.', (string) ($qtyReceiveds[$i] ?? 0));
-            $qtyRej = (float) str_replace(',', '.', (string) ($qtyRejects[$i] ?? 0));
-
-            // kalau dua-duanya 0 atau kosong, abaikan
-            if ($qtyRec <= 0 && $qtyRej <= 0) {
-                continue;
-            }
-
-            $unitPrice = (float) str_replace(',', '.', (string) ($unitPrices[$i] ?? 0));
-
-            $lines[] = [
-                'purchase_order_line_id' => $poLineIds[$i] ?? null,
-                'item_id' => $itemId,
-                'qty_received' => $qtyRec,
-                'qty_reject' => $qtyRej,
-                'unit_price' => $unitPrice,
-                'unit' => $units[$i] ?? null,
-                'notes' => $lineNotes[$i] ?? null,
-            ];
-        }
-
-        // Kalau tidak ada satu pun baris valid
         if (empty($lines)) {
             return back()
                 ->withInput()
-                ->withErrors([
-                    'lines' => 'Tidak ada item yang dipilih, atau Qty Diterima / Reject masih 0.',
-                ]);
+                ->withErrors(['lines' => 'Tidak ada item yang dipilih, atau Qty Diterima / Reject masih 0.']);
         }
 
         $data['lines'] = $lines;
@@ -259,7 +198,13 @@ class PurchaseReceiptController extends Controller
      */
     public function show(PurchaseReceipt $purchase_receipt)
     {
-        $purchase_receipt->load(['supplier', 'warehouse', 'lines.item']);
+        $purchase_receipt->load([
+            'supplier',
+            'warehouse',
+            'lines.item',
+            'order.paymentMethod',
+            'journal.lines.account',
+        ]);
 
         return view('purchasing.purchase_receipts.show', [
             'receipt' => $purchase_receipt,
@@ -277,7 +222,7 @@ class PurchaseReceiptController extends Controller
                 ->with('error', 'Hanya GRN draft yang bisa diedit.');
         }
 
-        $purchase_receipt->load(['lines.item']);
+        $purchase_receipt->load(['supplier', 'warehouse', 'lines.item', 'order']);
 
         $suppliers = Supplier::orderBy('name')->get();
         $warehouses = Warehouse::orderBy('name')->get();
@@ -302,29 +247,15 @@ class PurchaseReceiptController extends Controller
                 ->with('error', 'Hanya GRN draft yang bisa diupdate.');
         }
 
-        $data = $this->validateData($request);
+        $data = $this->validateHeader($request);
 
-        $lines = [];
-        $itemIds = $request->input('item_id', []);
-        $qtyReceiveds = $request->input('qty_received', []);
-        $qtyRejects = $request->input('qty_reject', []);
-        $unitPrices = $request->input('unit_price', []);
-        $lineNotes = $request->input('line_notes', []);
-        $units = $request->input('unit', []);
+        // untuk edit: tidak wajib checkbox selected (anggap semua baris yang qty>0 dianggap masuk)
+        $lines = $this->buildLinesFromRequest($request, requireSelected: false);
 
-        foreach ($itemIds as $i => $itemId) {
-            if (!$itemId) {
-                continue;
-            }
-
-            $lines[] = [
-                'item_id' => $itemId,
-                'qty_received' => $qtyReceiveds[$i] ?? 0,
-                'qty_reject' => $qtyRejects[$i] ?? 0,
-                'unit_price' => $unitPrices[$i] ?? 0,
-                'unit' => $units[$i] ?? null,
-                'notes' => $lineNotes[$i] ?? null,
-            ];
+        if (empty($lines)) {
+            return back()
+                ->withInput()
+                ->withErrors(['lines' => 'Tidak ada line dengan Qty Diterima / Reject > 0.']);
         }
 
         $data['lines'] = $lines;
@@ -337,7 +268,7 @@ class PurchaseReceiptController extends Controller
     }
 
     /**
-     * POST / Confirm GRN → masuk stok.
+     * POST / Confirm GRN → stok masuk + journal tercatat (handled by service).
      */
     public function post(PurchaseReceipt $purchase_receipt)
     {
@@ -346,7 +277,7 @@ class PurchaseReceiptController extends Controller
 
             return redirect()
                 ->route('purchasing.purchase_receipts.show', $receipt->id)
-                ->with('success', 'Goods Receipt berhasil diposting. Stok gudang sudah bertambah.');
+                ->with('success', 'Goods Receipt berhasil diposting. Stok gudang sudah bertambah & jurnal tercatat.');
         } catch (\Throwable $e) {
             return redirect()
                 ->route('purchasing.purchase_receipts.show', $purchase_receipt->id)
@@ -355,81 +286,174 @@ class PurchaseReceiptController extends Controller
     }
 
     /**
-     * Validasi basic GRN header + struktur array detail (untuk create/edit).
+     * UNPOST GRN (optional route kalau kamu pakai).
      */
-    protected function validateData(Request $request): array
+    public function unpost(PurchaseReceipt $purchase_receipt)
     {
-        $validated = $request->validate([
+        try {
+            $receipt = $this->service->unpost($purchase_receipt);
+
+            return redirect()
+                ->route('purchasing.purchase_receipts.show', $receipt->id)
+                ->with('success', 'GRN berhasil di-unpost (stok dibalik + jurnal di-void).');
+        } catch (\Throwable $e) {
+            return redirect()
+                ->route('purchasing.purchase_receipts.show', $purchase_receipt->id)
+                ->with('error', $e->getMessage());
+        }
+    }
+
+    // ==========================================================
+    // VALIDATION + BUILD LINES
+    // ==========================================================
+
+    /**
+     * Validasi header GRN (tanpa array detail).
+     */
+    protected function validateHeader(Request $request): array
+    {
+        return $request->validate([
             'date' => ['required', 'date'],
             'supplier_id' => ['required', 'exists:suppliers,id'],
             'warehouse_id' => ['required', 'exists:warehouses,id'],
             'purchase_order_id' => ['nullable', 'exists:purchase_orders,id'],
-
-            // detail item (array struktur)
-            'po_line_id' => ['required', 'array'],
-            'po_line_id.*' => ['required', 'exists:purchase_order_lines,id'],
-
-            'item_id' => ['required', 'array'],
-            'item_id.*' => ['required', 'exists:items,id'],
-
-            'qty_received' => ['required', 'array'],
-            'qty_received.*' => ['nullable', 'numeric', 'min:0'],
-
-            'qty_reject' => ['required', 'array'],
-            'qty_reject.*' => ['nullable', 'numeric', 'min:0'],
-
-            'selected' => ['nullable', 'array'], // boleh null kalau belum centang
-            'selected.*' => ['nullable'],
-
-            'unit_price' => ['required', 'array'],
-            'unit_price.*' => ['nullable', 'numeric'],
-
-            'unit' => ['required', 'array'],
-            'unit.*' => ['nullable', 'string'],
-        ], [
-            'qty_received.*.numeric' => 'Qty diterima harus angka.',
-            'qty_reject.*.numeric' => 'Qty reject harus angka.',
-            'qty_received.*.min' => 'Qty diterima tidak boleh minus.',
-            'qty_reject.*.min' => 'Qty reject tidak boleh minus.',
+            'discount' => ['nullable', 'string'],
+            'tax_percent' => ['nullable', 'string'],
+            'shipping_cost' => ['nullable', 'string'],
+            'notes' => ['nullable', 'string'],
         ]);
+    }
 
-        // VALIDASI LOGIKA: qty_received + qty_reject ≤ qty_po, serta minimal 1 selected
-        $errors = [];
-        $anySelected = false;
+    /**
+     * Build lines dari request tabel.
+     * - create: requireSelected=true (pakai checkbox selected)
+     * - edit: requireSelected=false (ambil semua baris yang qty>0)
+     *
+     * Input yang dipakai:
+     * - po_line_id[], item_id[], qty_received[], qty_reject[], unit_price[], unit[], line_notes[], selected[index]
+     */
+    protected function buildLinesFromRequest(Request $request, bool $requireSelected): array
+    {
+        $poLineIds = $request->input('po_line_id', []);
+        $itemIds = $request->input('item_id', []);
+        $qtyReceiveds = $request->input('qty_received', []);
+        $qtyRejects = $request->input('qty_reject', []);
+        $unitPrices = $request->input('unit_price', []);
+        $units = $request->input('unit', []);
+        $lineNotes = $request->input('line_notes', []);
+        $selected = $request->input('selected', []);
 
-        foreach ($validated['po_line_id'] as $i => $poLineId) {
-            $selected = $request->input("selected.$i");
-            $qtyRec = (float) ($validated['qty_received'][$i] ?? 0);
-            $qtyRej = (float) ($validated['qty_reject'][$i] ?? 0);
+        // Validasi struktur minimal (kalau create flow kamu selalu kirim array-array ini)
+        if (!is_array($itemIds) || count($itemIds) === 0) {
+            throw ValidationException::withMessages(['lines' => 'Detail item tidak ditemukan.']);
+        }
 
-            if ($selected) {
-                $anySelected = true;
-
-                $poQty = PurchaseOrderLine::find($poLineId)?->qty ?? 0;
-
-                if ($qtyRec + $qtyRej > $poQty) {
-                    $errors["qty_received.$i"] = "Qty diterima + qty reject tidak boleh melebihi Qty PO ($poQty).";
-                    $errors["qty_reject.$i"] = "Qty diterima + qty reject tidak boleh melebihi Qty PO ($poQty).";
-                }
-
-                if ($qtyRec > $poQty) {
-                    $errors["qty_received.$i"] = "Qty diterima tidak boleh lebih dari Qty PO ($poQty).";
-                }
-
-                if ($qtyRej > $poQty) {
-                    $errors["qty_reject.$i"] = "Qty reject tidak boleh lebih dari Qty PO ($poQty).";
-                }
+        // Preload PO qty untuk validasi (hindari N+1)
+        $poQtyMap = [];
+        if (is_array($poLineIds) && count($poLineIds) > 0) {
+            $ids = collect($poLineIds)->filter()->unique()->values();
+            if ($ids->count()) {
+                $poQtyMap = PurchaseOrderLine::whereIn('id', $ids)
+                    ->pluck('qty', 'id')
+                    ->toArray();
             }
         }
 
-        if (!$anySelected) {
+        $lines = [];
+        $errors = [];
+        $anySelected = false;
+
+        foreach ($itemIds as $i => $itemId) {
+            if (!$itemId) {
+                continue;
+            }
+
+            $isChecked = array_key_exists($i, $selected);
+
+            if ($requireSelected) {
+                if (!$isChecked) {
+                    continue;
+                }
+
+                $anySelected = true;
+            }
+
+            $qtyRec = $this->num($qtyReceiveds[$i] ?? 0);
+            $qtyRej = $this->num($qtyRejects[$i] ?? 0);
+
+            if ($qtyRec <= 0 && $qtyRej <= 0) {
+                // kalau edit mode, baris kosong di-skip
+                continue;
+            }
+
+            $unitPrice = $this->num($unitPrices[$i] ?? 0);
+
+            // Validasi qty vs qty PO (kalau ada po_line_id)
+            $poLineId = $poLineIds[$i] ?? null;
+            if ($poLineId) {
+                $poQty = (float) ($poQtyMap[$poLineId] ?? 0);
+
+                if ($poQty > 0 && ($qtyRec + $qtyRej) > $poQty) {
+                    $errors["qty_received.$i"] = "Qty diterima + reject tidak boleh melebihi Qty PO ($poQty).";
+                    $errors["qty_reject.$i"] = "Qty diterima + reject tidak boleh melebihi Qty PO ($poQty).";
+                }
+            }
+
+            $lines[] = [
+                'purchase_order_line_id' => $poLineId,
+                'item_id' => (int) $itemId,
+                'qty_received' => $qtyRec,
+                'qty_reject' => $qtyRej,
+                'unit_price' => $unitPrice,
+                'unit' => $units[$i] ?? null,
+                'notes' => $lineNotes[$i] ?? null,
+            ];
+        }
+
+        if ($requireSelected && !$anySelected) {
             $errors['selected'] = 'Tidak ada item yang dipilih. Centang minimal satu item.';
         }
 
         if (!empty($errors)) {
-            throw \Illuminate\Validation\ValidationException::withMessages($errors);
+            throw ValidationException::withMessages($errors);
         }
 
-        return $validated;
+        return $lines;
+    }
+
+    /**
+     * Parse angka format Indonesia / umum:
+     * - "1.234,56" => 1234.56
+     * - "1.234" => 1234
+     * - "12,5" => 12.5
+     * - "12.5" => 12.5
+     */
+    protected function num($value): float
+    {
+        if ($value === null || $value === '') {
+            return 0.0;
+        }
+
+        if (is_int($value) || is_float($value)) {
+            return (float) $value;
+        }
+
+        $v = trim((string) $value);
+        $v = str_replace(' ', '', $v);
+
+        // kalau ada koma, anggap koma = desimal, titik = ribuan
+        if (str_contains($v, ',')) {
+            $v = str_replace('.', '', $v);
+            $v = str_replace(',', '.', $v);
+            return (float) $v;
+        }
+
+        // kalau format ribuan pake titik: 1.234.567
+        if (preg_match('/^\d{1,3}(\.\d{3})+$/', $v)) {
+            $v = str_replace('.', '', $v);
+            return (float) $v;
+        }
+
+        return (float) $v;
     }
 }
