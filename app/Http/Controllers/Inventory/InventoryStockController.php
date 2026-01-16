@@ -55,12 +55,15 @@ class InventoryStockController extends Controller
     // ✅ NEW (UPDATED) : STOK PER ITEM (AJAX + JSON pagination)
     // ==========================================================
     // app/Http/Controllers/Inventory/InventoryStockController.php (misal)
+
     public function items(Request $request)
     {
         $user = auth()->user();
-        $role = $user?->role ?? null;
-        $roleNorm = strtolower((string) $role);
-        $isOwner = $roleNorm === 'owner';
+
+        // ✅ normalize role (anti spasi/case)
+        $roleRaw = (string) ($user?->role ?? '');
+        $role = strtolower(trim($roleRaw));
+        $isOwner = $role === 'owner';
 
         // =========================
         // Filters & sorting
@@ -71,9 +74,9 @@ class InventoryStockController extends Controller
         $sort = (string) $request->input('sort', 'code');
         $dir = strtolower((string) $request->input('dir', 'asc')) === 'desc' ? 'desc' : 'asc';
 
-        $allowedSortOwner = ['code', 'value', 'total', 'fg', 'wip', 'ads', 'cover'];
-        $allowedSortNonOwner = ['code', 'total', 'fg', 'wip'];
-        $allowedSort = $isOwner ? $allowedSortOwner : $allowedSortNonOwner;
+        $allowedSort = $isOwner
+        ? ['code', 'value', 'total', 'fg', 'wip', 'ads', 'cover']
+        : ['code', 'total', 'fg', 'wip'];
 
         if (!in_array($sort, $allowedSort, true)) {
             $sort = 'code';
@@ -86,12 +89,12 @@ class InventoryStockController extends Controller
             ->join('warehouses as w', 'w.id', '=', 'm.warehouse_id');
 
         // 🔒 Role scope
-        if ($roleNorm === 'operating') {
+        if ($role === 'operating') {
             $base->where(function ($q) {
                 $q->where('w.code', 'WH-PRD')
                     ->orWhere('w.code', 'LIKE', 'WIP-%');
             });
-        } elseif ($roleNorm === 'admin') {
+        } elseif ($role === 'admin') {
             $base->where('w.code', 'WH-RTS');
         }
 
@@ -105,25 +108,25 @@ class InventoryStockController extends Controller
         // =========================
         // STEP 2: aggregate per item + category
         // =========================
-        $query = DB::query()
+        $q = DB::query()
             ->fromSub($base, 's')
             ->join('items', 'items.id', '=', 's.item_id')
-            ->leftJoin('item_categories', 'item_categories.id', '=', 'items.item_category_id') // ✅ FIX
+            ->leftJoin('item_categories', 'item_categories.id', '=', 'items.item_category_id')
             ->where('items.active', 1);
 
         // Search
         if ($search !== '') {
             $terms = array_values(array_filter(preg_split('/[\s,;|]+/', $search)));
-            $query->where(function ($q) use ($terms) {
+            $q->where(function ($qq) use ($terms) {
                 foreach ($terms as $t) {
                     $like = "%{$t}%";
-                    $q->orWhere('items.code', 'like', $like)
+                    $qq->orWhere('items.code', 'like', $like)
                         ->orWhere('items.name', 'like', $like);
                 }
             });
         }
 
-        $query->selectRaw('
+        $q->selectRaw('
         s.item_id,
         items.code AS item_code,
         items.name AS item_name,
@@ -162,49 +165,47 @@ class InventoryStockController extends Controller
                 'items.avg_daily_sales'
             );
 
-        // =========================
         // Sorting
-        // =========================
         switch ($sort) {
             case 'value':
-                $query->orderBy('stock_value', $dir)->orderBy('items.code', 'asc');
+                $q->orderBy('stock_value', $dir)->orderBy('items.code', 'asc');
                 break;
             case 'total':
-                $query->orderBy('total_qty', $dir)->orderBy('items.code', 'asc');
+                $q->orderBy('total_qty', $dir)->orderBy('items.code', 'asc');
                 break;
             case 'fg':
-                $query->orderBy('fg_qty', $dir)->orderBy('items.code', 'asc');
+                $q->orderBy('fg_qty', $dir)->orderBy('items.code', 'asc');
                 break;
             case 'wip':
-                $query->orderBy('wip_qty', $dir)->orderBy('items.code', 'asc');
+                $q->orderBy('wip_qty', $dir)->orderBy('items.code', 'asc');
                 break;
             case 'ads':
-                $query->orderBy('ads', $dir)->orderBy('items.code', 'asc');
+                $q->orderBy('ads', $dir)->orderBy('items.code', 'asc');
                 break;
             case 'cover':
-                $query->orderBy('coverage_days', $dir)->orderBy('items.code', 'asc');
+                $q->orderBy('coverage_days', $dir)->orderBy('items.code', 'asc');
                 break;
             case 'code':
             default:
-                $query->orderBy('items.code', $dir);
+                $q->orderBy('items.code', $dir);
                 break;
         }
 
         // =========================
         // Pagination
         // =========================
-        $stocks = $query->paginate(50)->appends($request->query());
-        $collection = $stocks->getCollection();
+        $stocks = $q->paginate(50)->appends($request->query());
+        $rows = $stocks->getCollection();
 
         // =========================
-        // Owner-only summary (page current)
+        // Owner-only summary (current page)
         // =========================
         $hppSummary = null;
         $hppByCategory = [];
 
         if ($isOwner) {
-            $totalQty = (float) $collection->sum('total_qty');
-            $totalValue = (float) $collection->sum('stock_value');
+            $totalQty = (float) $rows->sum('total_qty');
+            $totalValue = (float) $rows->sum('stock_value');
 
             $hppSummary = [
                 'total_qty' => $totalQty,
@@ -212,7 +213,7 @@ class InventoryStockController extends Controller
                 'avg_hpp_weighted' => $totalQty > 0 ? ($totalValue / $totalQty) : 0.0,
             ];
 
-            $hppByCategory = $collection
+            $hppByCategory = $rows
                 ->groupBy(fn($r) => $r->category_name ?? 'Uncategorized')
                 ->map(function ($grp, $catName) {
                     $qty = (float) $grp->sum('total_qty');
@@ -226,26 +227,17 @@ class InventoryStockController extends Controller
                 })
                 ->values()
                 ->all();
-
-            if (empty($hppByCategory)) {
-                $hppByCategory = [[
-                    'category' => 'Uncategorized',
-                    'total_qty' => 0.0,
-                    'total_value' => 0.0,
-                    'avg_hpp_weighted' => 0.0,
-                ]];
-            }
         }
 
         // =========================
-        // JSON (AJAX) – bulletproof
+        // JSON (AJAX)
         // =========================
         $accept = (string) ($request->header('accept') ?? '');
         $forceJson = str_contains(strtolower($accept), 'application/json');
 
         if ($request->wantsJson() || $request->expectsJson() || $request->ajax() || $forceJson) {
 
-            $rows = $collection->map(function ($r) use ($isOwner) {
+            $payloadRows = $rows->map(function ($r) use ($isOwner) {
                 return [
                     'item_id' => (int) $r->item_id,
                     'item_code' => (string) $r->item_code,
@@ -258,7 +250,6 @@ class InventoryStockController extends Controller
                     'fg_qty' => (float) $r->fg_qty,
                     'wip_qty' => (float) $r->wip_qty,
 
-                    // owner-only sensitive fields
                     'hpp_per_unit' => $isOwner ? (float) $r->hpp_per_unit : null,
                     'stock_value' => $isOwner ? (float) $r->stock_value : null,
                     'ads' => $isOwner ? (float) $r->ads : null,
@@ -277,13 +268,13 @@ class InventoryStockController extends Controller
                     'current_page' => $stocks->currentPage(),
                     'last_page' => $stocks->lastPage(),
                 ],
-                'rows' => $rows,
+                'rows' => $payloadRows,
                 'pagination_html' => (string) $stocks->links(),
             ];
 
             if ($isOwner) {
                 $resp['hpp_summary'] = $hppSummary;
-                $resp['hpp_by_category'] = array_values($hppByCategory); // ✅ numeric array
+                $resp['hpp_by_category'] = array_values($hppByCategory);
             }
 
             return response()->json($resp);
