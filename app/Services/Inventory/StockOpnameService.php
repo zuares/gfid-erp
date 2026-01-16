@@ -109,12 +109,10 @@ class StockOpnameService
             $warehouseId = (int) $opname->warehouse_id;
 
             // ==========================================================
-            // OPENING: bikin adjustment juga
+            // OPENING
             // ==========================================================
             if ($opname->type === StockOpname::TYPE_OPENING) {
 
-                // Owner: wajib resolve cost (karena akan bikin snapshot & update base cost)
-                // Non-owner pending: boleh lolos tanpa cost lengkap (akan dipaksa saat approve adjustment)
                 $resolvedCosts = [];
                 if ($isOwner) {
                     [$resolvedCosts, $missingCostLines] = $this->resolveOpeningUnitCosts($opname);
@@ -133,7 +131,6 @@ class StockOpnameService
                     }
                 }
 
-                // Header InventoryAdjustment utk opening
                 $adjustment = new InventoryAdjustment();
                 $adjustment->code = $this->generateAdjustmentCodeForDate($date);
                 $adjustment->date = $date;
@@ -142,9 +139,7 @@ class StockOpnameService
                 $adjustment->source_id = $opname->id;
                 $adjustment->reason = $reason ?: ('Saldo awal dari stock opname opening ' . $opname->code);
                 $adjustment->notes = $notes;
-                $adjustment->status = $isOwner
-                ? InventoryAdjustment::STATUS_APPROVED
-                : InventoryAdjustment::STATUS_PENDING;
+                $adjustment->status = $isOwner ? InventoryAdjustment::STATUS_APPROVED : InventoryAdjustment::STATUS_PENDING;
                 $adjustment->created_by = $opname->created_by ?? $user?->id;
 
                 if ($isOwner) {
@@ -162,7 +157,7 @@ class StockOpnameService
                     $itemId = (int) $line->item_id;
                     $physicalQty = (float) $line->physical_qty;
 
-                    // qty_before = stok real saat finalize (lebih akurat utk opening)
+                    // realtime qty_before
                     $qtyBefore = (float) $this->inventory->getOnHandQty(
                         warehouseId: $warehouseId,
                         itemId: $itemId
@@ -171,6 +166,7 @@ class StockOpnameService
                     $difference = $physicalQty - $qtyBefore; // SIGNED
 
                     if (abs($difference) < 0.0000001) {
+                        // optional: kalau mau tetap audit even 0, kamu boleh create line 0 di sini
                         continue;
                     }
 
@@ -181,36 +177,33 @@ class StockOpnameService
                         'item_id' => $itemId,
                         'qty_before' => $qtyBefore,
                         'qty_after' => $physicalQty,
-                        'qty_change' => $difference, // ✅ SIGNED
+                        'qty_change' => $difference,
                         'direction' => $direction,
                         'notes' => $line->notes,
                         'lot_id' => null,
                     ]);
 
-                    // Non-owner -> pending: stop (stok belum berubah)
                     if (!$isOwner) {
                         continue;
                     }
 
-                    // Owner: set stok real jadi qty fisik (DENGAN COST)
-                    $unitCost = $resolvedCosts[$line->id] ?? null; // hasil resolveOpeningUnitCosts()
+                    $unitCost = $resolvedCosts[$line->id] ?? null;
 
                     $this->inventory->adjustByDifference(
                         warehouseId: $warehouseId,
                         itemId: $itemId,
-                        qtyChange: $difference, // SIGNED (physical - before)
+                        qtyChange: $difference,
                         date: $date,
                         sourceType: InventoryAdjustment::class,
                         sourceId: $adjustment->id,
                         notes: $adjustment->reason,
                         lotId: null,
                         allowNegative: false,
-                        unitCostOverride: $unitCost, // ✅ kunci agar mutasi punya unit_cost & total_cost
+                        unitCostOverride: $unitCost,
                         affectLotCost: false,
                     );
 
-                    // Snapshot opening hanya jika qty > 0 + cost > 0
-                    $unitCost = $resolvedCosts[$line->id] ?? null;
+                    // snapshot opening + update base_unit_cost
                     if ($physicalQty > 0 && $unitCost && (float) $unitCost > 0) {
                         $this->deactivateActiveSnapshots($itemId, $warehouseId);
 
@@ -233,7 +226,6 @@ class StockOpnameService
                             'created_by' => $opname->created_by ?? Auth::id(),
                         ]);
 
-                        // update base_unit_cost (last opening wins)
                         if ($line->item) {
                             $line->item->base_unit_cost = (float) $unitCost;
                             $line->item->save();
@@ -241,7 +233,6 @@ class StockOpnameService
                     }
                 }
 
-                // finalize opname (dikunci)
                 $opname->status = StockOpname::STATUS_FINALIZED;
                 $opname->finalized_by = $user?->id;
                 $opname->finalized_at = now();
@@ -251,7 +242,7 @@ class StockOpnameService
             }
 
             // ==========================================================
-            // PERIODIC: tetap seperti biasa, tapi sekarang kirim HPP ke mutasi
+            // PERIODIC (✅ realtime qty_before, bukan system_qty di line)
             // ==========================================================
             $adjustment = new InventoryAdjustment();
             $adjustment->code = $this->generateAdjustmentCodeForDate($date);
@@ -261,9 +252,7 @@ class StockOpnameService
             $adjustment->source_id = $opname->id;
             $adjustment->reason = $reason ?: ('Penyesuaian stok dari stock opname ' . $opname->code);
             $adjustment->notes = $notes;
-            $adjustment->status = $isOwner
-            ? InventoryAdjustment::STATUS_APPROVED
-            : InventoryAdjustment::STATUS_PENDING;
+            $adjustment->status = $isOwner ? InventoryAdjustment::STATUS_APPROVED : InventoryAdjustment::STATUS_PENDING;
             $adjustment->created_by = $opname->created_by ?? $user?->id;
 
             if ($isOwner) {
@@ -278,75 +267,67 @@ class StockOpnameService
                     continue;
                 }
 
-                $systemQty = (float) $line->system_qty;
+                $itemId = (int) $line->item_id;
                 $physicalQty = (float) $line->physical_qty;
-                $difference = $physicalQty - $systemQty; // SIGNED
 
-                if (abs($difference) < 0.0000001) {
-                    // tetep simpan line biar audit kelihatan, tapi tidak perlu mutasi stok
-                    InventoryAdjustmentLine::create([
-                        'inventory_adjustment_id' => $adjustment->id,
-                        'item_id' => (int) $line->item_id,
-                        'qty_before' => $systemQty,
-                        'qty_after' => $physicalQty,
-                        'qty_change' => 0,
-                        'direction' => 'in',
-                        'notes' => $line->notes,
-                        'lot_id' => null,
-                    ]);
-                    continue;
+                // ✅ qty_before realtime (lebih benar)
+                $qtyBefore = (float) $this->inventory->getOnHandQty(
+                    warehouseId: $warehouseId,
+                    itemId: $itemId
+                );
+
+                $difference = $physicalQty - $qtyBefore; // SIGNED
+
+                // resolve cost periodic (konsisten dengan generator kamu)
+                $unitCost = null;
+                if ($line->unit_cost !== null && (float) $line->unit_cost > 0) {
+                    $unitCost = (float) $line->unit_cost;
+                } elseif ($line->item && (float) ($line->item->hpp ?? 0) > 0) {
+                    $unitCost = (float) $line->item->hpp;
                 }
 
+                // ✅ selalu simpan adjustment line untuk audit (even difference 0)
                 $direction = $difference >= 0 ? 'in' : 'out';
 
-                // Simpan ringkasan di adjustment line
                 InventoryAdjustmentLine::create([
                     'inventory_adjustment_id' => $adjustment->id,
-                    'item_id' => (int) $line->item_id,
-                    'qty_before' => $systemQty,
+                    'item_id' => $itemId,
+                    'qty_before' => $qtyBefore,
                     'qty_after' => $physicalQty,
-                    'qty_change' => $difference, // SIGNED
+                    'qty_change' => (abs($difference) < 0.0000001) ? 0 : $difference,
                     'direction' => $direction,
                     'notes' => $line->notes,
                     'lot_id' => null,
                 ]);
 
-                // Kalau bukan owner → belum eksekusi stok, cuma bikin dokumen
+                // non-owner -> pending: stop (stok belum berubah)
                 if (!$isOwner) {
                     continue;
                 }
 
-                /**
-                 * ==== Resolve unit cost periodic ====
-                 * Urutan:
-                 * 1. Kalau SO Periodik punya unit_cost di baris item → pakai itu
-                 * 2. Kalau tidak, pakai HPP dari master item (kolom items.hpp)
-                 */
-                $unitCost = null;
-
-                if ($line->unit_cost !== null && (float) $line->unit_cost > 0) {
-                    $unitCost = (float) $line->unit_cost;
-                } elseif ($line->item && (float) $line->item->hpp > 0) {
-                    $unitCost = (float) $line->item->hpp;
+                // kalau beda 0, tidak perlu mutasi stok & snapshot
+                if (abs($difference) < 0.0000001) {
+                    continue;
                 }
 
-                // Sesuaikan stok ke qty fisik hasil SO
-                $this->inventory->adjustTo(
+                // ✅ gunakan adjustByDifference agar qty_before sesuai realtime
+                $this->inventory->adjustByDifference(
                     warehouseId: $warehouseId,
-                    itemId: (int) $line->item_id,
-                    newQty: $physicalQty,
+                    itemId: $itemId,
+                    qtyChange: $difference, // SIGNED
                     date: $date,
                     sourceType: InventoryAdjustment::class,
                     sourceId: $adjustment->id,
                     notes: $adjustment->reason,
                     lotId: null,
-                    unitCostOverride: $unitCost, // ✅ kunci supaya mutasi periodic ada HPP (dari items.hpp)
+                    allowNegative: false,
+                    unitCostOverride: $unitCost,
                     affectLotCost: false,
                 );
 
-                // Snapshot periodic (pakai unitCost yg sama)
+                // snapshot periodic (pakai qtyBasis physicalQty + unit cost resolved)
                 $this->snapshotPeriodicCost(
-                    itemId: (int) $line->item_id,
+                    itemId: $itemId,
                     warehouseId: $warehouseId,
                     snapshotDate: $date,
                     qtyBasis: $physicalQty,

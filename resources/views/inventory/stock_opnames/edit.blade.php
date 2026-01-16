@@ -30,23 +30,19 @@
     };
 
     $linesCollection = $opname->lines;
+
     $totalLines = $linesCollection->count();
-    $countedLines = $linesCollection->whereNotNull('physical_qty')->count();
+    // ✅ benar: progress pakai is_counted
+    $countedLines = $linesCollection->where('is_counted', true)->count();
     $notCounted = max($totalLines - $countedLines, 0);
 
-    /**
-     * ✅ URUTAN: terbaru berada di urutan terakhir
-     * (terlama dulu, terbaru paling bawah)
-     */
+    // urutan: terlama -> terbaru (terbaru paling bawah)
     $lines = $linesCollection
         ->sortBy(function ($line) {
             return $line->updated_at ?? ($line->created_at ?? $line->id);
         })
         ->values();
 
-    /**
-     * ✅ line terakhir (untuk highlight soft setelah add/update)
-     */
     $lastLine = $lines->last();
     $lastLineId = $lastLine?->id;
 @endphp
@@ -66,26 +62,18 @@
         }
 
         body[data-theme="light"] .page-wrap {
-            background:
-                radial-gradient(circle at top left,
-                    rgba(59, 130, 246, 0.10) 0,
-                    rgba(148, 163, 184, 0.07) 30%,
-                    #f9fafb 70%);
+            background: radial-gradient(circle at top left, rgba(59, 130, 246, 0.10) 0, rgba(148, 163, 184, 0.07) 30%, #f9fafb 70%);
         }
 
         body[data-theme="dark"] .page-wrap {
-            background: radial-gradient(circle at top left,
-                    rgba(59, 130, 246, 0.26) 0,
-                    rgba(15, 23, 42, 1) 55%);
+            background: radial-gradient(circle at top left, rgba(59, 130, 246, 0.26) 0, rgba(15, 23, 42, 1) 55%);
         }
 
         .card-main {
             background: var(--card);
             border-radius: var(--so-card-radius);
             border: 1px solid var(--so-border);
-            box-shadow:
-                0 10px 26px rgba(15, 23, 42, 0.06),
-                0 0 0 1px rgba(15, 23, 42, 0.03);
+            box-shadow: 0 10px 26px rgba(15, 23, 42, 0.06), 0 0 0 1px rgba(15, 23, 42, 0.03);
         }
 
         .page-head {
@@ -169,7 +157,6 @@
             color: #15803d;
         }
 
-        /* ✅ TABLE WRAP: max-height ~10 row + scroll */
         .table-wrap {
             margin-top: .65rem;
             border-radius: 12px;
@@ -178,7 +165,6 @@
             overflow-y: auto;
             background: rgba(248, 250, 252, .9);
             max-height: 480px;
-            /* fallback, akan di-set JS jadi ~10 row */
         }
 
         body[data-theme="dark"] .table-wrap {
@@ -186,18 +172,14 @@
             border-color: rgba(51, 65, 85, .9);
         }
 
-        /* ✅ THEAD STICKY + TIDAK TRANSPARAN */
         .table thead th {
             position: sticky;
             top: 0;
             z-index: 3;
-
             font-size: .72rem;
             text-transform: uppercase;
             letter-spacing: .06em;
             white-space: nowrap;
-
-            /* penting: solid background */
             background: var(--card) !important;
             opacity: 1 !important;
             color: rgba(100, 116, 139, 1);
@@ -359,7 +341,6 @@
             color: #9ca3af;
         }
 
-        /* ✅ Highlight row terakhir */
         .so-row-highlight {
             position: relative;
             animation: soRowPulseStrong 1.8s ease-out 1;
@@ -454,12 +435,8 @@
                                         </div>
 
                                         <div class="pill-label mt-3 mb-1">Gudang</div>
-                                        <div class="fw-semibold">
-                                            {{ $opname->warehouse?->code ?? '-' }}
-                                        </div>
-                                        <div class="meta">
-                                            {{ $opname->warehouse?->name }}
-                                        </div>
+                                        <div class="fw-semibold">{{ $opname->warehouse?->code ?? '-' }}</div>
+                                        <div class="meta">{{ $opname->warehouse?->name }}</div>
                                     </div>
 
                                     <div class="col-md-6 so-meta--hide-mobile">
@@ -476,19 +453,13 @@
                                         <div class="text-mono fw-semibold">{{ $opname->code }}</div>
 
                                         <div class="pill-label mt-3 mb-1">Tanggal</div>
-                                        <div style="font-size:.9rem;">
-                                            {{ $opname->date?->format('d M Y') ?? '-' }}
-                                        </div>
+                                        <div style="font-size:.9rem;">{{ $opname->date?->format('d M Y') ?? '-' }}</div>
                                     </div>
 
                                     <div class="col-md-4">
                                         <div class="pill-label mb-1">Gudang</div>
-                                        <div class="fw-semibold">
-                                            {{ $opname->warehouse?->code ?? '-' }}
-                                        </div>
-                                        <div class="meta">
-                                            {{ $opname->warehouse?->name }}
-                                        </div>
+                                        <div class="fw-semibold">{{ $opname->warehouse?->code ?? '-' }}</div>
+                                        <div class="meta">{{ $opname->warehouse?->name }}</div>
                                     </div>
 
                                     <div class="col-md-4">
@@ -516,7 +487,6 @@
                             <div class="card-body">
                                 <div id="openingAddMobile"
                                     data-action="{{ route('inventory.stock_opnames.lines.store', $opname) }}">
-                                    {{-- CSRF untuk AJAX --}}
                                     <input type="hidden" id="openingAddTokenMobile" value="{{ csrf_token() }}">
                                     <input type="hidden" name="_token" value="{{ csrf_token() }}">
 
@@ -554,14 +524,12 @@
                             <div class="card-body">
                                 <div class="d-flex justify-content-between align-items-start gap-2 mb-2">
                                     <div class="pill-label">
-                                        {{ $isOpening ? 'Tambah item saldo awal' : 'Tambah item opname' }}
-                                    </div>
+                                        {{ $isOpening ? 'Tambah item saldo awal' : 'Tambah item opname' }}</div>
                                     <span class="chip">{{ $isOpening ? 'Mode Opening' : 'Mode Periodik' }}</span>
                                 </div>
 
                                 <div id="openingAddDesktop"
                                     data-action="{{ route('inventory.stock_opnames.lines.store', $opname) }}">
-                                    {{-- CSRF untuk AJAX --}}
                                     <input type="hidden" id="openingAddTokenDesktop" value="{{ csrf_token() }}">
                                     <input type="hidden" name="_token" value="{{ csrf_token() }}">
 
@@ -636,8 +604,7 @@
                         <div class="card-body">
                             <div class="d-flex justify-content-between align-items-center flex-wrap gap-2">
                                 <div class="pill-label">
-                                    {{ $isOpening ? 'Saldo awal per item' : 'Hasil hitung fisik per item' }}
-                                </div>
+                                    {{ $isOpening ? 'Saldo awal per item' : 'Hasil hitung fisik per item' }}</div>
                                 <span class="chip">{{ $countedLines }} / {{ $totalLines }} terisi</span>
                             </div>
 
@@ -676,8 +643,9 @@
                                             @php
                                                 $inputNamePrefix = "lines[{$line->id}]";
 
-                                                $rawSystemQty = $line->system_qty ?? 0;
+                                                $rawSystemQty = (float) ($line->system_qty ?? 0);
 
+                                                // physical di DB (bukan dipaksa 0 lagi)
                                                 $rawPhysical = old(
                                                     $inputNamePrefix . '.physical_qty',
                                                     $line->physical_qty,
@@ -685,11 +653,6 @@
                                                 $hasPhysicalValue = $rawPhysical !== null && $rawPhysical !== '';
                                                 if ($hasPhysicalValue) {
                                                     $rawPhysical = (float) $rawPhysical;
-                                                }
-
-                                                if (!$isOpening && !$hasPhysicalValue) {
-                                                    $rawPhysical = 0;
-                                                    $hasPhysicalValue = true;
                                                 }
 
                                                 $diffFromModel = $line->difference ?? ($line->difference_qty ?? null);
@@ -702,6 +665,7 @@
                                                 }
 
                                                 $hasPhysicalForDisplay = $hasPhysicalValue;
+
                                                 $diffDisplay =
                                                     $diff > 0 ? '+' . number_format($diff, 2) : number_format($diff, 2);
 
@@ -723,11 +687,12 @@
                                                     $rawUnitCost = (float) $rawUnitCost;
                                                 }
 
+                                                // opening fallback base_unit_cost
                                                 $fallbackUnitCost = null;
                                                 if (
                                                     !$hasUnitCostValue &&
                                                     $line->item &&
-                                                    $line->item->base_unit_cost > 0
+                                                    (float) ($line->item->base_unit_cost ?? 0) > 0
                                                 ) {
                                                     $fallbackUnitCost = (float) $line->item->base_unit_cost;
                                                 }
@@ -738,7 +703,9 @@
 
                                                 $rowClasses = [];
                                                 $showNotCountedBadge = false;
-                                                if ($isOpening && !$hasPhysicalValue) {
+
+                                                // ✅ opening & periodic: kalau belum input physical -> not counted
+                                                if (!$hasPhysicalValue) {
                                                     $rowClasses[] = 'so-row-not-counted';
                                                     $showNotCountedBadge = true;
                                                 }
@@ -768,6 +735,7 @@
                                                     </td>
                                                 @endunless
 
+                                                {{-- ✅ Qty Fisik --}}
                                                 <td class="text-end">
                                                     @if ($isOpening)
                                                         @if ($hasPhysicalForDisplay)
@@ -780,13 +748,20 @@
                                                             <span class="meta">-</span>
                                                         @endif
                                                     @else
-                                                        <span
-                                                            class="text-mono">{{ number_format($rawPhysical ?? 0, 2) }}</span>
-                                                        <input type="hidden" name="{{ $inputNamePrefix }}[physical_qty]"
-                                                            value="{{ $rawPhysical ?? 0 }}">
+                                                        {{-- PERIODIC: hanya kirim jika sudah ada input --}}
+                                                        @if ($hasPhysicalForDisplay)
+                                                            <span
+                                                                class="text-mono">{{ number_format($rawPhysical, 2) }}</span>
+                                                            <input type="hidden"
+                                                                name="{{ $inputNamePrefix }}[physical_qty]"
+                                                                value="{{ $rawPhysical }}">
+                                                        @else
+                                                            <span class="meta">-</span>
+                                                        @endif
                                                     @endif
                                                 </td>
 
+                                                {{-- Selisih --}}
                                                 <td class="text-end text-mono col-diff d-none d-md-table-cell">
                                                     @if ($hasPhysicalForDisplay)
                                                         <span class="{{ $diffClass }}">{{ $diffDisplay }}</span>
@@ -795,8 +770,16 @@
                                                     @endif
                                                 </td>
 
-                                                <input type="hidden" name="{{ $inputNamePrefix }}[unit_cost]"
-                                                    value="{{ $effectiveUnitCost !== null ? $effectiveUnitCost : '' }}">
+                                                {{-- ✅ unit_cost: opening selalu kirim; periodic hanya kalau sudah ada physical --}}
+                                                @if ($isOpening)
+                                                    <input type="hidden" name="{{ $inputNamePrefix }}[unit_cost]"
+                                                        value="{{ $effectiveUnitCost !== null ? $effectiveUnitCost : '' }}">
+                                                @else
+                                                    @if ($hasPhysicalForDisplay)
+                                                        <input type="hidden" name="{{ $inputNamePrefix }}[unit_cost]"
+                                                            value="{{ $effectiveUnitCost !== null ? $effectiveUnitCost : '' }}">
+                                                    @endif
+                                                @endif
 
                                                 @if ($isOpening && !$isOpOrAdmin)
                                                     <td class="text-end col-unit">
@@ -847,8 +830,8 @@
                                     @if ($isOpening)
                                         Mode Opening • Tambah / edit item di atas, lalu simpan di sini.
                                     @else
-                                        Mode Periodik • Tambah / edit Qty Fisik. Item tanpa input akan dianggap Qty Fisik =
-                                        0.
+                                        Mode Periodik • Isi Qty Fisik untuk item yang dihitung. Saat “Tandai Selesai”, item
+                                        yang belum diisi akan otomatis dianggap 0.
                                     @endif
                                 </div>
 
@@ -950,34 +933,29 @@
             focusBackAfterReload();
             renumberOpnameRows();
 
-            // ✅ max-height muat ~10 row
             setTableMaxHeight10Rows();
-
-            // ✅ highlight + auto scroll ke row terakhir setelah reload
             highlightLastRowIfNeeded();
 
             const soForm = document.getElementById('soUpdateForm');
             const markReviewedEl = document.getElementById('mark_reviewed');
             const forceAutoFillEl = document.getElementById('force_auto_fill');
 
-            // ✅ Solusi rapi: saat submit form utama, disable blok add-item
             if (soForm) {
                 soForm.addEventListener('submit', function() {
                     disableOpeningAddInputsBeforeSubmit();
                 });
             }
 
+            // ✅ tombol finish: mark_reviewed=1 + force_auto_fill=1
             if (soForm && markReviewedEl && forceAutoFillEl) {
                 const strictBtn = document.querySelector('[data-action="finish-counting-strict"]');
                 if (strictBtn) {
                     strictBtn.addEventListener('click', function(e) {
                         e.preventDefault();
-
-                        // sebelum submit juga disable add inputs
                         disableOpeningAddInputsBeforeSubmit();
 
                         markReviewedEl.value = '1';
-                        forceAutoFillEl.value = '0';
+                        forceAutoFillEl.value = '1';
                         soForm.submit();
                     });
                 }
@@ -996,24 +974,14 @@
             };
         }
 
-        /**
-         * ✅ Solusi rapi:
-         * Disable semua input pada blok add-item (mobile & desktop)
-         * agar tidak memicu invalid HTML5 saat klik Simpan.
-         */
         function disableOpeningAddInputsBeforeSubmit() {
             const blocks = ['#openingAddMobile', '#openingAddDesktop'];
-
             blocks.forEach(sel => {
                 const root = document.querySelector(sel);
                 if (!root) return;
-
                 root.querySelectorAll('input, select, textarea, button').forEach(el => {
-                    // tombol tambah juga boleh disable biar tidak kepencet dobel saat submit
                     el.disabled = true;
                 });
-
-                // jaga-jaga kalau input suggest ada di dalam
                 const suggest = root.querySelector('.js-item-suggest-input');
                 if (suggest) suggest.disabled = true;
             });
@@ -1022,9 +990,7 @@
         function renumberOpnameRows() {
             const tbody = document.querySelector('#opname-lines-table tbody');
             if (!tbody) return;
-
-            const rows = tbody.querySelectorAll('tr');
-            rows.forEach((tr, idx) => {
+            tbody.querySelectorAll('tr').forEach((tr, idx) => {
                 const firstCell = tr.querySelector('td');
                 if (firstCell) firstCell.textContent = String(idx + 1);
             });
@@ -1033,7 +999,6 @@
         function setTableMaxHeight10Rows() {
             const tableWrap = document.getElementById('opname-lines-table');
             if (!tableWrap) return;
-
             const table = tableWrap.querySelector('table');
             const thead = table ? table.querySelector('thead') : null;
             const firstRow = table ? table.querySelector('tbody tr') : null;
@@ -1041,8 +1006,8 @@
 
             const rowH = firstRow.getBoundingClientRect().height || 38;
             const headH = thead ? (thead.getBoundingClientRect().height || 34) : 34;
-
             const maxH = Math.ceil((rowH * 10) + headH + 8);
+
             tableWrap.style.maxHeight = maxH + 'px';
             tableWrap.style.overflowY = 'auto';
         }
@@ -1063,7 +1028,6 @@
             try {
                 const flag = sessionStorage.getItem('so_opening_highlight_last');
                 if (!flag) return;
-
                 sessionStorage.removeItem('so_opening_highlight_last');
 
                 const tableWrap = document.getElementById('opname-lines-table');
@@ -1227,10 +1191,7 @@
                     if (labelEl) labelEl.textContent = (code ? code : 'Item') + (name ? ' — ' + name : '');
                     if (qtyOldEl) qtyOldEl.textContent = formatNumberForDisplay(oldQty);
                     if (qtyNewEl) qtyNewEl.textContent = formatNumberForDisplay(newQty);
-                    if (qtyDiffEl) {
-                        const prefix = diff > 0 ? '+' : '';
-                        qtyDiffEl.textContent = prefix + formatNumberForDisplay(diff);
-                    }
+                    if (qtyDiffEl) qtyDiffEl.textContent = (diff > 0 ? '+' : '') + formatNumberForDisplay(diff);
 
                     pendingOpeningSubmit = {
                         rootEl,
@@ -1393,7 +1354,6 @@
                             if (data.status === 'ok') {
                                 const tr = btn.closest('tr');
                                 if (tr) tr.remove();
-
                                 renumberOpnameRows();
                                 setTableMaxHeight10Rows();
                             } else {

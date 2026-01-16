@@ -223,12 +223,13 @@ class StockOpnameController extends Controller
             'lines.*.unit_cost' => ['nullable', 'numeric', 'gte:0'],
             'lines.*.notes' => ['nullable', 'string'],
             'mark_reviewed' => ['nullable', 'boolean'],
+            // optional kalau nanti kamu pakai (buat beda "Simpan" vs "Selesai")
+            // 'force_auto_fill' => ['nullable', 'boolean'],
         ]);
 
         $markReviewed = $request->boolean('mark_reviewed');
         $isOpening = $stockOpname->isOpening();
 
-        // ✅ Guard backend: siapa yang boleh tandai selesai hitung
         if ($markReviewed) {
             $userRole = auth()->user()->role ?? null;
             if (!in_array($userRole, ['operating', 'admin', 'owner'], true)) {
@@ -245,79 +246,99 @@ class StockOpnameController extends Controller
                 $stockOpname->status = StockOpname::STATUS_COUNTING;
             }
 
+            // load sekali: lines + item (buat fallback cost)
+            $stockOpname->load('lines.item');
+
             $linesInput = $validated['lines'] ?? [];
 
-            if (!empty($linesInput)) {
-                // ✅ sekaligus load relasi item agar bisa ambil base_unit_cost
-                $stockOpname->load('lines.item');
+            // ==========================================================
+            // 1) Apply input lines (kalau ada)
+            // ==========================================================
+            foreach ($linesInput as $lineId => $data) {
+                /** @var \App\Models\StockOpnameLine|null $line */
+                $line = $stockOpname->lines->firstWhere('id', (int) $lineId);
+                if (!$line) {
+                    continue;
+                }
 
-                foreach ($linesInput as $lineId => $data) {
-                    /** @var \App\Models\StockOpnameLine|null $line */
-                    $line = $stockOpname->lines->firstWhere('id', (int) $lineId);
-                    if (!$line) {
+                $systemQty = (float) ($line->system_qty ?? 0);
+
+                // normalize physical qty
+                $rawPhysical = $data['physical_qty'] ?? null;
+
+                if ($rawPhysical === '' || $rawPhysical === null) {
+                    $physicalQty = $isOpening ? null : 0.0;
+                } else {
+                    $physicalQty = (float) $rawPhysical;
+                }
+
+                // counted rule (simple & benar)
+                $isCounted = ($physicalQty !== null);
+
+                $difference = $isCounted ? ($physicalQty - $systemQty) : 0.0;
+
+                $line->physical_qty = $physicalQty;
+                $line->difference_qty = $difference;
+                $line->is_counted = $isCounted;
+                $line->notes = $data['notes'] ?? $line->notes;
+
+                // unit cost (kalau key ada, set; kalau tidak ada, biarkan)
+                if (array_key_exists('unit_cost', $data)) {
+                    $line->unit_cost = ($data['unit_cost'] !== null && $data['unit_cost'] !== '')
+                    ? (float) $data['unit_cost']
+                    : null;
+                }
+
+                // fallback cost untuk PERIODIC (biar konsisten dengan service kamu)
+                if (!$isOpening) {
+                    if ($line->unit_cost === null || (float) $line->unit_cost <= 0) {
+                        // ✅ rekomendasi: pakai items.hpp karena finalize/generate kamu pakai ini
+                        $fallback = (float) ($line->item->hpp ?? 0);
+
+                        // kalau kamu mau base_unit_cost, ganti jadi:
+                        // $fallback = (float) ($line->item->base_unit_cost ?? 0);
+
+                        if ($fallback > 0) {
+                            $line->unit_cost = $fallback;
+                        }
+                    }
+                }
+
+                $line->save();
+            }
+
+            // ==========================================================
+            // 2) Saat mark reviewed: PERIODIC auto-fill yang belum counted jadi 0
+            // ==========================================================
+            if ($markReviewed && !$isOpening) {
+                foreach ($stockOpname->lines as $line) {
+                    if ($line->is_counted) {
                         continue;
                     }
 
                     $systemQty = (float) ($line->system_qty ?? 0);
 
-                    // --- PERLAKUAN physical_qty ---
-                    // Opening: boleh null => belum dihitung
-                    // Periodik: kalau kosong, anggap 0 dan dianggap sudah dihitung
-                    $rawPhysical = $data['physical_qty'] ?? null;
+                    $line->physical_qty = 0.0;
+                    $line->difference_qty = 0.0 - $systemQty;
+                    $line->is_counted = true;
 
-                    if ($rawPhysical === '' || $rawPhysical === null) {
-                        if ($isOpening) {
-                            $physicalQty = null;
-                        } else {
-                            $physicalQty = 0.0;
+                    if ($line->unit_cost === null || (float) $line->unit_cost <= 0) {
+                        $fallback = (float) ($line->item->hpp ?? 0);
+                        // atau base_unit_cost kalau itu standar kamu
+                        if ($fallback > 0) {
+                            $line->unit_cost = $fallback;
                         }
-                    } else {
-                        $physicalQty = (float) $rawPhysical;
-                    }
 
-                    $difference = 0.0;
-                    $isCounted = false;
-
-                    if ($physicalQty !== null) {
-                        $difference = $physicalQty - $systemQty;
-                        // Periodik: semua baris dianggap counted (termasuk yang default 0)
-                        $isCounted = $isOpening ? true : true;
-                    }
-
-                    if ($isOpening && $physicalQty === null) {
-                        // Opening, belum diisi: jangan counted, selisih tetap 0
-                        $isCounted = false;
-                        $difference = 0.0;
-                    }
-
-                    $line->physical_qty = $physicalQty;
-                    $line->difference_qty = $difference;
-                    $line->is_counted = $isCounted;
-                    $line->notes = $data['notes'] ?? $line->notes;
-
-                    // --- HPP / unit ---
-                    if (array_key_exists('unit_cost', $data)) {
-                        $line->unit_cost = $data['unit_cost'] !== null ? (float) $data['unit_cost'] : null;
-                    }
-
-                    // ✅ RULE BARU: khusus SO PERIODIK
-                    // Kalau HPP kosong / 0 => ambil dari master item (base_unit_cost)
-                    if (!$isOpening) {
-                        if ($line->unit_cost === null || $line->unit_cost <= 0) {
-                            $base = optional($line->item)->base_unit_cost;
-                            if ($base !== null && $base > 0) {
-                                $line->unit_cost = (float) $base;
-                            }
-                        }
                     }
 
                     $line->save();
                 }
             }
 
+            // ==========================================================
+            // 3) Mark reviewed validation (harus semua counted)
+            // ==========================================================
             if ($markReviewed) {
-                $stockOpname->load('lines');
-
                 $notCountedExists = $stockOpname->lines->contains(fn($line) => !$line->is_counted);
 
                 if ($notCountedExists) {
@@ -334,21 +355,18 @@ class StockOpnameController extends Controller
             $stockOpname->save();
         });
 
-        // ✅ kalau klik tombol selesai counting (dari edit/show)
         if ($request->boolean('mark_reviewed')) {
             return redirect()
                 ->route('inventory.stock_opnames.show', $stockOpname)
                 ->with('success', 'Counting selesai. Dokumen dikirim untuk review.');
         }
 
-        // ✅ kalau klik simpan biasa (misalnya dari edit form)
         if ($request->boolean('save_and_view')) {
             return redirect()
                 ->route('inventory.stock_opnames.show', $stockOpname)
                 ->with('success', 'Perubahan berhasil disimpan.');
         }
 
-        // fallback default
         return redirect()
             ->back()
             ->with('success', 'Perubahan berhasil disimpan.');
@@ -473,7 +491,7 @@ class StockOpnameController extends Controller
 
                 if ($physicalQty !== null) {
                     $difference = $physicalQty - $systemQty;
-                    $isCounted = $isOpening ? true : true;
+                    $isCounted = ($physicalQty !== null);
                 }
 
                 if ($isOpening && $physicalQty === null) {
@@ -496,7 +514,7 @@ class StockOpnameController extends Controller
 
                 if ($physicalQty !== null) {
                     $difference = $physicalQty - $systemQty;
-                    $isCounted = $isOpening ? true : true;
+                    $$isCounted = ($physicalQty !== null);;
                 }
 
                 if ($isOpening && $physicalQty === null) {
