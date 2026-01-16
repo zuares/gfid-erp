@@ -59,10 +59,7 @@ class InventoryStockController extends Controller
     public function items(Request $request)
     {
         $user = auth()->user();
-
-        // ✅ normalize role (anti spasi/case)
-        $roleRaw = (string) ($user?->role ?? '');
-        $role = strtolower(trim($roleRaw));
+        $role = strtolower(trim((string) ($user?->role ?? '')));
         $isOwner = $role === 'owner';
 
         // =========================
@@ -83,7 +80,36 @@ class InventoryStockController extends Controller
         }
 
         // =========================
-        // STEP 1: base stock per item + warehouse
+        // ✅ Owner: list gudang + selected warehouse_id
+        // =========================
+        $warehouses = collect();
+        $warehouseId = null;
+
+        if ($isOwner) {
+            $warehouses = Warehouse::query()
+                ->where('active', 1) // ✅ kolomnya active
+                ->orderByRaw("
+                CASE
+                    WHEN code = 'FG' THEN 1
+                    WHEN code = 'WH-RTS' THEN 2
+                    WHEN code = 'WH-PRD' THEN 3
+                    WHEN code LIKE 'WIP-%' THEN 4
+                    WHEN code LIKE 'REJ-%' OR code = 'REJECT' THEN 5
+                    ELSE 6
+                END
+            ")
+                ->orderBy('code')
+                ->get(['id', 'code', 'name', 'type']);
+
+            $warehouseId = $request->filled('warehouse_id') ? (int) $request->input('warehouse_id') : null;
+
+            if ($warehouseId && !$warehouses->firstWhere('id', $warehouseId)) {
+                $warehouseId = null;
+            }
+        }
+
+        // =========================
+        // STEP 1: base stock per item+warehouse
         // =========================
         $base = DB::table('inventory_mutations as m')
             ->join('warehouses as w', 'w.id', '=', 'm.warehouse_id');
@@ -96,6 +122,9 @@ class InventoryStockController extends Controller
             });
         } elseif ($role === 'admin') {
             $base->where('w.code', 'WH-RTS');
+        } elseif ($isOwner && $warehouseId) {
+            // ✅ Owner filter gudang
+            $base->where('m.warehouse_id', $warehouseId);
         }
 
         $base->selectRaw('
@@ -106,7 +135,7 @@ class InventoryStockController extends Controller
             ->groupBy('m.item_id', 'w.code');
 
         // =========================
-        // STEP 2: aggregate per item + category
+        // STEP 2: aggregate per item
         // =========================
         $q = DB::query()
             ->fromSub($base, 's')
@@ -126,18 +155,23 @@ class InventoryStockController extends Controller
             });
         }
 
+        // ✅ Mapping FG/WIP sesuai gudangmu
         $q->selectRaw('
         s.item_id,
         items.code AS item_code,
         items.name AS item_name,
-
         item_categories.id AS category_id,
         item_categories.name AS category_name,
 
         COALESCE(SUM(s.qty),0) AS total_qty,
 
         COALESCE(SUM(
-            CASE WHEN s.wh_code LIKE \'WH-%\' THEN s.qty ELSE 0 END
+            CASE
+                WHEN s.wh_code = \'FG\' THEN s.qty
+                WHEN s.wh_code = \'WH-TRANSIT\' THEN s.qty
+                WHEN s.wh_code LIKE \'WH-%\' THEN s.qty
+                ELSE 0
+            END
         ),0) AS fg_qty,
 
         COALESCE(SUM(
@@ -185,20 +219,16 @@ class InventoryStockController extends Controller
             case 'cover':
                 $q->orderBy('coverage_days', $dir)->orderBy('items.code', 'asc');
                 break;
-            case 'code':
             default:
                 $q->orderBy('items.code', $dir);
                 break;
         }
 
-        // =========================
-        // Pagination
-        // =========================
         $stocks = $q->paginate(50)->appends($request->query());
         $rows = $stocks->getCollection();
 
         // =========================
-        // Owner-only summary (current page)
+        // Owner summary
         // =========================
         $hppSummary = null;
         $hppByCategory = [];
@@ -236,7 +266,6 @@ class InventoryStockController extends Controller
         $forceJson = str_contains(strtolower($accept), 'application/json');
 
         if ($request->wantsJson() || $request->expectsJson() || $request->ajax() || $forceJson) {
-
             $payloadRows = $rows->map(function ($r) use ($isOwner) {
                 return [
                     'item_id' => (int) $r->item_id,
@@ -289,7 +318,9 @@ class InventoryStockController extends Controller
                 'search' => $searchRaw,
                 'sort' => $sort,
                 'dir' => $dir,
+                'warehouse_id' => $warehouseId,
             ],
+            'warehouses' => $warehouses,
         ]);
     }
 
