@@ -7,6 +7,7 @@ use App\Models\StockOpname;
 use App\Models\StockOpnameLine;
 use App\Models\Warehouse;
 use App\Services\Inventory\StockOpnameService;
+use Illuminate\Http\JsonResponse;
 use Illuminate\Http\RedirectResponse;
 use Illuminate\Http\Request;
 use Illuminate\Support\Carbon;
@@ -157,19 +158,190 @@ class StockOpnameController extends Controller
     /**
      * Detail (read-only) + tombol Simpan & Selesai Hitung + Reopen.
      */
-    public function show(StockOpname $stockOpname): View
+
+    public function show(Request $request, StockOpname $stockOpname): View | JsonResponse
     {
-        $stockOpname->load(['warehouse', 'lines.item', 'creator', 'reviewer', 'finalizer']);
+        $stockOpname->load(['warehouse', 'creator', 'reviewer', 'finalizer']);
+
+        // ==========================================================
+        // Lines query (filter + sorting)
+        // ==========================================================
+        $linesQ = \App\Models\StockOpnameLine::query()
+            ->where('stock_opname_id', $stockOpname->id)
+            ->with(['item']);
+
+        $search = trim((string) $request->get('q', ''));
+        if ($search !== '') {
+            $linesQ->whereHas('item', function ($q) use ($search) {
+                $q->where('code', 'like', "%{$search}%")
+                    ->orWhere('name', 'like', "%{$search}%");
+            });
+        }
+
+        $counted = (string) $request->get('counted', 'all'); // all|yes|no
+        if ($counted === 'yes') {
+            $linesQ->where('is_counted', 1);
+        } elseif ($counted === 'no') {
+            $linesQ->where(function ($q) {
+                $q->whereNull('is_counted')->orWhere('is_counted', 0);
+            });
+        }
+
+        $diffOnly = (bool) $request->boolean('diff_only');
+        if ($diffOnly) {
+            $linesQ->where('is_counted', 1)
+                ->whereRaw('ABS(COALESCE(difference_qty,0)) > 0.0000001');
+        }
+
+        $diffSign = (string) $request->get('diff_sign', 'all'); // all|plus|minus
+        if ($diffSign === 'plus') {
+            $linesQ->where('is_counted', 1)->where('difference_qty', '>', 0);
+        } elseif ($diffSign === 'minus') {
+            $linesQ->where('is_counted', 1)->where('difference_qty', '<', 0);
+        }
+
+        $sort = (string) $request->get('sort', 'item'); // item|system|physical|diff|value|updated
+        $dir = strtolower((string) $request->get('dir', 'asc')) === 'desc' ? 'desc' : 'asc';
+
+        switch ($sort) {
+            case 'updated':
+                $linesQ->orderBy('updated_at', $dir)->orderBy('id', $dir);
+                break;
+            case 'system':
+                $linesQ->orderBy('system_qty', $dir)->orderBy('id', $dir);
+                break;
+            case 'physical':
+                $linesQ->orderByRaw("CASE WHEN physical_qty IS NULL THEN 1 ELSE 0 END")
+                    ->orderBy('physical_qty', $dir)->orderBy('id', $dir);
+                break;
+            case 'diff':
+                $linesQ->orderByRaw("CASE WHEN difference_qty IS NULL THEN 1 ELSE 0 END")
+                    ->orderBy('difference_qty', $dir)->orderBy('id', $dir);
+                break;
+            case 'value':
+                $linesQ->orderByRaw("ABS(COALESCE(difference_qty,0)) * COALESCE(unit_cost,0) {$dir}")
+                    ->orderBy('id', $dir);
+                break;
+            case 'item':
+            default:
+                $linesQ->join('items', 'items.id', '=', 'stock_opname_lines.item_id')
+                    ->orderBy('items.code', $dir)
+                    ->select('stock_opname_lines.*');
+                break;
+        }
+
+        $lines = $linesQ->get();
 
         $adjustment = \App\Models\InventoryAdjustment::query()
             ->where('source_type', \App\Models\StockOpname::class)
-            ->where('source_id', $stockOpname->id)
+            ->where('source_id', $stock_opname->id ?? $stockOpname->id)
             ->latest('id')
             ->first();
+
+        $filters = [
+            'q' => $search,
+            'counted' => $counted,
+            'diff_only' => $diffOnly,
+            'diff_sign' => $diffSign,
+            'sort' => $sort,
+            'dir' => $dir,
+        ];
+
+        // ==========================================================
+        // Prepare JSON rows + summary (filtered)
+        // ==========================================================
+        $rows = [];
+        $plusQty = 0.0;
+        $minusQty = 0.0;
+        $plusValue = 0.0;
+        $minusValue = 0.0;
+
+        foreach ($lines as $idx => $line) {
+            $itemCode = $line->item?->code ?? '-';
+            $itemName = $line->item?->name ?? '';
+
+            $systemQty = (float) ($line->system_qty ?? 0);
+            $physicalQty = $line->physical_qty !== null ? (float) $line->physical_qty : null;
+
+            $isCounted = (bool) ($line->is_counted ?? false);
+
+            // diff hanya meaningful kalau counted & physical ada
+            $diff = null;
+            if ($isCounted && $physicalQty !== null) {
+                $diff = (float) ($line->difference_qty ?? ($physicalQty - $systemQty));
+            }
+
+            // cost untuk nilai: line.unit_cost -> fallback item.hpp
+            $unitCost = 0.0;
+            if ($line->unit_cost !== null && (float) $line->unit_cost > 0) {
+                $unitCost = (float) $line->unit_cost;
+            } elseif ($line->item && (float) ($line->item->hpp ?? 0) > 0) {
+                $unitCost = (float) $line->item->hpp;
+            }
+
+            $value = null;
+            if ($diff !== null && abs($diff) >= 0.0000001 && $unitCost > 0) {
+                $value = $diff * $unitCost;
+            }
+
+            // update summary (filtered, counted only)
+            if ($diff !== null && abs($diff) >= 0.0000001) {
+                if ($diff > 0) {
+                    $plusQty += $diff;
+                    $plusValue += abs((float) ($value ?? 0));
+                } else {
+                    $minusQty += $diff;
+                    $minusValue += ((float) ($value ?? 0)) <= 0 ? (float) ($value ?? 0) : -abs((float) ($value ?? 0));
+                }
+            }
+
+            $tone = '';
+            if ($diff !== null) {
+                $tone = $diff < 0 ? 'diff-danger' : ($diff > 0 ? 'diff-warning' : 'diff-success');
+            }
+
+            $rows[] = [
+                'no' => $idx + 1,
+                'item_code' => $itemCode,
+                'item_name' => $itemName,
+                'system_qty' => $systemQty,
+                'physical_qty' => $physicalQty,
+                'diff_qty' => $diff,
+                'tone' => $tone,
+                'value' => $value,
+                'notes' => (string) ($line->notes ?? ''),
+            ];
+        }
+
+        $netQty = $plusQty + $minusQty;
+        $netValue = $plusValue + $minusValue;
+
+        $netQtyClass = $netQty < 0 ? 'diff-danger' : ($netQty > 0 ? 'diff-warning' : 'diff-success');
+        $netValueClass = $netValue < 0 ? 'diff-danger' : ($netValue > 0 ? 'diff-warning' : 'diff-success');
+
+        if ($request->ajax() || $request->wantsJson()) {
+            return response()->json([
+                'ok' => true,
+                'count' => count($rows),
+                'lines' => $rows,
+                'summary' => [
+                    'plus_qty' => $plusQty,
+                    'minus_qty' => $minusQty,
+                    'plus_value' => $plusValue,
+                    'minus_value' => $minusValue,
+                    'net_qty' => $netQty,
+                    'net_value' => $netValue,
+                    'net_qty_class' => $netQtyClass,
+                    'net_value_class' => $netValueClass,
+                ],
+            ]);
+        }
 
         return view('inventory.stock_opnames.show', [
             'opname' => $stockOpname,
             'adjustment' => $adjustment,
+            'lines' => $lines,
+            'filters' => $filters,
         ]);
     }
 
