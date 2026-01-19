@@ -118,11 +118,16 @@ class InventoryService
             ->lockForUpdate()
             ->first();
 
-        $current = $stock?->qty ?? 0;
+        $current = $this->num($stock?->qty ?? 0);
 
-        if (!$allowNegative && $current < $qty) {
+// toleransi float biar kasus 24.24 vs 24.24 tidak false-negative
+        $eps = 0.0000001;
+
+        if (!$allowNegative && ($current + $eps) < $qty) {
             throw new \RuntimeException(
-                "Stok tidak mencukupi untuk item {$itemId} di gudang {$warehouseId}. Stok: {$current}, mau keluar: {$qty}"
+                "Stok tidak mencukupi untuk item {$itemId} di gudang {$warehouseId}. "
+                . "Stok: {$current}, mau keluar: {$qty} "
+                . "(dbg current=" . sprintf('%.10f', $current) . ", qty=" . sprintf('%.10f', $qty) . ")"
             );
         }
 
