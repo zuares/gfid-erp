@@ -41,16 +41,8 @@
     // extra params for API
     'extraParams' => [],
 
-    /**
-     * ✅ DEFAULT: false (AMAN untuk block "Tambah item")
-     * Kalau benar-benar wajib sebelum submit form → set :required="true"
-     */
+    // validation options
     'required' => false,
-
-    /**
-     * ✅ DEFAULT: true (komponen tidak ikut validasi submit form utama)
-     * Kalau komponen bagian form utama (wajib dipilih) → set :skipSubmitValidation="false"
-     */
     'skipSubmitValidation' => true,
 ])
 
@@ -84,10 +76,10 @@
     data-show-name="{{ $showName ? '1' : '0' }}" data-show-category="{{ $showCategory ? '1' : '0' }}"
     data-extra-params='@json($extraParams)' data-required="{{ $required ? '1' : '0' }}"
     data-skip-submit="{{ $skipSubmitValidation ? '1' : '0' }}">
+
     <input type="text" value="{{ strtoupper($displayValue) }}" autocomplete="off"
         class="form-control form-control-sm js-item-suggest-input" placeholder="{{ $placeholder }}"
-        data-items='@json($jsItems)' id="{{ $uid }}" {{-- ❌ JANGAN pakai required HTML5 di text input untuk komponen ini --}}
-        aria-autocomplete="list">
+        data-items='@json($jsItems)' id="{{ $uid }}" aria-autocomplete="list">
 
     <input type="hidden" name="{{ $idName }}" value="{{ $idValue }}" class="js-item-suggest-id">
 
@@ -102,6 +94,7 @@
 @once
     @push('head')
         <style>
+            /* keep dropdown visible above table scroll */
             .table-responsive,
             table td,
             table th,
@@ -117,20 +110,21 @@
                 top: calc(100% + 4px);
                 background: var(--card, #fff);
                 border: 1px solid #e5e7eb;
-                border-radius: 6px;
+                border-radius: 10px;
                 max-height: 240px;
                 overflow-y: auto;
-                z-index: 1000;
+                z-index: 9999;
+                /* ✅ higher */
             }
 
             .item-suggest-option {
-                padding: .4rem .6rem;
+                padding: .45rem .6rem;
                 cursor: pointer;
             }
 
             .item-suggest-option:hover,
             .item-suggest-option.is-active {
-                background: rgba(59, 130, 246, 0.12);
+                background: rgba(59, 130, 246, .12);
             }
 
             .item-suggest-option-code {
@@ -164,7 +158,7 @@
                 return window.matchMedia("(max-width: 768px)").matches;
             }
 
-            function positionDropdown(input, dropdown, maxVisibleRows = 4) {
+            function positionDropdown(input, dropdown, maxVisibleRows) {
                 const rect = input.getBoundingClientRect();
                 const viewportHeight = window.innerHeight;
 
@@ -179,6 +173,16 @@
                 const spaceBelow = viewportHeight - rect.bottom - 6;
 
                 dropdown.style.maxHeight = Math.max(80, Math.min(desired, spaceBelow)) + "px";
+            }
+
+            function fireValueEvents(el) {
+                if (!el) return;
+                el.dispatchEvent(new Event('change', {
+                    bubbles: true
+                }));
+                el.dispatchEvent(new Event('input', {
+                    bubbles: true
+                }));
             }
 
             function setupItemSuggest(wrap) {
@@ -216,7 +220,7 @@
                     initialItems = [];
                 }
 
-                if (input.value) input.value = input.value.toUpperCase();
+                if (input.value) input.value = (input.value || '').toUpperCase();
 
                 let timer = null;
                 let lastItems = [];
@@ -301,7 +305,13 @@
                         }
 
                         btn.innerHTML = html;
-                        btn.addEventListener("click", () => selectItem(item));
+
+                        // ✅ mousedown -> ga ketutup duluan
+                        btn.addEventListener("mousedown", (e) => {
+                            e.preventDefault();
+                            selectItem(item);
+                        });
+
                         dropdown.appendChild(btn);
                     });
 
@@ -309,16 +319,12 @@
                     show();
                 }
 
-                function selectItem(item) {
-                    if (isDisabled()) return;
-
+                function setSelection(item) {
                     const mobile = isMobileViewport();
                     let text = item.code || '';
 
                     if (!mobile && displayMode === "code-name" && item.name) text += " — " + item.name;
                     text = (text || '').toUpperCase();
-
-                    isSelecting = true;
 
                     input.value = text;
                     hiddenId.value = item.id || '';
@@ -326,9 +332,18 @@
 
                     input.classList.remove('is-invalid');
 
-                    hiddenId.dispatchEvent(new Event('change', {
-                        bubbles: true
-                    }));
+                    // ✅ important for PO auto-price & other listeners
+                    fireValueEvents(hiddenId);
+                    fireValueEvents(hiddenCat);
+                }
+
+                function selectItem(item) {
+                    if (isDisabled()) return;
+
+                    isSelecting = true;
+                    setSelection(item);
+
+                    // release flag next tick
                     setTimeout(() => {
                         isSelecting = false;
                     }, 0);
@@ -374,7 +389,11 @@
                         });
                     }
 
-                    fetch(`/api/v1/items/suggest?${params.toString()}`)
+                    fetch(`/api/v1/items/suggest?${params.toString()}`, {
+                            headers: {
+                                'Accept': 'application/json'
+                            }
+                        })
                         .then(r => r.json())
                         .then(json => {
                             const data = json?.data || [];
@@ -403,11 +422,11 @@
                     }
 
                     if (!isSelecting) {
+                        // clear selection
                         hiddenId.value = "";
                         if (hiddenCat) hiddenCat.value = "";
-                        hiddenId.dispatchEvent(new Event('change', {
-                            bubbles: true
-                        }));
+                        fireValueEvents(hiddenId);
+                        fireValueEvents(hiddenCat);
 
                         if (required) input.classList.add('is-invalid');
                         else input.classList.remove('is-invalid');
@@ -469,19 +488,16 @@
                     }, 150);
                 }
 
-                document.addEventListener("click", (e) => {
+                // click outside
+                document.addEventListener("mousedown", (e) => {
                     if (!wrap.contains(e.target)) hide();
                 });
+
                 window.addEventListener('resize', () => {
                     if (isDropdownVisible()) positionDropdown(input, dropdown, maxResults);
                 });
 
-                /**
-                 * ✅ Validasi submit form:
-                 * - hanya untuk required=1
-                 * - dan skip-submit=0
-                 * - dan tidak disabled
-                 */
+                // submit validation (only required && !skipSubmit)
                 if (required && !skipSubmit) {
                     const form = wrap.closest('form');
                     if (form && !form.dataset.itemSuggestRequiredBound) {

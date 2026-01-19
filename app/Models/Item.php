@@ -210,4 +210,11 @@ class Item extends Model
         return $this->hasMany(ItemBarcode::class);
     }
 
+    public function suppliers()
+    {
+        return $this->belongsToMany(\App\Models\Supplier::class, 'supplier_items')
+            ->withPivot(['last_price'])
+            ->withTimestamps();
+    }
+
 }

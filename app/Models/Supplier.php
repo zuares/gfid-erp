@@ -63,4 +63,12 @@ class Supplier extends Model
     {
         return $this->type === 'sewing_vendor';
     }
+
+    public function items()
+    {
+        return $this->belongsToMany(\App\Models\Item::class, 'supplier_items')
+            ->withPivot(['last_price'])
+            ->withTimestamps();
+    }
+
 }
