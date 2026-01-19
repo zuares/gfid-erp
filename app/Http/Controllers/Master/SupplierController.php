@@ -8,6 +8,7 @@ use App\Models\Supplier;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\RedirectResponse;
 use Illuminate\Http\Request;
+use Illuminate\Support\Facades\DB;
 use Illuminate\Validation\Rule;
 use Illuminate\View\View;
 
@@ -174,13 +175,17 @@ class SupplierController extends Controller
             'last_price' => ['nullable', 'numeric', 'min:0'],
         ]);
 
-        $itemId = (int) $data['item_id'];
-        $lastPrice = (float) ($data['last_price'] ?? 0);
-
-        // syncWithoutDetaching biar idempotent
-        $supplier->items()->syncWithoutDetaching([
-            $itemId => ['last_price' => $lastPrice],
-        ]);
+        DB::table('supplier_items')->updateOrInsert(
+            [
+                'supplier_id' => (int) $supplier->id,
+                'item_id' => (int) $data['item_id'],
+            ],
+            [
+                'last_price' => (float) ($data['last_price'] ?? 0),
+                'updated_at' => now(),
+                'created_at' => now(),
+            ]
+        );
 
         return response()->json(['ok' => true]);
     }

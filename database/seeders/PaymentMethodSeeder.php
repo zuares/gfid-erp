@@ -38,8 +38,6 @@ class PaymentMethodSeeder extends Seeder
             // PAYMENT METHODS (mode: cash|transfer|credit)
             // =====================================================
             $rows = [
-
-                // ================= CASH =================
                 [
                     'code' => 'CASH',
                     'name' => 'Tunai',
@@ -47,34 +45,19 @@ class PaymentMethodSeeder extends Seeder
                     'default_cash_account_id' => $kas->id,
                     'sort_order' => 10,
                 ],
-
-                // ================= TRANSFER BANK =================
                 [
                     'code' => 'BANK',
                     'name' => 'Transfer Bank',
                     'mode' => 'transfer',
-                    'default_cash_account_id' => $bankJago->id, // default: Bank Jago (1111)
+                    'default_cash_account_id' => $bankJago->id,
                     'sort_order' => 20,
                 ],
-
-                // ================= CREDIT / TEMPO =================
                 [
                     'code' => 'TEMPO',
                     'name' => 'Tempo Supplier',
                     'mode' => 'credit',
-                    'default_cash_account_id' => null, // tempo memang tidak pakai kas/bank
+                    'default_cash_account_id' => null,
                     'sort_order' => 30,
-                ],
-
-                // ================= DOWN PAYMENT =================
-                // DP tetap "pembayaran" (uang keluar), default transfer via Bank Jago
-                // Jika suatu saat DP tunai, user bisa override cash_account_id di form
-                [
-                    'code' => 'DP',
-                    'name' => 'Down Payment',
-                    'mode' => 'transfer',
-                    'default_cash_account_id' => $bankJago->id,
-                    'sort_order' => 40,
                 ],
             ];
 

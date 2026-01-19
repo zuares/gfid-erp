@@ -35,6 +35,7 @@
             font-size: .7rem;
             border: 1px solid var(--line);
             background: rgba(148, 163, 184, .12);
+            white-space: nowrap;
         }
 
         .tag-status-draft {
@@ -62,6 +63,7 @@
             border: 1px solid rgba(59, 130, 246, .5);
             background: rgba(59, 130, 246, .08);
             color: #1d4ed8;
+            white-space: nowrap;
         }
 
         .badge-pill {
@@ -106,7 +108,7 @@
             color: #1d4ed8;
         }
 
-        .pm-hybrid {
+        .pm-transfer {
             border-color: rgba(234, 179, 8, .55);
             background: rgba(234, 179, 8, .10);
             color: #a16207;
@@ -185,29 +187,37 @@
     @php
         $user = auth()->user();
 
-        $status = $order->status;
+        // Status PO
+        $status = (string) ($order->status ?? 'draft');
         $statusClass = match ($status) {
             'approved' => 'tag tag-status-approved',
             'cancelled' => 'tag tag-status-cancelled',
             default => 'tag tag-status-draft',
         };
 
+        // GRN list
         $grnList = $order->purchaseReceipts ?? collect();
         $grnCount = $grnList->count();
 
+        // Payment method "preferensi" PO
         $pm = $order->paymentMethod ?? null;
         $pmMode = strtolower((string) ($pm->mode ?? ''));
         $pmBadgeClass = match ($pmMode) {
             'cash' => 'pm-badge pm-cash',
             'credit' => 'pm-badge pm-credit',
-            'hybrid' => 'pm-badge pm-hybrid',
+            'transfer' => 'pm-badge pm-transfer',
             default => 'pm-badge',
         };
 
-        $paid = (float) ($order->paid_amount ?? 0);
-        $grand = (float) ($order->grand_total ?? 0);
-        $balance = max(0, $grand - $paid);
+        // ==========================
+        // Hutang real berbasis GRN posted (dari controller show)
+        // ==========================
+        $grnPostedTotal = (float) ($grnPostedTotal ?? 0);
+        $paidPaymentTotal = (float) ($paidPaymentTotal ?? 0); // type=payment
+        $dpTotal = (float) ($dpTotal ?? 0); // type=dp
+        $apOutstanding = (float) ($apOutstanding ?? max(0, round($grnPostedTotal - $paidPaymentTotal, 2)));
 
+        // status bayar
         $payStatus = (string) ($order->payment_status ?? 'unpaid');
         $payBadgeClass = match ($payStatus) {
             'paid' => 'pay-badge pay-paid',
@@ -215,10 +225,10 @@
             default => 'pay-badge pay-unpaid',
         };
 
-        $canPay = $order->status !== 'cancelled';
+        $canPay = $status !== 'cancelled';
         $hasPayments = ($order->payments?->count() ?? 0) > 0;
 
-        // ✅ strict list sesuai permintaan kamu
+        // strict cash/bank list
         $cashAccountsCol = collect($cashAccounts ?? []);
         $cash1101 = $cashAccountsCol->firstWhere('code', '1101');
 
@@ -226,6 +236,9 @@
         $transferBanks = $cashAccountsCol
             ->filter(fn($a) => in_array((string) ($a->code ?? ''), $transferBankCodes, true))
             ->values();
+
+        // guard: payment hanya boleh kalau hutang real sudah ada
+        $hasAp = $grnPostedTotal > 0.0001;
     @endphp
 
     <div class="page-wrap py-4">
@@ -242,7 +255,7 @@
                     &larr; Kembali
                 </a>
 
-                @if ($order->status === 'draft')
+                @if ($status === 'draft')
                     <a href="{{ route('purchasing.purchase_orders.edit', $order->id) }}"
                         class="btn btn-outline-primary btn-sm btn-action">
                         Edit PO
@@ -264,7 +277,7 @@
                     @endif
                 @endif
 
-                @if ($user && $user->role === 'owner' && $order->status === 'draft')
+                @if ($user && $user->role === 'owner' && $status === 'draft')
                     <form action="{{ route('purchasing.purchase_orders.approve', $order->id) }}" method="POST"
                         onsubmit="return confirm('Approve PO ini? Setelah di-approve, PO tidak bisa diedit lagi.');">
                         @csrf
@@ -274,7 +287,7 @@
                     </form>
                 @endif
 
-                @if ($user && $user->role === 'owner' && in_array($order->status, ['draft', 'approved'], true) && $grnCount === 0)
+                @if ($user && $user->role === 'owner' && in_array($status, ['draft', 'approved'], true) && $grnCount === 0)
                     <form action="{{ route('purchasing.purchase_orders.cancel', $order->id) }}" method="POST"
                         onsubmit="return confirm('Batalkan PO ini? Tindakan ini tidak bisa dibatalkan.');">
                         @csrf
@@ -313,11 +326,11 @@
                 </div>
 
                 <div class="col-md-3 col-6">
-                    <div class="text-muted small">Metode bayar</div>
+                    <div class="text-muted small">Preferensi metode</div>
                     @if ($pm)
                         <div class="fw-semibold">{{ $pm->name }}</div>
                         <div class="mt-1">
-                            <span class="{{ $pmBadgeClass }} mono">{{ strtoupper($pm->mode ?? '-') }}</span>
+                            {{-- <span class="{{ $pmBadgeClass }} mono">{{ strtoupper($pm->mode ?? '-') }}</span> --}}
                             @if (!empty($pm->code))
                                 <span class="text-muted small mono ms-1">{{ $pm->code }}</span>
                             @endif
@@ -329,10 +342,30 @@
 
                 <div class="col-md-3 col-6">
                     <div class="text-muted small">Status PO</div>
-                    <span class="{{ $statusClass }} mono">{{ strtoupper($order->status) }}</span>
+                    <span class="{{ $statusClass }} mono">{{ strtoupper($status) }}</span>
                     @if ($grnCount > 0)
                         <span class="tag-grn mono ms-1">GRN x{{ $grnCount }}</span>
                     @endif
+                </div>
+
+                <div class="col-md-3 col-6">
+                    <div class="text-muted small">GRN Posted</div>
+                    <div class="fw-semibold mono">{{ rupiah($grnPostedTotal) }}</div>
+                </div>
+
+                <div class="col-md-3 col-6">
+                    <div class="text-muted small">DP</div>
+                    <div class="fw-semibold mono">{{ rupiah($dpTotal) }}</div>
+                </div>
+
+                <div class="col-md-3 col-6">
+                    <div class="text-muted small">Paid (Pelunasan)</div>
+                    <div class="fw-semibold mono">{{ rupiah($paidPaymentTotal) }}</div>
+                </div>
+
+                <div class="col-md-3 col-6">
+                    <div class="text-muted small">Sisa Hutang</div>
+                    <div class="fw-bold mono">{{ rupiah($apOutstanding) }}</div>
                 </div>
 
                 <div class="col-md-3 col-6">
@@ -341,16 +374,6 @@
                     @if (!empty($order->due_date))
                         <div class="text-muted small mono mt-1">JT: {{ id_date($order->due_date) }}</div>
                     @endif
-                </div>
-
-                <div class="col-md-3 col-6">
-                    <div class="text-muted small">Paid</div>
-                    <div class="fw-semibold mono">{{ rupiah($paid) }}</div>
-                </div>
-
-                <div class="col-md-3 col-6">
-                    <div class="text-muted small">Sisa</div>
-                    <div class="fw-bold mono">{{ rupiah($balance) }}</div>
                 </div>
 
                 <div class="col-md-3 col-6">
@@ -371,7 +394,7 @@
                 <div class="card">
                     <div class="card-header d-flex justify-content-between align-items-center flex-wrap gap-2">
                         <div class="fw-semibold">Riwayat Pembayaran</div>
-                        <div class="text-muted small mono">Sisa {{ rupiah($balance) }}</div>
+                        <div class="text-muted small mono">Sisa {{ rupiah($apOutstanding) }}</div>
                     </div>
 
                     <div class="card-body">
@@ -429,7 +452,7 @@
             <div class="card-header d-flex justify-content-between align-items-center flex-wrap gap-2">
                 <div class="fw-semibold">Goods Receipts (GRN) terkait</div>
                 <div class="d-flex flex-wrap gap-2">
-                    @if ($order->status === 'approved')
+                    @if ($status === 'approved')
                         <a href="{{ route('purchasing.purchase_receipts.create_from_order', $order->id) }}"
                             class="btn btn-sm btn-outline-primary">
                             + GRN baru dari PO ini
@@ -625,28 +648,8 @@
                         @endforelse
                     </tbody>
                     <tfoot>
-                        <tr>
-                            <th colspan="5" class="text-end">Subtotal</th>
-                            <th class="text-end">{{ rupiah($order->subtotal) }}</th>
-                        </tr>
-                        <tr>
-                            <th colspan="5" class="text-end">Diskon</th>
-                            <th class="text-end">{{ rupiah($order->discount) }}</th>
-                        </tr>
-                        <tr>
-                            <th colspan="5" class="text-end">
-                                PPN @if ($order->tax_percent)
-                                    ({{ angka($order->tax_percent) }}%)
-                                @endif
-                            </th>
-                            <th class="text-end">{{ rupiah($order->tax_amount) }}</th>
-                        </tr>
-                        <tr>
-                            <th colspan="5" class="text-end">Ongkir</th>
-                            <th class="text-end">{{ rupiah($order->shipping_cost) }}</th>
-                        </tr>
                         <tr class="table-light">
-                            <th colspan="5" class="text-end">Grand Total</th>
+                            <th colspan="5" class="text-end">Total PO</th>
                             <th class="text-end fs-5 fw-bold">{{ rupiah($order->grand_total) }}</th>
                         </tr>
                     </tfoot>
@@ -687,18 +690,10 @@
                     @endforelse
 
                     <div class="mt-3 border-top pt-2 small">
-                        <div class="d-flex justify-content-between"><span>Subtotal</span><span
-                                class="mono">{{ rupiah($order->subtotal) }}</span></div>
-                        <div class="d-flex justify-content-between"><span>Diskon</span><span
-                                class="mono">{{ rupiah($order->discount) }}</span></div>
-                        <div class="d-flex justify-content-between"><span>PPN @if ($order->tax_percent)
-                                    ({{ angka($order->tax_percent) }}%)
-                                @endif
-                            </span><span class="mono">{{ rupiah($order->tax_amount) }}</span></div>
-                        <div class="d-flex justify-content-between"><span>Ongkir</span><span
-                                class="mono">{{ rupiah($order->shipping_cost) }}</span></div>
-                        <div class="d-flex justify-content-between mt-1 fw-bold"><span>Grand Total</span><span
-                                class="mono">{{ rupiah($order->grand_total) }}</span></div>
+                        <div class="d-flex justify-content-between mt-1 fw-bold">
+                            <span>Total PO</span>
+                            <span class="mono">{{ rupiah($order->grand_total) }}</span>
+                        </div>
                     </div>
                 </div>
             </div>
@@ -712,16 +707,14 @@
         </div>
     </div>
 
-    {{-- ===========================
-        MODAL: ADD PAYMENT (STRICT BANK LIST)
-    =========================== --}}
+    {{-- MODAL: ADD PAYMENT --}}
     <div class="modal fade" id="modalAddPayment" tabindex="-1" aria-hidden="true">
         <div class="modal-dialog modal-dialog-centered modal-lg">
             <div class="modal-content">
                 <div class="modal-header">
                     <div>
                         <div class="fw-semibold">Tambah Pembayaran</div>
-                        <div class="text-muted small mono">Sisa: {{ rupiah($balance) }}</div>
+                        <div class="text-muted small mono">Sisa hutang: {{ rupiah($apOutstanding) }}</div>
                     </div>
                     <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
                 </div>
@@ -762,11 +755,9 @@
                                 </select>
                             </div>
 
-                            {{-- ✅ STRICT CASH/BANK OPTIONS --}}
                             <div class="col-12 col-md-6">
                                 <label class="form-label small text-muted mb-1">Akun Kas/Bank</label>
 
-                                {{-- cash select (1101 only) --}}
                                 <div id="cashWrap" class="d-none">
                                     <select name="cash_account_id" class="form-select" id="cashSelectCash">
                                         <option value="">— Pilih Kas —</option>
@@ -777,10 +768,8 @@
                                             </option>
                                         @endif
                                     </select>
-                                    <div class="text-muted small mt-1">CASH: gunakan Kas Tunai (1101).</div>
                                 </div>
 
-                                {{-- transfer select (1111..1114 only) --}}
                                 <div id="bankWrap" class="d-none">
                                     <select name="cash_account_id" class="form-select" id="cashSelectBank">
                                         <option value="">— Pilih Bank/E-Wallet —</option>
@@ -792,17 +781,13 @@
                                         @endforeach
                                     </select>
                                     <div class="text-danger small mt-1 d-none" id="bankErrModal">
-                                        Untuk <span class="fw-semibold">TRANSFER</span>, wajib pilih salah satu:
-                                        1111/1112/1113/1114.
+                                        Untuk TRANSFER, wajib pilih 1111/1112/1113/1114.
                                     </div>
-                                    <div class="text-muted small mt-1" id="bankHintModal" style="display:none;"></div>
                                 </div>
 
-                                {{-- credit/tempo --}}
                                 <div id="creditWrap" class="d-none">
                                     <input type="text" class="form-control"
                                         value="Tidak perlu kas/bank (TEMPO/CREDIT)" disabled>
-                                    <div class="text-muted small mt-1">Hutang dicatat saat GRN diposting.</div>
                                 </div>
                             </div>
 
@@ -827,13 +812,6 @@
                                 <label class="form-label small text-muted mb-1">Catatan</label>
                                 <input type="text" name="notes" class="form-control" placeholder="Opsional"
                                     value="{{ old('notes') }}">
-                            </div>
-
-                            <div class="col-12">
-                                <div class="alert alert-warning py-2 small mb-0 d-none" id="pmWarn">
-                                    Metode <span class="fw-semibold">CREDIT/TEMPO</span> tidak membutuhkan kas/bank.
-                                    Hutang dicatat saat <span class="fw-semibold">GRN diposting</span>.
-                                </div>
                             </div>
 
                         </div>
@@ -864,7 +842,6 @@
             document.addEventListener('DOMContentLoaded', function() {
                 const pm = document.getElementById('pmSelectModal');
                 const btnSave = document.getElementById('btnSavePayment');
-                const warn = document.getElementById('pmWarn');
 
                 const cashWrap = document.getElementById('cashWrap');
                 const bankWrap = document.getElementById('bankWrap');
@@ -874,16 +851,19 @@
                 const cashSelectBank = document.getElementById('cashSelectBank');
 
                 const bankErr = document.getElementById('bankErrModal');
-                const bankHint = document.getElementById('bankHintModal');
 
                 const amountInput = document.getElementById('amountInput');
                 const btnFill = document.getElementById('btnFillRemaining');
-                const remaining = {{ (float) $balance }};
+
+                const remaining = {{ (float) $apOutstanding }};
+                const grnPostedTotal = {{ (float) $grnPostedTotal }};
+                const typeSelect = document.getElementById('typeSelectModal');
 
                 function fmtId(n) {
                     return new Intl.NumberFormat('id-ID', {
-                        maximumFractionDigits: 0
-                    }).format(Math.round(n || 0));
+                            maximumFractionDigits: 0
+                        })
+                        .format(Math.round(n || 0));
                 }
 
                 function detectMode() {
@@ -892,7 +872,7 @@
                     const code = (opt?.dataset?.code || '').toUpperCase();
                     if (mode) return mode;
                     if (code.includes('CASH')) return 'cash';
-                    if (code.includes('TRF') || code.includes('TRANSFER')) return 'transfer';
+                    if (code.includes('TRF') || code.includes('TRANSFER') || code.includes('BANK')) return 'transfer';
                     if (code.includes('TEMPO') || code.includes('CREDIT')) return 'credit';
                     return '';
                 }
@@ -908,25 +888,15 @@
                     bankErr.classList.toggle('d-none', !show);
                 }
 
-                function setBankHint(text) {
-                    if (!bankHint) return;
-                    bankHint.style.display = text ? 'block' : 'none';
-                    bankHint.textContent = text || '';
-                }
-
                 function autoPickCash() {
                     if (!cashSelectCash) return;
-                    if (!cashSelectCash.value) {
-                        // pilih option kedua (1101) kalau ada
-                        if (cashSelectCash.options.length > 1) cashSelectCash.selectedIndex = 1;
-                    }
+                    if (!cashSelectCash.value && cashSelectCash.options.length > 1) cashSelectCash.selectedIndex = 1;
                 }
 
                 function autoPickBankJago() {
                     if (!cashSelectBank) return;
                     if (cashSelectBank.value) return;
 
-                    // cari yang 1111 dulu
                     const opts = Array.from(cashSelectBank.options);
                     const jago = opts.find(o => (o.dataset.code || '') === '1111' || (o.textContent || '').includes(
                         '1111'));
@@ -935,7 +905,6 @@
                         return;
                     }
 
-                    // fallback: option pertama setelah placeholder
                     if (cashSelectBank.options.length > 1) cashSelectBank.selectedIndex = 1;
                 }
 
@@ -956,14 +925,10 @@
                 function syncModeUI() {
                     const mode = detectMode();
 
-                    warn?.classList.toggle('d-none', mode !== 'credit');
-
                     if (mode === 'credit') {
                         showOnly('credit');
-                        // pastikan select tidak ngirim nilai (remove selection)
                         if (cashSelectCash) cashSelectCash.value = '';
                         if (cashSelectBank) cashSelectBank.value = '';
-                        setBankHint(null);
                         setBankError(false);
                         if (btnSave) btnSave.disabled = false;
                         return;
@@ -972,20 +937,23 @@
                     if (mode === 'transfer') {
                         showOnly('bank');
                         autoPickBankJago();
-                        setBankHint('TRANSFER: pilih bank/ewallet (default: 1111 Bank Jago).');
                         validateTransfer();
                         return;
                     }
 
-                    // default cash
                     showOnly('cash');
                     autoPickCash();
-                    setBankHint(null);
                     setBankError(false);
                     if (btnSave) btnSave.disabled = false;
                 }
 
-                // Fill remaining
+                // Auto: kalau belum ada GRN posted, paksa DP dan disable PAYMENT
+                if (typeSelect && grnPostedTotal <= 0.0001) {
+                    typeSelect.value = 'dp';
+                    const optPay = typeSelect.querySelector('option[value="payment"]');
+                    if (optPay) optPay.disabled = true;
+                }
+
                 btnFill?.addEventListener('click', function() {
                     if (!amountInput) return;
                     amountInput.value = fmtId(remaining);
@@ -993,7 +961,6 @@
                     amountInput.select?.();
                 });
 
-                // format nominal on blur
                 amountInput?.addEventListener('focusout', function() {
                     const raw = (amountInput.value || '').toString().trim();
                     if (raw === '') return;

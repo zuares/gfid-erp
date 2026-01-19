@@ -9,7 +9,6 @@ use App\Models\PaymentMethod;
 use App\Models\PurchaseOrder;
 use App\Models\PurchasePayment;
 use App\Models\Supplier;
-use App\Models\SupplierPrice;
 use App\Services\Purchasing\PurchaseOrderService;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Auth;
@@ -362,7 +361,8 @@ class PurchaseOrderController extends Controller
             'supplier_id' => ['required', 'integer', 'exists:suppliers,id'],
             'order_type' => ['required', 'in:material,finished_good'],
 
-            'payment_method_id' => ['required', 'integer', 'exists:payment_methods,id'],
+            // ✅ sekarang optional (karena UI dihilangkan)
+            'payment_method_id' => ['nullable', 'integer', 'exists:payment_methods,id'],
 
             'tax_percent' => ['nullable', 'string'],
             'discount' => ['nullable', 'string'],
@@ -412,6 +412,23 @@ class PurchaseOrderController extends Controller
             $line['discount'] = $normalize($line['discount'] ?? 0);
         }
         unset($line);
+
+        // ✅ Auto default payment_method_id kalau kosong
+        if (empty($data['payment_method_id'])) {
+            $transferId = \App\Models\PaymentMethod::query()
+                ->where('is_active', 1)
+                ->where('mode', 'transfer')
+                ->orderBy('sort_order')
+                ->orderBy('name')
+                ->value('id');
+
+            $data['payment_method_id'] = $transferId
+            ?: \App\Models\PaymentMethod::query()
+                ->where('is_active', 1)
+                ->orderBy('sort_order')
+                ->orderBy('name')
+                ->value('id');
+        }
 
         return $data;
     }
@@ -465,16 +482,34 @@ class PurchaseOrderController extends Controller
             return response()->json(['last_price' => null]);
         }
 
-        $row = SupplierPrice::query()
+        // 1) Ambil dari supplier_items (sumber utama)
+        $last = DB::table('supplier_items')
             ->where('supplier_id', $supplierId)
             ->where('item_id', $itemId)
-            ->first();
+            ->value('last_price');
+
+        if ($last !== null) {
+            $n = (float) $last;
+            return response()->json([
+                'last_price' => $n > 0 ? $n : 0.0,
+            ]);
+        }
+
+        // 2) Fallback: item.last_purchase_price (kalau belum ada mapping supplier_items)
+        $fallback = Item::query()
+            ->whereKey($itemId)
+            ->value('last_purchase_price');
+
+        if ($fallback === null) {
+            return response()->json(['last_price' => null]);
+        }
+
+        $n = (float) $fallback;
 
         return response()->json([
-            'last_price' => $row ? (float) $row->last_price : null,
+            'last_price' => $n > 0 ? $n : 0.0,
         ]);
     }
-
     // ======================================================================
     // HELPERS: payment dari form
     // ======================================================================

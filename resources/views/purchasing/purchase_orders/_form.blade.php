@@ -23,7 +23,8 @@
     $defaultSupplierId = $suppliers->first()->id ?? null;
     $selectedSupplierId = old('supplier_id', $order?->supplier_id ?? $defaultSupplierId);
 
-    // === PAYMENT METHOD ===
+    // === PAYMENT METHOD (HIDDEN) ===
+    // UI dropdown dihilangkan, tetapi tetap kirim nilai default agar backend aman.
     $defaultPaymentMethodId = $paymentMethods->first()->id ?? null;
     $selectedPaymentMethodId = old('payment_method_id', $order?->payment_method_id ?? $defaultPaymentMethodId);
 
@@ -143,10 +144,6 @@
             align-items: end;
         }
 
-        .po-meta-grid .po-meta-span-2 {
-            grid-column: span 2;
-        }
-
         .po-num-display {
             text-align: right;
         }
@@ -155,8 +152,33 @@
             color: rgba(148, 163, 184, .8);
         }
 
-        .po-hint {
-            font-size: .78rem;
+        .po-total-line {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            gap: .75rem;
+            padding: .35rem 0;
+            border-top: 1px dashed rgba(148, 163, 184, .22);
+        }
+
+        .po-total-line:first-child {
+            border-top: 0;
+            padding-top: 0;
+        }
+
+        .po-total-key {
+            font-size: .72rem;
+            letter-spacing: .08em;
+            text-transform: uppercase;
+            color: var(--muted);
+        }
+
+        .po-total-val {
+            font-weight: 800;
+        }
+
+        .po-total-val.subtle {
+            font-weight: 700;
             color: var(--muted);
         }
 
@@ -175,10 +197,6 @@
 
             .po-meta-grid {
                 grid-template-columns: 1fr;
-            }
-
-            .po-meta-grid .po-meta-span-2 {
-                grid-column: auto;
             }
 
             .po-lines-table {
@@ -283,6 +301,9 @@
     </style>
 @endpush
 
+{{-- HIDDEN: payment_method_id tetap dikirim tanpa UI --}}
+<input type="hidden" name="payment_method_id" value="{{ $selectedPaymentMethodId }}">
+
 {{-- HEADER --}}
 <div class="card po-card mb-3" data-order-type="{{ $orderType }}">
     <div class="card-body">
@@ -307,8 +328,6 @@
                 @error('order_type')
                     <div class="invalid-feedback">{{ $message }}</div>
                 @enderror
-                <div class="po-hint mt-1">Mengubah jenis PO akan reload halaman untuk memuat daftar item yang sesuai.
-                </div>
             </div>
 
             <div class="col-12 col-md-6">
@@ -355,8 +374,10 @@
                 @forelse ($linesData as $i => $line)
                     @php
                         $lineItemId = $line['item_id'] ?? ($line['item']['id'] ?? null);
+
                         $itemCode = $line['item']['code'] ?? null;
-                        $itemDisplay = $itemCode ?? '';
+                        $itemName = $line['item']['name'] ?? null;
+                        $itemDisplay = trim(($itemCode ?? '') . ($itemName ? ' — ' . $itemName : ''));
 
                         $qtyRaw = $line['qty'] ?? '';
                         $qtyDisplay =
@@ -488,22 +509,19 @@
                     @enderror
                 </div>
 
-                <div class="po-meta-span-2">
-                    <div class="po-label">Metode Pembayaran</div>
-                    <select name="payment_method_id"
-                        class="form-select po-field @error('payment_method_id') is-invalid @enderror">
-                        @foreach ($paymentMethods as $pm)
-                            <option value="{{ $pm->id }}" @selected((string) $selectedPaymentMethodId === (string) $pm->id)>
-                                {{ $pm->name }}@if (!empty($pm->mode))
-                                    — {{ strtoupper($pm->mode) }}
-                                @endif
-                            </option>
-                        @endforeach
-                    </select>
-                    @error('payment_method_id')
-                        <div class="invalid-feedback d-block">{{ $message }}</div>
-                    @enderror
-                    <div class="po-hint mt-1">Pembayaran dicatat di halaman detail (modal), bukan di form ini.</div>
+                <div style="grid-column: span 2;">
+                    <div class="po-total-line">
+                        <div class="po-total-key">Subtotal Items</div>
+                        <div class="po-total-val subtle" id="po-subtotal-meta">0</div>
+                    </div>
+                    <div class="po-total-line">
+                        <div class="po-total-key">Ongkir</div>
+                        <div class="po-total-val subtle" id="po-shipping-meta">0</div>
+                    </div>
+                    <div class="po-total-line">
+                        <div class="po-total-key">Grand Total</div>
+                        <div class="po-total-val" id="po-grand-meta">0</div>
+                    </div>
                 </div>
 
             </div>
@@ -517,7 +535,11 @@
             const tableBody = document.querySelector('#po-lines-table tbody');
             const btnAddTop = document.getElementById('btn-add-line');
             const btnAddBottom = document.getElementById('btn-add-line-bottom');
+
             const subtotalCell = document.getElementById('po-subtotal-cell');
+            const subtotalMeta = document.getElementById('po-subtotal-meta');
+            const shippingMeta = document.getElementById('po-shipping-meta');
+            const grandMeta = document.getElementById('po-grand-meta');
 
             const orderTypeSelect = document.getElementById('po-order-type');
             const currentOrderType = @json($orderType);
@@ -527,9 +549,6 @@
             const shippingRaw = document.querySelector('.shipping-raw');
             const supplierSelect = document.querySelector('select[name="supplier_id"]');
 
-            // =========================
-            // Helpers
-            // =========================
             function parseNumber(value) {
                 if (!value) return 0;
                 value = value.toString().trim().replace(/\s+/g, '');
@@ -600,11 +619,19 @@
 
             function recalcAll() {
                 let subtotal = 0;
+
                 tableBody.querySelectorAll('tr').forEach(tr => {
                     syncRowRaw(tr);
                     subtotal += recalcRow(tr);
                 });
+
+                const ship = parseFloat(shippingRaw?.value || '0') || 0;
+                const grand = Math.max(0, subtotal + ship);
+
                 if (subtotalCell) subtotalCell.textContent = fmtIntId(subtotal);
+                if (subtotalMeta) subtotalMeta.textContent = fmtIntId(subtotal);
+                if (shippingMeta) shippingMeta.textContent = fmtIntId(ship);
+                if (grandMeta) grandMeta.textContent = fmtIntId(grand);
             }
 
             function renumberLines() {
@@ -629,9 +656,6 @@
                 if (window.initItemSuggestInputs) window.initItemSuggestInputs(tr);
             }
 
-            // =========================
-            // Supplier last price fetch
-            // =========================
             async function fetchLastPrice(supplierId, itemId) {
                 const url =
                     `{{ route('purchasing.supplier_price') }}?supplier_id=${encodeURIComponent(supplierId)}&item_id=${encodeURIComponent(itemId)}`;
@@ -641,8 +665,10 @@
                     }
                 });
                 if (!res.ok) return null;
-                const json = await res.json();
+
+                const json = await res.json().catch(() => null);
                 if (!json || json.last_price == null) return null;
+
                 const n = Number(json.last_price);
                 return isNaN(n) ? null : n;
             }
@@ -673,6 +699,10 @@
                 recalcAll();
             }
 
+            function focusRowItem(tr) {
+                tr?.querySelector('.js-item-suggest-input')?.focus();
+            }
+
             function addNewRow() {
                 const lastRow = tableBody.querySelector('tr:last-child');
                 const newRow = lastRow.cloneNode(true);
@@ -688,14 +718,15 @@
                 tableBody.appendChild(newRow);
                 renumberLines();
                 recalcAll();
+
+                focusRowItem(tableBody.querySelector('tr:last-child'));
             }
 
-            // =========================
-            // Events
-            // =========================
+            // add row
             btnAddTop?.addEventListener('click', addNewRow);
             btnAddBottom?.addEventListener('click', addNewRow);
 
+            // remove row
             tableBody.addEventListener('click', function(e) {
                 const btn = e.target.closest('.btn-remove-line');
                 if (!btn) return;
@@ -708,43 +739,61 @@
                     row.querySelectorAll('.line-qty-raw, .line-price-raw').forEach(inp => inp.value = '');
                     row.querySelectorAll('.js-item-suggest-input').forEach(inp => inp.value = '');
                     row.querySelectorAll('.js-item-suggest-id, .js-item-suggest-category').forEach(h => h
-                        .value =
-                        '');
+                        .value = '');
                     const totalCell = row.querySelector('.line-total');
                     if (totalCell) totalCell.textContent = '';
                     recalcAll();
+                    focusRowItem(row);
                     return;
                 }
 
-                btn.closest('tr').remove();
+                btn.closest('tr')?.remove();
                 renumberLines();
                 recalcAll();
             });
 
+            // enter flow: item -> qty -> price -> new row
             tableBody.addEventListener('keydown', function(e) {
                 if (e.key !== 'Enter') return;
-                const el = e.target;
-                const isLineInput =
-                    el.classList.contains('line-qty-display') ||
-                    el.classList.contains('line-price-display') ||
-                    el.classList.contains('js-item-suggest-input');
 
-                if (isLineInput) {
+                const el = e.target;
+                const tr = el.closest('tr');
+                if (!tr) return;
+
+                const isItem = el.classList.contains('js-item-suggest-input');
+                const isQty = el.classList.contains('line-qty-display');
+                const isPrice = el.classList.contains('line-price-display');
+
+                if (isItem) {
+                    e.preventDefault();
+                    tr.querySelector('.line-qty-display')?.focus();
+                    return;
+                }
+                if (isQty) {
+                    e.preventDefault();
+                    tr.querySelector('.line-price-display')?.focus();
+                    return;
+                }
+                if (isPrice) {
                     e.preventDefault();
                     addNewRow();
+                    return;
                 }
             }, true);
 
+            // focus select
             tableBody.addEventListener('focusin', function(e) {
                 const el = e.target;
                 if (el.classList.contains('line-price-display')) selectAllLater(el);
                 if (el.classList.contains('line-qty-display')) selectAllLater(el);
             }, true);
 
+            // userEdited flag
             tableBody.addEventListener('input', function(e) {
                 if (e.target.classList.contains('line-price-display')) e.target.dataset.userEdited = '1';
             });
 
+            // blur format
             tableBody.addEventListener('focusout', function(e) {
                 const el = e.target;
 
@@ -762,11 +811,19 @@
                 }
 
                 if (el.classList.contains('line-price-display')) {
+                    const tr = el.closest('tr');
                     const txt = el.value.toString().trim();
-                    if (txt === '') return;
+
+                    if (txt === '') {
+                        el.dataset.userEdited = '0';
+                        tr?.querySelector('.line-price-raw') && (tr.querySelector('.line-price-raw').value =
+                            '');
+                        recalcAll();
+                        return;
+                    }
+
                     const n = parseNumber(txt);
                     el.value = fmtIntId(n);
-                    const tr = el.closest('tr');
                     if (tr) {
                         syncRowRaw(tr);
                         recalcAll();
@@ -792,6 +849,7 @@
                 });
             });
 
+            // supplier change -> refresh last price on rows not edited
             supplierSelect?.addEventListener('change', function() {
                 tableBody.querySelectorAll('tr').forEach(tr => applyLastPriceToRow(tr, {
                     force: false
@@ -827,9 +885,7 @@
                 }
             }
 
-            // ===========================
-            // Order type change behavior
-            // ===========================
+            // order type change => reload
             if (orderTypeSelect) {
                 orderTypeSelect.addEventListener('change', function() {
                     const nextType = orderTypeSelect.value || 'material';
@@ -856,13 +912,28 @@
             }
 
             // init
-            recalcAll();
             if (window.initItemSuggestInputs) window.initItemSuggestInputs();
 
             tableBody.querySelectorAll('tr').forEach(tr => {
                 const priceDisp = tr.querySelector('.line-price-display');
                 if (priceDisp && !priceDisp.dataset.userEdited) priceDisp.dataset.userEdited = '0';
             });
+
+            // auto apply price for existing rows (item set but price empty/0)
+            tableBody.querySelectorAll('tr').forEach(tr => {
+                const itemId = tr.querySelector('.js-item-suggest-id')?.value;
+                const priceRaw = tr.querySelector('.line-price-raw')?.value;
+                if (itemId && (!priceRaw || Number(priceRaw) <= 0)) {
+                    const priceDisp = tr.querySelector('.line-price-display');
+                    if (priceDisp) priceDisp.dataset.userEdited = '0';
+                    applyLastPriceToRow(tr, {
+                        force: false
+                    });
+                }
+            });
+
+            recalcAll();
+            focusRowItem(tableBody.querySelector('tr'));
         });
     </script>
 @endpush

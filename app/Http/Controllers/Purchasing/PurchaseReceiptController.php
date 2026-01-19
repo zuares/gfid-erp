@@ -206,6 +206,7 @@ class PurchaseReceiptController extends Controller
      */
     public function store(Request $request)
     {
+        $data['purchase_order_id'] = $request->input('purchase_order_id') ?: ($data['purchase_order_id'] ?? null);
         $data = $this->validateHeader($request);
 
         // build lines dari input tabel (create wajib centang selected)
@@ -218,6 +219,7 @@ class PurchaseReceiptController extends Controller
         }
 
         $data['lines'] = $lines;
+
         $data['created_by'] = $request->user()->id;
 
         $receipt = $this->service->create($data);

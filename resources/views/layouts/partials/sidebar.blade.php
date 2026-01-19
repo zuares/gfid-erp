@@ -1,13 +1,14 @@
 {{-- resources/views/layouts/partials/sidebar.blade.php --}}
 @php
+    use Illuminate\Support\Facades\Cache;
     use Illuminate\Support\Facades\DB;
 
     $user = auth()->user();
-    $userRole = $user->role ?? null;
+    $role = strtolower((string) ($user->role ?? ''));
 
-    $isOwner = $userRole === 'owner';
-    $isOperating = $userRole === 'operating';
-    $isAdmin = $userRole === 'admin';
+    $isOwner = $role === 'owner';
+    $isOperating = $role === 'operating';
+    $isAdmin = $role === 'admin';
 
     // =========================================================
     // OPEN STATES
@@ -15,8 +16,7 @@
     $poOpen = request()->routeIs('purchasing.purchase_orders.*');
     $grnOpen = request()->routeIs('purchasing.purchase_receipts.*');
 
-    $masterOpen = request()->routeIs('master.customers.*') || request()->routeIs('master.items.*');
-
+    $masterOpen = request()->routeIs('master.*');
     $marketplaceOpen = request()->routeIs('marketplace.orders.*');
 
     $salesInvoiceOpen = request()->routeIs('sales.invoices.*');
@@ -34,7 +34,7 @@
         request()->routeIs('inventory.external_transfers.*') ||
         request()->routeIs('inventory.adjustments.*');
 
-    $invOpen = $invStocksOpen || $invOpnameOpen || ($isOwner && $invOwnerExtrasOpen);
+    $invOpen = $invStocksOpen || $invOpnameOpen || $invOwnerExtrasOpen;
 
     $stockReqOpen = request()->routeIs('rts.stock-requests.*') || request()->routeIs('prd.stock-requests.*');
 
@@ -80,7 +80,7 @@
         request()->routeIs('accounting.journals.*') ||
         request()->routeIs('accounting.accounts.*');
 
-    // ✅ Payroll NEW ROUTES (piecework)
+    // Payroll
     $payrollOpen =
         request()->routeIs('payroll.piecework.*') ||
         request()->routeIs('payroll.piece_rates.*') ||
@@ -89,53 +89,64 @@
     $costingOpen = request()->routeIs('costing.hpp.*') || request()->routeIs('costing.production_cost_periods.*');
 
     // =========================================================
-    // BADGE COUNTERS (DOT-ONLY)
+    // BADGE COUNTERS (dot-only, cached)
     // =========================================================
     $rtsNeedReceiveQty = 0.0;
     $prdNeedProcessQty = 0.0;
-
-    if ($user) {
-        $rtsNeedReceiveQty = (float) DB::table('stock_request_lines as l')
-            ->join('stock_requests as r', 'r.id', '=', 'l.stock_request_id')
-            ->where('r.purpose', 'rts_replenish')
-            ->whereIn('r.status', ['submitted', 'shipped', 'partial'])
-            ->selectRaw(
-                'COALESCE(SUM(CASE WHEN (COALESCE(l.qty_dispatched,0) - COALESCE(l.qty_received,0)) > 0 THEN (COALESCE(l.qty_dispatched,0) - COALESCE(l.qty_received,0)) ELSE 0 END),0) as s',
-            )
-            ->value('s');
-
-        // ✅ kalau di sistem kamu purpose PRD sama dengan RTS, ganti 'prd_replenish' -> 'rts_replenish'
-        $prdNeedProcessQty = (float) DB::table('stock_request_lines as l')
-            ->join('stock_requests as r', 'r.id', '=', 'l.stock_request_id')
-            ->where('r.purpose', 'prd_replenish')
-            ->whereIn('r.status', ['submitted', 'shipped', 'partial'])
-            ->selectRaw(
-                'COALESCE(SUM(CASE WHEN (COALESCE(l.qty_request,0) - COALESCE(l.qty_dispatched,0) - COALESCE(l.qty_received,0) - COALESCE(l.qty_picked,0)) > 0 THEN (COALESCE(l.qty_request,0) - COALESCE(l.qty_dispatched,0) - COALESCE(l.qty_received,0) - COALESCE(l.qty_picked,0)) ELSE 0 END),0) as s',
-            )
-            ->value('s');
-    }
-
-    $hasRtsNeedReceive = $rtsNeedReceiveQty > 0.000001;
-    $hasPrdNeedProcess = $prdNeedProcessQty > 0.000001;
 
     $fmtQty = function ($n) {
         $n = (float) $n;
         return rtrim(rtrim(number_format($n, 2, '.', ''), '0'), '.');
     };
 
+    if ($user) {
+        $cacheKey = 'sidebar_badges_u' . (int) $user->id . '_r' . $role;
+
+        $badges = Cache::remember($cacheKey, now()->addSeconds(20), function () {
+            $rtsNeedReceiveQty = (float) DB::table('stock_request_lines as l')
+                ->join('stock_requests as r', 'r.id', '=', 'l.stock_request_id')
+                ->where('r.purpose', 'rts_replenish')
+                ->whereIn('r.status', ['submitted', 'shipped', 'partial'])
+                ->selectRaw(
+                    'COALESCE(SUM(CASE WHEN (COALESCE(l.qty_dispatched,0) - COALESCE(l.qty_received,0)) > 0 THEN (COALESCE(l.qty_dispatched,0) - COALESCE(l.qty_received,0)) ELSE 0 END),0) as s',
+                )
+                ->value('s');
+
+            $prdNeedProcessQty = (float) DB::table('stock_request_lines as l')
+                ->join('stock_requests as r', 'r.id', '=', 'l.stock_request_id')
+                ->where('r.purpose', 'prd_replenish')
+                ->whereIn('r.status', ['submitted', 'shipped', 'partial'])
+                ->selectRaw(
+                    'COALESCE(SUM(CASE WHEN (COALESCE(l.qty_request,0) - COALESCE(l.qty_dispatched,0) - COALESCE(l.qty_received,0) - COALESCE(l.qty_picked,0)) > 0 THEN (COALESCE(l.qty_request,0) - COALESCE(l.qty_dispatched,0) - COALESCE(l.qty_received,0) - COALESCE(l.qty_picked,0)) ELSE 0 END),0) as s',
+                )
+                ->value('s');
+
+            return [
+                'rtsNeedReceiveQty' => (float) $rtsNeedReceiveQty,
+                'prdNeedProcessQty' => (float) $prdNeedProcessQty,
+            ];
+        });
+
+        $rtsNeedReceiveQty = (float) ($badges['rtsNeedReceiveQty'] ?? 0);
+        $prdNeedProcessQty = (float) ($badges['prdNeedProcessQty'] ?? 0);
+    }
+
+    $hasRtsNeedReceive = $rtsNeedReceiveQty > 0.000001;
+    $hasPrdNeedProcess = $prdNeedProcessQty > 0.000001;
+
     $rtsBadgeTitle = 'Perlu diterima: ' . $fmtQty($rtsNeedReceiveQty);
     $prdBadgeTitle = 'Perlu diproses: ' . $fmtQty($prdNeedProcessQty);
 
-    // =========================================================
-    // Payroll active helpers (untuk menu)
-    // =========================================================
+    // Payroll active helpers
     $activeModule = request()->route()?->parameter('module');
     $pieceworkCuttingActive = request()->routeIs('payroll.piecework.*') && $activeModule === 'cutting';
     $pieceworkSewingActive = request()->routeIs('payroll.piecework.*') && $activeModule === 'sewing';
+
+    // route guards (biar tidak error kalau route belum dibuat)
+    $hasMasterSuppliersRoute = app('router')->has('master.suppliers.index');
 @endphp
 
 <style>
-    /* === CSS kamu (tetap) === */
     @media (min-width: 992px) {
         .sidebar-modern {
             position: fixed;
@@ -314,37 +325,6 @@
     .simple-group {
         margin-top: .4rem;
     }
-
-    .nav-dot {
-        width: 9px;
-        height: 9px;
-        border-radius: 999px;
-        display: inline-block;
-        margin-left: auto;
-        flex: 0 0 auto;
-        box-shadow: 0 0 0 2px color-mix(in srgb, var(--card) 70%, transparent 30%);
-        opacity: .95;
-    }
-
-    .nav-dot.warn {
-        background: rgba(245, 158, 11, 1);
-    }
-
-    .nav-dot.ok {
-        background: rgba(16, 185, 129, 1);
-    }
-
-    .nav-dot.danger {
-        background: rgba(239, 68, 68, 1);
-    }
-
-    .nav-dot.info {
-        background: rgba(59, 130, 246, 1);
-    }
-
-    .nav-dot.muted {
-        background: rgba(100, 116, 139, 1);
-    }
 </style>
 
 <aside class="sidebar-modern flex-column">
@@ -358,15 +338,12 @@
             </x-sidebar.simple-link>
         </li>
 
-        {{-- ===========================
-            GUEST SAFETY
-        ============================ --}}
+        {{-- GUEST --}}
         @if (!$user)
-            {{-- stop --}}
+            {{-- no menu --}}
         @elseif ($isAdmin || $isOperating)
             {{-- ===========================
-                ADMIN / OPERATING (HARIAN)
-                Urutan: Stock -> Requests -> Sales/Prod -> Finance
+                ADMIN / OPERATING
             ============================ --}}
             <x-sidebar.label text="Inventory" />
             <li class="simple-group">
@@ -464,8 +441,7 @@
             </li>
         @elseif ($isOwner)
             {{-- ===========================
-                OWNER (BISNIS)
-                Urutan: Master -> Purchasing -> Sales -> Inventory -> Stock Requests -> Production -> Finance
+                OWNER
             ============================ --}}
 
             {{-- MASTER --}}
@@ -483,6 +459,15 @@
                     <x-sidebar.sub-link href="{{ route('master.items.index') }}" icon="📦" :active="request()->routeIs('master.items.*')">
                         Items
                     </x-sidebar.sub-link>
+
+                    {{-- ✅ NEW: Suppliers --}}
+                    @if ($hasMasterSuppliersRoute)
+                        <x-sidebar.sub-link href="{{ route('master.suppliers.index') }}" icon="🏷️"
+                            :active="request()->routeIs('master.suppliers.*')">
+                            Suppliers
+                        </x-sidebar.sub-link>
+                    @endif
+
                     <x-sidebar.sub-link href="{{ route('master.customers.index') }}" icon="👤" :active="request()->routeIs('master.customers.*')">
                         Customers
                     </x-sidebar.sub-link>
@@ -584,7 +569,6 @@
                         :active="request()->routeIs('sales.shipments.index')">
                         Daftar Shipment
                     </x-sidebar.sub-link>
-
                     <x-sidebar.sub-link href="{{ route('sales.shipments.create') }}" icon="＋"
                         :active="request()->routeIs('sales.shipments.create')">
                         Shipment Baru
@@ -599,7 +583,6 @@
                         :active="request()->routeIs('sales.shipment_returns.index')">
                         Daftar Retur
                     </x-sidebar.sub-link>
-
                     <x-sidebar.sub-link href="{{ route('sales.shipment_returns.create') }}" icon="＋"
                         :active="request()->routeIs('sales.shipment_returns.create')">
                         Retur Shipment Baru
@@ -638,12 +621,10 @@
                         :active="request()->routeIs('inventory.stocks.items')">
                         Stok Barang
                     </x-sidebar.sub-link>
-
                     <x-sidebar.sub-link href="{{ route('inventory.stocks.lots') }}" icon="🎫"
                         :active="request()->routeIs('inventory.stocks.lots')">
                         Stok per LOT
                     </x-sidebar.sub-link>
-
                     <x-sidebar.sub-link href="{{ route('inventory.stock_card.index') }}" icon="📋"
                         :active="request()->routeIs('inventory.stock_card.*')">
                         Kartu Stok
@@ -653,7 +634,6 @@
                         :active="request()->routeIs('inventory.transfers.index')">
                         Daftar Transfer
                     </x-sidebar.sub-link>
-
                     <x-sidebar.sub-link href="{{ route('inventory.transfers.create') }}" icon="➕"
                         :active="request()->routeIs('inventory.transfers.create')">
                         Transfer Baru
@@ -673,7 +653,6 @@
                         :active="request()->routeIs('inventory.stock_opnames.*')">
                         Stock Opname
                     </x-sidebar.sub-link>
-
                     <x-sidebar.sub-link href="{{ route('inventory.stock_opnames.create') }}" icon="＋"
                         :active="request()->routeIs('inventory.stock_opnames.create')">
                         Stock Opname Baru
@@ -688,7 +667,6 @@
                         :active="request()->routeIs('inventory.external_transfers.index')">
                         Daftar External TF
                     </x-sidebar.sub-link>
-
                     <x-sidebar.sub-link href="{{ route('inventory.external_transfers.create') }}" icon="➕"
                         :active="request()->routeIs('inventory.external_transfers.create')">
                         External TF Baru
