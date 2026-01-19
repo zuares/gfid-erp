@@ -73,3 +73,60 @@ if (!function_exists('toNumber')) {
     }
 
 }
+
+if (!function_exists('to_num')) {
+    /**
+     * Convert string angka format ID/EN -> float.
+     * Support:
+     * - "1.234,56" => 1234.56
+     * - "1.234"    => 1234
+     * - "1234,56"  => 1234.56
+     * - "1234.56"  => 1234.56
+     * - null / ""  => 0
+     */
+    function to_num($value): float
+    {
+        if ($value === null) {
+            return 0.0;
+        }
+
+        if (is_int($value) || is_float($value)) {
+            return (float) $value;
+        }
+
+        $v = trim((string) $value);
+        if ($v === '') {
+            return 0.0;
+        }
+
+        // buang spasi
+        $v = preg_replace('/\s+/', '', $v);
+
+        // kalau ada koma, anggap koma = desimal (ID style)
+        if (strpos($v, ',') !== false) {
+            $v = str_replace('.', '', $v); // ribuan
+            $v = str_replace(',', '.', $v); // desimal
+            return (float) $v;
+        }
+
+        // kalau pola ribuan pakai titik (1.234.567)
+        if (preg_match('/^\d{1,3}(\.\d{3})+$/', $v)) {
+            $v = str_replace('.', '', $v);
+            return (float) $v;
+        }
+
+        // default (1234.56 atau 1234)
+        return (float) $v;
+    }
+}
+
+if (!function_exists('angka')) {
+    /**
+     * Format number ke ID: 1.234.567 (atau dengan desimal).
+     */
+    function angka($value, $decimal = 0): string
+    {
+        $num = to_num($value);
+        return number_format($num, (int) $decimal, ',', '.');
+    }
+}

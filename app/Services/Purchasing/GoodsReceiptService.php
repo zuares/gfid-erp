@@ -15,48 +15,18 @@ class GoodsReceiptService
 {
     public function __construct(
         protected InventoryService $inventory,
-    ) {
-    }
+    ) {}
 
-    /**
-     * Buat GRN baru (status: draft).
-     *
-     * $payload contoh:
-     * [
-     *   'date'            => '2025-11-21',
-     *   'supplier_id'     => 1,
-     *   'warehouse_id'    => 1,
-     *   'purchase_order_id' => 1,  // optional
-     *   'discount'        => 0,
-     *   'tax_percent'     => 11,
-     *   'shipping_cost'   => 25000,
-     *   'notes'           => 'Barang datang dari PO 001',
-     *   'created_by'      => 1,
-     *   'lines' => [
-     *      [
-     *          'item_id'       => 1,
-     *          'qty_received'  => 100,
-     *          'qty_reject'    => 0,
-     *          'unit_price'    => 12000,
-     *          'unit'          => 'kg',
-     *          'notes'         => 'Roll 1-5',
-     *          'lot_id'        => null, // optional
-     *      ],
-     *   ],
-     * ]
-     */
     public function create(array $payload): PurchaseReceipt
     {
         return DB::transaction(function () use ($payload) {
             $linesData = $payload['lines'] ?? [];
             unset($payload['lines']);
 
-            // generate kode GRN kalau belum ada
             if (empty($payload['code'] ?? null)) {
                 $payload['code'] = CodeGenerator::generate('GRN');
             }
 
-            // set default angka
             $payload['subtotal'] = 0;
             $payload['discount'] = $this->num($payload['discount'] ?? 0);
             $payload['tax_percent'] = $this->num($payload['tax_percent'] ?? 0);
@@ -68,19 +38,13 @@ class GoodsReceiptService
             /** @var PurchaseReceipt $grn */
             $grn = PurchaseReceipt::create($payload);
 
-            // simpan detail + hitung subtotal
             $subtotal = $this->syncLines($grn, $linesData);
-
-            // hitung total header
             $this->recalcTotals($grn, $subtotal);
 
             return $grn->fresh(['lines', 'supplier', 'warehouse']);
         });
     }
 
-    /**
-     * Update GRN (selama masih draft).
-     */
     public function update(PurchaseReceipt $grn, array $payload): PurchaseReceipt
     {
         return DB::transaction(function () use ($grn, $payload) {
@@ -89,9 +53,8 @@ class GoodsReceiptService
             }
 
             $linesData = $payload['lines'] ?? [];
-            unset($payload['lines'], $payload['code']); // kode tidak diubah
+            unset($payload['lines'], $payload['code']);
 
-            // update header field yang boleh berubah
             $allowedFields = [
                 'date',
                 'supplier_id',
@@ -104,30 +67,26 @@ class GoodsReceiptService
             ];
 
             foreach ($allowedFields as $field) {
-                if (array_key_exists($field, $payload)) {
-                    if (in_array($field, ['discount', 'tax_percent', 'shipping_cost'])) {
-                        $grn->{$field} = $this->num($payload[$field]);
-                    } else {
-                        $grn->{$field} = $payload[$field];
-                    }
+                if (!array_key_exists($field, $payload)) {
+                    continue;
+                }
+
+                if (in_array($field, ['discount', 'tax_percent', 'shipping_cost'], true)) {
+                    $grn->{$field} = $this->num($payload[$field]);
+                } else {
+                    $grn->{$field} = $payload[$field];
                 }
             }
 
             $grn->save();
 
-            // sync ulang lines
             $subtotal = $this->syncLines($grn, $linesData);
-
-            // hitung ulang totals
             $this->recalcTotals($grn, $subtotal);
 
             return $grn->fresh(['lines', 'supplier', 'warehouse']);
         });
     }
 
-    /**
-     * POST GRN → stok masuk ke gudang + update LOT & moving average.
-     */
     public function post(PurchaseReceipt $grn): PurchaseReceipt
     {
         return DB::transaction(function () use ($grn) {
@@ -139,22 +98,18 @@ class GoodsReceiptService
                 throw new \RuntimeException("Goods Receipt belum punya gudang tujuan.");
             }
 
-            // muat lines + item untuk keamanan
             $grn->loadMissing('lines.item');
 
             foreach ($grn->lines as $line) {
+                // stock masuk hanya dari qty_received
                 if ($line->qty_received <= 0) {
                     continue;
                 }
 
-                // ==========================
-                // 1. Pastikan LOT ada
-                // ==========================
+                // 1) Pastikan LOT
                 if ($line->lot_id) {
-                    // kalau dari form sudah diset lot_id
                     $lot = $line->lot ?? Lot::findOrFail($line->lot_id);
                 } else {
-                    // kalau belum ada lot_id → buat LOT baru per baris item
                     $lot = Lot::create([
                         'code' => CodeGenerator::generate('LOT'),
                         'item_id' => $line->item_id,
@@ -170,9 +125,7 @@ class GoodsReceiptService
                     $line->save();
                 }
 
-                // ==========================
-                // 2. Stok masuk via InventoryService + LOT & unit_cost
-                // ==========================
+                // 2) StockIn
                 $this->inventory->stockIn(
                     warehouseId: $grn->warehouse_id,
                     itemId: $line->item_id,
@@ -181,14 +134,12 @@ class GoodsReceiptService
                     sourceType: 'purchase_receipt',
                     sourceId: $grn->id,
                     notes: "GRN {$grn->code} line {$line->id}",
-                    lotId: $lot->id, // <<— kunci LOT
-                    unitCost: $line->unit_price, // <<— unit cost untuk moving average
+                    lotId: $lot->id,
+                    unitCost: $line->unit_price,
                 );
 
-                // ==========================
-                // 3. Update harga terakhir item & supplier
-                // ==========================
-                $this->touchLastPrices($grn, $line->item_id, $line->unit_price);
+                // 3) last price
+                $this->touchLastPrices($grn, (int) $line->item_id, (float) $line->unit_price);
             }
 
             $grn->status = 'posted';
@@ -198,9 +149,6 @@ class GoodsReceiptService
         });
     }
 
-    /**
-     * UNPOST GRN → stok dikurangi lagi (reverse) + rollback LOT cost.
-     */
     public function unpost(PurchaseReceipt $grn): PurchaseReceipt
     {
         return DB::transaction(function () use ($grn) {
@@ -219,7 +167,6 @@ class GoodsReceiptService
                     continue;
                 }
 
-                // Kalau belum pakai LOT (legacy), still jalan tapi tanpa cost accuracy
                 if (!$line->lot_id) {
                     $this->inventory->stockOut(
                         warehouseId: $grn->warehouse_id,
@@ -234,7 +181,6 @@ class GoodsReceiptService
                     continue;
                 }
 
-                // Dengan LOT: cost & qty di LOT ikut rollback
                 $this->inventory->stockOut(
                     warehouseId: $grn->warehouse_id,
                     itemId: $line->item_id,
@@ -244,7 +190,7 @@ class GoodsReceiptService
                     sourceId: $grn->id,
                     notes: "UNPOST GRN {$grn->code} line {$line->id}",
                     allowNegative: false,
-                    lotId: $line->lot_id, // <<— penting
+                    lotId: $line->lot_id,
                 );
             }
 
@@ -255,62 +201,61 @@ class GoodsReceiptService
         });
     }
 
-    /**
-     * Hitung ulang total dari detail (kalau ada perubahan manual).
-     */
     public function recalculate(PurchaseReceipt $grn): PurchaseReceipt
     {
         return DB::transaction(function () use ($grn) {
-            $subtotal = $grn->lines()->sum('line_total');
-
-            $this->recalcTotals($grn, (float) $subtotal);
-
+            $subtotal = (float) $grn->lines()->sum('line_total');
+            $this->recalcTotals($grn, $subtotal);
             return $grn->fresh(['lines', 'supplier', 'warehouse']);
         });
     }
 
     // =====================================================================
-    // HELPER INTERNAL
+    // INTERNAL
     // =====================================================================
 
     /**
      * Simpan ulang detail lines GRN.
-     * Sederhana: hapus semua lalu insert ulang.
+     * ✅ Tidak skip reject-only.
+     * ✅ Simpan purchase_order_line_id.
      */
     protected function syncLines(PurchaseReceipt $grn, array $linesData): float
     {
-        // Hapus semua line lama dulu (sederhana)
         $grn->lines()->delete();
 
         $subtotal = 0.0;
 
         foreach ($linesData as $row) {
             $itemId = $row['item_id'] ?? null;
+
             $qtyReceived = $this->num($row['qty_received'] ?? 0);
             $qtyReject = $this->num($row['qty_reject'] ?? 0);
+
             $unitPrice = $this->num($row['unit_price'] ?? 0);
             $unit = $row['unit'] ?? null;
             $notes = $row['notes'] ?? null;
             $lotId = $row['lot_id'] ?? null;
 
-            // ⬅️⬅️ INI YANG KURANG
             $poLineId = $row['purchase_order_line_id'] ?? null;
 
-            if (!$itemId || $qtyReceived <= 0) {
+            // ✅ skip hanya kalau dua-duanya nol
+            if (!$itemId || ($qtyReceived <= 0 && $qtyReject <= 0)) {
                 continue;
             }
 
-            $lineTotal = round($qtyReceived * $unitPrice, 2);
+            // Nilai persediaan hanya dari yang diterima
+            $lineTotal = round(max(0, $qtyReceived) * $unitPrice, 2);
 
-            /** @var PurchaseReceiptLine $line */
-            $line = PurchaseReceiptLine::create([
+            PurchaseReceiptLine::create([
                 'purchase_receipt_id' => $grn->id,
-                'purchase_order_line_id' => $poLineId, // ⬅️ SIMPAN DI SINI
+                'purchase_order_line_id' => $poLineId,
 
                 'item_id' => $itemId,
                 'lot_id' => $lotId,
+
                 'qty_received' => $qtyReceived,
                 'qty_reject' => $qtyReject,
+
                 'unit' => $unit,
                 'unit_price' => $unitPrice,
                 'line_total' => $lineTotal,
@@ -319,15 +264,13 @@ class GoodsReceiptService
 
             $subtotal += $lineTotal;
 
-            // update harga terakhir di master & supplier
-            $this->touchLastPrices($grn, $itemId, $unitPrice);
+            // update last price (boleh tetap, walau qty_received=0 tapi reject>0 — aman)
+            $this->touchLastPrices($grn, (int) $itemId, (float) $unitPrice);
         }
 
         return round($subtotal, 2);
     }
-    /**
-     * Hitung subtotal, tax_amount, grand_total dan simpan ke header GRN.
-     */
+
     protected function recalcTotals(PurchaseReceipt $grn, float $subtotal): void
     {
         $discount = $this->num($grn->discount);
@@ -345,21 +288,14 @@ class GoodsReceiptService
         $grn->save();
     }
 
-    /**
-     * Update:
-     *  - items.last_purchase_price
-     *  - supplier_prices.last_price
-     */
     protected function touchLastPrices(PurchaseReceipt $grn, int $itemId, float $unitPrice): void
     {
         $unitPrice = round($unitPrice, 2);
 
-        // update master item
         Item::where('id', $itemId)->update([
             'last_purchase_price' => $unitPrice,
         ]);
 
-        // update harga per supplier
         SupplierPrice::updateOrCreate(
             [
                 'supplier_id' => $grn->supplier_id,
@@ -371,40 +307,30 @@ class GoodsReceiptService
         );
     }
 
-    /**
-     * Normalisasi angka dari input (string format Indonesia, dll).
-     */
     protected function num($value): float
     {
         if ($value === null || $value === '') {
             return 0.0;
         }
 
-        // Kalau sudah numeric (hasil validasi / cast Laravel), langsung saja
         if (is_int($value) || is_float($value)) {
             return (float) $value;
         }
 
-        // Pastikan string
         $value = trim((string) $value);
         $value = str_replace(' ', '', $value);
 
-        // Kalau ada koma → anggap format Indonesia: "1.234,56" / "24,00"
         if (strpos($value, ',') !== false) {
-            // Hilangkan titik ribuan
             $value = str_replace('.', '', $value);
-            // Ganti koma jadi titik desimal
             $value = str_replace(',', '.', $value);
             return (float) $value;
         }
 
-        // Kalau tidak ada koma, tapi pola ribuan: "1.234" atau "1.234.567"
         if (preg_match('/^\d{1,3}(\.\d{3})+$/', $value)) {
             $value = str_replace('.', '', $value);
             return (float) $value;
         }
 
-        // Default: biarkan Laravel terjemahkan (mis. "1234.56")
         return (float) $value;
     }
 }

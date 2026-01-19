@@ -12,18 +12,13 @@ use Illuminate\Support\Facades\Auth;
 
 class PurchaseOrderController extends Controller
 {
-    protected PurchaseOrderService $service;
-
-    public function __construct(PurchaseOrderService $service)
-    {
-        $this->service = $service;
-    }
+    public function __construct(
+        protected PurchaseOrderService $service
+    ) {}
 
     /**
      * List PO.
      */
-    // app/Http/Controllers/Purchasing/PurchaseOrderController.php
-
     public function index(Request $request)
     {
         $q = PurchaseOrder::with(['supplier', 'approvedBy', 'purchaseReceipts'])
@@ -36,6 +31,11 @@ class PurchaseOrderController extends Controller
 
         if ($request->filled('status')) {
             $q->where('status', $request->status);
+        }
+
+        // (optional) filter order_type kalau kolomnya ada & request ada
+        if ($request->filled('order_type')) {
+            $q->where('order_type', $request->order_type);
         }
 
         if ($request->filled('from_date')) {
@@ -57,10 +57,8 @@ class PurchaseOrderController extends Controller
             'last_date' => optional((clone $summaryQuery)->orderByDesc('date')->first())->date,
         ];
 
-        // Data untuk tabel (paginated)
         $orders = $q->paginate(20)->withQueryString();
 
-        // Jika AJAX (infinite scroll): balas JSON (HTML rows + next_page_url)
         if ($request->ajax()) {
             $html = view('purchasing.purchase_orders._table_rows', [
                 'orders' => $orders,
@@ -79,8 +77,9 @@ class PurchaseOrderController extends Controller
 
     /**
      * Form create PO.
+     * Support: jenis pembelian material / finished_good.
      */
-    public function create()
+    public function create(Request $request)
     {
         $order = new PurchaseOrder();
         $order->date = now()->toDateString();
@@ -88,19 +87,36 @@ class PurchaseOrderController extends Controller
         $order->discount = 0;
         $order->shipping_cost = 0;
 
+        // =========================
+        // Determine order type
+        // =========================
+        $orderType = $this->normalizeOrderType($request->input('order_type', 'material'));
+
+        // kalau tabel punya kolom order_type, set buat tampilan (optional)
+        if ($this->poHasOrderTypeColumn($order)) {
+            $order->order_type = $orderType;
+        }
+
         $suppliers = Supplier::orderBy('name')->get();
+
+        // items sesuai jenis
         $items = Item::query()
             ->where('active', 1)
-            ->where('type', 'material')
+            ->where('type', $orderType)
             ->with('category')
             ->orderBy('name')
-            ->limit(100)
+            ->limit(300)
             ->get();
 
-        // lines kosong untuk form awal
         $lines = collect();
 
-        return view('purchasing.purchase_orders.create', compact('order', 'suppliers', 'items', 'lines'));
+        return view('purchasing.purchase_orders.create', [
+            'order' => $order,
+            'suppliers' => $suppliers,
+            'items' => $items,
+            'lines' => $lines,
+            'orderType' => $orderType,
+        ]);
     }
 
     /**
@@ -111,7 +127,10 @@ class PurchaseOrderController extends Controller
         $data = $this->validateData($request);
 
         $data['created_by'] = $request->user()->id;
-        $data['status'] = 'draft'; // ⬅ selalu draft saat dibuat
+        $data['status'] = 'draft';
+
+        // order_type optional kalau kolom ada (atau kamu mau simpan di payload)
+        $data['order_type'] = $this->normalizeOrderType($request->input('order_type', $data['order_type'] ?? 'material'));
 
         $order = $this->service->create($data);
 
@@ -141,14 +160,10 @@ class PurchaseOrderController extends Controller
 
     /**
      * Form edit PO.
-
-    /**
-     * Form edit PO.
      */
-    public function edit(PurchaseOrder $purchase_order)
+    public function edit(Request $request, PurchaseOrder $purchase_order)
     {
-
-        // ⬅ blokir edit kalau status bukan draft
+        // blokir edit kalau status bukan draft
         if ($purchase_order->status !== 'draft') {
             return redirect()
                 ->route('purchasing.purchase_orders.show', $purchase_order->id)
@@ -159,9 +174,54 @@ class PurchaseOrderController extends Controller
         $purchase_order->load(['lines.item']);
 
         $suppliers = Supplier::orderBy('name')->get();
-        $items = Item::where('active', 1)->orderBy('name')->get();
 
-        // bisa langsung kirim collection-nya, _form akan handle array/collection
+        // =========================
+        // Determine order type
+        // Priority:
+        // 1) DB order_type (kalau ada)
+        // 2) query ?order_type=...
+        // 3) default material
+        // =========================
+        $orderType = $this->normalizeOrderType(
+            (string) ($purchase_order->getAttribute('order_type')
+                ?: $request->input('order_type', 'material'))
+        );
+
+        // =========================
+        // Items list:
+        // - ambil items sesuai orderType (rapi)
+        // - tapi juga gabungkan items yang sudah dipakai di lines,
+        //   supaya dropdown tidak blank walau orderType berubah via query.
+        // =========================
+        $itemsBase = Item::query()
+            ->where('active', 1)
+            ->where('type', $orderType)
+            ->with('category')
+            ->orderBy('name')
+            ->get();
+
+        $lineItemIds = $purchase_order->lines
+            ->pluck('item_id')
+            ->filter()
+            ->unique()
+            ->values()
+            ->all();
+
+        $itemsLine = collect();
+        if (!empty($lineItemIds)) {
+            $itemsLine = Item::query()
+                ->whereIn('id', $lineItemIds)
+                ->with('category')
+                ->get();
+        }
+
+        // merge + unique by id
+        $items = $itemsBase
+            ->concat($itemsLine)
+            ->unique('id')
+            ->sortBy('name')
+            ->values();
+
         $lines = $purchase_order->lines;
 
         return view('purchasing.purchase_orders.edit', [
@@ -169,6 +229,7 @@ class PurchaseOrderController extends Controller
             'suppliers' => $suppliers,
             'items' => $items,
             'lines' => $lines,
+            'orderType' => $orderType,
         ]);
     }
 
@@ -182,11 +243,14 @@ class PurchaseOrderController extends Controller
                 ->route('purchasing.purchase_orders.show', $purchase_order->id)
                 ->with('error', 'PO yang sudah di-approve/cancel tidak bisa diubah.');
         }
+
         $data = $this->validateData($request);
-        // jaga-jaga: jangan izinkan ganti status lewat update
         $data['status'] = 'draft';
 
-        // kirim ke service, termasuk status
+        $data['order_type'] = $this->normalizeOrderType(
+            $request->input('order_type', $purchase_order->getAttribute('order_type') ?: 'material')
+        );
+
         $order = $this->service->update($purchase_order, $data);
 
         return redirect()
@@ -195,11 +259,10 @@ class PurchaseOrderController extends Controller
     }
 
     /**
-     * Hapus PO (opsional).
+     * Hapus PO.
      */
     public function destroy(PurchaseOrder $purchase_order)
     {
-        // Tergantung rules bisnis, kalau PO sudah dipakai stok jangan dihapus
         if ($purchase_order->status !== 'draft') {
             return back()->with('error', 'PO non-draft tidak boleh dihapus.');
         }
@@ -221,17 +284,19 @@ class PurchaseOrderController extends Controller
         $rules = [
             'date' => ['required', 'date'],
             'supplier_id' => ['required', 'integer', 'exists:suppliers,id'],
+
+            // NEW: jenis PO (kalau kolom belum ada pun tetap dipakai untuk filtering item)
+            'order_type' => ['required', 'in:material,finished_good'],
+
             'shipping_cost' => ['nullable', 'string'],
+            'discount' => ['nullable', 'string'],
+            'tax_percent' => ['nullable', 'string'],
+
             'lines' => ['array'],
-            'lines.*.item_id' => ['nullable', 'integer'],
+            'lines.*.item_id' => ['nullable', 'integer', 'exists:items,id'],
             'lines.*.qty' => ['nullable', 'string'],
             'lines.*.unit_price' => ['nullable', 'string'],
-
-            // pesan error custom (opsional)
-            'lines.required' => 'Minimal harus ada 1 baris detail.',
-            'lines.*.item_id.required' => 'Item harus dipilih.',
-            'lines.*.qty.required' => 'Qty wajib diisi.',
-            'lines.*.unit_price.required' => 'Harga wajib diisi.',
+            'lines.*.discount' => ['nullable', 'string'],
         ];
 
         $data = $request->validate($rules);
@@ -241,7 +306,7 @@ class PurchaseOrderController extends Controller
                 return 0;
             }
 
-            $v = trim($v);
+            $v = trim((string) $v);
             $v = str_replace(' ', '', $v);
             if (strpos($v, ',') !== false) {
                 $v = str_replace('.', '', $v);
@@ -252,15 +317,21 @@ class PurchaseOrderController extends Controller
             return (float) $v;
         };
 
+        // normalisasi header
         $data['discount'] = $normalize($data['discount'] ?? 0);
         $data['tax_percent'] = $normalize($data['tax_percent'] ?? 0);
         $data['shipping_cost'] = $normalize($data['shipping_cost'] ?? 0);
 
-        foreach ($data['lines'] as &$line) {
-            $line['qty'] = $normalize($line['qty']);
-            $line['unit_price'] = $normalize($line['unit_price']);
+        $data['order_type'] = $this->normalizeOrderType($data['order_type'] ?? $request->input('order_type', 'material'));
+
+        // normalisasi lines
+        $lines = $data['lines'] ?? [];
+        foreach ($lines as &$line) {
+            $line['qty'] = $normalize($line['qty'] ?? 0);
+            $line['unit_price'] = $normalize($line['unit_price'] ?? 0);
             $line['discount'] = $normalize($line['discount'] ?? 0);
         }
+        $data['lines'] = $lines;
 
         return $data;
     }
@@ -282,7 +353,6 @@ class PurchaseOrderController extends Controller
 
     public function cancel(PurchaseOrder $purchase_order)
     {
-        // Double safety di controller: status + GRN
         if (!in_array($purchase_order->status, ['draft', 'approved'], true)) {
             return redirect()
                 ->route('purchasing.purchase_orders.show', $purchase_order->id)
@@ -302,4 +372,25 @@ class PurchaseOrderController extends Controller
             ->with('success', 'PO berhasil dibatalkan.');
     }
 
+    // ======================================================================
+    // HELPERS
+    // ======================================================================
+
+    protected function normalizeOrderType(?string $value): string
+    {
+        $v = strtolower(trim((string) $value));
+        return in_array($v, ['material', 'finished_good'], true) ? $v : 'material';
+    }
+
+    protected function poHasOrderTypeColumn(PurchaseOrder $order): bool
+    {
+        // Aman: kalau kolom belum ada, attribute akan null terus; tapi ini sekadar indikator.
+        // Kamu bisa hapus fungsi ini kalau kamu sudah yakin kolomnya ada.
+        try {
+            $order->getAttribute('order_type');
+            return true;
+        } catch (\Throwable $e) {
+            return false;
+        }
+    }
 }
