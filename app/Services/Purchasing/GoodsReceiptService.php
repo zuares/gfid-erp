@@ -3,20 +3,28 @@
 namespace App\Services\Purchasing;
 
 use App\Helpers\CodeGenerator;
+use App\Models\Account;
 use App\Models\Item;
 use App\Models\Lot;
 use App\Models\PurchaseReceipt;
 use App\Models\PurchaseReceiptLine;
 use App\Models\SupplierPrice;
+use App\Services\Accounting\JournalService;
 use App\Services\Inventory\InventoryService;
 use Illuminate\Support\Facades\DB;
+use Illuminate\Validation\ValidationException;
 
 class GoodsReceiptService
 {
     public function __construct(
         protected InventoryService $inventory,
-    ) {}
+        protected JournalService $journal,
+    ) {
+    }
 
+    /**
+     * Buat GRN baru (status: draft).
+     */
     public function create(array $payload): PurchaseReceipt
     {
         return DB::transaction(function () use ($payload) {
@@ -41,7 +49,7 @@ class GoodsReceiptService
             $subtotal = $this->syncLines($grn, $linesData);
             $this->recalcTotals($grn, $subtotal);
 
-            return $grn->fresh(['lines', 'supplier', 'warehouse']);
+            return $grn->fresh(['lines.item', 'supplier', 'warehouse']);
         });
     }
 
@@ -83,36 +91,54 @@ class GoodsReceiptService
             $subtotal = $this->syncLines($grn, $linesData);
             $this->recalcTotals($grn, $subtotal);
 
-            return $grn->fresh(['lines', 'supplier', 'warehouse']);
+            return $grn->fresh(['lines.item', 'supplier', 'warehouse']);
         });
     }
 
+    /**
+     * POST GRN → stock in + jurnal GRN + (opsional) apply DP (1151)
+     *
+     * Catatan:
+     * - Tidak pakai journal_id / posted_at (biar aman ke schema sekarang).
+     * - DP apply dibuat "guarded" (tidak hard-depend ke method/relasi tertentu).
+     */
     public function post(PurchaseReceipt $grn): PurchaseReceipt
     {
         return DB::transaction(function () use ($grn) {
             if ($grn->status !== 'draft') {
                 throw new \RuntimeException("Goods Receipt tidak dalam status draft.");
             }
-
             if (!$grn->warehouse_id) {
                 throw new \RuntimeException("Goods Receipt belum punya gudang tujuan.");
             }
 
-            $grn->loadMissing('lines.item');
+            // Load minimal yang aman (order optional, jangan bikin error kalau relasi belum ada)
+            $grn->loadMissing(['lines.item', 'supplier']);
 
+            if ($grn->lines->count() === 0) {
+                throw ValidationException::withMessages(['grn' => 'GRN tidak punya line.']);
+            }
+
+            $totalForJournal = (float) $grn->grand_total;
+            if ($totalForJournal <= 0) {
+                throw ValidationException::withMessages(['grn' => 'Total GRN harus > 0.']);
+            }
+
+            // ==========================
+            // 1) STOCK IN (LOT + moving average)
+            // ==========================
             foreach ($grn->lines as $line) {
-                // stock masuk hanya dari qty_received
-                if ($line->qty_received <= 0) {
+                if ((float) $line->qty_received <= 0) {
                     continue;
                 }
 
-                // 1) Pastikan LOT
+                // Pastikan LOT ada
                 if ($line->lot_id) {
                     $lot = $line->lot ?? Lot::findOrFail($line->lot_id);
                 } else {
                     $lot = Lot::create([
                         'code' => CodeGenerator::generate('LOT'),
-                        'item_id' => $line->item_id,
+                        'item_id' => (int) $line->item_id,
                         'initial_qty' => 0,
                         'initial_cost' => 0,
                         'qty_onhand' => 0,
@@ -125,79 +151,130 @@ class GoodsReceiptService
                     $line->save();
                 }
 
-                // 2) StockIn
                 $this->inventory->stockIn(
-                    warehouseId: $grn->warehouse_id,
-                    itemId: $line->item_id,
-                    qty: $line->qty_received,
+                    warehouseId: (int) $grn->warehouse_id,
+                    itemId: (int) $line->item_id,
+                    qty: (float) $line->qty_received,
                     date: $grn->date,
                     sourceType: 'purchase_receipt',
-                    sourceId: $grn->id,
+                    sourceId: (int) $grn->id,
                     notes: "GRN {$grn->code} line {$line->id}",
-                    lotId: $lot->id,
-                    unitCost: $line->unit_price,
+                    lotId: (int) $lot->id,
+                    unitCost: (float) $line->unit_price,
                 );
 
-                // 3) last price
+                // update last price
                 $this->touchLastPrices($grn, (int) $line->item_id, (float) $line->unit_price);
             }
 
+            // ==========================
+            // 2) SET STATUS POSTED
+            // ==========================
             $grn->status = 'posted';
             $grn->save();
 
-            return $grn->fresh(['lines', 'supplier', 'warehouse']);
+            // ==========================
+            // 3) Resolve akun via CODE
+            // ==========================
+            $inventoryCode = (string) (config('accounting.inventory_account_code') ?: '1201');
+            $apCode = (string) (config('accounting.ap_account_code') ?: '2101');
+            $advanceCode = '1151';
+
+            $inventoryAccountId = Account::where('code', $inventoryCode)->value('id');
+            $apAccountId = Account::where('code', $apCode)->value('id');
+            $advanceAccountId = Account::where('code', $advanceCode)->value('id');
+
+            if (!$inventoryAccountId || !$apAccountId || !$advanceAccountId) {
+                throw ValidationException::withMessages([
+                    'grn' => "Akun tidak lengkap. Pastikan ada COA: Inventory {$inventoryCode}, AP {$apCode}, Uang Muka {$advanceCode}.",
+                ]);
+            }
+
+            // ==========================
+            // 4) POST JOURNAL GRN (Inventory vs AP)
+            // ==========================
+            $this->journal->post(
+                date: $grn->date->format('Y-m-d'),
+                sourceType: 'grn',
+                sourceId: (int) $grn->id,
+                description: "GRN {$grn->code} - {$grn->supplier?->name}",
+                lines: [
+                    ['account_id' => (int) $inventoryAccountId, 'debit' => $totalForJournal, 'credit' => 0],
+                    ['account_id' => (int) $apAccountId, 'debit' => 0, 'credit' => $totalForJournal],
+                ]
+            );
+
+            // ==========================
+            // 5) APPLY DP (optional, guarded)
+            // ==========================
+            $dpApplied = $this->calculateDpAppliedAmountSafely($grn, $totalForJournal);
+
+            if ($dpApplied > 0.0001) {
+                $this->journal->post(
+                    date: $grn->date->format('Y-m-d'),
+                    sourceType: 'grn_apply_dp',
+                    sourceId: (int) $grn->id,
+                    description: "Apply DP ke GRN {$grn->code}",
+                    lines: [
+                        ['account_id' => (int) $apAccountId, 'debit' => $dpApplied, 'credit' => 0],
+                        ['account_id' => (int) $advanceAccountId, 'debit' => 0, 'credit' => $dpApplied],
+                    ]
+                );
+            }
+
+            return $grn->fresh(['lines.item', 'supplier', 'warehouse']);
         });
     }
 
+    /**
+     * UNPOST GRN → reverse stock + void jurnal GRN + void jurnal apply DP
+     */
     public function unpost(PurchaseReceipt $grn): PurchaseReceipt
     {
         return DB::transaction(function () use ($grn) {
             if ($grn->status !== 'posted') {
                 throw new \RuntimeException("Hanya GRN yang sudah posted yang bisa di-unpost.");
             }
-
             if (!$grn->warehouse_id) {
                 throw new \RuntimeException("Goods Receipt tidak punya gudang.");
             }
 
-            $grn->loadMissing('lines');
+            $grn->loadMissing(['lines', 'supplier']);
 
+            // ==========================
+            // 1) reverse stock
+            // ==========================
             foreach ($grn->lines as $line) {
-                if ($line->qty_received <= 0) {
-                    continue;
-                }
-
-                if (!$line->lot_id) {
-                    $this->inventory->stockOut(
-                        warehouseId: $grn->warehouse_id,
-                        itemId: $line->item_id,
-                        qty: $line->qty_received,
-                        date: now(),
-                        sourceType: 'purchase_receipt_reverse',
-                        sourceId: $grn->id,
-                        notes: "UNPOST GRN {$grn->code} line {$line->id}",
-                        allowNegative: false,
-                    );
+                if ((float) $line->qty_received <= 0) {
                     continue;
                 }
 
                 $this->inventory->stockOut(
-                    warehouseId: $grn->warehouse_id,
-                    itemId: $line->item_id,
-                    qty: $line->qty_received,
+                    warehouseId: (int) $grn->warehouse_id,
+                    itemId: (int) $line->item_id,
+                    qty: (float) $line->qty_received,
                     date: now(),
                     sourceType: 'purchase_receipt_reverse',
-                    sourceId: $grn->id,
+                    sourceId: (int) $grn->id,
                     notes: "UNPOST GRN {$grn->code} line {$line->id}",
                     allowNegative: false,
-                    lotId: $line->lot_id,
+                    lotId: $line->lot_id ?: null,
                 );
             }
 
+            // ==========================
+            // 2) void journals by source
+            // ==========================
+            $this->journal->voidBySource('grn', (int) $grn->id);
+            $this->journal->voidBySource('grn_apply_dp', (int) $grn->id);
+
+            // ==========================
+            // 3) set back to draft
+            // ==========================
             $grn->status = 'draft';
             $grn->save();
 
-            return $grn->fresh(['lines', 'supplier', 'warehouse']);
+            return $grn->fresh(['lines.item', 'supplier', 'warehouse']);
         });
     }
 
@@ -206,19 +283,14 @@ class GoodsReceiptService
         return DB::transaction(function () use ($grn) {
             $subtotal = (float) $grn->lines()->sum('line_total');
             $this->recalcTotals($grn, $subtotal);
-            return $grn->fresh(['lines', 'supplier', 'warehouse']);
+            return $grn->fresh(['lines.item', 'supplier', 'warehouse']);
         });
     }
 
     // =====================================================================
-    // INTERNAL
+    // INTERNAL HELPERS
     // =====================================================================
 
-    /**
-     * Simpan ulang detail lines GRN.
-     * ✅ Tidak skip reject-only.
-     * ✅ Simpan purchase_order_line_id.
-     */
     protected function syncLines(PurchaseReceipt $grn, array $linesData): float
     {
         $grn->lines()->delete();
@@ -235,10 +307,9 @@ class GoodsReceiptService
             $unit = $row['unit'] ?? null;
             $notes = $row['notes'] ?? null;
             $lotId = $row['lot_id'] ?? null;
-
             $poLineId = $row['purchase_order_line_id'] ?? null;
 
-            // ✅ skip hanya kalau dua-duanya nol
+            // skip hanya kalau dua-duanya nol
             if (!$itemId || ($qtyReceived <= 0 && $qtyReject <= 0)) {
                 continue;
             }
@@ -250,7 +321,7 @@ class GoodsReceiptService
                 'purchase_receipt_id' => $grn->id,
                 'purchase_order_line_id' => $poLineId,
 
-                'item_id' => $itemId,
+                'item_id' => (int) $itemId,
                 'lot_id' => $lotId,
 
                 'qty_received' => $qtyReceived,
@@ -263,9 +334,6 @@ class GoodsReceiptService
             ]);
 
             $subtotal += $lineTotal;
-
-            // update last price (boleh tetap, walau qty_received=0 tapi reject>0 — aman)
-            $this->touchLastPrices($grn, (int) $itemId, (float) $unitPrice);
         }
 
         return round($subtotal, 2);
@@ -284,7 +352,6 @@ class GoodsReceiptService
         $grn->subtotal = round($subtotal, 2);
         $grn->tax_amount = $taxAmount;
         $grn->grand_total = round($grand, 2);
-
         $grn->save();
     }
 
@@ -305,6 +372,71 @@ class GoodsReceiptService
                 'last_price' => $unitPrice,
             ]
         );
+    }
+
+    /**
+     * Hitung DP yang boleh di-apply tanpa bikin error kalau relasi/metodenya belum ada.
+     */
+    protected function calculateDpAppliedAmountSafely(PurchaseReceipt $grn, float $totalForJournal): float
+    {
+        if (!$grn->purchase_order_id) {
+            return 0.0;
+        }
+
+        // Coba ambil PO via relasi yang mungkin ada: order / purchaseOrder
+        $order = null;
+
+        if (method_exists($grn, 'order')) {
+            try {
+                $order = $grn->relationLoaded('order') ? $grn->getRelation('order') : $grn->order;
+            } catch (\Throwable $e) {
+                $order = null;
+            }
+        }
+
+        if (!$order && method_exists($grn, 'purchaseOrder')) {
+            try {
+                $order = $grn->relationLoaded('purchaseOrder') ? $grn->getRelation('purchaseOrder') : $grn->purchaseOrder;
+            } catch (\Throwable $e) {
+                $order = null;
+            }
+        }
+
+        if (!$order) {
+            return 0.0;
+        }
+
+        // Cari DP via method yang mungkin ada.
+        $dpTotal = 0.0;
+
+        // 1) Kalau ada activePayments()
+        if (method_exists($order, 'activePayments')) {
+            try {
+                $dpTotal = (float) $order->activePayments()
+                    ->where('type', 'dp')
+                    ->sum('amount');
+            } catch (\Throwable $e) {
+                $dpTotal = 0.0;
+            }
+        }
+
+        // 2) fallback: relasi payments()
+        if ($dpTotal <= 0.0001 && method_exists($order, 'payments')) {
+            try {
+                $dpTotal = (float) $order->payments()
+                    ->where('type', 'dp')
+                    ->sum('amount');
+            } catch (\Throwable $e) {
+                $dpTotal = 0.0;
+            }
+        }
+
+        if ($dpTotal <= 0.0001) {
+            return 0.0;
+        }
+
+        $dpApplied = min($dpTotal, $totalForJournal);
+        return round($dpApplied, 2);
     }
 
     protected function num($value): float

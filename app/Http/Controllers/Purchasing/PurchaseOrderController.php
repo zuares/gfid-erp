@@ -3,12 +3,18 @@
 namespace App\Http\Controllers\Purchasing;
 
 use App\Http\Controllers\Controller;
+use App\Models\Account;
 use App\Models\Item;
+use App\Models\PaymentMethod;
 use App\Models\PurchaseOrder;
+use App\Models\PurchasePayment;
 use App\Models\Supplier;
+use App\Models\SupplierPrice;
 use App\Services\Purchasing\PurchaseOrderService;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Auth;
+use Illuminate\Support\Facades\DB;
+use Illuminate\Validation\ValidationException;
 
 class PurchaseOrderController extends Controller
 {
@@ -21,7 +27,13 @@ class PurchaseOrderController extends Controller
      */
     public function index(Request $request)
     {
-        $q = PurchaseOrder::with(['supplier', 'approvedBy', 'purchaseReceipts'])
+        $q = PurchaseOrder::query()
+            ->with([
+                'supplier',
+                'approvedBy',
+                'paymentMethod',
+                'purchaseReceipts',
+            ])
             ->orderByDesc('date')
             ->orderByDesc('id');
 
@@ -33,9 +45,8 @@ class PurchaseOrderController extends Controller
             $q->where('status', $request->status);
         }
 
-        // (optional) filter order_type kalau kolomnya ada & request ada
         if ($request->filled('order_type')) {
-            $q->where('order_type', $request->order_type);
+            $q->where('order_type', $this->normalizeOrderType($request->order_type));
         }
 
         if ($request->filled('from_date')) {
@@ -46,7 +57,6 @@ class PurchaseOrderController extends Controller
             $q->whereDate('date', '<=', $request->to_date);
         }
 
-        // Summary untuk mini dashboard (hasil filter penuh, bukan per halaman)
         $summaryQuery = clone $q;
         $summary = (object) [
             'total_orders' => (clone $summaryQuery)->count(),
@@ -87,25 +97,39 @@ class PurchaseOrderController extends Controller
         $order->discount = 0;
         $order->shipping_cost = 0;
 
-        // =========================
-        // Determine order type
-        // =========================
+        // order type untuk filtering items + disimpan ke model (kalau kolom ada)
         $orderType = $this->normalizeOrderType($request->input('order_type', 'material'));
+        $order->order_type = $orderType;
 
-        // kalau tabel punya kolom order_type, set buat tampilan (optional)
-        if ($this->poHasOrderTypeColumn($order)) {
-            $order->order_type = $orderType;
-        }
+        // payment methods (aktif)
+        $paymentMethods = PaymentMethod::query()
+            ->where('is_active', 1)
+            ->orderByRaw("CASE WHEN code='CASH' THEN 0 ELSE 1 END")
+            ->orderBy('sort_order')
+            ->orderBy('name')
+            ->get();
 
-        $suppliers = Supplier::orderBy('name')->get();
+        // default payment method
+        $order->payment_method_id = $paymentMethods->first()?->id;
 
-        // items sesuai jenis
+        $suppliers = Supplier::query()->orderBy('name')->get();
+
+        // items sesuai jenis (ambil field yang dipakai untuk performa)
         $items = Item::query()
+            ->select(['id', 'code', 'name', 'category_id', 'type', 'active'])
             ->where('active', 1)
             ->where('type', $orderType)
-            ->with('category')
+            ->with(['category:id,code,name'])
             ->orderBy('name')
-            ->limit(300)
+            ->limit(200)
+            ->get();
+
+        // akun kas/bank untuk CASH/TRANSFER
+        $cashAccounts = Account::query()
+            ->where('type', 'asset')
+            ->where('is_active', 1)
+            ->where('is_cash', 1)
+            ->orderBy('code')
             ->get();
 
         $lines = collect();
@@ -113,8 +137,10 @@ class PurchaseOrderController extends Controller
         return view('purchasing.purchase_orders.create', [
             'order' => $order,
             'suppliers' => $suppliers,
+            'paymentMethods' => $paymentMethods,
             'items' => $items,
             'lines' => $lines,
+            'cashAccounts' => $cashAccounts,
             'orderType' => $orderType,
         ]);
     }
@@ -129,10 +155,10 @@ class PurchaseOrderController extends Controller
         $data['created_by'] = $request->user()->id;
         $data['status'] = 'draft';
 
-        // order_type optional kalau kolom ada (atau kamu mau simpan di payload)
-        $data['order_type'] = $this->normalizeOrderType($request->input('order_type', $data['order_type'] ?? 'material'));
-
         $order = $this->service->create($data);
+
+        // auto-create payment from form (pay_now)
+        $this->maybeCreatePayNowPayment($request, $order, allowIfHasExistingPayments: true);
 
         return redirect()
             ->route('purchasing.purchase_orders.show', $order->id)
@@ -146,15 +172,74 @@ class PurchaseOrderController extends Controller
     {
         $purchase_order->load([
             'supplier',
+            'paymentMethod',
             'lines.item',
             'createdBy',
             'approvedBy',
             'cancelledBy',
+            'purchaseReceipts.warehouse',
             'purchaseReceipts',
+            'payments' => function ($q) {
+                $q->with(['paymentMethod', 'cashAccount'])
+                    ->orderByDesc('date')
+                    ->orderByDesc('id');
+            },
         ]);
+
+        $paymentMethods = PaymentMethod::query()
+            ->where('is_active', 1)
+            ->orderByRaw("
+                CASE
+                    WHEN mode = 'cash' THEN 0
+                    WHEN code = 'CASH' THEN 0
+                    ELSE 1
+                END
+            ")
+            ->orderBy('sort_order')
+            ->orderBy('name')
+            ->get();
+
+        $cashAccounts = Account::query()
+            ->where('is_active', 1)
+            ->where('is_cash', 1)
+            ->whereIn('code', ['1101', '1111', '1112', '1113', '1114'])
+            ->orderByRaw("
+                CASE code
+                    WHEN '1101' THEN 0
+                    WHEN '1111' THEN 1
+                    WHEN '1112' THEN 2
+                    WHEN '1113' THEN 3
+                    WHEN '1114' THEN 4
+                    ELSE 99
+                END
+            ")
+            ->get();
+
+        // metrics hutang berbasis GRN posted
+        $grnPostedTotal = (float) $purchase_order->purchaseReceipts
+            ->where('status', 'posted')
+            ->sum('grand_total');
+
+        $paidPaymentTotal = (float) $purchase_order->payments
+            ->whereNull('voided_at')
+            ->where('type', 'payment')
+            ->sum('amount');
+
+        $dpTotal = (float) $purchase_order->payments
+            ->whereNull('voided_at')
+            ->where('type', 'dp')
+            ->sum('amount');
+
+        $apOutstanding = max(0, round($grnPostedTotal - $paidPaymentTotal, 2));
 
         return view('purchasing.purchase_orders.show', [
             'order' => $purchase_order,
+            'paymentMethods' => $paymentMethods,
+            'cashAccounts' => $cashAccounts,
+            'grnPostedTotal' => $grnPostedTotal,
+            'paidPaymentTotal' => $paidPaymentTotal,
+            'dpTotal' => $dpTotal,
+            'apOutstanding' => $apOutstanding,
         ]);
     }
 
@@ -163,41 +248,33 @@ class PurchaseOrderController extends Controller
      */
     public function edit(Request $request, PurchaseOrder $purchase_order)
     {
-        // blokir edit kalau status bukan draft
         if ($purchase_order->status !== 'draft') {
             return redirect()
                 ->route('purchasing.purchase_orders.show', $purchase_order->id)
                 ->with('error', 'PO yang sudah di-approve/cancel tidak bisa diedit.');
         }
 
-        // load detail + item
-        $purchase_order->load(['lines.item']);
+        $purchase_order->load(['lines.item', 'paymentMethod']);
 
         $suppliers = Supplier::orderBy('name')->get();
 
-        // =========================
-        // Determine order type
-        // Priority:
-        // 1) DB order_type (kalau ada)
-        // 2) query ?order_type=...
-        // 3) default material
-        // =========================
+        $paymentMethods = PaymentMethod::query()
+            ->where('is_active', 1)
+            ->orderBy('sort_order')
+            ->orderBy('name')
+            ->get();
+
         $orderType = $this->normalizeOrderType(
-            (string) ($purchase_order->getAttribute('order_type')
-                ?: $request->input('order_type', 'material'))
+            (string) ($purchase_order->getAttribute('order_type') ?: $request->input('order_type', 'material'))
         );
 
-        // =========================
-        // Items list:
-        // - ambil items sesuai orderType (rapi)
-        // - tapi juga gabungkan items yang sudah dipakai di lines,
-        //   supaya dropdown tidak blank walau orderType berubah via query.
-        // =========================
+        // items sesuai orderType + pastikan item yang sudah dipilih tetap muncul
         $itemsBase = Item::query()
             ->where('active', 1)
             ->where('type', $orderType)
             ->with('category')
             ->orderBy('name')
+            ->limit(300)
             ->get();
 
         $lineItemIds = $purchase_order->lines
@@ -215,7 +292,6 @@ class PurchaseOrderController extends Controller
                 ->get();
         }
 
-        // merge + unique by id
         $items = $itemsBase
             ->concat($itemsLine)
             ->unique('id')
@@ -227,6 +303,7 @@ class PurchaseOrderController extends Controller
         return view('purchasing.purchase_orders.edit', [
             'order' => $purchase_order,
             'suppliers' => $suppliers,
+            'paymentMethods' => $paymentMethods,
             'items' => $items,
             'lines' => $lines,
             'orderType' => $orderType,
@@ -247,11 +324,10 @@ class PurchaseOrderController extends Controller
         $data = $this->validateData($request);
         $data['status'] = 'draft';
 
-        $data['order_type'] = $this->normalizeOrderType(
-            $request->input('order_type', $purchase_order->getAttribute('order_type') ?: 'material')
-        );
-
         $order = $this->service->update($purchase_order, $data);
+
+        // hanya buat payment dari form kalau belum ada payment aktif
+        $this->maybeCreatePayNowPayment($request, $order, allowIfHasExistingPayments: false);
 
         return redirect()
             ->route('purchasing.purchase_orders.show', $order->id)
@@ -276,7 +352,7 @@ class PurchaseOrderController extends Controller
     }
 
     // ======================================================================
-    // VALIDASI
+    // VALIDASI + NORMALISASI
     // ======================================================================
 
     protected function validateData(Request $request): array
@@ -284,19 +360,22 @@ class PurchaseOrderController extends Controller
         $rules = [
             'date' => ['required', 'date'],
             'supplier_id' => ['required', 'integer', 'exists:suppliers,id'],
-
-            // NEW: jenis PO (kalau kolom belum ada pun tetap dipakai untuk filtering item)
             'order_type' => ['required', 'in:material,finished_good'],
 
-            'shipping_cost' => ['nullable', 'string'],
-            'discount' => ['nullable', 'string'],
+            'payment_method_id' => ['required', 'integer', 'exists:payment_methods,id'],
+
             'tax_percent' => ['nullable', 'string'],
+            'discount' => ['nullable', 'string'],
+            'shipping_cost' => ['nullable', 'string'],
 
             'lines' => ['array'],
             'lines.*.item_id' => ['nullable', 'integer', 'exists:items,id'],
             'lines.*.qty' => ['nullable', 'string'],
             'lines.*.unit_price' => ['nullable', 'string'],
             'lines.*.discount' => ['nullable', 'string'],
+
+            'pay_now' => ['nullable', 'string'],
+            'cash_account_id' => ['nullable', 'integer', 'exists:accounts,id'],
         ];
 
         $data = $request->validate($rules);
@@ -308,30 +387,31 @@ class PurchaseOrderController extends Controller
 
             $v = trim((string) $v);
             $v = str_replace(' ', '', $v);
+
             if (strpos($v, ',') !== false) {
                 $v = str_replace('.', '', $v);
                 $v = str_replace(',', '.', $v);
             } elseif (preg_match('/^\d{1,3}(\.\d{3})+$/', $v)) {
                 $v = str_replace('.', '', $v);
             }
+
             return (float) $v;
         };
 
-        // normalisasi header
+        $data['order_type'] = $this->normalizeOrderType($data['order_type'] ?? 'material');
+
         $data['discount'] = $normalize($data['discount'] ?? 0);
         $data['tax_percent'] = $normalize($data['tax_percent'] ?? 0);
         $data['shipping_cost'] = $normalize($data['shipping_cost'] ?? 0);
+        $data['pay_now'] = $normalize($data['pay_now'] ?? 0);
 
-        $data['order_type'] = $this->normalizeOrderType($data['order_type'] ?? $request->input('order_type', 'material'));
-
-        // normalisasi lines
-        $lines = $data['lines'] ?? [];
-        foreach ($lines as &$line) {
+        $data['lines'] = $data['lines'] ?? [];
+        foreach ($data['lines'] as &$line) {
             $line['qty'] = $normalize($line['qty'] ?? 0);
             $line['unit_price'] = $normalize($line['unit_price'] ?? 0);
             $line['discount'] = $normalize($line['discount'] ?? 0);
         }
-        $data['lines'] = $lines;
+        unset($line);
 
         return $data;
     }
@@ -373,8 +453,141 @@ class PurchaseOrderController extends Controller
     }
 
     // ======================================================================
-    // HELPERS
+    // API kecil: last price supplier-item
     // ======================================================================
+
+    public function getSupplierLastPrice(Request $request)
+    {
+        $supplierId = (int) $request->query('supplier_id');
+        $itemId = (int) $request->query('item_id');
+
+        if ($supplierId <= 0 || $itemId <= 0) {
+            return response()->json(['last_price' => null]);
+        }
+
+        $row = SupplierPrice::query()
+            ->where('supplier_id', $supplierId)
+            ->where('item_id', $itemId)
+            ->first();
+
+        return response()->json([
+            'last_price' => $row ? (float) $row->last_price : null,
+        ]);
+    }
+
+    // ======================================================================
+    // HELPERS: payment dari form
+    // ======================================================================
+
+    protected function maybeCreatePayNowPayment(Request $request, PurchaseOrder $order, bool $allowIfHasExistingPayments = true): void
+    {
+        $payNow = $this->toNumber($request->input('pay_now'));
+        if ($payNow <= 0) {
+            return;
+        }
+
+        if (!$allowIfHasExistingPayments && method_exists($order, 'activePayments')) {
+            if ($order->activePayments()->exists()) {
+                return;
+            }
+        }
+
+        /** @var PaymentMethod|null $pm */
+        $pm = PaymentMethod::query()->find($order->payment_method_id);
+        $mode = $this->detectPaymentMode($pm);
+
+        if ($mode === 'credit') {
+            throw ValidationException::withMessages([
+                'payment_method_id' => 'Metode CREDIT/TEMPO tidak boleh bayar langsung dari form. Pembayaran dilakukan sebagai pelunasan hutang.',
+            ]);
+        }
+
+        $cashAccountId = $request->input('cash_account_id');
+
+        if ($mode === 'transfer' && empty($cashAccountId)) {
+            throw ValidationException::withMessages([
+                'cash_account_id' => 'Pilih akun bank untuk transfer.',
+            ]);
+        }
+
+        if ($mode === 'cash' && empty($cashAccountId)) {
+            $cash = Account::query()
+                ->where('code', '1101')
+                ->where('is_active', 1)
+                ->first();
+
+            $cashAccountId = $cash?->id;
+        }
+
+        $grand = (float) $order->grand_total;
+        $payNow = min($payNow, max(0, $grand));
+
+        $type = (abs($payNow - $grand) < 0.01) ? 'payment' : 'dp';
+
+        DB::transaction(function () use ($request, $order, $cashAccountId, $payNow, $type) {
+            PurchasePayment::create([
+                'purchase_order_id' => $order->id,
+                'date' => $order->date,
+                'payment_method_id' => $order->payment_method_id,
+                'cash_account_id' => $cashAccountId ? (int) $cashAccountId : null,
+                'type' => $type,
+                'amount' => $payNow,
+                'ref_no' => null,
+                'notes' => $type === 'dp' ? 'DP saat buat/ubah PO' : 'Lunas saat buat/ubah PO',
+                'created_by' => $request->user()->id,
+            ]);
+
+            $this->recalcPaymentStatus($order);
+        });
+    }
+
+    protected function recalcPaymentStatus(PurchaseOrder $order): void
+    {
+        $paid = method_exists($order, 'activePayments')
+        ? (float) $order->activePayments()->sum('amount')
+        : 0.0;
+
+        $grand = (float) $order->grand_total;
+
+        $eps = 0.01;
+
+        $status = 'unpaid';
+        if ($paid > $eps && $paid + $eps < $grand) {
+            $status = 'partial';
+        } elseif ($paid + $eps >= $grand && $grand > 0) {
+            $status = 'paid';
+        }
+
+        // kalau kolom belum ada, minimal save tidak error? (asumsi kolom ada)
+        $order->paid_amount = round($paid, 2);
+        $order->payment_status = $status;
+        $order->save();
+    }
+
+    protected function detectPaymentMode(?PaymentMethod $pm): string
+    {
+        if (!$pm) {
+            return 'unknown';
+        }
+
+        $mode = strtolower((string) ($pm->mode ?? ''));
+        if (in_array($mode, ['cash', 'transfer', 'credit'], true)) {
+            return $mode;
+        }
+
+        $code = strtoupper((string) ($pm->code ?? ''));
+        if (str_contains($code, 'CASH')) {
+            return 'cash';
+        }
+        if (str_contains($code, 'TRF') || str_contains($code, 'TRANSFER')) {
+            return 'transfer';
+        }
+        if (str_contains($code, 'TEMPO') || str_contains($code, 'CREDIT')) {
+            return 'credit';
+        }
+
+        return 'unknown';
+    }
 
     protected function normalizeOrderType(?string $value): string
     {
@@ -382,15 +595,30 @@ class PurchaseOrderController extends Controller
         return in_array($v, ['material', 'finished_good'], true) ? $v : 'material';
     }
 
-    protected function poHasOrderTypeColumn(PurchaseOrder $order): bool
+    protected function toNumber($value): float
     {
-        // Aman: kalau kolom belum ada, attribute akan null terus; tapi ini sekadar indikator.
-        // Kamu bisa hapus fungsi ini kalau kamu sudah yakin kolomnya ada.
-        try {
-            $order->getAttribute('order_type');
-            return true;
-        } catch (\Throwable $e) {
-            return false;
+        if ($value === null || $value === '') {
+            return 0.0;
         }
+
+        if (is_int($value) || is_float($value)) {
+            return (float) $value;
+        }
+
+        $value = trim((string) $value);
+        $value = str_replace(' ', '', $value);
+
+        if (strpos($value, ',') !== false) {
+            $value = str_replace('.', '', $value);
+            $value = str_replace(',', '.', $value);
+            return (float) $value;
+        }
+
+        if (preg_match('/^\d{1,3}(\.\d{3})+$/', $value)) {
+            $value = str_replace('.', '', $value);
+            return (float) $value;
+        }
+
+        return (float) $value;
     }
 }
