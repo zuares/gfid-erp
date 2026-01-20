@@ -37,6 +37,8 @@ Route::middleware(['web', 'auth'])->prefix('purchasing')->name('purchasing.')->g
 
         Route::post('purchase-orders/{purchase_order}/payments/{payment}/void', [PurchasePaymentController::class, 'void'])
             ->name('purchase_orders.payments.void');
+        Route::post('purchase-orders/{purchase_order}/apply-dp', [PurchasePaymentController::class, 'applyDp'])
+            ->name('purchase_orders.payments.apply_dp');
 
         /*
         |--------------------------------------------------------------------------

@@ -21,9 +21,20 @@ class PurchasePaymentController extends Controller
         protected JournalService $journalService
     ) {}
 
+    /**
+     * Store DP / Payment (pelunasan) dari modal show PO.
+     *
+     * Rules:
+     * - DP: boleh CASH / TRANSFER / CREDIT
+     * - PAYMENT (pelunasan): hanya boleh CASH / TRANSFER (bukan CREDIT)
+     * - CASH: wajib akun 1101
+     * - TRANSFER: wajib akun 1111-1114
+     * - CREDIT: cash_account_id harus null
+     * - PAYMENT: hanya boleh kalau ada GRN posted dan tidak boleh melebihi outstanding
+     */
     public function store(Request $request, PurchaseOrder $purchase_order)
     {
-        if ($purchase_order->status === 'cancelled') {
+        if (($purchase_order->status ?? '') === 'cancelled') {
             return back()->with('error', 'PO cancelled tidak bisa menerima pembayaran.');
         }
 
@@ -39,42 +50,69 @@ class PurchasePaymentController extends Controller
 
         $amount = $this->toNumber($data['amount']);
         if ($amount <= 0) {
-            return back()->with('error', 'Nominal pembayaran harus > 0.');
+            throw ValidationException::withMessages([
+                'amount' => 'Nominal pembayaran harus > 0.',
+            ]);
         }
 
         /** @var PaymentMethod $pm */
-        $pm = PaymentMethod::findOrFail((int) $data['payment_method_id']);
+        $pm = PaymentMethod::query()->findOrFail((int) $data['payment_method_id']);
         $mode = $this->detectPaymentMode($pm); // cash|transfer|credit|unknown
-
-        // =====================================================
-        // 0) CREDIT/TEMPO itu bukan "pembayaran"
-        // =====================================================
-        if ($mode === 'credit') {
+        if ($mode === 'unknown') {
             throw ValidationException::withMessages([
-                'payment_method_id' => 'Metode TEMPO/CREDIT tidak dicatat sebagai pembayaran. Gunakan CASH/TRANSFER untuk pembayaran. Hutang dicatat saat GRN diposting.',
+                'payment_method_id' => 'Mode payment method tidak valid. Pastikan mode: cash/transfer/credit.',
             ]);
         }
 
         // =====================================================
-        // 1) Resolve cash/bank (boleh override user)
+        // 0) CREDIT hanya boleh untuk DP (bukan pelunasan)
+        // =====================================================
+        if ($mode === 'credit' && ($data['type'] ?? '') === 'payment') {
+            throw ValidationException::withMessages([
+                'payment_method_id' => 'Metode TEMPO/CREDIT tidak boleh untuk pelunasan. Gunakan CASH/TRANSFER.',
+            ]);
+        }
+
+        // =====================================================
+        // 1) Resolve cash/bank sesuai mode
+        //    - credit: harus null
+        //    - cash/transfer: bisa default/fallback
         // =====================================================
         $cashAccountId = $this->resolveCashAccountId($pm, $data['cash_account_id'] ?? null);
 
-        if (!$cashAccountId) {
-            throw ValidationException::withMessages([
-                'cash_account_id' => 'Akun kas/bank wajib dipilih.',
-            ]);
-        }
-
-        $acc = Account::query()->find($cashAccountId);
-        if (!$acc || (int) ($acc->is_cash ?? 0) !== 1) {
-            throw ValidationException::withMessages([
-                'cash_account_id' => 'Akun yang dipilih bukan akun kas/bank.',
-            ]);
-        }
-
-        // TRANSFER: wajib bank tertentu (1111..1114)
-        if ($mode === 'transfer') {
+        // Validasi akun sesuai mode
+        if ($mode === 'credit') {
+            // Pastikan tidak ada akun kas/bank
+            $cashAccountId = null;
+        } elseif ($mode === 'cash') {
+            if (!$cashAccountId) {
+                throw ValidationException::withMessages([
+                    'cash_account_id' => 'Untuk CASH, wajib pilih akun 1101 (Kas).',
+                ]);
+            }
+            $acc = Account::query()->find($cashAccountId);
+            if (!$acc || (int) ($acc->is_cash ?? 0) !== 1) {
+                throw ValidationException::withMessages([
+                    'cash_account_id' => 'Akun yang dipilih bukan akun kas/bank.',
+                ]);
+            }
+            if ((string) ($acc->code ?? '') !== '1101') {
+                throw ValidationException::withMessages([
+                    'cash_account_id' => 'Untuk CASH, akun harus 1101 (Kas).',
+                ]);
+            }
+        } elseif ($mode === 'transfer') {
+            if (!$cashAccountId) {
+                throw ValidationException::withMessages([
+                    'cash_account_id' => 'Untuk TRANSFER, wajib pilih akun 1111/1112/1113/1114.',
+                ]);
+            }
+            $acc = Account::query()->find($cashAccountId);
+            if (!$acc || (int) ($acc->is_cash ?? 0) !== 1) {
+                throw ValidationException::withMessages([
+                    'cash_account_id' => 'Akun yang dipilih bukan akun kas/bank.',
+                ]);
+            }
             $code = (string) ($acc->code ?? '');
             if (!in_array($code, self::TRANSFER_BANK_CODES, true)) {
                 throw ValidationException::withMessages([
@@ -87,7 +125,7 @@ class PurchasePaymentController extends Controller
         // 2) Validasi hutang outstanding hanya untuk PELUNASAN
         //    DP tidak mengurangi hutang (DP masuk 1151)
         // =====================================================
-        if ($data['type'] === 'payment') {
+        if (($data['type'] ?? '') === 'payment') {
             $outstanding = $this->calcApOutstandingByGrn($purchase_order);
 
             if ($outstanding <= 0.0001) {
@@ -104,7 +142,7 @@ class PurchasePaymentController extends Controller
         }
 
         // (Opsional) batas DP supaya tidak kebablasan
-        if ($data['type'] === 'dp') {
+        if (($data['type'] ?? '') === 'dp') {
             $dpTotal = (float) $purchase_order->activePayments()->where('type', 'dp')->sum('amount');
             if ($dpTotal + $amount > (float) $purchase_order->grand_total + 0.01) {
                 throw ValidationException::withMessages([
@@ -114,20 +152,22 @@ class PurchasePaymentController extends Controller
         }
 
         DB::transaction(function () use ($purchase_order, $data, $amount, $request, $cashAccountId) {
-
             $payment = PurchasePayment::create([
                 'purchase_order_id' => (int) $purchase_order->id,
                 'date' => $data['date'],
                 'payment_method_id' => (int) $data['payment_method_id'],
-                'cash_account_id' => (int) $cashAccountId,
+                'cash_account_id' => $cashAccountId ? (int) $cashAccountId : null, // CREDIT => null
                 'type' => $data['type'], // dp|payment
-                'amount' => $amount,
+                'amount' => round($amount, 2),
                 'ref_no' => $data['ref_no'] ?? null,
                 'notes' => $data['notes'] ?? null,
                 'created_by' => (int) $request->user()->id,
             ]);
 
-            // Jurnal: DP => 1151, Payment => 2101 (aturan di JournalService)
+            // Jurnal:
+            // - DP => 1151
+            // - Payment => 2101
+            // (aturannya ada di JournalService)
             $this->journalService->postPurchasePayment(
                 $payment->fresh(['purchaseOrder', 'cashAccount', 'paymentMethod'])
             );
@@ -149,7 +189,6 @@ class PurchasePaymentController extends Controller
         }
 
         DB::transaction(function () use ($payment, $purchase_order, $request) {
-
             $payment->voided_at = now();
             $payment->voided_by = (int) $request->user()->id;
             $payment->save();
@@ -166,26 +205,42 @@ class PurchasePaymentController extends Controller
     /**
      * paid_amount & payment_status untuk hutang
      * hanya menghitung type=payment (pelunasan hutang)
+     * basis hutang: total GRN posted
      */
     protected function recalcPaymentStatus(PurchaseOrder $order): void
     {
-        $paid = (float) $order->activePayments()
-            ->where('type', 'payment')
-            ->sum('amount');
-
-        // status hutang sebaiknya berbasis hutang real (GRN posted)
-        $debt = $this->totalGrnPosted($order);
-
+        $debt = (float) $this->totalGrnPosted($order);
         $eps = 0.01;
 
+        // kalau belum ada GRN posted, hutang belum terbentuk
+        if ($debt <= $eps) {
+            $order->paid_amount = 0;
+            $order->payment_status = 'unpaid';
+            $order->save();
+            return;
+        }
+
+        $agg = $order->activePayments()
+            ->selectRaw("
+            COALESCE(SUM(CASE WHEN type = 'payment' THEN amount ELSE 0 END), 0) as paid,
+            COALESCE(SUM(CASE WHEN type = 'dp_apply' THEN amount ELSE 0 END), 0) as dp_applied
+        ")
+            ->first();
+
+        $paid = (float) ($agg->paid ?? 0);
+        $dpApplied = (float) ($agg->dp_applied ?? 0);
+
+        $paidForAp = round($paid + $dpApplied, 2);
+        $paidForAp = min($paidForAp, round($debt, 2)); // clamp
+
         $status = 'unpaid';
-        if ($paid > $eps && $paid + $eps < $debt) {
+        if ($paidForAp > $eps && $paidForAp + $eps < $debt) {
             $status = 'partial';
-        } elseif ($paid + $eps >= $debt && $debt > 0) {
+        } elseif ($paidForAp + $eps >= $debt) {
             $status = 'paid';
         }
 
-        $order->paid_amount = round($paid, 2);
+        $order->paid_amount = $paidForAp;
         $order->payment_status = $status;
         $order->save();
     }
@@ -196,13 +251,19 @@ class PurchasePaymentController extends Controller
      */
     protected function calcApOutstandingByGrn(PurchaseOrder $order): float
     {
-        $debt = $this->totalGrnPosted($order);
+        $debt = (float) $this->totalGrnPosted($order);
 
-        $paid = (float) $order->activePayments()
-            ->where('type', 'payment')
-            ->sum('amount');
+        $agg = $order->activePayments()
+            ->selectRaw("
+            COALESCE(SUM(CASE WHEN type = 'payment' THEN amount ELSE 0 END), 0) as paid,
+            COALESCE(SUM(CASE WHEN type = 'dp_apply' THEN amount ELSE 0 END), 0) as dp_applied
+        ")
+            ->first();
 
-        return max(0, round($debt - $paid, 2));
+        $paid = (float) ($agg->paid ?? 0);
+        $dpApplied = (float) ($agg->dp_applied ?? 0);
+
+        return max(0, round($debt - $paid - $dpApplied, 2));
     }
 
     protected function totalGrnPosted(PurchaseOrder $order): float
@@ -228,7 +289,7 @@ class PurchasePaymentController extends Controller
             return 'cash';
         }
 
-        if (str_contains($code, 'TRF') || str_contains($code, 'TRANSFER')) {
+        if (str_contains($code, 'TRF') || str_contains($code, 'TRANSFER') || str_contains($code, 'BANK')) {
             return 'transfer';
         }
 
@@ -271,12 +332,19 @@ class PurchasePaymentController extends Controller
 
     /**
      * Resolve cash_account_id:
+     * - credit: selalu null
      * - user pilih -> pakai
      * - default_cash_account_id -> pakai
      * - fallback: cash=1101, transfer=1111
      */
     protected function resolveCashAccountId(PaymentMethod $pm, ?int $selectedAccountId): ?int
     {
+        $mode = $this->detectPaymentMode($pm);
+
+        if ($mode === 'credit') {
+            return null;
+        }
+
         if ($selectedAccountId) {
             return $selectedAccountId;
         }
@@ -284,8 +352,6 @@ class PurchasePaymentController extends Controller
         if (!empty($pm->default_cash_account_id)) {
             return (int) $pm->default_cash_account_id;
         }
-
-        $mode = $this->detectPaymentMode($pm);
 
         $fallbackCode = match ($mode) {
             'cash' => '1101',
@@ -298,4 +364,103 @@ class PurchasePaymentController extends Controller
             ->where('is_active', 1)
             ->value('id');
     }
+
+    public function applyDp(Request $request, PurchaseOrder $purchase_order)
+    {
+        if (($purchase_order->status ?? '') === 'cancelled') {
+            return back()->with('error', 'PO cancelled tidak bisa diproses.');
+        }
+
+        $data = $request->validate([
+            'date' => ['required', 'date'],
+            'amount' => ['required', 'string'],
+            'notes' => ['nullable', 'string', 'max:255'],
+        ]);
+
+        $amountReq = $this->toNumber($data['amount'] ?? 0);
+        if ($amountReq <= 0) {
+            throw ValidationException::withMessages([
+                'amount' => 'Nominal harus > 0.',
+            ]);
+        }
+
+        // hitung DP tersedia
+        $dpTotal = (float) $purchase_order->activePayments()
+            ->where('type', 'dp')
+            ->sum('amount');
+
+        $dpApplied = (float) $purchase_order->activePayments()
+            ->where('type', 'dp_apply')
+            ->sum('amount');
+
+        $dpAvailable = max(0, round($dpTotal - $dpApplied, 2));
+
+        // hitung hutang outstanding (GRN posted - payment - dp_apply)
+        $debt = $this->totalGrnPosted($purchase_order);
+
+        $paid = (float) $purchase_order->activePayments()
+            ->where('type', 'payment')
+            ->sum('amount');
+
+        $apOutstanding = max(0, round($debt - $paid - $dpApplied, 2));
+
+        if ($debt <= 0.0001) {
+            throw ValidationException::withMessages([
+                'amount' => 'Belum ada GRN POSTED, hutang belum terbentuk.',
+            ]);
+        }
+
+        if ($dpAvailable <= 0.0001) {
+            throw ValidationException::withMessages([
+                'amount' => 'DP tidak tersedia (sudah habis di-offset atau belum ada DP).',
+            ]);
+        }
+
+        if ($apOutstanding <= 0.0001) {
+            throw ValidationException::withMessages([
+                'amount' => 'Hutang sudah lunas, tidak ada yang bisa di-offset.',
+            ]);
+        }
+
+        $amount = min($amountReq, $dpAvailable, $apOutstanding);
+        $amount = round($amount, 2);
+
+        DB::transaction(function () use ($request, $purchase_order, $data, $amount) {
+            // NOTE: dp_apply tidak butuh kas/bank & tidak butuh payment_method
+            // tapi kolom payment_method_id kamu kemungkinan NOT NULL.
+            // Solusi paling aman: sediakan 1 PaymentMethod khusus "Offset DP"
+            // (mode=credit, code=DP_APPLY, default_cash_account_id=null)
+            $pmId = PaymentMethod::query()
+                ->where('code', 'DP_APPLY')
+                ->value('id');
+
+            if (!$pmId) {
+                throw ValidationException::withMessages([
+                    'amount' => 'PaymentMethod code=DP_APPLY belum ada. Buat dulu payment method "Offset DP".',
+                ]);
+            }
+
+            $payment = PurchasePayment::create([
+                'purchase_order_id' => (int) $purchase_order->id,
+                'date' => $data['date'],
+                'payment_method_id' => (int) $pmId,
+                'cash_account_id' => null,
+                'type' => 'dp_apply',
+                'amount' => $amount,
+                'ref_no' => null,
+                'notes' => $data['notes'] ?? 'Apply DP ke hutang (AP)',
+                'created_by' => (int) $request->user()->id,
+            ]);
+
+            // Journal: Dr 2101, Cr 1151
+            $this->journalService->postPurchasePayment(
+                $payment->fresh(['purchaseOrder', 'cashAccount', 'paymentMethod'])
+            );
+
+            $this->recalcPaymentStatus($purchase_order);
+        });
+
+        return back()->with('success', 'DP berhasil di-offset ke hutang.');
+    }
+
 }

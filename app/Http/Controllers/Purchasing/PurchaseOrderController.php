@@ -188,12 +188,12 @@ class PurchaseOrderController extends Controller
         $paymentMethods = PaymentMethod::query()
             ->where('is_active', 1)
             ->orderByRaw("
-                CASE
-                    WHEN mode = 'cash' THEN 0
-                    WHEN code = 'CASH' THEN 0
-                    ELSE 1
-                END
-            ")
+            CASE
+                WHEN mode = 'cash' THEN 0
+                WHEN code = 'CASH' THEN 0
+                ELSE 1
+            END
+        ")
             ->orderBy('sort_order')
             ->orderBy('name')
             ->get();
@@ -203,33 +203,47 @@ class PurchaseOrderController extends Controller
             ->where('is_cash', 1)
             ->whereIn('code', ['1101', '1111', '1112', '1113', '1114'])
             ->orderByRaw("
-                CASE code
-                    WHEN '1101' THEN 0
-                    WHEN '1111' THEN 1
-                    WHEN '1112' THEN 2
-                    WHEN '1113' THEN 3
-                    WHEN '1114' THEN 4
-                    ELSE 99
-                END
-            ")
+            CASE code
+                WHEN '1101' THEN 0
+                WHEN '1111' THEN 1
+                WHEN '1112' THEN 2
+                WHEN '1113' THEN 3
+                WHEN '1114' THEN 4
+                ELSE 99
+            END
+        ")
             ->get();
 
-        // metrics hutang berbasis GRN posted
+        // =========================================================
+        // METRICS hutang berbasis GRN posted
+        // =========================================================
         $grnPostedTotal = (float) $purchase_order->purchaseReceipts
             ->where('status', 'posted')
             ->sum('grand_total');
 
+        // Pelunasan hutang via cash/bank
         $paidPaymentTotal = (float) $purchase_order->payments
             ->whereNull('voided_at')
             ->where('type', 'payment')
             ->sum('amount');
 
+        // DP (uang muka)
         $dpTotal = (float) $purchase_order->payments
             ->whereNull('voided_at')
             ->where('type', 'dp')
             ->sum('amount');
 
-        $apOutstanding = max(0, round($grnPostedTotal - $paidPaymentTotal, 2));
+        // DP yang sudah dipakai untuk offset hutang
+        $dpAppliedTotal = (float) $purchase_order->payments
+            ->whereNull('voided_at')
+            ->where('type', 'dp_apply')
+            ->sum('amount');
+
+        $dpAvailable = max(0, round($dpTotal - $dpAppliedTotal, 2));
+
+        // Outstanding hutang = GRN posted - (pelunasan + dp_apply)
+        $settled = $paidPaymentTotal + $dpAppliedTotal;
+        $apOutstanding = max(0, round($grnPostedTotal - $settled, 2));
 
         return view('purchasing.purchase_orders.show', [
             'order' => $purchase_order,
@@ -238,6 +252,8 @@ class PurchaseOrderController extends Controller
             'grnPostedTotal' => $grnPostedTotal,
             'paidPaymentTotal' => $paidPaymentTotal,
             'dpTotal' => $dpTotal,
+            'dpAppliedTotal' => $dpAppliedTotal,
+            'dpAvailable' => $dpAvailable,
             'apOutstanding' => $apOutstanding,
         ]);
     }

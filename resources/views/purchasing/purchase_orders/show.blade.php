@@ -86,6 +86,36 @@
             border-color: rgba(148, 163, 184, .5);
         }
 
+        /* payment badges */
+        .pay-badge {
+            border-radius: 999px;
+            padding: .14rem .6rem;
+            font-size: .72rem;
+            border: 1px solid rgba(148, 163, 184, .45);
+            background: rgba(148, 163, 184, .12);
+            color: #64748b;
+            white-space: nowrap;
+        }
+
+        .pay-paid {
+            border-color: rgba(22, 163, 74, .55);
+            background: rgba(22, 163, 74, .12);
+            color: #15803d;
+        }
+
+        .pay-partial {
+            border-color: rgba(234, 179, 8, .55);
+            background: rgba(234, 179, 8, .12);
+            color: #a16207;
+        }
+
+        .pay-unpaid {
+            border-color: rgba(148, 163, 184, .45);
+            background: rgba(148, 163, 184, .12);
+            color: #64748b;
+        }
+
+        /* method badges */
         .pm-badge {
             border-radius: 999px;
             padding: .12rem .55rem;
@@ -114,32 +144,39 @@
             color: #a16207;
         }
 
-        .pay-badge {
+        /* type chips */
+        .type-chip {
             border-radius: 999px;
-            padding: .14rem .6rem;
+            padding: .12rem .55rem;
             font-size: .72rem;
             border: 1px solid rgba(148, 163, 184, .45);
-            background: rgba(148, 163, 184, .12);
+            background: rgba(148, 163, 184, .10);
             color: #64748b;
             white-space: nowrap;
+            text-transform: uppercase;
         }
 
-        .pay-paid {
+        .type-dp {
+            border-color: rgba(59, 130, 246, .55);
+            background: rgba(59, 130, 246, .08);
+            color: #1d4ed8;
+        }
+
+        .type-payment {
             border-color: rgba(22, 163, 74, .55);
-            background: rgba(22, 163, 74, .12);
+            background: rgba(22, 163, 74, .10);
             color: #15803d;
         }
 
-        .pay-partial {
+        .type-dp-apply {
             border-color: rgba(234, 179, 8, .55);
-            background: rgba(234, 179, 8, .12);
+            background: rgba(234, 179, 8, .10);
             color: #a16207;
         }
 
-        .pay-unpaid {
-            border-color: rgba(148, 163, 184, .45);
-            background: rgba(148, 163, 184, .12);
-            color: #64748b;
+        .btn-pill {
+            border-radius: 999px;
+            padding-inline: .95rem;
         }
 
         @media (max-width: 768px) {
@@ -201,21 +238,20 @@
 
         // Payment method "preferensi" PO
         $pm = $order->paymentMethod ?? null;
-        $pmMode = strtolower((string) ($pm->mode ?? ''));
-        $pmBadgeClass = match ($pmMode) {
-            'cash' => 'pm-badge pm-cash',
-            'credit' => 'pm-badge pm-credit',
-            'transfer' => 'pm-badge pm-transfer',
-            default => 'pm-badge',
-        };
 
-        // ==========================
         // Hutang real berbasis GRN posted (dari controller show)
-        // ==========================
         $grnPostedTotal = (float) ($grnPostedTotal ?? 0);
         $paidPaymentTotal = (float) ($paidPaymentTotal ?? 0); // type=payment
         $dpTotal = (float) ($dpTotal ?? 0); // type=dp
-        $apOutstanding = (float) ($apOutstanding ?? max(0, round($grnPostedTotal - $paidPaymentTotal, 2)));
+
+        // DP APPLY total (buat UI)
+        $dpAppliedTotal =
+            (float) ($dpAppliedTotal ?? ($order->activePayments()?->where('type', 'dp_apply')->sum('amount') ?? 0));
+        $dpAvailable = max(0, round($dpTotal - $dpAppliedTotal, 2));
+
+        // outstanding hutang (should include dp_apply)
+        $apOutstanding =
+            (float) ($apOutstanding ?? max(0, round($grnPostedTotal - $paidPaymentTotal - $dpAppliedTotal, 2)));
 
         // status bayar
         $payStatus = (string) ($order->payment_status ?? 'unpaid');
@@ -239,6 +275,16 @@
 
         // guard: payment hanya boleh kalau hutang real sudah ada
         $hasAp = $grnPostedTotal > 0.0001;
+
+        // apply DP guard
+        $canApplyDp = $canPay && $hasAp && $dpAvailable > 0.01 && $apOutstanding > 0.01;
+        $maxApplyDp = max(0, round(min($dpAvailable, $apOutstanding), 2));
+
+        // for JS/open modal routing
+        $voidActionTemplate = route('purchasing.purchase_orders.payments.void', [
+            'purchase_order' => $order->id,
+            'payment' => '___PAYMENT___',
+        ]);
     @endphp
 
     <div class="page-wrap py-4">
@@ -265,7 +311,13 @@
                 @if ($canPay)
                     <button type="button" class="btn btn-primary btn-sm btn-action" data-bs-toggle="modal"
                         data-bs-target="#modalAddPayment">
-                        + Pembayaran
+                        + Pembayaran / DP
+                    </button>
+
+                    <button type="button" class="btn btn-outline-primary btn-sm btn-action" data-bs-toggle="modal"
+                        data-bs-target="#modalApplyDp" @if (!$canApplyDp) disabled @endif
+                        title="{{ $canApplyDp ? '' : 'Offset DP tidak tersedia / hutang belum terbentuk / hutang sudah lunas / PO cancelled' }}">
+                        Offset DP
                     </button>
 
                     @if ($hasPayments)
@@ -329,12 +381,9 @@
                     <div class="text-muted small">Preferensi metode</div>
                     @if ($pm)
                         <div class="fw-semibold">{{ $pm->name }}</div>
-                        <div class="mt-1">
-                            {{-- <span class="{{ $pmBadgeClass }} mono">{{ strtoupper($pm->mode ?? '-') }}</span> --}}
-                            @if (!empty($pm->code))
-                                <span class="text-muted small mono ms-1">{{ $pm->code }}</span>
-                            @endif
-                        </div>
+                        @if (!empty($pm->code))
+                            <div class="text-muted small mono">{{ $pm->code }}</div>
+                        @endif
                     @else
                         <div class="fw-semibold text-muted">—</div>
                     @endif
@@ -356,11 +405,13 @@
                 <div class="col-md-3 col-6">
                     <div class="text-muted small">DP</div>
                     <div class="fw-semibold mono">{{ rupiah($dpTotal) }}</div>
+                    <div class="text-muted small mono">Available: {{ rupiah($dpAvailable) }}</div>
                 </div>
 
                 <div class="col-md-3 col-6">
                     <div class="text-muted small">Paid (Pelunasan)</div>
                     <div class="fw-semibold mono">{{ rupiah($paidPaymentTotal) }}</div>
+                    <div class="text-muted small mono">+ Offset: {{ rupiah($dpAppliedTotal) }}</div>
                 </div>
 
                 <div class="col-md-3 col-6">
@@ -394,7 +445,9 @@
                 <div class="card">
                     <div class="card-header d-flex justify-content-between align-items-center flex-wrap gap-2">
                         <div class="fw-semibold">Riwayat Pembayaran</div>
-                        <div class="text-muted small mono">Sisa {{ rupiah($apOutstanding) }}</div>
+                        <div class="text-muted small mono">
+                            Sisa {{ rupiah($apOutstanding) }} • DP Avail {{ rupiah($dpAvailable) }}
+                        </div>
                     </div>
 
                     <div class="card-body">
@@ -403,36 +456,86 @@
                                 <thead>
                                     <tr>
                                         <th style="width: 18%;">Tanggal</th>
-                                        <th style="width: 10%;">Tipe</th>
+                                        <th style="width: 14%;">Tipe</th>
                                         <th>Metode</th>
                                         <th style="width: 18%;" class="text-end">Nominal</th>
                                         <th style="width: 18%;">Ref</th>
-                                        <th style="width: 12%;" class="text-end">Aksi</th>
+                                        <th style="width: 14%;" class="text-end">Aksi</th>
                                     </tr>
                                 </thead>
                                 <tbody>
                                     @foreach ($order->payments as $p)
+                                        @php
+                                            $pMode = strtolower((string) ($p->paymentMethod?->mode ?? ''));
+                                            $pPmClass = match ($pMode) {
+                                                'cash' => 'pm-badge pm-cash',
+                                                'credit' => 'pm-badge pm-credit',
+                                                'transfer' => 'pm-badge pm-transfer',
+                                                default => 'pm-badge',
+                                            };
+
+                                            $type = (string) ($p->type ?? '');
+                                            $typeClass = match ($type) {
+                                                'dp' => 'type-chip type-dp',
+                                                'dp_apply' => 'type-chip type-dp-apply',
+                                                default => 'type-chip type-payment',
+                                            };
+
+                                            $typeLabel = match ($type) {
+                                                'dp' => 'DP',
+                                                'dp_apply' => 'OFFSET',
+                                                default => 'PAYMENT',
+                                            };
+                                        @endphp
+
                                         <tr @class(['text-muted' => $p->voided_at])>
                                             <td>{{ $p->date ? id_date($p->date) : '-' }}</td>
-                                            <td class="fw-semibold text-uppercase">{{ $p->type }}</td>
+
                                             <td>
-                                                {{ $p->paymentMethod?->name ?? '-' }}
+                                                <span class="{{ $typeClass }}">{{ $typeLabel }}</span>
+                                            </td>
+
+                                            <td>
+                                                <div class="d-flex align-items-center gap-2 flex-wrap">
+                                                    <span>{{ $p->paymentMethod?->name ?? '-' }}</span>
+                                                    @if ($p->paymentMethod)
+                                                        <span class="{{ $pPmClass }} mono">
+                                                            {{ strtoupper($p->paymentMethod?->mode ?? '-') }}
+                                                        </span>
+                                                    @endif
+                                                    @if ($p->voided_at)
+                                                        <span class="tag tag-status-cancelled mono">VOID</span>
+                                                    @endif
+                                                </div>
+
                                                 @if ($p->cashAccount)
                                                     <div class="text-muted small mono">
                                                         {{ $p->cashAccount->code }} — {{ $p->cashAccount->name }}
                                                     </div>
+                                                @else
+                                                    @if (strtolower((string) ($p->paymentMethod?->mode ?? '')) === 'credit')
+                                                        <div class="text-muted small">Tanpa kas/bank (tempo/credit)</div>
+                                                    @endif
+                                                @endif
+
+                                                @if (!empty($p->notes))
+                                                    <div class="text-muted small">{{ $p->notes }}</div>
                                                 @endif
                                             </td>
+
                                             <td class="text-end fw-semibold">{{ rupiah($p->amount) }}</td>
                                             <td>{{ $p->ref_no ?? '—' }}</td>
+
                                             <td class="text-end">
                                                 @if (!$p->voided_at && $canPay)
-                                                    <form method="POST"
-                                                        action="{{ route('purchasing.purchase_orders.payments.void', [$order->id, $p->id]) }}"
-                                                        onsubmit="return confirm('VOID pembayaran ini?')" class="d-inline">
-                                                        @csrf
-                                                        <button class="btn btn-sm btn-outline-danger">VOID</button>
-                                                    </form>
+                                                    <button type="button" class="btn btn-sm btn-outline-danger"
+                                                        data-bs-toggle="modal" data-bs-target="#modalVoidPayment"
+                                                        data-payment-id="{{ $p->id }}"
+                                                        data-payment-type="{{ $typeLabel }}"
+                                                        data-payment-amount="{{ rupiah($p->amount) }}"
+                                                        data-payment-date="{{ $p->date ? id_date($p->date) : '-' }}">
+                                                        VOID
+                                                    </button>
                                                 @else
                                                     <span class="text-muted small">—</span>
                                                 @endif
@@ -441,6 +544,19 @@
                                     @endforeach
                                 </tbody>
                             </table>
+
+                            <div class="small text-muted mt-3">
+                                <div>Catatan:</div>
+                                <ul class="mb-0">
+                                    <li><b>DP</b> boleh dicatat walau GRN belum posted.</li>
+                                    <li><b>Pembayaran (pelunasan)</b> hanya relevan kalau sudah ada GRN posted (ada hutang
+                                        real).</li>
+                                    <li><b>TEMPO/CREDIT</b> hanya untuk <b>DP</b>, tidak boleh untuk pelunasan.</li>
+                                    <li><b>OFFSET DP</b> mengurangi hutang tanpa keluar kas/bank (Dr AP, Cr DP/Advance).
+                                    </li>
+                                </ul>
+                            </div>
+
                         </div>
                     </div>
                 </div>
@@ -705,16 +821,21 @@
                 ⬅️ Kembali ke daftar
             </a>
         </div>
+
     </div>
 
-    {{-- MODAL: ADD PAYMENT --}}
+    {{-- =========================================================
+    MODAL: ADD PAYMENT / DP (punya kamu, tetap, cuma sedikit touch)
+========================================================= --}}
     <div class="modal fade" id="modalAddPayment" tabindex="-1" aria-hidden="true">
         <div class="modal-dialog modal-dialog-centered modal-lg">
             <div class="modal-content">
                 <div class="modal-header">
                     <div>
                         <div class="fw-semibold">Tambah Pembayaran</div>
-                        <div class="text-muted small mono">Sisa hutang: {{ rupiah($apOutstanding) }}</div>
+                        <div class="text-muted small mono">
+                            GRN Posted: {{ rupiah($grnPostedTotal) }} • Sisa hutang: {{ rupiah($apOutstanding) }}
+                        </div>
                     </div>
                     <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
                 </div>
@@ -725,7 +846,6 @@
 
                     <div class="modal-body">
                         <div class="row g-2">
-
                             <div class="col-6 col-md-3">
                                 <label class="form-label small text-muted mb-1">Tanggal</label>
                                 <input type="date" name="date" class="form-control"
@@ -735,24 +855,34 @@
                             <div class="col-6 col-md-3">
                                 <label class="form-label small text-muted mb-1">Jenis</label>
                                 <select name="type" class="form-select" required id="typeSelectModal">
-                                    <option value="payment" @selected(old('type', 'payment') === 'payment')>Pembayaran</option>
-                                    <option value="dp" @selected(old('type') === 'dp')>DP</option>
+                                    <option value="payment" @selected(old('type', 'payment') === 'payment')>Pembayaran (Pelunasan)</option>
+                                    <option value="dp" @selected(old('type') === 'dp')>DP (Uang Muka)</option>
                                 </select>
+                                <div class="text-muted small mt-1">
+                                    <span class="mono">DP</span> boleh sebelum GRN posted.
+                                </div>
                             </div>
 
                             <div class="col-12 col-md-6">
-                                <label class="form-label small text-muted mb-1">Metode</label>
+                                <label class="form-label small text-muted mb-1">Metode Bayar</label>
                                 <select name="payment_method_id" class="form-select" required id="pmSelectModal">
                                     @foreach ($paymentMethods ?? [] as $pmOpt)
                                         <option value="{{ $pmOpt->id }}"
                                             data-mode="{{ strtolower($pmOpt->mode ?? '') }}"
                                             data-code="{{ strtoupper($pmOpt->code ?? '') }}" @selected(old('payment_method_id', $order->payment_method_id) == $pmOpt->id)>
-                                            {{ $pmOpt->name }}@if (!empty($pmOpt->mode))
+                                            {{ $pmOpt->name }}
+                                            @if (!empty($pmOpt->mode))
                                                 — {{ strtoupper($pmOpt->mode) }}
                                             @endif
                                         </option>
                                     @endforeach
                                 </select>
+                                <div class="text-muted small mt-1">
+                                    Pilih <b>lewat apa</b> bayarnya (Cash / Transfer / Tempo).
+                                </div>
+                                <div class="text-danger small mt-1 d-none" id="creditPayErrModal">
+                                    Metode TEMPO/CREDIT hanya untuk DP. Untuk pelunasan, pilih CASH / TRANSFER.
+                                </div>
                             </div>
 
                             <div class="col-12 col-md-6">
@@ -768,6 +898,8 @@
                                             </option>
                                         @endif
                                     </select>
+                                    <div class="text-danger small mt-1 d-none" id="cashErrModal">Untuk CASH, wajib pilih
+                                        akun 1101 (Kas).</div>
                                 </div>
 
                                 <div id="bankWrap" class="d-none">
@@ -780,9 +912,8 @@
                                             </option>
                                         @endforeach
                                     </select>
-                                    <div class="text-danger small mt-1 d-none" id="bankErrModal">
-                                        Untuk TRANSFER, wajib pilih 1111/1112/1113/1114.
-                                    </div>
+                                    <div class="text-danger small mt-1 d-none" id="bankErrModal">Untuk TRANSFER, wajib
+                                        pilih 1111/1112/1113/1114.</div>
                                 </div>
 
                                 <div id="creditWrap" class="d-none">
@@ -800,6 +931,9 @@
                                     <button type="button" class="btn btn-outline-secondary" id="btnFillRemaining">Isi
                                         sisa</button>
                                 </div>
+                                <div class="text-muted small mt-1">
+                                    Tombol <b>Isi sisa</b> mengisi sesuai <b>sisa hutang</b> (GRN posted - paid - offset).
+                                </div>
                             </div>
 
                             <div class="col-12 col-md-6">
@@ -813,7 +947,6 @@
                                 <input type="text" name="notes" class="form-control" placeholder="Opsional"
                                     value="{{ old('notes') }}">
                             </div>
-
                         </div>
 
                         @if ($errors->any())
@@ -837,9 +970,131 @@
         </div>
     </div>
 
+    {{-- =========================================================
+    MODAL: APPLY DP (OFFSET)
+========================================================= --}}
+    <div class="modal fade" id="modalApplyDp" tabindex="-1" aria-hidden="true">
+        <div class="modal-dialog modal-dialog-centered">
+            <form method="POST" action="{{ route('purchasing.purchase_orders.payments.apply_dp', $order->id) }}"
+                class="modal-content" id="applyDpForm">
+                @csrf
+
+                <div class="modal-header">
+                    <div>
+                        <div class="fw-semibold">Offset DP ke Hutang</div>
+                        <div class="text-muted small mono">
+                            DP Available: {{ rupiah($dpAvailable) }} • AP Outstanding: {{ rupiah($apOutstanding) }}
+                        </div>
+                    </div>
+                    <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
+                </div>
+
+                <div class="modal-body">
+                    <div class="alert alert-info py-2 small mb-3">
+                        <div class="d-flex justify-content-between">
+                            <span>Max Offset</span>
+                            <span class="mono fw-semibold">{{ rupiah($maxApplyDp) }}</span>
+                        </div>
+                        <div class="text-muted mt-1">
+                            Nominal akan otomatis diambil minimum dari: input, DP available, AP outstanding.
+                        </div>
+                    </div>
+
+                    <div class="row g-2">
+                        <div class="col-6">
+                            <label class="form-label small text-muted mb-1">Tanggal</label>
+                            <input type="date" name="date" class="form-control"
+                                value="{{ old('date', now()->toDateString()) }}" required>
+                            @error('date')
+                                <div class="text-danger small mt-1">{{ $message }}</div>
+                            @enderror
+                        </div>
+
+                        <div class="col-6">
+                            <label class="form-label small text-muted mb-1">Nominal Offset</label>
+                            <div class="input-group">
+                                <span class="input-group-text">Rp</span>
+                                <input type="text" name="amount" class="form-control mono" id="applyDpAmount"
+                                    placeholder="0" value="{{ old('amount') }}" required>
+                                <button type="button" class="btn btn-outline-secondary"
+                                    id="btnFillMaxApplyDp">Max</button>
+                            </div>
+                            @error('amount')
+                                <div class="text-danger small mt-1">{{ $message }}</div>
+                            @enderror
+                        </div>
+
+                        <div class="col-12">
+                            <label class="form-label small text-muted mb-1">Catatan (optional)</label>
+                            <input type="text" name="notes" class="form-control" maxlength="255"
+                                value="{{ old('notes') }}">
+                            @error('notes')
+                                <div class="text-danger small mt-1">{{ $message }}</div>
+                            @enderror
+                        </div>
+                    </div>
+
+                    @if ($errors->any())
+                        {{-- NOTE: error bag kamu masih global. Ini tetap tampil. --}}
+                        <div class="text-muted small mt-3">
+                            Tips: kalau error-nya terkait Offset DP, modal ini akan kebuka otomatis.
+                        </div>
+                    @endif
+                </div>
+
+                <div class="modal-footer">
+                    <button type="button" class="btn btn-outline-secondary" data-bs-dismiss="modal">Tutup</button>
+                    <button type="submit" class="btn btn-primary"
+                        @if (!$canApplyDp) disabled @endif>Proses Offset</button>
+                </div>
+            </form>
+        </div>
+    </div>
+
+    {{-- =========================================================
+    MODAL: VOID PAYMENT + REASON
+========================================================= --}}
+    <div class="modal fade" id="modalVoidPayment" tabindex="-1" aria-hidden="true">
+        <div class="modal-dialog modal-dialog-centered">
+            <form method="POST" action="" class="modal-content" id="voidPaymentForm">
+                @csrf
+
+                <div class="modal-header">
+                    <div>
+                        <div class="fw-semibold">Void Pembayaran</div>
+                        <div class="text-muted small mono" id="voidInfo">—</div>
+                    </div>
+                    <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
+                </div>
+
+                <div class="modal-body">
+                    <div class="alert alert-warning py-2 small">
+                        Ini akan membuat jurnal <b>reversal</b> otomatis. Pastikan kamu yakin.
+                    </div>
+
+                    <label class="form-label small text-muted mb-1">Alasan Void</label>
+                    <input type="text" name="reason" class="form-control" maxlength="255"
+                        placeholder="contoh: salah nominal / duplikat / salah metode" value="{{ old('reason') }}"
+                        required>
+                    @error('reason')
+                        <div class="text-danger small mt-1">{{ $message }}</div>
+                    @enderror
+                </div>
+
+                <div class="modal-footer">
+                    <button type="button" class="btn btn-outline-secondary" data-bs-dismiss="modal">Batal</button>
+                    <button type="submit" class="btn btn-danger">VOID</button>
+                </div>
+            </form>
+        </div>
+    </div>
+
     @push('scripts')
         <script>
             document.addEventListener('DOMContentLoaded', function() {
+                // =========================================================
+                // ADD PAYMENT (existing logic kamu)
+                // =========================================================
                 const pm = document.getElementById('pmSelectModal');
                 const btnSave = document.getElementById('btnSavePayment');
 
@@ -851,6 +1106,8 @@
                 const cashSelectBank = document.getElementById('cashSelectBank');
 
                 const bankErr = document.getElementById('bankErrModal');
+                const cashErr = document.getElementById('cashErrModal');
+                const creditPayErr = document.getElementById('creditPayErrModal');
 
                 const amountInput = document.getElementById('amountInput');
                 const btnFill = document.getElementById('btnFillRemaining');
@@ -861,15 +1118,15 @@
 
                 function fmtId(n) {
                     return new Intl.NumberFormat('id-ID', {
-                            maximumFractionDigits: 0
-                        })
-                        .format(Math.round(n || 0));
+                        maximumFractionDigits: 0
+                    }).format(Math.round(n || 0));
                 }
 
                 function detectMode() {
                     const opt = pm?.selectedOptions?.[0];
                     const mode = (opt?.dataset?.mode || '').toLowerCase();
                     const code = (opt?.dataset?.code || '').toUpperCase();
+
                     if (mode) return mode;
                     if (code.includes('CASH')) return 'cash';
                     if (code.includes('TRF') || code.includes('TRANSFER') || code.includes('BANK')) return 'transfer';
@@ -884,8 +1141,15 @@
                 }
 
                 function setBankError(show) {
-                    if (!bankErr) return;
-                    bankErr.classList.toggle('d-none', !show);
+                    if (bankErr) bankErr.classList.toggle('d-none', !show);
+                }
+
+                function setCashError(show) {
+                    if (cashErr) cashErr.classList.toggle('d-none', !show);
+                }
+
+                function setCreditPayError(show) {
+                    if (creditPayErr) creditPayErr.classList.toggle('d-none', !show);
                 }
 
                 function autoPickCash() {
@@ -904,22 +1168,44 @@
                         cashSelectBank.value = jago.value;
                         return;
                     }
-
                     if (cashSelectBank.options.length > 1) cashSelectBank.selectedIndex = 1;
                 }
 
-                function validateTransfer() {
+                function validateCashBank() {
                     const mode = detectMode();
-                    if (mode !== 'transfer') {
+                    if (mode === 'credit') {
                         setBankError(false);
-                        if (btnSave) btnSave.disabled = false;
+                        setCashError(false);
                         return true;
                     }
-
-                    const ok = !!(cashSelectBank && cashSelectBank.value);
-                    setBankError(!ok);
-                    if (btnSave) btnSave.disabled = !ok;
+                    if (mode === 'transfer') {
+                        const ok = !!(cashSelectBank && cashSelectBank.value);
+                        setBankError(!ok);
+                        setCashError(false);
+                        return ok;
+                    }
+                    const ok = !!(cashSelectCash && cashSelectCash.value);
+                    setCashError(!ok);
+                    setBankError(false);
                     return ok;
+                }
+
+                function validateTypeVsMode() {
+                    const mode = detectMode();
+                    const type = (typeSelect?.value || 'payment');
+                    if (type === 'payment' && mode === 'credit') {
+                        setCreditPayError(true);
+                        if (btnSave) btnSave.disabled = true;
+                        return false;
+                    }
+                    setCreditPayError(false);
+                    return true;
+                }
+
+                function applyAllValidations() {
+                    const okCashBank = validateCashBank();
+                    const okTypeMode = validateTypeVsMode();
+                    if (btnSave) btnSave.disabled = !(okCashBank && okTypeMode);
                 }
 
                 function syncModeUI() {
@@ -930,28 +1216,33 @@
                         if (cashSelectCash) cashSelectCash.value = '';
                         if (cashSelectBank) cashSelectBank.value = '';
                         setBankError(false);
-                        if (btnSave) btnSave.disabled = false;
+                        setCashError(false);
+                        applyAllValidations();
                         return;
                     }
 
                     if (mode === 'transfer') {
                         showOnly('bank');
                         autoPickBankJago();
-                        validateTransfer();
+                        applyAllValidations();
                         return;
                     }
 
                     showOnly('cash');
                     autoPickCash();
-                    setBankError(false);
-                    if (btnSave) btnSave.disabled = false;
+                    applyAllValidations();
                 }
 
-                // Auto: kalau belum ada GRN posted, paksa DP dan disable PAYMENT
-                if (typeSelect && grnPostedTotal <= 0.0001) {
-                    typeSelect.value = 'dp';
-                    const optPay = typeSelect.querySelector('option[value="payment"]');
-                    if (optPay) optPay.disabled = true;
+                function syncTypeRules() {
+                    if (typeSelect && grnPostedTotal <= 0.0001) {
+                        typeSelect.value = 'dp';
+                        const optPay = typeSelect.querySelector('option[value="payment"]');
+                        if (optPay) optPay.disabled = true;
+                    } else {
+                        const optPay = typeSelect?.querySelector('option[value="payment"]');
+                        if (optPay) optPay.disabled = false;
+                    }
+                    applyAllValidations();
                 }
 
                 btnFill?.addEventListener('click', function() {
@@ -968,23 +1259,99 @@
                     if (!isNaN(n)) amountInput.value = fmtId(n);
                 });
 
+                typeSelect?.addEventListener('change', syncTypeRules);
                 pm?.addEventListener('change', syncModeUI);
-                cashSelectBank?.addEventListener('change', validateTransfer);
+                cashSelectBank?.addEventListener('change', applyAllValidations);
+                cashSelectCash?.addEventListener('change', applyAllValidations);
 
+                // init
+                syncTypeRules();
                 syncModeUI();
 
-                @if ($errors->any())
-                    const addModalEl = document.getElementById('modalAddPayment');
-                    if (addModalEl && window.bootstrap) {
-                        new bootstrap.Modal(addModalEl).show();
-                    }
+                // =========================================================
+                // APPLY DP modal helpers
+                // =========================================================
+                const applyDpAmount = document.getElementById('applyDpAmount');
+                const btnFillMaxApplyDp = document.getElementById('btnFillMaxApplyDp');
+                const maxApplyDp = {{ (float) $maxApplyDp }};
+
+                btnFillMaxApplyDp?.addEventListener('click', function() {
+                    if (!applyDpAmount) return;
+                    applyDpAmount.value = fmtId(maxApplyDp);
+                    applyDpAmount.focus();
+                    applyDpAmount.select?.();
+                });
+
+                applyDpAmount?.addEventListener('focusout', function() {
+                    const raw = (applyDpAmount.value || '').toString().trim();
+                    if (raw === '') return;
+                    const n = Number(raw.replace(/\./g, '').replace(/,/g, '.'));
+                    if (!isNaN(n)) applyDpAmount.value = fmtId(n);
+                });
+
+                // =========================================================
+                // VOID modal wiring
+                // =========================================================
+                const modalVoidEl = document.getElementById('modalVoidPayment');
+                const voidForm = document.getElementById('voidPaymentForm');
+                const voidInfo = document.getElementById('voidInfo');
+                const actionTpl = @json($voidActionTemplate);
+
+                modalVoidEl?.addEventListener('show.bs.modal', function(event) {
+                    const btn = event.relatedTarget;
+                    if (!btn) return;
+
+                    const pid = btn.getAttribute('data-payment-id');
+                    const ptype = btn.getAttribute('data-payment-type') || '-';
+                    const pamt = btn.getAttribute('data-payment-amount') || '-';
+                    const pdate = btn.getAttribute('data-payment-date') || '-';
+
+                    if (voidForm) voidForm.action = actionTpl.replace('___PAYMENT___', pid);
+                    if (voidInfo) voidInfo.textContent = `${ptype} • ${pamt} • ${pdate}`;
+
+                    const reasonInput = voidForm?.querySelector('input[name="reason"]');
+                    if (reasonInput) reasonInput.value = '';
+                });
+
+                // =========================================================
+                // Auto open modal if validation errors (best-effort)
+                // =========================================================
+                const hasErrors = {{ $errors->any() ? 'true' : 'false' }};
+
+                if (hasErrors && window.bootstrap) {
+                    // Heuristic:
+                    // - if reason error exists -> open void modal and expand history
+                    // - else if amount/date/notes and request came from apply dp -> open apply dp modal
+                    // - else open add payment modal
+                    const reasonErr = {!! json_encode($errors->has('reason')) !!};
+                    const amountErr = {!! json_encode($errors->has('amount')) !!};
+                    const dateErr = {!! json_encode($errors->has('date')) !!};
+
                     const hist = document.getElementById('paymentHistoryCollapse');
-                    if (hist && window.bootstrap) {
-                        new bootstrap.Collapse(hist, {
-                            toggle: true
-                        });
+                    if (hist) new bootstrap.Collapse(hist, {
+                        toggle: true
+                    });
+
+                    if (reasonErr) {
+                        const el = document.getElementById('modalVoidPayment');
+                        if (el) new bootstrap.Modal(el).show();
+                        return;
                     }
-                @endif
+
+                    // apply dp biasanya error amount/date juga, tapi add payment juga.
+                    // trigger jika user terakhir tekan tombol offset dp (kita pakai session flash flag kalau ada)
+                    const fromApplyDp = {!! json_encode((bool) session('from_apply_dp')) !!};
+
+                    if (fromApplyDp) {
+                        const el = document.getElementById('modalApplyDp');
+                        if (el) new bootstrap.Modal(el).show();
+                        return;
+                    }
+
+                    // default: add payment
+                    const addModalEl = document.getElementById('modalAddPayment');
+                    if (addModalEl) new bootstrap.Modal(addModalEl).show();
+                }
             });
         </script>
     @endpush

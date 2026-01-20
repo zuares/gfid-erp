@@ -121,35 +121,83 @@ class JournalService
     /**
      * Void journal (soft).
      */
-    public function void(Journal $journal): Journal
+    public function void(Journal $journal, ?string $reason = null): Journal
     {
-        if ($journal->voided_at) {
-            return $journal;
-        }
+        return DB::transaction(function () use ($journal, $reason) {
 
-        $journal->update([
-            'voided_at' => now(),
-        ]);
+            $journal = Journal::query()
+                ->with('lines')
+                ->whereKey($journal->id)
+                ->lockForUpdate()
+                ->firstOrFail();
 
-        return $journal;
+            if ($journal->voided_at) {
+                throw ValidationException::withMessages([
+                    'journal' => 'Journal sudah void.',
+                ]);
+            }
+
+            if ($journal->lines->count() < 2) {
+                throw ValidationException::withMessages([
+                    'journal' => 'Journal lines tidak valid untuk reversal.',
+                ]);
+            }
+
+            // 1) Mark void journal lama
+            $journal->forceFill([
+                'voided_at' => now(),
+            ])->save();
+
+            // 2) Create reversal journal (swap debit/credit)
+            $revDesc = trim(
+                'Reversal: ' . ($journal->description ?? '-') .
+                ($reason ? " | {$reason}" : '')
+            );
+
+            $rev = Journal::create([
+                'date' => $journal->date,
+                'description' => $revDesc,
+                'source_type' => $journal->source_type,
+                'source_id' => $journal->source_id,
+                'posted_at' => now(),
+            ]);
+
+            $rev->lines()->createMany(
+                $journal->lines->map(function ($l) {
+                    return [
+                        'account_id' => (int) $l->account_id,
+                        'debit' => (float) $l->credit,
+                        'credit' => (float) $l->debit,
+                    ];
+                })->all()
+            );
+
+            return $rev;
+        });
     }
 
     /**
      * Void by source (helper)
      */
-    public function voidBySource(string $sourceType, int $sourceId): ?Journal
+    public function voidBySource(string $sourceType, int $sourceId, ?string $reason = null): ?Journal
     {
-        $j = Journal::query()
-            ->where('source_type', $sourceType)
-            ->where('source_id', $sourceId)
-            ->whereNull('voided_at')
-            ->first();
+        return DB::transaction(function () use ($sourceType, $sourceId, $reason) {
 
-        if (!$j) {
-            return null;
-        }
+            /** @var Journal|null $j */
+            $j = Journal::query()
+                ->where('source_type', $sourceType)
+                ->where('source_id', $sourceId)
+                ->whereNull('voided_at')
+                ->lockForUpdate()
+                ->first();
 
-        return $this->void($j);
+            if (!$j) {
+                return null;
+            }
+
+            // void() sudah bikin reversal journal
+            return $this->void($j, $reason);
+        });
     }
 
     // =========================================================
@@ -167,8 +215,12 @@ class JournalService
      */
     public function postPurchasePayment(PurchasePayment $payment): Journal
     {
+        // Load relasi yang dibutuhkan
         $payment->loadMissing(['purchaseOrder', 'paymentMethod', 'cashAccount']);
 
+        // =========================================================
+        // 0) Proteksi: void & amount
+        // =========================================================
         if ($payment->voided_at) {
             throw ValidationException::withMessages([
                 'payment' => 'Payment sudah void.',
@@ -182,7 +234,82 @@ class JournalService
             ]);
         }
 
-        // mode: cash/transfer/credit/tempo
+        // =========================================================
+        // 1) Idempotency + anti double click (row lock)
+        // =========================================================
+        // Kalau sudah ada journal_id, jangan bikin jurnal baru
+        if ($payment->journal_id) {
+            $existing = Journal::query()->find((int) $payment->journal_id);
+            if ($existing) {
+                return $existing;
+            }
+
+            // kalau journal_id terisi tapi journal-nya hilang (edge case)
+            // reset agar bisa dipost ulang (optional; atau throw error)
+            $payment->forceFill(['journal_id' => null])->save();
+        }
+
+        // Lock row untuk mencegah race-condition klik 2x
+        $locked = PurchasePayment::query()
+            ->whereKey($payment->id)
+            ->lockForUpdate()
+            ->first();
+
+        if ($locked && $locked->journal_id) {
+            $existing = Journal::query()->find((int) $locked->journal_id);
+            if ($existing) {
+                return $existing;
+            }
+
+            $locked->forceFill(['journal_id' => null])->save();
+        }
+
+        // =========================================================
+        // 2) Ambil akun COA
+        // =========================================================
+        $advId = $this->accountIdByCode(self::CODE_ADV_PURCHASE); // 1151
+        $apId = $this->accountIdByCode(self::CODE_AP); // 2101
+
+        // =========================================================
+        // 3) Meta jurnal
+        // =========================================================
+        $po = $payment->purchaseOrder;
+        $poCode = $po?->code ?? '-';
+        $date = $this->dateOnly($payment->date);
+
+        $pmName = $payment->paymentMethod?->name;
+        $cashName = $payment->cashAccount?->name;
+        $suffix = trim(implode(' ', array_filter([
+            $pmName ? "via {$pmName}" : null,
+            $cashName ? "({$cashName})" : null,
+        ])));
+
+        $sourceType = self::SRC_PURCHASE_PAYMENT;
+        $sourceId = (int) $payment->id;
+
+        // =========================================================
+        // 4) Branch by payment type
+        // =========================================================
+
+        // 4.1 DP APPLY / OFFSET (tanpa kas/bank)
+        if ($payment->type === 'dp_apply') {
+            $journal = $this->post(
+                $date,
+                $sourceType,
+                $sourceId,
+                trim("Apply DP ke Hutang {$poCode}"),
+                [
+                    ['account_id' => $apId, 'debit' => $amount, 'credit' => 0],
+                    ['account_id' => $advId, 'debit' => 0, 'credit' => $amount],
+                ]
+            );
+
+            $payment->forceFill(['journal_id' => $journal->id])->save();
+
+            return $journal;
+        }
+
+        // 4.2 DP / PAYMENT biasa -> wajib kas/bank (cash/transfer)
         $mode = $this->detectPaymentModeFromMethod($payment->paymentMethod);
 
         if (in_array($mode, ['credit', 'tempo'], true)) {
@@ -200,27 +327,9 @@ class JournalService
         $cashAccountId = (int) $payment->cash_account_id;
         $this->ensureAccountIsCash($cashAccountId);
 
-        $advId = $this->accountIdByCode(self::CODE_ADV_PURCHASE); // 1151
-        $apId = $this->accountIdByCode(self::CODE_AP); // 2101
-
-        $po = $payment->purchaseOrder;
-        $poCode = $po?->code ?? '-';
-
-        $date = $this->dateOnly($payment->date);
-
-        $pmName = $payment->paymentMethod?->name;
-        $cashName = $payment->cashAccount?->name;
-        $suffix = trim(implode(' ', array_filter([
-            $pmName ? "via {$pmName}" : null,
-            $cashName ? "({$cashName})" : null,
-        ])));
-
-        $sourceType = self::SRC_PURCHASE_PAYMENT;
-        $sourceId = (int) $payment->id;
-
-        // ✅ DP -> 1151, Pelunasan -> 2101
+        // 4.2.a DP (uang muka)
         if ($payment->type === 'dp') {
-            return $this->post(
+            $journal = $this->post(
                 $date,
                 $sourceType,
                 $sourceId,
@@ -230,9 +339,14 @@ class JournalService
                     ['account_id' => $cashAccountId, 'debit' => 0, 'credit' => $amount],
                 ]
             );
+
+            $payment->forceFill(['journal_id' => $journal->id])->save();
+
+            return $journal;
         }
 
-        return $this->post(
+        // 4.2.b Default: payment (pelunasan hutang)
+        $journal = $this->post(
             $date,
             $sourceType,
             $sourceId,
@@ -242,6 +356,10 @@ class JournalService
                 ['account_id' => $cashAccountId, 'debit' => 0, 'credit' => $amount],
             ]
         );
+
+        $payment->forceFill(['journal_id' => $journal->id])->save();
+
+        return $journal;
     }
 
     /**
@@ -400,4 +518,99 @@ class JournalService
     {
         return Carbon::parse($value)->toDateString();
     }
+
+    public function voidJournal(int $journalId, ?string $reason = null): Journal
+    {
+        return DB::transaction(function () use ($journalId, $reason) {
+
+            /** @var Journal $journal */
+            $journal = Journal::query()
+                ->with('lines')
+                ->lockForUpdate()
+                ->findOrFail($journalId);
+
+            if ($journal->voided_at) {
+                throw ValidationException::withMessages([
+                    'journal' => 'Journal sudah void.',
+                ]);
+            }
+
+            if ($journal->lines->count() < 2) {
+                throw ValidationException::withMessages([
+                    'journal' => 'Journal lines tidak valid untuk reversal.',
+                ]);
+            }
+
+            // 1) Void jurnal lama
+            $journal->forceFill([
+                'voided_at' => now(),
+            ])->save();
+
+            // 2) Buat jurnal reversal (balik debit/credit)
+            $revDescription = trim(
+                'Reversal: ' . ($journal->description ?? '-') .
+                ($reason ? " | {$reason}" : '')
+            );
+
+            $rev = Journal::create([
+                'date' => $journal->date,
+                'description' => $revDescription,
+                'source_type' => $journal->source_type,
+                'source_id' => $journal->source_id,
+                'posted_at' => now(),
+            ]);
+
+            $rev->lines()->createMany(
+                $journal->lines->map(function ($l) {
+                    return [
+                        'account_id' => (int) $l->account_id,
+                        'debit' => (float) $l->credit,
+                        'credit' => (float) $l->debit,
+                    ];
+                })->all()
+            );
+
+            return $rev;
+        });
+    }
+
+    public function voidPurchasePayment(PurchasePayment $payment, int $userId, ?string $reason = null): void
+    {
+        DB::transaction(function () use ($payment, $userId, $reason) {
+
+            $payment = PurchasePayment::query()
+                ->with(['purchaseOrder'])
+                ->lockForUpdate()
+                ->findOrFail($payment->id);
+
+            if ($payment->voided_at) {
+                throw ValidationException::withMessages([
+                    'payment' => 'Payment sudah void.',
+                ]);
+            }
+
+            // 1) Kalau ada journal -> reversal + void journal lama
+            if ($payment->journal_id) {
+                $this->journalService->voidJournal((int) $payment->journal_id, $reason ?: 'Void purchase payment');
+            }
+
+            // 2) Void payment
+            $payment->forceFill([
+                'voided_at' => now(),
+                'voided_by' => $userId,
+            ])->save();
+
+            // OPTIONAL: kalau kamu mau "payment void" tidak lagi punya journal_id
+            // tapi ingat: audit trail jadi putus kalau kamu null-in.
+            // Aku prefer BIARKAN journal_id tetap ada (menunjuk jurnal lama yg sudah void).
+            // Kalau kamu tetap mau null:
+            // $payment->forceFill(['journal_id' => null])->save();
+
+            // 3) Recalc status PO (DP available, AP outstanding, paid status)
+            if ($payment->purchaseOrder) {
+                $this->recalcPaymentStatus($payment->purchaseOrder);
+            }
+        });
+    }
+
 }
