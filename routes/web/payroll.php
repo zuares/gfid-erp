@@ -1,36 +1,60 @@
 <?php
 
-use App\Http\Controllers\Payroll\CuttingPayrollController;
 use App\Http\Controllers\Payroll\PayrollReportController;
 use App\Http\Controllers\Payroll\PieceRateController;
-use App\Http\Controllers\Payroll\SewingPayrollController;
+use App\Http\Controllers\Payroll\PieceworkPayrollController;
 
 // Semua route payroll: hanya bisa diakses oleh owner
 Route::middleware(['web', 'auth', 'role:owner'])->group(function () {
 
     /*
     |--------------------------------------------------------------------------
-    | CUTTING PAYROLL
+    | PIECEWORK PAYROLL (CUTTING & SEWING)
+    |--------------------------------------------------------------------------
+    | module: cutting | sewing
     |--------------------------------------------------------------------------
      */
-    Route::prefix('payroll/cutting')
-        ->name('payroll.cutting.')
+    Route::prefix('payroll/piecework/{module}')
+        ->whereIn('module', ['cutting', 'sewing'])
+        ->name('payroll.piecework.')
         ->group(function () {
-            Route::get('/', [CuttingPayrollController::class, 'index'])->name('index');
-            Route::get('/create', [CuttingPayrollController::class, 'create'])->name('create');
-            Route::post('/', [CuttingPayrollController::class, 'store'])->name('store');
-            Route::get('/{period}', [CuttingPayrollController::class, 'show'])->name('show');
-            Route::post('/{period}/finalize', [CuttingPayrollController::class, 'finalize'])->name('finalize');
-            Route::post('/{period}/regenerate', [CuttingPayrollController::class, 'regenerate'])->name('regenerate');
 
-            // SLIP BORONGAN PER OPERATOR — CUTTING
-            Route::get('/{period}/slip/{employee}', [CuttingPayrollController::class, 'slip'])
+            Route::get('/', [PieceworkPayrollController::class, 'index'])
+                ->name('index');
+
+            Route::get('/create', [PieceworkPayrollController::class, 'create'])
+                ->name('create');
+
+            Route::post('/', [PieceworkPayrollController::class, 'store'])
+                ->name('store');
+
+            Route::get('/{period}', [PieceworkPayrollController::class, 'show'])
+                ->name('show');
+
+            // SLIP PER OPERATOR
+            Route::get('/{period}/slip/{employee}', [PieceworkPayrollController::class, 'slip'])
                 ->name('slip');
+
+            // SLIP SEMUA OPERATOR (KHUSUS SEWING)
+            Route::get('/{period}/slip-all', [PieceworkPayrollController::class, 'slipAll'])
+                ->name('slip_all');
+
+            // FINALIZE → Dr HPP / Cr Hutang
+            Route::post('/{period}/finalize', [PieceworkPayrollController::class, 'finalize'])
+                ->name('finalize');
+
+            // PAY → Dr Hutang / Cr Kas-Bank
+            Route::post('/{period}/pay', [PieceworkPayrollController::class, 'pay'])
+                ->name('pay');
+
+            // REGENERATE (draft only)
+            Route::post('/{period}/regenerate', [PieceworkPayrollController::class, 'regenerate'])
+                ->name('regenerate');
         });
 
     /*
     |--------------------------------------------------------------------------
-    | PIECE RATES (master tarif borongan)
+    | PIECE RATES (MASTER TARIF BORONGAN)
     |--------------------------------------------------------------------------
      */
     Route::prefix('payroll/piece-rates')
@@ -46,40 +70,20 @@ Route::middleware(['web', 'auth', 'role:owner'])->group(function () {
 
     /*
     |--------------------------------------------------------------------------
-    | SEWING PAYROLL
-    |--------------------------------------------------------------------------
-     */
-    Route::prefix('payroll/sewing')
-        ->name('payroll.sewing.')
-        ->group(function () {
-            Route::get('/', [SewingPayrollController::class, 'index'])->name('index');
-            Route::get('/create', [SewingPayrollController::class, 'create'])->name('create');
-            Route::post('/', [SewingPayrollController::class, 'store'])->name('store');
-            Route::get('/{period}', [SewingPayrollController::class, 'show'])->name('show');
-            Route::post('/{period}/finalize', [SewingPayrollController::class, 'finalize'])->name('finalize');
-            Route::post('/{period}/regenerate', [SewingPayrollController::class, 'regenerate'])->name('regenerate');
-
-            // SLIP BORONGAN PER OPERATOR — SEWING
-            Route::get('/{period}/slip/{employee}', [SewingPayrollController::class, 'slip'])
-                ->name('slip');
-
-            // SLIP SEMUA OPERATOR — SEWING
-            Route::get('/{period}/slip-all', [SewingPayrollController::class, 'slipAll'])
-                ->name('slip_all');
-        });
-
-    /*
-    |--------------------------------------------------------------------------
     | PAYROLL REPORTS
     |--------------------------------------------------------------------------
      */
-    Route::get('/payroll/reports/operators', [PayrollReportController::class, 'operatorSummary'])
-        ->name('payroll.reports.operators');
+    Route::prefix('payroll/reports')
+        ->name('payroll.reports.')
+        ->group(function () {
+            Route::get('/operators', [PayrollReportController::class, 'operatorSummary'])
+                ->name('operators');
 
-    Route::get('/payroll/reports/operator-slips', [PayrollReportController::class, 'operatorSlips'])
-        ->name('payroll.reports.operator_slips');
+            Route::get('/operator-slips', [PayrollReportController::class, 'operatorSlips'])
+                ->name('operator_slips');
 
-    Route::get('/payroll/reports/operators/{employee}/detail',
-        [PayrollReportController::class, 'operatorDetail']
-    )->name('payroll.reports.operator_detail');
+            Route::get('/operators/{employee}/detail',
+                [PayrollReportController::class, 'operatorDetail']
+            )->name('operator_detail');
+        });
 });

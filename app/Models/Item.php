@@ -27,6 +27,7 @@ class Item extends Model
         'consumption_cutting',
         'consumption_cutting_basis_qty',
         'base_unit_cost',
+        'affects_hpp',
     ];
 
     protected $casts = [

@@ -66,9 +66,7 @@ class PurchaseReceipt extends Model
         return $this->belongsTo(User::class, 'approved_by');
     }
 
-    public function receipt()
-    {
-        return $this->belongsTo(PurchaseReceipt::class, 'purchase_receipt_id');
-    }
+    public function journal()
+    {return $this->belongsTo(\App\Models\Journal::class);}
 
 }

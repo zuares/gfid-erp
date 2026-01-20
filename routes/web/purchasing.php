@@ -1,60 +1,73 @@
 <?php
 
 use App\Http\Controllers\Purchasing\PurchaseOrderController;
+use App\Http\Controllers\Purchasing\PurchasePaymentController;
 use App\Http\Controllers\Purchasing\PurchaseReceiptController;
+use Illuminate\Support\Facades\Route;
 
-Route::middleware(['web', 'auth'])->group(function () {
+Route::middleware(['web', 'auth'])->prefix('purchasing')->name('purchasing.')->group(function () {
 
-    Route::prefix('purchasing')->name('purchasing.')->group(function () {
+    // ==========================================================
+    // Default access: OWNER + ADMIN
+    // ==========================================================
+    Route::middleware('role:owner,admin')->group(function () {
 
         /*
         |--------------------------------------------------------------------------
         | PURCHASE ORDERS
         |--------------------------------------------------------------------------
-        | Admin = boleh create/edit PO
-        | Owner = boleh approve PO + semua akses PO
+         */
+
+        Route::resource('purchase-orders', PurchaseOrderController::class)
+            ->names('purchase_orders');
+
+        // API kecil: last price supplier per item
+        // GET /purchasing/supplier-price?supplier_id=1&item_id=2
+        Route::get('supplier-price', [PurchaseOrderController::class, 'getSupplierLastPrice'])
+            ->name('supplier_price');
+
+        /*
+        |--------------------------------------------------------------------------
+        | PURCHASE ORDER PAYMENTS (DP / Payment)
         |--------------------------------------------------------------------------
          */
 
-        // CRUD PO — admin & owner
-        Route::resource('purchase-orders', PurchaseOrderController::class)
-            ->names('purchase_orders')
-            ->middleware('role:owner,admin');
+        Route::post('purchase-orders/{purchase_order}/payments', [PurchasePaymentController::class, 'store'])
+            ->name('purchase_orders.payments.store');
 
-        // APPROVE PO — hanya owner
-        Route::post('purchase-orders/{purchase_order}/approve',
-            [PurchaseOrderController::class, 'approve'])
-            ->name('purchase_orders.approve')
-            ->middleware('role:owner');
+        Route::post('purchase-orders/{purchase_order}/payments/{payment}/void', [PurchasePaymentController::class, 'void'])
+            ->name('purchase_orders.payments.void');
+        Route::post('purchase-orders/{purchase_order}/apply-dp', [PurchasePaymentController::class, 'applyDp'])
+            ->name('purchase_orders.payments.apply_dp');
 
         /*
         |--------------------------------------------------------------------------
         | PURCHASE RECEIPTS (GRN)
         |--------------------------------------------------------------------------
-        | GRN hanya boleh dibuat dari PO yg status-nya 'approved'
-        | Admin & Owner boleh create GRN setelah PO approved
-        |--------------------------------------------------------------------------
          */
+
         Route::resource('purchase-receipts', PurchaseReceiptController::class)
-            ->names('purchase_receipts')
-            ->middleware('role:owner,admin');
+            ->names('purchase_receipts');
 
-        // Posting GRN — admin & owner
-        Route::post('purchase-receipts/{purchase_receipt}/post',
-            [PurchaseReceiptController::class, 'post'])
-            ->name('purchase_receipts.post')
-            ->middleware('role:owner,admin');
+        Route::post('purchase-receipts/{purchase_receipt}/post', [PurchaseReceiptController::class, 'post'])
+            ->name('purchase_receipts.post');
 
-        // Buat GRN langsung dari PO (hanya PO approved)
-        Route::get('purchase-orders/{purchase_order}/create-grn',
-            [PurchaseReceiptController::class, 'createFromOrder'])
-            ->name('purchase_receipts.create_from_order')
-            ->middleware('role:owner,admin');
+        Route::post('purchase-receipts/{purchase_receipt}/unpost', [PurchaseReceiptController::class, 'unpost'])
+            ->name('purchase_receipts.unpost');
 
-        Route::post('purchase-orders/{purchase_order}/cancel', [PurchaseOrderController::class, 'cancel'])
-            ->name('purchase_orders.cancel')
-            ->middleware('role:owner');
-
+        // Buat GRN langsung dari PO (hanya PO approved) - action route
+        Route::get('purchase-orders/{purchase_order}/create-grn', [PurchaseReceiptController::class, 'createFromOrder'])
+            ->name('purchase_receipts.create_from_order');
     });
 
+    // ==========================================================
+    // OWNER only actions
+    // ==========================================================
+    Route::middleware('role:owner')->group(function () {
+        Route::post('purchase-orders/{purchase_order}/approve', [PurchaseOrderController::class, 'approve'])
+            ->name('purchase_orders.approve');
+
+        Route::post('purchase-orders/{purchase_order}/cancel', [PurchaseOrderController::class, 'cancel'])
+            ->name('purchase_orders.cancel');
+    });
 });

@@ -29,6 +29,8 @@ class DatabaseSeeder extends Seeder
             ChannelsSeeder::class,
             StoreSeeder::class,
             // InventoryTransferDemoSeeder::class,
+            AccountSeeder::class,
+            PaymentMethodSeeder::class,
 
         ]);
     }

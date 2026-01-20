@@ -158,6 +158,14 @@
             opacity: .6;
         }
 
+        .info-pill {
+            border: 1px solid var(--line);
+            background: color-mix(in srgb, var(--card) 92%, var(--bg) 8%);
+            border-radius: 999px;
+            padding: .35rem .7rem;
+            font-size: .82rem;
+        }
+
         @media (max-width: 767.98px) {
             .page-wrap {
                 padding-inline: .5rem;
@@ -171,10 +179,6 @@
 
             .table-section {
                 padding-top: .5rem !important;
-            }
-
-            .table-section .table tbody tr:first-child {
-                margin-top: .15rem;
             }
 
             .table thead {
@@ -232,7 +236,6 @@
 @section('content')
     @php
         /** @var \App\Models\PurchaseOrder|null $order */
-
         $hasOrder = isset($order) && $order?->id;
 
         $defaultDate = old('date', now()->toDateString());
@@ -243,13 +246,7 @@
             $hasOrder ? $order->supplier_id : $selectedSupplierId ?? request('supplier_id'),
         );
 
-        // =========================
-        // ORDER TYPE (AUTO + DISABLED)
-        // - kalau dari PO: ikut PO
-        // - kalau list: ambil dari request('order_type') kalau ada, kalau tidak:
-        //   auto tentukan dari defaultWhCode (RM=>material, WH-RTS=>finished_good)
-        //   (di sini tetap aman kalau controller sudah mengirim selectedOrderType)
-        // =========================
+        // ORDER TYPE (AUTO)
         $selectedOrderType = old(
             'order_type',
             $hasOrder ? $order->order_type ?? 'material' : ($selectedOrderType ?? request('order_type') ?: null),
@@ -270,26 +267,16 @@
 
         $selectedSupplier = isset($suppliers) ? $suppliers->firstWhere('id', $selectedSupplierId) : null;
 
-        // =========================
-        // DEFAULT WAREHOUSE (AUTO)
-        // FG -> WH-RTS
-        // Material -> RM
-        // =========================
+        // DEFAULT WAREHOUSE
         $defaultWhCode = 'RM';
-
         if ($hasOrder && ($order->order_type ?? null) === 'finished_good') {
             $defaultWhCode = 'WH-RTS';
         }
-
-        // mode list: kalau query order_type=finished_good => WH-RTS
         if (!$hasOrder && $selectedOrderType === 'finished_good') {
             $defaultWhCode = 'WH-RTS';
         }
 
-        // Cari warehouse berdasarkan code
         $defaultWarehouse = $warehouses->firstWhere('code', $defaultWhCode);
-
-        // fallback hard: kalau tidak ketemu, jatuhkan ke RM
         if (!$defaultWarehouse) {
             $defaultWhCode = 'RM';
             $defaultWarehouse = $warehouses->firstWhere('code', 'RM');
@@ -303,7 +290,6 @@
         }
 
         $typeLabel = $selectedOrderType === 'finished_good' ? 'Barang Jadi (FG)' : 'Bahan Baku (Material)';
-
         $typeCss = $selectedOrderType === 'material' ? 'material' : '';
     @endphp
 
@@ -325,6 +311,16 @@
                             <span class="ms-2 badge-type {{ $typeCss }}">{{ $typeLabel }}</span>
                         @endif
                     </div>
+
+                    @unless ($hasOrder)
+                        <div class="mt-2">
+                            <span class="info-pill d-inline-flex align-items-center gap-2">
+                                <i class="bi bi-info-circle"></i>
+                                GRN <strong>tidak boleh campur</strong> item dari beberapa PO. Sistem akan otomatis mengunci ke
+                                1 PO saat submit.
+                            </span>
+                        </div>
+                    @endunless
                 </div>
 
                 <div class="page-header-actions d-flex gap-2 ms-auto">
@@ -341,6 +337,7 @@
                     @endif
                 </div>
             </div>
+
             <hr class="mt-0 mb-3">
 
             {{-- ALERT VALIDATION --}}
@@ -365,8 +362,7 @@
                             <span class="badge bg-light text-dark border small">
                                 Aktif:
                                 <strong>{{ $selectedSupplier ? $selectedSupplier->code . ' — ' . $selectedSupplier->name : 'Semua Supplier' }}</strong>
-                                •
-                                <strong>{{ $typeLabel }}</strong>
+                                • <strong>{{ $typeLabel }}</strong>
                             </span>
                         </div>
                     </div>
@@ -378,7 +374,7 @@
                                 <select name="supplier_id" id="supplier_filter" class="form-select form-select-sm">
                                     <option value="">Semua Supplier</option>
                                     @foreach ($suppliers as $sup)
-                                        <option value="{{ $sup->id }}" @selected($selectedSupplierId == $sup->id)>
+                                        <option value="{{ $sup->id }}" @selected((string) $selectedSupplierId === (string) $sup->id)>
                                             {{ $sup->code }} — {{ $sup->name }}
                                         </option>
                                     @endforeach
@@ -401,17 +397,13 @@
 
                             <div class="col-6 col-md-3">
                                 <label class="form-label d-none d-md-block">&nbsp;</label>
-                                <button type="submit" class="btn btn-primary btn-sm w-100">
-                                    Terapkan Filter
-                                </button>
+                                <button type="submit" class="btn btn-primary btn-sm w-100">Terapkan Filter</button>
                             </div>
 
                             <div class="col-6 col-md-3">
                                 <label class="form-label d-none d-md-block">&nbsp;</label>
                                 <a href="{{ route('purchasing.purchase_receipts.create') }}"
-                                    class="btn btn-outline-secondary btn-sm w-100">
-                                    Reset
-                                </a>
+                                    class="btn btn-outline-secondary btn-sm w-100">Reset</a>
                             </div>
                         </div>
 
@@ -426,7 +418,13 @@
             <form id="grnForm" method="post" action="{{ route('purchasing.purchase_receipts.store') }}">
                 @csrf
 
-                <input type="hidden" name="purchase_order_id" value="{{ $hasOrder ? $order->id : '' }}">
+                {{-- IMPORTANT: purchase_order_id akan diisi:
+                     - mode order: langsung $order->id
+                     - mode list: JS auto derive dari baris pertama yang dicentang + validasi tidak campur PO
+                --}}
+                <input type="hidden" id="purchase_order_id" name="purchase_order_id"
+                    value="{{ $hasOrder ? $order->id : '' }}">
+                <input type="hidden" name="order_type" value="{{ $selectedOrderType }}">
                 <input type="hidden" name="supplier_id"
                     value="{{ $hasOrder ? $order->supplier_id : $selectedSupplierId }}">
 
@@ -486,8 +484,9 @@
                             <table class="table table-sm table-hover align-middle mb-0">
                                 <thead>
                                     <tr>
-                                        <th style="width: 32px;" class="text-center"><input type="checkbox"
-                                                id="checkAll"></th>
+                                        <th style="width: 32px;" class="text-center">
+                                            <input type="checkbox" id="checkAll">
+                                        </th>
                                         <th style="width: 40px;">#</th>
                                         <th>Item</th>
                                         <th class="text-end">Qty PO</th>
@@ -509,9 +508,12 @@
                                             $oldSelected = old('selected.' . $idx);
 
                                             $hasDraftGrn = (bool) ($poLine->has_draft_grn ?? false);
+                                            $poId = $po?->id;
+                                            $poCode = $po?->code;
                                         @endphp
 
                                         <tr data-line-index="{{ $idx }}" data-qty-po="{{ $poLine->qty }}"
+                                            data-po-id="{{ $poId }}" data-po-code="{{ $poCode }}"
                                             class="{{ $hasDraftGrn ? 'line-muted' : '' }}">
                                             <td class="text-center" data-label="Pilih">
                                                 @if ($hasDraftGrn)
@@ -535,7 +537,8 @@
                                                     @endif
                                                     @if ($hasDraftGrn)
                                                         <span class="badge-draft-grn ms-1">Sudah pernah dibuat GRN
-                                                            (draft)</span>
+                                                            (draft)
+                                                        </span>
                                                     @endif
                                                 </div>
 
@@ -654,6 +657,8 @@
 @push('scripts')
     <script>
         (function() {
+            const HAS_ORDER = @json($hasOrder);
+
             function parseNumber(val) {
                 if (val === null || val === undefined) return 0;
                 if (typeof val === 'string') val = val.replace(',', '.');
@@ -668,7 +673,7 @@
                         maximumFractionDigits: 2
                     });
                 } catch (e) {
-                    return num.toFixed(2);
+                    return (num || 0).toFixed(2);
                 }
             }
 
@@ -846,7 +851,6 @@
                     const qtyPo = parseNumber(row.getAttribute('data-qty-po'));
                     const rec = parseNumber(inputRec.value || 0);
                     const rej = parseNumber(inputRej.value || 0);
-
                     if (rec <= 0 && rej <= 0) return;
 
                     const itemMain = row.querySelector('.item-main')?.textContent?.trim() ?? '-';
@@ -891,6 +895,48 @@
 
                 html += '</tbody></table></div>';
                 return html;
+            }
+
+            // ==========================================================
+            // IMPORTANT: derive purchase_order_id from selected rows (list mode)
+            // - prevent mixing multiple PO in one GRN
+            // ==========================================================
+            function deriveAndLockPurchaseOrderIdOrThrow() {
+                if (HAS_ORDER) return true;
+
+                const poIdInput = document.getElementById('purchase_order_id');
+                const rows = document.querySelectorAll('#grnLinesBody tr[data-line-index]');
+                const selectedPoIds = [];
+
+                rows.forEach(row => {
+                    const cb = row.querySelector('.line-check');
+                    if (!cb || !cb.checked) return;
+                    const poId = row.getAttribute('data-po-id');
+                    if (poId) selectedPoIds.push(String(poId));
+                });
+
+                const uniq = Array.from(new Set(selectedPoIds)).filter(Boolean);
+
+                if (uniq.length === 0) {
+                    throw new Error('Belum ada item yang dicentang.');
+                }
+
+                if (uniq.length > 1) {
+                    // cari kode PO untuk membantu user
+                    const codes = new Set();
+                    rows.forEach(row => {
+                        const cb = row.querySelector('.line-check');
+                        if (!cb || !cb.checked) return;
+                        const code = row.getAttribute('data-po-code');
+                        if (code) codes.add(code);
+                    });
+
+                    const hint = codes.size ? `\nPO terpilih: ${Array.from(codes).join(', ')}` : '';
+                    throw new Error('GRN tidak boleh campur item dari beberapa PO. Pilih item dari 1 PO saja.' + hint);
+                }
+
+                poIdInput.value = uniq[0];
+                return true;
             }
 
             document.addEventListener('input', function(e) {
@@ -960,12 +1006,21 @@
 
                         if (!allValid) {
                             alert(
-                                'Masih ada input Qty Diterima / Reject yang tidak valid. Mohon periksa kembali.');
+                                'Masih ada input Qty Diterima / Reject yang tidak valid. Mohon periksa kembali.'
+                                );
                             return;
                         }
 
                         if (!lines.length) {
                             alert('Belum ada item yang dicentang dengan Qty Diterima / Reject.');
+                            return;
+                        }
+
+                        // derive purchase_order_id + prevent mixing PO
+                        try {
+                            deriveAndLockPurchaseOrderIdOrThrow();
+                        } catch (err) {
+                            alert(err.message || 'Gagal menyiapkan GRN.');
                             return;
                         }
 

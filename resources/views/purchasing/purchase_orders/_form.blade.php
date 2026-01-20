@@ -1,4 +1,4 @@
-{{-- resources/views/purchasing/purchase_orders/_blade.php --}}
+{{-- resources/views/purchasing/purchase_orders/_form.blade.php --}}
 @php
     use Illuminate\Support\Carbon;
 
@@ -23,9 +23,15 @@
     $defaultSupplierId = $suppliers->first()->id ?? null;
     $selectedSupplierId = old('supplier_id', $order?->supplier_id ?? $defaultSupplierId);
 
-    // === ONGKIR ===
-    $shippingCostDb = $order?->shipping_cost ?? 0;
-    $shippingCostInput = old('shipping_cost', angka($shippingCostDb));
+    // === PAYMENT METHOD (HIDDEN) ===
+    // UI dropdown dihilangkan, tetapi tetap kirim nilai default agar backend aman.
+    $defaultPaymentMethodId = $paymentMethods->first()->id ?? null;
+    $selectedPaymentMethodId = old('payment_method_id', $order?->payment_method_id ?? $defaultPaymentMethodId);
+
+    // === ONGKIR (display + raw) ===
+    $shippingCostDb = (float) ($order?->shipping_cost ?? 0);
+    $shippingCostDisplay = old('shipping_cost_display', angka($shippingCostDb));
+    $shippingCostRaw = old('shipping_cost', (string) (int) $shippingCostDb);
 
     // === STATUS ===
     $statusOptions = [
@@ -35,7 +41,7 @@
     ];
     $statusValue = old('status', $order?->status ?? 'draft');
 
-    // === DETAIL LINES ===
+    // Lines
     $oldLines = old('lines');
     $usingOldLines = $oldLines !== null;
 
@@ -50,39 +56,50 @@
 
 @push('head')
     <style>
-        .po-form-card {
+        .po-card {
             background: var(--card);
-            border-radius: 14px;
-            border: 1px solid var(--line)
+            border: 1px solid var(--line);
+            border-radius: 16px;
+            overflow: visible;
         }
 
-        .po-lines-card {
-            background: var(--card);
-            border-radius: 14px;
-            border: 1px solid var(--line);
-            overflow: visible
+        .po-card .card-body {
+            padding: 1rem 1rem 1.05rem;
+        }
+
+        .po-section-title {
+            font-weight: 700;
+            letter-spacing: -.01em;
+        }
+
+        .po-label {
+            font-size: .75rem;
+            color: var(--muted);
+            margin-bottom: .25rem;
+            text-transform: uppercase;
+            letter-spacing: .08em;
+        }
+
+        .po-field {
+            border-radius: 12px;
         }
 
         .po-lines-table thead th {
             text-transform: uppercase;
             letter-spacing: .08em;
-            font-size: .75rem;
-            color: var(--muted)
+            font-size: .72rem;
+            color: var(--muted);
         }
 
         .po-lines-table tbody td {
             vertical-align: middle
         }
 
-        .po-lines-table tfoot th {
-            font-size: .85rem
-        }
-
         .po-subtotal-label {
             text-transform: uppercase;
             letter-spacing: .08em;
-            font-size: .7rem;
-            color: var(--muted)
+            font-size: .72rem;
+            color: var(--muted);
         }
 
         .po-table-wrapper {
@@ -106,46 +123,80 @@
             z-index: 5000
         }
 
+        .po-meta-wrap {
+            display: flex;
+            justify-content: flex-end;
+            margin-top: .75rem;
+        }
+
+        .po-meta-card {
+            border: 1px solid var(--line);
+            background: color-mix(in srgb, var(--card) 92%, var(--bg) 8%);
+            border-radius: 14px;
+            padding: .8rem .85rem;
+            width: min(560px, 100%);
+        }
+
+        .po-meta-grid {
+            display: grid;
+            grid-template-columns: 1fr 1fr;
+            gap: .65rem .75rem;
+            align-items: end;
+        }
+
+        .po-num-display {
+            text-align: right;
+        }
+
+        .po-num-display::placeholder {
+            color: rgba(148, 163, 184, .8);
+        }
+
+        .po-total-line {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            gap: .75rem;
+            padding: .35rem 0;
+            border-top: 1px dashed rgba(148, 163, 184, .22);
+        }
+
+        .po-total-line:first-child {
+            border-top: 0;
+            padding-top: 0;
+        }
+
+        .po-total-key {
+            font-size: .72rem;
+            letter-spacing: .08em;
+            text-transform: uppercase;
+            color: var(--muted);
+        }
+
+        .po-total-val {
+            font-weight: 800;
+        }
+
+        .po-total-val.subtle {
+            font-weight: 700;
+            color: var(--muted);
+        }
+
         @media (max-width: 992px) {
-            .po-form-card {
-                border-radius: 14px;
-                padding-inline: .2rem
+            .po-card .card-body {
+                padding: .9rem .9rem 1rem;
             }
 
-            .po-form-card .card-body {
-                padding: .85rem .9rem 1rem
+            .po-meta-wrap {
+                justify-content: stretch;
             }
 
-            .po-form-card .form-label {
-                font-size: .8rem;
-                margin-bottom: .15rem
+            .po-meta-card {
+                width: 100%;
             }
 
-            .po-form-card .form-control,
-            .po-form-card .form-select {
-                font-size: .85rem;
-                padding-inline: .55rem;
-                padding-block: .35rem
-            }
-
-            .po-lines-card {
-                border-radius: 16px
-            }
-
-            .po-lines-card .card-header {
-                padding-inline: .9rem;
-                padding-block: .6rem
-            }
-
-            .po-lines-card .card-header span {
-                font-size: .9rem;
-                font-weight: 600
-            }
-
-            .po-lines-card .card-header .btn {
-                padding-block: .25rem;
-                padding-inline: .6rem;
-                font-size: .8rem
+            .po-meta-grid {
+                grid-template-columns: 1fr;
             }
 
             .po-lines-table {
@@ -171,7 +222,7 @@
                 border-radius: 14px;
                 border: 1px solid var(--line);
                 background: color-mix(in srgb, var(--card) 92%, var(--bg) 8%);
-                box-shadow: 0 8px 18px rgba(15, 23, 42, .08), 0 0 0 1px rgba(148, 163, 184, .12)
+                box-shadow: 0 8px 18px rgba(15, 23, 42, .08), 0 0 0 1px rgba(148, 163, 184, .12);
             }
 
             .po-lines-table tbody td {
@@ -191,7 +242,6 @@
 
             .po-col-no {
                 grid-area: header;
-                display: block;
                 text-align: center;
                 font-weight: 600;
                 font-size: .9rem;
@@ -213,7 +263,7 @@
             .po-td-total {
                 grid-area: total;
                 text-align: right;
-                font-weight: 500;
+                font-weight: 600;
                 font-size: .9rem;
                 color: var(--muted)
             }
@@ -221,12 +271,7 @@
             .po-td-action {
                 grid-area: action;
                 text-align: center;
-                margin-top: .2rem
-            }
-
-            .po-lines-table tbody .line-qty,
-            .po-lines-table tbody .line-price {
-                text-align: center !important
+                margin-top: .2rem;
             }
 
             #po-lines-table tfoot tr {
@@ -240,20 +285,11 @@
                 padding: .35rem 1.2rem .5rem
             }
 
-            .po-subtotal-label {
-                display: block;
-                font-size: .7rem;
-                letter-spacing: .08em;
-                text-transform: uppercase;
-                color: var(--muted);
-                margin-bottom: .05rem
-            }
-
             #po-subtotal-cell {
                 display: block;
                 font-size: 1.1rem;
-                font-weight: 700;
-                color: var(--text)
+                font-weight: 800;
+                color: var(--text);
             }
         }
 
@@ -265,29 +301,26 @@
     </style>
 @endpush
 
-{{-- ============================
-     HEADER FORM
-============================ --}}
-<div class="card mb-3 po-form-card" data-order-type="{{ $orderType }}">
+{{-- HIDDEN: payment_method_id tetap dikirim tanpa UI --}}
+<input type="hidden" name="payment_method_id" value="{{ $selectedPaymentMethodId }}">
+
+{{-- HEADER --}}
+<div class="card po-card mb-3" data-order-type="{{ $orderType }}">
     <div class="card-body">
         <div class="row g-3">
-
-            {{-- TANGGAL --}}
             <div class="col-12 col-md-3">
-                <label class="form-label">Tanggal</label>
+                <div class="po-label">Tanggal</div>
                 <input type="date" name="date" value="{{ $orderDate }}"
-                    class="form-control @error('date') is-invalid @enderror">
+                    class="form-control po-field @error('date') is-invalid @enderror">
                 @error('date')
                     <div class="invalid-feedback">{{ $message }}</div>
                 @enderror
             </div>
 
-
-            {{-- JENIS PO --}}
-            <div class="col-6 col-md-3">
-                <label class="form-label">Jenis PO</label>
+            <div class="col-12 col-md-3">
+                <div class="po-label">Jenis PO</div>
                 <select name="order_type" id="po-order-type"
-                    class="form-select @error('order_type') is-invalid @enderror">
+                    class="form-select po-field @error('order_type') is-invalid @enderror">
                     @foreach ($orderTypeOptions as $k => $label)
                         <option value="{{ $k }}" @selected($orderType === $k)>{{ $label }}</option>
                     @endforeach
@@ -297,14 +330,11 @@
                 @enderror
             </div>
 
-
-
-            {{-- SUPPLIER --}}
-            <div class="col-12 col-md-3">
-                <label class="form-label">Supplier</label>
-                <select name="supplier_id" class="form-select @error('supplier_id') is-invalid @enderror">
+            <div class="col-12 col-md-6">
+                <div class="po-label">Supplier</div>
+                <select name="supplier_id" class="form-select po-field @error('supplier_id') is-invalid @enderror">
                     @foreach ($suppliers as $sup)
-                        <option value="{{ $sup->id }}" @selected($selectedSupplierId == $sup->id)>
+                        <option value="{{ $sup->id }}" @selected((string) $selectedSupplierId === (string) $sup->id)>
                             {{ $sup->code }} — {{ $sup->name }}
                         </option>
                     @endforeach
@@ -313,32 +343,18 @@
                     <div class="invalid-feedback">{{ $message }}</div>
                 @enderror
             </div>
-
-
-
-            {{-- ONGKIR --}}
-            <div class="col-6 col-md-3">
-                <label class="form-label">Ongkir (Rp)</label>
-                <input type="text" name="shipping_cost" value="{{ $shippingCostInput }}" inputmode="decimal"
-                    class="form-control form-control-sm text-end @error('shipping_cost') is-invalid @enderror"
-                    autocomplete="off">
-                @error('shipping_cost')
-                    <div class="invalid-feedback">{{ $message }}</div>
-                @enderror
-            </div>
-
-
         </div>
     </div>
 </div>
 
-{{-- ============================
-     DETAIL BARANG
-============================ --}}
-<div class="card po-lines-card">
-    <div class="card-header d-flex justify-content-between align-items-center">
-        <span>Detail Barang</span>
-        <button type="button" id="btn-add-line" class="btn btn-sm btn-outline-primary">+ Tambah Baris</button>
+{{-- LINES --}}
+<div class="card po-card mb-3">
+    <div class="card-header d-flex justify-content-between align-items-center"
+        style="background: transparent; border-bottom: 1px solid var(--line); padding: .85rem 1rem;">
+        <div class="po-section-title">Detail Barang</div>
+        <button type="button" id="btn-add-line" class="btn btn-sm btn-outline-primary" style="border-radius:12px;">
+            + Tambah Baris
+        </button>
     </div>
 
     <div class="table-responsive po-table-wrapper">
@@ -357,13 +373,19 @@
             <tbody>
                 @forelse ($linesData as $i => $line)
                     @php
-                        $lineQtyRaw = $line['qty'] ?? '';
-                        $linePriceRaw = $line['unit_price'] ?? '';
                         $lineItemId = $line['item_id'] ?? ($line['item']['id'] ?? null);
-                        $lineQty = $lineQtyRaw;
-                        $linePrice = $usingOldLines ? $linePriceRaw : angka($linePriceRaw);
+
                         $itemCode = $line['item']['code'] ?? null;
-                        $itemDisplay = $itemCode ?? '';
+                        $itemName = $line['item']['name'] ?? null;
+                        $itemDisplay = trim(($itemCode ?? '') . ($itemName ? ' — ' . $itemName : ''));
+
+                        $qtyRaw = $line['qty'] ?? '';
+                        $qtyDisplay =
+                            $qtyRaw === '' || $qtyRaw === null ? '' : number_format((float) $qtyRaw, 2, ',', '.');
+
+                        $priceRaw = $line['unit_price'] ?? '';
+                        $priceDisplay =
+                            $priceRaw === '' || $priceRaw === null ? '' : number_format((float) $priceRaw, 0, ',', '.');
                     @endphp
 
                     <tr>
@@ -379,16 +401,20 @@
                         </td>
 
                         <td data-label="Qty" class="po-td-qty">
-                            <x-number-input name="lines[{{ $i }}][qty]" :value="$lineQty" mode="decimal"
-                                min="0" decimals="2" placeholder="0.00" class="line-qty js-next-focus" />
+                            <input type="text" class="form-control po-field po-num-display line-qty-display"
+                                inputmode="decimal" placeholder="0,00" value="{{ $qtyDisplay }}" autocomplete="off">
+                            <input type="hidden" name="lines[{{ $i }}][qty]" class="line-qty-raw"
+                                value="{{ $qtyRaw }}">
                             @error("lines.$i.qty")
                                 <div class="text-danger small">{{ $message }}</div>
                             @enderror
                         </td>
 
                         <td data-label="Harga (Rp)" class="po-td-price">
-                            <x-number-input name="lines[{{ $i }}][unit_price]" :value="$linePrice"
-                                mode="integer" min="0" placeholder="0" class="line-price js-next-focus" />
+                            <input type="text" class="form-control po-field po-num-display line-price-display"
+                                inputmode="numeric" placeholder="0" value="{{ $priceDisplay }}" autocomplete="off">
+                            <input type="hidden" name="lines[{{ $i }}][unit_price]" class="line-price-raw"
+                                value="{{ $priceRaw }}">
                             @error("lines.$i.unit_price")
                                 <div class="text-danger small">{{ $message }}</div>
                             @enderror
@@ -397,7 +423,8 @@
                         <td class="text-end align-middle line-total po-td-total" data-label="Total (Rp)"></td>
 
                         <td class="text-center po-td-action">
-                            <button type="button" class="btn btn-sm btn-outline-danger btn-remove-line">
+                            <button type="button" class="btn btn-sm btn-outline-danger btn-remove-line"
+                                style="border-radius:12px;">
                                 <span class="d-inline d-lg-none">Hapus baris</span>
                                 <span class="d-none d-lg-inline">&times;</span>
                             </button>
@@ -414,19 +441,22 @@
                         </td>
 
                         <td data-label="Qty" class="po-td-qty">
-                            <x-number-input name="lines[0][qty]" mode="decimal" min="0" decimals="2"
-                                placeholder="0.00" class="line-qty js-next-focus" />
+                            <input type="text" class="form-control po-field po-num-display line-qty-display"
+                                inputmode="decimal" placeholder="0,00" value="" autocomplete="off">
+                            <input type="hidden" name="lines[0][qty]" class="line-qty-raw" value="">
                         </td>
 
                         <td data-label="Harga (Rp)" class="po-td-price">
-                            <x-number-input name="lines[0][unit_price]" mode="integer" min="0" placeholder="0"
-                                class="line-price js-next-focus" />
+                            <input type="text" class="form-control po-field po-num-display line-price-display"
+                                inputmode="numeric" placeholder="0" value="" autocomplete="off">
+                            <input type="hidden" name="lines[0][unit_price]" class="line-price-raw" value="">
                         </td>
 
                         <td class="text-end align-middle line-total po-td-total" data-label="Total (Rp)"></td>
 
                         <td class="text-center po-td-action">
-                            <button type="button" class="btn btn-sm btn-outline-danger btn-remove-line">
+                            <button type="button" class="btn btn-sm btn-outline-danger btn-remove-line"
+                                style="border-radius:12px;">
                                 <span class="d-inline d-lg-none">Hapus baris</span>
                                 <span class="d-none d-lg-inline">&times;</span>
                             </button>
@@ -446,8 +476,56 @@
     </div>
 
     <div class="d-block d-lg-none text-center py-2">
-        <button type="button" id="btn-add-line-bottom" class="btn btn-outline-primary btn-sm">+ Tambah
-            Baris</button>
+        <button type="button" id="btn-add-line-bottom" class="btn btn-outline-primary btn-sm"
+            style="border-radius:12px;">
+            + Tambah Baris
+        </button>
+    </div>
+
+    {{-- META --}}
+    <div class="po-meta-wrap">
+        <div class="po-meta-card">
+            <div class="po-meta-grid">
+
+                <div>
+                    <div class="po-label">Status</div>
+                    <input type="hidden" name="status" value="{{ $statusValue }}">
+                    <select class="form-select po-field" disabled>
+                        @foreach ($statusOptions as $key => $label)
+                            <option value="{{ $key }}" @selected($statusValue === $key)>{{ $label }}
+                            </option>
+                        @endforeach
+                    </select>
+                </div>
+
+                <div>
+                    <div class="po-label">Ongkir (Rp)</div>
+                    <input type="text"
+                        class="form-control po-field po-num-display shipping-display @error('shipping_cost') is-invalid @enderror"
+                        inputmode="numeric" placeholder="0" value="{{ $shippingCostDisplay }}" autocomplete="off">
+                    <input type="hidden" name="shipping_cost" class="shipping-raw" value="{{ $shippingCostRaw }}">
+                    @error('shipping_cost')
+                        <div class="invalid-feedback">{{ $message }}</div>
+                    @enderror
+                </div>
+
+                <div style="grid-column: span 2;">
+                    <div class="po-total-line">
+                        <div class="po-total-key">Subtotal Items</div>
+                        <div class="po-total-val subtle" id="po-subtotal-meta">0</div>
+                    </div>
+                    <div class="po-total-line">
+                        <div class="po-total-key">Ongkir</div>
+                        <div class="po-total-val subtle" id="po-shipping-meta">0</div>
+                    </div>
+                    <div class="po-total-line">
+                        <div class="po-total-key">Grand Total</div>
+                        <div class="po-total-val" id="po-grand-meta">0</div>
+                    </div>
+                </div>
+
+            </div>
+        </div>
     </div>
 </div>
 
@@ -457,150 +535,363 @@
             const tableBody = document.querySelector('#po-lines-table tbody');
             const btnAddTop = document.getElementById('btn-add-line');
             const btnAddBottom = document.getElementById('btn-add-line-bottom');
+
             const subtotalCell = document.getElementById('po-subtotal-cell');
-            const shippingInput = document.querySelector('input[name="shipping_cost"]');
+            const subtotalMeta = document.getElementById('po-subtotal-meta');
+            const shippingMeta = document.getElementById('po-shipping-meta');
+            const grandMeta = document.getElementById('po-grand-meta');
 
             const orderTypeSelect = document.getElementById('po-order-type');
             const currentOrderType = @json($orderType);
             const isEdit = @json((bool) $order?->id);
 
+            const shippingDisplay = document.querySelector('.shipping-display');
+            const shippingRaw = document.querySelector('.shipping-raw');
+            const supplierSelect = document.querySelector('select[name="supplier_id"]');
+
             function parseNumber(value) {
                 if (!value) return 0;
                 value = value.toString().trim().replace(/\s+/g, '');
-                if (value.indexOf(',') !== -1) {
+
+                if (value.includes(',') && value.includes('.')) {
                     value = value.replace(/\./g, '').replace(',', '.');
-                    const n = parseFloat(value);
-                    return isNaN(n) ? 0 : n;
-                }
-                if (/^\d{1,3}(\.\d{3})+$/.test(value)) {
+                } else if (/^\d{1,3}(\.\d{3})+$/.test(value)) {
                     value = value.replace(/\./g, '');
-                    const n = parseFloat(value);
-                    return isNaN(n) ? 0 : n;
+                } else if (value.includes(',')) {
+                    value = value.replace(',', '.');
                 }
                 const n = parseFloat(value);
                 return isNaN(n) ? 0 : n;
             }
 
-            function formatNumberId(value) {
+            function fmtIntId(n) {
                 return new Intl.NumberFormat('id-ID', {
-                    minimumFractionDigits: 0,
                     maximumFractionDigits: 0
-                }).format(isNaN(value) ? 0 : value);
+                }).format(Math.round(n || 0));
             }
 
-            function formatInputOnBlur(el) {
-                const num = parseNumber(el.value);
-                el.value = num ? formatNumberId(num) : '';
+            function fmtQtyId(n) {
+                const fixed = (isNaN(n) ? 0 : n).toFixed(2);
+                return fixed.replace('.', ',');
+            }
+
+            function selectAllLater(el) {
+                requestAnimationFrame(() => {
+                    try {
+                        el.focus();
+                    } catch (e) {}
+                    try {
+                        el.select();
+                    } catch (e) {}
+                });
+            }
+
+            function syncRowRaw(tr) {
+                const qtyDisp = tr.querySelector('.line-qty-display');
+                const qtyRaw = tr.querySelector('.line-qty-raw');
+                const priceDisp = tr.querySelector('.line-price-display');
+                const priceRaw = tr.querySelector('.line-price-raw');
+
+                if (qtyDisp && qtyRaw) {
+                    const q = parseNumber(qtyDisp.value);
+                    qtyRaw.value = (isNaN(q) ? 0 : q).toFixed(2);
+                }
+                if (priceDisp && priceRaw) {
+                    const p = parseNumber(priceDisp.value);
+                    priceRaw.value = String(Math.round(isNaN(p) ? 0 : p));
+                }
             }
 
             function recalcRow(tr) {
-                const qtyInput = tr.querySelector('.line-qty');
-                const priceInput = tr.querySelector('.line-price');
+                const qtyRaw = tr.querySelector('.line-qty-raw');
+                const priceRaw = tr.querySelector('.line-price-raw');
                 const totalCell = tr.querySelector('.line-total');
-                const qty = parseNumber(qtyInput?.value);
-                const price = parseNumber(priceInput?.value);
+
+                const qty = parseFloat(qtyRaw?.value || '0') || 0;
+                const price = parseFloat(priceRaw?.value || '0') || 0;
+
                 let total = qty * price;
                 if (total < 0) total = 0;
-                if (totalCell) totalCell.textContent = formatNumberId(total);
+
+                if (totalCell) totalCell.textContent = fmtIntId(total);
                 return total;
             }
 
             function recalcAll() {
                 let subtotal = 0;
-                tableBody.querySelectorAll('tr').forEach(tr => subtotal += recalcRow(tr));
-                if (subtotalCell) subtotalCell.textContent = formatNumberId(subtotal);
+
+                tableBody.querySelectorAll('tr').forEach(tr => {
+                    syncRowRaw(tr);
+                    subtotal += recalcRow(tr);
+                });
+
+                const ship = parseFloat(shippingRaw?.value || '0') || 0;
+                const grand = Math.max(0, subtotal + ship);
+
+                if (subtotalCell) subtotalCell.textContent = fmtIntId(subtotal);
+                if (subtotalMeta) subtotalMeta.textContent = fmtIntId(subtotal);
+                if (shippingMeta) shippingMeta.textContent = fmtIntId(ship);
+                if (grandMeta) grandMeta.textContent = fmtIntId(grand);
             }
 
             function renumberLines() {
                 const rows = tableBody.querySelectorAll('tr');
-                rows.forEach((tr, index) => {
+                rows.forEach((tr, idx) => {
                     const idxCell = tr.querySelector('.line-index');
-                    if (idxCell) idxCell.textContent = index + 1;
+                    if (idxCell) idxCell.textContent = idx + 1;
 
                     tr.querySelectorAll('input, select').forEach(el => {
                         const name = el.getAttribute('name');
                         if (!name) return;
-                        el.setAttribute('name', name.replace(/lines\[\d+\]/, 'lines[' + index +
-                            ']'));
+                        el.setAttribute('name', name.replace(/lines\[\d+\]/, 'lines[' + idx + ']'));
                     });
                 });
+            }
+
+            function resetItemSuggest(tr) {
+                tr.querySelectorAll('.js-item-suggest-input').forEach(i => i.value = '');
+                tr.querySelectorAll('.js-item-suggest-id').forEach(h => h.value = '');
+                tr.querySelectorAll('.js-item-suggest-category').forEach(h => h.value = '');
+                tr.querySelectorAll('.item-suggest-wrap').forEach(w => w.removeAttribute('data-suggest-inited'));
+                if (window.initItemSuggestInputs) window.initItemSuggestInputs(tr);
+            }
+
+            async function fetchLastPrice(supplierId, itemId) {
+                const url =
+                    `{{ route('purchasing.supplier_price') }}?supplier_id=${encodeURIComponent(supplierId)}&item_id=${encodeURIComponent(itemId)}`;
+                const res = await fetch(url, {
+                    headers: {
+                        'Accept': 'application/json'
+                    }
+                });
+                if (!res.ok) return null;
+
+                const json = await res.json().catch(() => null);
+                if (!json || json.last_price == null) return null;
+
+                const n = Number(json.last_price);
+                return isNaN(n) ? null : n;
+            }
+
+            async function applyLastPriceToRow(tr, {
+                force = false
+            } = {}) {
+                const supplierId = supplierSelect?.value;
+                const itemId = tr.querySelector('.js-item-suggest-id')?.value;
+                if (!supplierId || !itemId) return;
+
+                const priceDisp = tr.querySelector('.line-price-display');
+                const priceRaw = tr.querySelector('.line-price-raw');
+                if (!priceDisp || !priceRaw) return;
+
+                const userEdited = priceDisp.dataset.userEdited === '1';
+                if (!force && userEdited) return;
+                if (!force && priceRaw.value && Number(priceRaw.value) > 0) return;
+
+                const last = await fetchLastPrice(supplierId, itemId);
+                if (last == null || last <= 0) return;
+
+                priceDisp.value = fmtIntId(last);
+                priceRaw.value = String(Math.round(last));
+                priceDisp.dataset.userEdited = '0';
+
+                syncRowRaw(tr);
+                recalcAll();
+            }
+
+            function focusRowItem(tr) {
+                tr?.querySelector('.js-item-suggest-input')?.focus();
             }
 
             function addNewRow() {
                 const lastRow = tableBody.querySelector('tr:last-child');
                 const newRow = lastRow.cloneNode(true);
 
-                newRow.querySelectorAll('.line-qty, .line-price').forEach(input => input.value = '');
-
-                // reset item-suggest
-                newRow.querySelectorAll('.js-item-suggest-input').forEach(input => input.value = '');
-                newRow.querySelectorAll('.js-item-suggest-id').forEach(hidden => hidden.value = '');
-                newRow.querySelectorAll('.js-item-suggest-category').forEach(hidden => hidden.value = '');
+                resetItemSuggest(newRow);
+                newRow.querySelectorAll('.line-qty-display, .line-price-display').forEach(inp => inp.value = '');
+                newRow.querySelectorAll('.line-price-display').forEach(inp => inp.dataset.userEdited = '0');
+                newRow.querySelectorAll('.line-qty-raw, .line-price-raw').forEach(inp => inp.value = '');
 
                 const totalCell = newRow.querySelector('.line-total');
                 if (totalCell) totalCell.textContent = '';
-
-                newRow.querySelectorAll('.item-suggest-wrap').forEach(wrap => wrap.removeAttribute(
-                    'data-suggest-inited'));
 
                 tableBody.appendChild(newRow);
                 renumberLines();
                 recalcAll();
 
-                if (window.initItemSuggestInputs) window.initItemSuggestInputs(newRow);
-                if (window.initNumberInputs) window.initNumberInputs(newRow);
+                focusRowItem(tableBody.querySelector('tr:last-child'));
             }
 
+            // add row
             btnAddTop?.addEventListener('click', addNewRow);
             btnAddBottom?.addEventListener('click', addNewRow);
 
+            // remove row
             tableBody.addEventListener('click', function(e) {
-                if (e.target.classList.contains('btn-remove-line') || e.target.closest(
-                        '.btn-remove-line')) {
-                    const btn = e.target.closest('.btn-remove-line');
-                    if (!btn) return;
+                const btn = e.target.closest('.btn-remove-line');
+                if (!btn) return;
 
-                    const rows = tableBody.querySelectorAll('tr');
-                    if (rows.length <= 1) {
-                        const row = rows[0];
-                        row.querySelectorAll('.line-qty, .line-price').forEach(input => input.value = '');
-                        row.querySelectorAll('.js-item-suggest-input').forEach(input => input.value = '');
-                        row.querySelectorAll('.js-item-suggest-id, .js-item-suggest-category').forEach(
-                            hidden => hidden.value = '');
-                        const totalCell = row.querySelector('.line-total');
-                        if (totalCell) totalCell.textContent = '';
+                const rows = tableBody.querySelectorAll('tr');
+                if (rows.length <= 1) {
+                    const row = rows[0];
+                    row.querySelectorAll('.line-qty-display, .line-price-display').forEach(inp => inp
+                        .value = '');
+                    row.querySelectorAll('.line-qty-raw, .line-price-raw').forEach(inp => inp.value = '');
+                    row.querySelectorAll('.js-item-suggest-input').forEach(inp => inp.value = '');
+                    row.querySelectorAll('.js-item-suggest-id, .js-item-suggest-category').forEach(h => h
+                        .value = '');
+                    const totalCell = row.querySelector('.line-total');
+                    if (totalCell) totalCell.textContent = '';
+                    recalcAll();
+                    focusRowItem(row);
+                    return;
+                }
+
+                btn.closest('tr')?.remove();
+                renumberLines();
+                recalcAll();
+            });
+
+            // enter flow: item -> qty -> price -> new row
+            tableBody.addEventListener('keydown', function(e) {
+                if (e.key !== 'Enter') return;
+
+                const el = e.target;
+                const tr = el.closest('tr');
+                if (!tr) return;
+
+                const isItem = el.classList.contains('js-item-suggest-input');
+                const isQty = el.classList.contains('line-qty-display');
+                const isPrice = el.classList.contains('line-price-display');
+
+                if (isItem) {
+                    e.preventDefault();
+                    tr.querySelector('.line-qty-display')?.focus();
+                    return;
+                }
+                if (isQty) {
+                    e.preventDefault();
+                    tr.querySelector('.line-price-display')?.focus();
+                    return;
+                }
+                if (isPrice) {
+                    e.preventDefault();
+                    addNewRow();
+                    return;
+                }
+            }, true);
+
+            // focus select
+            tableBody.addEventListener('focusin', function(e) {
+                const el = e.target;
+                if (el.classList.contains('line-price-display')) selectAllLater(el);
+                if (el.classList.contains('line-qty-display')) selectAllLater(el);
+            }, true);
+
+            // userEdited flag
+            tableBody.addEventListener('input', function(e) {
+                if (e.target.classList.contains('line-price-display')) e.target.dataset.userEdited = '1';
+            });
+
+            // blur format
+            tableBody.addEventListener('focusout', function(e) {
+                const el = e.target;
+
+                if (el.classList.contains('line-qty-display')) {
+                    const txt = el.value.toString().trim();
+                    if (txt === '') return;
+                    const n = parseNumber(txt);
+                    el.value = fmtQtyId(n);
+                    const tr = el.closest('tr');
+                    if (tr) {
+                        syncRowRaw(tr);
+                        recalcAll();
+                    }
+                    return;
+                }
+
+                if (el.classList.contains('line-price-display')) {
+                    const tr = el.closest('tr');
+                    const txt = el.value.toString().trim();
+
+                    if (txt === '') {
+                        el.dataset.userEdited = '0';
+                        tr?.querySelector('.line-price-raw') && (tr.querySelector('.line-price-raw').value =
+                            '');
                         recalcAll();
                         return;
                     }
 
-                    btn.closest('tr').remove();
-                    renumberLines();
-                    recalcAll();
+                    const n = parseNumber(txt);
+                    el.value = fmtIntId(n);
+                    if (tr) {
+                        syncRowRaw(tr);
+                        recalcAll();
+                    }
+                    return;
                 }
-            });
+            }, true);
 
-            tableBody.addEventListener('input', function(e) {
-                if (e.target.classList.contains('line-qty') || e.target.classList.contains('line-price')) {
-                    recalcAll();
+            // item picked -> last price
+            tableBody.addEventListener('change', function(e) {
+                if (!e.target.classList.contains('js-item-suggest-id')) return;
+                const tr = e.target.closest('tr');
+                if (!tr) return;
+
+                const priceDisp = tr.querySelector('.line-price-display');
+                const priceRaw = tr.querySelector('.line-price-raw');
+                if (priceDisp && priceRaw && (!priceRaw.value || Number(priceRaw.value) <= 0)) {
+                    priceDisp.dataset.userEdited = '0';
                 }
-            });
 
-            if (shippingInput) {
-                shippingInput.addEventListener('blur', function() {
-                    formatInputOnBlur(shippingInput);
+                applyLastPriceToRow(tr, {
+                    force: false
                 });
+            });
+
+            // supplier change -> refresh last price on rows not edited
+            supplierSelect?.addEventListener('change', function() {
+                tableBody.querySelectorAll('tr').forEach(tr => applyLastPriceToRow(tr, {
+                    force: false
+                }));
+            });
+
+            // shipping format
+            if (shippingDisplay && shippingRaw) {
+                shippingDisplay.addEventListener('focusin', () => selectAllLater(shippingDisplay));
+                shippingDisplay.addEventListener('keydown', (e) => {
+                    if (e.key === 'Enter') e.preventDefault();
+                });
+
+                shippingDisplay.addEventListener('focusout', function() {
+                    const txt = shippingDisplay.value.toString().trim();
+                    if (txt === '') {
+                        shippingDisplay.value = '';
+                        shippingRaw.value = '';
+                        recalcAll();
+                        return;
+                    }
+                    const n = parseNumber(txt);
+                    shippingDisplay.value = fmtIntId(n);
+                    shippingRaw.value = String(Math.round(n || 0));
+                    recalcAll();
+                }, true);
+
+                const initTxt = shippingDisplay.value.toString().trim();
+                if (initTxt !== '') {
+                    const n = parseNumber(initTxt);
+                    shippingDisplay.value = fmtIntId(n);
+                    shippingRaw.value = String(Math.round(n || 0));
+                }
             }
 
-            // ===========================
-            // Order type change behavior
-            // ===========================
+            // order type change => reload
             if (orderTypeSelect) {
                 orderTypeSelect.addEventListener('change', function() {
                     const nextType = orderTypeSelect.value || 'material';
                     if (nextType === currentOrderType) return;
 
                     if (isEdit) {
-                        // cek hidden id item yang terisi
                         const ids = Array.from(document.querySelectorAll('.js-item-suggest-id'));
                         const hasFilled = ids.some(el => (el.value || '').toString().trim() !== '');
                         if (hasFilled) {
@@ -620,9 +911,29 @@
                 });
             }
 
-            recalcAll();
+            // init
             if (window.initItemSuggestInputs) window.initItemSuggestInputs();
-            if (window.initNumberInputs) window.initNumberInputs();
+
+            tableBody.querySelectorAll('tr').forEach(tr => {
+                const priceDisp = tr.querySelector('.line-price-display');
+                if (priceDisp && !priceDisp.dataset.userEdited) priceDisp.dataset.userEdited = '0';
+            });
+
+            // auto apply price for existing rows (item set but price empty/0)
+            tableBody.querySelectorAll('tr').forEach(tr => {
+                const itemId = tr.querySelector('.js-item-suggest-id')?.value;
+                const priceRaw = tr.querySelector('.line-price-raw')?.value;
+                if (itemId && (!priceRaw || Number(priceRaw) <= 0)) {
+                    const priceDisp = tr.querySelector('.line-price-display');
+                    if (priceDisp) priceDisp.dataset.userEdited = '0';
+                    applyLastPriceToRow(tr, {
+                        force: false
+                    });
+                }
+            });
+
+            recalcAll();
+            focusRowItem(tableBody.querySelector('tr'));
         });
     </script>
 @endpush

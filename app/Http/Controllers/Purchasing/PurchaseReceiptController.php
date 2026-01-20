@@ -24,7 +24,8 @@ class PurchaseReceiptController extends Controller
      */
     public function index(Request $request)
     {
-        $q = PurchaseReceipt::with(['supplier', 'warehouse'])
+        $q = PurchaseReceipt::query()
+            ->with(['supplier', 'warehouse'])
             ->orderByDesc('date')
             ->orderByDesc('id');
 
@@ -36,8 +37,8 @@ class PurchaseReceiptController extends Controller
             $q->where('warehouse_id', $request->warehouse_id);
         }
 
-        // STATUS default posted kalau param status tidak ada sama sekali
-        $status = $request->input('status', null);
+        // default: posted (kalau param status tidak dikirim sama sekali)
+        $status = $request->input('status');
         if ($request->has('status')) {
             if ($status !== null && $status !== '') {
                 $q->where('status', $status);
@@ -50,13 +51,13 @@ class PurchaseReceiptController extends Controller
         if ($request->filled('from_date')) {
             $q->whereDate('date', '>=', $request->from_date);
         }
-
         if ($request->filled('to_date')) {
             $q->whereDate('date', '<=', $request->to_date);
         }
 
         $receipts = $q->paginate(15)->withQueryString();
 
+        // Summary (clone query biar aman)
         $summary = (clone $q)
             ->selectRaw('COUNT(*) as total_receipts')
             ->selectRaw("SUM(CASE WHEN status = 'draft' THEN 1 ELSE 0 END) as draft_count")
@@ -71,9 +72,7 @@ class PurchaseReceiptController extends Controller
         if ($request->ajax()) {
             $html = view('purchasing.purchase_receipts._rows', [
                 'receipts' => $receipts,
-                'startIndex' => method_exists($receipts, 'firstItem')
-                ? $receipts->firstItem()
-                : 1,
+                'startIndex' => method_exists($receipts, 'firstItem') ? ($receipts->firstItem() ?? 1) : 1,
             ])->render();
 
             return response()->json([
@@ -102,10 +101,10 @@ class PurchaseReceiptController extends Controller
         $order = null;
 
         $selectedSupplierId = $request->input('supplier_id');
-
         $selectedOrderType = $this->normalizeOrderType($request->input('order_type')); // null/material/finished_good
 
-        $lines = PurchaseOrderLine::with(['item', 'purchaseOrder.supplier'])
+        $lines = PurchaseOrderLine::query()
+            ->with(['item', 'purchaseOrder.supplier'])
             ->withCount('draftReceiptLines')
             ->whereHas('purchaseOrder', function ($q) use ($selectedSupplierId, $selectedOrderType) {
                 $q->where('status', 'approved');
@@ -130,7 +129,6 @@ class PurchaseReceiptController extends Controller
         $defaultWhCode = ($selectedOrderType === 'finished_good') ? 'WH-RTS' : 'RM';
         $defaultWarehouse = $warehouses->firstWhere('code', $defaultWhCode);
 
-        // fallback kalau tidak ketemu
         if (!$defaultWarehouse) {
             $defaultWhCode = 'RM';
             $defaultWarehouse = $warehouses->firstWhere('code', 'RM');
@@ -180,7 +178,6 @@ class PurchaseReceiptController extends Controller
         $selectedSupplierId = $purchase_order->supplier_id;
         $selectedOrderType = $this->normalizeOrderType($purchase_order->order_type) ?: 'material';
 
-        // ✅ Default warehouse (controller side)
         $defaultWhCode = ($selectedOrderType === 'finished_good') ? 'WH-RTS' : 'RM';
         $defaultWarehouse = $warehouses->firstWhere('code', $defaultWhCode);
 
@@ -209,48 +206,11 @@ class PurchaseReceiptController extends Controller
      */
     public function store(Request $request)
     {
-        $data = $this->validateData($request);
+        $data['purchase_order_id'] = $request->input('purchase_order_id') ?: ($data['purchase_order_id'] ?? null);
+        $data = $this->validateHeader($request);
 
-        $poLineIds = $request->input('po_line_id', []);
-        $itemIds = $request->input('item_id', []);
-        $qtyReceiveds = $request->input('qty_received', []);
-        $qtyRejects = $request->input('qty_reject', []);
-        $unitPrices = $request->input('unit_price', []);
-        $lineNotes = $request->input('line_notes', []);
-        $units = $request->input('unit', []);
-
-        $selected = $request->input('selected', []); // key = index baris
-
-        $lines = [];
-
-        foreach ($itemIds as $i => $itemId) {
-            if (!$itemId) {
-                continue;
-            }
-
-            if (!array_key_exists($i, $selected)) {
-                continue;
-            }
-
-            $qtyRec = (float) str_replace(',', '.', (string) ($qtyReceiveds[$i] ?? 0));
-            $qtyRej = (float) str_replace(',', '.', (string) ($qtyRejects[$i] ?? 0));
-
-            if ($qtyRec <= 0 && $qtyRej <= 0) {
-                continue;
-            }
-
-            $unitPrice = (float) str_replace(',', '.', (string) ($unitPrices[$i] ?? 0));
-
-            $lines[] = [
-                'purchase_order_line_id' => $poLineIds[$i] ?? null,
-                'item_id' => (int) $itemId,
-                'qty_received' => $qtyRec,
-                'qty_reject' => $qtyRej,
-                'unit_price' => $unitPrice,
-                'unit' => $units[$i] ?? null,
-                'notes' => $lineNotes[$i] ?? null,
-            ];
-        }
+        // build lines dari input tabel (create wajib centang selected)
+        $lines = $this->buildLinesFromRequest($request, requireSelected: true);
 
         if (empty($lines)) {
             return back()
@@ -259,6 +219,7 @@ class PurchaseReceiptController extends Controller
         }
 
         $data['lines'] = $lines;
+
         $data['created_by'] = $request->user()->id;
 
         $receipt = $this->service->create($data);
@@ -273,7 +234,13 @@ class PurchaseReceiptController extends Controller
      */
     public function show(PurchaseReceipt $purchase_receipt)
     {
-        $purchase_receipt->load(['supplier', 'warehouse', 'lines.item']);
+        $purchase_receipt->load([
+            'supplier',
+            'warehouse',
+            'lines.item',
+            // order optional; jangan maksa relasi journal di controller (service kamu post by sourceType)
+            'order',
+        ]);
 
         return view('purchasing.purchase_receipts.show', [
             'receipt' => $purchase_receipt,
@@ -291,7 +258,7 @@ class PurchaseReceiptController extends Controller
                 ->with('error', 'Hanya GRN draft yang bisa diedit.');
         }
 
-        $purchase_receipt->load(['lines.item']);
+        $purchase_receipt->load(['supplier', 'warehouse', 'lines.item', 'order']);
 
         $suppliers = Supplier::orderBy('name')->get();
         $warehouses = Warehouse::orderBy('name')->get();
@@ -316,37 +283,15 @@ class PurchaseReceiptController extends Controller
                 ->with('error', 'Hanya GRN draft yang bisa diupdate.');
         }
 
-        $data = $this->validateData($request);
+        $data = $this->validateHeader($request);
 
-        $poLineIds = $request->input('po_line_id', []); // ✅ penting
-        $itemIds = $request->input('item_id', []);
-        $qtyReceiveds = $request->input('qty_received', []);
-        $qtyRejects = $request->input('qty_reject', []);
-        $unitPrices = $request->input('unit_price', []);
-        $lineNotes = $request->input('line_notes', []);
-        $units = $request->input('unit', []);
+        // edit: tidak wajib checkbox selected (anggap baris qty>0 dianggap masuk)
+        $lines = $this->buildLinesFromRequest($request, requireSelected: false);
 
-        $lines = [];
-
-        foreach ($itemIds as $i => $itemId) {
-            if (!$itemId) {
-                continue;
-            }
-
-            $qtyRec = (float) str_replace(',', '.', (string) ($qtyReceiveds[$i] ?? 0));
-            $qtyRej = (float) str_replace(',', '.', (string) ($qtyRejects[$i] ?? 0));
-            $unitPrice = (float) str_replace(',', '.', (string) ($unitPrices[$i] ?? 0));
-
-            // ✅ simpan juga purchase_order_line_id agar tidak hilang saat edit
-            $lines[] = [
-                'purchase_order_line_id' => $poLineIds[$i] ?? null,
-                'item_id' => (int) $itemId,
-                'qty_received' => $qtyRec,
-                'qty_reject' => $qtyRej,
-                'unit_price' => $unitPrice,
-                'unit' => $units[$i] ?? null,
-                'notes' => $lineNotes[$i] ?? null,
-            ];
+        if (empty($lines)) {
+            return back()
+                ->withInput()
+                ->withErrors(['lines' => 'Tidak ada line dengan Qty Diterima / Reject > 0.']);
         }
 
         $data['lines'] = $lines;
@@ -359,7 +304,7 @@ class PurchaseReceiptController extends Controller
     }
 
     /**
-     * POST / Confirm GRN → masuk stok.
+     * POST / Confirm GRN → stok masuk + journal tercatat (handled by service).
      */
     public function post(PurchaseReceipt $purchase_receipt)
     {
@@ -368,7 +313,7 @@ class PurchaseReceiptController extends Controller
 
             return redirect()
                 ->route('purchasing.purchase_receipts.show', $receipt->id)
-                ->with('success', 'Goods Receipt berhasil diposting. Stok gudang sudah bertambah.');
+                ->with('success', 'Goods Receipt berhasil diposting. Stok gudang sudah bertambah & jurnal tercatat.');
         } catch (\Throwable $e) {
             return redirect()
                 ->route('purchasing.purchase_receipts.show', $purchase_receipt->id)
@@ -377,73 +322,128 @@ class PurchaseReceiptController extends Controller
     }
 
     /**
-     * Validasi basic GRN header + struktur array detail.
+     * UNPOST GRN.
      */
-    protected function validateData(Request $request): array
+    public function unpost(PurchaseReceipt $purchase_receipt)
     {
-        $validated = $request->validate([
+        try {
+            $receipt = $this->service->unpost($purchase_receipt);
+
+            return redirect()
+                ->route('purchasing.purchase_receipts.show', $receipt->id)
+                ->with('success', 'GRN berhasil di-unpost (stok dibalik + jurnal di-void).');
+        } catch (\Throwable $e) {
+            return redirect()
+                ->route('purchasing.purchase_receipts.show', $purchase_receipt->id)
+                ->with('error', $e->getMessage());
+        }
+    }
+
+    // ==========================================================
+    // VALIDATION + BUILD LINES
+    // ==========================================================
+
+    /**
+     * Validasi header GRN (tanpa array detail).
+     */
+    protected function validateHeader(Request $request): array
+    {
+        return $request->validate([
             'date' => ['required', 'date'],
             'supplier_id' => ['required', 'exists:suppliers,id'],
             'warehouse_id' => ['required', 'exists:warehouses,id'],
             'purchase_order_id' => ['nullable', 'exists:purchase_orders,id'],
 
-            'po_line_id' => ['required', 'array'],
-            'po_line_id.*' => ['required', 'exists:purchase_order_lines,id'],
-
-            'item_id' => ['required', 'array'],
-            'item_id.*' => ['required', 'exists:items,id'],
-
-            'qty_received' => ['required', 'array'],
-            'qty_received.*' => ['nullable', 'numeric', 'min:0'],
-
-            'qty_reject' => ['required', 'array'],
-            'qty_reject.*' => ['nullable', 'numeric', 'min:0'],
-
-            'selected' => ['nullable', 'array'],
-            'selected.*' => ['nullable'],
-
-            'unit_price' => ['required', 'array'],
-            'unit_price.*' => ['nullable', 'numeric'],
-
-            'unit' => ['required', 'array'],
-            'unit.*' => ['nullable', 'string'],
-        ], [
-            'qty_received.*.numeric' => 'Qty diterima harus angka.',
-            'qty_reject.*.numeric' => 'Qty reject harus angka.',
-            'qty_received.*.min' => 'Qty diterima tidak boleh minus.',
-            'qty_reject.*.min' => 'Qty reject tidak boleh minus.',
+            'discount' => ['nullable', 'string'],
+            'tax_percent' => ['nullable', 'string'],
+            'shipping_cost' => ['nullable', 'string'],
+            'notes' => ['nullable', 'string'],
         ]);
+    }
 
-        // Validasi logika qty <= qty_po, minimal 1 selected
-        $errors = [];
-        $anySelected = false;
+    /**
+     * Build lines dari request tabel.
+     * - create: requireSelected=true (pakai checkbox selected)
+     * - edit: requireSelected=false (ambil semua baris yang qty>0)
+     *
+     * Input yang dipakai:
+     * - po_line_id[], item_id[], qty_received[], qty_reject[], unit_price[], unit[], line_notes[], selected[index]
+     */
+    protected function buildLinesFromRequest(Request $request, bool $requireSelected): array
+    {
+        $poLineIds = $request->input('po_line_id', []);
+        $itemIds = $request->input('item_id', []);
+        $qtyReceiveds = $request->input('qty_received', []);
+        $qtyRejects = $request->input('qty_reject', []);
+        $unitPrices = $request->input('unit_price', []);
+        $units = $request->input('unit', []);
+        $lineNotes = $request->input('line_notes', []);
+        $selected = $request->input('selected', []);
 
-        foreach ($validated['po_line_id'] as $i => $poLineId) {
-            $selected = $request->input("selected.$i");
-            $qtyRec = (float) ($validated['qty_received'][$i] ?? 0);
-            $qtyRej = (float) ($validated['qty_reject'][$i] ?? 0);
+        if (!is_array($itemIds) || count($itemIds) === 0) {
+            throw ValidationException::withMessages(['lines' => 'Detail item tidak ditemukan.']);
+        }
 
-            if ($selected) {
-                $anySelected = true;
-
-                $poQty = (float) (PurchaseOrderLine::find($poLineId)?->qty ?? 0);
-
-                if ($qtyRec + $qtyRej > $poQty) {
-                    $errors["qty_received.$i"] = "Qty diterima + qty reject tidak boleh melebihi Qty PO ($poQty).";
-                    $errors["qty_reject.$i"] = "Qty diterima + qty reject tidak boleh melebihi Qty PO ($poQty).";
-                }
-
-                if ($qtyRec > $poQty) {
-                    $errors["qty_received.$i"] = "Qty diterima tidak boleh lebih dari Qty PO ($poQty).";
-                }
-
-                if ($qtyRej > $poQty) {
-                    $errors["qty_reject.$i"] = "Qty reject tidak boleh lebih dari Qty PO ($poQty).";
-                }
+        // Preload PO qty untuk validasi (hindari N+1)
+        $poQtyMap = [];
+        if (is_array($poLineIds) && count($poLineIds) > 0) {
+            $ids = collect($poLineIds)->filter()->unique()->values();
+            if ($ids->count()) {
+                $poQtyMap = PurchaseOrderLine::whereIn('id', $ids)
+                    ->pluck('qty', 'id')
+                    ->toArray();
             }
         }
 
-        if (!$anySelected) {
+        $lines = [];
+        $errors = [];
+        $anySelected = false;
+
+        foreach ($itemIds as $i => $itemId) {
+            if (!$itemId) {
+                continue;
+            }
+
+            $isChecked = array_key_exists($i, $selected);
+
+            if ($requireSelected) {
+                if (!$isChecked) {
+                    continue;
+                }
+                $anySelected = true;
+            }
+
+            $qtyRec = $this->num($qtyReceiveds[$i] ?? 0);
+            $qtyRej = $this->num($qtyRejects[$i] ?? 0);
+
+            if ($qtyRec <= 0 && $qtyRej <= 0) {
+                continue;
+            }
+
+            $unitPrice = $this->num($unitPrices[$i] ?? 0);
+
+            $poLineId = $poLineIds[$i] ?? null;
+            if ($poLineId) {
+                $poQty = (float) ($poQtyMap[$poLineId] ?? 0);
+
+                if ($poQty > 0 && ($qtyRec + $qtyRej) > $poQty) {
+                    $errors["qty_received.$i"] = "Qty diterima + reject tidak boleh melebihi Qty PO ($poQty).";
+                    $errors["qty_reject.$i"] = "Qty diterima + reject tidak boleh melebihi Qty PO ($poQty).";
+                }
+            }
+
+            $lines[] = [
+                'purchase_order_line_id' => $poLineId,
+                'item_id' => (int) $itemId,
+                'qty_received' => $qtyRec,
+                'qty_reject' => $qtyRej,
+                'unit_price' => $unitPrice,
+                'unit' => $units[$i] ?? null,
+                'notes' => $lineNotes[$i] ?? null,
+            ];
+        }
+
+        if ($requireSelected && !$anySelected) {
             $errors['selected'] = 'Tidak ada item yang dipilih. Centang minimal satu item.';
         }
 
@@ -451,7 +451,37 @@ class PurchaseReceiptController extends Controller
             throw ValidationException::withMessages($errors);
         }
 
-        return $validated;
+        return $lines;
+    }
+
+    /**
+     * Parse angka format Indonesia / umum.
+     */
+    protected function num($value): float
+    {
+        if ($value === null || $value === '') {
+            return 0.0;
+        }
+
+        if (is_int($value) || is_float($value)) {
+            return (float) $value;
+        }
+
+        $v = trim((string) $value);
+        $v = str_replace(' ', '', $v);
+
+        if (str_contains($v, ',')) {
+            $v = str_replace('.', '', $v);
+            $v = str_replace(',', '.', $v);
+            return (float) $v;
+        }
+
+        if (preg_match('/^\d{1,3}(\.\d{3})+$/', $v)) {
+            $v = str_replace('.', '', $v);
+            return (float) $v;
+        }
+
+        return (float) $v;
     }
 
     /**
@@ -467,6 +497,7 @@ class PurchaseReceiptController extends Controller
         if (in_array($v, ['material', 'finished_good'], true)) {
             return $v;
         }
+
         return null;
     }
 }
