@@ -8,12 +8,12 @@
         :root {
             --rts-main: rgba(45, 212, 191, 1);
             --rts-soft: rgba(45, 212, 191, .14);
-            --danger-soft: rgba(239, 68, 68, .12);
             --warn-soft: rgba(245, 158, 11, .14);
+            --danger-soft: rgba(239, 68, 68, .12);
         }
 
         .page-wrap {
-            max-width: 1150px;
+            max-width: 1100px;
             margin-inline: auto;
             padding: .85rem .85rem 4.5rem;
         }
@@ -29,9 +29,7 @@
             background: var(--card);
             border-radius: 14px;
             border: 1px solid rgba(148, 163, 184, .30);
-            box-shadow:
-                0 10px 26px rgba(15, 23, 42, .06),
-                0 0 0 1px rgba(15, 23, 42, .03);
+            box-shadow: 0 10px 26px rgba(15, 23, 42, .06), 0 0 0 1px rgba(15, 23, 42, .03);
             padding: .8rem .85rem;
         }
 
@@ -82,112 +80,17 @@
             background: transparent;
         }
 
-        .note {
-            border: 1px solid rgba(148, 163, 184, .25);
-            border-radius: 12px;
-            padding: .65rem .75rem;
-            background: rgba(148, 163, 184, .08);
-            font-size: .85rem;
-            opacity: .92;
-            white-space: pre-wrap;
-        }
-
         .line {
             border-top: 1px dashed rgba(148, 163, 184, .35);
             margin: .7rem 0;
         }
 
-        /* =========================
-                CLEAN SOFT BADGES
-            ========================== */
-        .badges {
-            display: flex;
-            flex-wrap: wrap;
-            gap: .4rem;
-            margin-top: .38rem;
-        }
-
-        .badge {
-            display: inline-flex;
-            align-items: center;
-            gap: .38rem;
-            padding: .18rem .55rem;
-            border-radius: 999px;
-            font-size: .75rem;
-            font-weight: 850;
-            white-space: nowrap;
-            border: 1px solid transparent;
-            line-height: 1;
-        }
-
-        .badge .dot {
-            width: 8px;
-            height: 8px;
-            border-radius: 999px;
-            background: currentColor;
-            opacity: .75;
-        }
-
-        .badge.info {
-            background: rgba(148, 163, 184, .14);
-            border-color: rgba(148, 163, 184, .30);
-            color: rgba(51, 65, 85, 1);
-        }
-
-        .badge.ok {
-            background: rgba(16, 185, 129, .16);
-            border-color: rgba(16, 185, 129, .35);
-            color: rgba(4, 120, 87, 1);
-        }
-
-        .badge.warn {
-            background: rgba(245, 158, 11, .18);
-            border-color: rgba(245, 158, 11, .40);
-            color: rgba(146, 64, 14, 1);
-        }
-
-        .badge.danger {
-            background: rgba(239, 68, 68, .16);
-            border-color: rgba(239, 68, 68, .40);
-            color: rgba(153, 27, 27, 1);
-        }
-
-        .badge.muted {
-            background: rgba(100, 116, 139, .16);
-            border-color: rgba(100, 116, 139, .35);
-            color: rgba(51, 65, 85, 1);
-        }
-
-        .badge.is-hidden {
-            display: none !important;
-        }
-
-        /* =========================
-                TABLE (DESKTOP) + STACK (MOBILE)
-            ========================== */
+        /* Table */
         .table-wrap {
             border: 1px solid rgba(148, 163, 184, .22);
             border-radius: 12px;
-            max-height: 40vh;
-            overflow-y: auto;
-            overflow-x: auto;
+            overflow: auto;
             -webkit-overflow-scrolling: touch;
-            background: rgba(15, 23, 42, .01);
-        }
-
-        .table-wrap::-webkit-scrollbar {
-            width: 8px;
-            height: 8px;
-        }
-
-        .table-wrap::-webkit-scrollbar-track {
-            background: rgba(15, 23, 42, .04);
-            border-radius: 999px;
-        }
-
-        .table-wrap::-webkit-scrollbar-thumb {
-            background: rgba(148, 163, 184, .75);
-            border-radius: 999px;
         }
 
         .tbl {
@@ -200,7 +103,7 @@
         .tbl td {
             padding: .55rem .55rem;
             border-bottom: 1px solid rgba(148, 163, 184, .18);
-            vertical-align: top;
+            vertical-align: middle;
             font-size: .9rem;
         }
 
@@ -212,17 +115,12 @@
             font-size: .78rem;
             letter-spacing: .02em;
             text-transform: uppercase;
-            opacity: 1;
-            border-bottom: 1px solid rgba(148, 163, 184, .35);
+            opacity: .8;
+            border-bottom: 1px solid rgba(148, 163, 184, .26);
         }
 
         .tbl tbody tr:hover {
             background: rgba(148, 163, 184, .05);
-        }
-
-        .no {
-            width: 44px;
-            opacity: .75;
         }
 
         .td-right {
@@ -230,13 +128,8 @@
             white-space: nowrap;
         }
 
-        .td-center {
-            text-align: center;
-            white-space: nowrap;
-        }
-
         .item-cell {
-            min-width: 420px;
+            min-width: 360px;
         }
 
         .item-code {
@@ -244,35 +137,47 @@
         }
 
         .item-name {
-            margin-top: .10rem;
+            margin-top: .12rem;
             font-size: .82rem;
             opacity: .82;
         }
 
         .num {
-            width: 160px;
+            width: 140px;
             max-width: 100%;
-            padding: .45rem .55rem;
+            padding: .42rem .55rem;
             border-radius: 12px;
             border: 1px solid rgba(148, 163, 184, .35);
             background: var(--card);
             color: inherit;
+            text-align: right;
         }
 
-        .num.num-center {
-            text-align: center;
+        .badge {
+            display: inline-flex;
+            align-items: center;
+            padding: .14rem .5rem;
+            border-radius: 999px;
+            font-size: .74rem;
+            border: 1px solid rgba(148, 163, 184, .28);
+            background: rgba(148, 163, 184, .10);
+            font-weight: 800;
+            white-space: nowrap;
         }
 
-        .num.is-disabled {
-            opacity: .6;
-            cursor: not-allowed;
-            pointer-events: none;
+        .badge.warn {
+            border-color: rgba(245, 158, 11, .40);
+            background: var(--warn-soft);
         }
 
-        .hint {
-            font-size: .78rem;
-            opacity: .75;
-            margin-top: .22rem;
+        .badge.danger {
+            border-color: rgba(239, 68, 68, .40);
+            background: var(--danger-soft);
+        }
+
+        .badge.ok {
+            border-color: rgba(16, 185, 129, .35);
+            background: rgba(16, 185, 129, .14);
         }
 
         .err {
@@ -282,16 +187,15 @@
         }
 
         @media (max-width: 820px) {
-            .table-wrap {
-                border: none;
-                border-radius: 0;
-                max-height: none;
-                overflow: visible;
-            }
-
             .tbl {
                 min-width: 0;
                 width: 100%;
+            }
+
+            .table-wrap {
+                border: none;
+                border-radius: 0;
+                overflow: visible;
             }
 
             .tbl thead {
@@ -330,95 +234,14 @@
                 margin-right: .5rem;
             }
 
-            .td-right,
-            .td-center {
+            .td-right {
                 text-align: left;
             }
 
             .num {
-                width: 190px;
+                width: 180px;
+                text-align: left;
             }
-
-            .item-cell {
-                min-width: 0;
-            }
-        }
-
-        @media (max-width: 980px) {
-            .page-wrap {
-                padding: .75rem .75rem 5rem;
-            }
-        }
-
-        /* =========================
-                SIMPLE CUSTOM MODAL
-            ========================== */
-        .confirm-overlay {
-            position: fixed;
-            inset: 0;
-            background: rgba(15, 23, 42, .58);
-            display: none;
-            align-items: center;
-            justify-content: center;
-            z-index: 9999;
-            padding: 1.25rem;
-        }
-
-        .confirm-overlay.is-open {
-            display: flex;
-        }
-
-        .confirm-modal {
-            max-width: 780px;
-            width: 100%;
-            background: var(--card, #0f172a);
-            border-radius: 14px;
-            border: 1px solid rgba(148, 163, 184, .35);
-            box-shadow: 0 22px 45px rgba(15, 23, 42, .55);
-            display: flex;
-            flex-direction: column;
-            max-height: 90vh;
-        }
-
-        .confirm-modal-header,
-        .confirm-modal-footer {
-            padding: .75rem .9rem;
-            border-bottom: 1px solid rgba(148, 163, 184, .22);
-            display: flex;
-            align-items: center;
-            justify-content: space-between;
-            gap: .5rem;
-        }
-
-        .confirm-modal-header-title {
-            font-size: .95rem;
-            font-weight: 800;
-        }
-
-        .confirm-modal-body {
-            padding: .7rem .9rem .85rem;
-            font-size: .9rem;
-            overflow: auto;
-        }
-
-        .confirm-modal-footer {
-            border-top: 1px solid rgba(148, 163, 184, .22);
-            border-bottom: none;
-            justify-content: flex-end;
-        }
-
-        .confirm-close-btn {
-            border: none;
-            background: transparent;
-            font-size: 1.1rem;
-            line-height: 1;
-            padding: .15rem .35rem;
-            cursor: pointer;
-            opacity: .7;
-        }
-
-        .confirm-close-btn:hover {
-            opacity: 1;
         }
     </style>
 @endpush
@@ -426,15 +249,13 @@
 @section('content')
     <div class="page-wrap">
 
-        {{-- =======================
-            HEADER
-        ======================== --}}
         <div class="header-row">
             <div>
                 <h1 class="title mono">{{ $stockRequest->code }} — Receive</h1>
                 <div class="meta sub">
                     {{ optional($stockRequest->date)->format('d M Y') }}
-                    · TRANSIT → {{ $stockRequest->destinationWarehouse->code ?? 'RTS' }}
+                    · {{ $stockRequest->sourceWarehouse->code ?? 'WH-PRD' }} →
+                    {{ $stockRequest->destinationWarehouse->code ?? 'WH-RTS' }}
                 </div>
             </div>
 
@@ -444,31 +265,18 @@
             </div>
         </div>
 
-        {{-- =======================
-            TOP ACTIONS + RULE
-        ======================== --}}
-        <div class="card">
-            <div style="display:flex;justify-content:space-between;gap:.75rem;flex-wrap:wrap;align-items:center">
-                <div class="note" style="padding:.55rem .65rem;border:none;background:transparent;margin:0">
-                    <b>Aturan:</b> Qty receive ≤ <b>Stok Transit (Live)</b>.<br>
-                    <span class="meta">RTS boleh menerima lebih dari permintaan, selama stok Transit mencukupi.</span>
-                </div>
-
-                <div class="actions">
-                    <button type="button" class="btn btn-outline" id="btnFillAll">Isi Semua = Transit</button>
-                    <button type="button" class="btn btn-outline" id="btnClearAll">Kosongkan</button>
-                </div>
-            </div>
-        </div>
-
-        <form id="formReceive" method="POST" action="{{ route('rts.stock-requests.finalize', $stockRequest) }}"
-            style="margin-top:.85rem">
+        <form id="formReceive" method="POST" action="{{ route('rts.stock-requests.finalize', $stockRequest) }}">
             @csrf
 
             <div class="card">
-                <div style="display:flex;justify-content:space-between;align-items:baseline;gap:.6rem;flex-wrap:wrap">
-                    <div style="font-weight:900;letter-spacing:-.01em">Daftar Item</div>
-                    <div class="meta">{{ $stockRequest->lines->count() }} item</div>
+                <div style="display:flex;justify-content:space-between;align-items:center;gap:.6rem;flex-wrap:wrap">
+                    <div style="font-weight:900;letter-spacing:-.01em">Input Qty Terima</div>
+
+                    <div class="actions">
+                        <button type="button" class="btn btn-outline" id="btnFillReq">Isi = Req</button>
+                        <button type="button" class="btn btn-outline" id="btnClearAll">Kosongkan</button>
+                        <button class="btn btn-primary" type="submit">Simpan</button>
+                    </div>
                 </div>
 
                 <div class="line"></div>
@@ -477,88 +285,54 @@
                     <table class="tbl">
                         <thead>
                             <tr>
-                                <th class="no">No</th>
-                                <th class="item-cell">Item</th>
-                                <th class="td-right">Permintaan</th>
-                                <th class="td-right">Dikirim</th>
-                                <th class="td-right">Sudah Terima</th>
-                                <th class="td-center">Jumlah Diterima</th>
+                                <th>Item</th>
+                                <th class="td-right">Req</th>
+                                <th class="td-right">PRD Live</th>
+                                <th class="td-right">Qty Terima</th>
+                                <th class="td-right">Status</th>
                             </tr>
                         </thead>
 
                         <tbody>
-                            @foreach ($stockRequest->lines as $i => $line)
+                            @foreach ($stockRequest->lines as $line)
                                 @php
                                     $req = (float) ($line->qty_request ?? 0);
-                                    $disp = (float) ($line->qty_dispatched ?? 0);
-                                    $recv = (float) ($line->qty_received ?? 0);
-                                    $pick = (float) ($line->qty_picked ?? 0);
-
-                                    // ✅ Batas baru: stok Transit live per line (dari controller)
-                                    $liveTransit = (float) ($liveStocks[$line->id] ?? 0);
-
-                                    // ✅ disable hanya kalau transit live 0
-                                    $isDisabled = $liveTransit <= 0.0000001;
-
-                                    // status badge berbasis liveTransit
-                                    if ($isDisabled) {
-                                        $statusCls = 'badge danger';
-                                        $statusLbl = 'Transit kosong';
-                                    } elseif ($liveTransit <= 2) {
-                                        $statusCls = 'badge warn';
-                                        $statusLbl = 'Transit rendah';
-                                    } else {
-                                        $statusCls = 'badge ok';
-                                        $statusLbl = 'Transit OK';
-                                    }
-
+                                    $live = (float) ($liveStocks[$line->id] ?? 0);
                                     $old = old("lines.{$line->id}.qty_received", 0);
+
+                                    // status awal (berdasarkan live)
+                                    $liveBadge = $live <= 0.0000001 ? 'badge warn' : 'badge ok';
+                                    $liveText = $live <= 0.0000001 ? 'PRD Minus' : 'OK';
                                 @endphp
 
-                                <tr style="{{ $isDisabled ? 'opacity:.78' : '' }}">
-                                    <td class="no td-center" data-k="No">{{ $i + 1 }}</td>
-
+                                <tr>
                                     <td class="item-cell" data-k="Item">
                                         <div class="item-code mono">{{ $line->item->code }}</div>
                                         <div class="item-name">{{ $line->item->name }}</div>
-
-                                        {{-- badges: Pickup + Transit --}}
-                                        <div class="badges" data-badge-group>
-                                            <span class="badge info js-hide-zero" data-zero="{{ $pick }}">
-                                                <span class="dot"></span> Pickup
-                                                <b class="mono">{{ $pick }}</b>
-                                            </span>
-
-                                            <span class="badge info">
-                                                <span class="dot"></span> Transit Live
-                                                <b class="mono">{{ $liveTransit }}</b>
-                                            </span>
-
-                                            <span class="{{ $statusCls }}">
-                                                <span class="dot"></span> {{ $statusLbl }}
-                                            </span>
-                                        </div>
                                     </td>
 
-                                    <td class="td-right mono" data-k="Req">{{ $req }}</td>
-                                    <td class="td-right mono" data-k="Kirim">{{ $disp }}</td>
-                                    <td class="td-right mono" data-k="Terima">{{ $recv }}</td>
+                                    <td class="td-right mono" data-k="Req">
+                                        {{ rtrim(rtrim(number_format($req, 2, '.', ''), '0'), '.') }}
+                                    </td>
 
-                                    <td class="td-center" data-k="Qty Receive">
-                                        <input class="num num-center js-recv {{ $isDisabled ? 'is-disabled' : '' }}"
-                                            type="number" step="0.01" min="0"
-                                            name="lines[{{ $line->id }}][qty_received]"
-                                            value="{{ $isDisabled ? 0 : $old }}" data-max-live="{{ $liveTransit }}"
-                                            data-item-code="{{ $line->item->code }}"
-                                            data-item-name="{{ $line->item->name }}" {{ $isDisabled ? 'disabled' : '' }}>
+                                    <td class="td-right mono" data-k="PRD Live">
+                                        {{ rtrim(rtrim(number_format($live, 2, '.', ''), '0'), '.') }}
+                                    </td>
 
-                                        <div class="hint">
-                                            Batas (Live Transit): <b class="mono">{{ $liveTransit }}</b>
-                                        </div>
-
+                                    <td class="td-right" data-k="Qty Terima">
+                                        <input class="num js-recv" type="number" step="0.01" min="0"
+                                            name="lines[{{ $line->id }}][qty_received]" value="{{ $old }}"
+                                            data-req="{{ $req }}" data-live="{{ $live }}"
+                                            inputmode="decimal">
                                         @error("lines.{$line->id}.qty_received")
                                             <div class="err">{{ $message }}</div>
                                         @enderror
+                                    </td>
+
+                                    <td class="td-right" data-k="Status">
+                                        <span class="{{ $liveBadge }} js-status" data-live="{{ $live }}">
+                                            {{ $liveText }}
+                                        </span>
                                     </td>
                                 </tr>
                             @endforeach
@@ -567,49 +341,10 @@
                 </div>
 
                 @error('stock')
-                    <div class="note"
-                        style="margin-top:.85rem;border-color:rgba(239,68,68,.35);background:rgba(239,68,68,.10)">
-                        <b>Error stock:</b> {{ $message }}
-                    </div>
+                    <div class="err" style="margin-top:.75rem">{{ $message }}</div>
                 @enderror
-
-                <div style="display:flex;gap:.6rem;justify-content:flex-end;flex-wrap:wrap;margin-top:1rem">
-                    <a href="{{ route('rts.stock-requests.show', $stockRequest) }}" class="btn btn-outline">Batal</a>
-                    <button class="btn btn-primary" type="submit">Simpan Receive</button>
-                </div>
             </div>
         </form>
-    </div>
-
-    {{-- =======================
-        SIMPLE CUSTOM MODAL KONFIRMASI + DETAIL BARANG
-    ======================== --}}
-    <div id="confirmReceiveOverlay" class="confirm-overlay" aria-hidden="true">
-        <div class="confirm-modal">
-            <div class="confirm-modal-header">
-                <div class="confirm-modal-header-title">
-                    Konfirmasi Simpan Receive
-                </div>
-                <button type="button" class="confirm-close-btn" data-confirm-close>&times;</button>
-            </div>
-            <div class="confirm-modal-body">
-                <p style="margin-bottom:.4rem">
-                    Pastikan jumlah yang diterima sudah sesuai dengan fisik barang.
-                </p>
-                <p class="meta" style="margin-bottom:.5rem">
-                    Berikut ringkasan barang yang akan ditandai sebagai <b>diterima</b> untuk permintaan
-                    <span class="mono">{{ $stockRequest->code }}</span>:
-                </p>
-
-                <div id="confirmReceiveList"></div>
-            </div>
-            <div class="confirm-modal-footer">
-                <button type="button" class="btn btn-outline" data-confirm-close>Kembali</button>
-                <button type="button" class="btn btn-primary" id="btnConfirmReceive">
-                    Ya, Simpan Receive
-                </button>
-            </div>
-        </div>
     </div>
 
     <script>
@@ -619,165 +354,74 @@
                 return Number.isFinite(n) ? n : 0;
             }
 
-            function isZero(n) {
-                return Math.abs(n) <= 0.0000001;
+            function fmtBadge(el, qty) {
+                const req = toNum(el.dataset.req || 0);
+                const live = toNum(el.dataset.live || 0);
+
+                // cari badge status di row yang sama
+                const row = el.closest('tr');
+                const badge = row ? row.querySelector('.js-status') : null;
+                if (!badge) return;
+
+                // default
+                badge.className = 'badge js-status';
+                let text = (live <= 0.0000001) ? 'PRD Minus' : 'OK';
+
+                if (qty <= 0.0000001) {
+                    badge.classList.add('badge');
+                    badge.textContent = '-';
+                    return;
+                }
+
+                if (qty > req + 0.0000001 && req > 0) {
+                    badge.classList.add('danger');
+                    badge.textContent = 'Over';
+                    return;
+                }
+
+                if (live <= 0.0000001) {
+                    badge.classList.add('warn');
+                    badge.textContent = 'PRD Minus';
+                    return;
+                }
+
+                badge.classList.add('ok');
+                badge.textContent = 'OK';
             }
 
-            // Auto-hide zero badges (Pickup)
-            document.querySelectorAll('.js-hide-zero').forEach(b => {
-                const v = toNum(b.getAttribute('data-zero'));
-                if (isZero(v)) b.classList.add('is-hidden');
-            });
+            function clampNonNegative(el) {
+                let v = toNum(el.value);
+                if (v < 0) v = 0;
+                v = Math.round(v * 100) / 100;
+                el.value = (v % 1 === 0) ? String(v.toFixed(0)) : String(v);
+                fmtBadge(el, v);
+            }
 
             const inputs = Array.from(document.querySelectorAll('.js-recv'));
 
-            // ✅ clamp ke stok Transit live (bukan ke sisa dispatch)
-            function clampInput(el) {
-                if (el.disabled) return;
+            inputs.forEach(el => {
+                el.addEventListener('input', () => clampNonNegative(el));
+                el.addEventListener('change', () => clampNonNegative(el));
+                el.addEventListener('blur', () => clampNonNegative(el));
 
-                const maxLive = toNum(el.dataset.maxLive || '0');
-                let v = toNum(el.value);
-
-                if (v < 0) v = 0;
-                if (maxLive > 0 && v > maxLive) v = maxLive;
-
-                el.value = (Math.round(v * 100) / 100)
-                    .toFixed(2)
-                    .replace(/\.00$/, '');
-            }
-
-            function selectAll(el) {
-                if (!el || el.disabled) return;
-                setTimeout(() => {
-                    try {
-                        el.select();
-                        if (el.setSelectionRange) {
-                            const len = el.value.length;
-                            el.setSelectionRange(0, len);
-                        }
-                    } catch (e) {}
-                }, 10);
-            }
-
-            inputs.forEach(i => {
-                if (i.disabled) return;
-                i.addEventListener('focus', (e) => selectAll(e.target));
-                i.addEventListener('click', (e) => {
-                    if (document.activeElement === e.target) {
-                        selectAll(e.target);
-                    }
-                });
-                i.addEventListener('blur', () => clampInput(i));
-                i.addEventListener('change', () => clampInput(i));
+                // init badge
+                clampNonNegative(el);
             });
 
-            // Isi semua = Transit live
-            document.getElementById('btnFillAll')?.addEventListener('click', () => {
+            document.getElementById('btnFillReq')?.addEventListener('click', () => {
                 inputs.forEach(el => {
-                    if (el.disabled) return;
-                    const maxLive = toNum(el.dataset.maxLive || '0');
-                    el.value = maxLive > 0 ? maxLive : 0;
-                    clampInput(el);
+                    const req = toNum(el.dataset.req || 0);
+                    el.value = req > 0 ? req : 0;
+                    clampNonNegative(el);
                 });
             });
 
             document.getElementById('btnClearAll')?.addEventListener('click', () => {
                 inputs.forEach(el => {
-                    if (el.disabled) return;
                     el.value = 0;
-                    clampInput(el);
+                    clampNonNegative(el);
                 });
             });
-
-            // Build detail list untuk modal konfirmasi
-            const listEl = document.getElementById('confirmReceiveList');
-
-            function buildConfirmList() {
-                if (!listEl) return;
-
-                inputs.forEach(el => clampInput(el));
-
-                const rows = [];
-                inputs.forEach(el => {
-                    if (el.disabled) return;
-                    const qty = toNum(el.value);
-                    if (isZero(qty)) return;
-
-                    rows.push({
-                        code: el.getAttribute('data-item-code') || '',
-                        name: el.getAttribute('data-item-name') || '',
-                        qty
-                    });
-                });
-
-                if (!rows.length) {
-                    listEl.innerHTML =
-                        '<p class="meta" style="margin-bottom:0">Belum ada qty receive &gt; 0. Jika memang tidak ada barang yang diterima, Anda tetap bisa melanjutkan.</p>';
-                    return;
-                }
-
-                let html = '';
-                html +=
-                    '<div style="max-height:260px;overflow:auto;border-radius:10px;border:1px solid rgba(148,163,184,.35);padding:.4rem .5rem;">';
-                html += '<table class="table table-sm mb-0" style="font-size:.8rem;">';
-                html +=
-                    '<thead><tr><th style="width:40px;">No</th><th>Item</th><th class="text-center">Diterima</th></tr></thead><tbody>';
-
-                rows.forEach((row, idx) => {
-                    html += '<tr>';
-                    html += '<td class="text-center">' + (idx + 1) + '</td>';
-                    html += '<td>';
-                    html += '<div class="mono" style="font-weight:700;">' + row.code + '</div>';
-                    html += '<div style="opacity:.8;">' + row.name + '</div>';
-                    html += '</td>';
-                    html += '<td class="text-center mono" style="font-weight:700;">' + row.qty + '</td>';
-                    html += '</tr>';
-                });
-
-                html += '</tbody></table></div>';
-                listEl.innerHTML = html;
-            }
-
-            // Custom modal open/close
-            const overlay = document.getElementById('confirmReceiveOverlay');
-            const confirmBtn = document.getElementById('btnConfirmReceive');
-            const closeBtns = overlay ? overlay.querySelectorAll('[data-confirm-close]') : [];
-            const form = document.getElementById('formReceive');
-
-            function openConfirmModal() {
-                if (!overlay) return;
-                buildConfirmList();
-                overlay.classList.add('is-open');
-                document.body.style.overflow = 'hidden';
-            }
-
-            function closeConfirmModal() {
-                if (!overlay) return;
-                overlay.classList.remove('is-open');
-                document.body.style.overflow = '';
-            }
-
-            closeBtns.forEach(btn => btn.addEventListener('click', closeConfirmModal));
-
-            overlay?.addEventListener('click', (e) => {
-                if (e.target === overlay) closeConfirmModal();
-            });
-
-            if (form) {
-                let isConfirmed = false;
-
-                form.addEventListener('submit', function(e) {
-                    if (isConfirmed) return;
-                    e.preventDefault();
-                    openConfirmModal();
-                });
-
-                confirmBtn?.addEventListener('click', function() {
-                    closeConfirmModal();
-                    isConfirmed = true;
-                    form.submit();
-                });
-            }
         })();
     </script>
 @endsection

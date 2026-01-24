@@ -4,26 +4,22 @@ use App\Http\Controllers\Api\StockApiController;
 use App\Http\Controllers\Inventory\ExternalTransferController;
 use App\Http\Controllers\Inventory\InventoryAdjustmentController;
 use App\Http\Controllers\Inventory\InventoryStockController;
-use App\Http\Controllers\Inventory\PrdDispatchCorrectionController;
 use App\Http\Controllers\Inventory\RtsStockRequestController;
-use App\Http\Controllers\Inventory\RtsStockRequestProcessController;
 use App\Http\Controllers\Inventory\StockCardController;
 use App\Http\Controllers\Inventory\StockOpnameController;
 use App\Http\Controllers\Inventory\TransferController;
 use App\Http\Controllers\Inventory\WipAdjustmentController;
-
-// ✅ NEW (OPSI 1: PRD DISPATCH CORRECTION)
 use Illuminate\Support\Facades\Route;
 
 /*
 |--------------------------------------------------------------------------
 | INVENTORY + STOCK REQUEST ROUTES
 |--------------------------------------------------------------------------
-| Notes:
 | - Inventory internal: owner, admin, operating
-| - RTS Stock Requests: owner, admin
-| - PRD Stock Requests process: owner, admin, operating (sesuai middleware inventory internal)
-| - API stock: owner, admin, operating
+| - RTS Stock Requests (NO TODAY):
+|   - operating: READ ONLY (index/show)
+|   - owner/admin: FULL (create/store/confirm/finalize)
+| - PRD process removed (no more PRD -> TRANSIT)
 |--------------------------------------------------------------------------
  */
 
@@ -32,11 +28,6 @@ use Illuminate\Support\Facades\Route;
 // ======================================================================
 Route::middleware(['web', 'auth', 'role:owner,admin,operating'])->group(function () {
 
-    /*
-    |--------------------------------------------------------------------------
-    | INVENTORY NAMESPACE: /inventory/*
-    |--------------------------------------------------------------------------
-     */
     Route::prefix('inventory')->name('inventory.')->group(function () {
 
         // ================== STOCK CARD ==================
@@ -97,89 +88,72 @@ Route::middleware(['web', 'auth', 'role:owner,admin,operating'])->group(function
         // ================== INVENTORY ADJUSTMENTS ==================
         Route::prefix('adjustments')->name('adjustments.')->group(function () {
 
-            // INDEX
             Route::get('/', [InventoryAdjustmentController::class, 'index'])->name('index');
 
-            // MANUAL ADJUSTMENT
             Route::get('/manual/create', [InventoryAdjustmentController::class, 'createManual'])
                 ->name('manual.create');
 
             Route::post('/manual', [InventoryAdjustmentController::class, 'storeManual'])
                 ->name('manual.store');
 
-            // AJAX ITEMS
             Route::get('/items', [InventoryAdjustmentController::class, 'itemsForWarehouse'])
                 ->name('items_for_warehouse');
 
-            // DETAIL DOKUMEN
             Route::get('/{inventoryAdjustment}', [InventoryAdjustmentController::class, 'show'])
                 ->name('show');
 
             Route::post('/{inventoryAdjustment}/approve', [InventoryAdjustmentController::class, 'approve'])
                 ->name('approve');
         });
-    });
 
-    /*
-    |--------------------------------------------------------------------------
-    | PRD STOCK REQUESTS (Proses permintaan stok di gudang produksi)
-    | URL: /prd/stock-requests/*
-    | Name: prd.stock-requests.*
-    |--------------------------------------------------------------------------
-     */
-    Route::prefix('prd/stock-requests')->name('prd.stock-requests.')->group(function () {
+        // ================== WIP ADJUSTMENTS ==================
+        Route::prefix('wip-adjustments')->name('wip_adjustments.')->group(function () {
+            Route::get('/', [WipAdjustmentController::class, 'index'])->name('index');
+            Route::get('/create', [WipAdjustmentController::class, 'create'])->name('create');
+            Route::post('/', [WipAdjustmentController::class, 'store'])->name('store');
 
-        // list
-        Route::get('/', [RtsStockRequestProcessController::class, 'index'])->name('index');
+            Route::get('/ajax/items', [WipAdjustmentController::class, 'items'])->name('items');
+            Route::get('/ajax/bundles', [WipAdjustmentController::class, 'bundles'])->name('bundles');
 
-        // detail
-        Route::get('/{stockRequest}', [RtsStockRequestProcessController::class, 'show'])->name('show');
-
-        // process screen
-        Route::get('/{stockRequest}/process', [RtsStockRequestProcessController::class, 'edit'])->name('edit');
-
-        // confirm dispatch (PRD -> TRANSIT)
-        Route::post('/{stockRequest}/process/confirm', [RtsStockRequestProcessController::class, 'confirm'])
-            ->name('confirm');
-
-        // ==============================
-        // ✅ NEW: PRD Dispatch Correction
-        // ==============================
-        Route::get('/{stockRequest}/dispatch-corrections/create', [PrdDispatchCorrectionController::class, 'create'])
-            ->name('dispatch_corrections.create');
-
-        Route::post('/{stockRequest}/dispatch-corrections', [PrdDispatchCorrectionController::class, 'store'])
-            ->name('dispatch_corrections.store');
-
-        Route::get('/dispatch-corrections/{correction}', [PrdDispatchCorrectionController::class, 'show'])
-            ->name('dispatch_corrections.show');
+            Route::get('/{inventoryAdjustment}', [WipAdjustmentController::class, 'show'])->name('show');
+            Route::post('/{inventoryAdjustment}/approve', [WipAdjustmentController::class, 'approve'])->name('approve');
+        });
     });
 });
 
 // ======================================================================
-// RTS STOCK REQUESTS (owner + admin)
+// RTS STOCK REQUESTS (NO TODAY ROUTE, FIX create not found)
+// - WRITE: owner + admin (create/store/confirm/finalize)
+// - READ ONLY: owner + admin + operating (index/show)
+// IMPORTANT: show route constrained so it won't catch "create"
 // ======================================================================
+
+// ✅ WRITE ONLY (define dulu agar /create tidak ketabrak)
 Route::middleware(['web', 'auth', 'role:owner,admin'])->group(function () {
-
     Route::prefix('rts/stock-requests')->name('rts.stock-requests.')->group(function () {
-
-        Route::get('/', [RtsStockRequestController::class, 'index'])->name('index');
-
-        // ✅ QUICK TODAY harus di atas {stockRequest}
-        Route::get('/today', [RtsStockRequestController::class, 'quickToday'])->name('today');
 
         Route::get('/create', [RtsStockRequestController::class, 'create'])->name('create');
         Route::post('/', [RtsStockRequestController::class, 'store'])->name('store');
 
-        Route::get('/{stockRequest}', [RtsStockRequestController::class, 'show'])->name('show');
+        Route::get('/{stockRequest}/confirm', [RtsStockRequestController::class, 'confirmReceive'])
+            ->whereNumber('stockRequest')
+            ->name('confirm');
 
-        // RTS receive flow
-        Route::get('/{stockRequest}/confirm', [RtsStockRequestController::class, 'confirmReceive'])->name('confirm');
-        Route::post('/{stockRequest}/finalize', [RtsStockRequestController::class, 'finalize'])->name('finalize');
+        Route::post('/{stockRequest}/finalize', [RtsStockRequestController::class, 'finalize'])
+            ->whereNumber('stockRequest')
+            ->name('finalize');
+    });
+});
 
-        // RTS direct pickup
-        Route::post('/{stockRequest}/direct-pickup', [RtsStockRequestController::class, 'directPickup'])
-            ->name('direct-pickup');
+// ✅ READ ONLY
+Route::middleware(['web', 'auth', 'role:owner,admin,operating'])->group(function () {
+    Route::prefix('rts/stock-requests')->name('rts.stock-requests.')->group(function () {
+
+        Route::get('/', [RtsStockRequestController::class, 'index'])->name('index');
+
+        Route::get('/{stockRequest}', [RtsStockRequestController::class, 'show'])
+            ->whereNumber('stockRequest')
+            ->name('show');
     });
 });
 
@@ -192,16 +166,4 @@ Route::middleware(['web', 'auth', 'role:owner,admin,operating'])->group(function
         Route::get('/stock/available', [StockApiController::class, 'available'])->name('stock.available');
         Route::get('/stock/summary', [StockApiController::class, 'summary'])->name('stock.summary');
     });
-});
-
-Route::prefix('inventory/wip-adjustments')->name('inventory.wip_adjustments.')->group(function () {
-    Route::get('/', [WipAdjustmentController::class, 'index'])->name('index');
-    Route::get('/create', [WipAdjustmentController::class, 'create'])->name('create');
-    Route::post('/', [WipAdjustmentController::class, 'store'])->name('store');
-
-    Route::get('/ajax/items', [WipAdjustmentController::class, 'items'])->name('items');
-    Route::get('/ajax/bundles', [WipAdjustmentController::class, 'bundles'])->name('bundles');
-
-    Route::get('/{inventoryAdjustment}', [WipAdjustmentController::class, 'show'])->name('show');
-    Route::post('/{inventoryAdjustment}/approve', [WipAdjustmentController::class, 'approve'])->name('approve');
 });

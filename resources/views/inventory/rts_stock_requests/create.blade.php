@@ -1,7 +1,7 @@
 {{-- resources/views/inventory/rts_stock_requests/create.blade.php --}}
 @extends('layouts.app')
 
-@section('title', 'RTS • Buat / Update Permintaan Replenish')
+@section('title', 'RTS • Buat Permintaan Replenish')
 
 @push('head')
     <style>
@@ -87,59 +87,6 @@
             resize: vertical;
         }
 
-        .banner {
-            border-radius: 14px;
-            padding: .75rem .85rem;
-            border: 1px solid rgba(45, 212, 191, .35);
-            background: var(--rts-main-soft);
-        }
-
-        .pill {
-            display: inline-flex;
-            align-items: center;
-            gap: .35rem;
-            padding: .16rem .55rem;
-            border-radius: 999px;
-            font-size: .78rem;
-            border: 1px solid rgba(148, 163, 184, .35);
-            background: rgba(148, 163, 184, .10);
-            white-space: nowrap;
-        }
-
-        .pill.warn {
-            border-color: rgba(245, 158, 11, .40);
-            background: var(--warn-soft);
-        }
-
-        .pill.danger {
-            border-color: rgba(239, 68, 68, .40);
-            background: var(--danger-soft);
-        }
-
-        .hint {
-            margin-top: .6rem;
-            border-radius: 12px;
-            padding: .65rem .75rem;
-            border: 1px dashed rgba(148, 163, 184, .45);
-            background: rgba(148, 163, 184, .06);
-        }
-
-        .hint b {
-            font-weight: 800;
-        }
-
-        .hint ul {
-            margin: .35rem 0 0;
-            padding-left: 1.05rem;
-        }
-
-        .hint li {
-            margin: .15rem 0;
-        }
-
-        /* =========================
-                   TABLE + DROPDOWN SAFETY
-                ========================== */
         .table-wrap {
             border-radius: 14px;
             border: 1px solid rgba(148, 163, 184, .22);
@@ -200,6 +147,30 @@
             justify-content: flex-end;
         }
 
+        .btn {
+            display: inline-flex;
+            align-items: center;
+            justify-content: center;
+            gap: .35rem;
+            padding: .45rem .75rem;
+            border-radius: 12px;
+            border: 1px solid rgba(148, 163, 184, .35);
+            background: transparent;
+            color: inherit;
+            text-decoration: none;
+            cursor: pointer;
+        }
+
+        .btn:hover {
+            border-color: rgba(45, 212, 191, .55);
+        }
+
+        .btn-primary {
+            background: rgba(45, 212, 191, .14);
+            border-color: rgba(45, 212, 191, .55);
+            font-weight: 800;
+        }
+
         .icon-btn {
             width: 34px;
             height: 34px;
@@ -216,9 +187,6 @@
             border-color: rgba(45, 212, 191, .55);
         }
 
-        /* =========================
-                   UX: flash highlight row yg kena merge
-                ========================== */
         tr.flash td {
             animation: flashBg 900ms ease;
         }
@@ -233,10 +201,6 @@
             }
         }
 
-        /* =========================
-                   Dropdown "always on top"
-                   - pakai position fixed via JS
-                ========================== */
         .item-suggest-dropdown {
             z-index: 999999 !important;
             position: fixed !important;
@@ -246,7 +210,6 @@
             display: none;
         }
 
-        /* Toast */
         .toast {
             position: fixed;
             left: 50%;
@@ -273,13 +236,18 @@
 
 @section('content')
     @php
+        $role = strtolower((string) (auth()->user()?->role ?? ''));
+        $canManage = in_array($role, ['owner', 'admin'], true);
+
         $itemsForJs = $finishedGoodsItems
             ->map(fn($i) => ['id' => $i->id, 'code' => $i->code, 'name' => $i->name])
             ->values()
             ->toArray();
 
-        $prefillLinesForJs = $prefillLines ?? [];
+        // ✅ create selalu baru: ambil old('lines') saja
+        $oldLinesForJs = old('lines', []);
 
+        // Render item-suggest component template
         $itemSuggestHtml = view('components.item-suggest', [
             'idName' => '__tmp__',
             'categoryName' => null,
@@ -303,121 +271,121 @@
     <div class="page-wrap">
         <div style="display:flex;justify-content:space-between;gap:1rem;align-items:flex-start;flex-wrap:wrap">
             <div>
-                <h1 style="font-size:1.25rem;font-weight:800;margin:0">RTS • Buat / Update Permintaan</h1>
+                <h1 style="font-size:1.25rem;font-weight:800;margin:0">RTS • Buat Permintaan</h1>
                 <div class="muted small" style="margin-top:.25rem">
-                    Form ini untuk <b>append kebutuhan</b> ke dokumen hari ini (kalau sudah ada).
+                    Buat dokumen permintaan baru dari <b>{{ $prdWarehouse->code }}</b> ke <b>{{ $rtsWarehouse->code }}</b>.
                 </div>
             </div>
 
             <div class="btns">
-                <a class="btn btn-outline" href="{{ route('rts.stock-requests.index') }}">← List</a>
-                <a class="btn btn-primary" href="{{ route('rts.stock-requests.today') }}">Hari Ini</a>
+                <a class="btn" href="{{ route('rts.stock-requests.index') }}">← List</a>
             </div>
         </div>
 
-        @if (!empty($prefillRequest))
-            <div class="banner" style="margin-top:.85rem">
-                <div style="display:flex;justify-content:space-between;gap:.75rem;flex-wrap:wrap;align-items:flex-start">
-                    <div>
-                        <div class="mono" style="font-weight:900">Lanjutkan dokumen: {{ $prefillRequest->code }}</div>
-                        <div class="muted small">
-                            Prefill berisi <b>sisa (outstanding)</b>. Submit akan <b>append</b> qty_request ke dokumen ini.
-                        </div>
-                    </div>
-                    <div class="pill warn">Mode: APPEND</div>
+        @if (!$canManage)
+            <div class="card" style="margin-top:.85rem">
+                <div class="tiny" style="color: rgba(239,68,68,1); font-weight:700;">
+                    Akses ditolak. Hanya Owner/Admin yang bisa membuat permintaan RTS.
                 </div>
             </div>
-        @endif
+        @else
+            <form id="rtsCreateForm" method="POST" action="{{ route('rts.stock-requests.store') }}"
+                style="margin-top:.9rem">
+                @csrf
 
+                <div class="card">
+                    <div class="row">
+                        <div class="col">
+                            <label>Tanggal</label>
+                            <input type="date" name="date"
+                                value="{{ old('date', $prefillDate ?? now()->toDateString()) }}">
+                            @error('date')
+                                <div class="tiny" style="color: rgba(239,68,68,1); margin-top:.25rem">{{ $message }}
+                                </div>
+                            @enderror
+                        </div>
 
+                        <div class="col">
+                            <label>Gudang Sumber (PRD)</label>
+                            <input type="hidden" name="source_warehouse_id" value="{{ $prdWarehouse->id }}">
+                            <input type="text" value="{{ $prdWarehouse->code }} — {{ $prdWarehouse->name ?? 'PRD' }}"
+                                disabled>
+                            @error('source_warehouse_id')
+                                <div class="tiny" style="color: rgba(239,68,68,1); margin-top:.25rem">{{ $message }}
+                                </div>
+                            @enderror
+                        </div>
 
-        <form id="rtsCreateForm" method="POST" action="{{ route('rts.stock-requests.store') }}" style="margin-top:.9rem">
-            @csrf
+                        <div class="col">
+                            <label>Gudang Tujuan (RTS)</label>
+                            <input type="hidden" name="destination_warehouse_id" value="{{ $rtsWarehouse->id }}">
+                            <input type="text" value="{{ $rtsWarehouse->code }} — {{ $rtsWarehouse->name ?? 'RTS' }}"
+                                disabled>
+                            @error('destination_warehouse_id')
+                                <div class="tiny" style="color: rgba(239,68,68,1); margin-top:.25rem">{{ $message }}
+                                </div>
+                            @enderror
+                        </div>
+                    </div>
 
-            <div class="card">
-                <div class="row">
-                    <div class="col">
-                        <label>Tanggal</label>
-                        <input type="date" name="date"
-                            value="{{ old('date', $prefillDate ?? now()->toDateString()) }}">
-                        @error('date')
+                    <div style="margin-top:.75rem">
+                        <label>Catatan (opsional)</label>
+                        <textarea name="notes" placeholder="Contoh: urgent untuk packing sore / order besar">{{ old('notes') }}</textarea>
+                        @error('notes')
                             <div class="tiny" style="color: rgba(239,68,68,1); margin-top:.25rem">{{ $message }}</div>
                         @enderror
                     </div>
-
-                    <div class="col">
-                        <label>Gudang Sumber (PRD)</label>
-                        <input type="hidden" name="source_warehouse_id" value="{{ $prdWarehouse->id }}">
-                        <input type="text" value="{{ $prdWarehouse->code }} — {{ $prdWarehouse->name ?? 'PRD' }}"
-                            disabled>
-                    </div>
-
-                    <div class="col">
-                        <label>Gudang Tujuan (RTS)</label>
-                        <input type="hidden" name="destination_warehouse_id" value="{{ $rtsWarehouse->id }}">
-                        <input type="text" value="{{ $rtsWarehouse->code }} — {{ $rtsWarehouse->name ?? 'RTS' }}"
-                            disabled>
-                    </div>
                 </div>
 
-                <div style="margin-top:.75rem">
-                    <label>Catatan (opsional)</label>
-                    <textarea name="notes" placeholder="Contoh: butuh untuk packing sore / order urgent">{{ old('notes') }}</textarea>
-                </div>
-            </div>
+                <div class="card" style="margin-top:.85rem">
+                    <div style="display:flex;justify-content:space-between;gap:.75rem;flex-wrap:wrap;align-items:center">
+                        <div>
+                            <div style="font-weight:900">Item Request</div>
+                            <div class="muted small">Isi item + qty yang ingin diminta. Qty harus <b>lebih dari 0</b>.</div>
+                        </div>
 
-            <div class="card" style="margin-top:.85rem">
-                <div style="display:flex;justify-content:space-between;gap:.75rem;flex-wrap:wrap;align-items:center">
-                    <div>
-                        <div style="font-weight:900">Item Request</div>
-                        <div class="muted small">Isi qty yang ingin kamu <b>tambahkan</b> (append).</div>
+                        <div class="btns">
+                            <button type="button" class="btn" id="btnAddRow">+ Tambah Baris</button>
+                        </div>
                     </div>
 
+                    <div class="table-wrap">
+                        <div class="table-scroll">
+                            <table>
+                                <thead>
+                                    <tr>
+                                        <th style="width:44px">#</th>
+                                        <th style="width:360px">Item</th>
+                                        <th style="width:150px">Qty</th>
+                                        <th>Catatan Line</th>
+                                        <th style="width:120px;text-align:right">Aksi</th>
+                                    </tr>
+                                </thead>
+                                <tbody id="linesTbody"></tbody>
+                            </table>
+                        </div>
+                    </div>
+
+                    @error('lines')
+                        <div class="tiny" style="color: rgba(239,68,68,1); margin-top:.5rem">{{ $message }}</div>
+                    @enderror
+
+                    @if ($errors->has('lines.*.qty_request') || $errors->has('lines.*.item_id'))
+                        <div class="tiny" style="color: rgba(239,68,68,1); margin-top:.5rem">
+                            Periksa item & qty. Qty harus &gt; 0 dan item tidak boleh duplikat.
+                        </div>
+                    @endif
+                </div>
+
+                <div class="btn-row">
+                    <div class="muted small">Setelah submit: diarahkan ke halaman detail RTS.</div>
                     <div class="btns">
-                        <button type="button" class="btn btn-outline" id="btnAddRow">+ Tambah Baris</button>
-                        <button type="button" class="btn btn-outline" id="btnFillOutstanding"
-                            @if (empty($prefillLinesForJs) || count($prefillLinesForJs) === 0) disabled @endif>
-                            Prefill Sisa
-                        </button>
+                        <a class="btn" href="{{ route('rts.stock-requests.index') }}">Batal</a>
+                        <button type="submit" class="btn btn-primary">Simpan Permintaan</button>
                     </div>
                 </div>
-
-                <div class="table-wrap">
-                    <div class="table-scroll">
-                        <table>
-                            <thead>
-                                <tr>
-                                    <th style="width:44px">#</th>
-                                    <th style="width:360px">Item</th>
-                                    <th style="width:150px">Qty ADD</th>
-                                    <th>Catatan Line</th>
-                                    <th style="width:120px;text-align:right">Aksi</th>
-                                </tr>
-                            </thead>
-                            <tbody id="linesTbody"></tbody>
-                        </table>
-                    </div>
-                </div>
-
-                @error('lines')
-                    <div class="tiny" style="color: rgba(239,68,68,1); margin-top:.5rem">{{ $message }}</div>
-                @enderror
-            </div>
-
-            <div class="btn-row">
-                <div class="muted small">Setelah submit: diarahkan ke halaman detail RTS.</div>
-                <div class="btns">
-                    <a class="btn btn-outline" href="{{ route('rts.stock-requests.index') }}">Batal</a>
-                    <button type="submit" class="btn btn-primary">
-                        @if (!empty($prefillRequest))
-                            Update (Append) Permintaan
-                        @else
-                            Kirim Permintaan ke PRD
-                        @endif
-                    </button>
-                </div>
-            </div>
-        </form>
+            </form>
+        @endif
     </div>
 
     <div id="toast" class="toast"></div>
@@ -425,8 +393,7 @@
     <script>
         (function() {
             const items = @json($itemsForJs);
-            const oldLines = @json(old('lines', null));
-            const prefillLines = @json($prefillLinesForJs);
+            const oldLines = @json($oldLinesForJs);
             const itemSuggestHtml = @json($itemSuggestHtml);
 
             const tbody = document.getElementById('linesTbody');
@@ -462,9 +429,6 @@
 
                     const hiddenId = tr.querySelector('.js-item-suggest-id');
                     if (hiddenId) hiddenId.setAttribute('name', `lines[${idx}][item_id]`);
-
-                    const hiddenCat = tr.querySelector('.js-item-suggest-category');
-                    if (hiddenCat) hiddenCat.setAttribute('name', `lines[${idx}][item_category_id]`);
                 });
             }
 
@@ -479,7 +443,6 @@
 
             function flashRow(tr) {
                 tr.classList.remove('flash');
-                // force reflow
                 void tr.offsetWidth;
                 tr.classList.add('flash');
                 setTimeout(() => tr.classList.remove('flash'), 950);
@@ -526,7 +489,7 @@
 
                 if (window.initItemSuggestInputs) window.initItemSuggestInputs(tr);
 
-                // MERGE behavior
+                // ✅ anti duplicate: merge qty ke row existing
                 const hiddenId = tr.querySelector('.js-item-suggest-id');
                 if (hiddenId) {
                     hiddenId.addEventListener('change', () => {
@@ -556,7 +519,6 @@
                                 notesThis) : notesThis;
                         }
 
-                        // feedback
                         const it = getItemById(chosen);
                         const label = it ? `${(it.code || '').toUpperCase()}` : `Item ${chosen}`;
                         showToast(`✅ ${label}: qty digabung (+${addQty})`);
@@ -610,27 +572,16 @@
                     oldLines.forEach(l => addRow(l));
                     return;
                 }
-                if (Array.isArray(prefillLines) && prefillLines.length > 0) {
-                    prefillLines.forEach(l => addRow(l));
-                    return;
-                }
                 addRow({});
             }
 
             document.getElementById('btnAddRow')?.addEventListener('click', () => addRow({}));
 
-            document.getElementById('btnFillOutstanding')?.addEventListener('click', () => {
-                tbody.innerHTML = '';
-                if (Array.isArray(prefillLines) && prefillLines.length > 0) {
-                    prefillLines.forEach(l => addRow(l));
-                } else {
-                    addRow({});
-                }
-            });
-
-            // submit cleanup
+            // submit cleanup + validation
             form?.addEventListener('submit', (e) => {
                 const rows = [...tbody.querySelectorAll('tr')];
+
+                // remove empty rows
                 rows.forEach(tr => {
                     const id = (tr.querySelector('.js-item-suggest-id')?.value || '').trim();
                     const qty = num(tr.querySelector('.line-qty')?.value);
@@ -639,11 +590,17 @@
 
                 renumber();
 
-                const any = [...tbody.querySelectorAll('.js-item-suggest-id')]
-                    .some(h => (h.value || '').trim() !== '');
-                if (!any) {
+                // validate: minimal 1 item + qty > 0
+                const validRows = [...tbody.querySelectorAll('tr')].filter(tr => {
+                    const id = (tr.querySelector('.js-item-suggest-id')?.value || '').trim();
+                    const qty = num(tr.querySelector('.line-qty')?.value);
+                    return !!id && qty > 0;
+                });
+
+                if (validRows.length < 1) {
                     e.preventDefault();
-                    alert('Minimal isi 1 item.');
+                    alert('Minimal isi 1 item dengan qty > 0.');
+                    return;
                 }
             });
 
@@ -670,20 +627,16 @@
                         const maxH = 240;
                         const viewportH = window.innerHeight;
 
-                        // default below
                         let top = rect.bottom + margin;
                         let left = rect.left;
                         let width = rect.width;
 
-                        // if not enough space below, show above
                         const spaceBelow = viewportH - rect.bottom - margin;
                         const desiredH = Math.min(maxH, dropdown.scrollHeight || maxH);
 
                         if (spaceBelow < 120) {
                             const aboveTop = rect.top - margin - desiredH;
-                            if (aboveTop > 8) {
-                                top = aboveTop;
-                            }
+                            if (aboveTop > 8) top = aboveTop;
                         }
 
                         dropdown.style.left = left + 'px';
@@ -692,36 +645,25 @@
                         dropdown.style.maxHeight = Math.min(maxH, Math.max(120, spaceBelow)) + 'px';
                     }
 
-                    // observe show/hide by monkey patch style.display changes via MutationObserver
                     const obs = new MutationObserver(() => placeDropdown());
                     obs.observe(dropdown, {
                         attributes: true,
                         attributeFilter: ['style', 'class']
                     });
 
-                    // reposition on scroll/resize
                     const onMove = () => placeDropdown();
                     window.addEventListener('scroll', onMove, true);
                     window.addEventListener('resize', onMove);
 
-                    // also on focus
                     input.addEventListener('focus', () => setTimeout(placeDropdown, 0));
                     input.addEventListener('input', () => setTimeout(placeDropdown, 0));
                 });
             }
 
-            // init rows first
+            // init
             seedInitialRows();
-
-            // patch dropdown after initItemSuggestInputs created dropdown content
             setTimeout(() => patchFixedDropdown(document), 0);
 
-            // also patch when adding rows
-            const _origAddRow = addRow;
-            window.__rtsAddRow = function(data) {
-                _origAddRow(data);
-                setTimeout(() => patchFixedDropdown(document), 0);
-            };
         })();
     </script>
 @endsection
