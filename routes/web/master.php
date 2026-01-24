@@ -24,6 +24,9 @@ Route::middleware(['web', 'auth'])
 
             Route::post('items/{item}/hpp-temp', [ItemController::class, 'storeHppTemp'])
                 ->name('items.hpp_temp.store');
+            // metadata master item (akun2, kategori, dll)
+            Route::get('items/meta', [\App\Http\Controllers\Master\ItemController::class, 'meta'])
+                ->name('items.meta');
 
             // =========================
             // MASTER CUSTOMERS

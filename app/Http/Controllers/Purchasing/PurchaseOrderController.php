@@ -13,6 +13,7 @@ use App\Services\Purchasing\PurchaseOrderService;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Auth;
 use Illuminate\Support\Facades\DB;
+use Illuminate\Support\Facades\Schema;
 use Illuminate\Validation\ValidationException;
 
 class PurchaseOrderController extends Controller
@@ -37,11 +38,11 @@ class PurchaseOrderController extends Controller
             ->orderByDesc('id');
 
         if ($request->filled('supplier_id')) {
-            $q->where('supplier_id', $request->supplier_id);
+            $q->where('supplier_id', (int) $request->supplier_id);
         }
 
         if ($request->filled('status')) {
-            $q->where('status', $request->status);
+            $q->where('status', (string) $request->status);
         }
 
         if ($request->filled('order_type')) {
@@ -96,11 +97,9 @@ class PurchaseOrderController extends Controller
         $order->discount = 0;
         $order->shipping_cost = 0;
 
-        // order type untuk filtering items + disimpan ke model (kalau kolom ada)
         $orderType = $this->normalizeOrderType($request->input('order_type', 'material'));
         $order->order_type = $orderType;
 
-        // payment methods (aktif)
         $paymentMethods = PaymentMethod::query()
             ->where('is_active', 1)
             ->orderByRaw("CASE WHEN code='CASH' THEN 0 ELSE 1 END")
@@ -108,12 +107,10 @@ class PurchaseOrderController extends Controller
             ->orderBy('name')
             ->get();
 
-        // default payment method
         $order->payment_method_id = $paymentMethods->first()?->id;
 
         $suppliers = Supplier::query()->orderBy('name')->get();
 
-        // items sesuai jenis (ambil field yang dipakai untuk performa)
         $items = Item::query()
             ->select(['id', 'code', 'name', 'category_id', 'type', 'active'])
             ->where('active', 1)
@@ -123,7 +120,6 @@ class PurchaseOrderController extends Controller
             ->limit(200)
             ->get();
 
-        // akun kas/bank untuk CASH/TRANSFER
         $cashAccounts = Account::query()
             ->where('type', 'asset')
             ->where('is_active', 1)
@@ -151,7 +147,7 @@ class PurchaseOrderController extends Controller
     {
         $data = $this->validateData($request);
 
-        $data['created_by'] = $request->user()->id;
+        $data['created_by'] = (int) $request->user()->id;
         $data['status'] = 'draft';
 
         $order = $this->service->create($data);
@@ -188,12 +184,12 @@ class PurchaseOrderController extends Controller
         $paymentMethods = PaymentMethod::query()
             ->where('is_active', 1)
             ->orderByRaw("
-            CASE
-                WHEN mode = 'cash' THEN 0
-                WHEN code = 'CASH' THEN 0
-                ELSE 1
-            END
-        ")
+                CASE
+                    WHEN mode = 'cash' THEN 0
+                    WHEN code = 'CASH' THEN 0
+                    ELSE 1
+                END
+            ")
             ->orderBy('sort_order')
             ->orderBy('name')
             ->get();
@@ -203,15 +199,15 @@ class PurchaseOrderController extends Controller
             ->where('is_cash', 1)
             ->whereIn('code', ['1101', '1111', '1112', '1113', '1114'])
             ->orderByRaw("
-            CASE code
-                WHEN '1101' THEN 0
-                WHEN '1111' THEN 1
-                WHEN '1112' THEN 2
-                WHEN '1113' THEN 3
-                WHEN '1114' THEN 4
-                ELSE 99
-            END
-        ")
+                CASE code
+                    WHEN '1101' THEN 0
+                    WHEN '1111' THEN 1
+                    WHEN '1112' THEN 2
+                    WHEN '1113' THEN 3
+                    WHEN '1114' THEN 4
+                    ELSE 99
+                END
+            ")
             ->get();
 
         // =========================================================
@@ -221,19 +217,16 @@ class PurchaseOrderController extends Controller
             ->where('status', 'posted')
             ->sum('grand_total');
 
-        // Pelunasan hutang via cash/bank
         $paidPaymentTotal = (float) $purchase_order->payments
             ->whereNull('voided_at')
             ->where('type', 'payment')
             ->sum('amount');
 
-        // DP (uang muka)
         $dpTotal = (float) $purchase_order->payments
             ->whereNull('voided_at')
             ->where('type', 'dp')
             ->sum('amount');
 
-        // DP yang sudah dipakai untuk offset hutang
         $dpAppliedTotal = (float) $purchase_order->payments
             ->whereNull('voided_at')
             ->where('type', 'dp_apply')
@@ -241,7 +234,6 @@ class PurchaseOrderController extends Controller
 
         $dpAvailable = max(0, round($dpTotal - $dpAppliedTotal, 2));
 
-        // Outstanding hutang = GRN posted - (pelunasan + dp_apply)
         $settled = $paidPaymentTotal + $dpAppliedTotal;
         $apOutstanding = max(0, round($grnPostedTotal - $settled, 2));
 
@@ -283,7 +275,6 @@ class PurchaseOrderController extends Controller
             (string) ($purchase_order->getAttribute('order_type') ?: $request->input('order_type', 'material'))
         );
 
-        // items sesuai orderType + pastikan item yang sudah dipilih tetap muncul
         $itemsBase = Item::query()
             ->where('active', 1)
             ->where('type', $orderType)
@@ -367,87 +358,8 @@ class PurchaseOrderController extends Controller
     }
 
     // ======================================================================
-    // VALIDASI + NORMALISASI
+    // APPROVE / CANCEL
     // ======================================================================
-
-    protected function validateData(Request $request): array
-    {
-        $rules = [
-            'date' => ['required', 'date'],
-            'supplier_id' => ['required', 'integer', 'exists:suppliers,id'],
-            'order_type' => ['required', 'in:material,finished_good'],
-
-            // ✅ sekarang optional (karena UI dihilangkan)
-            'payment_method_id' => ['nullable', 'integer', 'exists:payment_methods,id'],
-
-            'tax_percent' => ['nullable', 'string'],
-            'discount' => ['nullable', 'string'],
-            'shipping_cost' => ['nullable', 'string'],
-
-            'lines' => ['array'],
-            'lines.*.item_id' => ['nullable', 'integer', 'exists:items,id'],
-            'lines.*.qty' => ['nullable', 'string'],
-            'lines.*.unit_price' => ['nullable', 'string'],
-            'lines.*.discount' => ['nullable', 'string'],
-
-            'pay_now' => ['nullable', 'string'],
-            'cash_account_id' => ['nullable', 'integer', 'exists:accounts,id'],
-        ];
-
-        $data = $request->validate($rules);
-
-        $normalize = function ($v) {
-            if ($v === null || $v === '') {
-                return 0;
-            }
-
-            $v = trim((string) $v);
-            $v = str_replace(' ', '', $v);
-
-            if (strpos($v, ',') !== false) {
-                $v = str_replace('.', '', $v);
-                $v = str_replace(',', '.', $v);
-            } elseif (preg_match('/^\d{1,3}(\.\d{3})+$/', $v)) {
-                $v = str_replace('.', '', $v);
-            }
-
-            return (float) $v;
-        };
-
-        $data['order_type'] = $this->normalizeOrderType($data['order_type'] ?? 'material');
-
-        $data['discount'] = $normalize($data['discount'] ?? 0);
-        $data['tax_percent'] = $normalize($data['tax_percent'] ?? 0);
-        $data['shipping_cost'] = $normalize($data['shipping_cost'] ?? 0);
-        $data['pay_now'] = $normalize($data['pay_now'] ?? 0);
-
-        $data['lines'] = $data['lines'] ?? [];
-        foreach ($data['lines'] as &$line) {
-            $line['qty'] = $normalize($line['qty'] ?? 0);
-            $line['unit_price'] = $normalize($line['unit_price'] ?? 0);
-            $line['discount'] = $normalize($line['discount'] ?? 0);
-        }
-        unset($line);
-
-        // ✅ Auto default payment_method_id kalau kosong
-        if (empty($data['payment_method_id'])) {
-            $transferId = \App\Models\PaymentMethod::query()
-                ->where('is_active', 1)
-                ->where('mode', 'transfer')
-                ->orderBy('sort_order')
-                ->orderBy('name')
-                ->value('id');
-
-            $data['payment_method_id'] = $transferId
-            ?: \App\Models\PaymentMethod::query()
-                ->where('is_active', 1)
-                ->orderBy('sort_order')
-                ->orderBy('name')
-                ->value('id');
-        }
-
-        return $data;
-    }
 
     public function approve(PurchaseOrder $purchase_order)
     {
@@ -457,7 +369,7 @@ class PurchaseOrderController extends Controller
                 ->with('error', 'PO yang bukan draft tidak bisa di-approve.');
         }
 
-        $this->service->approve($purchase_order, auth()->id());
+        $this->service->approve($purchase_order, (int) auth()->id());
 
         return redirect()
             ->route('purchasing.purchase_orders.show', $purchase_order->id)
@@ -478,7 +390,7 @@ class PurchaseOrderController extends Controller
                 ->with('error', 'PO yang sudah punya GRN tidak boleh dibatalkan.');
         }
 
-        $this->service->cancel($purchase_order, Auth::id());
+        $this->service->cancel($purchase_order, (int) Auth::id());
 
         return redirect()
             ->route('purchasing.purchase_orders.show', $purchase_order->id)
@@ -498,20 +410,20 @@ class PurchaseOrderController extends Controller
             return response()->json(['last_price' => null]);
         }
 
-        // 1) Ambil dari supplier_items (sumber utama)
-        $last = DB::table('supplier_items')
-            ->where('supplier_id', $supplierId)
-            ->where('item_id', $itemId)
-            ->value('last_price');
+        // 1) sumber utama: supplier_items (kalau tabel ada)
+        if (Schema::hasTable('supplier_items')) {
+            $last = DB::table('supplier_items')
+                ->where('supplier_id', $supplierId)
+                ->where('item_id', $itemId)
+                ->value('last_price');
 
-        if ($last !== null) {
-            $n = (float) $last;
-            return response()->json([
-                'last_price' => $n > 0 ? $n : 0.0,
-            ]);
+            if ($last !== null) {
+                $n = (float) $last;
+                return response()->json(['last_price' => $n > 0 ? $n : 0.0]);
+            }
         }
 
-        // 2) Fallback: item.last_purchase_price (kalau belum ada mapping supplier_items)
+        // 2) fallback: item.last_purchase_price
         $fallback = Item::query()
             ->whereKey($itemId)
             ->value('last_purchase_price');
@@ -521,19 +433,84 @@ class PurchaseOrderController extends Controller
         }
 
         $n = (float) $fallback;
-
-        return response()->json([
-            'last_price' => $n > 0 ? $n : 0.0,
-        ]);
+        return response()->json(['last_price' => $n > 0 ? $n : 0.0]);
     }
+
     // ======================================================================
-    // HELPERS: payment dari form
+    // VALIDASI + NORMALISASI
+    // ======================================================================
+
+    protected function validateData(Request $request): array
+    {
+        $rules = [
+            'date' => ['required', 'date'],
+            'supplier_id' => ['required', 'integer', 'exists:suppliers,id'],
+            'order_type' => ['required', 'in:material,finished_good'],
+
+            // optional
+            'payment_method_id' => ['nullable', 'integer', 'exists:payment_methods,id'],
+
+            'tax_percent' => ['nullable', 'string'],
+            'discount' => ['nullable', 'string'],
+            'shipping_cost' => ['nullable', 'string'],
+
+            'lines' => ['array'],
+            'lines.*.item_id' => ['nullable', 'integer', 'exists:items,id'],
+            'lines.*.qty' => ['nullable', 'string'],
+            'lines.*.unit_price' => ['nullable', 'string'],
+            'lines.*.discount' => ['nullable', 'string'],
+
+            'pay_now' => ['nullable', 'string'],
+            'cash_account_id' => ['nullable', 'integer', 'exists:accounts,id'],
+        ];
+
+        $data = $request->validate($rules);
+
+        $data['supplier_id'] = (int) $data['supplier_id'];
+        $data['order_type'] = $this->normalizeOrderType($data['order_type'] ?? 'material');
+
+        $data['discount'] = $this->toNumber($data['discount'] ?? 0);
+        $data['tax_percent'] = $this->toNumber($data['tax_percent'] ?? 0);
+        $data['shipping_cost'] = $this->toNumber($data['shipping_cost'] ?? 0);
+        $data['pay_now'] = $this->toNumber($data['pay_now'] ?? 0);
+
+        $data['lines'] = $data['lines'] ?? [];
+        foreach ($data['lines'] as &$line) {
+            $line['qty'] = $this->toNumber($line['qty'] ?? 0);
+            $line['unit_price'] = $this->toNumber($line['unit_price'] ?? 0);
+            $line['discount'] = $this->toNumber($line['discount'] ?? 0);
+        }
+        unset($line);
+
+        // Auto default payment_method_id kalau kosong
+        if (empty($data['payment_method_id'])) {
+            $transferId = PaymentMethod::query()
+                ->where('is_active', 1)
+                ->where('mode', 'transfer')
+                ->orderBy('sort_order')
+                ->orderBy('name')
+                ->value('id');
+
+            $data['payment_method_id'] = $transferId ?: PaymentMethod::query()
+                ->where('is_active', 1)
+                ->orderBy('sort_order')
+                ->orderBy('name')
+                ->value('id');
+        }
+
+        $data['payment_method_id'] = !empty($data['payment_method_id']) ? (int) $data['payment_method_id'] : null;
+
+        return $data;
+    }
+
+    // ======================================================================
+    // PAYMENT dari form (pay_now)
     // ======================================================================
 
     protected function maybeCreatePayNowPayment(Request $request, PurchaseOrder $order, bool $allowIfHasExistingPayments = true): void
     {
         $payNow = $this->toNumber($request->input('pay_now'));
-        if ($payNow <= 0) {
+        if ($payNow <= 0.0001) {
             return;
         }
 
@@ -573,7 +550,8 @@ class PurchaseOrderController extends Controller
         $grand = (float) $order->grand_total;
         $payNow = min($payNow, max(0, $grand));
 
-        $type = (abs($payNow - $grand) < 0.01) ? 'payment' : 'dp';
+        $eps = 0.01;
+        $type = (abs($payNow - $grand) < $eps) ? 'payment' : 'dp';
 
         DB::transaction(function () use ($request, $order, $cashAccountId, $payNow, $type) {
             PurchasePayment::create([
@@ -582,10 +560,10 @@ class PurchaseOrderController extends Controller
                 'payment_method_id' => $order->payment_method_id,
                 'cash_account_id' => $cashAccountId ? (int) $cashAccountId : null,
                 'type' => $type,
-                'amount' => $payNow,
+                'amount' => round($payNow, 2),
                 'ref_no' => null,
                 'notes' => $type === 'dp' ? 'DP saat buat/ubah PO' : 'Lunas saat buat/ubah PO',
-                'created_by' => $request->user()->id,
+                'created_by' => (int) $request->user()->id,
             ]);
 
             $this->recalcPaymentStatus($order);
@@ -599,7 +577,6 @@ class PurchaseOrderController extends Controller
         : 0.0;
 
         $grand = (float) $order->grand_total;
-
         $eps = 0.01;
 
         $status = 'unpaid';
@@ -609,7 +586,6 @@ class PurchaseOrderController extends Controller
             $status = 'paid';
         }
 
-        // kalau kolom belum ada, minimal save tidak error? (asumsi kolom ada)
         $order->paid_amount = round($paid, 2);
         $order->payment_status = $status;
         $order->save();
@@ -659,12 +635,14 @@ class PurchaseOrderController extends Controller
         $value = trim((string) $value);
         $value = str_replace(' ', '', $value);
 
+        // format indo: 1.234,56
         if (strpos($value, ',') !== false) {
             $value = str_replace('.', '', $value);
             $value = str_replace(',', '.', $value);
             return (float) $value;
         }
 
+        // ribuan: 1.234.567
         if (preg_match('/^\d{1,3}(\.\d{3})+$/', $value)) {
             $value = str_replace('.', '', $value);
             return (float) $value;

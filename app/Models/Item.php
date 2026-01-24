@@ -28,6 +28,8 @@ class Item extends Model
         'consumption_cutting_basis_qty',
         'base_unit_cost',
         'affects_hpp',
+        'default_allocation',
+        'default_expense_account_id',
     ];
 
     protected $casts = [
@@ -37,6 +39,7 @@ class Item extends Model
         'consumption_cutting' => 'decimal:2',
         'consumption_cutting_basis_qty' => 'decimal:2',
         'base_unit_cost' => 'decimal:2',
+        'affects_hpp' => 'boolean',
     ];
 
     /* ==========================

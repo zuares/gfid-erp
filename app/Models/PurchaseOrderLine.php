@@ -18,6 +18,8 @@ class PurchaseOrderLine extends Model
         'discount',
         'line_total',
         'notes',
+        'allocation',
+        'expense_account_id',
     ];
 
     protected $casts = [

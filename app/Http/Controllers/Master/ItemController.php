@@ -270,4 +270,22 @@ class ItemController extends Controller
             ]);
         }
     }
+
+    public function meta(Request $request)
+    {
+        $id = (int) $request->get('item_id');
+        $item = \App\Models\Item::select('id', 'default_allocation', 'default_expense_account_id')
+            ->where('id', $id)
+            ->first();
+
+        if (!$item) {
+            return response()->json(['ok' => false], 404);
+        }
+
+        return response()->json([
+            'ok' => true,
+            'default_allocation' => $item->default_allocation ?: 'hpp',
+            'default_expense_account_id' => $item->default_expense_account_id,
+        ]);
+    }
 }

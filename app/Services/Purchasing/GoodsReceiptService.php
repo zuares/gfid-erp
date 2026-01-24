@@ -12,6 +12,7 @@ use App\Models\SupplierPrice;
 use App\Services\Accounting\JournalService;
 use App\Services\Inventory\InventoryService;
 use Illuminate\Support\Facades\DB;
+use Illuminate\Support\Facades\Schema;
 use Illuminate\Validation\ValidationException;
 
 class GoodsReceiptService
@@ -19,8 +20,7 @@ class GoodsReceiptService
     public function __construct(
         protected InventoryService $inventory,
         protected JournalService $journal,
-    ) {
-    }
+    ) {}
 
     /**
      * Buat GRN baru (status: draft).
@@ -46,8 +46,11 @@ class GoodsReceiptService
             /** @var PurchaseReceipt $grn */
             $grn = PurchaseReceipt::create($payload);
 
-            $subtotal = $this->syncLines($grn, $linesData);
-            $this->recalcTotals($grn, $subtotal);
+            // sync lines FULL (hpp + expense)
+            $subtotalAll = $this->syncLines($grn, $linesData);
+
+            // subtotal header = total semua line (jujur)
+            $this->recalcTotals($grn, $subtotalAll);
 
             return $grn->fresh(['lines.item', 'supplier', 'warehouse']);
         });
@@ -88,19 +91,17 @@ class GoodsReceiptService
 
             $grn->save();
 
-            $subtotal = $this->syncLines($grn, $linesData);
-            $this->recalcTotals($grn, $subtotal);
+            $subtotalAll = $this->syncLines($grn, $linesData);
+
+            // subtotal header = total semua line (jujur)
+            $this->recalcTotals($grn, $subtotalAll);
 
             return $grn->fresh(['lines.item', 'supplier', 'warehouse']);
         });
     }
 
     /**
-     * POST GRN → stock in + jurnal GRN + (opsional) apply DP (1151)
-     *
-     * Catatan:
-     * - Tidak pakai journal_id / posted_at (biar aman ke schema sekarang).
-     * - DP apply dibuat "guarded" (tidak hard-depend ke method/relasi tertentu).
+     * POST GRN → stock-in (HPP only) + jurnal (split HPP/Expense) + (opsional) apply DP (1151).
      */
     public function post(PurchaseReceipt $grn): PurchaseReceipt
     {
@@ -112,23 +113,35 @@ class GoodsReceiptService
                 throw new \RuntimeException("Goods Receipt belum punya gudang tujuan.");
             }
 
-            // Load minimal yang aman (order optional, jangan bikin error kalau relasi belum ada)
             $grn->loadMissing(['lines.item', 'supplier']);
 
             if ($grn->lines->count() === 0) {
                 throw ValidationException::withMessages(['grn' => 'GRN tidak punya line.']);
             }
 
-            $totalForJournal = (float) $grn->grand_total;
-            if ($totalForJournal <= 0) {
+            $grandTotal = (float) $grn->grand_total;
+            if ($grandTotal <= 0) {
                 throw ValidationException::withMessages(['grn' => 'Total GRN harus > 0.']);
             }
 
+            // Map allocation + expense account
+            $maps = $this->buildLineMetaMapsForGrn($grn);
+
             // ==========================
-            // 1) STOCK IN (LOT + moving average)
+            // 1) STOCK IN (LOT + moving average) — hanya HPP
             // ==========================
             foreach ($grn->lines as $line) {
                 if ((float) $line->qty_received <= 0) {
+                    continue;
+                }
+
+                $isHpp = $this->isLineEligibleForStock(
+                    $line->purchase_order_line_id,
+                    (int) $line->item_id,
+                    $maps['eligibility']
+                );
+
+                if (!$isHpp) {
                     continue;
                 }
 
@@ -163,7 +176,7 @@ class GoodsReceiptService
                     unitCost: (float) $line->unit_price,
                 );
 
-                // update last price
+                // update last price hanya untuk HPP (opsional tapi masuk akal)
                 $this->touchLastPrices($grn, (int) $line->item_id, (float) $line->unit_price);
             }
 
@@ -180,34 +193,148 @@ class GoodsReceiptService
             $apCode = (string) (config('accounting.ap_account_code') ?: '2101');
             $advanceCode = '1151';
 
-            $inventoryAccountId = Account::where('code', $inventoryCode)->value('id');
-            $apAccountId = Account::where('code', $apCode)->value('id');
-            $advanceAccountId = Account::where('code', $advanceCode)->value('id');
+            $inventoryAccountId = (int) (Account::where('code', $inventoryCode)->value('id') ?? 0);
+            $apAccountId = (int) (Account::where('code', $apCode)->value('id') ?? 0);
+            $advanceAccountId = (int) (Account::where('code', $advanceCode)->value('id') ?? 0);
 
-            if (!$inventoryAccountId || !$apAccountId || !$advanceAccountId) {
+            if ($inventoryAccountId <= 0 || $apAccountId <= 0 || $advanceAccountId <= 0) {
                 throw ValidationException::withMessages([
                     'grn' => "Akun tidak lengkap. Pastikan ada COA: Inventory {$inventoryCode}, AP {$apCode}, Uang Muka {$advanceCode}.",
                 ]);
             }
 
+            // akun tambahan
+            $shippingExpenseCode = '6102'; // Biaya Transport/Ongkir
+            $taxInputCode = '1401'; // PPN Masukan (optional)
+            $purchaseExpenseFallbackCode = '6110'; // fallback biaya pembelian / pembelian expense
+
+            $shippingExpenseId = (int) (Account::where('code', $shippingExpenseCode)->value('id') ?? 0);
+            $taxInputId = (int) (Account::where('code', $taxInputCode)->value('id') ?? 0); // boleh 0
+            $purchaseExpenseFallbackId = (int) (Account::where('code', $purchaseExpenseFallbackCode)->value('id') ?? 0); // boleh 0, tapi sebaiknya ada
+
             // ==========================
-            // 4) POST JOURNAL GRN (Inventory vs AP)
+            // 4) Build split amounts (HPP vs Expense) + prorate discount
             // ==========================
+            $discount = (float) $grn->discount;
+            $taxAmount = (float) $grn->tax_amount;
+            $shippingCost = (float) $grn->shipping_cost;
+
+            $totals = $this->calculateSplitTotals($grn, $maps);
+
+            // total before discount (base for prorate)
+            $totalBeforeDiscount = $totals['hpp_total'] + $totals['expense_total'];
+
+            // apply discount prorata
+            $discount = min($discount, max(0, $totalBeforeDiscount));
+            $hppAfterDiscount = $totals['hpp_total'];
+            $expenseAfterDiscountByAcc = $totals['expense_by_account'];
+
+            if ($discount > 0.0001 && $totalBeforeDiscount > 0.0001) {
+                $hppShare = $totals['hpp_total'] / $totalBeforeDiscount;
+                $hppDisc = round($discount * $hppShare, 2);
+                $hppAfterDiscount = max(0, round($totals['hpp_total'] - $hppDisc, 2));
+
+                $remainingDisc = round($discount - $hppDisc, 2);
+
+                // prorata ke tiap akun expense
+                $expenseAfterDiscountByAcc = [];
+                $expTotal = (float) $totals['expense_total'];
+
+                if ($expTotal > 0.0001 && $remainingDisc > 0.0001) {
+                    $running = 0.0;
+                    $accIds = array_keys($totals['expense_by_account']);
+                    $lastAccId = end($accIds);
+
+                    foreach ($totals['expense_by_account'] as $accId => $amt) {
+                        $amt = (float) $amt;
+                        $share = $amt / $expTotal;
+                        $accDisc = round($remainingDisc * $share, 2);
+
+                        // terakhir: adjust biar total diskon pas
+                        if ((int) $accId === (int) $lastAccId) {
+                            $accDisc = round($remainingDisc - $running, 2);
+                        } else {
+                            $running = round($running + $accDisc, 2);
+                        }
+
+                        $expenseAfterDiscountByAcc[$accId] = max(0, round($amt - $accDisc, 2));
+                    }
+                } else {
+                    // tidak ada expense atau diskon sisa
+                    $expenseAfterDiscountByAcc = $totals['expense_by_account'];
+                }
+            }
+
+            // ==========================
+            // 5) POST JOURNAL GRN (Split)
+            // - Debit Inventory: HPP after discount
+            // - Debit Expense: per account (after discount)
+            // - Debit Tax Input: tax_amount (if exists else fallback inventory)
+            // - Debit Shipping: 6102
+            // - Credit AP: grand_total
+            // ==========================
+            $journalLines = [];
+
+            // Debit Inventory (hpp)
+            if ($hppAfterDiscount > 0.0001) {
+                $journalLines[] = ['account_id' => $inventoryAccountId, 'debit' => $hppAfterDiscount, 'credit' => 0];
+            }
+
+            // Debit Expense per account
+            foreach ($expenseAfterDiscountByAcc as $accId => $amt) {
+                $accId = (int) $accId;
+                $amt = (float) $amt;
+                if ($amt <= 0.0001) {
+                    continue;
+                }
+
+                // fallback jika akun tidak ada
+                if ($accId <= 0) {
+                    if ($purchaseExpenseFallbackId <= 0) {
+                        throw ValidationException::withMessages([
+                            'grn' => "Expense line ada tapi tidak ada akun biaya. Set expense_account_id di PO line, atau buat COA {$purchaseExpenseFallbackCode} sebagai fallback.",
+                        ]);
+                    }
+                    $accId = $purchaseExpenseFallbackId;
+                }
+
+                $journalLines[] = ['account_id' => $accId, 'debit' => $amt, 'credit' => 0];
+            }
+
+            // Debit PPN Masukan (opsional)
+            if ($taxAmount > 0.0001) {
+                $journalLines[] = [
+                    'account_id' => ($taxInputId > 0 ? $taxInputId : $inventoryAccountId),
+                    'debit' => $taxAmount,
+                    'credit' => 0,
+                ];
+            }
+
+            // Debit Ongkir (6102)
+            if ($shippingCost > 0.0001) {
+                if ($shippingExpenseId <= 0) {
+                    throw ValidationException::withMessages([
+                        'grn' => "Akun ongkir belum ada. Pastikan COA {$shippingExpenseCode} (Biaya Transport/Ongkir).",
+                    ]);
+                }
+                $journalLines[] = ['account_id' => $shippingExpenseId, 'debit' => $shippingCost, 'credit' => 0];
+            }
+
+            // Credit AP = grand_total
+            $journalLines[] = ['account_id' => $apAccountId, 'debit' => 0, 'credit' => $grandTotal];
+
             $this->journal->post(
                 date: $grn->date->format('Y-m-d'),
                 sourceType: 'grn',
                 sourceId: (int) $grn->id,
                 description: "GRN {$grn->code} - {$grn->supplier?->name}",
-                lines: [
-                    ['account_id' => (int) $inventoryAccountId, 'debit' => $totalForJournal, 'credit' => 0],
-                    ['account_id' => (int) $apAccountId, 'debit' => 0, 'credit' => $totalForJournal],
-                ]
+                lines: $journalLines
             );
 
             // ==========================
-            // 5) APPLY DP (optional, guarded)
+            // 6) APPLY DP (optional, guarded)
             // ==========================
-            $dpApplied = $this->calculateDpAppliedAmountSafely($grn, $totalForJournal);
+            $dpApplied = $this->calculateDpAppliedAmountSafely($grn, $grandTotal);
 
             if ($dpApplied > 0.0001) {
                 $this->journal->post(
@@ -216,8 +343,8 @@ class GoodsReceiptService
                     sourceId: (int) $grn->id,
                     description: "Apply DP ke GRN {$grn->code}",
                     lines: [
-                        ['account_id' => (int) $apAccountId, 'debit' => $dpApplied, 'credit' => 0],
-                        ['account_id' => (int) $advanceAccountId, 'debit' => 0, 'credit' => $dpApplied],
+                        ['account_id' => $apAccountId, 'debit' => $dpApplied, 'credit' => 0],
+                        ['account_id' => $advanceAccountId, 'debit' => 0, 'credit' => $dpApplied],
                     ]
                 );
             }
@@ -227,7 +354,7 @@ class GoodsReceiptService
     }
 
     /**
-     * UNPOST GRN → reverse stock + void jurnal GRN + void jurnal apply DP
+     * UNPOST GRN → reverse stock (hpp only) + void journals.
      */
     public function unpost(PurchaseReceipt $grn): PurchaseReceipt
     {
@@ -241,11 +368,21 @@ class GoodsReceiptService
 
             $grn->loadMissing(['lines', 'supplier']);
 
-            // ==========================
-            // 1) reverse stock
-            // ==========================
+            $maps = $this->buildLineMetaMapsForGrn($grn);
+
+            // reverse stock (hpp only)
             foreach ($grn->lines as $line) {
                 if ((float) $line->qty_received <= 0) {
+                    continue;
+                }
+
+                $isHpp = $this->isLineEligibleForStock(
+                    $line->purchase_order_line_id,
+                    (int) $line->item_id,
+                    $maps['eligibility']
+                );
+
+                if (!$isHpp) {
                     continue;
                 }
 
@@ -262,15 +399,11 @@ class GoodsReceiptService
                 );
             }
 
-            // ==========================
-            // 2) void journals by source
-            // ==========================
+            // void journals
             $this->journal->voidBySource('grn', (int) $grn->id);
             $this->journal->voidBySource('grn_apply_dp', (int) $grn->id);
 
-            // ==========================
-            // 3) set back to draft
-            // ==========================
+            // back to draft
             $grn->status = 'draft';
             $grn->save();
 
@@ -291,6 +424,10 @@ class GoodsReceiptService
     // INTERNAL HELPERS
     // =====================================================================
 
+    /**
+     * syncLines FULL: simpan semua line (hpp + expense).
+     * subtotal yang dikembalikan = total semua line_total (jujur).
+     */
     protected function syncLines(PurchaseReceipt $grn, array $linesData): float
     {
         $grn->lines()->delete();
@@ -299,6 +436,7 @@ class GoodsReceiptService
 
         foreach ($linesData as $row) {
             $itemId = $row['item_id'] ?? null;
+            $itemId = ($itemId === null || $itemId === '') ? 0 : (int) $itemId;
 
             $qtyReceived = $this->num($row['qty_received'] ?? 0);
             $qtyReject = $this->num($row['qty_reject'] ?? 0);
@@ -307,26 +445,23 @@ class GoodsReceiptService
             $unit = $row['unit'] ?? null;
             $notes = $row['notes'] ?? null;
             $lotId = $row['lot_id'] ?? null;
-            $poLineId = $row['purchase_order_line_id'] ?? null;
 
-            // skip hanya kalau dua-duanya nol
-            if (!$itemId || ($qtyReceived <= 0 && $qtyReject <= 0)) {
+            $poLineId = $row['purchase_order_line_id'] ?? null;
+            $poLineId = ($poLineId === null || $poLineId === '') ? null : (int) $poLineId;
+
+            if ($itemId <= 0 || ($qtyReceived <= 0 && $qtyReject <= 0)) {
                 continue;
             }
 
-            // Nilai persediaan hanya dari yang diterima
             $lineTotal = round(max(0, $qtyReceived) * $unitPrice, 2);
 
             PurchaseReceiptLine::create([
                 'purchase_receipt_id' => $grn->id,
                 'purchase_order_line_id' => $poLineId,
-
-                'item_id' => (int) $itemId,
+                'item_id' => $itemId,
                 'lot_id' => $lotId,
-
                 'qty_received' => $qtyReceived,
                 'qty_reject' => $qtyReject,
-
                 'unit' => $unit,
                 'unit_price' => $unitPrice,
                 'line_total' => $lineTotal,
@@ -364,14 +499,172 @@ class GoodsReceiptService
         ]);
 
         SupplierPrice::updateOrCreate(
-            [
-                'supplier_id' => $grn->supplier_id,
-                'item_id' => $itemId,
-            ],
-            [
-                'last_price' => $unitPrice,
-            ]
+            ['supplier_id' => $grn->supplier_id, 'item_id' => $itemId],
+            ['last_price' => $unitPrice]
         );
+    }
+
+    /**
+     * Build meta maps:
+     * - eligibility: allocation from PO line > item default > fallback hpp
+     * - expense_account_id: from PO line if exists, else 0
+     */
+    protected function buildLineMetaMapsForGrn(PurchaseReceipt $grn): array
+    {
+        $eligibility = $this->buildEligibilityMapsForGrnLines($grn);
+
+        // expense account map (optional)
+        $hasLineExpenseAcc = Schema::hasColumn('purchase_order_lines', 'expense_account_id');
+        $expenseAccByPoLineId = collect();
+
+        if ($hasLineExpenseAcc) {
+            $poLineIds = $grn->lines
+                ->pluck('purchase_order_line_id')
+                ->filter()
+                ->map(fn($v) => (int) $v)
+                ->unique()
+                ->values()
+                ->all();
+
+            if (!empty($poLineIds)) {
+                $expenseAccByPoLineId = DB::table('purchase_order_lines')
+                    ->whereIn('id', $poLineIds)
+                    ->pluck('expense_account_id', 'id'); // [po_line_id => expense_account_id]
+            }
+        }
+
+        return [
+            'eligibility' => $eligibility,
+            'expenseAccByPoLineId' => $expenseAccByPoLineId,
+        ];
+    }
+
+    /**
+     * Hitung totals split:
+     * - hpp_total (sum line_total untuk HPP)
+     * - expense_by_account (sum line_total untuk expense per akun)
+     * - expense_total (sum expense_by_account)
+     */
+    protected function calculateSplitTotals(PurchaseReceipt $grn, array $maps): array
+    {
+        $elig = $maps['eligibility'] ?? ['poAllocByLineId' => collect(), 'itemAllocById' => collect()];
+        $expenseAccByPoLineId = $maps['expenseAccByPoLineId'] ?? collect();
+
+        $hppTotal = 0.0;
+        $expenseByAcc = [];
+
+        foreach ($grn->lines as $line) {
+            $amt = (float) ($line->line_total ?? 0);
+            if ($amt <= 0.0001) {
+                continue;
+            }
+
+            $isHpp = $this->isLineEligibleForStock($line->purchase_order_line_id, (int) $line->item_id, $elig);
+
+            if ($isHpp) {
+                $hppTotal = round($hppTotal + $amt, 2);
+                continue;
+            }
+
+            // expense
+            $accId = 0;
+            $poLineId = $line->purchase_order_line_id ? (int) $line->purchase_order_line_id : 0;
+
+            if ($poLineId > 0) {
+                $accId = (int) ($expenseAccByPoLineId[$poLineId] ?? 0);
+            }
+
+            $expenseByAcc[$accId] = round((float) ($expenseByAcc[$accId] ?? 0) + $amt, 2);
+        }
+
+        $expenseTotal = 0.0;
+        foreach ($expenseByAcc as $accId => $amt) {
+            $expenseTotal = round($expenseTotal + (float) $amt, 2);
+        }
+
+        return [
+            'hpp_total' => round($hppTotal, 2),
+            'expense_by_account' => $expenseByAcc,
+            'expense_total' => round($expenseTotal, 2),
+        ];
+    }
+
+    /**
+     * Eligibility maps untuk GRN lines (dipakai di post/unpost).
+     * - poAllocByLineId: [purchase_order_line_id => allocation]
+     * - itemAllocById:   [item_id => default_allocation]
+     */
+    protected function buildEligibilityMapsForGrnLines(PurchaseReceipt $grn): array
+    {
+        $hasPoLineAlloc = Schema::hasColumn('purchase_order_lines', 'allocation');
+        $hasItemDefaultAlloc = Schema::hasColumn('items', 'default_allocation');
+
+        $poAllocByLineId = collect();
+        $itemAllocById = collect();
+
+        if ($hasPoLineAlloc) {
+            $poLineIds = $grn->lines
+                ->pluck('purchase_order_line_id')
+                ->filter()
+                ->map(fn($v) => (int) $v)
+                ->unique()
+                ->values()
+                ->all();
+
+            if (!empty($poLineIds)) {
+                $poAllocByLineId = DB::table('purchase_order_lines')
+                    ->whereIn('id', $poLineIds)
+                    ->pluck('allocation', 'id');
+            }
+        }
+
+        if ($hasItemDefaultAlloc) {
+            $itemIds = $grn->lines
+                ->pluck('item_id')
+                ->filter()
+                ->map(fn($v) => (int) $v)
+                ->unique()
+                ->values()
+                ->all();
+
+            if (!empty($itemIds)) {
+                $itemAllocById = Item::query()
+                    ->whereIn('id', $itemIds)
+                    ->pluck('default_allocation', 'id');
+            }
+        }
+
+        return [
+            'poAllocByLineId' => $poAllocByLineId,
+            'itemAllocById' => $itemAllocById,
+        ];
+    }
+
+    protected function isLineEligibleForStock($purchaseOrderLineId, int $itemId, array $maps): bool
+    {
+        $poAllocByLineId = $maps['poAllocByLineId'] ?? collect();
+        $itemAllocById = $maps['itemAllocById'] ?? collect();
+
+        $poLineId = ($purchaseOrderLineId === null || $purchaseOrderLineId === '') ? null : (int) $purchaseOrderLineId;
+
+        return $this->isEligibleFromMaps($poLineId, $itemId, $poAllocByLineId, $itemAllocById);
+    }
+
+    /**
+     * Decide eligibility from preloaded maps.
+     * - if PO line says expense => NOT eligible
+     * - else if item default says expense => NOT eligible
+     * - else eligible (hpp)
+     */
+    protected function isEligibleFromMaps(?int $poLineId, int $itemId, $poAllocByLineId, $itemAllocById): bool
+    {
+        if ($poLineId) {
+            $alloc = (string) ($poAllocByLineId[$poLineId] ?? 'hpp');
+            return $alloc !== 'expense';
+        }
+
+        $alloc = (string) ($itemAllocById[$itemId] ?? 'hpp');
+        return $alloc !== 'expense';
     }
 
     /**
@@ -383,7 +676,6 @@ class GoodsReceiptService
             return 0.0;
         }
 
-        // Coba ambil PO via relasi yang mungkin ada: order / purchaseOrder
         $order = null;
 
         if (method_exists($grn, 'order')) {
@@ -406,10 +698,8 @@ class GoodsReceiptService
             return 0.0;
         }
 
-        // Cari DP via method yang mungkin ada.
         $dpTotal = 0.0;
 
-        // 1) Kalau ada activePayments()
         if (method_exists($order, 'activePayments')) {
             try {
                 $dpTotal = (float) $order->activePayments()
@@ -420,7 +710,6 @@ class GoodsReceiptService
             }
         }
 
-        // 2) fallback: relasi payments()
         if ($dpTotal <= 0.0001 && method_exists($order, 'payments')) {
             try {
                 $dpTotal = (float) $order->payments()

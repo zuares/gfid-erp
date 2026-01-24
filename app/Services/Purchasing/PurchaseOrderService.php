@@ -3,10 +3,12 @@
 namespace App\Services\Purchasing;
 
 use App\Helpers\CodeGenerator;
+use App\Models\Account;
 use App\Models\Item;
 use App\Models\PurchaseOrder;
 use App\Models\SupplierPrice;
 use Illuminate\Support\Facades\DB;
+use Illuminate\Support\Facades\Schema;
 use Illuminate\Validation\ValidationException;
 
 class PurchaseOrderService
@@ -20,15 +22,13 @@ class PurchaseOrderService
             $linesData = $payload['lines'] ?? [];
             unset($payload['lines']);
 
-            // ✅ whitelist header fields (biar aman)
             $payload = $this->onlyHeaderFields($payload);
 
-            // Generate kode jika belum diisi
             if (empty($payload['code'] ?? null)) {
                 $payload['code'] = CodeGenerator::generate('PO');
             }
 
-            // Default angka (dinormalisasi)
+            // normalize numbers
             $payload['subtotal'] = 0;
             $payload['discount'] = $this->toNumber($payload['discount'] ?? 0);
             $payload['tax_percent'] = $this->toNumber($payload['tax_percent'] ?? 0);
@@ -37,24 +37,15 @@ class PurchaseOrderService
             $payload['grand_total'] = 0;
 
             $payload['status'] = $payload['status'] ?? 'draft';
-
-            // ✅ jenis PO (fallback material)
             $payload['order_type'] = $this->normalizeOrderType($payload['order_type'] ?? 'material');
 
             /** @var PurchaseOrder $order */
             $order = PurchaseOrder::create($payload);
 
-            // Sync detail & hitung subtotal
             $subtotal = $this->syncLines($order, is_array($linesData) ? $linesData : []);
-
-            // Hitung total header
             $this->recalculateTotals($order, $subtotal);
 
-            return $order->fresh([
-                'lines.item',
-                'supplier',
-                'paymentMethod',
-            ]);
+            return $order->fresh(['lines.item', 'supplier', 'paymentMethod']);
         });
     }
 
@@ -67,7 +58,6 @@ class PurchaseOrderService
             $linesData = $payload['lines'] ?? [];
             unset($payload['lines']);
 
-            // ✅ whitelist header fields (hindari field liar)
             $payload = $this->onlyHeaderFields($payload);
 
             // code tidak boleh berubah lewat update
@@ -78,11 +68,11 @@ class PurchaseOrderService
             }
 
             if (array_key_exists('supplier_id', $payload)) {
-                $order->supplier_id = $payload['supplier_id'];
+                $order->supplier_id = (int) $payload['supplier_id'];
             }
 
             if (array_key_exists('payment_method_id', $payload)) {
-                $order->payment_method_id = $payload['payment_method_id'];
+                $order->payment_method_id = $payload['payment_method_id'] ? (int) $payload['payment_method_id'] : null;
             }
 
             if (array_key_exists('discount', $payload)) {
@@ -102,30 +92,22 @@ class PurchaseOrderService
             }
 
             if (array_key_exists('status', $payload)) {
-                $order->status = $payload['status'];
+                $order->status = (string) $payload['status'];
             }
 
-            // ✅ update order_type kalau dikirim (fallback existing)
+            // update order_type kalau dikirim (fallback existing)
             if (array_key_exists('order_type', $payload)) {
                 $order->order_type = $this->normalizeOrderType($payload['order_type']);
             } else {
-                // pastikan nilai existing tetap valid
                 $order->order_type = $this->normalizeOrderType($order->getAttribute('order_type') ?: 'material');
             }
 
             $order->save();
 
-            // Sync detail & hitung subtotal
             $subtotal = $this->syncLines($order, is_array($linesData) ? $linesData : []);
-
-            // Hitung ulang total header
             $this->recalculateTotals($order, $subtotal);
 
-            return $order->fresh([
-                'lines.item',
-                'supplier',
-                'paymentMethod',
-            ]);
+            return $order->fresh(['lines.item', 'supplier', 'paymentMethod']);
         });
     }
 
@@ -138,11 +120,7 @@ class PurchaseOrderService
             $subtotal = (float) $order->lines()->sum('line_total');
             $this->recalculateTotals($order, $subtotal);
 
-            return $order->fresh([
-                'lines.item',
-                'supplier',
-                'paymentMethod',
-            ]);
+            return $order->fresh(['lines.item', 'supplier', 'paymentMethod']);
         });
     }
 
@@ -153,14 +131,46 @@ class PurchaseOrderService
     public function approve(PurchaseOrder $order, int $approvedBy): PurchaseOrder
     {
         return DB::transaction(function () use ($order, $approvedBy) {
+            $order->load(['lines', 'supplier', 'paymentMethod']);
+
             if ($order->status !== 'draft') {
                 return $order->fresh(['supplier', 'lines', 'paymentMethod']);
             }
 
+            // =========================
+            // ✅ VALIDASI: expense line harus punya akun biaya (kalau kolom ada)
+            // =========================
+            $hasLineAllocation = Schema::hasColumn('purchase_order_lines', 'allocation');
+            $hasLineExpenseAcc = Schema::hasColumn('purchase_order_lines', 'expense_account_id');
+
+            if ($hasLineAllocation && $hasLineExpenseAcc) {
+                $bad = $order->lines
+                    ->where('allocation', 'expense')
+                    ->first(function ($ln) {
+                        return empty($ln->expense_account_id);
+                    });
+
+                if ($bad) {
+                    throw ValidationException::withMessages([
+                        'lines' => 'Ada item Expense tapi akun biaya belum ter-set. Set default_expense_account_id pada master item / pilih akun biaya di baris PO.',
+                    ]);
+                }
+            }
+
+            // =========================
+            // ✅ APPROVE ORDER (ONLY)
+            // =========================
             $order->status = 'approved';
             $order->approved_by = $approvedBy;
             $order->approved_at = now();
             $order->save();
+
+            // =========================
+            // ✅ IMPORTANT:
+            // PO tidak mem-posting jurnal.
+            // Jurnal pembelian terjadi saat GRN diposting (barang benar-benar masuk),
+            // dan hutang berkurang saat pembayaran.
+            // =========================
 
             return $order->fresh(['supplier', 'lines', 'paymentMethod']);
         });
@@ -190,9 +200,6 @@ class PurchaseOrderService
     // INTERNAL HELPERS
     // ======================================================================
 
-    /**
-     * Field header yang diizinkan lewat service.
-     */
     protected function onlyHeaderFields(array $payload): array
     {
         $allowed = [
@@ -206,26 +213,54 @@ class PurchaseOrderService
             'notes',
             'created_by',
             'status',
-            'order_type', // ✅ penting buat PO barang jadi
+            'order_type',
         ];
 
         return array_intersect_key($payload, array_flip($allowed));
     }
 
     /**
-     * Simpan ulang detail lines: hapus semua lalu insert ulang.
-     * Return subtotal.
+     * syncLines:
+     * - simpan semua line (hpp + expense)
+     * - allocation & expense_account_id ikut jika kolom ada
+     * - expense account boleh null saat draft (validasi keras ada di approve())
      */
     protected function syncLines(PurchaseOrder $order, array $linesData): float
     {
         $order->lines()->delete();
 
         $subtotal = 0.0;
-
         $orderType = $this->normalizeOrderType($order->getAttribute('order_type') ?: 'material');
+
+        // feature flags
+        $hasLineAllocation = Schema::hasColumn('purchase_order_lines', 'allocation');
+        $hasLineExpenseAcc = Schema::hasColumn('purchase_order_lines', 'expense_account_id');
+        $hasItemDefaultAlloc = Schema::hasColumn('items', 'default_allocation');
+        $hasItemDefaultExpAcc = Schema::hasColumn('items', 'default_expense_account_id');
+
+        // preload items
+        $itemIds = collect($linesData)
+            ->pluck('item_id')
+            ->filter(fn($v) => $v !== null && $v !== '')
+            ->map(fn($v) => (int) $v)
+            ->unique()
+            ->values()
+            ->all();
+
+        $itemsById = Item::query()
+            ->select(array_values(array_filter([
+                'id',
+                'type',
+                $hasItemDefaultAlloc ? 'default_allocation' : null,
+                $hasItemDefaultExpAcc ? 'default_expense_account_id' : null,
+            ])))
+            ->whereIn('id', $itemIds)
+            ->get()
+            ->keyBy('id');
 
         foreach ($linesData as $i => $row) {
             $itemId = $row['item_id'] ?? null;
+            $itemId = ($itemId === null || $itemId === '') ? 0 : (int) $itemId;
 
             $qty = $this->toNumber($row['qty'] ?? 0);
             $unitPrice = $this->toNumber($row['unit_price'] ?? 0);
@@ -233,38 +268,76 @@ class PurchaseOrderService
             $notes = $row['notes'] ?? null;
             $lotId = $row['lot_id'] ?? null;
 
-            if (!$itemId || $qty <= 0) {
+            if ($itemId <= 0 || $qty <= 0.0001) {
                 continue;
             }
 
             /** @var Item|null $item */
-            $item = Item::query()->select('id', 'type')->find($itemId);
+            $item = $itemsById->get($itemId);
             if (!$item) {
                 continue;
             }
 
-            // ✅ Guard: item type harus match orderType
+            // Guard item type must match order type
             if ((string) $item->type !== (string) $orderType) {
                 throw ValidationException::withMessages([
-                    "lines.$i.item_id" => "Item yang dipilih tidak sesuai jenis PO. PO: {$orderType}, Item: {$item->type}.",
+                    "lines.$i.item_id" => "Item tidak sesuai jenis PO. PO: {$orderType}, Item: {$item->type}.",
                 ]);
+            }
+
+            // Allocation (hpp/expense)
+            $allocation = 'hpp';
+            if ($hasLineAllocation) {
+                $allocRaw = (string) (
+                    $row['allocation'] ?? ($hasItemDefaultAlloc ? ($item->default_allocation ?? null) : null) ?? 'hpp'
+                );
+                $allocation = in_array($allocRaw, ['hpp', 'expense'], true) ? $allocRaw : 'hpp';
+            }
+
+            // Expense account if expense
+            $expenseAccountId = null;
+            if ($hasLineExpenseAcc && $allocation === 'expense') {
+                $expAccRaw = $row['expense_account_id'] ?? null;
+
+                if ($expAccRaw !== null && $expAccRaw !== '') {
+                    $expenseAccountId = (int) $expAccRaw;
+                    if ($expenseAccountId <= 0) {
+                        $expenseAccountId = null;
+                    }
+                } elseif ($hasItemDefaultExpAcc && !empty($item->default_expense_account_id)) {
+                    $expenseAccountId = (int) $item->default_expense_account_id;
+                    if ($expenseAccountId <= 0) {
+                        $expenseAccountId = null;
+                    }
+                }
+                // NOTE: tidak divalidasi keras di sini (draft friendly)
             }
 
             $lineTotal = max(0, ($qty * $unitPrice) - $discount);
             $lineTotal = round($lineTotal, 2);
 
-            $order->lines()->create([
+            $payload = [
                 'item_id' => (int) $itemId,
                 'lot_id' => $lotId ? (int) $lotId : null,
-                'qty' => $qty,
-                'unit_price' => $unitPrice,
-                'discount' => $discount,
+                'qty' => round($qty, 4),
+                'unit_price' => round($unitPrice, 4),
+                'discount' => round($discount, 2),
                 'line_total' => $lineTotal,
                 'notes' => $notes,
-            ]);
+            ];
 
-            $subtotal += $lineTotal;
+            if ($hasLineAllocation) {
+                $payload['allocation'] = $allocation;
+            }
+            if ($hasLineExpenseAcc) {
+                $payload['expense_account_id'] = ($allocation === 'expense') ? $expenseAccountId : null;
+            }
 
+            $order->lines()->create($payload);
+
+            $subtotal = round($subtotal + $lineTotal, 2);
+
+            // update last purchase price
             $this->touchLastPrices($order, (int) $itemId, (float) $unitPrice);
         }
 
@@ -291,7 +364,6 @@ class PurchaseOrderService
     {
         $unitPrice = round($unitPrice, 2);
 
-        // Update master item (tanpa load besar)
         Item::whereKey($itemId)->update([
             'last_purchase_price' => $unitPrice,
         ]);
@@ -308,9 +380,6 @@ class PurchaseOrderService
         return in_array($v, ['material', 'finished_good'], true) ? $v : 'material';
     }
 
-    /**
-     * Normalisasi angka (menerima string indo / numeric).
-     */
     protected function toNumber($value): float
     {
         if ($value === null || $value === '') {

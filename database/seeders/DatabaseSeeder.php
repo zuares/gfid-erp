@@ -17,6 +17,7 @@ class DatabaseSeeder extends Seeder
         // User::factory(10)->create();
 
         $this->call([
+            AccountSeeder::class,
             UserEmployeeSeeder::class,
             ItemCategorySeeder::class,
             SupplierSeeder::class,
@@ -29,7 +30,6 @@ class DatabaseSeeder extends Seeder
             ChannelsSeeder::class,
             StoreSeeder::class,
             // InventoryTransferDemoSeeder::class,
-            AccountSeeder::class,
             PaymentMethodSeeder::class,
 
         ]);

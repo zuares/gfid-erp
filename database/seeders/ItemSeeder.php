@@ -8,6 +8,7 @@ use App\Models\ItemCostSnapshot;
 use Illuminate\Database\Seeder;
 use Illuminate\Support\Carbon;
 use Illuminate\Support\Facades\DB;
+use Illuminate\Support\Facades\Schema;
 
 class ItemSeeder extends Seeder
 {
@@ -18,17 +19,59 @@ class ItemSeeder extends Seeder
 
             $finishedGoodCategories = ['CRG', 'LJR', 'SJR', 'LCG', 'SHT', 'TJR'];
 
+            // ✅ COA SIMPLE
+            // 6110 = Biaya Packing
+            $packingExpenseAccountId = $this->lookupAccountIdByCode('6110'); // nullable kalau accounting belum ada
+
+            // schema guards (biar aman lintas branch/env)
+            $hasAffectsHpp = Schema::hasColumn('items', 'affects_hpp');
+            $hasDefaultAllocation = Schema::hasColumn('items', 'default_allocation');
+            $hasDefaultExpenseAcc = Schema::hasColumn('items', 'default_expense_account_id');
+
+            // =========================================================
+            // ✅ BACKFILL GLOBAL (penting untuk data yang sudah terlanjur ada)
+            // - isi default_expense_account_id untuk PACK expense yang masih NULL/0
+            // - set active=1 untuk semua item PACK (THR/PLY) yang active masih 0
+            // =========================================================
+            if ($hasDefaultExpenseAcc && $packingExpenseAccountId) {
+                $packCatId = DB::table('item_categories')->where('code', 'PACK')->value('id');
+
+                if ($packCatId) {
+                    // backfill akun expense untuk PACK expense
+                    DB::table('items')
+                        ->where('item_category_id', (int) $packCatId)
+                        ->where('default_allocation', 'expense')
+                        ->where(function ($q) {
+                            $q->whereNull('default_expense_account_id')
+                                ->orWhere('default_expense_account_id', 0);
+                        })
+                        ->update([
+                            'default_expense_account_id' => (int) $packingExpenseAccountId,
+                            'updated_at' => now(),
+                        ]);
+
+                    // set active=1 untuk semua item PACK yang masih 0
+                    DB::table('items')
+                        ->where('item_category_id', (int) $packCatId)
+                        ->where('active', '!=', 1)
+                        ->update([
+                            'active' => 1,
+                            'updated_at' => now(),
+                        ]);
+                }
+            }
+
             foreach ($data as $catCode => $config) {
                 // Category: update/create (aman)
                 $category = ItemCategory::updateOrCreate(
                     ['code' => $catCode],
                     [
-                        'name' => (string) $config['name'],
+                        'name' => (string) ($config['name'] ?? $catCode),
                         'active' => 1,
                     ]
                 );
 
-                foreach ($config['items'] as $itemDef) {
+                foreach (($config['items'] ?? []) as $itemDef) {
                     $code = is_array($itemDef) ? (string) ($itemDef['code'] ?? '') : (string) $itemDef;
                     if ($code === '') {
                         continue;
@@ -43,13 +86,15 @@ class ItemSeeder extends Seeder
                     $defaultName = $this->generateName($catCode, $code);
                     $defaultUnit = $unitOverride ?: 'pcs';
 
+                    // affects_hpp + allocation
                     $affectsHpp = $this->guessAffectsHpp($catCode, $code, $type);
+                    $allocation = $affectsHpp ? 'hpp' : 'expense';
 
                     /** @var Item|null $item */
                     $item = Item::where('code', $code)->first();
 
                     if (!$item) {
-                        // ✅ CREATE: WAJIB isi kolom NOT NULL (biar SQLite ga error)
+                        // ✅ CREATE (wajib isi NOT NULL)
                         $payload = [
                             'code' => $code,
                             'name' => $defaultName,
@@ -58,21 +103,29 @@ class ItemSeeder extends Seeder
                             'item_category_id' => $category->id,
                             'last_purchase_price' => 0,
                             'hpp' => 0,
-                            'active' => 1,
+                            'active' => 1, // ✅ selalu aktif
                         ];
 
-                        // affects_hpp optional (kalau kolom sudah ada)
-                        if ($this->modelHasAttribute($payload, 'affects_hpp')) {
-                            // (ga kepake, helper ini cuma placeholder)
+                        if ($hasAffectsHpp) {
+                            $payload['affects_hpp'] = $affectsHpp ? 1 : 0;
                         }
 
-                        // Cara aman: coba set jika kolom ada di table (cek via schema runtime terlalu berat)
-                        // Jadi: set saja, kalau kolom belum ada akan error -> pastikan migrate dulu.
-                        $payload['affects_hpp'] = $affectsHpp ? 1 : 0;
+                        if ($hasDefaultAllocation) {
+                            $payload['default_allocation'] = $allocation;
+                        }
+
+                        // ✅ AUTO ASSIGN PACK expense → 6110
+                        if ($hasDefaultExpenseAcc) {
+                            if ($catCode === 'PACK' && $allocation === 'expense') {
+                                $payload['default_expense_account_id'] = $packingExpenseAccountId;
+                            } else {
+                                $payload['default_expense_account_id'] = null;
+                            }
+                        }
 
                         $item = Item::create($payload);
                     } else {
-                        // ✅ UPDATE: patch hanya kalau kosong / null (ramah produksi)
+                        // ✅ UPDATE (production-safe)
                         $dirty = false;
 
                         if (empty($item->name)) {
@@ -100,16 +153,44 @@ class ItemSeeder extends Seeder
                             $dirty = true;
                         }
 
-                        if ($item->active !== 1) {
+                        if ($item->hpp === null) {
+                            $item->hpp = 0;
+                            $dirty = true;
+                        }
+
+                        // ✅ kamu minta: THR/PLY active harus 1 → force semua item yang ada di seedConfig jadi active=1
+                        if ((int) $item->active !== 1) {
                             $item->active = 1;
                             $dirty = true;
                         }
 
-                        // affects_hpp: set hanya kalau null (biar ga nimpa setting manual)
-                        // Catatan: ini butuh kolom affects_hpp sudah ada.
-                        if (property_exists($item, 'affects_hpp') || array_key_exists('affects_hpp', $item->getAttributes())) {
-                            if ($item->affects_hpp === null) {
+                        // affects_hpp set hanya kalau null
+                        if ($hasAffectsHpp) {
+                            $attrs = $item->getAttributes();
+                            if (array_key_exists('affects_hpp', $attrs) && $item->affects_hpp === null) {
                                 $item->affects_hpp = $affectsHpp ? 1 : 0;
+                                $dirty = true;
+                            }
+                        }
+
+                        // default_allocation set hanya kalau null/kosong
+                        if ($hasDefaultAllocation) {
+                            $attrs = $item->getAttributes();
+                            $cur = $attrs['default_allocation'] ?? null;
+                            if ($cur === null || $cur === '') {
+                                $item->default_allocation = $allocation;
+                                $dirty = true;
+                            }
+                        }
+
+                        // ✅ AUTO ASSIGN + BACKFILL: PACK expense → default_expense_account_id = 6110
+                        // set jika masih null/0 dan akun 6110 ada
+                        if ($hasDefaultExpenseAcc && $catCode === 'PACK' && $allocation === 'expense' && $packingExpenseAccountId) {
+                            $attrs = $item->getAttributes();
+                            $cur = $attrs['default_expense_account_id'] ?? null;
+
+                            if ($cur === null || (int) $cur === 0 || (string) $cur === '') {
+                                $item->default_expense_account_id = (int) $packingExpenseAccountId;
                                 $dirty = true;
                             }
                         }
@@ -119,17 +200,16 @@ class ItemSeeder extends Seeder
                         }
                     }
 
-                    // === HPP untuk Finished Good (hanya kalau hpp masih 0/null) ===
+                    // === HPP untuk Finished Good (opsional seperti seeder kamu) ===
                     if ($type === 'finished_good') {
-                        $hpp = $this->guessHppFromCode($code);
+                        $hppGuess = $this->guessHppFromCode($code);
 
-                        if ($hpp !== null && (empty($item->hpp) || (float) $item->hpp == 0.0)) {
-                            $item->hpp = $hpp;
+                        if ($hppGuess !== null && ((float) ($item->hpp ?? 0) == 0.0)) {
+                            $item->hpp = $hppGuess;
                             $item->save();
                         }
 
-                        // Snapshot hanya kalau belum ada snapshot aktif
-                        if ($hpp !== null) {
+                        if ($hppGuess !== null) {
                             $hasActiveSnapshot = ItemCostSnapshot::where('item_id', $item->id)
                                 ->where('is_active', 1)
                                 ->exists();
@@ -148,7 +228,7 @@ class ItemSeeder extends Seeder
                                     'finishing_unit_cost' => 0,
                                     'packaging_unit_cost' => 0,
                                     'overhead_unit_cost' => 0,
-                                    'unit_cost' => (int) $hpp,
+                                    'unit_cost' => (int) $hppGuess,
                                     'notes' => 'Initial HPP seed from ItemSeeder (production-safe)',
                                     'is_active' => 1,
                                 ]);
@@ -158,6 +238,19 @@ class ItemSeeder extends Seeder
                 }
             }
         });
+    }
+
+    /**
+     * Lookup account id by code (return null if not found / table not exists)
+     */
+    private function lookupAccountIdByCode(string $code): ?int
+    {
+        if (!Schema::hasTable('accounts')) {
+            return null;
+        }
+
+        $id = DB::table('accounts')->where('code', $code)->value('id');
+        return $id ? (int) $id : null;
     }
 
     /**
@@ -237,10 +330,9 @@ class ItemSeeder extends Seeder
     {
         $c = strtoupper($code);
 
-        // default: true
-        $affects = true;
-
-        // PACK rule
+        // PACK rule:
+        // - OPP masuk HPP (nempel produk)
+        // - THR & PLY expense (operasional packing)
         if ($catCode === 'PACK') {
             if (str_starts_with($c, 'OPP')) {
                 return true;
@@ -249,10 +341,9 @@ class ItemSeeder extends Seeder
             if (str_starts_with($c, 'THR') || str_starts_with($c, 'PLY')) {
                 return false;
             }
-
         }
 
-        return $affects;
+        return true;
     }
 
     private function generateName(string $catCode, string $code): string
@@ -376,11 +467,5 @@ class ItemSeeder extends Seeder
         }
 
         return $base;
-    }
-
-    // dummy helper supaya tidak warning (tidak dipakai)
-    private function modelHasAttribute(array $payload, string $key): bool
-    {
-        return array_key_exists($key, $payload);
     }
 }

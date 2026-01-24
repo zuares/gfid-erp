@@ -30,11 +30,11 @@ class PurchaseReceiptController extends Controller
             ->orderByDesc('id');
 
         if ($request->filled('supplier_id')) {
-            $q->where('supplier_id', $request->supplier_id);
+            $q->where('supplier_id', (int) $request->supplier_id);
         }
 
         if ($request->filled('warehouse_id')) {
-            $q->where('warehouse_id', $request->warehouse_id);
+            $q->where('warehouse_id', (int) $request->warehouse_id);
         }
 
         // default: posted (kalau param status tidak dikirim sama sekali)
@@ -109,11 +109,11 @@ class PurchaseReceiptController extends Controller
             ->whereHas('purchaseOrder', function ($q) use ($selectedSupplierId, $selectedOrderType) {
                 $q->where('status', 'approved');
 
-                if ($selectedSupplierId) {
-                    $q->where('supplier_id', $selectedSupplierId);
+                if (!empty($selectedSupplierId)) {
+                    $q->where('supplier_id', (int) $selectedSupplierId);
                 }
 
-                if ($selectedOrderType) {
+                if (!empty($selectedOrderType)) {
                     $q->where('order_type', $selectedOrderType);
                 }
             })
@@ -122,17 +122,13 @@ class PurchaseReceiptController extends Controller
             ->get();
 
         $lines->each(function (PurchaseOrderLine $line) {
-            $line->has_draft_grn = ($line->draft_receipt_lines_count ?? 0) > 0;
+            $line->has_draft_grn = ((int) ($line->draft_receipt_lines_count ?? 0)) > 0;
         });
 
         // ✅ Default warehouse (controller side)
+        // finished_good -> WH-RTS ; material -> RM (atau fallback pertama)
         $defaultWhCode = ($selectedOrderType === 'finished_good') ? 'WH-RTS' : 'RM';
-        $defaultWarehouse = $warehouses->firstWhere('code', $defaultWhCode);
-
-        if (!$defaultWarehouse) {
-            $defaultWhCode = 'RM';
-            $defaultWarehouse = $warehouses->firstWhere('code', 'RM');
-        }
+        $defaultWarehouse = $warehouses->firstWhere('code', $defaultWhCode) ?: $warehouses->firstWhere('code', 'RM') ?: $warehouses->first();
 
         $selectedWarehouseId = (int) old('warehouse_id', $defaultWarehouse?->id);
 
@@ -143,7 +139,7 @@ class PurchaseReceiptController extends Controller
             'lines' => $lines,
             'selectedSupplierId' => $selectedSupplierId,
             'selectedOrderType' => $selectedOrderType,
-            'defaultWhCode' => $defaultWhCode,
+            'defaultWhCode' => $defaultWarehouse?->code,
             'defaultWarehouse' => $defaultWarehouse,
             'selectedWarehouseId' => $selectedWarehouseId,
         ]);
@@ -172,19 +168,14 @@ class PurchaseReceiptController extends Controller
 
         $lines = $purchase_order->lines;
         $lines->each(function (PurchaseOrderLine $line) {
-            $line->has_draft_grn = ($line->draft_receipt_lines_count ?? 0) > 0;
+            $line->has_draft_grn = ((int) ($line->draft_receipt_lines_count ?? 0)) > 0;
         });
 
         $selectedSupplierId = $purchase_order->supplier_id;
         $selectedOrderType = $this->normalizeOrderType($purchase_order->order_type) ?: 'material';
 
         $defaultWhCode = ($selectedOrderType === 'finished_good') ? 'WH-RTS' : 'RM';
-        $defaultWarehouse = $warehouses->firstWhere('code', $defaultWhCode);
-
-        if (!$defaultWarehouse) {
-            $defaultWhCode = 'RM';
-            $defaultWarehouse = $warehouses->firstWhere('code', 'RM');
-        }
+        $defaultWarehouse = $warehouses->firstWhere('code', $defaultWhCode) ?: $warehouses->firstWhere('code', 'RM') ?: $warehouses->first();
 
         $selectedWarehouseId = (int) old('warehouse_id', $defaultWarehouse?->id);
 
@@ -195,7 +186,7 @@ class PurchaseReceiptController extends Controller
             'lines' => $lines,
             'selectedSupplierId' => $selectedSupplierId,
             'selectedOrderType' => $selectedOrderType,
-            'defaultWhCode' => $defaultWhCode,
+            'defaultWhCode' => $defaultWarehouse?->code,
             'defaultWarehouse' => $defaultWarehouse,
             'selectedWarehouseId' => $selectedWarehouseId,
         ]);
@@ -206,7 +197,6 @@ class PurchaseReceiptController extends Controller
      */
     public function store(Request $request)
     {
-        $data['purchase_order_id'] = $request->input('purchase_order_id') ?: ($data['purchase_order_id'] ?? null);
         $data = $this->validateHeader($request);
 
         // build lines dari input tabel (create wajib centang selected)
@@ -218,9 +208,11 @@ class PurchaseReceiptController extends Controller
                 ->withErrors(['lines' => 'Tidak ada item yang dipilih, atau Qty Diterima / Reject masih 0.']);
         }
 
-        $data['lines'] = $lines;
+        // optional: kalau create dari single PO, pastikan supplier match PO
+        $this->validateOptionalPurchaseOrderRelation($data);
 
-        $data['created_by'] = $request->user()->id;
+        $data['lines'] = $lines;
+        $data['created_by'] = (int) $request->user()->id;
 
         $receipt = $this->service->create($data);
 
@@ -238,7 +230,6 @@ class PurchaseReceiptController extends Controller
             'supplier',
             'warehouse',
             'lines.item',
-            // order optional; jangan maksa relasi journal di controller (service kamu post by sourceType)
             'order',
         ]);
 
@@ -294,6 +285,8 @@ class PurchaseReceiptController extends Controller
                 ->withErrors(['lines' => 'Tidak ada line dengan Qty Diterima / Reject > 0.']);
         }
 
+        $this->validateOptionalPurchaseOrderRelation($data);
+
         $data['lines'] = $lines;
 
         $receipt = $this->service->update($purchase_receipt, $data);
@@ -348,7 +341,7 @@ class PurchaseReceiptController extends Controller
      */
     protected function validateHeader(Request $request): array
     {
-        return $request->validate([
+        $data = $request->validate([
             'date' => ['required', 'date'],
             'supplier_id' => ['required', 'exists:suppliers,id'],
             'warehouse_id' => ['required', 'exists:warehouses,id'],
@@ -359,6 +352,17 @@ class PurchaseReceiptController extends Controller
             'shipping_cost' => ['nullable', 'string'],
             'notes' => ['nullable', 'string'],
         ]);
+
+        // normalize numerics (Indonesia-friendly)
+        $data['discount'] = $this->num($data['discount'] ?? 0);
+        $data['tax_percent'] = $this->num($data['tax_percent'] ?? 0);
+        $data['shipping_cost'] = $this->num($data['shipping_cost'] ?? 0);
+
+        $data['supplier_id'] = (int) $data['supplier_id'];
+        $data['warehouse_id'] = (int) $data['warehouse_id'];
+        $data['purchase_order_id'] = !empty($data['purchase_order_id']) ? (int) $data['purchase_order_id'] : null;
+
+        return $data;
     }
 
     /**
@@ -373,8 +377,8 @@ class PurchaseReceiptController extends Controller
     {
         $poLineIds = $request->input('po_line_id', []);
         $itemIds = $request->input('item_id', []);
-        $qtyReceiveds = $request->input('qty_received', []);
-        $qtyRejects = $request->input('qty_reject', []);
+        $qtyReceived = $request->input('qty_received', []);
+        $qtyReject = $request->input('qty_reject', []);
         $unitPrices = $request->input('unit_price', []);
         $units = $request->input('unit', []);
         $lineNotes = $request->input('line_notes', []);
@@ -400,11 +404,12 @@ class PurchaseReceiptController extends Controller
         $anySelected = false;
 
         foreach ($itemIds as $i => $itemId) {
-            if (!$itemId) {
+            $itemId = ($itemId === null || $itemId === '') ? 0 : (int) $itemId;
+            if ($itemId <= 0) {
                 continue;
             }
 
-            $isChecked = array_key_exists($i, $selected);
+            $isChecked = is_array($selected) && array_key_exists($i, $selected);
 
             if ($requireSelected) {
                 if (!$isChecked) {
@@ -413,8 +418,8 @@ class PurchaseReceiptController extends Controller
                 $anySelected = true;
             }
 
-            $qtyRec = $this->num($qtyReceiveds[$i] ?? 0);
-            $qtyRej = $this->num($qtyRejects[$i] ?? 0);
+            $qtyRec = $this->num($qtyReceived[$i] ?? 0);
+            $qtyRej = $this->num($qtyReject[$i] ?? 0);
 
             if ($qtyRec <= 0 && $qtyRej <= 0) {
                 continue;
@@ -423,10 +428,11 @@ class PurchaseReceiptController extends Controller
             $unitPrice = $this->num($unitPrices[$i] ?? 0);
 
             $poLineId = $poLineIds[$i] ?? null;
+            $poLineId = ($poLineId === null || $poLineId === '') ? null : (int) $poLineId;
+
             if ($poLineId) {
                 $poQty = (float) ($poQtyMap[$poLineId] ?? 0);
-
-                if ($poQty > 0 && ($qtyRec + $qtyRej) > $poQty) {
+                if ($poQty > 0 && ($qtyRec + $qtyRej) > $poQty + 0.0001) {
                     $errors["qty_received.$i"] = "Qty diterima + reject tidak boleh melebihi Qty PO ($poQty).";
                     $errors["qty_reject.$i"] = "Qty diterima + reject tidak boleh melebihi Qty PO ($poQty).";
                 }
@@ -434,7 +440,7 @@ class PurchaseReceiptController extends Controller
 
             $lines[] = [
                 'purchase_order_line_id' => $poLineId,
-                'item_id' => (int) $itemId,
+                'item_id' => $itemId,
                 'qty_received' => $qtyRec,
                 'qty_reject' => $qtyRej,
                 'unit_price' => $unitPrice,
@@ -455,6 +461,41 @@ class PurchaseReceiptController extends Controller
     }
 
     /**
+     * Validasi tambahan: kalau purchase_order_id diisi, supplier harus match PO.
+     * (biar "jujur": GRN dari PO A gak boleh supplier B)
+     */
+    protected function validateOptionalPurchaseOrderRelation(array $header): void
+    {
+        $poId = $header['purchase_order_id'] ?? null;
+        if (!$poId) {
+            return;
+        }
+
+        /** @var PurchaseOrder|null $po */
+        $po = PurchaseOrder::query()
+            ->select(['id', 'supplier_id', 'status'])
+            ->find($poId);
+
+        if (!$po) {
+            throw ValidationException::withMessages([
+                'purchase_order_id' => 'PO tidak ditemukan.',
+            ]);
+        }
+
+        if (!in_array((string) $po->status, ['approved', 'closed'], true)) {
+            throw ValidationException::withMessages([
+                'purchase_order_id' => 'GRN hanya boleh mengacu ke PO yang statusnya approved/closed.',
+            ]);
+        }
+
+        if ((int) $po->supplier_id !== (int) ($header['supplier_id'] ?? 0)) {
+            throw ValidationException::withMessages([
+                'supplier_id' => 'Supplier GRN harus sama dengan supplier pada PO.',
+            ]);
+        }
+    }
+
+    /**
      * Parse angka format Indonesia / umum.
      */
     protected function num($value): float
@@ -470,12 +511,14 @@ class PurchaseReceiptController extends Controller
         $v = trim((string) $value);
         $v = str_replace(' ', '', $v);
 
+        // kalau ada koma, anggap format indo: 1.234,56
         if (str_contains($v, ',')) {
             $v = str_replace('.', '', $v);
             $v = str_replace(',', '.', $v);
             return (float) $v;
         }
 
+        // format ribuan: 1.234.567
         if (preg_match('/^\d{1,3}(\.\d{3})+$/', $v)) {
             $v = str_replace('.', '', $v);
             return (float) $v;
@@ -494,10 +537,6 @@ class PurchaseReceiptController extends Controller
         }
 
         $v = strtolower(trim((string) $value));
-        if (in_array($v, ['material', 'finished_good'], true)) {
-            return $v;
-        }
-
-        return null;
+        return in_array($v, ['material', 'finished_good'], true) ? $v : null;
     }
 }
