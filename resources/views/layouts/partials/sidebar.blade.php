@@ -10,7 +10,7 @@
     $isOperating = $role === 'operating';
     $isAdmin = $role === 'admin';
 
-    // ✅ NEW capability flags
+    // ✅ capability flags
     $canViewRts = $isOwner || $isAdmin || $isOperating;
     $canManageRts = $isOwner || $isAdmin;
 
@@ -19,7 +19,6 @@
     // =========================================================
     // ROUTE GUARDS (biar tidak error kalau route belum ada)
     // =========================================================
-    // Dashboard
     $hasDashboardRoute = $router->has('dashboard');
 
     // Inventory
@@ -36,11 +35,13 @@
     $hasInvExternalIndex = $router->has('inventory.external_transfers.index');
     $hasInvExternalCreate = $router->has('inventory.external_transfers.create');
 
-    // WIP adjustments
     $hasInvWipAdjIndex = $router->has('inventory.wip_adjustments.index');
 
-    // Stock Requests RTS
+    // RTS Stock Requests
     $hasRtsStockReqIndex = $router->has('rts.stock-requests.index');
+
+    // ✅ RTS Direct Receives (Dadakan)
+    $hasRtsDirectReceiveIndex = $router->has('rts.direct-receives.index');
 
     // Sales (admin)
     $hasSalesShipmentsIndex = $router->has('sales.shipments.index');
@@ -99,7 +100,7 @@
     $hasProdCostPeriodsIndex = $router->has('costing.production_cost_periods.index');
 
     // =========================================================
-    // OPEN STATES (hanya pakai routeIs, tidak pakai route()!)
+    // OPEN STATES
     // =========================================================
     $poOpen = request()->routeIs('purchasing.purchase_orders.*');
     $grnOpen = request()->routeIs('purchasing.purchase_receipts.*');
@@ -124,8 +125,8 @@
 
     $invOpen = $invStocksOpen || $invOpnameOpen || $invOwnerExtrasOpen;
 
-    // ✅ PRD route dihapus, jadi hanya RTS
-    $stockReqOpen = request()->routeIs('rts.stock-requests.*');
+    // ✅ stock requests open if RTS request OR direct receive
+    $stockReqOpen = request()->routeIs('rts.stock-requests.*') || request()->routeIs('rts.direct-receives.*');
 
     $prodOpen =
         request()->routeIs('production.cutting_jobs.*') ||
@@ -414,14 +415,24 @@
                 @endif
             </li>
 
-            {{-- ✅ RTS Stock Requests (admin + operating bisa lihat) --}}
-            @if ($canViewRts && $hasRtsStockReqIndex)
+            {{-- ✅ RTS menus --}}
+            @if ($canViewRts && ($hasRtsStockReqIndex || $hasRtsDirectReceiveIndex))
                 <x-sidebar.label text="Stock Requests" />
                 <li class="simple-group">
-                    <x-sidebar.simple-link href="{{ route('rts.stock-requests.index') }}" icon="🛒"
-                        :active="request()->routeIs('rts.stock-requests.*')" :dot-only="$canManageRts && $hasRtsNeedReceive" badge-tone="warn" :badge-title="$rtsBadgeTitle">
-                        Permintaan Stock (RTS)
-                    </x-sidebar.simple-link>
+                    @if ($hasRtsStockReqIndex)
+                        <x-sidebar.simple-link href="{{ route('rts.stock-requests.index') }}" icon="🛒"
+                            :active="request()->routeIs('rts.stock-requests.*')" :dot-only="$canManageRts && $hasRtsNeedReceive" badge-tone="warn" :badge-title="$rtsBadgeTitle">
+                            Permintaan Stock (RTS)
+                        </x-sidebar.simple-link>
+                    @endif
+
+                    {{-- ✅ NEW: RTS Dadakan (owner/admin only) --}}
+                    @if ($canManageRts && $hasRtsDirectReceiveIndex)
+                        <x-sidebar.simple-link href="{{ route('rts.direct-receives.index') }}" icon="⚡"
+                            :active="request()->routeIs('rts.direct-receives.*')">
+                            RTS Dadakan
+                        </x-sidebar.simple-link>
+                    @endif
                 </li>
             @endif
 
@@ -815,8 +826,8 @@
                 </div>
             </li>
 
-            {{-- STOCK REQUESTS --}}
-            @if ($hasRtsStockReqIndex)
+            {{-- STOCK REQUESTS (OWNER) --}}
+            @if ($hasRtsStockReqIndex || $hasRtsDirectReceiveIndex)
                 <x-sidebar.label text="Stock Requests" />
                 <li class="mb-1">
                     <button class="sidebar-link sidebar-toggle {{ $stockReqOpen ? 'is-open' : '' }}" type="button"
@@ -829,10 +840,20 @@
                     </button>
 
                     <div class="collapse {{ $stockReqOpen ? 'show' : '' }}" id="navInventoryStockRequests">
-                        <x-sidebar.sub-link href="{{ route('rts.stock-requests.index') }}" icon="🛒"
-                            :active="request()->routeIs('rts.stock-requests.*')" :dot-only="$hasRtsNeedReceive" badge-tone="warn" :badge-title="$rtsBadgeTitle">
-                            Permintaan Stock (RTS)
-                        </x-sidebar.sub-link>
+                        @if ($hasRtsStockReqIndex)
+                            <x-sidebar.sub-link href="{{ route('rts.stock-requests.index') }}" icon="🛒"
+                                :active="request()->routeIs('rts.stock-requests.*')" :dot-only="$hasRtsNeedReceive" badge-tone="warn" :badge-title="$rtsBadgeTitle">
+                                Permintaan Stock (RTS)
+                            </x-sidebar.sub-link>
+                        @endif
+
+                        {{-- ✅ NEW: RTS Dadakan --}}
+                        @if ($hasRtsDirectReceiveIndex)
+                            <x-sidebar.sub-link href="{{ route('rts.direct-receives.index') }}" icon="⚡"
+                                :active="request()->routeIs('rts.direct-receives.*')">
+                                RTS Dadakan
+                            </x-sidebar.sub-link>
+                        @endif
                     </div>
                 </li>
             @endif

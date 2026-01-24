@@ -4,6 +4,7 @@ use App\Http\Controllers\Api\StockApiController;
 use App\Http\Controllers\Inventory\ExternalTransferController;
 use App\Http\Controllers\Inventory\InventoryAdjustmentController;
 use App\Http\Controllers\Inventory\InventoryStockController;
+use App\Http\Controllers\Inventory\RtsDirectReceiveController;
 use App\Http\Controllers\Inventory\RtsStockRequestController;
 use App\Http\Controllers\Inventory\StockCardController;
 use App\Http\Controllers\Inventory\StockOpnameController;
@@ -16,9 +17,11 @@ use Illuminate\Support\Facades\Route;
 | INVENTORY + STOCK REQUEST ROUTES
 |--------------------------------------------------------------------------
 | - Inventory internal: owner, admin, operating
-| - RTS Stock Requests (NO TODAY):
+| - RTS Stock Requests:
 |   - operating: READ ONLY (index/show)
 |   - owner/admin: FULL (create/store/confirm/finalize)
+| - RTS Direct Receives (Dadakan):
+|   - owner/admin: index/create/store/show + operator-wip (ajax)
 | - PRD process removed (no more PRD -> TRANSIT)
 |--------------------------------------------------------------------------
  */
@@ -52,11 +55,9 @@ Route::middleware(['web', 'auth', 'role:owner,admin,operating'])->group(function
             Route::get('/items', [InventoryStockController::class, 'items'])->name('items');
             Route::get('/lots', [InventoryStockController::class, 'lots'])->name('lots');
 
-            Route::get('/{item}/locations', [InventoryStockController::class, 'itemLocations'])
-                ->name('item_locations');
+            Route::get('/{item}/locations', [InventoryStockController::class, 'itemLocations'])->name('item_locations');
 
-            Route::get('/items-legacy', [InventoryStockController::class, 'itemsLegacy'])
-                ->name('items_legacy');
+            Route::get('/items-legacy', [InventoryStockController::class, 'itemsLegacy'])->name('items_legacy');
         });
 
         // ================== STOCK OPNAME ==================
@@ -72,38 +73,25 @@ Route::middleware(['web', 'auth', 'role:owner,admin,operating'])->group(function
             Route::post('/{stockOpname}/finalize', [StockOpnameController::class, 'finalize'])->name('finalize');
 
             Route::post('/{stockOpname}/lines', [StockOpnameController::class, 'addLine'])->name('lines.store');
-            Route::delete('/{stockOpname}/lines/{line}', [StockOpnameController::class, 'deleteLine'])
-                ->name('lines.destroy');
+            Route::delete('/{stockOpname}/lines/{line}', [StockOpnameController::class, 'deleteLine'])->name('lines.destroy');
 
-            Route::post('/{stockOpname}/reset-lines', [StockOpnameController::class, 'resetLines'])
-                ->name('reset_lines');
+            Route::post('/{stockOpname}/reset-lines', [StockOpnameController::class, 'resetLines'])->name('reset_lines');
+            Route::post('/{stockOpname}/reset-all-lines', [StockOpnameController::class, 'resetAllLines'])->name('reset_all_lines');
 
-            Route::post('/{stockOpname}/reset-all-lines', [StockOpnameController::class, 'resetAllLines'])
-                ->name('reset_all_lines');
-
-            Route::post('/{stockOpname}/reopen', [StockOpnameController::class, 'reopen'])
-                ->name('reopen');
+            Route::post('/{stockOpname}/reopen', [StockOpnameController::class, 'reopen'])->name('reopen');
         });
 
         // ================== INVENTORY ADJUSTMENTS ==================
         Route::prefix('adjustments')->name('adjustments.')->group(function () {
-
             Route::get('/', [InventoryAdjustmentController::class, 'index'])->name('index');
 
-            Route::get('/manual/create', [InventoryAdjustmentController::class, 'createManual'])
-                ->name('manual.create');
+            Route::get('/manual/create', [InventoryAdjustmentController::class, 'createManual'])->name('manual.create');
+            Route::post('/manual', [InventoryAdjustmentController::class, 'storeManual'])->name('manual.store');
 
-            Route::post('/manual', [InventoryAdjustmentController::class, 'storeManual'])
-                ->name('manual.store');
+            Route::get('/items', [InventoryAdjustmentController::class, 'itemsForWarehouse'])->name('items_for_warehouse');
 
-            Route::get('/items', [InventoryAdjustmentController::class, 'itemsForWarehouse'])
-                ->name('items_for_warehouse');
-
-            Route::get('/{inventoryAdjustment}', [InventoryAdjustmentController::class, 'show'])
-                ->name('show');
-
-            Route::post('/{inventoryAdjustment}/approve', [InventoryAdjustmentController::class, 'approve'])
-                ->name('approve');
+            Route::get('/{inventoryAdjustment}', [InventoryAdjustmentController::class, 'show'])->name('show');
+            Route::post('/{inventoryAdjustment}/approve', [InventoryAdjustmentController::class, 'approve'])->name('approve');
         });
 
         // ================== WIP ADJUSTMENTS ==================
@@ -122,10 +110,9 @@ Route::middleware(['web', 'auth', 'role:owner,admin,operating'])->group(function
 });
 
 // ======================================================================
-// RTS STOCK REQUESTS (NO TODAY ROUTE, FIX create not found)
-// - WRITE: owner + admin (create/store/confirm/finalize)
-// - READ ONLY: owner + admin + operating (index/show)
-// IMPORTANT: show route constrained so it won't catch "create"
+// RTS STOCK REQUESTS (NO TODAY ROUTE)
+// - WRITE: owner + admin
+// - READ ONLY: owner + admin + operating
 // ======================================================================
 
 // ✅ WRITE ONLY (define dulu agar /create tidak ketabrak)
@@ -158,10 +145,32 @@ Route::middleware(['web', 'auth', 'role:owner,admin,operating'])->group(function
 });
 
 // ======================================================================
+// RTS DIRECT RECEIVES (DADAKAN) - owner + admin
+// - includes AJAX operator-wip for auto_sr
+// ======================================================================
+Route::middleware(['web', 'auth', 'role:owner,admin'])->group(function () {
+    Route::prefix('rts/direct-receives')->name('rts.direct-receives.')->group(function () {
+
+        Route::get('/', [RtsDirectReceiveController::class, 'index'])->name('index');
+
+        // ✅ AJAX: operator outstanding WIP-SEW
+        Route::get('/operator-wip', [RtsDirectReceiveController::class, 'operatorWip'])
+            ->name('operator_wip');
+
+        // ✅ static route must be before {directReceive}
+        Route::get('/create', [RtsDirectReceiveController::class, 'create'])->name('create');
+        Route::post('/', [RtsDirectReceiveController::class, 'store'])->name('store');
+
+        Route::get('/{directReceive}', [RtsDirectReceiveController::class, 'show'])
+            ->whereNumber('directReceive')
+            ->name('show');
+    });
+});
+
+// ======================================================================
 // STOCK API (owner + admin + operating)
 // ======================================================================
 Route::middleware(['web', 'auth', 'role:owner,admin,operating'])->group(function () {
-
     Route::prefix('api')->name('api.')->group(function () {
         Route::get('/stock/available', [StockApiController::class, 'available'])->name('stock.available');
         Route::get('/stock/summary', [StockApiController::class, 'summary'])->name('stock.summary');
