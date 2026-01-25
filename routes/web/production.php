@@ -41,14 +41,21 @@ Route::middleware(['web', 'auth', 'role:owner,operating'])
 
         /*
     |--------------------------------------------------------------------------
-    | QC
+    | QC (List)
     |--------------------------------------------------------------------------
      */
         Route::get('/qc', [QcController::class, 'index'])->name('qc.index');
 
+        /*
+    |--------------------------------------------------------------------------
+    | QC (Actions)
+    |--------------------------------------------------------------------------
+     */
         Route::prefix('qc')->name('qc.')->group(function () {
 
-            // ===== QC Cutting =====
+            // ==========================================================
+            // QC CUTTING
+            // ==========================================================
             Route::get('/cutting/{cuttingJob}/edit', [QcController::class, 'editCutting'])
                 ->name('cutting.edit');
 
@@ -59,10 +66,21 @@ Route::middleware(['web', 'auth', 'role:owner,operating'])
                 ->middleware('role:owner')
                 ->name('cutting.cancel');
 
-            // ✅ QC Adjustment per bundle (OWNER ONLY) — name FINAL: production.qc.cutting.bundle_adjust
+            // ✅ NEW: revert status Cutting Job sent_to_qc -> cutting (OWNER ONLY)
+            // name: production.qc.cutting.revert_to_cutting
+            Route::post('/cutting/{cuttingJob}/revert-to-cutting', [QcController::class, 'revertCuttingToCutting'])
+                ->middleware('role:owner')
+                ->name('cutting.revert_to_cutting');
+
+            // ✅ QC Adjustment per bundle (OWNER ONLY)
+            // name FINAL: production.qc.cutting.bundle_adjust
             Route::post('/cutting/{cuttingJob}/bundles/{bundle}/adjust', [QcController::class, 'adjustCuttingBundle'])
                 ->middleware('role:owner')
                 ->name('cutting.bundle_adjust');
+
+            // ==========================================================
+            // (opsional) nanti QC SEWING / QC FINISHING / QC PACKING bisa masuk sini
+            // ==========================================================
         });
 
         /*
@@ -201,6 +219,11 @@ Route::middleware(['web', 'auth', 'role:owner,admin,operating'])
             ->name('wip-fin-adjustments.void');
     });
 
+/*
+|--------------------------------------------------------------------------
+| PRODUCTION (Owner) — CUTTING OVERPRODUCTION (Inventory Adjustments)
+|--------------------------------------------------------------------------
+ */
 Route::middleware(['web', 'auth', 'role:owner'])
     ->prefix('production/cutting-overproduction')
     ->name('production.cutting_overproduction.')
@@ -217,5 +240,4 @@ Route::middleware(['web', 'auth', 'role:owner'])
 
         Route::post('/{adjustment}/void', [InventoryAdjustmentController::class, 'void'])
             ->name('void');
-
     });

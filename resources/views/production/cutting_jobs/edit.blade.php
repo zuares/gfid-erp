@@ -3,427 +3,966 @@
 
 @section('title', 'Edit Cutting Job ' . $job->code)
 
+@php
+    // LOCKED jika ada pivot cutting_job_lots
+    $isLotsLocked = !empty($selectedLotSummaries);
+
+    $selectedLotsExisting = $selectedLotsExisting ?? [];
+
+    $rowsExisting = $rows ?? [];
+    if (empty($rowsExisting)) {
+        $rowsExisting = [
+            [
+                'id' => null,
+                'bundle_no' => 1,
+                'lot_id' => null,
+                'finished_item_id' => null,
+                'finished_item_code' => null,
+                'finished_item_name' => null,
+                'item_category_id' => null,
+                'qty_pcs' => null,
+                'qty_used_fabric' => 0,
+                'notes' => '',
+            ],
+        ];
+    }
+
+    $defaultOperatorId = old('operator_id', optional($job->bundles->first())->operator_id);
+
+    // Untuk summary di atas
+    $lockedFabricLabel = '-';
+    if (!empty($selectedLotSummaries) && !empty($selectedLotSummaries[0]['item_code'])) {
+        $lockedFabricLabel = trim(
+            ($selectedLotSummaries[0]['item_code'] ?? '-') . ' — ' . ($selectedLotSummaries[0]['item_name'] ?? '-'),
+        );
+    }
+
+    // Build map LOT untuk JS (kode + planned)
+    $lockedLotInfo = collect($selectedLotSummaries ?? [])
+        ->mapWithKeys(function ($s) {
+            $lotId = (int) ($s['lot_id'] ?? 0);
+            return $lotId
+                ? [
+                    $lotId => [
+                        'lot_id' => $lotId,
+                        'code' => $s['code'] ?? 'LOT#' . $lotId,
+                        'planned' => (float) ($s['planned'] ?? 0),
+                        'used' => (float) ($s['used'] ?? 0),
+                    ],
+                ]
+                : [];
+        })
+        ->all();
+@endphp
+
 @push('head')
     <style>
         .page-wrap {
             max-width: 1100px;
             margin-inline: auto;
+            padding: .75rem .75rem 4.5rem
         }
 
         .mono {
             font-variant-numeric: tabular-nums;
-            font-family: ui-monospace, SFMono-Regular, Menlo, Consolas, "Liberation Mono";
+            font-family: ui-monospace, SFMono-Regular, Menlo, Consolas, "Liberation Mono"
         }
 
         .help {
             color: var(--muted);
-            font-size: .85rem;
+            font-size: .85rem
         }
 
-        .lot-bar-mobile {
-            position: sticky;
-            top: 56px;
-            /* sesuaikan tinggi navbar */
-            z-index: 1020;
-            background: var(--card, #fff);
-            border-bottom: 1px solid var(--line, #e5e7eb);
-            padding: .35rem .75rem;
-            font-size: .85rem;
+        .cutting-card {
+            border-radius: 14px;
+            border: 1px solid rgba(148, 163, 184, .45);
+            background: var(--card);
+            margin-bottom: .75rem
+        }
+
+        .cutting-card-header {
+            padding: .55rem .75rem .45rem;
+            border-bottom: 1px solid rgba(148, 163, 184, .35);
             display: flex;
+            justify-content: space-between;
             align-items: center;
-            gap: .25rem;
-            white-space: nowrap;
-            overflow-x: auto;
+            gap: .5rem
         }
 
-        @media (max-width: 767.98px) {
-            .card .d-flex.flex-column.flex-md-row {
-                gap: .5rem;
+        .cutting-card-header h5 {
+            font-size: .9rem;
+            margin: 0
+        }
+
+        .cutting-card-body {
+            padding: .6rem .75rem;
+            overflow: visible;
+            position: relative
+        }
+
+        .badge-soft {
+            font-size: .7rem;
+            border-radius: 999px;
+            padding: .08rem .5rem;
+            border: 1px solid rgba(148, 163, 184, .6);
+            background: rgba(148, 163, 184, .14)
+        }
+
+        .bundles-table {
+            border-collapse: separate;
+            border-spacing: 0
+        }
+
+        .bundle-notes-cell {
+            min-width: 140px
+        }
+
+        .lot-table-wrap {
+            overflow-x: auto
+        }
+
+        .lot-table td,
+        .lot-table th {
+            vertical-align: middle
+        }
+
+        .lot-code {
+            font-weight: 700
+        }
+
+        .cutting-main-content.d-none {
+            display: none
+        }
+
+        .lot-locked-grid {
+            display: grid;
+            grid-template-columns: 1fr auto;
+            gap: .25rem .75rem;
+            font-size: .85rem
+        }
+
+        .lot-locked-grid .muted {
+            color: var(--muted)
+        }
+
+        .lot-locked-grid .right {
+            text-align: right
+        }
+
+        .cutting-actions {
+            gap: .5rem
+        }
+
+        @media(max-width:767.98px) {
+            .cutting-actions {
+                flex-direction: column-reverse;
+                align-items: stretch
             }
 
-            .table-wrap {
-                overflow-x: auto;
+            .cutting-actions .btn-primary {
+                width: 100%
             }
         }
     </style>
 @endpush
 
 @section('content')
-    @php
-        $isEdit = true;
-
-        $lotQty = isset($lotBalance) ? (float) $lotBalance : 0;
-
-        $defaultOperatorId = optional($job->bundles->first())->operator_id;
-
-        $lotPurchaseDate = $lot?->purchased_at ?? ($lot?->purchase_date ?? ($lot?->received_at ?? $lot?->created_at));
-        $lotPurchaseDateLabel = $lotPurchaseDate ? $lotPurchaseDate->format('d/m/Y') : '-';
-    @endphp
-
     <div class="page-wrap">
-        <h1 class="h5 mb-3">Edit Cutting Job: {{ $job->code }}</h1>
+        <div class="d-flex justify-content-between align-items-center flex-wrap gap-2 mb-3">
+            <div>
+                <div class="text-muted small">Produksi • Cutting Job</div>
+                <h1 class="h5 mb-0">Edit: <span class="mono">{{ $job->code }}</span></h1>
+                <div class="help mt-1">Tanggal: {{ $job->date?->format('Y-m-d') ?? $job->date }}</div>
+            </div>
+            <div class="d-flex gap-2">
+                <a href="{{ route('production.cutting_jobs.show', $job) }}"
+                    class="btn btn-outline-secondary btn-sm">Kembali</a>
+                <a href="{{ route('production.cutting_jobs.index') }}" class="btn btn-outline-secondary btn-sm">List</a>
+            </div>
+        </div>
 
-        <form action="{{ route('production.cutting_jobs.update', $job) }}" method="post">
+        <form action="{{ route('production.cutting_jobs.update', $job) }}" method="POST" id="cutting-form">
             @csrf
             @method('PUT')
 
-            {{-- MOBILE: BAR INFO LOT --}}
-            <div class="lot-bar-mobile d-md-none mb-2">
-                <span class="mono">{{ $lotPurchaseDateLabel }}</span>
-                <span class="mx-1">•</span>
-                <span class="fw-semibold">{{ $lot?->item?->name ?? '-' }}</span>
-                <span class="mx-1">•</span>
-                <span class="mono">{{ number_format($lotQty, 2, ',', '.') }} Kg</span>
+            {{-- wajib --}}
+            <input type="hidden" name="warehouse_id" value="{{ old('warehouse_id', $job->warehouse_id) }}">
+
+            {{-- ✅ aman: fabric_item_id ambil dari job (update backend boleh override dari LOT) --}}
+            <input type="hidden" name="fabric_item_id" id="fabric_item_id"
+                value="{{ old('fabric_item_id', $job->fabric_item_id) }}">
+
+            {{-- ✅ selected_lots (untuk update backend yang minta selected_lots) --}}
+            <div id="selected-lots-hidden">
+                @foreach ($selectedLotsExisting ?? [] as $lotId)
+                    <input type="hidden" name="selected_lots[]" value="{{ (int) $lotId }}">
+                @endforeach
             </div>
 
-            {{-- HIDDEN HEADER --}}
-            <input type="hidden" name="warehouse_id" value="{{ $warehouse?->id }}">
-            <input type="hidden" name="lot_id" value="{{ $lot?->id }}">
-            <input type="hidden" name="lot_balance" value="{{ $lotQty }}">
-            <input type="hidden" name="fabric_item_id"
-                value="{{ old('fabric_item_id', $job->fabric_item_id ?? ($lot?->item_id ?? null)) }}">
-
-            {{-- INFORMASI LOT (DESKTOP) --}}
-            <div class="card p-3 mb-3 d-none d-md-block">
-                <h2 class="h6 mb-2">Informasi Lot Kain</h2>
-                @error('fabric_item_id')
-                    <div class="text-danger small mt-1">{{ $message }}</div>
-                @enderror
-
-                <div class="row g-3 mb-2">
-                    <div class="col-md-4">
-                        <div class="help mb-1">Tgl Beli</div>
-                        <div class="mono">{{ $lotPurchaseDateLabel }}</div>
+            {{-- =========================
+            LOT SECTION
+        ========================== --}}
+            @if ($isLotsLocked)
+                <div class="cutting-card" id="cutting-lot-locked">
+                    <div class="cutting-card-header">
+                        <h5>LOT (Terkunci)</h5>
+                        <span class="badge-soft">Edit tidak perlu pilih LOT lagi</span>
                     </div>
-
-                    <div class="col-md-4">
-                        <div class="help mb-1">Nama Bahan</div>
-                        <div>{{ $lot?->item?->name ?? '-' }}</div>
-                    </div>
-
-                    <div class="col-md-4">
-                        <div class="help mb-1">Qty</div>
-                        <div class="mono">{{ number_format($lotQty, 2, ',', '.') }} Kg</div>
+                    <div class="cutting-card-body">
+                        <div class="lot-locked-grid">
+                            @foreach ($selectedLotSummaries as $s)
+                                <div>
+                                    <div class="mono fw-semibold">{{ $s['code'] }}</div>
+                                    <div class="muted small">{{ $s['item_code'] }} — {{ $s['item_name'] }}</div>
+                                </div>
+                                <div class="right">
+                                    <div class="mono fw-semibold">{{ number_format((float) $s['used'], 2, ',', '.') }}
+                                    </div>
+                                    <div class="muted small">planned:
+                                        {{ number_format((float) $s['planned'], 2, ',', '.') }}</div>
+                                </div>
+                            @endforeach
+                        </div>
                     </div>
                 </div>
-
-                <div class="row g-3">
-                    <div class="col-md-4 col-12">
-                        <div class="help mb-1">LOT</div>
-                        <div class="fw-semibold">{{ $lot?->code ?? '-' }}</div>
-                        <div class="small text-muted">{{ $lot?->item?->code ?? '-' }}</div>
+            @else
+                <div class="cutting-card" id="cutting-pick-lot">
+                    <div class="cutting-card-header">
+                        <h5>Step 1: Pilih LOT</h5>
+                        <span class="badge-soft">Wajib: pilih minimal 1 LOT</span>
                     </div>
+                    <div class="cutting-card-body">
+                        <div class="d-flex gap-2 flex-wrap mb-2">
+                            <button type="button" class="btn btn-sm btn-outline-secondary" id="btn-select-all-lots">Pilih
+                                Semua</button>
+                            <button type="button" class="btn btn-sm btn-outline-secondary"
+                                id="btn-unselect-all-lots">Unselect Semua</button>
+                            <button type="button" class="btn btn-sm btn-primary" id="btn-confirm-lots">Konfirmasi
+                                LOT</button>
+                        </div>
 
-                    <div class="col-md-4 col-6">
-                        <div class="help mb-1">Gudang</div>
-                        <div class="mono">{{ $warehouse?->code }} — {{ $warehouse?->name }}</div>
-                    </div>
+                        <div class="lot-table-wrap">
+                            <table class="table table-sm lot-table">
+                                <thead>
+                                    <tr>
+                                        <th style="width:44px;"></th>
+                                        <th>LOT</th>
+                                        <th>Item Kain</th>
+                                        <th class="text-end" style="width:140px;">Saldo</th>
+                                    </tr>
+                                </thead>
+                                <tbody>
+                                    @foreach ($lotStocks as $row)
+                                        @php
+                                            $lot = $row->lot;
+                                            $item = $lot?->item;
+                                            $lotId = (int) ($lot?->id ?? 0);
+                                            $itemId = (int) ($item?->id ?? 0);
+                                            $balance = (float) ($row->balance ?? 0);
+                                            $checked = in_array($lotId, $selectedLotsExisting, true);
+                                        @endphp
+                                        <tr class="lot-row" data-lot-id="{{ $lotId }}"
+                                            data-item-id="{{ $itemId }}"
+                                            data-balance="{{ number_format($balance, 4, '.', '') }}"
+                                            data-code="{{ $lot?->code ?? 'LOT#' . $lotId }}">
+                                            <td class="text-center">
+                                                <input type="checkbox" class="form-check-input lot-checkbox"
+                                                    value="{{ $lotId }}" @checked($checked)>
+                                            </td>
+                                            <td>
+                                                <div class="lot-code mono">{{ $lot?->code ?? '-' }}</div>
+                                                <div class="text-muted small">{{ $item?->code ?? '-' }}</div>
+                                            </td>
+                                            <td>{{ $item?->name ?? '-' }}</td>
+                                            <td class="text-end mono">{{ number_format($balance, 2, ',', '.') }}</td>
+                                        </tr>
+                                    @endforeach
+                                </tbody>
+                            </table>
+                        </div>
 
-                    <div class="col-md-4 col-6">
-                        <div class="help mb-1">Saldo LOT (perkiraan)</div>
-                        <div class="mono">{{ number_format($lotQty, 2, ',', '.') }} Kg</div>
-                    </div>
-                </div>
-            </div>
-
-            {{-- HEADER JOB --}}
-            <div class="card p-3 mb-3">
-                <h2 class="h6 mb-2">Header Cutting Job</h2>
-
-                <div class="row g-3">
-                    <div class="col-md-3 col-6">
-                        <label class="form-label">Tanggal</label>
-                        <input type="date" name="date" class="form-control @error('date') is-invalid @enderror"
-                            value="{{ old('date', $job->date?->format('Y-m-d') ?? now()->toDateString()) }}">
-                        @error('date')
-                            <div class="invalid-feedback">{{ $message }}</div>
+                        @error('selected_lots')
+                            <div class="text-danger small mt-2">{{ $message }}</div>
                         @enderror
                     </div>
+                </div>
+            @endif
 
-                    <div class="col-md-3 col-6">
-                        <label class="form-label">Operator Cutting</label>
-                        @php
-                            $currentOperatorId = old('operator_id', $defaultOperatorId);
-                        @endphp
-                        <select name="operator_id" class="form-select @error('operator_id') is-invalid @enderror">
-                            <option value="">Pilih operator cutting…</option>
-                            @foreach ($operators as $op)
-                                <option value="{{ $op->id }}" @selected($currentOperatorId == $op->id)>
-                                    {{ $op->code }} — {{ $op->name }}
-                                </option>
-                            @endforeach
+            {{-- =========================
+            MAIN CONTENT
+        ========================== --}}
+            <div id="cutting-main-content" class="cutting-main-content d-none">
+
+                {{-- SUMMARY LOT --}}
+                <div class="cutting-card mb-2">
+                    <div class="cutting-card-body d-flex justify-content-between align-items-center flex-wrap gap-2">
+                        <div class="small">
+                            <div>
+                                <span class="text-muted">Item kain:</span>
+                                <span class="fw-semibold" id="current-fabric-label">-</span>
+                            </div>
+                            <div>
+                                <span class="text-muted">LOT terpilih:</span>
+                                <span class="fw-semibold" id="current-lot-count">0 LOT</span>
+                                <span class="text-muted ms-2">Total planned:</span>
+                                <span class="fw-semibold mono" id="current-lot-balance">0.00</span>
+                            </div>
+                        </div>
+
+                        @if (!$isLotsLocked)
+                            <button type="button" class="btn btn-outline-secondary btn-sm" id="btn-change-lots">Ubah
+                                LOT</button>
+                        @endif
+                    </div>
+                </div>
+
+                {{-- INFO --}}
+                <div class="cutting-card">
+                    <div class="cutting-card-header">
+                        <h5>Info Cutting Job</h5>
+                        <span class="badge-soft">Tanggal • Operator • Catatan</span>
+                    </div>
+                    <div class="cutting-card-body">
+                        <div class="row g-3">
+                            <div class="col-md-3 col-6">
+                                <label class="form-label">Tanggal</label>
+                                <input type="date" name="date"
+                                    class="form-control @error('date') is-invalid @enderror"
+                                    value="{{ old('date', $job->date?->format('Y-m-d') ?? now()->toDateString()) }}">
+                                @error('date')
+                                    <div class="invalid-feedback">{{ $message }}</div>
+                                @enderror
+                            </div>
+
+                            <div class="col-md-4 col-6">
+                                <label class="form-label">Operator Cutting</label>
+                                <select name="operator_id" class="form-select @error('operator_id') is-invalid @enderror">
+                                    <option value="">Pilih operator cutting…</option>
+                                    @foreach ($operators as $op)
+                                        <option value="{{ $op->id }}" @selected(old('operator_id', $defaultOperatorId) == $op->id)>
+                                            {{ $op->code }} — {{ $op->name }}
+                                        </option>
+                                    @endforeach
+                                </select>
+                                @error('operator_id')
+                                    <div class="invalid-feedback">{{ $message }}</div>
+                                @enderror
+                            </div>
+
+                            <div class="col-md-5 col-12">
+                                <label class="form-label">Catatan</label>
+                                <input type="text" name="notes" class="form-control"
+                                    value="{{ old('notes', $job->notes) }}">
+                            </div>
+                        </div>
+                    </div>
+                </div>
+
+                {{-- BUNDLES --}}
+                <div class="cutting-card">
+                    <div class="cutting-card-header">
+                        <h5>Bundles</h5>
+                        <span class="badge-soft">Qty pcs integer • Used = planned ÷ baris/LOT</span>
+                    </div>
+
+                    <div class="cutting-card-body">
+                        @error('bundles')
+                            <div class="text-danger small mb-2">{{ $message }}</div>
+                        @enderror
+
+                        <div class="table-responsive mb-2">
+                            <table class="bundles-table table table-sm" id="bundles-table">
+                                <thead>
+                                    <tr>
+                                        <th style="width:40px;">#</th>
+                                        <th style="min-width:120px;">LOT</th>
+                                        <th style="min-width:220px;">Item Jadi</th>
+                                        <th style="min-width:120px;" class="text-end">Qty (pcs)</th>
+                                        <th style="min-width:150px;">Catatan</th>
+                                        <th style="width:40px;"></th>
+                                    </tr>
+                                </thead>
+
+                                <tbody id="bundle-rows">
+                                    @foreach ($rowsExisting as $i => $r)
+                                        @php
+                                            $fiId = old("bundles.$i.finished_item_id", $r['finished_item_id'] ?? '');
+                                            $catId = old("bundles.$i.item_category_id", $r['item_category_id'] ?? '');
+
+                                            $dispOld = old("bundles.$i.finished_item_display", '');
+                                            $code = $r['finished_item_code'] ?? '';
+                                            $name = $r['finished_item_name'] ?? '';
+                                            $disp =
+                                                $dispOld !== ''
+                                                    ? $dispOld
+                                                    : trim(($code ?: '') . ($name ? ' — ' . $name : ''));
+                                        @endphp
+
+                                        <tr class="bundle-row">
+                                            @if (!empty($r['id']))
+                                                <input type="hidden" name="bundles[{{ $i }}][id]"
+                                                    value="{{ $r['id'] }}">
+                                            @endif
+
+                                            <input type="hidden" class="bundle-used-fabric"
+                                                name="bundles[{{ $i }}][qty_used_fabric]"
+                                                value="{{ old("bundles.$i.qty_used_fabric", $r['qty_used_fabric'] ?? 0) }}">
+
+                                            <td class="bundle-index mono">{{ $i + 1 }}</td>
+
+                                            <td>
+                                                <select class="form-select form-select-sm bundle-lot-select"
+                                                    name="bundles[{{ $i }}][lot_id]">
+                                                    <option value="">- Pilih LOT -</option>
+                                                </select>
+                                                @error("bundles.$i.lot_id")
+                                                    <div class="text-danger small">{{ $message }}</div>
+                                                @enderror
+
+                                                <input type="hidden" class="bundle-lot-selected"
+                                                    value="{{ old("bundles.$i.lot_id", $r['lot_id'] ?? '') }}">
+                                            </td>
+
+                                            <td>
+                                                <x-item-suggest idName="bundles[{{ $i }}][finished_item_id]"
+                                                    categoryName="bundles[{{ $i }}][item_category_id]"
+                                                    :items="collect()" displayValue="{{ $disp }}"
+                                                    idValue="{{ $fiId }}" categoryValue="{{ $catId }}"
+                                                    placeholder="Cari item jadi…" type="finished_good" :minChars="1"
+                                                    :maxResults="5" variant="mini" :required="true" :skipSubmitValidation="true" />
+                                                @error("bundles.$i.finished_item_id")
+                                                    <div class="text-danger small mt-1">{{ $message }}</div>
+                                                @enderror
+                                            </td>
+
+                                            <td>
+                                                <input type="number" step="1" min="0" inputmode="numeric"
+                                                    pattern="[0-9]*" name="bundles[{{ $i }}][qty_pcs]"
+                                                    class="form-control form-control-sm text-end bundle-qty @error("bundles.$i.qty_pcs") is-invalid @enderror"
+                                                    value="{{ old("bundles.$i.qty_pcs", $r['qty_pcs'] ?? '') }}">
+                                                @error("bundles.$i.qty_pcs")
+                                                    <div class="invalid-feedback">{{ $message }}</div>
+                                                @enderror
+
+                                                <div class="help mt-1">
+                                                    Used: <span class="bundle-used-preview">
+                                                        {{ number_format((float) old("bundles.$i.qty_used_fabric", $r['qty_used_fabric'] ?? 0), 2, ',', '.') }}
+                                                    </span>
+                                                </div>
+                                            </td>
+
+                                            <td class="bundle-notes-cell">
+                                                <input type="text" class="form-control form-control-sm"
+                                                    name="bundles[{{ $i }}][notes]"
+                                                    value="{{ old("bundles.$i.notes", $r['notes'] ?? '') }}">
+                                            </td>
+
+                                            <td class="text-center">
+                                                <button type="button"
+                                                    class="btn btn-sm btn-link text-danger btn-remove-row">&times;</button>
+                                            </td>
+                                        </tr>
+                                    @endforeach
+                                </tbody>
+
+                                <tfoot>
+                                    <tr>
+                                        <td colspan="6">
+                                            <button type="button" class="btn btn-sm btn-outline-primary"
+                                                id="btn-add-row">
+                                                + Tambah Baris
+                                            </button>
+
+                                            <span class="ms-3 small text-muted">
+                                                Total Used: <span class="mono fw-semibold"
+                                                    id="used-total-label">0,00</span>
+                                            </span>
+                                        </td>
+                                    </tr>
+                                </tfoot>
+                            </table>
+                        </div>
+
+                        <div class="help">
+                            <b>Wajib:</b> setiap baris harus punya LOT & Item Jadi.
+                            @if ($isLotsLocked)
+                                LOT sudah <b>terkunci</b>, dropdown hanya menampilkan LOT milik job.
+                            @else
+                                Pilih LOT di Step 1, lalu dropdown per baris otomatis terisi.
+                            @endif
+                        </div>
+                    </div>
+                </div>
+
+                {{-- ACTIONS --}}
+                <div class="d-flex justify-content-between align-items-center mt-3 cutting-actions">
+                    <button type="submit" class="btn btn-primary btn-sm">Update Cutting Job</button>
+                    <a href="{{ route('production.cutting_jobs.show', $job) }}"
+                        class="btn btn-outline-secondary btn-sm">Batal</a>
+                </div>
+            </div>
+
+            {{-- TEMPLATE row baru --}}
+            <template id="bundle-row-template">
+                <tr class="bundle-row">
+                    <input type="hidden" class="bundle-used-fabric" name="bundles[__INDEX__][qty_used_fabric]"
+                        value="0">
+                    <td class="bundle-index mono">__NO__</td>
+
+                    <td>
+                        <select class="form-select form-select-sm bundle-lot-select" name="bundles[__INDEX__][lot_id]">
+                            <option value="">- Pilih LOT -</option>
                         </select>
-                        @error('operator_id')
-                            <div class="invalid-feedback">{{ $message }}</div>
-                        @enderror
-                    </div>
+                        <input type="hidden" class="bundle-lot-selected" value="">
+                    </td>
 
-                    <div class="col-12 d-none d-md-block">
-                        <label class="form-label">Catatan</label>
-                        <textarea name="notes" rows="2" class="form-control">{{ old('notes', $job->notes) }}</textarea>
-                    </div>
-                </div>
-            </div>
+                    <td>
+                        <x-item-suggest idName="bundles[__INDEX__][finished_item_id]"
+                            categoryName="bundles[__INDEX__][item_category_id]" :items="collect()" displayValue=""
+                            idValue="" categoryValue="" placeholder="Cari item jadi…" type="finished_good"
+                            :minChars="1" :maxResults="5" variant="mini" :required="true" :skipSubmitValidation="true" />
+                    </td>
 
-            {{-- OUTPUT BUNDLES --}}
-            <div class="card p-3 mb-4">
-                <div class="d-flex flex-column flex-md-row justify-content-between align-items-md-center mb-2">
-                    <div class="mb-2 mb-md-0">
-                        <h2 class="h6 mb-0">Output Bundles</h2>
-                    </div>
+                    <td>
+                        <input type="number" step="1" min="0" inputmode="numeric" pattern="[0-9]*"
+                            name="bundles[__INDEX__][qty_pcs]" class="form-control form-control-sm text-end bundle-qty"
+                            value="">
+                        <div class="help mt-1">Used: <span class="bundle-used-preview">0,00</span></div>
+                    </td>
 
-                    <div class="w-100 w-md-auto d-none d-md-block">
-                        <button type="button" class="btn btn-outline-secondary btn-sm" id="add-row-top">
-                            + Tambah baris
-                        </button>
-                    </div>
-                </div>
+                    <td class="bundle-notes-cell">
+                        <input type="text" class="form-control form-control-sm" name="bundles[__INDEX__][notes]"
+                            value="">
+                    </td>
 
-                <div id="bundle-warning" class="text-danger small mb-2" style="display:none;">
-                    ⚠️ Total pemakaian kain > saldo LOT
-                </div>
-
-                <div class="table-wrap">
-                    <table class="table table-sm align-middle mono">
-                        <thead>
-                            <tr>
-                                <th style="width:40px;">#</th>
-                                <th>Item Jadi</th>
-                                <th style="width:110px;">Qty (pcs)</th>
-                                <th class="d-none d-md-table-cell">Item Category</th>
-                                <th style="width:120px;" class="d-none d-md-table-cell">Used</th>
-                                <th style="width:40px;" class="d-none d-md-table-cell"></th>
-                            </tr>
-                        </thead>
-                        <tbody id="bundle-rows">
-                            @foreach ($rows as $i => $row)
-                                <tr>
-                                    @if (!empty($row['id']))
-                                        <input type="hidden" name="bundles[{{ $i }}][id]"
-                                            value="{{ $row['id'] }}">
-                                    @endif
-
-                                    <td data-label="#">
-                                        <span class="row-index mono"></span>
-                                    </td>
-
-                                    {{-- ITEM JADI: SELECT BIASA --}}
-                                    <td data-label="Item Jadi">
-                                        <select name="bundles[{{ $i }}][finished_item_id]"
-                                            class="form-select form-select-sm @error("bundles.$i.finished_item_id") is-invalid @enderror">
-                                            <option value="">Pilih item jadi…</option>
-                                            @foreach ($items as $it)
-                                                <option value="{{ $it->id }}" @selected(old("bundles.$i.finished_item_id", $row['finished_item_id'] ?? null) == $it->id)>
-                                                    {{ $it->code }} — {{ $it->name }}
-                                                </option>
-                                            @endforeach
-                                        </select>
-                                        @error("bundles.$i.finished_item_id")
-                                            <div class="invalid-feedback">{{ $message }}</div>
-                                        @enderror
-                                    </td>
-
-                                    {{-- Qty (pcs) --}}
-                                    <td data-label="Qty (pcs)">
-                                        <input type="number" step="1" min="0" inputmode="numeric"
-                                            pattern="\d*" name="bundles[{{ $i }}][qty_pcs]"
-                                            class="form-control form-control-sm text-end bundle-qty @error("bundles.$i.qty_pcs") is-invalid @enderror"
-                                            value="{{ old("bundles.$i.qty_pcs", isset($row['qty_pcs']) ? (int) $row['qty_pcs'] : '') }}">
-                                        @error("bundles.$i.qty_pcs")
-                                            <div class="invalid-feedback">{{ $message }}</div>
-                                        @enderror
-                                    </td>
-
-                                    {{-- Item Category (opsional, masih manual teks) --}}
-                                    <td data-label="Item Category" class="d-none d-md-table-cell">
-                                        <input type="text" name="bundles[{{ $i }}][item_category]"
-                                            class="form-control form-control-sm" placeholder="Kategori"
-                                            value="{{ old("bundles.$i.item_category", $row['item_category'] ?? '') }}">
-                                    </td>
-
-                                    {{-- Used (client-side) --}}
-                                    <td data-label="Used" class="d-none d-md-table-cell">
-                                        <span class="bundle-qty-used help">-</span>
-                                    </td>
-
-                                    {{-- Hapus baris --}}
-                                    <td data-label="" class="d-none d-md-table-cell">
-                                        <button type="button"
-                                            class="btn btn-sm btn-link text-danger remove-row">×</button>
-                                    </td>
-                                </tr>
-                            @endforeach
-                        </tbody>
-                    </table>
-                </div>
-
-                {{-- tombol bawah khusus mobile --}}
-                <div class="mt-2 d-md-none">
-                    <button type="button" class="btn btn-outline-secondary w-100 btn-sm" id="add-row-bottom">
-                        + Tambah baris
-                    </button>
-                </div>
-
-                @error('bundles')
-                    <div class="text-danger small mt-1">{{ $message }}</div>
-                @enderror
-            </div>
-
-            {{-- SUBMIT --}}
-            <div class="d-flex justify-content-end mb-4">
-                <button class="btn btn-primary">
-                    Update Cutting Job
-                </button>
-            </div>
+                    <td class="text-center">
+                        <button type="button" class="btn btn-sm btn-link text-danger btn-remove-row">&times;</button>
+                    </td>
+                </tr>
+            </template>
         </form>
     </div>
 @endsection
 
 @push('scripts')
     <script>
-        const bundleRows = document.getElementById('bundle-rows');
-        const addRowBtnTop = document.getElementById('add-row-top');
-        const addRowBtnBottom = document.getElementById('add-row-bottom');
+        document.addEventListener('DOMContentLoaded', function() {
+            // ✅ JANGAN bergantung pada window.__LOTS_LOCKED__ dari inline script
+            const lotsLocked = @json((bool) $isLotsLocked);
+            const lockedLotsFromServer = @json(array_values($selectedLotsExisting ?? []));
+            const lockedLotInfo = @json($lockedLotInfo); // { lotId: {code, planned, used}, ... }
+            const lockedFabricLabel = @json($lockedFabricLabel);
 
-        const rowCountSpan = document.getElementById('bundle-row-count');
-        const perRowSpan = document.getElementById('bundle-per-row');
-        const totalQtySpan = document.getElementById('bundle-total-qty');
-        const totalUsedSpan = document.getElementById('bundle-total-used');
-        const warningEl = document.getElementById('bundle-warning');
+            const form = document.getElementById('cutting-form');
 
-        const lotQty = {{ $lotQty }};
+            const lotRows = Array.from(document.querySelectorAll('.lot-row'));
+            const lotCheckboxes = Array.from(document.querySelectorAll('.lot-checkbox'));
+            const btnSelectAllLots = document.getElementById('btn-select-all-lots');
+            const btnUnselectAllLots = document.getElementById('btn-unselect-all-lots');
+            const btnConfirmLots = document.getElementById('btn-confirm-lots');
 
-        function attachSelectAllOnFocus(input) {
-            input.addEventListener('focus', function() {
-                setTimeout(() => this.select(), 0);
+            const bundlesTbody = document.getElementById('bundle-rows');
+            const btnAddRow = document.getElementById('btn-add-row');
+
+            const usedTotalLabel = document.getElementById('used-total-label');
+
+            const mainContent = document.getElementById('cutting-main-content');
+            const pickLotSection = document.getElementById('cutting-pick-lot');
+
+            const currentFabricLabel = document.getElementById('current-fabric-label');
+            const currentLotCount = document.getElementById('current-lot-count');
+            const currentLotBalance = document.getElementById('current-lot-balance');
+            const btnChangeLots = document.getElementById('btn-change-lots');
+
+            const selectedLotsHiddenWrap = document.getElementById('selected-lots-hidden');
+
+            function isMobile() {
+                return window.matchMedia('(max-width: 767.98px)').matches;
+            }
+
+            function toInt(val) {
+                if (val === null || val === undefined) return 0;
+                const s = String(val).replace(',', '.');
+                const head = s.split('.')[0];
+                const n = parseInt(head.replace(/[^\d]/g, '') || '0', 10);
+                return isNaN(n) || n < 0 ? 0 : n;
+            }
+
+            function fmt2(n) {
+                const x = Number(n || 0);
+                return x.toFixed(2).replace('.', ',');
+            }
+
+            // lot_id -> info (untuk unlocked mode)
+            const lotInfoMap = {};
+            lotRows.forEach(tr => {
+                const lotId = parseInt(tr.dataset.lotId, 10);
+                lotInfoMap[lotId] = {
+                    lotId,
+                    itemId: parseInt(tr.dataset.itemId || '0', 10),
+                    code: tr.dataset.code || (tr.querySelector('.lot-code')?.textContent?.trim() ??
+                        `LOT#${lotId}`),
+                    balance: parseFloat(tr.dataset.balance ?? '0'),
+                };
             });
-            input.addEventListener('mouseup', function(e) {
-                e.preventDefault();
-            });
-        }
 
-        function renumberRows() {
-            if (!bundleRows) return;
-            const rows = bundleRows.querySelectorAll('tr');
-            rows.forEach((tr, idx) => {
-                const idxSpan = tr.querySelector('.row-index');
-                if (idxSpan) {
-                    idxSpan.textContent = idx + 1;
+            let bundleIndexCounter = bundlesTbody ? bundlesTbody.querySelectorAll('.bundle-row').length : 0;
+
+            function getCheckedLots() {
+                if (lotsLocked) return (lockedLotsFromServer || []).map(n => parseInt(n, 10)).filter(n => n > 0);
+                const ids = [];
+                lotCheckboxes.forEach(cb => {
+                    if (cb.checked) ids.push(parseInt(cb.value, 10));
+                });
+                return ids;
+            }
+
+            function setSelectedLotsHidden(ids) {
+                if (!selectedLotsHiddenWrap) return;
+                selectedLotsHiddenWrap.innerHTML = '';
+                (ids || []).forEach(id => {
+                    const input = document.createElement('input');
+                    input.type = 'hidden';
+                    input.name = 'selected_lots[]';
+                    input.value = String(id);
+                    selectedLotsHiddenWrap.appendChild(input);
+                });
+            }
+
+            function showMainContent() {
+                if (!mainContent) return;
+                mainContent.classList.remove('d-none');
+                if (isMobile() && pickLotSection) pickLotSection.classList.add('d-none');
+            }
+
+            function showPickLotSection() {
+                if (!pickLotSection) return;
+                if (isMobile()) {
+                    pickLotSection.classList.remove('d-none');
+                    if (mainContent) mainContent.classList.add('d-none');
                 }
-            });
-        }
+                pickLotSection.scrollIntoView({
+                    behavior: 'smooth',
+                    block: 'start'
+                });
+            }
 
-        function recalcAll() {
-            if (!bundleRows) return;
+            // planned per lot:
+            // - locked: dari pivot (lockedLotInfo[lotId].planned)
+            // - unlocked: fallback pakai balance table (lotInfoMap[lotId].balance)
+            function plannedForLot(lotId) {
+                const k = String(lotId);
+                if (lockedLotInfo && lockedLotInfo[k] && Number(lockedLotInfo[k].planned || 0) > 0) return Number(
+                    lockedLotInfo[k].planned || 0);
+                if (lockedLotInfo && lockedLotInfo[lotId] && Number(lockedLotInfo[lotId].planned || 0) > 0)
+                return Number(lockedLotInfo[lotId].planned || 0);
+                return Number(lotInfoMap[lotId]?.balance || 0);
+            }
 
-            const rows = bundleRows.querySelectorAll('tr');
-            const count = rows.length;
-            let totalQtyPcs = 0;
+            function lotLabel(lotId) {
+                const k = String(lotId);
+                if (lockedLotInfo && lockedLotInfo[k]?.code) return lockedLotInfo[k].code;
+                if (lockedLotInfo && lockedLotInfo[lotId]?.code) return lockedLotInfo[lotId].code;
+                return lotInfoMap[lotId]?.code ?? `LOT#${lotId}`;
+            }
 
-            rows.forEach(tr => {
+            function updateCurrentLotSummary() {
+                const ids = getCheckedLots();
+                const lotCount = ids.length;
+                let totalPlanned = 0;
+                ids.forEach(id => totalPlanned += plannedForLot(id));
+
+                if (currentLotCount) currentLotCount.textContent = `${lotCount} LOT`;
+                if (currentLotBalance) currentLotBalance.textContent = Number(totalPlanned || 0).toFixed(2);
+
+                if (currentFabricLabel) {
+                    if (lotsLocked) currentFabricLabel.textContent = lockedFabricLabel || '-';
+                    else currentFabricLabel.textContent = (lotCount > 0) ? 'Mengikuti LOT terpilih' : '-';
+                }
+            }
+
+            function enforceSingleFabricForCheckedLots(changedCb = null) {
+                if (lotsLocked) return true; // pivot sudah aman
+                const infos = [];
+                lotCheckboxes.forEach(cb => {
+                    if (!cb.checked) return;
+                    const lotId = parseInt(cb.value, 10);
+                    if (lotInfoMap[lotId]) infos.push(lotInfoMap[lotId]);
+                });
+                if (!infos.length) return true;
+
+                const firstItemId = infos[0].itemId || 0;
+                const conflict = infos.some(i => (i.itemId || 0) !== firstItemId);
+                if (conflict) {
+                    if (changedCb) changedCb.checked = false;
+                    alert('Semua LOT yang dipilih harus dari item kain yang sama.');
+                    return false;
+                }
+                return true;
+            }
+
+            function rebuildLotOptionsForAllRows() {
+                if (!bundlesTbody) return;
+
+                const checkedLotIds = getCheckedLots();
+                const rows = Array.from(bundlesTbody.querySelectorAll('.bundle-row'));
+
+                rows.forEach((tr, rowIndex) => {
+                    const select = tr.querySelector('.bundle-lot-select');
+                    if (!select) return;
+
+                    const selectedHidden = tr.querySelector('.bundle-lot-selected');
+                    const preferred = selectedHidden ? parseInt(selectedHidden.value || '0', 10) : 0;
+
+                    select.innerHTML = '';
+                    const ph = document.createElement('option');
+                    ph.value = '';
+                    ph.textContent = checkedLotIds.length ? '- Pilih LOT -' : 'Tidak ada LOT terpilih';
+                    select.appendChild(ph);
+
+                    checkedLotIds.forEach(lotId => {
+                        const opt = document.createElement('option');
+                        opt.value = lotId;
+                        opt.textContent = lotLabel(lotId);
+                        select.appendChild(opt);
+                    });
+
+                    if (preferred && checkedLotIds.includes(preferred)) select.value = String(preferred);
+                    else if (checkedLotIds.length > 0) select.value = String(checkedLotIds[rowIndex %
+                        checkedLotIds.length]);
+                    else select.value = '';
+                });
+            }
+
+            function updateBundleRowIndices() {
+                if (!bundlesTbody) return;
+                const rows = bundlesTbody.querySelectorAll('.bundle-row');
+                rows.forEach((tr, idx) => {
+                    const n = tr.querySelector('.bundle-index');
+                    if (n) n.textContent = idx + 1;
+                    tr.querySelectorAll('[name]').forEach(el => {
+                        el.name = el.name.replace(/bundles\[\d+]/, `bundles[${idx}]`);
+                    });
+                });
+            }
+
+            function rowIsActive(tr) {
+                const lotId = parseInt(tr.querySelector('.bundle-lot-select')?.value || '0', 10);
+                const qty = toInt(tr.querySelector('.bundle-qty')?.value || '');
+                const fi = tr.querySelector('input[name*="[finished_item_id]"]')?.value || '';
+                return lotId > 0 && qty > 0 && String(fi).trim() !== '';
+            }
+
+            // ✅ CORE: Used = planned LOT ÷ jumlah baris aktif pada LOT tsb (last row remainder)
+            function redistributeUsedByLot() {
+                if (!bundlesTbody) return;
+
+                const rows = Array.from(bundlesTbody.querySelectorAll('.bundle-row'));
+
+                // group rows aktif by lot
+                const groups = {};
+                rows.forEach(tr => {
+                    const lotId = parseInt(tr.querySelector('.bundle-lot-select')?.value || '0', 10);
+                    if (!lotId) {
+                        // kalau lot kosong, used = 0
+                        setRowUsed(tr, 0);
+                        return;
+                    }
+                    if (!rowIsActive(tr)) {
+                        setRowUsed(tr, 0);
+                        return;
+                    }
+                    groups[lotId] = groups[lotId] || [];
+                    groups[lotId].push(tr);
+                });
+
+                Object.keys(groups).forEach(k => {
+                    const lotId = parseInt(k, 10);
+                    const list = groups[lotId] || [];
+                    const planned = plannedForLot(lotId);
+
+                    if (!list.length || planned <= 0) {
+                        list.forEach(tr => setRowUsed(tr, 0));
+                        return;
+                    }
+
+                    const count = list.length;
+                    const per = Math.round((planned / count) * 100) / 100; // 2 decimals
+                    let usedSoFar = 0;
+
+                    list.forEach((tr, idx) => {
+                        if (idx === count - 1) {
+                            const last = Math.max(planned - usedSoFar, 0);
+                            setRowUsed(tr, last);
+                        } else {
+                            setRowUsed(tr, per);
+                            usedSoFar += per;
+                        }
+                    });
+                });
+
+                rebuildUsedSummaries();
+            }
+
+            function setRowUsed(tr, used) {
+                const hiddenUsed = tr.querySelector('.bundle-used-fabric');
+                const prev = tr.querySelector('.bundle-used-preview');
+                const val = Number(used || 0);
+                if (hiddenUsed) hiddenUsed.value = val.toFixed(2);
+                if (prev) prev.textContent = fmt2(val);
+            }
+
+            function rebuildUsedSummaries() {
+                if (!bundlesTbody || !usedTotalLabel) return;
+                let total = 0;
+                Array.from(bundlesTbody.querySelectorAll('.bundle-row')).forEach(tr => {
+                    const hidden = tr.querySelector('.bundle-used-fabric');
+                    const v = parseFloat((hidden?.value ?? '0').toString().replace(',', '.'));
+                    total += isNaN(v) ? 0 : v;
+                });
+                usedTotalLabel.textContent = fmt2(total);
+            }
+
+            function clampQtyInteger(tr) {
                 const qtyInput = tr.querySelector('.bundle-qty');
                 if (!qtyInput) return;
-
-                let v = parseInt(qtyInput.value || '0', 10);
-                if (isNaN(v) || v < 0) v = 0;
-                qtyInput.value = v;
-
-                totalQtyPcs += v;
-            });
-
-            const perRow = (count > 0 && lotQty > 0) ? (lotQty / count) : 0;
-            const totalUsed = perRow * count;
-
-            if (rowCountSpan) rowCountSpan.textContent = count;
-            if (perRowSpan) perRowSpan.textContent = perRow ? perRow.toFixed(2).replace('.', ',') : '';
-            if (totalQtySpan) totalQtySpan.textContent = totalQtyPcs.toFixed(2).replace('.', ',');
-            if (totalUsedSpan) totalUsedSpan.textContent = totalUsed ? totalUsed.toFixed(2).replace('.', ',') : '';
-
-            if (warningEl) {
-                warningEl.style.display = (totalUsed > lotQty + 0.000001) ? 'block' : 'none';
+                const qty = toInt(qtyInput.value || '');
+                qtyInput.value = qty ? String(qty) : '';
             }
 
-            rows.forEach(tr => {
-                const usedSpan = tr.querySelector('.bundle-qty-used');
-                if (usedSpan) {
-                    usedSpan.textContent = perRow ? perRow.toFixed(2).replace('.', ',') : '-';
-                }
-            });
-        }
+            function attachRowListeners(tr) {
+                tr.querySelector('.btn-remove-row')?.addEventListener('click', () => {
+                    tr.remove();
+                    updateBundleRowIndices();
+                    rebuildLotOptionsForAllRows();
+                    redistributeUsedByLot();
+                });
 
-        function attachRowListeners(tr) {
-            const qtyInput = tr.querySelector('.bundle-qty');
-            if (qtyInput) {
-                attachSelectAllOnFocus(qtyInput);
-                qtyInput.addEventListener('input', recalcAll);
+                tr.querySelector('.bundle-qty')?.addEventListener('input', () => {
+                    clampQtyInteger(tr);
+                    redistributeUsedByLot();
+                });
+
+                tr.querySelector('.bundle-lot-select')?.addEventListener('change', () => {
+                    redistributeUsedByLot();
+                });
+
+                // perubahan item-suggest biasanya update hidden finished_item_id
+                tr.addEventListener('change', (e) => {
+                    if (e.target && String(e.target.name || '').includes('[finished_item_id]')) {
+                        redistributeUsedByLot();
+                    }
+                }, true);
+
+                // init
+                clampQtyInteger(tr);
             }
-        }
 
-        function addRow() {
-            if (!bundleRows) return;
+            function createBundleRow() {
+                if (!bundlesTbody) return;
+                const tpl = document.getElementById('bundle-row-template');
+                if (!tpl) return;
 
-            const rows = bundleRows.querySelectorAll('tr');
-            const index = rows.length;
-            if (!rows.length) return;
+                const idx = bundleIndexCounter++;
+                const html = tpl.innerHTML
+                    .replaceAll('__INDEX__', String(idx))
+                    .replaceAll('__NO__', String(idx + 1));
 
-            const templateRow = rows[0];
-            const newRow = templateRow.cloneNode(true);
+                const temp = document.createElement('tbody');
+                temp.innerHTML = html.trim();
+                const tr = temp.querySelector('tr');
+                if (!tr) return;
 
-            // Bersihkan nilai lama
-            newRow.querySelectorAll('input, select, textarea').forEach(el => {
-                const name = el.name || '';
+                bundlesTbody.appendChild(tr);
 
-                // id bundle lama tidak dipakai di row baru
-                if (name.endsWith('[id]')) {
-                    el.remove();
-                    return;
-                }
+                // init item-suggest
+                if (window.initItemSuggestInputs) window.initItemSuggestInputs(tr);
 
-                if (el.tagName === 'SELECT') {
-                    el.selectedIndex = 0;
-                } else if (['hidden', 'text', 'number'].includes(el.type)) {
-                    el.value = '';
-                }
-            });
-
-            // Update name index
-            newRow.querySelectorAll('input, select, textarea').forEach(el => {
-                if (!el.name) return;
-                el.name = el.name.replace(/bundles\[\d+]/, `bundles[${index}]`);
-            });
-
-            bundleRows.appendChild(newRow);
-            attachRowListeners(newRow);
-            renumberRows();
-            recalcAll();
-        }
-
-        // INIT EXISTING ROWS
-        if (bundleRows) {
-            Array.from(bundleRows.querySelectorAll('tr')).forEach(tr => {
                 attachRowListeners(tr);
-            });
-            renumberRows();
-            recalcAll();
-        }
-
-        if (addRowBtnTop) {
-            addRowBtnTop.addEventListener('click', addRow);
-        }
-        if (addRowBtnBottom) {
-            addRowBtnBottom.addEventListener('click', addRow);
-        }
-
-        // Hapus baris
-        document.addEventListener('click', function(e) {
-            if (e.target.classList.contains('remove-row')) {
-                const tr = e.target.closest('tr');
-                if (!tr || !bundleRows) return;
-
-                tr.parentNode.removeChild(tr);
-                renumberRows();
-                recalcAll();
+                updateBundleRowIndices();
+                rebuildLotOptionsForAllRows();
+                redistributeUsedByLot();
             }
+
+            // =========================
+            // INIT
+            // =========================
+            if (bundlesTbody) {
+                Array.from(bundlesTbody.querySelectorAll('.bundle-row')).forEach(tr => attachRowListeners(tr));
+                updateBundleRowIndices();
+            }
+
+            if (window.initItemSuggestInputs) window.initItemSuggestInputs(document);
+
+            // checkbox mode only when unlocked
+            if (!lotsLocked) {
+                lotCheckboxes.forEach(cb => {
+                    cb.addEventListener('change', () => {
+                        const ok = enforceSingleFabricForCheckedLots(cb);
+                        if (!ok) return;
+                        setSelectedLotsHidden(getCheckedLots());
+                        rebuildLotOptionsForAllRows();
+                        updateCurrentLotSummary();
+                        redistributeUsedByLot();
+                    });
+                });
+
+                btnSelectAllLots?.addEventListener('click', () => {
+                    lotCheckboxes.forEach(cb => cb.checked = true);
+                    enforceSingleFabricForCheckedLots();
+                    setSelectedLotsHidden(getCheckedLots());
+                    rebuildLotOptionsForAllRows();
+                    updateCurrentLotSummary();
+                    redistributeUsedByLot();
+                });
+
+                btnUnselectAllLots?.addEventListener('click', () => {
+                    lotCheckboxes.forEach(cb => cb.checked = false);
+                    setSelectedLotsHidden([]);
+                    rebuildLotOptionsForAllRows();
+                    updateCurrentLotSummary();
+                    redistributeUsedByLot();
+                });
+
+                btnConfirmLots?.addEventListener('click', () => {
+                    const checked = getCheckedLots();
+                    if (!checked.length) return alert('Pilih minimal satu LOT terlebih dahulu.');
+                    const ok = enforceSingleFabricForCheckedLots();
+                    if (!ok) return;
+
+                    setSelectedLotsHidden(checked);
+                    rebuildLotOptionsForAllRows();
+                    updateCurrentLotSummary();
+                    showMainContent();
+                    redistributeUsedByLot();
+                });
+
+                btnChangeLots?.addEventListener('click', () => showPickLotSection());
+            } else {
+                // locked: pastikan hidden selected_lots selalu ada
+                setSelectedLotsHidden(getCheckedLots());
+            }
+
+            btnAddRow?.addEventListener('click', () => createBundleRow());
+
+            // open default
+            rebuildLotOptionsForAllRows();
+            updateCurrentLotSummary();
+
+            // ✅ ini yang bikin “item cutting muncul” saat locked
+            if (lotsLocked) showMainContent();
+            else if (getCheckedLots().length > 0) showMainContent();
+
+            // hitung used awal (planned ÷ baris)
+            redistributeUsedByLot();
+
+            // safety sebelum submit
+            form?.addEventListener('submit', () => {
+                // pastikan selected_lots[] kebentuk
+                setSelectedLotsHidden(getCheckedLots());
+                // pastikan used sesuai
+                redistributeUsedByLot();
+            });
         });
     </script>
 @endpush

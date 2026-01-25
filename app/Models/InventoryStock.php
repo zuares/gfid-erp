@@ -9,6 +9,7 @@ class InventoryStock extends Model
     protected $fillable = [
         'warehouse_id',
         'item_id',
+        'lot_id',
         'qty',
     ];
 

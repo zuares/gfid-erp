@@ -472,4 +472,53 @@ class QcController extends Controller
         });
     }
 
+    public function revertCuttingToCutting(CuttingJob $cuttingJob): RedirectResponse
+    {
+        // owner-only (samakan pola dengan cancelCutting)
+        if ((Auth::user()->role ?? null) !== 'owner') {
+            return back()->with('error', 'Hanya OWNER yang boleh mengubah status ini.');
+        }
+
+        return DB::transaction(function () use ($cuttingJob) {
+
+            // hanya boleh kalau status-nya memang sent_to_qc
+            if ($cuttingJob->status !== 'sent_to_qc') {
+                return back()->with('error', 'Job ini bukan status sent_to_qc.');
+            }
+
+            // kalau sudah ada QC cutting, jangan boleh revert (suruh cancel QC saja)
+            $hasQc = QcResult::query()
+                ->where('stage', QcResult::STAGE_CUTTING)
+                ->where('cutting_job_id', $cuttingJob->id)
+                ->exists();
+
+            if ($hasQc) {
+                return back()->with('error', 'Sudah ada QC Cutting. Gunakan menu Cancel QC (VOID) untuk membatalkan QC terlebih dulu.');
+            }
+
+            // OPTIONAL: reset field QC di bundle (kalau kamu simpan qty_qc_ok/reject/status di bundle)
+            $cuttingJob->loadMissing('bundles');
+
+            foreach ($cuttingJob->bundles as $b) {
+                $b->qty_qc_ok = 0;
+                $b->qty_qc_reject = 0;
+                $b->status = 'cut'; // atau 'cutting' tergantung enum status bundle kamu
+                $b->wip_qty = 0;
+                $b->wip_warehouse_id = null;
+                $b->wip_posted_at = null;
+                $b->save();
+            }
+
+            // update header
+            $cuttingJob->update([
+                'status' => 'cutting',
+                'updated_by' => Auth::id(),
+            ]);
+
+            return redirect()
+                ->route('production.cutting_jobs.show', $cuttingJob)
+                ->with('success', 'Status Cutting Job berhasil dikembalikan ke CUTTING.');
+        });
+    }
+
 }
