@@ -45,23 +45,25 @@ class FinishingJobController extends Controller
             ->withCount('lines as bundle_count')
             ->withSum('lines as total_ok', 'qty_ok')
             ->withSum('lines as total_reject', 'qty_reject')
+        // urut terbaru: yang terakhir berubah di atas
             ->orderByDesc('date')
+            ->orderByDesc('updated_at')
             ->orderByDesc('id');
 
         if ($search) {
             $query->where(function ($q) use ($search) {
-                $q->where('code', 'like', '%' . $search . '%')
-                    ->orWhere('notes', 'like', '%' . $search . '%');
+                $q->where('code', 'like', "%{$search}%")
+                    ->orWhere('notes', 'like', "%{$search}%");
             });
         }
 
+        // FILTER STATUS pakai kolom status (bukan posted_at)
         if ($status === 'draft') {
-            $query->whereNull('posted_at');
+            $query->where('status', 'draft');
         } elseif ($status === 'posted') {
-            $query->whereNotNull('posted_at');
+            $query->where('status', 'posted');
         }
 
-        // ✅ lebih aman daripada HAVING alias
         if ($rejectFlag === 'yes') {
             $query->whereHas('lines', fn($q) => $q->where('qty_reject', '>', 0));
         } elseif ($rejectFlag === 'no') {
@@ -71,10 +73,7 @@ class FinishingJobController extends Controller
         $finishingJobs = $query->paginate(15)->withQueryString();
 
         return view('production.finishing_jobs.index', compact(
-            'finishingJobs',
-            'search',
-            'status',
-            'rejectFlag',
+            'finishingJobs', 'search', 'status', 'rejectFlag'
         ));
     }
 
@@ -85,71 +84,247 @@ class FinishingJobController extends Controller
 
     public function create(Request $request): View
     {
-        $today = Carbon::today()->toDateString();
+        $today = \Carbon\Carbon::today()->toDateString();
+
         $wipFinWarehouseId = Warehouse::where('code', 'WIP-FIN')->value('id');
 
+        // dropdown modal (operator jahit / finishing) - kamu bisa sesuaikan rolenya
         $operators = Employee::query()
-            ->where('role', 'sewing') // sementara
+            ->where('role', 'sewing') // <- kalau operator finishing beda role, ganti jadi ['sewing','finishing'] dll
             ->orderBy('name')
-            ->get();
+            ->get(['id', 'code', 'name']);
 
         if (!$wipFinWarehouseId) {
             return view('production.finishing_jobs.create', [
-                'dateDefault' => old('date', $today),
-                'lines' => [],
+                'dateDefault' => $today,
+                'linesAll' => [],
+                'linesByOp' => [],
                 'operators' => $operators,
-            ])->withErrors([
-                'warehouse' => 'Gudang WIP-FIN belum dikonfigurasi. Silakan set warehouse dengan kode "WIP-FIN" terlebih dahulu.',
+            ])->withErrors(['warehouse' => 'Gudang WIP-FIN belum dikonfigurasi.']);
+        }
+
+        // schema beda2 (sqlite / mysql)
+        $hasSplVoided = \Schema::hasColumn('sewing_pickup_lines', 'voided_at');
+        $hasSrVoided = \Schema::hasColumn('sewing_returns', 'voided_at');
+
+        /**
+         * 1) Ambil daftar item yang punya WIP-FIN real
+         */
+        $itemIds = CuttingJobBundle::query()
+            ->readyForFinishing($wipFinWarehouseId)
+            ->whereNotNull('finished_item_id')
+            ->where('wip_qty', '>', 0)
+            ->selectRaw('finished_item_id as item_id')
+            ->groupBy('finished_item_id')
+            ->pluck('item_id')
+            ->map(fn($v) => (int) $v)
+            ->values();
+
+        if ($itemIds->isEmpty()) {
+            return view('production.finishing_jobs.create', [
+                'dateDefault' => $today,
+                'linesAll' => [],
+                'linesByOp' => [],
+                'operators' => $operators,
             ]);
         }
 
-        $bundleIds = (array) $request->input('bundle_ids', []);
-
-        $bundlesQuery = CuttingJobBundle::query()
-            ->readyForFinishing($wipFinWarehouseId)
-            ->when(!empty($bundleIds), fn($q) => $q->whereIn('id', $bundleIds));
-
-        $itemsWip = $bundlesQuery
-            ->selectRaw('finished_item_id as item_id, SUM(wip_qty) as total_wip')
-            ->whereNotNull('finished_item_id')
-            ->groupBy('finished_item_id')
-            ->orderBy('finished_item_id')
-            ->get();
-
-        $itemIds = $itemsWip->pluck('item_id')->filter()->unique()->values()->all();
-
         $items = Item::query()
             ->whereIn('id', $itemIds)
-            ->get(['id', 'code', 'name', 'color'])
+            ->get(['id', 'code', 'name'])
             ->keyBy('id');
 
-        $lines = [];
+        /**
+         * 2) WIP-FIN SUM per item (REAL)
+         */
+        $wipByItem = CuttingJobBundle::query()
+            ->readyForFinishing($wipFinWarehouseId)
+            ->whereIn('finished_item_id', $itemIds)
+            ->where('wip_qty', '>', 0)
+            ->selectRaw('finished_item_id as item_id, SUM(wip_qty) as wip_sum')
+            ->groupBy('finished_item_id')
+            ->get()
+            ->keyBy('item_id'); // {item_id: wip_sum}
 
-        foreach ($itemsWip as $row) {
-            $itemId = (int) $row->item_id;
-            $totalWip = (int) round((float) $row->total_wip); // ✅ integer
+        /**
+         * 3) Base query remaining dari sewing_return_lines:
+         * remaining_ok = SUM(qty_ok - finished_qty)
+         * + last pickup/setor date (optional)
+         */
+        $base = DB::table('cutting_job_bundles as b')
+            ->join('sewing_pickup_lines as spl', 'spl.cutting_job_bundle_id', '=', 'b.id')
+            ->join('sewing_return_lines as srl', 'srl.sewing_pickup_line_id', '=', 'spl.id')
+            ->join('sewing_returns as sr', 'sr.id', '=', 'srl.sewing_return_id')
+            ->leftJoin('sewing_pickups as sp', 'sp.id', '=', 'spl.sewing_pickup_id')
+            ->leftJoin('employees as e', 'e.id', '=', 'sr.operator_id')
+            ->where('b.wip_warehouse_id', $wipFinWarehouseId)
+            ->where('b.wip_qty', '>', 0)
+            ->whereIn('b.finished_item_id', $itemIds)
+            ->whereNotNull('b.finished_item_id')
+            ->whereRaw('(COALESCE(srl.qty_ok,0) - COALESCE(srl.finished_qty,0)) > 0');
 
-            $item = $items[$itemId] ?? null;
-
-            // label = kode saja
-            $itemLabel = $item
-            ? ($item->code ?? ('Item #' . $itemId))
-            : 'Item #' . $itemId;
-
-            $lines[] = [
-                'item_id' => $itemId,
-                'item_label' => $itemLabel,
-                'total_wip' => $totalWip,
-                'qty_in' => null,
-                'qty_reject' => 0,
-                'reject_reason' => null,
-                'reject_notes' => null,
-            ];
+        if ($hasSplVoided) {
+            $base->whereNull('spl.voided_at');
         }
 
+        if ($hasSrVoided) {
+            $base->whereNull('sr.voided_at');
+        }
+
+        /**
+         * 4A) Remaining per ITEM+OP (BYOP)
+         */
+        $rowsByOp = (clone $base)
+            ->selectRaw('
+            b.finished_item_id as item_id,
+            sr.operator_id as operator_id,
+            MAX(e.code) as operator_code,
+            MAX(e.name) as operator_name,
+            SUM(COALESCE(srl.qty_ok,0) - COALESCE(srl.finished_qty,0)) as remaining_ok,
+            MAX(sp.date) as pickup_date,
+            MAX(sr.date) as setor_date
+        ')
+            ->groupBy('b.finished_item_id', 'sr.operator_id')
+            ->orderBy('b.finished_item_id')
+            ->orderByRaw('COALESCE(MAX(e.code), "")')
+            ->get();
+
+        /**
+         * 4B) Remaining per ITEM (ALL)
+         */
+        $rowsAll = (clone $base)
+            ->selectRaw('
+            b.finished_item_id as item_id,
+            SUM(COALESCE(srl.qty_ok,0) - COALESCE(srl.finished_qty,0)) as remaining_ok,
+            MAX(sp.date) as pickup_date,
+            MAX(sr.date) as setor_date
+        ')
+            ->groupBy('b.finished_item_id')
+            ->orderBy('b.finished_item_id')
+            ->get();
+
+        /**
+         * 5) WIP “eligible” per ITEM+OP
+         *    Artinya: jumlah wip_qty dari bundle yang memang punya remaining untuk operator tsb
+         *    (ini yang bikin angka BYOP tidak “lebih besar dari real allocatable”)
+         *
+         * NOTE: join besar bisa dup karena banyak srl per bundle, jadi:
+         * - groupBy(bundle_id, item_id, operator_id) dulu (ambil MAX(wip_qty))
+         * - lalu SUM di luar
+         */
+        $qEligibleBundles = DB::table('cutting_job_bundles as b')
+            ->join('sewing_pickup_lines as spl', 'spl.cutting_job_bundle_id', '=', 'b.id')
+            ->join('sewing_return_lines as srl', 'srl.sewing_pickup_line_id', '=', 'spl.id')
+            ->join('sewing_returns as sr', 'sr.id', '=', 'srl.sewing_return_id')
+            ->where('b.wip_warehouse_id', $wipFinWarehouseId)
+            ->where('b.wip_qty', '>', 0)
+            ->whereIn('b.finished_item_id', $itemIds)
+            ->whereNotNull('b.finished_item_id')
+            ->whereRaw('(COALESCE(srl.qty_ok,0) - COALESCE(srl.finished_qty,0)) > 0');
+
+        if ($hasSplVoided) {
+            $qEligibleBundles->whereNull('spl.voided_at');
+        }
+
+        if ($hasSrVoided) {
+            $qEligibleBundles->whereNull('sr.voided_at');
+        }
+
+        $eligibleBundleRows = $qEligibleBundles
+            ->selectRaw('
+            b.id as bundle_id,
+            b.finished_item_id as item_id,
+            sr.operator_id as operator_id,
+            MAX(b.wip_qty) as bundle_wip
+        ')
+            ->groupBy('b.id', 'b.finished_item_id', 'sr.operator_id')
+            ->get();
+
+        // sum eligible wip per (item_id, operator_id)
+        $eligibleWipByItemOp = [];
+        foreach ($eligibleBundleRows as $r) {
+            $key = (int) $r->item_id . ':' . (int) $r->operator_id;
+            $eligibleWipByItemOp[$key] = ($eligibleWipByItemOp[$key] ?? 0) + (int) round((float) ($r->bundle_wip ?? 0));
+        }
+
+        /**
+         * 6) Build linesByOp dan linesAll
+         *    total_wip = MIN(remaining_ok, eligible_wip) (BYOP)
+         *    total_wip = MIN(remaining_ok, wip_sum_item) (ALL)
+         */
+        $linesByOp = collect($rowsByOp)->map(function ($r) use ($items, $eligibleWipByItemOp) {
+            $itemId = (int) $r->item_id;
+            $opId = (int) ($r->operator_id ?? 0);
+
+            $it = $items->get($itemId);
+
+            $remaining = (int) round((float) ($r->remaining_ok ?? 0));
+            $eligibleWip = (int) ($eligibleWipByItemOp["{$itemId}:{$opId}"] ?? 0);
+
+            $cap = min($remaining, $eligibleWip);
+            if ($cap < 0) {
+                $cap = 0;
+            }
+
+            return [
+                'item_id' => $itemId,
+                'item_code' => strtoupper($it?->code ?? ('ITEM-' . $itemId)),
+                'item_name' => $it?->name ?? null,
+
+                // ✅ yang ditampilkan di UI (sudah dicap)
+                'total_wip' => $cap,
+
+                'operator_id' => $opId,
+                'operator_code' => $r->operator_code ?? null,
+                'operator_name' => $r->operator_name ?? null,
+
+                'pickup_date' => $r->pickup_date ?? null,
+                'setor_date' => $r->setor_date ?? null,
+
+                'qty_in' => null,
+                'qty_reject' => 0,
+                'reject_notes' => null,
+            ];
+        })->filter(fn($l) => (int) $l['total_wip'] > 0)->values()->all();
+
+        $linesAll = collect($rowsAll)->map(function ($r) use ($items, $wipByItem) {
+            $itemId = (int) $r->item_id;
+            $it = $items->get($itemId);
+
+            $remaining = (int) round((float) ($r->remaining_ok ?? 0));
+            $wipSum = (int) round((float) (optional($wipByItem->get($itemId))->wip_sum ?? 0));
+
+            $cap = min($remaining, $wipSum);
+            if ($cap < 0) {
+                $cap = 0;
+            }
+
+            return [
+                'item_id' => $itemId,
+                'item_code' => strtoupper($it?->code ?? ('ITEM-' . $itemId)),
+                'item_name' => $it?->name ?? null,
+
+                // ✅ yang ditampilkan di UI (cap remaining vs WIP real)
+                'total_wip' => $cap,
+
+                // operator kosong (dipilih di modal)
+                'operator_id' => 0,
+                'operator_code' => null,
+                'operator_name' => null,
+
+                'pickup_date' => $r->pickup_date ?? null,
+                'setor_date' => $r->setor_date ?? null,
+
+                'qty_in' => null,
+                'qty_reject' => 0,
+                'reject_notes' => null,
+            ];
+        })->filter(fn($l) => (int) $l['total_wip'] > 0)->values()->all();
+
         return view('production.finishing_jobs.create', [
-            'dateDefault' => old('date', $today),
-            'lines' => $lines,
+            'dateDefault' => $today,
+            'linesAll' => $linesAll,
+            'linesByOp' => $linesByOp,
             'operators' => $operators,
         ]);
     }
@@ -161,107 +336,195 @@ class FinishingJobController extends Controller
 
     public function store(Request $request): RedirectResponse
     {
-        $validated = $request->validate([
+        // ============================================================
+        // 0) Mode & lines key (harus match Blade)
+        // ============================================================
+        $mode = $request->input('operator_mode', 'all');
+        $mode = in_array($mode, ['all', 'byop'], true) ? $mode : 'all';
+
+        $linesKey = $mode === 'all' ? 'lines_all' : 'lines_byop';
+
+        // Operator finishing (dipakai isi finishing_job_lines.operator_id)
+        // - Mode ALL: wajib dipilih dari modal => operator_global_id
+        // - Mode BYOP: boleh kosong, nanti fallback ke operator jahit per baris
+        $finishingOperatorId = (int) ($request->input('operator_global_id') ?? 0);
+
+        // Schema compatibility
+        $hasSplVoided = \Schema::hasColumn('sewing_pickup_lines', 'voided_at');
+        $hasSrVoided = \Schema::hasColumn('sewing_returns', 'voided_at');
+
+        // ============================================================
+        // 1) Validate request
+        // ============================================================
+        $rules = [
             'date' => ['required', 'date'],
             'notes' => ['nullable', 'string'],
+            'operator_mode' => ['required', 'in:all,byop'],
 
-            'operator_global_id' => ['nullable', 'integer', 'exists:employees,id'],
+            // mode ALL wajib operator_global_id (modal)
+            'operator_global_id' => [
+                $mode === 'all' ? 'required' : 'nullable',
+                'integer',
+                'exists:employees,id',
+            ],
 
-            'lines' => ['required', 'array', 'min:1'],
-            'lines.*.item_id' => ['required', 'integer', 'exists:items,id'],
+            $linesKey => ['required', 'array', 'min:1'],
+            $linesKey . '.*.item_id' => ['required', 'integer', 'exists:items,id'],
+            $linesKey . '.*.qty_in' => ['nullable', 'integer', 'min:0'],
+            $linesKey . '.*.qty_reject' => ['nullable', 'integer', 'min:0'],
+            $linesKey . '.*.reject_reason' => ['nullable', 'string', 'max:100'],
+            $linesKey . '.*.reject_notes' => ['nullable', 'string'],
 
-            // ✅ integer qty
-            'lines.*.qty_in' => ['nullable', 'integer', 'min:0'],
-            'lines.*.qty_reject' => ['required', 'integer', 'min:0'],
-            'lines.*.reject_reason' => ['nullable', 'string', 'max:100'],
-            'lines.*.reject_notes' => ['nullable', 'string'],
-        ]);
+            // byop wajib operator_id per baris
+            $linesKey . '.*.operator_id' => [
+                $mode === 'byop' ? 'required' : 'nullable',
+                'integer',
+                'exists:employees,id',
+            ],
+        ];
+
+        $validated = $request->validate($rules);
 
         $wipFinWarehouseId = Warehouse::where('code', 'WIP-FIN')->value('id');
         if (!$wipFinWarehouseId) {
             return back()->withInput()->withErrors([
-                'warehouse' => 'Gudang WIP-FIN belum dikonfigurasi. Silakan set warehouse dengan kode WIP-FIN terlebih dahulu.',
+                'warehouse' => 'Gudang WIP-FIN belum dikonfigurasi. Set kode warehouse WIP-FIN terlebih dahulu.',
             ]);
         }
 
-        $globalOperatorId = $this->resolveGlobalOperatorId($validated['operator_global_id'] ?? null);
+        if ($mode === 'all' && $finishingOperatorId <= 0) {
+            return back()->withInput()->withErrors([
+                'operator_global_id' => 'Wajib pilih operator jahit (mode ALL).',
+            ]);
+        }
 
-        $perItemLines = [];
+        // ============================================================
+        // 2) Build workLines + VALIDASI KERAS
+        // - Validasi remaining operator per item
+        // - Validasi total WIP per item
+        // ============================================================
+        $workLines = [];
 
-        foreach ($validated['lines'] as $index => $lineData) {
-            $itemId = (int) $lineData['item_id'];
-            $qtyInRequested = (int) ($lineData['qty_in'] ?? 0);
-            $qtyRejectRequested = (int) ($lineData['qty_reject'] ?? 0);
+        foreach (($validated[$linesKey] ?? []) as $index => $line) {
+            $itemId = (int) ($line['item_id'] ?? 0);
+            $qtyIn = max(0, (int) ($line['qty_in'] ?? 0));
+            $qtyRj = max(0, (int) ($line['qty_reject'] ?? 0));
 
-            $qtyInRequested = max(0, $qtyInRequested);
-            $qtyRejectRequested = max(0, $qtyRejectRequested);
-
-            $rejectReason = $lineData['reject_reason'] ?? null;
-            $rejectNotes = $lineData['reject_notes'] ?? null;
-
-            $bundles = CuttingJobBundle::query()
-                ->readyForFinishing($wipFinWarehouseId)
-                ->where('finished_item_id', $itemId)
-                ->orderBy('cutting_job_id')
-                ->orderBy('bundle_no')
-                ->orderBy('id')
-                ->get();
-
-            $totalWip = (int) round((float) $bundles->sum('wip_qty'));
-
-            if ($totalWip <= 0) {
-                return back()->withInput()->withErrors([
-                    "lines.{$index}.item_id" => 'Tidak ada saldo WIP-FIN untuk item ini. Pastikan sudah ada Sewing Return ke WIP-FIN.',
+            if ($qtyIn <= 0 && $qtyRj > 0) {
+                throw \Illuminate\Validation\ValidationException::withMessages([
+                    "{$linesKey}.{$index}.qty_in" => 'Qty Setor harus > 0 jika ada Reject.',
                 ]);
             }
 
-            if ($qtyInRequested <= 0) {
-                if ($qtyRejectRequested > 0) {
-                    return back()->withInput()->withErrors([
-                        "lines.{$index}.qty_in" => 'Qty Proses harus > 0 jika ada Qty Reject.',
-                    ]);
-                }
+            if ($qtyIn <= 0) {
                 continue;
             }
 
-            $qtyIn = min($qtyInRequested, $totalWip);
-
-            if ($qtyRejectRequested > $qtyIn) {
-                return back()->withInput()->withErrors([
-                    "lines.{$index}.qty_reject" => "Qty Reject melebihi Qty Proses untuk item ini ({$qtyIn}).",
+            if ($qtyRj > $qtyIn) {
+                throw \Illuminate\Validation\ValidationException::withMessages([
+                    "{$linesKey}.{$index}.qty_reject" => 'Qty Reject tidak boleh > Qty Setor.',
                 ]);
             }
 
-            $qtyOk = $qtyIn - $qtyRejectRequested;
+            // sewing operator sumber jatah:
+            $sewingOperatorId = ($mode === 'all')
+            ? $finishingOperatorId
+            : (int) ($line['operator_id'] ?? 0);
 
-            $perItemLines[] = [
-                'item_id' => $itemId,
-                'qty_in' => $qtyIn,
-                'qty_ok' => $qtyOk,
-                'qty_reject' => $qtyRejectRequested,
-                'reject_reason' => $rejectReason,
-                'reject_notes' => $rejectNotes,
-                'bundles' => $bundles,
+            if ($sewingOperatorId <= 0) {
+                throw \Illuminate\Validation\ValidationException::withMessages([
+                    "{$linesKey}.{$index}.operator_id" => 'Operator wajib dipilih.',
+                ]);
+            }
+
+            // Remaining OK operator per item
+            $qRemaining = DB::table('sewing_return_lines as srl')
+                ->join('sewing_returns as sr', 'sr.id', '=', 'srl.sewing_return_id')
+                ->join('sewing_pickup_lines as spl', 'spl.id', '=', 'srl.sewing_pickup_line_id')
+                ->where('spl.finished_item_id', $itemId)
+                ->where('sr.operator_id', $sewingOperatorId)
+                ->whereRaw('(COALESCE(srl.qty_ok,0) - COALESCE(srl.finished_qty,0)) > 0');
+
+            if ($hasSplVoided) {
+                $qRemaining->whereNull('spl.voided_at');
+            }
+
+            if ($hasSrVoided) {
+                $qRemaining->whereNull('sr.voided_at');
+            }
+
+            $remaining = (int) ($qRemaining
+                    ->selectRaw('SUM(COALESCE(srl.qty_ok,0) - COALESCE(srl.finished_qty,0)) as remaining')
+                    ->value('remaining') ?? 0);
+
+            if ($remaining <= 0) {
+                throw \Illuminate\Validation\ValidationException::withMessages([
+                    "{$linesKey}.{$index}.qty_in" => 'Tidak ada sisa jahitan untuk operator ini.',
+                ]);
+            }
+
+            if ($qtyIn > $remaining) {
+                throw \Illuminate\Validation\ValidationException::withMessages([
+                    "{$linesKey}.{$index}.qty_in" => "Qty melebihi sisa operator. Maks: {$remaining}.",
+                ]);
+            }
+
+            // Total WIP-FIN per item (anti mismatch)
+            $totalWip = (int) round((float) CuttingJobBundle::query()
+                    ->readyForFinishing($wipFinWarehouseId)
+                    ->where('finished_item_id', $itemId)
+                    ->sum('wip_qty'));
+
+            if ($totalWip <= 0) {
+                throw \Illuminate\Validation\ValidationException::withMessages([
+                    "{$linesKey}.{$index}.item_id" => 'Tidak ada saldo WIP-FIN untuk item ini.',
+                ]);
+            }
+
+            if ($qtyIn > $totalWip) {
+                throw \Illuminate\Validation\ValidationException::withMessages([
+                    "{$linesKey}.{$index}.qty_in" => "Qty melebihi saldo WIP-FIN item. Maks: {$totalWip}.",
+                ]);
+            }
+
+            $workLines[] = [
                 'index' => $index,
+                'item_id' => $itemId,
+                'sewing_operator_id' => $sewingOperatorId,
+                'qty_in' => $qtyIn,
+                'qty_reject' => $qtyRj,
+                'reject_reason' => $line['reject_reason'] ?? null,
+                'reject_notes' => $line['reject_notes'] ?? null,
             ];
         }
 
-        if (empty($perItemLines)) {
+        if (empty($workLines)) {
             return back()->withInput()->withErrors([
-                'lines' => 'Isi minimal satu Qty Proses > 0 untuk membuat Finishing Job.',
+                $linesKey => 'Isi minimal satu Qty Setor > 0.',
             ]);
         }
 
-        $job = null;
-
-        // ✅ cache nama operator sewing biar tidak N+1
+        // cache nama operator
         $empNameCache = [];
 
-        DB::transaction(function () use ($request, $validated, $perItemLines, $globalOperatorId, &$job, &$empNameCache) {
-            $code = CodeGenerator::generate('FIN');
-
-            $jobLocal = FinishingJob::create([
-                'code' => $code,
+        // ============================================================
+        // 3) TRANSACTION: create job + allocate bundles + consume finished_qty + create lines
+        //    ⚠️ store tidak mengurangi WIP bundle (sesuai request kamu)
+        // ============================================================
+        $job = DB::transaction(function () use (
+            $request,
+            $validated,
+            $mode,
+            $linesKey,
+            $wipFinWarehouseId,
+            $workLines,
+            $hasSplVoided,
+            $hasSrVoided,
+            $finishingOperatorId,
+            &$empNameCache
+        ) {
+            $job = FinishingJob::create([
+                'code' => CodeGenerator::generate('FIN'),
                 'date' => $validated['date'],
                 'status' => 'draft',
                 'notes' => $validated['notes'] ?? null,
@@ -269,21 +532,49 @@ class FinishingJobController extends Controller
                 'updated_by' => $request->user()->id,
             ]);
 
-            foreach ($perItemLines as $line) {
-                $itemId = (int) $line['item_id'];
-                $qtyInTotal = (int) $line['qty_in'];
-                $qtyRejectTotal = (int) $line['qty_reject'];
+            foreach ($workLines as $wl) {
+                $itemId = (int) $wl['item_id'];
+                $sewingOperatorId = (int) $wl['sewing_operator_id'];
 
-                $rejectReason = $line['reject_reason'];
-                $rejectNotes = $line['reject_notes'];
+                $needIn = (int) $wl['qty_in'];
+                $needReject = (int) $wl['qty_reject'];
 
-                $bundles = $line['bundles'];
+                // bundles WIP-FIN yang match operator tsb (anti makan jatah operator lain)
+                $bundles = CuttingJobBundle::query()
+                    ->readyForFinishing($wipFinWarehouseId)
+                    ->where('finished_item_id', $itemId)
+                    ->whereExists(function ($q) use ($sewingOperatorId, $itemId, $hasSplVoided, $hasSrVoided) {
+                        $q->select(DB::raw(1))
+                            ->from('sewing_return_lines as srl')
+                            ->join('sewing_returns as sr', 'sr.id', '=', 'srl.sewing_return_id')
+                            ->join('sewing_pickup_lines as spl', 'spl.id', '=', 'srl.sewing_pickup_line_id')
+                            ->whereColumn('spl.cutting_job_bundle_id', 'cutting_job_bundles.id')
+                            ->where('spl.finished_item_id', $itemId)
+                            ->where('sr.operator_id', $sewingOperatorId)
+                            ->whereRaw('(COALESCE(srl.qty_ok,0) - COALESCE(srl.finished_qty,0)) > 0');
 
-                $remainingIn = $qtyInTotal;
-                $remainingReject = $qtyRejectTotal;
+                        if ($hasSplVoided) {
+                            $q->whereNull('spl.voided_at');
+                        }
+
+                        if ($hasSrVoided) {
+                            $q->whereNull('sr.voided_at');
+                        }
+
+                    })
+                    ->orderBy('id')
+                    ->get();
+
+                if ($bundles->isEmpty()) {
+                    throw \Illuminate\Validation\ValidationException::withMessages([
+                        "{$linesKey}.{$wl['index']}.qty_in" => 'Tidak ada bundle WIP-FIN yang match operator ini.',
+                    ]);
+                }
+
+                $sewingOperatorName = $empNameCache[$sewingOperatorId] ??= (Employee::whereKey($sewingOperatorId)->value('name') ?: null);
 
                 foreach ($bundles as $bundle) {
-                    if ($remainingIn <= 0) {
+                    if ($needIn <= 0) {
                         break;
                     }
 
@@ -292,83 +583,140 @@ class FinishingJobController extends Controller
                         continue;
                     }
 
-                    $takeIn = min($bundleWip, $remainingIn);
+                    // remaining operator untuk bundle ini
+                    $qBundleRemaining = DB::table('sewing_return_lines as srl')
+                        ->join('sewing_returns as sr', 'sr.id', '=', 'srl.sewing_return_id')
+                        ->join('sewing_pickup_lines as spl', 'spl.id', '=', 'srl.sewing_pickup_line_id')
+                        ->where('spl.cutting_job_bundle_id', $bundle->id)
+                        ->where('spl.finished_item_id', $itemId)
+                        ->where('sr.operator_id', $sewingOperatorId)
+                        ->whereRaw('(COALESCE(srl.qty_ok,0) - COALESCE(srl.finished_qty,0)) > 0');
 
-                    // ✅ reject integer: ambil dari sisa reject, tidak boleh > takeIn
+                    if ($hasSplVoided) {
+                        $qBundleRemaining->whereNull('spl.voided_at');
+                    }
+
+                    if ($hasSrVoided) {
+                        $qBundleRemaining->whereNull('sr.voided_at');
+                    }
+
+                    $bundleRemaining = (int) ($qBundleRemaining
+                            ->selectRaw('SUM(COALESCE(srl.qty_ok,0) - COALESCE(srl.finished_qty,0)) as remaining')
+                            ->value('remaining') ?? 0);
+
+                    if ($bundleRemaining <= 0) {
+                        continue;
+                    }
+
+                    // ambil maksimum yang aman
+                    $takeIn = min($needIn, $bundleWip, $bundleRemaining);
+
+                    // reject diambil dari qty_in
                     $takeReject = 0;
-                    if ($remainingReject > 0) {
-                        $takeReject = min($remainingReject, $takeIn);
+                    if ($needReject > 0) {
+                        $takeReject = min($needReject, $takeIn);
                     }
 
-                    $qtyOkThisBundle = $takeIn - $takeReject;
+                    $takeOk = $takeIn - $takeReject;
 
-                    // Ambil sewing attribution dari SewingReturnLine terbaru untuk bundle + item ini
-                    $sewingReturnLine = SewingReturnLine::query()
-                        ->whereHas('sewingPickupLine', function ($q) use ($bundle, $itemId) {
-                            $q->where('cutting_job_bundle_id', $bundle->id)
-                                ->where('finished_item_id', $itemId);
-                        })
-                        ->latest('id')
-                        ->first();
+                    // consume finished_qty FIFO
+                    $toConsume = $takeIn;
 
-                    $sewingOperatorId = $sewingReturnLine?->sewingPickupLine?->operator_id ?? null;
+                    $qRows = DB::table('sewing_return_lines as srl')
+                        ->join('sewing_returns as sr', 'sr.id', '=', 'srl.sewing_return_id')
+                        ->join('sewing_pickup_lines as spl', 'spl.id', '=', 'srl.sewing_pickup_line_id')
+                        ->where('spl.cutting_job_bundle_id', $bundle->id)
+                        ->where('spl.finished_item_id', $itemId)
+                        ->where('sr.operator_id', $sewingOperatorId)
+                        ->whereRaw('(COALESCE(srl.qty_ok,0) - COALESCE(srl.finished_qty,0)) > 0');
 
-                    $sewingOperatorName = null;
-                    if ($sewingOperatorId) {
-                        $sewingOperatorName = $empNameCache[$sewingOperatorId] ??= Employee::whereKey($sewingOperatorId)->value('name');
+                    if ($hasSplVoided) {
+                        $qRows->whereNull('spl.voided_at');
                     }
+
+                    if ($hasSrVoided) {
+                        $qRows->whereNull('sr.voided_at');
+                    }
+
+                    $srlRows = $qRows
+                        ->select([
+                            'srl.id',
+                            DB::raw('(COALESCE(srl.qty_ok,0) - COALESCE(srl.finished_qty,0)) as remaining'),
+                        ])
+                        ->orderBy('srl.id')
+                        ->get();
+
+                    foreach ($srlRows as $r) {
+                        if ($toConsume <= 0) {
+                            break;
+                        }
+
+                        $rem = (int) $r->remaining;
+                        if ($rem <= 0) {
+                            continue;
+                        }
+
+                        $use = min($rem, $toConsume);
+
+                        DB::table('sewing_return_lines')
+                            ->where('id', $r->id)
+                            ->update([
+                                'finished_qty' => DB::raw('COALESCE(finished_qty,0) + ' . (int) $use),
+                                'updated_at' => now(),
+                            ]);
+
+                        $toConsume -= $use;
+                    }
+
+                    if ($toConsume > 0) {
+                        throw \Illuminate\Validation\ValidationException::withMessages([
+                            "{$linesKey}.{$wl['index']}.qty_in" => 'Sisa operator berubah saat proses. Refresh lalu ulang.',
+                        ]);
+                    }
+
+                    // ==== operator_id (FK) harus valid ====
+                    // - Mode ALL: operator finishing = operator_global_id (modal)
+                    // - Mode BYOP: jika operator_global_id kosong, fallback pakai sewingOperatorId
+                    $lineOperatorId = $finishingOperatorId > 0 ? $finishingOperatorId : $sewingOperatorId;
 
                     FinishingJobLine::create([
-                        'finishing_job_id' => $jobLocal->id,
+                        'finishing_job_id' => $job->id,
                         'bundle_id' => $bundle->id,
-                        'operator_id' => $globalOperatorId,
+
+                        // ✅ selalu valid (menghindari 0)
+                        'operator_id' => (int) $lineOperatorId,
+
+                        // ✅ operator jahit sumber
                         'sewing_operator_id' => $sewingOperatorId,
                         'sewing_operator_name' => $sewingOperatorName,
+
                         'item_id' => $itemId,
                         'qty_in' => $takeIn,
-                        'qty_ok' => $qtyOkThisBundle,
+                        'qty_ok' => $takeOk,
                         'qty_reject' => $takeReject,
-                        'reject_reason' => $rejectReason,
-                        'reject_notes' => $rejectNotes,
+                        'reject_reason' => $wl['reject_reason'],
+                        'reject_notes' => $wl['reject_notes'],
                         'processed_at' => $validated['date'],
                     ]);
 
-                    $remainingIn -= $takeIn;
-                    $remainingReject -= $takeReject;
+                    $needIn -= $takeIn;
+                    $needReject -= $takeReject;
                 }
 
-                // kalau masih ada reject tersisa padahal qty_in sudah habis -> harusnya tidak terjadi
-                if ($remainingReject > 0) {
-                    throw ValidationException::withMessages([
-                        'finishing' => "Reject tersisa {$remainingReject} padahal Qty In habis. Cek input item {$itemId}.",
+                if ($needIn > 0) {
+                    throw \Illuminate\Validation\ValidationException::withMessages([
+                        "{$linesKey}.{$wl['index']}.qty_in" => "Tidak cukup WIP/operator untuk alokasi. Sisa: {$needIn}.",
                     ]);
                 }
             }
 
-            $job = $jobLocal;
+            return $job;
         });
 
-        $job->loadMissing('lines');
-
-        $hasReject = $job->lines()
-            ->where('qty_reject', '>', 0)
-            ->exists();
-
-        if (!$hasReject) {
-            try {
-                // auto-post jika 0 reject
-                return $this->post($job);
-            } catch (ValidationException $e) {
-                return redirect()
-                    ->route('production.finishing_jobs.show', $job->id)
-                    ->withErrors($e->errors())
-                    ->with('status', 'Finishing Job berhasil dibuat sebagai draft, namun auto-post gagal. Periksa detail di bawah.');
-            }
-        }
-
         return redirect()
-            ->route('production.finishing_jobs.show', $job->id)
-            ->with('status', 'Finishing Job berhasil dibuat sebagai draft (ADA REJECT).');
+            ->route('production.finishing_jobs.show', ['finishing_job' => $job->id])
+            ->with('status', 'Finishing Job berhasil dibuat sebagai draft.');
+
     }
 
     /* ============================================================

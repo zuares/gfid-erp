@@ -10,6 +10,7 @@
             --b: rgba(148, 163, 184, .22);
             --shadow: 0 10px 26px rgba(15, 23, 42, .08), 0 0 0 1px rgba(15, 23, 42, .03);
             --muted2: rgba(100, 116, 139, .9);
+
             --ok: rgba(22, 163, 74, 1);
             --okbg: rgba(22, 163, 74, .10);
             --rj: rgba(220, 38, 38, 1);
@@ -363,9 +364,267 @@
             color: rgba(146, 64, 14, 1);
         }
 
-        .muted-hint {
+        /* ===== Submit modal (center + mobile safe) ===== */
+        .submit-modal-backdrop {
+            position: fixed;
+            inset: 0;
+            background: rgba(2, 6, 23, .55);
+            backdrop-filter: blur(4px);
+            z-index: 1100;
+            display: none;
+        }
+
+        .submit-modal-backdrop.show {
+            display: block;
+        }
+
+        .submit-modal-sheet {
+            position: fixed;
+            left: 50%;
+            top: 50%;
+            transform: translate(-50%, -50%);
+            width: min(560px, calc(100vw - 1.5rem));
+            z-index: 1110;
+            display: none;
+        }
+
+        .submit-modal-sheet.show {
+            display: block;
+        }
+
+        .submit-modal-card {
+            border-radius: 18px;
+            border: 1px solid rgba(148, 163, 184, .22);
+            box-shadow: 0 25px 70px rgba(15, 23, 42, .28);
+            background: var(--card);
+            overflow: hidden;
+        }
+
+        @media (max-width: 767.98px) {
+            .submit-modal-sheet {
+                width: min(560px, calc(100vw - 1.25rem));
+                padding: 0;
+            }
+
+            .submit-modal-card {
+                max-height: calc(100vh - 7.5rem);
+                overflow: auto;
+                -webkit-overflow-scrolling: touch;
+            }
+        }
+
+        .submit-modal-topbar {
+            display: flex;
+            align-items: center;
+            justify-content: space-between;
+            padding: .85rem 1rem .75rem;
+            border-bottom: 1px solid rgba(148, 163, 184, .18);
+            gap: .75rem;
+        }
+
+        .submit-title {
+            display: flex;
+            align-items: center;
+            gap: .6rem;
+            font-weight: 950;
+            letter-spacing: -.01em;
+            margin: 0;
+            font-size: 1rem;
+        }
+
+        .submit-x {
+            width: 36px;
+            height: 36px;
+            border-radius: 999px;
+            border: 1px solid rgba(148, 163, 184, .25);
+            background: rgba(148, 163, 184, .10);
+            display: inline-flex;
+            align-items: center;
+            justify-content: center;
+            cursor: pointer;
+        }
+
+        .submit-modal-body {
+            padding: .85rem 1rem .9rem;
+        }
+
+        .submit-kpis {
+            display: grid;
+            grid-template-columns: 1fr 1fr;
+            gap: .5rem;
+            margin-top: .5rem;
+        }
+
+        .kpi {
+            border-radius: 14px;
+            border: 1px solid rgba(148, 163, 184, .20);
+            background: rgba(148, 163, 184, .06);
+            padding: .65rem .75rem;
+        }
+
+        .kpi .k-label {
+            font-size: .68rem;
+            text-transform: uppercase;
+            letter-spacing: .10em;
+            font-weight: 900;
             color: var(--muted);
+            margin-bottom: .2rem;
+        }
+
+        .kpi .k-value {
+            font-weight: 950;
+            font-size: 1.05rem;
+        }
+
+        .submit-modal-actions {
+            display: flex;
+            gap: .5rem;
+            padding: .75rem 1rem 1rem;
+            border-top: 1px solid rgba(148, 163, 184, .18);
+        }
+
+        .submit-btn {
+            border-radius: 999px !important;
+            font-weight: 800;
+            padding: .7rem 1rem;
+            display: inline-flex;
+            align-items: center;
+            justify-content: center;
+            gap: .45rem;
+            flex: 1 1 auto;
+        }
+
+        .submit-btn.secondary {
+            background: rgba(148, 163, 184, .10);
+            border: 1px solid rgba(148, 163, 184, .25);
+        }
+
+        .submit-btn.primary {
+            background: rgba(22, 163, 74, 1);
+            border: 1px solid rgba(22, 163, 74, .45);
+            color: #fff;
+        }
+
+        .submit-btn.primary:disabled {
+            opacity: .7;
+        }
+
+        .submit-spinner {
+            width: 16px;
+            height: 16px;
+            border-radius: 999px;
+            border: 2px solid rgba(255, 255, 255, .55);
+            border-top-color: rgba(255, 255, 255, 1);
+            animation: spin .8s linear infinite;
+            display: none;
+        }
+
+        .submit-btn.primary.is-loading .submit-spinner {
+            display: inline-block;
+        }
+
+        @keyframes spin {
+            to {
+                transform: rotate(360deg);
+            }
+        }
+
+        /* ===== Modal item details ===== */
+        .modal-items {
+            margin-top: .75rem;
+            border-radius: 14px;
+            border: 1px solid rgba(148, 163, 184, .20);
+            overflow: hidden;
+        }
+
+        .modal-items-head {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            padding: .55rem .75rem;
+            background: rgba(148, 163, 184, .06);
+            border-bottom: 1px solid rgba(148, 163, 184, .18);
+            font-size: .72rem;
+            text-transform: uppercase;
+            letter-spacing: .10em;
+            font-weight: 900;
+            color: var(--muted);
+        }
+
+        .modal-items-body {
+            max-height: 36vh;
+            overflow: auto;
+            -webkit-overflow-scrolling: touch;
+        }
+
+        .modal-item-row {
+            display: grid;
+            grid-template-columns: 1.4fr .8fr;
+            gap: .6rem;
+            padding: .6rem .75rem;
+            border-bottom: 1px solid rgba(148, 163, 184, .14);
+            background: rgba(255, 255, 255, .02);
+        }
+
+        .modal-item-row:last-child {
+            border-bottom: none;
+        }
+
+        .modal-item-title {
+            font-weight: 950;
+            line-height: 1.15;
+        }
+
+        .modal-item-sub {
+            color: var(--muted2);
             font-size: .78rem;
+            margin-top: .12rem;
+            line-height: 1.2;
+        }
+
+        .modal-item-metrics {
+            display: flex;
+            flex-direction: column;
+            gap: .25rem;
+            align-items: flex-end;
+            text-align: right;
+        }
+
+        .mchip {
+            border-radius: 999px;
+            padding: .10rem .55rem;
+            font-size: .72rem;
+            font-weight: 950;
+            border: 1px solid rgba(148, 163, 184, .28);
+            background: rgba(148, 163, 184, .06);
+            display: inline-flex;
+            gap: .35rem;
+            align-items: center;
+        }
+
+        .mchip.ok {
+            background: var(--okbg);
+            border-color: rgba(22, 163, 74, .30);
+            color: #166534;
+        }
+
+        .mchip.rj {
+            background: var(--rjbg);
+            border-color: rgba(248, 113, 113, .25);
+            color: #b91c1c;
+        }
+
+        .mchip.sisa {
+            background: rgba(59, 130, 246, .10);
+            border-color: rgba(59, 130, 246, .25);
+            color: rgba(30, 64, 175, 1);
+        }
+
+        .modal-empty {
+            padding: .75rem;
+            color: var(--muted);
+            text-align: center;
+            font-size: .85rem;
         }
     </style>
 @endpush
@@ -401,7 +660,6 @@
             $returnedRej = (float) ($line->qty_returned_reject ?? 0);
             $directPick = (float) ($line->qty_direct_picked ?? 0);
             $progressAdj = (float) ($line->qty_progress_adjusted ?? 0);
-
             return max($qtyBundle - ($returnedOk + $returnedRej + $directPick + $progressAdj), 0);
         };
     @endphp
@@ -425,7 +683,7 @@
             </div>
         </div>
 
-        <form id="sewing-return-form" action="{{ route('production.sewing.returns.store') }}" method="POST">
+        <form id="sewing-return-form" action="{{ route('production.sewing.returns.store') }}" method="POST" novalidate>
             @csrf
 
             {{-- Form header --}}
@@ -451,14 +709,11 @@
 
                                 @foreach ($pickups as $pickup)
                                     @php
-                                        // ✅ SKIP PICKUP VOID
                                         if (!empty($pickup->voided_at)) {
                                             continue;
                                         }
 
                                         $pickupLines = $pickup->lines ?? collect();
-
-                                        // ✅ totalRemaining sinkron dengan controller (incl progress_adjusted)
                                         $totalRemaining = $pickupLines->sum(fn($line) => $calcRemaining($line));
 
                                         $pickupLabelDate = $fmtDay($pickup->date);
@@ -568,6 +823,7 @@
                                         data-remaining="{{ $remainingPickup }}" data-item-id="{{ $itemId }}"
                                         data-wip-stock="{{ $wipStock }}"
                                         data-item-code="{{ $bundle?->finishedItem?->code }}"
+                                        data-item-name="{{ $bundle?->finishedItem?->name }}"
                                         data-operator-code="{{ $operatorCode }}" data-operator-name="{{ $operatorName }}"
                                         data-pickup-date="{{ $pickupDateLabel }}"
                                         data-direct-picked="{{ $directPicked }}">
@@ -638,9 +894,8 @@
                                                 <div class="text-muted small">{{ $bundle->finishedItem->name }}</div>
                                             @endif
                                             @if ($lot)
-                                                <div class="text-muted small">
-                                                    LOT: <span class="mono">{{ $lot->code }}</span>
-                                                </div>
+                                                <div class="text-muted small">LOT: <span
+                                                        class="mono">{{ $lot->code }}</span></div>
                                             @endif
                                         </td>
 
@@ -726,14 +981,10 @@
                             </tbody>
                         </table>
                     </div>
-
-                    <div class="muted-hint mt-2 d-none d-md-block">
-                        Tip: klik baris untuk isi cepat OK = “Belum”.
-                    </div>
                 </div>
             </div>
 
-            {{-- Footer: 2 tombol (Batal + Simpan) --}}
+            {{-- Footer floating --}}
             <div class="form-footer d-flex align-items-center">
                 <div class="floating-actions">
                     <a href="{{ route('production.sewing.returns.index') }}"
@@ -741,13 +992,75 @@
                         <i class="bi bi-arrow-left"></i>
                     </a>
 
-                    <button type="submit" id="btn-submit-return" class="btn btn-success btn-sm btn-floating-submit"
+                    <button type="button" id="btn-submit-return" class="btn btn-success btn-sm btn-floating-submit"
                         disabled>
                         <i class="bi bi-check2 me-1"></i> Simpan
                         <span class="btn-floating-meta" id="btn-submit-return-meta">Belum ada isi</span>
                     </button>
                 </div>
             </div>
+
+            {{-- ===== Friendly Submit Modal (dengan detail item + sisa) ===== --}}
+            <div id="submit-modal-backdrop" class="submit-modal-backdrop" aria-hidden="true"></div>
+
+            <div id="submit-modal" class="submit-modal-sheet" role="dialog" aria-modal="true" aria-hidden="true">
+                <div class="submit-modal-card">
+                    <div class="submit-modal-topbar">
+                        <h3 class="submit-title">
+                            <span class="pill ok" style="margin:0"><i class="bi bi-check2-circle"></i></span>
+                            Konfirmasi Simpan
+                        </h3>
+
+                        <button type="button" class="submit-x" id="btn-close-submit-modal" aria-label="Tutup">
+                            <i class="bi bi-x-lg"></i>
+                        </button>
+                    </div>
+
+                    <div class="submit-modal-body">
+                        <div class="d-flex flex-wrap gap-2">
+                            <span class="pill"><i class="bi bi-list-check"></i> <span id="modal-row-filled">0</span>
+                                baris</span>
+                            <span class="pill ok"><i class="bi bi-check-circle"></i> OK: <span
+                                    id="modal-ok">0,00</span></span>
+                            <span class="pill rj"><i class="bi bi-x-circle"></i> RJ: <span
+                                    id="modal-rj">0,00</span></span>
+                        </div>
+
+                        <div class="submit-kpis">
+                            <div class="kpi">
+                                <div class="k-label">Tanggal</div>
+                                <div class="k-value mono" id="modal-date">-</div>
+                            </div>
+                            <div class="kpi">
+                                <div class="k-label">Pickup</div>
+                                <div class="k-value" id="modal-pickup">-</div>
+                            </div>
+                        </div>
+
+                        {{-- detail barang yang disetor + sisa --}}
+                        <div class="modal-items" id="modal-items">
+                            <div class="modal-items-head">
+                                <span>Detail Setor</span>
+                                <span class="mono" id="modal-items-count">0</span>
+                            </div>
+                            <div class="modal-items-body" id="modal-items-body">
+                                <div class="modal-empty">Tidak ada item.</div>
+                            </div>
+                        </div>
+                    </div>
+
+                    <div class="submit-modal-actions">
+                        <button type="button" class="btn submit-btn secondary" id="btn-cancel-submit">
+                            <i class="bi bi-arrow-left"></i> Batal
+                        </button>
+                        <button type="button" class="btn submit-btn primary" id="btn-confirm-submit">
+                            <span class="submit-spinner" aria-hidden="true"></span>
+                            <i class="bi bi-check2"></i> Simpan
+                        </button>
+                    </div>
+                </div>
+            </div>
+            {{-- ===== /Modal ===== --}}
         </form>
     </div>
 @endsection
@@ -755,6 +1068,8 @@
 @push('scripts')
     <script>
         document.addEventListener('DOMContentLoaded', function() {
+            const form = document.getElementById('sewing-return-form');
+
             const rows = Array.from(document.querySelectorAll('.return-row'));
             const filterSelects = Array.from(document.querySelectorAll('.filter-item-code'));
 
@@ -768,19 +1083,26 @@
             const submitBtn = document.getElementById('btn-submit-return');
             const submitMeta = document.getElementById('btn-submit-return-meta');
 
-            const isMobile = () => window.innerWidth <= 767;
+            // modal
+            const modalBackdrop = document.getElementById('submit-modal-backdrop');
+            const modalSheet = document.getElementById('submit-modal');
+            const closeModalBtn = document.getElementById('btn-close-submit-modal');
+            const cancelModalBtn = document.getElementById('btn-cancel-submit');
+            const confirmModalBtn = document.getElementById('btn-confirm-submit');
 
-            function scrollRowForInput(input) {
-                if (!isMobile()) return;
-                const row = input.closest('.return-row');
-                if (!row) return;
-                setTimeout(() => {
-                    row.scrollIntoView({
-                        block: 'center',
-                        behavior: 'smooth'
-                    });
-                }, 250);
-            }
+            const modalRowFilled = document.getElementById('modal-row-filled');
+            const modalOk = document.getElementById('modal-ok');
+            const modalRj = document.getElementById('modal-rj');
+            const modalDate = document.getElementById('modal-date');
+            const modalPickup = document.getElementById('modal-pickup');
+
+            const modalItemsBody = document.getElementById('modal-items-body');
+            const modalItemsCount = document.getElementById('modal-items-count');
+
+            const dateInput = form?.querySelector('input[name="date"]');
+            const pickupSelect = form?.querySelector('select[name="pickup_id"]');
+
+            const isMobile = () => window.innerWidth <= 767;
 
             let nf;
             try {
@@ -799,21 +1121,25 @@
                 return isNaN(n) ? 0 : n;
             };
 
-            let errTimer = null;
+            function escapeHtml(s) {
+                return String(s ?? '')
+                    .replaceAll('&', '&amp;')
+                    .replaceAll('<', '&lt;')
+                    .replaceAll('>', '&gt;')
+                    .replaceAll('"', '&quot;')
+                    .replaceAll("'", '&#039;');
+            }
 
+            let errTimer = null;
             const showClientError = (msg) => {
                 if (!clientErrorBox || !clientErrorText) return;
                 clientErrorText.textContent = msg;
                 clientErrorBox.classList.remove('d-none');
-
                 if (errTimer) clearTimeout(errTimer);
-                errTimer = setTimeout(() => hideClientError(), 2200);
-            };
-
-            const hideClientError = () => {
-                if (!clientErrorBox || !clientErrorText) return;
-                clientErrorText.textContent = '';
-                clientErrorBox.classList.add('d-none');
+                errTimer = setTimeout(() => {
+                    clientErrorText.textContent = '';
+                    clientErrorBox.classList.add('d-none');
+                }, 2200);
             };
 
             function getOk(row) {
@@ -940,7 +1266,7 @@
                 if (!input || input.value.trim() === '') wrap.classList.add('d-none');
             }
 
-            function updateSummary() {
+            function computeSummary() {
                 let filled = 0,
                     okSum = 0,
                     rjSum = 0;
@@ -953,15 +1279,214 @@
                     rjSum += rj;
                 });
 
-                if (summaryRowFilled) summaryRowFilled.textContent = String(filled);
-                if (summaryOk) summaryOk.textContent = nf.format(okSum);
-                if (summaryReject) summaryReject.textContent = nf.format(rjSum);
+                return {
+                    filled,
+                    okSum,
+                    rjSum
+                };
+            }
+
+            function updateSummary() {
+                const s = computeSummary();
+
+                if (summaryRowFilled) summaryRowFilled.textContent = String(s.filled);
+                if (summaryOk) summaryOk.textContent = nf.format(s.okSum);
+                if (summaryReject) summaryReject.textContent = nf.format(s.rjSum);
 
                 if (submitBtn) {
-                    submitBtn.disabled = filled <= 0;
-                    if (submitMeta) submitMeta.textContent = filled > 0 ? `${filled} baris siap` : 'Belum ada isi';
+                    submitBtn.disabled = s.filled <= 0;
+                    if (submitMeta) submitMeta.textContent = s.filled > 0 ? `${s.filled} baris siap` :
+                        'Belum ada isi';
                 }
             }
+
+            function renderModalItems() {
+                if (!modalItemsBody) return;
+
+                // group per item_code (ringkas)
+                const map = new Map();
+
+                rows.forEach(row => {
+                    const ok = getOk(row);
+                    const rj = getReject(row);
+                    const total = ok + rj;
+                    if (total <= 0) return;
+
+                    const code = (row.dataset.itemCode || '').trim() || '-';
+                    const name = (row.dataset.itemName || '').trim() || '';
+                    const remainingBefore = parseNum(row.dataset.remaining ||
+                        '0'); // "Belum" sebelum setor ini
+                    const sisa = Math.max(remainingBefore - total, 0);
+
+                    const key = code + '||' + name;
+                    if (!map.has(key)) {
+                        map.set(key, {
+                            code,
+                            name,
+                            ok: 0,
+                            rj: 0,
+                            sisa: 0
+                        });
+                    }
+                    const it = map.get(key);
+                    it.ok += ok;
+                    it.rj += rj;
+                    it.sisa += sisa;
+                });
+
+                const items = Array.from(map.values());
+
+                if (modalItemsCount) modalItemsCount.textContent = String(items.length);
+
+                if (items.length === 0) {
+                    modalItemsBody.innerHTML = `<div class="modal-empty">Tidak ada item.</div>`;
+                    return;
+                }
+
+                items.sort((a, b) => (a.code || '').localeCompare(b.code || ''));
+
+                modalItemsBody.innerHTML = items.map(it => {
+                    const sub = it.name ? `<div class="modal-item-sub">${escapeHtml(it.name)}</div>` : '';
+                    return `
+                        <div class="modal-item-row">
+                            <div>
+                                <div class="modal-item-title">${escapeHtml(it.code || '-')}</div>
+                                ${sub}
+                            </div>
+                            <div class="modal-item-metrics">
+                                <span class="mchip ok"><i class="bi bi-check-circle"></i> <span class="mono">${nf.format(it.ok)}</span></span>
+                                <span class="mchip rj"><i class="bi bi-x-circle"></i> <span class="mono">${nf.format(it.rj)}</span></span>
+                                <span class="mchip sisa"><i class="bi bi-hourglass-split"></i> <span class="mono">${nf.format(it.sisa)}</span></span>
+                            </div>
+                        </div>
+                    `;
+                }).join('');
+            }
+
+            // ===== MODAL logic =====
+            let lastFocus = null;
+
+            function lockScroll(lock) {
+                if (lock) {
+                    document.documentElement.style.overflow = 'hidden';
+                    document.body.style.overflow = 'hidden';
+                } else {
+                    document.documentElement.style.overflow = '';
+                    document.body.style.overflow = '';
+                }
+            }
+
+            function hideFloatingActions(hide) {
+                const footer = document.querySelector('.form-footer');
+                if (!footer) return;
+                footer.style.opacity = hide ? '0' : '';
+                footer.style.pointerEvents = hide ? 'none' : '';
+            }
+
+            function openSubmitModal() {
+                if (!modalBackdrop || !modalSheet) return;
+
+                const s = computeSummary();
+                if (s.filled <= 0) return;
+
+                if (modalRowFilled) modalRowFilled.textContent = String(s.filled);
+                if (modalOk) modalOk.textContent = nf.format(s.okSum);
+                if (modalRj) modalRj.textContent = nf.format(s.rjSum);
+
+                if (modalDate) modalDate.textContent = (dateInput?.value || '-');
+                if (modalPickup) modalPickup.textContent = (pickupSelect?.selectedOptions?.[0]?.textContent
+                    ?.trim() || '-');
+
+                renderModalItems();
+
+                lastFocus = document.activeElement;
+
+                modalBackdrop.classList.add('show');
+                modalSheet.classList.add('show');
+                modalBackdrop.setAttribute('aria-hidden', 'false');
+                modalSheet.setAttribute('aria-hidden', 'false');
+
+                lockScroll(true);
+                hideFloatingActions(true);
+
+                setTimeout(() => confirmModalBtn?.focus(), 30);
+            }
+
+            function closeSubmitModal() {
+                if (!modalBackdrop || !modalSheet) return;
+                modalBackdrop.classList.remove('show');
+                modalSheet.classList.remove('show');
+                modalBackdrop.setAttribute('aria-hidden', 'true');
+                modalSheet.setAttribute('aria-hidden', 'true');
+
+                lockScroll(false);
+                hideFloatingActions(false);
+
+                if (lastFocus && typeof lastFocus.focus === 'function') {
+                    setTimeout(() => lastFocus.focus(), 0);
+                }
+            }
+
+            function setSubmittingState(isSubmitting) {
+                if (confirmModalBtn) {
+                    confirmModalBtn.disabled = !!isSubmitting;
+                    confirmModalBtn.classList.toggle('is-loading', !!isSubmitting);
+                }
+                if (submitBtn) submitBtn.disabled = true;
+            }
+
+            // Bind submit button (ANTI GAGAL)
+            if (submitBtn) {
+                submitBtn.setAttribute('type', 'button');
+                submitBtn.addEventListener('click', function(e) {
+                    e.preventDefault();
+                    e.stopPropagation();
+                    openSubmitModal();
+                });
+            }
+
+            closeModalBtn?.addEventListener('click', function(e) {
+                e.preventDefault();
+                closeSubmitModal();
+            });
+            cancelModalBtn?.addEventListener('click', function(e) {
+                e.preventDefault();
+                closeSubmitModal();
+            });
+            modalBackdrop?.addEventListener('click', function(e) {
+                e.preventDefault();
+                closeSubmitModal();
+            });
+
+            document.addEventListener('keydown', function(e) {
+                const isOpen = modalSheet?.classList.contains('show');
+                if (!isOpen) return;
+                if (e.key === 'Escape') closeSubmitModal();
+            });
+
+            confirmModalBtn?.addEventListener('click', function(e) {
+                e.preventDefault();
+                if (!form) return;
+
+                // hard guard double submit
+                if (form.dataset.submitting === '1') return;
+
+                setSubmittingState(true);
+                form.dataset.submitting = '1';
+                setTimeout(() => form.submit(), 20);
+            });
+
+            // prevent enter submits
+            form?.addEventListener('keydown', function(e) {
+                if (e.key !== 'Enter') return;
+                const t = e.target;
+                if (!t) return;
+                if (t.tagName === 'TEXTAREA') return;
+                if (t.tagName === 'INPUT' || t.tagName === 'SELECT') {
+                    e.preventDefault();
+                    return false;
+                }
+            });
 
             // filter item
             filterSelects.forEach(sel => {
@@ -977,6 +1502,7 @@
                 });
             });
 
+            // row handlers
             rows.forEach(row => {
                 const okD = row.querySelector('.qty-ok-desktop');
                 const okM = row.querySelector('.qty-ok-mobile');
@@ -984,16 +1510,21 @@
                 const rjM = row.querySelector('.qty-reject-mobile');
                 const notes = row.querySelector('.notes-wrapper input[type="text"]');
 
-                let touchMoved = false;
+                function scrollRowForInput(input) {
+                    if (!isMobile()) return;
+                    const rr = input.closest('.return-row');
+                    if (!rr) return;
+                    setTimeout(() => rr.scrollIntoView({
+                        block: 'center',
+                        behavior: 'smooth'
+                    }), 250);
+                }
 
-                row.addEventListener('touchstart', function() {
-                    touchMoved = false;
-                }, {
+                let touchMoved = false;
+                row.addEventListener('touchstart', () => touchMoved = false, {
                     passive: true
                 });
-                row.addEventListener('touchmove', function() {
-                    touchMoved = true;
-                }, {
+                row.addEventListener('touchmove', () => touchMoved = true, {
                     passive: true
                 });
 
@@ -1021,18 +1552,8 @@
                     updateRowVisual(row);
                     updateNotesVisibility(row);
                     updateSummary();
-
-                    if (!isMobile()) {
-                        const target = okD || okM;
-                        if (target) {
-                            target.focus();
-                            target.select();
-                            target.classList.add('qty-input-active');
-                        }
-                    }
                 });
 
-                // OK handlers
                 [okD, okM].forEach(inp => {
                     if (!inp) return;
                     inp.addEventListener('focus', function() {
@@ -1055,7 +1576,6 @@
                     });
                 });
 
-                // RJ handlers
                 [rjD, rjM].forEach(inp => {
                     if (!inp) return;
                     inp.addEventListener('focus', function() {
@@ -1080,7 +1600,6 @@
                     });
                 });
 
-                // Notes
                 if (notes) {
                     notes.addEventListener('focus', function() {
                         scrollRowForInput(this);

@@ -6,53 +6,79 @@
 @push('head')
     <style>
         :root {
-            --fin-card-radius: 14px;
-            --fin-border: rgba(148, 163, 184, 0.28);
-            --fin-muted: #6b7280;
-            --fin-accent: #2563eb;
+            --r: 14px;
+            --b: rgba(148, 163, 184, .22);
+            --muted: #6b7280;
+            --soft2: rgba(148, 163, 184, .05);
+            --accent: #2563eb;
+            --ok: #16a34a;
+            --rj: #b91c1c;
+            --shadow: 0 10px 26px rgba(15, 23, 42, .08), 0 0 0 1px rgba(15, 23, 42, .03);
+            --bottom-nav-h: 72px;
+            --fab-gap: 12px;
+            --fab-bottom: calc(var(--bottom-nav-h) + var(--fab-gap) + env(safe-area-inset-bottom));
         }
 
-        .finishing-page {
-            min-height: 100vh;
+        .page-wrap {
+            max-width: 980px;
+            margin: 0 auto;
+            padding: 14px 12px 96px;
         }
 
-        .finishing-page .page-wrap {
-            max-width: 1050px;
-            margin-inline: auto;
-            padding: 1rem .9rem 3.5rem;
-        }
-
-        body[data-theme="light"] .finishing-page .page-wrap {
-            background: linear-gradient(to bottom,
-                    #f5f6fa 0,
-                    #f9fafb 40%,
-                    #ffffff 100%);
-        }
-
-        body[data-theme="dark"] .finishing-page .page-wrap {
-            background: radial-gradient(circle at top left,
-                    rgba(37, 99, 235, 0.26) 0,
-                    rgba(15, 23, 42, 0.92) 46%,
-                    #020617 100%);
-        }
-
-        .card-main {
-            background: var(--card);
-            border-radius: var(--fin-card-radius);
-            border: 1px solid rgba(148, 163, 184, 0.2);
-            box-shadow:
-                0 8px 20px rgba(15, 23, 42, 0.06),
-                0 0 0 1px rgba(15, 23, 42, 0.02);
-        }
-
-        .card-section {
-            padding: .9rem 1rem;
-        }
-
-        @media (min-width: 768px) {
-            .card-section {
-                padding: 1rem 1.2rem;
+        @media(max-width:767.98px) {
+            .page-wrap {
+                padding-bottom: calc(var(--bottom-nav-h) + 130px + var(--vv-kbd));
             }
+
+            body.keyboard-open .page-wrap {
+                padding-bottom: calc(14rem + var(--vv-kbd));
+            }
+        }
+
+        .panel {
+            background: var(--card);
+            border: 1px solid var(--b);
+            border-radius: var(--r);
+            box-shadow: var(--shadow);
+        }
+
+        .panel-h {
+            padding: 12px 14px;
+            border-bottom: 1px solid rgba(148, 163, 184, .12);
+        }
+
+        .panel-b {
+            padding: 12px 14px;
+        }
+
+        .h-title {
+            font-weight: 900;
+            font-size: 1.05rem;
+            margin: 0;
+        }
+
+        .meta {
+            border: 1px solid rgba(148, 163, 184, .18);
+            border-radius: var(--r);
+            padding: 10px;
+            background: var(--soft2);
+        }
+
+        body[data-theme="dark"] .meta {
+            background: rgba(15, 23, 42, .35);
+        }
+
+        .form-label-sm {
+            font-size: .75rem;
+            font-weight: 800;
+            color: var(--muted);
+        }
+
+        .form-control-sm,
+        .form-select-sm {
+            font-size: .88rem;
+            padding: .42rem .55rem;
+            border-radius: 12px;
         }
 
         .mono {
@@ -60,1093 +86,1004 @@
             font-family: ui-monospace, SFMono-Regular, Menlo, Consolas;
         }
 
-        .header-card {
-            border-radius: 14px;
-            border: 1px solid rgba(148, 163, 184, 0.3);
-            box-shadow:
-                0 10px 24px rgba(15, 23, 42, 0.06),
-                0 0 0 1px rgba(15, 23, 42, 0.02);
+        .list {
+            display: grid;
+            gap: .6rem;
+            margin-top: 12px;
         }
 
-        .header-row {
+        .cardx {
+            border: 1px solid rgba(148, 163, 184, .22);
+            border-radius: 16px;
+            background: var(--card);
+            overflow: hidden;
+        }
+
+        .cardx-h {
+            padding: 10px 12px;
+            border-bottom: 1px solid rgba(148, 163, 184, .12);
             display: flex;
             justify-content: space-between;
+            gap: 10px;
             align-items: flex-start;
-            gap: .75rem;
-            flex-wrap: wrap;
         }
 
-        .header-icon-circle {
-            width: 40px;
-            height: 40px;
-            border-radius: 999px;
-            display: inline-flex;
-            align-items: center;
-            justify-content: center;
-            margin-right: .75rem;
-            background: radial-gradient(circle at 30% 0,
-                    rgba(37, 99, 235, 0.25),
-                    rgba(59, 130, 246, 0.08),
-                    rgba(15, 23, 42, 0.02));
-            color: var(--fin-accent);
-        }
-
-        body[data-theme="dark"] .header-icon-circle {
-            background: radial-gradient(circle at 30% 0,
-                    rgba(59, 130, 246, 0.45),
-                    rgba(15, 23, 42, 0.9));
-            color: #e5e7eb;
-        }
-
-        .header-title h1 {
-            font-size: 1.25rem;
-            font-weight: 600;
-            margin: 0;
-        }
-
-        .header-subtitle {
-            font-size: .82rem;
-            color: var(--fin-muted);
-        }
-
-        .btn-header-pill {
-            border-radius: 999px;
-            font-size: .8rem;
-            padding-inline: .9rem;
-        }
-
-        .btn-header-accent {
-            border-color: rgba(37, 99, 235, 0.35);
-            color: var(--fin-accent);
-            background: rgba(37, 99, 235, 0.03);
-        }
-
-        body[data-theme="dark"] .btn-header-accent {
-            background: rgba(37, 99, 235, 0.15);
-            color: #e5e7eb;
-        }
-
-        .meta-row {
-            margin-top: .25rem;
-            border-radius: 10px;
-            padding: .7rem .75rem;
-            border: 1px solid rgba(148, 163, 184, 0.2);
-            background: rgba(248, 250, 252, 0.8);
-        }
-
-        body[data-theme="dark"] .meta-row {
-            background: rgba(15, 23, 42, 0.9);
-            border-color: rgba(51, 65, 85, 0.9);
-        }
-
-        .meta-row .form-label-sm {
-            font-size: .76rem;
-            font-weight: 500;
-            color: var(--muted-foreground);
-        }
-
-        .form-control-sm,
-        .form-select-sm {
-            font-size: .84rem;
-            padding: .32rem .48rem;
-        }
-
-        .filter-summary {
-            font-size: .76rem;
-            color: var(--fin-muted);
+        .cardx-left {
             display: flex;
-            flex-wrap: wrap;
-            gap: .25rem .45rem;
-            justify-content: flex-end;
-            margin-top: .4rem;
+            gap: 10px;
+            align-items: flex-start;
+            min-width: 0;
         }
 
-        .filter-summary strong {
-            font-weight: 600;
+        .cardx-left>div {
+            min-width: 0;
         }
 
-        .filter-dot {
-            opacity: .7;
+        .chk {
+            width: 18px;
+            height: 18px;
+            border-radius: 6px;
+            cursor: pointer;
+            margin-top: 2px;
+            flex: 0 0 auto;
         }
 
-        .finishing-table-wrap {
-            margin-top: .75rem;
-        }
-
-        .finishing-table {
-            margin-bottom: 0;
-            width: 100%;
-        }
-
-        .finishing-table thead th {
-            background: rgba(15, 23, 42, 0.02);
-            font-size: .74rem;
-            text-transform: uppercase;
-            color: var(--muted-foreground);
-            padding: .5rem .55rem;
+        .code {
+            font-weight: 900;
+            letter-spacing: .08em;
+            color: var(--accent);
+            font-size: .98rem;
             white-space: nowrap;
-            border-bottom-color: rgba(148, 163, 184, 0.35);
+            overflow: hidden;
+            text-overflow: ellipsis;
+            max-width: 100%;
         }
 
-        body[data-theme="dark"] .finishing-table thead th {
-            background: rgba(15, 23, 42, 0.9);
-        }
-
-        .finishing-table tbody td {
-            padding: .42rem .55rem;
-            vertical-align: middle;
-            font-size: .86rem;
-        }
-
-        .finishing-table tbody tr:nth-child(even) td {
-            background: rgba(15, 23, 42, 0.01);
-        }
-
-        .finishing-table tbody tr:hover td {
-            background: rgba(37, 99, 235, 0.03);
-        }
-
-        .item-label-main-desktop {
-            font-weight: 600;
-        }
-
-        .item-label-main-mobile {
-            font-weight: 700;
-            font-size: .9rem;
-        }
-
-        .wip-badge {
+        .op-chip {
             display: inline-flex;
             align-items: center;
             gap: .35rem;
-            padding: .18rem .45rem;
+            margin-top: .35rem;
+            padding: .18rem .5rem;
             border-radius: 999px;
-            background: rgba(16, 185, 129, 0.06);
-            color: #047857;
-            font-size: .8rem;
-            font-weight: 600;
+            border: 1px solid rgba(148, 163, 184, .22);
+            font-size: .72rem;
+            font-weight: 900;
+            color: var(--muted);
+            background: rgba(148, 163, 184, .04);
+            white-space: nowrap;
         }
 
-        body[data-theme="dark"] .wip-badge {
-            background: rgba(16, 185, 129, 0.18);
-            color: #bbf7d0;
+        body[data-theme="dark"] .op-chip {
+            background: rgba(15, 23, 42, .18);
         }
 
-        .wip-badge small {
-            font-size: .7rem;
-            opacity: .85;
-        }
-
-        .qty-ok-input,
-        .qty-reject-input {
-            border-radius: 999px;
-            transition: box-shadow 0.15s ease, border-color 0.15s ease, background-color 0.15s ease;
-        }
-
-        .qty-ok-input {
-            border: 1px solid rgba(16, 185, 129, 0.3);
-            background: rgba(16, 185, 129, 0.02);
-        }
-
-        .qty-reject-input {
-            border: 1px solid rgba(248, 113, 113, 0.4);
-            background: rgba(248, 113, 113, 0.02);
-        }
-
-        .qty-ok-input:focus {
-            box-shadow: 0 0 0 1px rgba(16, 185, 129, 0.7);
-            background: rgba(16, 185, 129, 0.08);
-        }
-
-        .qty-reject-input:focus {
-            box-shadow: 0 0 0 1px rgba(248, 113, 113, 0.75);
-            background: rgba(248, 113, 113, 0.1);
-        }
-
-        .footer-actions {
-            margin-top: 1rem;
+        .meta-inline {
+            margin-top: .28rem;
+            font-size: .72rem;
+            color: var(--muted);
+            font-weight: 900;
             display: flex;
-            justify-content: flex-end;
-            gap: .5rem;
+            align-items: center;
+            gap: .4rem;
+            flex-wrap: nowrap;
+            white-space: nowrap;
+            overflow: hidden;
+            text-overflow: ellipsis;
+            max-width: 100%;
         }
 
-        .btn-save {
+        .meta-inline .dot {
+            opacity: .6;
+        }
+
+        .wip {
+            font-size: .78rem;
+            color: var(--muted);
+            font-weight: 900;
+            white-space: nowrap;
+            text-align: right;
+            flex: 0 0 auto;
+        }
+
+        .cardx-b {
+            padding: 10px 12px;
+            display: grid;
+            gap: .55rem;
+        }
+
+        .grid2 {
+            display: grid;
+            grid-template-columns: 1fr 1fr;
+            gap: .55rem;
+        }
+
+        .field label {
+            display: block;
+            font-size: .7rem;
+            font-weight: 900;
+            color: var(--muted);
+            text-transform: uppercase;
+            letter-spacing: .08em;
+            margin-bottom: .25rem;
+        }
+
+        .qty {
+            text-align: center !important;
+            font-weight: 900;
+            padding: .55rem .55rem !important;
             border-radius: 999px;
-            padding-inline: 1rem;
         }
 
-        /* HEADER ala Sewing Return */
-        .fin-header .header-icon-circle {
-            width: 42px;
-            height: 42px;
-            margin-right: .75rem;
+        .qty.ok {
+            border: 1px solid rgba(22, 163, 74, .22);
+            background: rgba(22, 163, 74, .05);
         }
 
-        .fin-header .header-title h1 {
-            font-size: 1.15rem;
-            font-weight: 700;
-            margin: 0;
+        .qty.rj {
+            border: 1px solid rgba(185, 28, 28, .22);
+            background: rgba(185, 28, 28, .05);
         }
 
-        .fin-header .header-subtitle {
-            font-size: .82rem;
-            color: var(--fin-muted);
+        .qty:focus {
+            box-shadow: none;
         }
 
-        @media (max-width: 767.98px) {
-            .finishing-page .page-wrap {
-                padding-inline: .8rem;
-                /* ruang untuk bottom-nav + tombol floating */
-                padding-bottom: calc(9.4rem + var(--vv-kbd));
-            }
+        .notes {
+            display: none;
+        }
 
-            /* Saat keyboard terbuka, tambah ruang scroll */
-            body.keyboard-open .finishing-page .page-wrap {
-                padding-bottom: calc(11.4rem + var(--vv-kbd));
-            }
+        .notes.is-show {
+            display: block;
+        }
 
-            .card-section {
-                padding: .8rem .85rem;
-            }
+        .notes input {
+            border-radius: 12px;
+        }
 
-            .fin-header .header-row {
-                flex-direction: column;
-                align-items: flex-start;
-                gap: .6rem;
-            }
+        .fab-wrap {
+            position: fixed;
+            right: 14px;
+            bottom: var(--fab-bottom);
+            z-index: 1090;
+            display: flex;
+            gap: 10px;
+            align-items: center;
+            pointer-events: none;
+        }
 
-            .fin-header .header-title h1 {
-                font-size: 1rem;
-            }
+        .fab-wrap .btn {
+            pointer-events: auto;
+            border-radius: 999px;
+            font-weight: 900;
+            box-shadow: 0 12px 26px rgba(15, 23, 42, .22), 0 4px 10px rgba(15, 23, 42, .14);
+        }
 
-            .fin-header .header-subtitle {
-                font-size: .78rem;
-            }
+        .fab-back {
+            width: 46px;
+            padding-left: 0;
+            padding-right: 0;
+        }
 
-            /* Sembunyikan CATATAN & SUMMARY di mobile */
-            .fin-notes-col {
-                display: none !important;
-            }
+        .fab-save {
+            width: auto;
+            padding: .62rem 1.05rem;
+            white-space: nowrap;
+        }
 
-            .filter-summary {
-                display: none !important;
-            }
-
-            /* Grid meta: tanggal + select sejajar, cari kode di baris bawah */
-            .meta-row .meta-grid .col-date,
-            .meta-row .meta-grid .col-select {
-                flex: 0 0 50%;
-                max-width: 50%;
-            }
-
-            .meta-row .meta-grid .col-search {
-                flex: 0 0 100%;
-                max-width: 100%;
-                margin-top: .25rem;
-            }
-
-            .meta-row .form-label-sm {
-                font-size: .75rem;
-            }
-
-            /* TABLE MOBILE FRIENDLY */
-            .finishing-table thead th {
-                font-size: .7rem;
-                padding: .4rem .4rem;
-            }
-
-            .finishing-table tbody td {
-                font-size: .8rem;
-                padding: .35rem .4rem;
-            }
-
-            /* Hilangkan kolom Alasan/Catatan di mobile saja */
-            th.col-reason,
-            td.col-reason {
-                display: none !important;
-            }
-
-            /* NOMOR BARIS MOBILE */
-            td.col-index {
-                width: 1%;
-                white-space: nowrap;
-            }
-
-            td.col-index span.mobile-index-pill {
-                display: inline-block;
-                min-width: 20px;
-                height: 20px;
-                padding: 0 .25rem;
-                border-radius: 999px;
-                background: rgba(59, 130, 246, .12);
-                border: 1px solid rgba(59, 130, 246, .35);
-                color: #1d4ed8;
-                font-size: .72rem;
-                font-weight: 700;
-                line-height: 18px;
-                text-align: center;
-            }
-
-            body[data-theme="dark"] td.col-index span.mobile-index-pill {
-                background: rgba(59, 130, 246, .25);
-                color: #e5edff;
-            }
-
-            /* Kode item: tampil kode saja (label panjang disembunyikan) */
-            .item-label-main-desktop {
-                display: none;
-            }
-
-            .item-label-main-mobile {
-                display: block;
-                font-size: .95rem;
-                color: var(--fin-accent);
-                letter-spacing: .08em;
-            }
-
-            .qty-ok-input,
-            .qty-reject-input {
-                text-align: center;
-                font-weight: 600;
-                padding-top: .4rem;
-                padding-bottom: .4rem;
-                font-size: .88rem;
-            }
-
-            .finishing-table tbody tr td:first-child {
-                border-left: 0;
-            }
-
-            .finishing-table tbody tr td:last-child {
-                border-right: 0;
-            }
-
-            .finishing-table tbody tr+tr td {
-                border-top: 1px solid rgba(148, 163, 184, 0.35);
-            }
-
-            /* Floating footer-actions: aman dari bottom-nav */
-            .footer-actions {
-                position: fixed;
-                left: .9rem;
-                right: .9rem;
-                bottom: calc(5.6rem + var(--vv-kbd));
-                z-index: 999;
-                justify-content: flex-end;
-                gap: .5rem;
-            }
-
-            /* Saat keyboard terbuka: jangan menghalangi input, ubah jadi layout biasa (non-fixed) */
-            body.keyboard-open .footer-actions {
+        @media(max-width:767.98px) {
+            body.keyboard-open .fab-wrap {
                 position: static;
-                margin-top: 1.25rem;
+                margin-top: 14px;
+                justify-content: flex-end;
+                pointer-events: auto;
+            }
+
+            body.keyboard-open .fab-wrap .btn {
                 box-shadow: none;
             }
 
-            .footer-actions .btn {
-                border-radius: 999px;
-                box-shadow:
-                    0 10px 22px rgba(15, 23, 42, 0.25),
-                    0 3px 8px rgba(15, 23, 42, 0.18);
+            .modal-dialog {
+                margin: .75rem;
             }
 
-            .footer-actions .btn-save {
-                order: 1;
-                background: linear-gradient(135deg, #22c55e 0%, #16a34a 60%, #15803d 100%);
-                border: none;
+            .modal-content {
+                border-radius: 16px;
             }
 
-            .footer-actions .btn-back {
-                order: 2;
+            .modal-body {
+                max-height: calc(100vh - 210px);
+                overflow: auto;
             }
         }
 
-        @media (min-width: 768px) {
-            .item-label-main-mobile {
-                display: none;
-            }
+        #item-filter-wrap {
+            scroll-margin-top: 84px;
+        }
 
-            .item-label-main-desktop {
-                display: block;
-            }
+        .fin-item {
+            scroll-margin-top: 84px;
         }
     </style>
 @endpush
 
 @section('content')
-    <div class="finishing-page">
-        <div class="page-wrap">
+    <div class="page-wrap">
 
-            {{-- Flash / Errors --}}
-            @if (session('status'))
-                <div class="alert alert-success alert-dismissible fade show mb-3" role="alert">
-                    {{ session('status') }}
-                    <button type="button" class="btn-close" data-bs-dismiss="alert" aria-label="Close"></button>
-                </div>
-            @endif
+        @if (session('status'))
+            <div class="alert alert-success alert-dismissible fade show mb-3" role="alert">
+                {{ session('status') }}
+                <button type="button" class="btn-close" data-bs-dismiss="alert" aria-label="Close"></button>
+            </div>
+        @endif
 
-            @if ($errors->any())
-                <div class="alert alert-danger alert-dismissible fade show mb-3" role="alert">
-                    <strong>Oops!</strong> Ada error input, cek form di bawah.
-                    <button type="button" class="btn-close" data-bs-dismiss="alert" aria-label="Close"></button>
-                </div>
-            @endif
+        @if ($errors->any())
+            <div class="alert alert-danger alert-dismissible fade show mb-3" role="alert">
+                <strong>Oops!</strong> Ada error input, cek form di bawah.
+                <button type="button" class="btn-close" data-bs-dismiss="alert" aria-label="Close"></button>
+            </div>
+        @endif
 
-            {{-- HEADER --}}
-            <div class="card mb-2 header-card fin-header">
-                <div class="card-section">
-                    <div class="header-row">
-                        <div class="d-flex align-items-center">
-                            <div class="header-icon-circle">
-                                <i class="bi bi-scissors"></i>
-                            </div>
-                            <div class="header-title d-flex flex-column gap-1">
-                                <h1>Finishing</h1>
-                                <div class="header-subtitle">
-                                    Proses stok <b>WIP-FIN</b> menjadi barang jadi. Isi Qty Proses & Reject per item.
-                                </div>
-                            </div>
-                        </div>
+        @php
+            $dateValue = old('date', $dateDefault ?? now()->toDateString());
+            $defaultOperator = old('operator_global_id') ?? (auth()->user()->employee_id ?? '');
 
-                        <div class="d-flex flex-column flex-md-row gap-2">
-                            <a href="{{ route('production.finishing_jobs.index') }}"
-                                class="btn btn-sm btn-header-pill btn-header-accent d-flex align-items-center gap-2">
-                                <i class="bi bi-list-task"></i>
-                                <span>Riwayat Finishing</span>
-                            </a>
-                        </div>
+            $linesAll = $linesAll ?? [];
+            $linesByOp = $linesByOp ?? [];
+
+            $oldAll = old('lines_all', []);
+            $oldByOp = old('lines_byop', []);
+
+            // options hanya dari item yg wip > 0 (biar filter ga berisi yg udah habis)
+            $itemOptionsBase = collect(array_merge($linesAll, $linesByOp))
+                ->filter(fn($l) => (int) ($l['total_wip'] ?? 0) > 0)
+                ->map(function ($l) {
+                    $id = $l['item_id'] ?? null;
+                    $code = strtoupper($l['item_code'] ?? 'ITEM-' . $id);
+                    return ['id' => $id, 'code' => $code];
+                })
+                ->filter(fn($x) => !empty($x['id']))
+                ->unique('id')
+                ->sortBy('code')
+                ->values();
+
+            $operatorOptions = collect($linesByOp)
+                ->filter(fn($l) => (int) ($l['total_wip'] ?? 0) > 0)
+                ->map(function ($l) {
+                    $id = $l['operator_id'] ?? null;
+                    if (!$id) {
+                        return null;
+                    }
+
+                    $code = $l['operator_code'] ?? null;
+                    $name = $l['operator_name'] ?? null;
+                    $label = trim(($code ? $code . ' — ' : '') . ($name ?? ''));
+
+                    return [
+                        'id' => (int) $id,
+                        'label' => $label !== '' ? $label : 'OP-' . (int) $id,
+                    ];
+                })
+                ->filter()
+                ->unique('id')
+                ->sortBy('label')
+                ->values();
+
+            // helper untuk cek ada data wip
+            $hasAnyWipAll = collect($linesAll)->sum(fn($l) => (int) ($l['total_wip'] ?? 0)) > 0;
+            $hasAnyWipByOp = collect($linesByOp)->sum(fn($l) => (int) ($l['total_wip'] ?? 0)) > 0;
+        @endphp
+
+        <div class="panel mb-2">
+            <div class="panel-h">
+                <div class="d-flex align-items-start justify-content-between gap-2 flex-wrap">
+                    <div>
+                        <div class="h-title">Finishing</div>
                     </div>
+                    <a href="{{ route('production.finishing_jobs.index') }}" class="btn btn-sm btn-outline-primary"
+                        style="border-radius:999px;">
+                        Riwayat
+                    </a>
                 </div>
             </div>
+        </div>
 
-            {{-- MAIN CARD --}}
-            <div class="card card-main">
-                <form id="finishing-form" action="{{ route('production.finishing_jobs.store') }}" method="POST" novalidate>
-                    @csrf
+        <div class="panel">
+            <form id="finishing-form" action="{{ route('production.finishing_jobs.store') }}" method="POST" novalidate>
+                @csrf
 
-                    @php
-                        use Illuminate\Support\Str;
+                {{-- ✅ SINGLE SOURCE OF TRUTH --}}
+                <input type="hidden" name="operator_mode" id="operator_mode" value="{{ old('operator_mode', 'all') }}">
+                <input type="hidden" name="operator_global_id" id="operator_global_id_hidden"
+                    value="{{ old('operator_global_id', $defaultOperator) }}">
 
-                        $userRole = auth()->user()->role ?? null;
-                        $dateValue = old('date', $dateDefault ?? now()->toDateString());
-                        $defaultOperator = old('operator_global_id') ?? (auth()->user()->employee_id ?? '');
-                        $grandWip = collect($lines ?? [])->sum('total_wip');
+                <div class="panel-b">
 
-                        $itemOptions = collect($lines ?? [])
-                            ->map(function ($l) {
-                                $label = $l['item_label'] ?? 'Item #' . $l['item_id'];
-                                $codeOnly = Str::contains($label, ' - ') ? Str::before($label, ' - ') : $label;
+                    <div class="meta">
+                        <div class="row g-2 align-items-end">
+                            <div class="col-6 col-md-3">
+                                <label class="form-label form-label-sm">Tanggal</label>
+                                <input type="date" name="date"
+                                    class="form-control form-control-sm @error('date') is-invalid @enderror"
+                                    value="{{ $dateValue }}">
+                                @error('date')
+                                    <div class="invalid-feedback">{{ $message }}</div>
+                                @enderror
+                            </div>
 
-                                return [
-                                    'id' => $l['item_id'],
-                                    'label' => $label,
-                                    'code' => $codeOnly,
-                                ];
-                            })
-                            ->unique('id')
-                            ->values();
-                    @endphp
+                            <div class="col-6 col-md-3">
+                                <label class="form-label form-label-sm">Filter operator</label>
+                                <select id="op-filter" class="form-select form-select-sm">
+                                    <option value="">Semua (gabung)</option>
+                                    @foreach ($operatorOptions as $opt)
+                                        <option value="{{ $opt['id'] }}">{{ $opt['label'] }}</option>
+                                    @endforeach
+                                </select>
+                            </div>
 
-                    {{-- HIDDEN GLOBAL OPERATOR --}}
-                    <input type="hidden" name="operator_global_id" id="operator_global_id_hidden"
-                        value="{{ old('operator_global_id', $defaultOperator) }}">
+                            <div class="col-12 col-md-3" id="item-filter-wrap">
+                                <label class="form-label form-label-sm">Filter item</label>
+                                <select id="item-filter" class="form-select form-select-sm">
+                                    <option value="">Semua</option>
+                                    @foreach ($itemOptionsBase as $opt)
+                                        <option value="{{ $opt['id'] }}">{{ $opt['code'] }}</option>
+                                    @endforeach
+                                </select>
+                            </div>
 
-                    {{-- META + FILTER --}}
-                    <div class="card-section">
-                        <div class="meta-row">
-                            <div class="row g-2 g-md-3 align-items-end meta-grid">
-                                {{-- Tanggal --}}
-                                <div class="col-6 col-md-3 col-date">
-                                    <label class="form-label form-label-sm">Tanggal</label>
-                                    <input type="date" name="date"
-                                        class="form-control form-control-sm @error('date') is-invalid @enderror"
-                                        value="{{ $dateValue }}">
-                                    @error('date')
-                                        <div class="invalid-feedback">{{ $message }}</div>
-                                    @enderror
-                                </div>
+                            <div class="col-12 col-md-3">
+                                <label class="form-label form-label-sm">Cari kode</label>
+                                <input type="text" id="q" class="form-control form-control-sm mono"
+                                    placeholder="Cari barang..." autocomplete="off">
+                            </div>
+                        </div>
+                    </div>
 
-                                {{-- Filter kode item (select) --}}
-                                <div class="col-6 col-md-3 col-select">
-                                    <label class="form-label form-label-sm d-none d-md-block">Filter kode item</label>
-                                    <div class="item-code-select-wrap">
-                                        <select id="item-filter-select" class="form-select form-select-sm">
-                                            <option value="">Semua kode</option>
-                                            @foreach ($itemOptions as $opt)
-                                                <option value="{{ $opt['id'] }}">
-                                                    {{ $opt['code'] }}
-                                                </option>
-                                            @endforeach
-                                        </select>
-                                    </div>
-                                </div>
+                    {{-- LIST ALL --}}
+                    <div class="list" id="list-all">
+                        @if (!$hasAnyWipAll)
+                            <div class="text-center py-4 text-muted">Tidak ada WIP-FIN.</div>
+                        @else
+                            @foreach ($linesAll as $idx => $line)
+                                @php
+                                    $oldLine = $oldAll[$idx] ?? [];
 
-                                {{-- Cari kode (input) --}}
-                                <div class="col-12 col-md-3 col-search">
-                                    <label class="form-label form-label-sm d-none d-md-block">Cari kode</label>
-                                    <div class="item-search-wrap">
-                                        <div class="input-group input-group-sm">
-                                            <span class="input-group-text border-end-0 bg-white">
-                                                <i class="bi bi-search text-muted"></i>
-                                            </span>
-                                            <input type="text" id="item-filter-input"
-                                                class="form-control form-control-sm border-start-0 text-uppercase"
-                                                placeholder="Cari kode item..." autocomplete="off">
+                                    $itemId = (int) ($oldLine['item_id'] ?? ($line['item_id'] ?? 0));
+                                    $wip = (int) ($oldLine['total_wip'] ?? ($line['total_wip'] ?? 0));
+                                    $code = strtoupper($line['item_code'] ?? 'ITEM-' . $itemId);
+
+                                    // ✅ HILANGKAN YANG SUDAH HABIS / SUDAH KEPOST
+                                    if ($wip <= 0) {
+                                        continue;
+                                    }
+
+                                    $pickupRaw = $oldLine['pickup_date'] ?? ($line['pickup_date'] ?? null);
+                                    $setorRaw = $oldLine['setor_date'] ?? ($line['setor_date'] ?? null);
+                                    $pickupTxt = $pickupRaw ? \Carbon\Carbon::parse($pickupRaw)->format('d/m/Y') : '—';
+                                    $setorTxt = $setorRaw ? \Carbon\Carbon::parse($setorRaw)->format('d/m/Y') : '—';
+
+                                    $qtyIn = array_key_exists('qty_in', $oldLine)
+                                        ? (is_null($oldLine['qty_in'])
+                                            ? ''
+                                            : (string) (int) $oldLine['qty_in'])
+                                        : '';
+
+                                    $qtyReject = array_key_exists('qty_reject', $oldLine)
+                                        ? ((int) ($oldLine['qty_reject'] ?? 0) === 0
+                                            ? ''
+                                            : (string) (int) $oldLine['qty_reject'])
+                                        : '';
+
+                                    $rejectNotes = $oldLine['reject_notes'] ?? '';
+                                @endphp
+
+                                <div class="cardx mono fin-item" data-idx="{{ $idx }}"
+                                    data-item-id="{{ $itemId }}" data-operator-id="0"
+                                    data-code="{{ $code }}" data-wip="{{ $wip }}">
+
+                                    <div class="cardx-h">
+                                        <div class="cardx-left">
+                                            <input type="checkbox" class="chk row-check">
+                                            <div>
+                                                <div class="code">{{ $code }}</div>
+                                                <div class="meta-inline">
+                                                    <span title="Terakhir ambil">📦 {{ $pickupTxt }}</span>
+                                                    <span class="dot">•</span>
+                                                    <span title="Terakhir setor">🧵 {{ $setorTxt }}</span>
+                                                </div>
+                                            </div>
                                         </div>
+                                        <div class="wip">SISA {{ number_format($wip, 0, ',', '.') }}</div>
+                                    </div>
+
+                                    <div class="cardx-b">
+                                        <div class="grid2">
+                                            <div class="field">
+                                                <label>Setor</label>
+                                                <input type="text" inputmode="numeric"
+                                                    class="form-control form-control-sm qty ok integer-input select-all-on-focus"
+                                                    name="lines_all[{{ $idx }}][qty_in]"
+                                                    value="{{ $qtyIn }}" placeholder="0">
+                                            </div>
+
+                                            <div class="field">
+                                                <label>Reject</label>
+                                                <input type="text" inputmode="numeric"
+                                                    class="form-control form-control-sm qty rj integer-input select-all-on-focus"
+                                                    name="lines_all[{{ $idx }}][qty_reject]"
+                                                    value="{{ $qtyReject }}" placeholder="0">
+                                            </div>
+                                        </div>
+
+                                        <div class="notes">
+                                            <input type="text" class="form-control form-control-sm"
+                                                name="lines_all[{{ $idx }}][reject_notes]"
+                                                placeholder="Catatan reject (opsional)" value="{{ $rejectNotes }}">
+                                        </div>
+
+                                        <input type="hidden" name="lines_all[{{ $idx }}][item_id]"
+                                            value="{{ $itemId }}">
+                                        <input type="hidden" name="lines_all[{{ $idx }}][total_wip]"
+                                            value="{{ $wip }}">
+                                        <input type="hidden" name="lines_all[{{ $idx }}][pickup_date]"
+                                            value="{{ $pickupRaw }}">
+                                        <input type="hidden" name="lines_all[{{ $idx }}][setor_date]"
+                                            value="{{ $setorRaw }}">
                                     </div>
                                 </div>
-
-                                {{-- Catatan global (desktop, mobile hide) --}}
-                                <div class="col-12 col-md-3 fin-notes-col">
-                                    <label class="form-label form-label-sm">Catatan</label>
-                                    <textarea name="notes" rows="1" class="form-control form-control-sm" placeholder="Catatan finishing (opsional)">{{ old('notes', '') }}</textarea>
-                                    @error('notes')
-                                        <div class="invalid-feedback">{{ $message }}</div>
-                                    @enderror
-                                </div>
-                            </div>
-
-                            {{-- Summary (desktop only, WIP-FIN disembunyikan untuk operating) --}}
-                            <div class="filter-summary">
-                                @if ($userRole !== 'operating')
-                                    <span><strong>WIP-FIN:</strong> {{ number_format($grandWip, 0, ',', '.') }} pcs</span>
-                                    <span class="filter-dot">•</span>
-                                @endif
-                                <span><strong>Item:</strong> {{ count($lines ?? []) }}</span>
-                                <span class="filter-dot">•</span>
-                                <span><strong>Tanggal:</strong>
-                                    {{ \Carbon\Carbon::parse($dateValue)->format('d M Y') }}</span>
-                            </div>
-                        </div>
+                            @endforeach
+                        @endif
                     </div>
 
-                    {{-- TABLE --}}
-                    <div class="card-section">
-                        <div class="finishing-table-wrap">
-                            <div class="table-wrap">
-                                <table class="table table-sm finishing-table mono">
-                                    <thead>
-                                        <tr>
-                                            <th class="text-center col-index" style="width:5%;">No</th>
-                                            <th class="col-item" style="width:32%;">Kode Item</th>
-                                            @if ($userRole !== 'operating')
-                                                <th class="text-end col-wip" style="width:16%;">Total WIP-FIN</th>
-                                            @endif
-                                            <th class="text-end col-ok" style="width:16%;">Proses</th>
-                                            <th class="text-end col-reject" style="width:16%;">Reject</th>
-                                            <th class="col-reason" style="width:17%;">Alasan / Catatan</th>
-                                        </tr>
-                                    </thead>
-                                    <tbody>
-                                        @forelse ($lines as $idx => $line)
-                                            @php
-                                                $oldLines = old('lines', []);
-                                                $oldLine = $oldLines[$idx] ?? [];
-                                                $itemId = $oldLine['item_id'] ?? $line['item_id'];
-                                                $totalWip = (int) ($oldLine['total_wip'] ?? ($line['total_wip'] ?? 0));
-                                                $qtyIn = isset($oldLine['qty_in'])
-                                                    ? (int) $oldLine['qty_in']
-                                                    : $line['qty_in'] ?? null;
-                                                $qtyReject = isset($oldLine['qty_reject'])
-                                                    ? (int) $oldLine['qty_reject']
-                                                    : $line['qty_reject'] ?? 0;
-                                                $rejectReason =
-                                                    $oldLine['reject_reason'] ?? ($line['reject_reason'] ?? '');
-                                                $rejectNotes =
-                                                    $oldLine['reject_notes'] ?? ($line['reject_notes'] ?? '');
-                                                $fullLabel = $line['item_label'] ?? 'Item #' . $itemId;
-                                                $codeOnly = Str::contains($fullLabel, ' - ')
-                                                    ? Str::before($fullLabel, ' - ')
-                                                    : $fullLabel;
-                                            @endphp
-                                            <tr data-search="{{ strtolower($codeOnly . ' ' . $itemId) }}"
-                                                data-item-id="{{ $itemId }}">
-                                                <td class="text-center align-middle col-index">
-                                                    <span class="mobile-index-pill">
-                                                        {{ $loop->iteration }}
-                                                    </span>
-                                                </td>
+                    {{-- LIST BYOP --}}
+                    <div class="list" id="list-byop" style="display:none;">
+                        @if (!$hasAnyWipByOp)
+                            <div class="text-center py-4 text-muted">Tidak ada WIP-FIN.</div>
+                        @else
+                            @foreach ($linesByOp as $idx => $line)
+                                @php
+                                    $oldLine = $oldByOp[$idx] ?? [];
 
-                                                <td class="col-item">
-                                                    <div class="item-label-main-desktop">
-                                                        {{ $fullLabel }}
-                                                    </div>
-                                                    <div class="item-label-main-mobile">
-                                                        {{ $codeOnly }}
-                                                    </div>
-                                                </td>
+                                    $itemId = (int) ($oldLine['item_id'] ?? ($line['item_id'] ?? 0));
+                                    $wip = (int) ($oldLine['total_wip'] ?? ($line['total_wip'] ?? 0));
+                                    $code = strtoupper($line['item_code'] ?? 'ITEM-' . $itemId);
 
-                                                @if ($userRole !== 'operating')
-                                                    <td class="text-end align-middle col-wip">
-                                                        <span class="wip-badge">
-                                                            <i class="bi bi-arrow-up-circle"></i>
-                                                            <span>{{ number_format($totalWip, 0, ',', '.') }}</span>
-                                                            <small>pcs</small>
-                                                        </span>
-                                                    </td>
+                                    // ✅ HILANGKAN YANG SUDAH HABIS / SUDAH KEPOST
+                                    if ($wip <= 0) {
+                                        continue;
+                                    }
+
+                                    $opId = (int) ($oldLine['operator_id'] ?? ($line['operator_id'] ?? 0));
+                                    $opCode = $oldLine['operator_code'] ?? ($line['operator_code'] ?? null);
+                                    $opName = $oldLine['operator_name'] ?? ($line['operator_name'] ?? null);
+                                    $opLabel = trim(($opCode ? $opCode . ' — ' : '') . ($opName ?? ''));
+                                    if ($opLabel === '' && $opId > 0) {
+                                        $opLabel = 'OP-' . $opId;
+                                    }
+
+                                    $pickupRaw = $oldLine['pickup_date'] ?? ($line['pickup_date'] ?? null);
+                                    $setorRaw = $oldLine['setor_date'] ?? ($line['setor_date'] ?? null);
+                                    $pickupTxt = $pickupRaw ? \Carbon\Carbon::parse($pickupRaw)->format('d/m/Y') : '—';
+                                    $setorTxt = $setorRaw ? \Carbon\Carbon::parse($setorRaw)->format('d/m/Y') : '—';
+
+                                    $qtyIn = array_key_exists('qty_in', $oldLine)
+                                        ? (is_null($oldLine['qty_in'])
+                                            ? ''
+                                            : (string) (int) $oldLine['qty_in'])
+                                        : '';
+
+                                    $qtyReject = array_key_exists('qty_reject', $oldLine)
+                                        ? ((int) ($oldLine['qty_reject'] ?? 0) === 0
+                                            ? ''
+                                            : (string) (int) $oldLine['qty_reject'])
+                                        : '';
+
+                                    $rejectNotes = $oldLine['reject_notes'] ?? '';
+                                @endphp
+
+                                <div class="cardx mono fin-item" data-idx="{{ $idx }}"
+                                    data-item-id="{{ $itemId }}" data-operator-id="{{ $opId }}"
+                                    data-code="{{ $code }}" data-wip="{{ $wip }}">
+
+                                    <div class="cardx-h">
+                                        <div class="cardx-left">
+                                            <input type="checkbox" class="chk row-check">
+                                            <div>
+                                                <div class="code">{{ $code }}</div>
+                                                <div class="meta-inline">
+                                                    <span title="Terakhir ambil">📦 {{ $pickupTxt }}</span>
+                                                    <span class="dot">•</span>
+                                                    <span title="Terakhir setor">🧵 {{ $setorTxt }}</span>
+                                                </div>
+                                                @if ($opId > 0)
+                                                    <div class="op-chip">OP: {{ $opLabel }}</div>
                                                 @endif
+                                            </div>
+                                        </div>
+                                        <div class="wip">SISA {{ number_format($wip, 0, ',', '.') }}</div>
+                                    </div>
 
-                                                {{-- Qty Proses (qty_in) --}}
-                                                <td class="text-end align-middle col-ok">
-                                                    <x-number-input :name="'lines[' . $idx . '][qty_in]'" :value="is_null($qtyIn) ? '' : (int) $qtyIn" mode="integer"
-                                                        :min="0" :max="$totalWip"
-                                                        class="form-control form-control-sm text-end integer-input qty-ok-input"
-                                                        placeholder="Proses" />
-                                                    @error("lines.$idx.qty_in")
-                                                        <div class="invalid-feedback d-block">{{ $message }}</div>
-                                                    @enderror
-                                                </td>
+                                    <div class="cardx-b">
+                                        <div class="grid2">
+                                            <div class="field">
+                                                <label>Setor</label>
+                                                <input type="text" inputmode="numeric"
+                                                    class="form-control form-control-sm qty ok integer-input select-all-on-focus"
+                                                    name="lines_byop[{{ $idx }}][qty_in]"
+                                                    value="{{ $qtyIn }}" placeholder="0">
+                                            </div>
 
-                                                {{-- Qty Reject --}}
-                                                <td class="text-end align-middle col-reject">
-                                                    <x-number-input :name="'lines[' . $idx . '][qty_reject]'" :value="(int) $qtyReject" mode="integer"
-                                                        :min="0" :max="$totalWip"
-                                                        class="form-control form-control-sm text-end integer-input qty-reject-input"
-                                                        placeholder="RJ" />
-                                                    @error("lines.$idx.qty_reject")
-                                                        <div class="invalid-feedback d-block">{{ $message }}</div>
-                                                    @enderror
-                                                </td>
+                                            <div class="field">
+                                                <label>Reject</label>
+                                                <input type="text" inputmode="numeric"
+                                                    class="form-control form-control-sm qty rj integer-input select-all-on-focus"
+                                                    name="lines_byop[{{ $idx }}][qty_reject]"
+                                                    value="{{ $qtyReject }}" placeholder="0">
+                                            </div>
+                                        </div>
 
-                                                <td class="align-middle col-reason">
-                                                    <input type="text"
-                                                        name="lines[{{ $idx }}][reject_reason]"
-                                                        class="form-control form-control-sm mb-1"
-                                                        placeholder="Alasan (opsional)" value="{{ $rejectReason }}">
-                                                    @error("lines.$idx.reject_reason")
-                                                        <div class="invalid-feedback d-block">{{ $message }}</div>
-                                                    @enderror
+                                        <div class="notes">
+                                            <input type="text" class="form-control form-control-sm"
+                                                name="lines_byop[{{ $idx }}][reject_notes]"
+                                                placeholder="Catatan reject (opsional)" value="{{ $rejectNotes }}">
+                                        </div>
 
-                                                    <input type="text" name="lines[{{ $idx }}][reject_notes]"
-                                                        class="form-control form-control-sm"
-                                                        placeholder="Catatan reject (opsional)"
-                                                        value="{{ $rejectNotes }}">
-                                                    @error("lines.$idx.reject_notes")
-                                                        <div class="invalid-feedback d-block">{{ $message }}</div>
-                                                    @enderror
-                                                </td>
-
-                                                {{-- Hidden fields --}}
-                                                <input type="hidden" name="lines[{{ $idx }}][item_id]"
-                                                    value="{{ $itemId }}">
-                                                <input type="hidden" name="lines[{{ $idx }}][total_wip]"
-                                                    value="{{ $totalWip }}">
-                                            </tr>
-                                        @empty
-                                            <tr>
-                                                <td colspan="6" class="text-center py-4 text-muted">
-                                                    Tidak ada WIP-FIN yang siap finishing.
-                                                </td>
-                                            </tr>
-                                        @endforelse
-                                    </tbody>
-                                </table>
-                            </div>
-                        </div>
-
-                        {{-- Footer actions --}}
-                        <div class="footer-actions">
-                            <a href="{{ route('production.finishing_jobs.index') }}"
-                                class="btn btn-sm btn-outline-secondary btn-back">
-                                <i class="bi bi-arrow-left"></i>
-                            </a>
-                            {{-- pakai button biasa, submit lewat modal --}}
-                            <button type="button" class="btn btn-sm btn-primary btn-save" disabled>
-                                <i class="bi bi-check2-circle"></i>
-                                Simpan Finishing
-                            </button>
-                        </div>
+                                        <input type="hidden" name="lines_byop[{{ $idx }}][item_id]"
+                                            value="{{ $itemId }}">
+                                        <input type="hidden" name="lines_byop[{{ $idx }}][total_wip]"
+                                            value="{{ $wip }}">
+                                        <input type="hidden" name="lines_byop[{{ $idx }}][operator_id]"
+                                            value="{{ $opId }}">
+                                        @if (!is_null($opCode))
+                                            <input type="hidden" name="lines_byop[{{ $idx }}][operator_code]"
+                                                value="{{ $opCode }}">
+                                        @endif
+                                        @if (!is_null($opName))
+                                            <input type="hidden" name="lines_byop[{{ $idx }}][operator_name]"
+                                                value="{{ $opName }}">
+                                        @endif
+                                        <input type="hidden" name="lines_byop[{{ $idx }}][pickup_date]"
+                                            value="{{ $pickupRaw }}">
+                                        <input type="hidden" name="lines_byop[{{ $idx }}][setor_date]"
+                                            value="{{ $setorRaw }}">
+                                    </div>
+                                </div>
+                            @endforeach
+                        @endif
                     </div>
 
-                    {{-- MODAL KONFIRMASI OPERATOR --}}
-                    <div class="modal fade" id="finishingOperatorModal" tabindex="-1"
-                        aria-labelledby="finishingOperatorModalLabel" aria-hidden="true">
+                    <div class="fab-wrap">
+                        <a href="{{ route('production.finishing_jobs.index') }}"
+                            class="btn btn-sm btn-outline-secondary fab-back">←</a>
+                        <button type="button" class="btn btn-sm btn-primary fab-save" id="btn-open-modal" disabled>
+                            Simpan
+                        </button>
+                    </div>
+
+                    {{-- MODAL --}}
+                    <div class="modal fade" id="finishingOperatorModal" tabindex="-1" aria-hidden="true">
                         <div class="modal-dialog modal-dialog-centered">
                             <div class="modal-content">
                                 <div class="modal-header">
-                                    <h5 class="modal-title" id="finishingOperatorModalLabel">
-                                        Konfirmasi Finishing
-                                    </h5>
+                                    <h5 class="modal-title">Konfirmasi</h5>
                                     <button type="button" class="btn-close" data-bs-dismiss="modal"
                                         aria-label="Close"></button>
                                 </div>
+
                                 <div class="modal-body">
-                                    <div class="mb-3">
-                                        <div class="small text-muted text-uppercase mb-1">
-                                            Ringkasan Proses
-                                        </div>
-                                        <div class="border rounded-3 p-2 bg-light-subtle small">
-                                            <div class="d-flex justify-content-between mb-1">
-                                                <span>Tanggal</span>
-                                                <span id="summary-date">
-                                                    {{ \Carbon\Carbon::parse($dateValue)->format('d M Y') }}
-                                                </span>
-                                            </div>
-                                            <div class="d-flex justify-content-between mb-1">
-                                                <span>Total Proses</span>
-                                                <span id="summary-total-ok">0</span>
-                                            </div>
-                                            <div class="d-flex justify-content-between">
-                                                <span>Total Reject</span>
-                                                <span id="summary-total-reject">0</span>
-                                            </div>
+                                    <div class="alert alert-light border" style="border-radius:14px;">
+                                        Pastikan input sudah benar.
+                                        <div class="mt-1" style="font-size:.86rem;color:var(--muted);font-weight:800;">
+                                            Mode <span class="mono" id="mode-label">ALL</span>
                                         </div>
                                     </div>
 
-                                    <div class="mb-3">
-                                        <label class="form-label form-label-sm">
-                                            Operator jahit (global)
-                                        </label>
+                                    <div class="mt-3" id="modal-operator-wrap">
+                                        <label class="form-label form-label-sm">Operator jahit (wajib jika mode
+                                            ALL)</label>
                                         <select id="modal-operator-select"
                                             class="form-select form-select-sm @error('operator_global_id') is-invalid @enderror">
-                                            <option value="">- pilih operator (opsional) -</option>
+                                            <option value="">- pilih -</option>
                                             @foreach ($operators as $op)
                                                 <option value="{{ $op->id }}" @selected((int) old('operator_global_id', $defaultOperator) === (int) $op->id)>
                                                     {{ $op->code ?? $op->id }} — {{ $op->name }}
                                                 </option>
                                             @endforeach
                                         </select>
+
                                         @error('operator_global_id')
                                             <div class="invalid-feedback d-block">{{ $message }}</div>
                                         @enderror
-                                        <div class="form-text small">
-                                            Operator ini akan dipakai sebagai operator jahit utama untuk semua baris
-                                            finishing.
+
+                                        <div class="invalid-feedback d-none" id="modal-op-required">
+                                            Operator wajib dipilih untuk mode ALL.
                                         </div>
                                     </div>
-
-                                    <div class="alert alert-info small mb-0">
-                                        Pastikan <strong>Qty Proses</strong> dan <strong>Qty Reject</strong> sudah benar.
-                                        Qty OK akan dihitung otomatis sebagai Proses - Reject per item.
-                                    </div>
                                 </div>
+
                                 <div class="modal-footer">
                                     <button type="button" class="btn btn-sm btn-outline-secondary"
-                                        data-bs-dismiss="modal">
-                                        Batal
-                                    </button>
-                                    <button type="button" class="btn btn-sm btn-primary" id="modal-confirm-submit">
-                                        <i class="bi bi-check2-circle"></i>
-                                        Simpan Sekarang
-                                    </button>
+                                        data-bs-dismiss="modal">Batal</button>
+                                    <button type="button" class="btn btn-sm btn-primary"
+                                        id="modal-confirm-submit">Simpan</button>
                                 </div>
                             </div>
                         </div>
                     </div>
-                </form>
-            </div>
 
+                </div>{{-- panel-b --}}
+            </form>
         </div>
+
     </div>
 @endsection
 
 @push('scripts')
     <script>
-        document.addEventListener('DOMContentLoaded', function() {
-            const table = document.querySelector('.finishing-table');
+        document.addEventListener('DOMContentLoaded', () => {
             const form = document.getElementById('finishing-form');
 
-            const integerInputs = Array.from(document.querySelectorAll('input.integer-input'));
-            const filterInput = document.getElementById('item-filter-input');
-            const filterSelect = document.getElementById('item-filter-select');
-            const saveBtn = document.querySelector('.btn-save');
+            const listAll = document.getElementById('list-all');
+            const listByOp = document.getElementById('list-byop');
 
+            const q = document.getElementById('q');
+            const itemFilter = document.getElementById('item-filter');
+            const opFilter = document.getElementById('op-filter');
+
+            const btnOpenModal = document.getElementById('btn-open-modal');
+
+            const operatorModeHidden = document.getElementById('operator_mode');
             const operatorHidden = document.getElementById('operator_global_id_hidden');
+
             const operatorSelectModal = document.getElementById('modal-operator-select');
-            const summaryDateEl = document.getElementById('summary-date');
-            const summaryOkEl = document.getElementById('summary-total-ok');
-            const summaryRejectEl = document.getElementById('summary-total-reject');
             const modalConfirmBtn = document.getElementById('modal-confirm-submit');
             const operatorModalEl = document.getElementById('finishingOperatorModal');
 
-            function isRejectInput(el) {
-                if (!el) return false;
-                if (el.classList.contains('qty-reject-input')) return true;
-                const name = el.name || '';
-                return name.includes('[qty_reject]');
+            const modalOpWrap = document.getElementById('modal-operator-wrap');
+            const modalModeLabel = document.getElementById('mode-label');
+            const modalOpRequired = document.getElementById('modal-op-required');
+
+            const body = document.body;
+            const $$ = (sel, root = document) => Array.from(root.querySelectorAll(sel));
+
+            function getMode() {
+                return (operatorModeHidden?.value || 'all').toString(); // all/byop
             }
 
-            function sanitizeToIntString(value, options = {}) {
-                const {
-                    allowEmpty = false
-                } = options;
-                let v = (value || '').toString().trim();
+            function setMode(mode) {
+                mode = (mode === 'byop') ? 'byop' : 'all';
+                if (operatorModeHidden) operatorModeHidden.value = mode;
 
-                if (v === '') {
-                    return allowEmpty ? '' : '0';
+                if (mode === 'all') {
+                    listAll.style.display = '';
+                    listByOp.style.display = 'none';
+                    setInputsEnabled(listAll, true);
+                    setInputsEnabled(listByOp, false);
+                } else {
+                    listAll.style.display = 'none';
+                    listByOp.style.display = '';
+                    setInputsEnabled(listAll, false);
+                    setInputsEnabled(listByOp, true);
+                }
+                applyFilter();
+                computeSubmitEnabled();
+            }
+
+            function setInputsEnabled(root, enabled) {
+                if (!root) return;
+                root.querySelectorAll('input, select, textarea').forEach(el => {
+                    el.disabled = !enabled;
+                });
+            }
+
+            const itemFilterAllHTML = itemFilter ? itemFilter.innerHTML : '';
+
+            function buildItemOptionsForOperator(opId) {
+                if (!itemFilter) return;
+                if (!opId) {
+                    itemFilter.innerHTML = itemFilterAllHTML;
+                    return;
                 }
 
-                if (/[.,]/.test(v)) {
-                    v = v.replace(',', '.');
-                    const f = parseFloat(v);
-                    if (!isNaN(f)) {
-                        return String(Math.max(0, Math.floor(f)));
-                    }
-                }
+                const map = new Map();
+                $$('.fin-item', listByOp).forEach(card => {
+                    const wip = parseInt(card.dataset.wip || '0', 10) || 0;
+                    if (wip <= 0) return;
 
+                    if ((card.dataset.operatorId || '') !== opId) return;
+                    const itemId = (card.dataset.itemId || '');
+                    const code = (card.dataset.code || '');
+                    if (itemId) map.set(itemId, code);
+                });
+
+                const arr = Array.from(map.entries())
+                    .map(([id, code]) => ({
+                        id,
+                        code
+                    }))
+                    .sort((a, b) => (a.code || '').localeCompare(b.code || ''));
+
+                itemFilter.innerHTML = ['<option value="">Semua</option>']
+                    .concat(arr.map(x => `<option value="${x.id}">${x.code}</option>`))
+                    .join('');
+            }
+
+            function ensureSelectedItemValid() {
+                if (!itemFilter) return;
+                const cur = (itemFilter.value || '').toString();
+                if (!cur) return;
+                const exists = Array.from(itemFilter.options).some(o => o.value === cur);
+                if (!exists) itemFilter.value = '';
+            }
+
+            function sanitizeInt(v, allowEmpty) {
+                v = (v ?? '').toString().trim();
+                if (v === '') return allowEmpty ? '' : '0';
                 const digits = v.replace(/[^0-9]/g, '');
-                if (digits === '') {
-                    return allowEmpty ? '' : '0';
-                }
-
+                if (digits === '') return allowEmpty ? '' : '0';
                 return String(Math.max(0, parseInt(digits, 10)));
             }
 
-            function isPositiveInt(value) {
-                const v = (value || '').toString().trim();
-                if (v === '') return false;
-                const num = parseInt(v, 10);
-                return !isNaN(num) && num > 0;
+            function getActiveList() {
+                return (getMode() === 'byop') ? listByOp : listAll;
             }
 
-            function renumberRows() {
-                if (!table) return;
-                const rows = table.querySelectorAll('tbody tr');
-                let counter = 1;
-
-                rows.forEach(row => {
-                    if (row.style.display === 'none') {
-                        return;
-                    }
-                    const cell = row.querySelector('td.col-index span.mobile-index-pill');
-                    if (cell) {
-                        cell.textContent = counter++;
-                    }
-                });
+            function getEls(card) {
+                return {
+                    qtyIn: card.querySelector('input.integer-input[name*="[qty_in]"]'),
+                    qtyRj: card.querySelector('input.integer-input[name*="[qty_reject]"]'),
+                    wip: card.querySelector('input[type="hidden"][name*="[total_wip]"]'),
+                    notesWrap: card.querySelector('.notes'),
+                    cb: card.querySelector('.row-check'),
+                };
             }
 
-            function updateSaveButtonState() {
-                if (!saveBtn) return;
+            function clampCard(card, changed) {
+                const {
+                    qtyIn,
+                    qtyRj,
+                    wip
+                } = getEls(card);
+                const W = Math.max(0, parseInt(wip?.value || 0, 10) || 0);
 
-                const hasAnyValue = integerInputs.some(input => isPositiveInt(input.value));
-                saveBtn.disabled = !hasAnyValue;
-                saveBtn.classList.toggle('disabled', !hasAnyValue);
-            }
+                let ok = Math.max(0, parseInt(qtyIn?.value || 0, 10) || 0);
+                let rj = Math.max(0, parseInt(qtyRj?.value || 0, 10) || 0);
 
-            function computeSummary() {
-                let totalProses = 0;
-                let totalReject = 0;
+                if (ok > W) ok = W;
+                if (rj > W) rj = W;
 
-                integerInputs.forEach(i => {
-                    const name = i.name || '';
-                    const match = name.match(/lines\[(\d+)\]\[(qty_in|qty_reject)\]/);
-                    if (!match) return;
-
-                    const val = parseInt(i.value || '0', 10) || 0;
-                    if (match[2] === 'qty_in') {
-                        totalProses += val;
-                    } else if (match[2] === 'qty_reject') {
-                        totalReject += val;
-                    }
-                });
-
-                if (summaryOkEl) summaryOkEl.textContent = totalProses.toString();
-                if (summaryRejectEl) summaryRejectEl.textContent = totalReject.toString();
-
-                const dateInput = document.querySelector('input[name="date"]');
-                if (dateInput && summaryDateEl && dateInput.value) {
-                    summaryDateEl.textContent = dateInput.value;
+                if (ok + rj > W) {
+                    if (changed === 'qty_in') ok = Math.max(0, W - rj);
+                    if (changed === 'qty_reject') rj = Math.max(0, W - ok);
                 }
+
+                if (qtyIn) qtyIn.value = ok === 0 ? '' : String(ok);
+                if (qtyRj) qtyRj.value = rj === 0 ? '' : String(rj);
             }
 
-            integerInputs.forEach(el => {
-                el.addEventListener('input', function() {
-                    if (isRejectInput(this)) {
-                        const normalized = sanitizeToIntString(this.value, {
-                            allowEmpty: false
-                        });
-                        this.value = normalized;
-                    } else {
-                        const normalized = sanitizeToIntString(this.value, {
-                            allowEmpty: true
-                        });
-                        this.value = normalized;
-                    }
+            function syncNotes(card) {
+                const {
+                    qtyRj,
+                    notesWrap
+                } = getEls(card);
+                const rj = Math.max(0, parseInt(qtyRj?.value || 0, 10) || 0);
+                if (!notesWrap) return;
+                if (rj > 0) notesWrap.classList.add('is-show');
+                else notesWrap.classList.remove('is-show');
+            }
 
-                    updateSaveButtonState();
-                    computeSummary();
+            function syncCheck(card) {
+                const {
+                    qtyIn,
+                    qtyRj,
+                    cb
+                } = getEls(card);
+                const ok = Math.max(0, parseInt(qtyIn?.value || 0, 10) || 0);
+                const rj = Math.max(0, parseInt(qtyRj?.value || 0, 10) || 0);
+                if (cb) cb.checked = ((ok + rj) > 0);
+            }
+
+            function computeSubmitEnabled() {
+                const activeList = getActiveList();
+                let total = 0;
+
+                $$('.fin-item', activeList).forEach(card => {
+                    const wip = parseInt(card.dataset.wip || '0', 10) || 0;
+                    if (wip <= 0) return; // ✅ jangan hitung yg sudah habis
+
+                    const {
+                        qtyIn,
+                        qtyRj
+                    } = getEls(card);
+                    const ok = Math.max(0, parseInt(qtyIn?.value || 0, 10) || 0);
+                    const rj = Math.max(0, parseInt(qtyRj?.value || 0, 10) || 0);
+                    total += (ok + rj);
                 });
 
-                el.addEventListener('paste', function(e) {
-                    e.preventDefault();
-                    const paste = (e.clipboardData || window.clipboardData).getData('text') || '';
-                    const normalized = sanitizeToIntString(paste, {
-                        allowEmpty: !isRejectInput(this)
-                    });
+                btnOpenModal.disabled = total <= 0;
+            }
 
-                    const start = this.selectionStart || 0;
-                    const end = this.selectionEnd || 0;
-                    const before = this.value.slice(0, start);
-                    const after = this.value.slice(end);
+            function applyFilter() {
+                const activeList = getActiveList();
+                const term = (q?.value || '').toString().trim().toUpperCase();
+                const selItemId = (itemFilter?.value || '').toString();
+                const selOpId = (opFilter?.value || '').toString();
 
-                    const next = before + normalized + after;
-                    this.value = sanitizeToIntString(next, {
-                        allowEmpty: !isRejectInput(this)
-                    });
+                $$('.fin-item', activeList).forEach(card => {
+                    const code = (card.dataset.code || '').toString().toUpperCase();
+                    const itemId = (card.dataset.itemId || '').toString();
+                    const opId = (card.dataset.operatorId || '').toString();
+                    const wip = parseInt(card.dataset.wip || '0', 10) || 0;
 
-                    const pos = (before + normalized).length;
-                    this.setSelectionRange(pos, pos);
-                    this.dispatchEvent(new Event('input', {
-                        bubbles: true
-                    }));
+                    const stillHasWip = wip > 0; // ✅ yang sudah kepost/habis -> hilang
+                    const matchSearch = !term || code.includes(term);
+                    const matchItem = !selItemId || itemId === selItemId;
+                    const matchOp = (getMode() === 'byop') ? (!selOpId || opId === selOpId) : true;
+
+                    card.style.display = (stillHasWip && matchSearch && matchItem && matchOp) ? '' : 'none';
                 });
 
-                el.addEventListener('wheel', function(ev) {
-                    if (document.activeElement === this) {
-                        ev.preventDefault();
-                    }
-                }, {
-                    passive: false
+                computeSubmitEnabled();
+            }
+
+            // SEARCH
+            q?.addEventListener('input', () => {
+                const up = (q.value || '').toString().toUpperCase();
+                if (q.value !== up) q.value = up;
+                applyFilter();
+            });
+
+            // OP FILTER -> mode switch
+            opFilter?.addEventListener('change', () => {
+                const selOpId = (opFilter.value || '').toString();
+
+                if (!selOpId) {
+                    setMode('all');
+                    if (itemFilter) itemFilter.innerHTML = itemFilterAllHTML;
+                } else {
+                    setMode('byop');
+                    buildItemOptionsForOperator(selOpId);
+                    ensureSelectedItemValid();
+                }
+
+                applyFilter();
+                setTimeout(() => {
+                    try {
+                        itemFilter?.focus?.();
+                    } catch (e) {}
+                }, 150);
+            });
+
+            // ITEM FILTER
+            itemFilter?.addEventListener('change', () => {
+                applyFilter();
+                const activeList = getActiveList();
+                const first = $$('.fin-item', activeList).find(c => c.style.display !== 'none');
+                if (first) first.scrollIntoView({
+                    behavior: 'smooth',
+                    block: 'start'
                 });
             });
 
-            if (table) {
-                table.addEventListener('input', function(e) {
-                    const target = e.target;
-                    if (!target.name) return;
+            // INPUT clamp
+            form.addEventListener('input', (e) => {
+                const t = e.target;
+                if (!t.classList?.contains('integer-input')) return;
 
-                    const match = target.name.match(/lines\[(\d+)\]\[(\w+)\]/);
-                    if (!match) return;
+                t.value = sanitizeInt(t.value, true);
 
-                    const idx = match[1];
-                    const field = match[2];
+                const card = t.closest('.fin-item');
+                if (!card) return;
 
-                    const qtyInEl = document.querySelector(`[name="lines[${idx}][qty_in]"]`);
-                    const qtyRejectEl = document.querySelector(`[name="lines[${idx}][qty_reject]"]`);
-                    const totalWipEl = document.querySelector(`[name="lines[${idx}][total_wip]"]`);
-
-                    const totalWip = Math.max(0, parseInt(totalWipEl?.value || 0, 10) || 0);
-
-                    let qtyIn = Math.max(0, parseInt(qtyInEl?.value || 0, 10) || 0);
-                    let qtyReject = Math.max(0, parseInt(qtyRejectEl?.value || 0, 10) || 0);
-
-                    if (qtyIn > totalWip) qtyIn = totalWip;
-                    if (qtyReject > totalWip) qtyReject = totalWip;
-
-                    if (qtyIn + qtyReject > totalWip) {
-                        if (field === 'qty_in') {
-                            qtyIn = Math.max(0, totalWip - qtyReject);
-                        } else if (field === 'qty_reject') {
-                            qtyReject = Math.max(0, totalWip - qtyIn);
-                        }
-                    }
-
-                    if (qtyInEl) qtyInEl.value = qtyIn === 0 ? '' : String(qtyIn);
-                    if (qtyRejectEl) qtyRejectEl.value = String(qtyReject);
-
-                    updateSaveButtonState();
-                    computeSummary();
-                });
-            }
-
-            function applyItemFilter() {
-                if (!table) return;
-
-                const term = (filterInput?.value || '').toLowerCase().trim();
-                const selectedId = (filterSelect?.value || '').toString();
-                const rows = table.querySelectorAll('tbody tr');
-
-                rows.forEach(row => {
-                    const text = (row.dataset.search || '').toLowerCase();
-                    const itemId = (row.dataset.itemId || '').toString();
-
-                    const matchText = !term || text.includes(term);
-                    const matchSelect = !selectedId || itemId === selectedId;
-
-                    row.style.display = (matchText && matchSelect) ? '' : 'none';
-                });
-
-                renumberRows();
-            }
-
-            if (filterInput) {
-                filterInput.addEventListener('input', applyItemFilter);
-            }
-
-            if (filterSelect) {
-                filterSelect.addEventListener('change', function() {
-                    applyItemFilter();
-
-                    const selectedId = (filterSelect.value || '').toString();
-                    if (!table || !selectedId) return;
-
-                    const targetRow = table.querySelector(`tbody tr[data-item-id="${selectedId}"]`);
-                    if (targetRow) {
-                        const qtyInEl = targetRow.querySelector('input[name^="lines"][name$="[qty_in]"]');
-                        if (qtyInEl) {
-                            qtyInEl.focus();
-                            qtyInEl.select();
-
-                            const rect = targetRow.getBoundingClientRect();
-                            const offset = rect.top + window.scrollY - 100;
-                            window.scrollTo({
-                                top: offset,
-                                behavior: 'smooth'
-                            });
-                        }
-                    }
-                });
-            }
-
-            const body = document.body;
-            integerInputs.forEach(inp => {
-                inp.addEventListener('focus', () => {
-                    if (window.innerWidth < 768) {
-                        body.classList.add('keyboard-open');
-                    }
-                });
-                inp.addEventListener('blur', () => {
-                    body.classList.remove('keyboard-open');
-                });
+                const changed = (t.name || '').includes('[qty_reject]') ? 'qty_reject' : 'qty_in';
+                clampCard(card, changed);
+                syncCheck(card);
+                syncNotes(card);
+                computeSubmitEnabled();
             });
 
-            if (form) {
-                form.addEventListener('submit', function() {
-                    integerInputs.forEach(i => {
-                        const reject = isRejectInput(i);
-                        let v = (i.value || '').trim();
+            // checkbox reset
+            form.addEventListener('change', (e) => {
+                const t = e.target;
+                if (!t.classList?.contains('row-check')) return;
 
-                        if (v === '') {
-                            if (reject) {
-                                i.value = '0';
-                            }
-                            return;
-                        }
+                const card = t.closest('.fin-item');
+                if (!card) return;
 
-                        i.value = sanitizeToIntString(v, {
-                            allowEmpty: false
-                        });
-                    });
-                });
-            }
+                if (!t.checked) {
+                    const {
+                        qtyIn,
+                        qtyRj
+                    } = getEls(card);
+                    if (qtyIn) qtyIn.value = '';
+                    if (qtyRj) qtyRj.value = '';
+                    syncNotes(card);
+                }
+                computeSubmitEnabled();
+            });
 
-            if (saveBtn && operatorModalEl && typeof bootstrap !== 'undefined') {
+            // select all on focus + keyboard class
+            form.addEventListener('focusin', (e) => {
+                const t = e.target;
+                if (t?.classList?.contains('select-all-on-focus')) {
+                    setTimeout(() => {
+                        try {
+                            t.select();
+                        } catch (e) {}
+                    }, 0);
+                }
+                if (window.innerWidth < 768) body.classList.add('keyboard-open');
+            });
+            form.addEventListener('focusout', () => body.classList.remove('keyboard-open'));
+
+            // MODAL
+            if (operatorModalEl && typeof bootstrap !== 'undefined') {
                 const bsModal = new bootstrap.Modal(operatorModalEl);
 
-                saveBtn.addEventListener('click', function(e) {
-                    if (saveBtn.disabled) {
-                        e.preventDefault();
-                        return;
-                    }
+                btnOpenModal?.addEventListener('click', (e) => {
+                    if (btnOpenModal.disabled) return;
                     e.preventDefault();
-                    computeSummary();
+
+                    const mode = getMode();
+                    if (modalModeLabel) modalModeLabel.textContent = (mode === 'all') ? 'ALL' : 'BYOP';
+                    if (modalOpWrap) modalOpWrap.style.display = (mode === 'all') ? '' : 'none';
+
+                    operatorSelectModal?.classList.remove('is-invalid');
+                    if (modalOpRequired) modalOpRequired.classList.add('d-none');
+
                     bsModal.show();
                 });
 
-                if (modalConfirmBtn) {
-                    modalConfirmBtn.addEventListener('click', function() {
-                        if (operatorHidden && operatorSelectModal) {
-                            operatorHidden.value = operatorSelectModal.value || '';
+                modalConfirmBtn?.addEventListener('click', () => {
+                    const mode = getMode();
+
+                    if (mode === 'all') {
+                        const chosen = (operatorSelectModal?.value || '').toString();
+                        if (!chosen) {
+                            operatorSelectModal?.classList.add('is-invalid');
+                            modalOpRequired?.classList.remove('d-none');
+                            return;
                         }
-                        bsModal.hide();
-                        form.submit();
-                    });
-                }
+                        operatorHidden.value = chosen; // ✅ operator_global_id terkirim
+                    }
+
+                    bsModal.hide();
+                    form.submit();
+                });
             }
 
-            updateSaveButtonState();
-            computeSummary();
-            renumberRows();
+            // normalize submit (only active list)
+            form.addEventListener('submit', () => {
+                const activeList = getActiveList();
+
+                const selOpId = (opFilter?.value || '').toString();
+                if (!selOpId) setMode('all');
+                else setMode('byop');
+
+                $$('.integer-input', activeList).forEach(i => {
+                    const isReject = (i.name || '').includes('[qty_reject]');
+                    let v = (i.value || '').trim();
+                    if (v === '') {
+                        if (isReject) i.value = '0';
+                        return;
+                    }
+                    i.value = sanitizeInt(v, false);
+                });
+            });
+
+            // init sync
+            [listAll, listByOp].forEach(list => {
+                if (!list) return;
+                $$('.fin-item', list).forEach(card => {
+                    syncCheck(card);
+                    syncNotes(card);
+                });
+            });
+
+            // init default mode = ALL
+            setMode((operatorModeHidden?.value || 'all'));
+            applyFilter();
+            computeSubmitEnabled();
         });
     </script>
 @endpush

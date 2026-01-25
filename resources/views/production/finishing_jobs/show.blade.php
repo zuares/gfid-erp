@@ -9,7 +9,6 @@
             --fin-card-radius: 16px;
             --fin-border: rgba(148, 163, 184, 0.28);
             --fin-muted: #6b7280;
-            --fin-accent: #2563eb;
             --fin-bg-light-1: #f5f6fa;
             --fin-bg-light-2: #f9fafb;
             --fin-bg-light-3: #ffffff;
@@ -25,7 +24,6 @@
             padding: 1rem 1rem 3.5rem;
         }
 
-        /* LIGHT MODE background */
         body[data-theme="light"] .finishing-show-page .page-wrap {
             background: linear-gradient(to bottom,
                     var(--fin-bg-light-1) 0,
@@ -33,7 +31,6 @@
                     var(--fin-bg-light-3) 100%);
         }
 
-        /* DARK MODE background */
         body[data-theme="dark"] .finishing-show-page .page-wrap {
             background:
                 radial-gradient(circle at top left,
@@ -65,46 +62,6 @@
             font-family: ui-monospace, SFMono-Regular, Menlo, Consolas, "Liberation Mono";
         }
 
-        .fin-badge-row {
-            display: flex;
-            flex-wrap: wrap;
-            gap: .35rem;
-            align-items: center;
-            justify-content: flex-end;
-        }
-
-        .badge-soft {
-            border-radius: 999px;
-            padding: .18rem .75rem;
-            font-size: .78rem;
-            font-weight: 500;
-            border: 1px solid rgba(148, 163, 184, 0.5);
-        }
-
-        .badge-status-draft {
-            background: rgba(251, 191, 36, 0.1);
-            border-color: rgba(251, 191, 36, 0.6);
-            color: #92400e;
-        }
-
-        .badge-status-posted {
-            background: rgba(34, 197, 94, 0.1);
-            border-color: rgba(34, 197, 94, 0.6);
-            color: #166534;
-        }
-
-        .badge-has-reject {
-            background: rgba(239, 68, 68, 0.08);
-            border-color: rgba(239, 68, 68, 0.7);
-            color: #991b1b;
-        }
-
-        .badge-auto-post {
-            background: rgba(59, 130, 246, 0.08);
-            border-color: rgba(59, 130, 246, 0.7);
-            color: #1d4ed8;
-        }
-
         .fin-alert {
             margin-top: .8rem;
             border-radius: 14px;
@@ -123,7 +80,7 @@
         }
 
         .fin-alert-title {
-            font-weight: 600;
+            font-weight: 700;
             font-size: .9rem;
             margin-bottom: .2rem;
         }
@@ -141,55 +98,8 @@
 
         .fin-section-title {
             font-size: .9rem;
-            font-weight: 600;
+            font-weight: 700;
             margin-bottom: .35rem;
-        }
-
-        .fin-table {
-            width: 100%;
-            border-collapse: separate;
-            border-spacing: 0 4px;
-            font-size: .8rem;
-        }
-
-        .fin-table thead tr {
-            font-size: .72rem;
-            text-transform: uppercase;
-            letter-spacing: .04em;
-            color: var(--fin-muted);
-        }
-
-        .fin-table thead th {
-            padding: .25rem .5rem;
-        }
-
-        .fin-table tbody tr {
-            background: rgba(248, 250, 252, 0.9);
-        }
-
-        body[data-theme="dark"] .fin-table tbody tr {
-            background: rgba(15, 23, 42, 0.9);
-        }
-
-        .fin-table tbody td {
-            padding: .35rem .5rem;
-            vertical-align: top;
-        }
-
-        .fin-table tbody tr:first-child td:first-child {
-            border-top-left-radius: 10px;
-        }
-
-        .fin-table tbody tr:first-child td:last-child {
-            border-top-right-radius: 10px;
-        }
-
-        .fin-table tbody tr:last-child td:first-child {
-            border-bottom-left-radius: 10px;
-        }
-
-        .fin-table tbody tr:last-child td:last-child {
-            border-bottom-right-radius: 10px;
         }
 
         .fin-chip {
@@ -210,19 +120,189 @@
             font-size: .75rem;
         }
 
-        @media (max-width: 640px) {
+        /* ===== TABLE UX ===== */
+        .fin-table-wrap {
+            overflow-x: auto;
+            -webkit-overflow-scrolling: touch;
+            scrollbar-gutter: stable;
+            border-radius: 14px;
+            border: 1px solid rgba(148, 163, 184, 0.22);
+        }
+
+        body[data-theme="dark"] .fin-table-wrap {
+            border-color: rgba(51, 65, 85, 0.75);
+        }
+
+        .fin-table {
+            width: 100%;
+            border-collapse: separate;
+            border-spacing: 0;
+            font-size: .8rem;
+            table-layout: fixed;
+            min-width: 820px;
+        }
+
+        .fin-table thead th {
+            position: sticky;
+            top: 0;
+            z-index: 2;
+            background: rgba(248, 250, 252, 0.98);
+            color: var(--fin-muted);
+            font-size: .72rem;
+            text-transform: uppercase;
+            letter-spacing: .04em;
+            padding: .55rem .6rem;
+            border-bottom: 1px solid rgba(148, 163, 184, 0.22);
+            white-space: nowrap;
+        }
+
+        body[data-theme="dark"] .fin-table thead th {
+            background: rgba(2, 6, 23, 0.92);
+            border-bottom-color: rgba(51, 65, 85, 0.8);
+        }
+
+        .fin-table tbody td {
+            padding: .55rem .6rem;
+            vertical-align: top;
+            border-bottom: 1px solid rgba(148, 163, 184, 0.14);
+            background: rgba(255, 255, 255, 0.55);
+        }
+
+        body[data-theme="dark"] .fin-table tbody td {
+            background: rgba(15, 23, 42, 0.55);
+        }
+
+        .fin-table tbody tr:hover td {
+            background: rgba(59, 130, 246, 0.06);
+        }
+
+        body[data-theme="dark"] .fin-table tbody tr:hover td {
+            background: rgba(59, 130, 246, 0.10);
+        }
+
+        .cell-2line {
+            line-height: 1.15;
+        }
+
+        .cell-sub {
+            margin-top: .15rem;
+            font-size: .72rem;
+            color: var(--fin-muted);
+        }
+
+        .num {
+            text-align: right;
+        }
+
+        .rej {
+            color: #991b1b;
+            font-weight: 700;
+        }
+
+        /* cols */
+        .col-no {
+            width: 64px;
+        }
+
+        .col-item {
+            width: 220px;
+        }
+
+        .col-num {
+            width: 96px;
+        }
+
+        .col-ops {
+            width: 160px;
+        }
+
+        .col-reason {
+            width: 210px;
+        }
+
+        .col-snapdate {
+            width: 170px;
+        }
+
+        /* badges mini bawah item (OWNER only) */
+        .mini-badges {
+            margin-top: .22rem;
+            display: flex;
+            flex-wrap: wrap;
+            gap: .25rem;
+        }
+
+        .mini-badge {
+            display: inline-flex;
+            align-items: center;
+            gap: .25rem;
+            border-radius: 999px;
+            padding: .10rem .45rem;
+            font-size: .68rem;
+            font-weight: 700;
+            border: 1px solid rgba(148, 163, 184, 0.45);
+            background: rgba(248, 250, 252, 0.75);
+            white-space: nowrap;
+        }
+
+        body[data-theme="dark"] .mini-badge {
+            background: rgba(2, 6, 23, 0.35);
+            border-color: rgba(51, 65, 85, 0.85);
+        }
+
+        .mini-badge .k {
+            font-size: .62rem;
+            opacity: .7;
+            letter-spacing: .04em;
+            text-transform: uppercase;
+        }
+
+        /* MOBILE */
+        @media (max-width: 768px) {
             .fin-card {
-                padding-inline: .9rem;
+                padding-inline: .95rem;
+            }
+
+            .fin-table {
+                font-size: .82rem;
+                min-width: 720px;
+            }
+
+            .fin-table thead th {
+                padding: .5rem .55rem;
+            }
+
+            .hide-sm {
+                display: none;
+            }
+
+            .col-item {
+                width: 190px;
+            }
+
+            .col-ops {
+                width: 140px;
             }
         }
     </style>
 @endpush
 
 @section('content')
+    @php
+        $isOwner = auth()->check() && auth()->user()?->role === 'owner';
+
+        /** @var \Illuminate\Support\Collection|\App\Models\FinishingJobLine[] $rejectLines */
+        $rejectLines = $job->lines->filter(fn($line) => (float) $line->qty_reject > 0.0001);
+
+        $totalIn = $job->lines->sum('qty_in');
+        $totalOk = $job->lines->sum('qty_ok');
+        $totalReject = $job->lines->sum('qty_reject');
+    @endphp
+
     <div class="finishing-show-page">
         <div class="page-wrap">
 
-            {{-- HEADER + BADGE + ACTIONS --}}
+            {{-- HEADER (tanpa badge row untuk non-owner) --}}
             <div class="fin-card">
                 <div class="flex items-start justify-between gap-3 flex-wrap">
                     <div class="space-y-1">
@@ -234,10 +314,7 @@
                             <span class="mono">{{ $job->date }}</span>
                         </div>
                         <div class="text-xs text-slate-500 dark:text-slate-400">
-                            Dibuat oleh:
-                            <span class="font-medium">
-                                {{ $job->createdBy?->name ?? '-' }}
-                            </span>
+                            Dibuat oleh: <span class="font-medium">{{ $job->createdBy?->name ?? '-' }}</span>
                         </div>
                         @if ($job->notes)
                             <div class="mt-1 text-xs text-slate-500 dark:text-slate-400">
@@ -246,35 +323,31 @@
                         @endif
                     </div>
 
-                    <div class="fin-badge-row">
-                        {{-- STATUS --}}
-                        @if ($job->status === 'posted')
-                            <span class="badge-soft badge-status-posted">
-                                POSTED
-                            </span>
-                        @else
-                            <span class="badge-soft badge-status-draft">
-                                DRAFT
-                            </span>
-                        @endif
+                    {{-- hanya OWNER boleh lihat status chips (opsional kecil), non-owner: kosong --}}
+                    @if ($isOwner)
+                        <div class="flex flex-wrap gap-2 justify-end">
+                            @if ($job->status === 'posted')
+                                <span class="mini-badge"><span class="k">status</span><span
+                                        class="mono">POSTED</span></span>
+                            @else
+                                <span class="mini-badge"><span class="k">status</span><span
+                                        class="mono">DRAFT</span></span>
+                            @endif
 
-                        {{-- AUTO POST (0 REJECT) --}}
-                        @if ($isAutoPost)
-                            <span class="badge-soft badge-auto-post">
-                                AUTO POST (0 REJECT)
-                            </span>
-                        @endif
+                            @if ($isAutoPost)
+                                <span class="mini-badge"><span class="k">auto</span><span class="mono">0
+                                        RJ</span></span>
+                            @endif
 
-                        {{-- HAS REJECT --}}
-                        @if ($hasReject)
-                            <span class="badge-soft badge-has-reject">
-                                HAS REJECT
-                            </span>
-                        @endif
-                    </div>
+                            @if ($hasReject)
+                                <span class="mini-badge"><span class="k">flag</span><span class="mono">HAS
+                                        RJ</span></span>
+                            @endif
+                        </div>
+                    @endif
                 </div>
 
-                {{-- ALERT: DRAFT + HAS REJECT --}}
+                {{-- ALERTS --}}
                 @if ($hasReject && $job->status !== 'posted')
                     <div class="fin-alert mt-3">
                         <div class="fin-alert-title">
@@ -292,12 +365,9 @@
                     </div>
                 @endif
 
-                {{-- ALERT: POSTED + HAS REJECT (bukan auto-post) --}}
                 @if ($hasReject && $job->status === 'posted' && !$isAutoPost)
                     <div class="fin-alert danger mt-3">
-                        <div class="fin-alert-title">
-                            Finishing ini sudah POSTED dengan REJECT.
-                        </div>
+                        <div class="fin-alert-title">Finishing ini sudah POSTED dengan REJECT.</div>
                         <p>
                             Stok OK telah dipindahkan ke <strong>WH-PRD</strong> dan stok reject ke gudang
                             <strong>REJECT</strong>. Data di bawah dipakai untuk evaluasi kualitas &amp; penanggung jawab.
@@ -305,7 +375,7 @@
                     </div>
                 @endif
 
-                {{-- ACTION BUTTONS --}}
+                {{-- ACTIONS --}}
                 <div class="mt-3 flex flex-wrap gap-2">
                     <a href="{{ route('production.finishing_jobs.index') }}" class="btn btn-sm btn-ghost">
                         &larr; Kembali
@@ -327,63 +397,62 @@
                 </div>
             </div>
 
-            {{-- RINGKASAN REJECT & PENANGGUNG JAWAB --}}
-            @php
-                /** @var \Illuminate\Support\Collection|\App\Models\FinishingJobLine[] $rejectLines */
-                $rejectLines = $job->lines->filter(fn($line) => (float) $line->qty_reject > 0.0001);
-            @endphp
-
+            {{-- RINGKASAN REJECT --}}
             @if ($rejectLines->count())
                 <div class="fin-card">
                     <div class="flex items-center justify-between mb-2 gap-2">
-                        <h2 class="fin-section-title">
-                            Ringkasan Reject &amp; Penanggung Jawab
-                        </h2>
-                        <span class="fin-chip fin-chip-light">
-                            Total baris reject: {{ $rejectLines->count() }}
-                        </span>
+                        <h2 class="fin-section-title">Ringkasan Reject</h2>
+                        <span class="fin-chip fin-chip-light">Total baris reject: {{ $rejectLines->count() }}</span>
                     </div>
 
-                    <div class="overflow-x-auto">
+                    <div class="fin-table-wrap">
                         <table class="fin-table">
                             <thead>
                                 <tr>
-                                    <th class="text-left">Bundle</th>
-                                    <th class="text-left">Item</th>
-                                    <th class="text-right">Qty In</th>
-                                    <th class="text-right text-red-600">Qty Reject</th>
-                                    <th class="text-left">Alasan</th>
-                                    <th class="text-left">Operator Finishing</th>
-                                    <th class="text-left">Operator Jahit</th>
+                                    <th class="col-no text-left">No</th>
+                                    <th class="col-item text-left">Item</th>
+                                    <th class="col-num num">In</th>
+                                    <th class="col-num num">Reject</th>
+                                    <th class="col-reason text-left">Alasan</th>
+                                    <th class="col-ops text-left">Finishing</th>
+                                    <th class="col-ops text-left">Jahit</th>
                                 </tr>
                             </thead>
                             <tbody>
-                                @foreach ($rejectLines as $line)
+                                @foreach ($rejectLines->values() as $i => $line)
+                                    @php
+                                        $itemCode = $line->item?->code ?? ($line->bundle?->finishedItem?->code ?? '-');
+                                        $itemName = $line->item?->name ?? ($line->bundle?->finishedItem?->name ?? '');
+                                        $bundleCode = $line->bundle?->bundle_code ?? '-';
+                                        $jobCode = $line->bundle?->cuttingJob?->code ?? '-';
+                                    @endphp
                                     <tr>
-                                        <td class="mono text-[11px]">
-                                            {{ $line->bundle?->bundle_code ?? '-' }}
-                                        </td>
-                                        <td>
-                                            <div class="text-[11px] font-medium">
-                                                {{ $line->item?->code ?? ($line->bundle?->finishedItem?->code ?? '-') }}
+                                        <td class="mono col-no">{{ $i + 1 }}</td>
+
+                                        <td class="col-item">
+                                            <div class="cell-2line">
+                                                {{-- MOBILE: kode saja --}}
+                                                <div class="mono font-semibold">{{ $itemCode }}</div>
+                                                {{-- DESKTOP: nama item --}}
+                                                <div class="cell-sub hide-sm">{{ $itemName }}</div>
+
+                                                {{-- OWNER: mini badges bundle+job di bawah item --}}
+                                                @if ($isOwner)
+                                                    <div class="mini-badges">
+                                                        <span class="mini-badge"><span class="k">b</span><span
+                                                                class="mono">{{ $bundleCode }}</span></span>
+                                                        <span class="mini-badge"><span class="k">job</span><span
+                                                                class="mono">{{ $jobCode }}</span></span>
+                                                    </div>
+                                                @endif
                                             </div>
-                                            <div class="text-[11px] text-slate-500">
-                                                {{ $line->item?->name ?? ($line->bundle?->finishedItem?->name ?? '') }}
-                                            </div>
                                         </td>
-                                        <td class="mono text-right text-[11px]">
-                                            {{ number_format($line->qty_in, 0) }}
-                                        </td>
-                                        <td class="mono text-right text-[11px] text-red-600">
-                                            {{ number_format($line->qty_reject, 0) }}
-                                        </td>
-                                        <td class="text-[11px]">
-                                            {{ $line->reject_reason ?: '-' }}
-                                        </td>
-                                        <td class="text-[11px]">
-                                            {{ $line->operator?->name ?? '-' }}
-                                        </td>
-                                        <td class="text-[11px]">
+
+                                        <td class="mono num col-num">{{ number_format($line->qty_in, 0) }}</td>
+                                        <td class="mono num col-num rej">{{ number_format($line->qty_reject, 0) }}</td>
+                                        <td class="col-reason">{{ $line->reject_reason ?: '-' }}</td>
+                                        <td class="col-ops">{{ $line->operator?->name ?? '-' }}</td>
+                                        <td class="col-ops">
                                             {{ $line->sewingOperator?->name ?? ($line->sewingPickupLine?->sewingPickup?->operator?->name ?? '-') }}
                                         </td>
                                     </tr>
@@ -393,73 +462,71 @@
                     </div>
 
                     <p class="help mt-2">
-                        Reject per bundle dikaitkan dengan operator finishing dan operator jahit
-                        (diambil dari Sewing Return / Sewing Pickup terbaru untuk bundle terkait).
+                        Operator jahit diambil dari Sewing Return / Sewing Pickup terbaru untuk bundle terkait.
                     </p>
                 </div>
             @endif
 
-            {{-- DETAIL BARIS FINISHING (SEMUA BUNDLE) --}}
+            {{-- DETAIL BARIS FINISHING --}}
             <div class="fin-card">
                 <div class="flex items-center justify-between mb-2 gap-2">
-                    <h2 class="fin-section-title">
-                        Detail Finishing per Bundle
-                    </h2>
-                    <span class="fin-chip fin-chip-light">
-                        Total baris: {{ $job->lines->count() }}
-                    </span>
+                    <h2 class="fin-section-title">Detail Finishing</h2>
+                    <span class="fin-chip fin-chip-light">Total baris: {{ $job->lines->count() }}</span>
                 </div>
 
-                <div class="overflow-x-auto">
+                <div class="fin-table-wrap">
                     <table class="fin-table">
                         <thead>
                             <tr>
-                                <th class="text-left">Bundle</th>
-                                <th class="text-left">Item</th>
-                                <th class="text-right">Qty In</th>
-                                <th class="text-right">Qty OK</th>
-                                <th class="text-right">Qty Reject</th>
-                                <th class="text-left">Operator Finishing</th>
-                                <th class="text-left">Operator Jahit</th>
+                                <th class="col-no text-left">No</th>
+                                <th class="col-item text-left">Item</th>
+                                <th class="col-num num">In</th>
+                                <th class="col-num num">OK</th>
+                                <th class="col-num num">Reject</th>
+                                <th class="col-ops text-left">Finishing</th>
+                                <th class="col-ops text-left">Jahit</th>
                             </tr>
                         </thead>
                         <tbody>
-                            @foreach ($job->lines as $line)
+                            @foreach ($job->lines->values() as $i => $line)
+                                @php
+                                    $itemCode = $line->item?->code ?? ($line->bundle?->finishedItem?->code ?? '-');
+                                    $itemName = $line->item?->name ?? ($line->bundle?->finishedItem?->name ?? '');
+                                    $lotCode = $line->bundle?->lot?->code ?? '-';
+                                    $lotName = $line->bundle?->lot?->item?->name ?? '';
+                                    $bundleCode = $line->bundle?->bundle_code ?? '-';
+                                    $jobCode = $line->bundle?->cuttingJob?->code ?? '-';
+                                @endphp
                                 <tr>
-                                    <td class="mono text-[11px]">
-                                        <div>{{ $line->bundle?->bundle_code ?? '-' }}</div>
-                                        <div class="text-[11px] text-slate-500">
-                                            Job: {{ $line->bundle?->cuttingJob?->code ?? '-' }}
+                                    <td class="mono col-no">{{ $i + 1 }}</td>
+
+                                    <td class="col-item">
+                                        <div class="cell-2line">
+                                            <div class="mono font-semibold">{{ $itemCode }}</div>
+                                            <div class="cell-sub hide-sm">{{ $itemName }}</div>
+                                            <div class="cell-sub hide-sm">LOT: {{ $lotCode }} &middot;
+                                                {{ $lotName }}</div>
+
+                                            {{-- OWNER: mini badges bundle+job di bawah item --}}
+                                            @if ($isOwner)
+                                                <div class="mini-badges">
+                                                    <span class="mini-badge"><span class="k">b</span><span
+                                                            class="mono">{{ $bundleCode }}</span></span>
+                                                    <span class="mini-badge"><span class="k">job</span><span
+                                                            class="mono">{{ $jobCode }}</span></span>
+                                                </div>
+                                            @endif
                                         </div>
                                     </td>
-                                    <td>
-                                        <div class="text-[11px] font-medium">
-                                            {{ $line->item?->code ?? ($line->bundle?->finishedItem?->code ?? '-') }}
-                                        </div>
-                                        <div class="text-[11px] text-slate-500">
-                                            {{ $line->item?->name ?? ($line->bundle?->finishedItem?->name ?? '') }}
-                                        </div>
-                                        <div class="text-[11px] text-slate-400">
-                                            LOT:
-                                            {{ $line->bundle?->lot?->code ?? '-' }}
-                                            &middot;
-                                            {{ $line->bundle?->lot?->item?->name ?? '' }}
-                                        </div>
-                                    </td>
-                                    <td class="mono text-right text-[11px]">
-                                        {{ number_format($line->qty_in, 0) }}
-                                    </td>
-                                    <td class="mono text-right text-[11px]">
-                                        {{ number_format($line->qty_ok, 0) }}
-                                    </td>
-                                    <td
-                                        class="mono text-right text-[11px] {{ $line->qty_reject > 0 ? 'text-red-600' : '' }}">
+
+                                    <td class="mono num col-num">{{ number_format($line->qty_in, 0) }}</td>
+                                    <td class="mono num col-num">{{ number_format($line->qty_ok, 0) }}</td>
+                                    <td class="mono num col-num {{ (float) $line->qty_reject > 0 ? 'rej' : '' }}">
                                         {{ number_format($line->qty_reject, 0) }}
                                     </td>
-                                    <td class="text-[11px]">
-                                        {{ $line->operator?->name ?? '-' }}
-                                    </td>
-                                    <td class="text-[11px]">
+
+                                    <td class="col-ops">{{ $line->operator?->name ?? '-' }}</td>
+                                    <td class="col-ops">
                                         {{ $line->sewingOperator?->name ?? ($line->sewingPickupLine?->sewingPickup?->operator?->name ?? '-') }}
                                     </td>
                                 </tr>
@@ -468,24 +535,12 @@
                     </table>
                 </div>
 
-                @php
-                    $totalIn = $job->lines->sum('qty_in');
-                    $totalOk = $job->lines->sum('qty_ok');
-                    $totalReject = $job->lines->sum('qty_reject');
-                @endphp
-
                 <div class="mt-3 flex flex-wrap gap-3 justify-end text-xs">
                     <div class="fin-chip">
-                        Total IN:
-                        <span class="mono ml-1">
-                            {{ number_format($totalIn, 0) }}
-                        </span>
+                        Total IN: <span class="mono ml-1">{{ number_format($totalIn, 0) }}</span>
                     </div>
                     <div class="fin-chip">
-                        Total OK:
-                        <span class="mono ml-1">
-                            {{ number_format($totalOk, 0) }}
-                        </span>
+                        Total OK: <span class="mono ml-1">{{ number_format($totalOk, 0) }}</span>
                     </div>
                     <div class="fin-chip">
                         Total Reject:
@@ -496,52 +551,42 @@
                 </div>
             </div>
 
-            {{-- SNAPSHOT HPP RM-ONLY --}}
-            @if ($rmSnapshots->count())
+            {{-- SNAPSHOT HPP RM-ONLY (HANYA OWNER) --}}
+            @if ($isOwner && $rmSnapshots->count())
                 <div class="fin-card">
                     <div class="flex items-center justify-between mb-2 gap-2">
-                        <h2 class="fin-section-title">
-                            Snapshot HPP RM-only (Finishing)
-                        </h2>
-                        <span class="fin-chip fin-chip-light">
-                            Total snapshot: {{ $rmSnapshots->count() }}
-                        </span>
+                        <h2 class="fin-section-title">Snapshot HPP RM-only (Finishing)</h2>
+                        <span class="fin-chip fin-chip-light">Total snapshot: {{ $rmSnapshots->count() }}</span>
                     </div>
 
-                    <div class="overflow-x-auto">
-                        <table class="fin-table">
+                    <div class="fin-table-wrap">
+                        <table class="fin-table" style="min-width: 780px;">
                             <thead>
                                 <tr>
-                                    <th class="text-left">Snapshot Date</th>
-                                    <th class="text-left">Item</th>
-                                    <th class="text-right">Qty</th>
-                                    <th class="text-right">HPP / pcs</th>
-                                    <th class="text-right">Total HPP</th>
+                                    <th class="col-snapdate text-left">Snapshot Date</th>
+                                    <th class="col-item text-left">Item</th>
+                                    <th class="col-num num">Qty</th>
+                                    <th class="col-num num">HPP/pcs</th>
+                                    <th class="col-num num">Total</th>
                                 </tr>
                             </thead>
                             <tbody>
                                 @foreach ($rmSnapshots as $snap)
+                                    @php
+                                        $snapItemCode = $snap->item?->code ?? '-';
+                                        $snapItemName = $snap->item?->name ?? '';
+                                    @endphp
                                     <tr>
-                                        <td class="mono text-[11px]">
-                                            {{ $snap->snapshot_date ?? $snap->created_at }}
-                                        </td>
-                                        <td>
-                                            <div class="text-[11px] font-medium">
-                                                {{ $snap->item?->code ?? '-' }}
-                                            </div>
-                                            <div class="text-[11px] text-slate-500">
-                                                {{ $snap->item?->name ?? '' }}
+                                        <td class="mono col-snapdate">{{ $snap->snapshot_date ?? $snap->created_at }}</td>
+                                        <td class="col-item">
+                                            <div class="cell-2line">
+                                                <div class="mono font-semibold">{{ $snapItemCode }}</div>
+                                                <div class="cell-sub hide-sm">{{ $snapItemName }}</div>
                                             </div>
                                         </td>
-                                        <td class="mono text-right text-[11px]">
-                                            {{ number_format($snap->qty ?? 0, 0) }}
-                                        </td>
-                                        <td class="mono text-right text-[11px]">
-                                            {{ number_format($snap->unit_cost ?? 0, 0) }}
-                                        </td>
-                                        <td class="mono text-right text-[11px]">
-                                            {{ number_format($snap->total_cost ?? 0, 0) }}
-                                        </td>
+                                        <td class="mono num col-num">{{ number_format($snap->qty ?? 0, 0) }}</td>
+                                        <td class="mono num col-num">{{ number_format($snap->unit_cost ?? 0, 0) }}</td>
+                                        <td class="mono num col-num">{{ number_format($snap->total_cost ?? 0, 0) }}</td>
                                     </tr>
                                 @endforeach
                             </tbody>
@@ -549,9 +594,7 @@
                     </div>
 
                     <p class="help mt-2">
-                        Snapshot ini di-generate otomatis saat Finishing diposting menggunakan HPP
-                        <strong>RM-only</strong> dari WIP-FIN, untuk keperluan analisa biaya produksi dan
-                        konsistensi nilai stok.
+                        Snapshot ini hanya tampil untuk <strong>owner</strong>.
                     </p>
                 </div>
             @endif
