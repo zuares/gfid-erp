@@ -453,57 +453,55 @@ class InventoryStockController extends Controller
     public function itemLocations(Item $item, Request $request)
     {
         $user = auth()->user();
-        $role = $user?->role ?? null;
+        $role = strtolower(trim((string) ($user?->role ?? '')));
+        $isOwner = $role === 'owner';
 
-        $warehouseId = $request->input('warehouse_id');
+        $warehouseId = $request->filled('warehouse_id') ? (int) $request->input('warehouse_id') : null;
 
-        $rows = InventoryStock::query()
-            ->join('warehouses', 'warehouses.id', '=', 'inventory_stocks.warehouse_id')
-            ->where('inventory_stocks.item_id', $item->id)
+        $q = DB::table('inventory_mutations as m')
+            ->join('warehouses as w', 'w.id', '=', 'm.warehouse_id')
+            ->where('m.item_id', $item->id);
 
-        // 🔒 Scope per ROLE (konsisten dengan items())
-            ->when($role === 'operating', function ($q) {
-                // Operating: hanya WH-PRD + WIP-%
-                $q->where(function ($q2) {
-                    $q2->where('warehouses.code', 'WH-PRD')
-                        ->orWhere('warehouses.code', 'LIKE', 'WIP-%');
-                });
-            })
-            ->when($role === 'admin', function ($q) {
-                // Admin: hanya WH-RTS
-                $q->where('warehouses.code', 'WH-RTS');
-            })
-        // Owner / role lain: tanpa pembatasan gudang
+        // 🔒 Role scope (samakan dengan items())
+        if ($role === 'operating') {
+            $q->where(function ($qq) {
+                $qq->where('w.code', 'WH-PRD')
+                    ->orWhere('w.code', 'LIKE', 'WIP-%');
+            });
+        } elseif ($role === 'admin') {
+            $q->where('w.code', 'WH-RTS');
+        }
+        // owner / role lain: tanpa pembatasan gudang
 
-        // Filter gudang spesifik dari request (kalau ada)
-            ->when($warehouseId, fn($q) => $q->where('inventory_stocks.warehouse_id', $warehouseId))
+        // Filter gudang spesifik (kalau ada)
+        if ($warehouseId) {
+            $q->where('m.warehouse_id', $warehouseId);
+        }
 
-            ->selectRaw('
-            warehouses.id,
-            warehouses.code,
-            warehouses.name,
-            SUM(inventory_stocks.qty) AS qty
+        $rows = $q->selectRaw('
+            w.id,
+            w.code,
+            w.name,
+            SUM(m.qty_change) AS qty
         ')
-            ->groupBy('warehouses.id', 'warehouses.code', 'warehouses.name')
-            ->havingRaw('SUM(inventory_stocks.qty) <> 0')
-            ->orderBy('warehouses.code')
+            ->groupBy('w.id', 'w.code', 'w.name')
+            ->havingRaw('SUM(m.qty_change) <> 0')
+            ->orderBy('w.code')
             ->get()
-            ->map(function ($row) {
-                return [
-                    'id' => (int) $row->id,
-                    'code' => (string) $row->code,
-                    'name' => (string) $row->name,
-                    'qty' => (float) $row->qty,
-                ];
-            })
+            ->map(fn($row) => [
+                'id' => (int) $row->id,
+                'code' => (string) $row->code,
+                'name' => (string) $row->name,
+                'qty' => (float) $row->qty,
+            ])
             ->values();
 
         return response()->json([
             'ok' => true,
             'item' => [
                 'id' => $item->id,
-                'code' => $item->code,
-                'name' => $item->name,
+                'code' => (string) $item->code,
+                'name' => (string) $item->name,
             ],
             'locations' => $rows,
         ]);

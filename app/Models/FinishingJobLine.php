@@ -25,9 +25,9 @@ class FinishingJobLine extends Model
     ];
 
     protected $casts = [
-        'qty_in' => 'float',
-        'qty_ok' => 'float',
-        'qty_reject' => 'float',
+        'qty_in' => 'integer',
+        'qty_ok' => 'integer',
+        'qty_reject' => 'integer',
         'processed_at' => 'datetime',
     ];
 
@@ -57,6 +57,21 @@ class FinishingJobLine extends Model
     public function sewingOperator()
     {
         return $this->belongsTo(User::class, 'sewing_operator_id');
+    }
+
+    public function setQtyInAttribute($value): void
+    {
+        $this->attributes['qty_in'] = (int) round((float) ($value ?? 0));
+    }
+
+    public function setQtyOkAttribute($value): void
+    {
+        $this->attributes['qty_ok'] = (int) round((float) ($value ?? 0));
+    }
+
+    public function setQtyRejectAttribute($value): void
+    {
+        $this->attributes['qty_reject'] = (int) round((float) ($value ?? 0));
     }
 
 }
