@@ -28,4 +28,9 @@ class Employee extends Model
     {
         return $this->hasOne(User::class);
     }
+
+    public function sewingPickups()
+    {
+        return $this->hasMany(SewingPickup::class, 'operator_id');
+    }
 }

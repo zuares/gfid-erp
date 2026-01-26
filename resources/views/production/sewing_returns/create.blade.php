@@ -8,1120 +8,1316 @@
         :root {
             --r: 14px;
             --b: rgba(148, 163, 184, .22);
+            --muted: #6b7280;
+            --soft2: rgba(148, 163, 184, .05);
+            --accent: #16a34a;
+            --ok: #16a34a;
+            --rj: #b91c1c;
             --shadow: 0 10px 26px rgba(15, 23, 42, .08), 0 0 0 1px rgba(15, 23, 42, .03);
-            --muted2: rgba(100, 116, 139, .9);
-
-            --ok: rgba(22, 163, 74, 1);
-            --okbg: rgba(22, 163, 74, .10);
-            --rj: rgba(220, 38, 38, 1);
-            --rjbg: rgba(248, 113, 113, .12);
-            --warn: rgba(245, 158, 11, 1);
-            --warnbg: rgba(245, 158, 11, .14);
+            --bottom-nav-h: 72px;
+            --fab-gap: 12px;
+            --fab-bottom: calc(var(--bottom-nav-h) + var(--fab-gap) + env(safe-area-inset-bottom));
+            --vv-kbd: 0px;
         }
 
         .page-wrap {
-            max-width: 1000px;
-            margin-inline: auto;
-            padding: .75rem .75rem 6.25rem;
+            max-width: 980px;
+            margin: 0 auto;
+            padding: 14px 12px 96px;
         }
 
-        body[data-theme="light"] .page-wrap {
-            background: radial-gradient(circle at top left,
-                    rgba(16, 185, 129, .10) 0,
-                    rgba(240, 253, 250, .34) 18%,
-                    #f9fafb 55%);
+        @media(max-width:767.98px) {
+            .page-wrap {
+                padding-bottom: calc(var(--bottom-nav-h) + 130px + var(--vv-kbd));
+            }
+
+            body.keyboard-open .page-wrap {
+                padding-bottom: calc(14rem + var(--vv-kbd));
+            }
+
+            .modal-dialog {
+                margin: .75rem;
+            }
+
+            .modal-content {
+                border-radius: 16px;
+            }
+
+            .modal-body {
+                max-height: calc(100vh - 210px);
+                overflow: auto;
+            }
         }
 
-        .card {
+        .panel {
             background: var(--card);
-            border-radius: var(--r);
             border: 1px solid var(--b);
+            border-radius: var(--r);
             box-shadow: var(--shadow);
         }
 
-        .card-section {
-            padding: .85rem .9rem;
+        .panel-h {
+            padding: 12px 14px;
+            border-bottom: 1px solid rgba(148, 163, 184, .12);
         }
 
-        @media(min-width:768px) {
-            .card-section {
-                padding: 1rem 1.15rem;
-            }
+        .panel-b {
+            padding: 12px 14px;
+        }
 
-            .page-wrap {
-                padding-bottom: 4rem;
-            }
+        .h-title {
+            font-weight: 900;
+            font-size: 1.05rem;
+            margin: 0;
+        }
+
+        .meta {
+            border: 1px solid rgba(148, 163, 184, .18);
+            border-radius: var(--r);
+            padding: 10px;
+            background: var(--soft2);
+        }
+
+        body[data-theme="dark"] .meta {
+            background: rgba(15, 23, 42, .35);
+        }
+
+        .form-label-sm {
+            font-size: .75rem;
+            font-weight: 800;
+            color: var(--muted);
+        }
+
+        .form-control-sm,
+        .form-select-sm {
+            font-size: .88rem;
+            padding: .42rem .55rem;
+            border-radius: 12px;
         }
 
         .mono {
             font-variant-numeric: tabular-nums;
-            font-family: ui-monospace, SFMono-Regular, Menlo, Consolas, "Liberation Mono";
+            font-family: ui-monospace, SFMono-Regular, Menlo, Consolas;
         }
 
-        .hdr {
-            display: flex;
-            justify-content: space-between;
-            gap: .75rem;
-            flex-wrap: wrap;
-            align-items: center;
+        .list {
+            display: grid;
+            gap: .6rem;
+            margin-top: 12px;
         }
 
-        .hdr h1 {
-            font-size: 1.02rem;
-            font-weight: 900;
-            margin: 0;
-            letter-spacing: -.01em;
-        }
-
-        .sub {
-            font-size: .8rem;
-            color: var(--muted);
-            line-height: 1.35;
-            margin-top: .15rem;
-        }
-
-        .lbl {
-            font-size: .68rem;
-            text-transform: uppercase;
-            letter-spacing: .10em;
-            font-weight: 900;
-            color: var(--muted);
-        }
-
-        .pill {
-            border-radius: 999px;
-            padding: .18rem .65rem;
-            font-size: .72rem;
-            font-weight: 900;
-            background: rgba(148, 163, 184, .10);
-            border: 1px solid rgba(148, 163, 184, .18);
-            display: inline-flex;
-            gap: .35rem;
-            align-items: center;
-        }
-
-        .pill.ok {
-            background: var(--okbg);
-            border-color: rgba(22, 163, 74, .26);
-            color: #166534;
-        }
-
-        .pill.rj {
-            background: var(--rjbg);
-            border-color: rgba(248, 113, 113, .22);
-            color: #b91c1c;
-        }
-
-        .chip {
-            border-radius: 999px;
-            padding: .08rem .55rem;
-            font-size: .72rem;
-            font-weight: 950;
-            line-height: 1.05;
-            border: 1px solid rgba(148, 163, 184, .35);
-            background: rgba(148, 163, 184, .06);
-            display: inline-flex;
-            align-items: center;
-            gap: .35rem;
-        }
-
-        .chip.belum {
-            background: rgba(22, 163, 74, .08);
-            border-color: rgba(22, 163, 74, .30);
-            color: #15803d;
-        }
-
-        .chip.dp {
-            background: var(--warnbg);
-            border-color: rgba(245, 158, 11, .35);
-            color: rgba(146, 64, 14, 1);
-        }
-
-        .table-wrap {
-            overflow: auto;
-            border-radius: var(--r);
-            border: 1px solid var(--b);
-        }
-
-        .table {
-            margin: 0;
-        }
-
-        .table thead th {
-            font-size: .72rem;
-            text-transform: uppercase;
-            letter-spacing: .10em;
-            color: var(--muted);
-            font-weight: 900;
-            background: rgba(148, 163, 184, .06);
-            border-bottom: 1px solid var(--b) !important;
-            padding: .6rem .65rem;
-            position: sticky;
-            top: 0;
-            z-index: 2;
-        }
-
-        .table tbody td {
-            padding: .55rem .65rem;
-            border-color: rgba(148, 163, 184, .16) !important;
-            vertical-align: top;
-        }
-
-        .return-row {
-            transition: background .15s ease, box-shadow .15s ease;
-        }
-
-        .return-row.row-empty {
-            background: rgba(255, 255, 255, .98);
-            box-shadow: inset 3px 0 0 rgba(148, 163, 184, .18);
-        }
-
-        .return-row.row-filled {
-            background: radial-gradient(circle at top left,
-                    rgba(34, 197, 94, .14) 0,
-                    rgba(240, 253, 244, .96) 55%);
-            box-shadow:
-                inset 3px 0 0 rgba(22, 163, 74, .95),
-                0 0 0 1px rgba(187, 247, 208, .86);
-        }
-
-        .item-title {
-            font-weight: 950;
-            font-size: .95rem;
-            display: flex;
-            align-items: center;
-            gap: .5rem;
-            flex-wrap: wrap;
-        }
-
-        .item-badge {
-            display: inline-flex;
-            align-items: center;
-            padding: .22rem .7rem;
-            border-radius: 999px;
-            font-size: 1.05rem;
-            font-weight: 950;
-            white-space: nowrap;
-            background: rgba(22, 163, 74, .07);
-            color: #166534;
-            border: 1px solid rgba(22, 163, 74, .24);
-        }
-
-        .mini {
-            color: var(--muted2);
-            font-size: .78rem;
-            line-height: 1.25;
-            margin-top: .1rem;
-        }
-
-        .mini-name {
-            font-weight: 500;
-        }
-
-        .qty-input {
-            font-weight: 750;
-            font-size: .84rem;
-            text-align: center;
-        }
-
-        .qty-input-active {
-            border-color: rgba(22, 163, 74, .60) !important;
-            box-shadow: 0 0 0 3px rgba(22, 163, 74, .12) !important;
-            background: rgba(240, 253, 244, .96) !important;
-        }
-
-        .notes-input {
-            font-size: .78rem;
-        }
-
-        .stack {
-            display: flex;
-            flex-direction: column;
-            gap: .2rem;
-        }
-
-        /* Mobile card rows */
-        @media(max-width:767.98px) {
-            .table thead {
-                display: none;
-            }
-
-            .table-wrap {
-                border: none;
-                overflow: visible;
-            }
-
-            .table tbody tr {
-                display: block;
-                border-radius: var(--r);
-                border: 1px solid rgba(148, 163, 184, .22);
-                padding: .6rem .75rem .7rem;
-                margin-bottom: .55rem;
-                box-shadow: var(--shadow);
-            }
-
-            .table tbody td {
-                display: block;
-                border: none !important;
-                padding: 0;
-            }
-
-            .m-top {
-                display: flex;
-                justify-content: space-between;
-                gap: .75rem;
-                align-items: flex-start;
-            }
-
-            .qbox {
-                text-align: right;
-                flex: 0 0 auto;
-            }
-
-            .qinline {
-                display: inline-flex;
-                gap: .25rem;
-                flex-wrap: wrap;
-                justify-content: flex-end;
-                margin-top: .35rem;
-            }
-
-            .cell-qty {
-                display: grid;
-                grid-template-columns: 1fr 1fr;
-                gap: .45rem;
-                margin-top: .55rem;
-            }
-
-            .notes-wrapper {
-                margin-top: .45rem;
-            }
-
-            /* Floating 2 buttons (Batal + Simpan) kanan bawah */
-            .form-footer {
-                position: fixed;
-                right: 1rem;
-                bottom: 5.2rem;
-                left: auto;
-                z-index: 50;
-                padding: 0;
-                background: transparent;
-                border: none;
-                box-shadow: none;
-                justify-content: flex-end !important;
-                pointer-events: none;
-            }
-
-            .floating-actions {
-                display: flex;
-                gap: .5rem;
-                pointer-events: all;
-            }
-
-            .btn-floating-cancel,
-            .btn-floating-submit {
-                border-radius: 999px !important;
-                box-shadow: 0 14px 35px rgba(15, 23, 42, .28);
-            }
-
-            .btn-floating-cancel {
-                width: 40px;
-                padding: 0;
-                display: inline-flex;
-                align-items: center;
-                justify-content: center;
-            }
-
-            .btn-floating-submit {
-                padding-inline: 1.1rem;
-                font-size: .82rem;
-                font-weight: 600;
-            }
-
-            body[data-theme="light"] .btn-floating-submit {
-                background: rgba(22, 163, 74, 1);
-                color: #fff;
-                border: 1px solid rgba(22, 163, 74, .45);
-            }
-
-            body[data-theme="dark"] .btn-floating-submit {
-                background: rgba(16, 185, 129, .95);
-                color: #fff;
-                border: 1px solid rgba(45, 212, 191, .45);
-            }
-
-            .btn-floating-meta {
-                opacity: .8;
-                font-weight: 500;
-                margin-left: .25rem;
-            }
-        }
-
-        .toastish {
-            border-radius: var(--r);
-            border: 1px solid rgba(245, 158, 11, .30);
-            background: rgba(245, 158, 11, .12);
-            color: rgba(146, 64, 14, 1);
-        }
-
-        /* ===== Submit modal (center + mobile safe) ===== */
-        .submit-modal-backdrop {
-            position: fixed;
-            inset: 0;
-            background: rgba(2, 6, 23, .55);
-            backdrop-filter: blur(4px);
-            z-index: 1100;
-            display: none;
-        }
-
-        .submit-modal-backdrop.show {
-            display: block;
-        }
-
-        .submit-modal-sheet {
-            position: fixed;
-            left: 50%;
-            top: 50%;
-            transform: translate(-50%, -50%);
-            width: min(560px, calc(100vw - 1.5rem));
-            z-index: 1110;
-            display: none;
-        }
-
-        .submit-modal-sheet.show {
-            display: block;
-        }
-
-        .submit-modal-card {
-            border-radius: 18px;
+        .cardx {
             border: 1px solid rgba(148, 163, 184, .22);
-            box-shadow: 0 25px 70px rgba(15, 23, 42, .28);
+            border-radius: 16px;
             background: var(--card);
             overflow: hidden;
         }
 
-        @media (max-width: 767.98px) {
-            .submit-modal-sheet {
-                width: min(560px, calc(100vw - 1.25rem));
-                padding: 0;
-            }
-
-            .submit-modal-card {
-                max-height: calc(100vh - 7.5rem);
-                overflow: auto;
-                -webkit-overflow-scrolling: touch;
-            }
-        }
-
-        .submit-modal-topbar {
+        .cardx-h {
+            padding: 10px 12px;
+            border-bottom: 1px solid rgba(148, 163, 184, .12);
             display: flex;
-            align-items: center;
             justify-content: space-between;
-            padding: .85rem 1rem .75rem;
-            border-bottom: 1px solid rgba(148, 163, 184, .18);
-            gap: .75rem;
+            gap: 10px;
+            align-items: flex-start;
         }
 
-        .submit-title {
+        .cardx-left {
+            display: flex;
+            gap: 10px;
+            align-items: flex-start;
+            min-width: 0;
+        }
+
+        .cardx-left>div {
+            min-width: 0;
+        }
+
+        .chk {
+            width: 18px;
+            height: 18px;
+            border-radius: 6px;
+            cursor: pointer;
+            margin-top: 2px;
+            flex: 0 0 auto;
+        }
+
+        .code {
+            font-weight: 900;
+            letter-spacing: .08em;
+            color: var(--accent);
+            font-size: .98rem;
+            white-space: nowrap;
+            overflow: hidden;
+            text-overflow: ellipsis;
+            max-width: 100%;
+        }
+
+        .meta-inline {
+            margin-top: .28rem;
+            font-size: .72rem;
+            color: var(--muted);
+            font-weight: 900;
             display: flex;
             align-items: center;
-            gap: .6rem;
-            font-weight: 950;
-            letter-spacing: -.01em;
-            margin: 0;
-            font-size: 1rem;
+            gap: .4rem;
+            flex-wrap: wrap;
         }
 
-        .submit-x {
-            width: 36px;
-            height: 36px;
-            border-radius: 999px;
-            border: 1px solid rgba(148, 163, 184, .25);
-            background: rgba(148, 163, 184, .10);
-            display: inline-flex;
-            align-items: center;
-            justify-content: center;
-            cursor: pointer;
+        .meta-inline .dot {
+            opacity: .6;
         }
 
-        .submit-modal-body {
-            padding: .85rem 1rem .9rem;
+        .meta-inline .truncate {
+            overflow: hidden;
+            text-overflow: ellipsis;
+            white-space: nowrap;
+            max-width: 260px;
+            display: inline-block;
+            vertical-align: bottom;
         }
 
-        .submit-kpis {
+        @media(max-width:767.98px) {
+            .meta-inline .truncate {
+                max-width: 170px;
+            }
+        }
+
+        .right-metrics {
+            font-size: .78rem;
+            color: var(--muted);
+            font-weight: 900;
+            white-space: nowrap;
+            text-align: right;
+            flex: 0 0 auto;
+        }
+
+        .cardx-b {
+            padding: 10px 12px;
+            display: grid;
+            gap: .55rem;
+        }
+
+        .grid2 {
             display: grid;
             grid-template-columns: 1fr 1fr;
-            gap: .5rem;
-            margin-top: .5rem;
+            gap: .55rem;
         }
 
-        .kpi {
-            border-radius: 14px;
-            border: 1px solid rgba(148, 163, 184, .20);
-            background: rgba(148, 163, 184, .06);
-            padding: .65rem .75rem;
-        }
-
-        .kpi .k-label {
-            font-size: .68rem;
-            text-transform: uppercase;
-            letter-spacing: .10em;
+        .field label {
+            display: block;
+            font-size: .7rem;
             font-weight: 900;
             color: var(--muted);
-            margin-bottom: .2rem;
+            text-transform: uppercase;
+            letter-spacing: .08em;
+            margin-bottom: .25rem;
         }
 
-        .kpi .k-value {
-            font-weight: 950;
-            font-size: 1.05rem;
-        }
-
-        .submit-modal-actions {
-            display: flex;
-            gap: .5rem;
-            padding: .75rem 1rem 1rem;
-            border-top: 1px solid rgba(148, 163, 184, .18);
-        }
-
-        .submit-btn {
-            border-radius: 999px !important;
-            font-weight: 800;
-            padding: .7rem 1rem;
-            display: inline-flex;
-            align-items: center;
-            justify-content: center;
-            gap: .45rem;
-            flex: 1 1 auto;
-        }
-
-        .submit-btn.secondary {
-            background: rgba(148, 163, 184, .10);
-            border: 1px solid rgba(148, 163, 184, .25);
-        }
-
-        .submit-btn.primary {
-            background: rgba(22, 163, 74, 1);
-            border: 1px solid rgba(22, 163, 74, .45);
-            color: #fff;
-        }
-
-        .submit-btn.primary:disabled {
-            opacity: .7;
-        }
-
-        .submit-spinner {
-            width: 16px;
-            height: 16px;
+        .qty {
+            text-align: center !important;
+            font-weight: 900;
+            padding: .55rem .55rem !important;
             border-radius: 999px;
-            border: 2px solid rgba(255, 255, 255, .55);
-            border-top-color: rgba(255, 255, 255, 1);
-            animation: spin .8s linear infinite;
+        }
+
+        .qty.ok {
+            border: 1px solid rgba(22, 163, 74, .22);
+            background: rgba(22, 163, 74, .05);
+        }
+
+        .qty.rj {
+            border: 1px solid rgba(185, 28, 28, .22);
+            background: rgba(185, 28, 28, .05);
+        }
+
+        .qty:focus {
+            box-shadow: none;
+        }
+
+        .notes {
             display: none;
         }
 
-        .submit-btn.primary.is-loading .submit-spinner {
-            display: inline-block;
+        .notes.is-show {
+            display: block;
         }
 
-        @keyframes spin {
-            to {
-                transform: rotate(360deg);
+        .notes input {
+            border-radius: 12px;
+        }
+
+        .fab-wrap {
+            position: fixed;
+            right: 14px;
+            bottom: var(--fab-bottom);
+            z-index: 1090;
+            display: flex;
+            gap: 10px;
+            align-items: center;
+            pointer-events: none;
+        }
+
+        .fab-wrap .btn {
+            pointer-events: auto;
+            border-radius: 999px;
+            font-weight: 900;
+            box-shadow: 0 12px 26px rgba(15, 23, 42, .22), 0 4px 10px rgba(15, 23, 42, .14);
+        }
+
+        .fab-back {
+            width: 46px;
+            padding-left: 0;
+            padding-right: 0;
+        }
+
+        .fab-save {
+            width: auto;
+            padding: .62rem 1.05rem;
+            white-space: nowrap;
+        }
+
+        @media(max-width:767.98px) {
+
+            /* FAB tetap fixed, tapi naik kalau keyboard muncul */
+            .fab-wrap {
+                transition: transform .15s ease, opacity .15s ease;
+                transform: translateY(0);
+                opacity: 1;
+            }
+
+            body.keyboard-open .fab-wrap {
+                bottom: calc(var(--fab-bottom) + var(--vv-kbd));
+            }
+
+            .fab-wrap.is-hidden {
+                opacity: 0;
+                transform: translateY(10px);
+                pointer-events: none;
+            }
+
+            body.keyboard-open .fab-wrap .btn {
+                box-shadow: none;
             }
         }
 
-        /* ===== Modal item details ===== */
-        .modal-items {
-            margin-top: .75rem;
-            border-radius: 14px;
-            border: 1px solid rgba(148, 163, 184, .20);
-            overflow: hidden;
+        .top-actions {
+            display: flex;
+            gap: .5rem;
+            flex-wrap: wrap;
+            align-items: center;
+            justify-content: space-between;
         }
 
-        .modal-items-head {
+        .pill {
+            border: 1px solid rgba(148, 163, 184, .22);
+            background: rgba(148, 163, 184, .06);
+            border-radius: 999px;
+            padding: .35rem .6rem;
+            font-weight: 900;
+            font-size: .78rem;
+            color: var(--muted);
+        }
+
+        .btn-mini {
+            border-radius: 999px;
+            font-weight: 900;
+            padding: .35rem .6rem;
+        }
+
+        /* ===== accordion (ALL mode) ===== */
+        .sum-box {
+            border: 1px solid rgba(148, 163, 184, .18);
+            border-radius: 14px;
+            padding: 10px 12px;
+            background: rgba(148, 163, 184, .06);
+        }
+
+        body[data-theme="dark"] .sum-box {
+            background: rgba(15, 23, 42, .25);
+        }
+
+        .sum-top {
             display: flex;
             justify-content: space-between;
-            align-items: center;
-            padding: .55rem .75rem;
-            background: rgba(148, 163, 184, .06);
-            border-bottom: 1px solid rgba(148, 163, 184, .18);
-            font-size: .72rem;
+            gap: 10px;
+            align-items: flex-start;
+            flex-wrap: wrap;
+        }
+
+        .sum-top .ttl {
+            font-weight: 900;
+        }
+
+        .sum-top .sub {
+            color: var(--muted);
+            font-weight: 900;
+            font-size: .82rem;
+        }
+
+        .sum-pillrow {
+            display: grid;
+            grid-template-columns: 1fr 1fr 1fr;
+            gap: .5rem;
+            margin-top: .65rem;
+        }
+
+        .sum-pill {
+            border: 1px solid rgba(148, 163, 184, .18);
+            border-radius: 999px;
+            padding: .35rem .6rem;
+            text-align: center;
+            font-weight: 900;
+            font-size: .82rem;
+            background: rgba(255, 255, 255, .55);
+        }
+
+        body[data-theme="dark"] .sum-pill {
+            background: rgba(15, 23, 42, .15);
+        }
+
+        .sum-pill .lbl {
+            display: block;
+            font-size: .7rem;
+            color: var(--muted);
+            font-weight: 900;
+            letter-spacing: .08em;
             text-transform: uppercase;
-            letter-spacing: .10em;
+        }
+
+        .sum-pill .val {
+            display: block;
+            margin-top: .12rem;
+        }
+
+        .acc-op-btn {
+            font-weight: 900;
+            padding: .7rem .85rem;
+        }
+
+        .acc-pill {
+            display: inline-flex;
+            align-items: center;
+            gap: .35rem;
+            padding: .18rem .55rem;
+            border-radius: 999px;
+            border: 1px solid rgba(148, 163, 184, .18);
+            background: rgba(148, 163, 184, .06);
+            font-weight: 900;
+            font-size: .78rem;
+            white-space: nowrap;
+        }
+
+        body[data-theme="dark"] .acc-pill {
+            background: rgba(15, 23, 42, .22);
+        }
+
+        .acc-sub {
+            font-size: .78rem;
             font-weight: 900;
             color: var(--muted);
-        }
-
-        .modal-items-body {
-            max-height: 36vh;
-            overflow: auto;
-            -webkit-overflow-scrolling: touch;
-        }
-
-        .modal-item-row {
-            display: grid;
-            grid-template-columns: 1.4fr .8fr;
-            gap: .6rem;
-            padding: .6rem .75rem;
-            border-bottom: 1px solid rgba(148, 163, 184, .14);
-            background: rgba(255, 255, 255, .02);
-        }
-
-        .modal-item-row:last-child {
-            border-bottom: none;
-        }
-
-        .modal-item-title {
-            font-weight: 950;
-            line-height: 1.15;
-        }
-
-        .modal-item-sub {
-            color: var(--muted2);
-            font-size: .78rem;
-            margin-top: .12rem;
-            line-height: 1.2;
-        }
-
-        .modal-item-metrics {
-            display: flex;
-            flex-direction: column;
-            gap: .25rem;
-            align-items: flex-end;
-            text-align: right;
-        }
-
-        .mchip {
-            border-radius: 999px;
-            padding: .10rem .55rem;
-            font-size: .72rem;
-            font-weight: 950;
-            border: 1px solid rgba(148, 163, 184, .28);
-            background: rgba(148, 163, 184, .06);
-            display: inline-flex;
-            gap: .35rem;
-            align-items: center;
-        }
-
-        .mchip.ok {
-            background: var(--okbg);
-            border-color: rgba(22, 163, 74, .30);
-            color: #166534;
-        }
-
-        .mchip.rj {
-            background: var(--rjbg);
-            border-color: rgba(248, 113, 113, .25);
-            color: #b91c1c;
-        }
-
-        .mchip.sisa {
-            background: rgba(59, 130, 246, .10);
-            border-color: rgba(59, 130, 246, .25);
-            color: rgba(30, 64, 175, 1);
-        }
-
-        .modal-empty {
-            padding: .75rem;
-            color: var(--muted);
-            text-align: center;
-            font-size: .85rem;
         }
     </style>
 @endpush
 
 @section('content')
     @php
-        $selectedPickupId = old('pickup_id', $pickupId ?? null);
-        $defaultDate = old('date', optional($selectedPickup?->date)->format('Y-m-d') ?? now()->format('Y-m-d'));
+        use Carbon\Carbon;
 
-        $itemCodes = ($lines ?? collect())
-            ->map(fn($l) => optional(optional($l->bundle)->finishedItem)->code)
+        $dateValue = old('date', now()->toDateString());
+
+        $selectedOperatorId = (string) (request('operator_id', old('operator_id', $operatorId ?? '')) ?? '');
+        $selectedPickupDate = (string) (request('pickup_date', '') ?? '');
+
+        $isAllMode = $selectedOperatorId === '' || $selectedOperatorId === '0';
+
+        $lines = $lines ?? collect();
+
+        $itemOptions = $lines
+            ->map(fn($l) => strtoupper(optional($l->finishedItem)->code ?? ''))
             ->filter()
             ->unique()
+            ->sort()
             ->values();
 
-        $wipMap = $wipStockByItemId ?? [];
+        $pickupDateOptions = $lines
+            ->map(fn($l) => optional($l->sewingPickup)->date)
+            ->filter()
+            ->map(fn($d) => Carbon::parse($d)->toDateString())
+            ->unique()
+            ->sortDesc()
+            ->values();
 
-        $fmtDay = function ($d) {
-            if (!$d) {
-                return '-';
-            }
+        $pickupDateLabel = function ($d) {
             try {
-                return function_exists('id_day') ? id_day($d) : \Illuminate\Support\Carbon::parse($d)->format('d/m/Y');
+                return Carbon::parse($d)->locale('id')->translatedFormat('l, d M Y');
             } catch (\Throwable $e) {
-                return '-';
+                return $d;
             }
         };
 
-        // Helper: remaining pickup line (sinkron dengan controller)
-        $calcRemaining = function ($line) {
-            $qtyBundle = (float) ($line->qty_bundle ?? 0);
-            $returnedOk = (float) ($line->qty_returned_ok ?? 0);
-            $returnedRej = (float) ($line->qty_returned_reject ?? 0);
-            $directPick = (float) ($line->qty_direct_picked ?? 0);
-            $progressAdj = (float) ($line->qty_progress_adjusted ?? 0);
-            return max($qtyBundle - ($returnedOk + $returnedRej + $directPick + $progressAdj), 0);
-        };
+        // ====== ALL MODE: build accordion per item -> operator breakdown (sum remaining)
+        $groupsAll = collect();
+        if ($isAllMode && $lines->isNotEmpty()) {
+            $groupsAll = $lines
+                ->map(function ($l) {
+                    $itemCode = strtoupper(
+                        optional($l->finishedItem)->code ?? 'ITEM-' . (int) ($l->finished_item_id ?? 0),
+                    );
+
+                    $pickup = $l->sewingPickup;
+                    $opCode = $pickup?->operator?->code ?? null;
+                    $opName = $pickup?->operator?->name ?? null;
+                    $opId = (int) ($pickup?->operator_id ?? 0);
+                    $opLabel = trim(($opCode ? $opCode . ' — ' : '') . ($opName ?? ''));
+                    if ($opLabel === '' && $opId > 0) {
+                        $opLabel = 'OP-' . $opId;
+                    }
+
+                    $remaining = (float) ($l->remaining_qty ?? 0);
+                    $wip = (float) ($l->wip_stock ?? 0); // per item (bukan per op)
+
+                    return [
+                        'item_code' => $itemCode,
+                        'operator_id' => $opId,
+                        'operator_label' => $opLabel,
+                        'remaining' => $remaining,
+                        'wip' => $wip,
+                        'pickup_date' => $pickup?->date ? Carbon::parse($pickup?->date)->toDateString() : '',
+                    ];
+                })
+                ->filter(fn($x) => (float) $x['remaining'] > 0.000001)
+                ->groupBy('item_code')
+                ->map(function ($rows, $itemCode) {
+                    $rows = collect($rows);
+
+                    $ops = $rows
+                        ->groupBy(fn($r) => $r['operator_label'] ?: 'OP-' . (int) $r['operator_id'])
+                        ->map(function ($opRows, $label) {
+                            $opRows = collect($opRows);
+                            return [
+                                'label' => $label,
+                                'operator_id' => (int) ($opRows->first()['operator_id'] ?? 0),
+                                'remaining_sum' => (float) $opRows->sum('remaining'),
+                                'lines_count' => (int) $opRows->count(),
+                            ];
+                        })
+                        ->values()
+                        ->sortBy('label')
+                        ->values();
+
+                    $opCount = (int) $ops->count();
+                    $remainingSum = (float) $rows->sum('remaining');
+                    $wipMax = (float) $rows->max('wip'); // aman: wip item sama
+                    $pickupDates = $rows->pluck('pickup_date')->filter()->unique()->sortDesc()->values();
+
+                    return [
+                        'item_code' => $itemCode,
+                        'op_count' => $opCount,
+                        'remaining_sum' => $remainingSum,
+                        'wip' => $wipMax,
+                        'pickup_dates' => $pickupDates,
+                        'ops' => $ops,
+                    ];
+                })
+                ->sortKeys()
+                ->values();
+        }
+
+        $summaryItems = $groupsAll->count();
+        $summaryRemaining = (float) $groupsAll->sum('remaining_sum');
+        $summaryOps = $groupsAll
+            ->flatMap(fn($g) => collect($g['ops'])->pluck('operator_id'))
+            ->filter(fn($id) => (int) $id > 0)
+            ->unique()
+            ->count();
     @endphp
 
     <div class="page-wrap">
 
-        {{-- Header --}}
-        <div class="card mb-2">
-            <div class="card-section">
-                <div class="hdr">
-                    <div>
-                        <h1>Setor Jahit</h1>
-                        <div class="sub"></div>
-                    </div>
+        @if (session('status'))
+            <div class="alert alert-success alert-dismissible fade show mb-3" role="alert">
+                {{ session('status') }}
+                <button type="button" class="btn-close" data-bs-dismiss="alert" aria-label="Close"></button>
+            </div>
+        @endif
 
-                    <a href="{{ route('production.sewing.pickups.create') }}"
-                        class="btn btn-sm btn-outline-success rounded-pill d-flex align-items-center gap-2">
-                        <i class="bi bi-box-seam"></i><span>Ambil Jahit</span>
+        @if ($errors->any())
+            <div class="alert alert-danger alert-dismissible fade show mb-3" role="alert">
+                <strong>Oops!</strong> Ada error input, cek form di bawah.
+                <button type="button" class="btn-close" data-bs-dismiss="alert" aria-label="Close"></button>
+            </div>
+        @endif
+
+        <div class="panel mb-2">
+            <div class="panel-h">
+                <div class="d-flex align-items-start justify-content-between gap-2 flex-wrap">
+                    <div>
+                        <div class="h-title">Sewing Return</div>
+                    </div>
+                    <a href="{{ route('production.sewing.returns.index') }}" class="btn btn-sm btn-outline-success"
+                        style="border-radius:999px;">
+                        Riwayat
                     </a>
                 </div>
             </div>
         </div>
 
-        <form id="sewing-return-form" action="{{ route('production.sewing.returns.store') }}" method="POST" novalidate>
-            @csrf
+        <div class="panel">
+            <form id="sewing-return-form" action="{{ route('production.sewing.returns.store') }}" method="POST" novalidate>
+                @csrf
 
-            {{-- Form header --}}
-            <div class="card mb-2">
-                <div class="card-section">
-                    <div class="row g-2 align-items-end">
-                        <div class="col-md-3 col-6">
-                            <div class="lbl mb-1">Tanggal</div>
-                            <input type="date" name="date"
-                                class="form-control form-control-sm @error('date') is-invalid @enderror"
-                                value="{{ $defaultDate }}">
-                            @error('date')
-                                <div class="invalid-feedback">{{ $message }}</div>
-                            @enderror
-                        </div>
+                <div class="panel-b">
 
-                        <div class="col-md-5 col-12">
-                            <div class="lbl mb-1">Pickup</div>
-                            <select name="pickup_id"
-                                class="form-select form-select-sm @error('pickup_id') is-invalid @enderror"
-                                onchange="if(this.value){ window.location='{{ route('production.sewing.returns.create') }}?pickup_id=' + this.value; }">
-                                <option value="">Pilih pickup...</option>
+                    <div class="meta">
+                        <div class="row g-2 align-items-end">
 
-                                @foreach ($pickups as $pickup)
-                                    @php
-                                        if (!empty($pickup->voided_at)) {
-                                            continue;
-                                        }
+                            <div class="col-6 col-md-3">
+                                <label class="form-label form-label-sm">Tanggal Return</label>
+                                <input type="date" name="date"
+                                    class="form-control form-control-sm @error('date') is-invalid @enderror"
+                                    value="{{ $dateValue }}">
+                                @error('date')
+                                    <div class="invalid-feedback">{{ $message }}</div>
+                                @enderror
+                            </div>
 
-                                        $pickupLines = $pickup->lines ?? collect();
-                                        $totalRemaining = $pickupLines->sum(fn($line) => $calcRemaining($line));
-
-                                        $pickupLabelDate = $fmtDay($pickup->date);
-                                        $opName = $pickup->operator?->name ?? '(Tanpa operator)';
-                                    @endphp
-
-                                    @if ($totalRemaining > 0.000001)
-                                        <option value="{{ $pickup->id }}"
-                                            {{ (int) $selectedPickupId === (int) $pickup->id ? 'selected' : '' }}>
-                                            {{ $opName }} — {{ $pickupLabelDate }}
+                            <div class="col-6 col-md-4">
+                                <label class="form-label form-label-sm">Operator</label>
+                                <select id="operator" name="operator_id"
+                                    class="form-select form-select-sm @error('operator_id') is-invalid @enderror">
+                                    <option value="">SEMUA</option>
+                                    @foreach ($operators as $op)
+                                        <option value="{{ $op->id }}" @selected((string) $selectedOperatorId === (string) $op->id)>
+                                            {{ $op->code ? $op->code . ' — ' : '' }}{{ $op->name }}
                                         </option>
-                                    @endif
-                                @endforeach
-                            </select>
+                                    @endforeach
+                                </select>
+                                @error('operator_id')
+                                    <div class="invalid-feedback">{{ $message }}</div>
+                                @enderror
+                            </div>
 
-                            @error('pickup_id')
-                                <div class="invalid-feedback">{{ $message }}</div>
-                            @enderror
-
-                            @if ($selectedPickup)
-                                <input type="hidden" name="operator_id" value="{{ $selectedPickup->operator_id }}">
-                            @endif
-                        </div>
-
-                        @if ($itemCodes->isNotEmpty())
-                            <div class="col-md-4 col-12">
-                                <div class="lbl mb-1">Item</div>
-                                <select class="form-select form-select-sm filter-item-code">
-                                    <option value="">Semua item</option>
-                                    @foreach ($itemCodes as $code)
+                            <div class="col-6 col-md-2">
+                                <label class="form-label form-label-sm">Filter item</label>
+                                <select id="item-filter" class="form-select form-select-sm">
+                                    <option value="">Semua</option>
+                                    @foreach ($itemOptions as $code)
                                         <option value="{{ $code }}">{{ $code }}</option>
                                     @endforeach
                                 </select>
                             </div>
+
+                            <div class="col-6 col-md-3">
+                                <label class="form-label form-label-sm">Tanggal Pickup (opsional)</label>
+                                <select id="pickup-date" class="form-select form-select-sm">
+                                    <option value="">Semua tanggal</option>
+                                    @foreach ($pickupDateOptions as $d)
+                                        <option value="{{ $d }}" @selected($selectedPickupDate === $d)>
+                                            {{ $pickupDateLabel($d) }}</option>
+                                    @endforeach
+                                </select>
+                            </div>
+
+                            <div class="col-12 col-md-2">
+                                <label class="form-label form-label-sm">Cari</label>
+                                <input type="text" id="q" class="form-control form-control-sm mono"
+                                    placeholder="Kode..." autocomplete="off">
+                            </div>
+                        </div>
+
+                        {{-- TOP ACTIONS: hanya relevan untuk mode input --}}
+                        <div class="top-actions mt-2" id="top-actions-input"
+                            style="{{ $isAllMode ? 'display:none;' : '' }}">
+                            <div class="d-flex gap-2 flex-wrap align-items-center">
+                                <span class="pill">
+                                    Total Iket:
+                                    <span class="mono" id="stat-total-rows">0</span>
+                                </span>
+                                <span class="pill">
+                                    Di Setor:
+                                    <span class="mono" id="stat-picked-rows">0</span>
+                                </span>
+                                <span class="pill">
+                                    Total OK:
+                                    <span class="mono" id="stat-total-ok">0,00</span>
+                                </span>
+                            </div>
+
+                            <div class="d-flex gap-2 align-items-center">
+                                <button type="button" class="btn btn-sm btn-outline-secondary btn-mini"
+                                    id="btn-check-visible">
+                                    Pilih semua (tampil)
+                                </button>
+
+                                <button type="button" class="btn btn-sm btn-outline-secondary btn-mini"
+                                    id="btn-uncheck-all">
+                                    Reset semua
+                                </button>
+                            </div>
+                        </div>
+                    </div>
+
+                    {{-- ===== ALL MODE (SEMUA) : ACCORDION ===== --}}
+                    <div class="list" id="list-all" style="{{ $isAllMode ? '' : 'display:none;' }}">
+                        @if ($lines->isEmpty() || $groupsAll->isEmpty())
+                            <div class="text-center py-4 text-muted">Tidak ada baris yang bisa disetor.</div>
+                        @else
+                            <div class="sum-box mb-2">
+                                <div class="sum-top">
+                                    <div>
+                                        <div class="ttl">Summary (Belum Setor)</div>
+                                    </div>
+                                    <div class="text-end">
+                                        <div class="sub">Update: <span class="mono">{{ now()->format('H:i') }}</span>
+                                        </div>
+                                    </div>
+                                </div>
+                                <div class="sum-pillrow">
+                                    <div class="sum-pill">
+                                        <span class="lbl">Item</span>
+                                        <span class="val mono">{{ number_format($summaryItems, 0, ',', '.') }}</span>
+                                    </div>
+                                    <div class="sum-pill">
+                                        <span class="lbl">Total Belum</span>
+                                        <span class="val mono">{{ number_format($summaryRemaining, 2, ',', '.') }}</span>
+                                    </div>
+                                    <div class="sum-pill">
+                                        <span class="lbl">Operator</span>
+                                        <span class="val mono">{{ number_format($summaryOps, 0, ',', '.') }}</span>
+                                    </div>
+                                </div>
+                            </div>
+
+                            <div class="accordion" id="all-items-accordion">
+                                @php $no = 0; @endphp
+                                @foreach ($groupsAll as $gidx => $g)
+                                    @php
+                                        $no++;
+                                        $itemCode = $g['item_code'];
+                                        $opCount = (int) ($g['op_count'] ?? 0);
+                                        $remainingSum = (float) ($g['remaining_sum'] ?? 0);
+                                        $wip = (float) ($g['wip'] ?? 0);
+                                        $ops = collect($g['ops'] ?? []);
+                                        $collapseId = 'allItemCollapse-' . $gidx;
+                                        $headingId = 'allItemHeading-' . $gidx;
+                                    @endphp
+
+                                    <div class="accordion-item acc-item" data-code="{{ $itemCode }}"
+                                        data-item="{{ $itemCode }}"
+                                        style="border-radius:16px; overflow:hidden; border:1px solid rgba(148,163,184,.18); background:var(--card); margin-bottom:.55rem;">
+                                        <h2 class="accordion-header" id="{{ $headingId }}">
+                                            <button class="accordion-button collapsed acc-op-btn" type="button"
+                                                data-bs-toggle="collapse" data-bs-target="#{{ $collapseId }}"
+                                                aria-expanded="false" aria-controls="{{ $collapseId }}">
+                                                <div
+                                                    class="d-flex w-100 justify-content-between align-items-center gap-2 flex-wrap">
+                                                    <div class="d-flex align-items-center gap-2 min-w-0">
+                                                        <span class="acc-pill"><span
+                                                                class="mono">{{ $no }}</span></span>
+                                                        <div class="mono text-truncate"
+                                                            style="font-weight:900; max-width: 62vw;">
+                                                            {{ $itemCode }}
+                                                        </div>
+                                                    </div>
+                                                    <div class="d-flex align-items-center gap-2">
+                                                        <span class="acc-pill">OP <span
+                                                                class="mono">{{ number_format($opCount, 0, ',', '.') }}</span></span>
+                                                        <span class="acc-pill">BELUM <span
+                                                                class="mono">{{ number_format($remainingSum, 2, ',', '.') }}</span></span>
+                                                        <span class="acc-pill">WIP <span
+                                                                class="mono">{{ number_format($wip, 2, ',', '.') }}</span></span>
+                                                    </div>
+                                                </div>
+                                            </button>
+                                        </h2>
+
+                                        <div id="{{ $collapseId }}" class="accordion-collapse collapse"
+                                            aria-labelledby="{{ $headingId }}" data-bs-parent="#all-items-accordion">
+                                            <div class="accordion-body" style="padding:.7rem .85rem;">
+                                                @if ($ops->isEmpty())
+                                                    <div class="text-muted text-center py-2">Tidak ada detail operator.
+                                                    </div>
+                                                @else
+                                                    <div class="table-responsive">
+                                                        <table class="table table-sm align-middle mb-0">
+                                                            <thead>
+                                                                <tr>
+                                                                    <th style="width:56px;">No</th>
+                                                                    <th>Operator</th>
+                                                                    <th class="text-end" style="width:170px;">Belum</th>
+                                                                    <th class="text-end" style="width:110px;">Iket</th>
+                                                                </tr>
+                                                            </thead>
+                                                            <tbody>
+                                                                @foreach ($ops as $i => $op)
+                                                                    <tr>
+                                                                        <td class="mono">{{ $i + 1 }}</td>
+                                                                        <td class="mono" style="font-weight:900;">
+                                                                            {{ $op['label'] ?: 'OP-' . $op['operator_id'] }}
+                                                                        </td>
+                                                                        <td class="text-end mono"
+                                                                            style="font-weight:900;">
+                                                                            {{ number_format((float) $op['remaining_sum'], 2, ',', '.') }}
+                                                                        </td>
+                                                                        <td class="text-end mono"
+                                                                            style="font-weight:900;">
+                                                                            {{ number_format((int) $op['lines_count'], 0, ',', '.') }}
+                                                                        </td>
+                                                                    </tr>
+                                                                @endforeach
+                                                            </tbody>
+                                                        </table>
+                                                    </div>
+                                                    <div class="mt-2 acc-sub">
+                                                        Total item: <span
+                                                            class="mono">{{ number_format($remainingSum, 2, ',', '.') }}</span>
+                                                    </div>
+                                                @endif
+                                            </div>
+                                        </div>
+                                    </div>
+                                @endforeach
+                            </div>
                         @endif
                     </div>
 
-                    <div class="d-flex flex-wrap gap-2 mt-3">
-                        <span class="pill"><i class="bi bi-list-check"></i> <span id="summary-row-filled">0</span>
-                            baris</span>
-                        <span class="pill ok"><i class="bi bi-check-circle"></i> OK: <span
-                                id="summary-ok">0,00</span></span>
-                        <span class="pill rj"><i class="bi bi-x-circle"></i> RJ: <span
-                                id="summary-reject">0,00</span></span>
-                    </div>
+                    {{-- ===== BYOP MODE (operator dipilih): LIST INPUT ===== --}}
+                    <div class="list" id="list-byop" style="{{ $isAllMode ? 'display:none;' : '' }}">
+                        @if ($lines->isEmpty())
+                            <div class="text-center py-4 text-muted">Tidak ada baris yang bisa disetor.</div>
+                        @else
+                            @foreach ($lines as $idx => $line)
+                                @php
+                                    $item = $line->finishedItem;
+                                    $pickup = $line->sewingPickup;
 
-                    <div id="client-error-box" class="toastish py-2 px-3 small d-none mt-2">
-                        <i class="bi bi-exclamation-triangle me-1"></i>
-                        <span id="client-error-text"></span>
-                    </div>
-                </div>
-            </div>
+                                    $code = strtoupper($item?->code ?? 'ITEM-' . $line->finished_item_id);
+                                    $pickupDateRaw = $pickup?->date ? Carbon::parse($pickup->date)->toDateString() : '';
+                                    $pickupDateText = $pickup?->date
+                                        ? Carbon::parse($pickup->date)->locale('id')->translatedFormat('D, d M')
+                                        : '-';
 
-            {{-- Table --}}
-            <div class="card mb-2">
-                <div class="card-section">
-                    @error('results')
-                        <div class="alert alert-danger py-1 small mb-2">{{ $message }}</div>
-                    @enderror
+                                    $opCode = $pickup?->operator?->code ?? null;
+                                    $opName = $pickup?->operator?->name ?? null;
+                                    $opLabel = trim(($opCode ? $opCode . ' — ' : '') . ($opName ?? ''));
 
-                    <div class="table-wrap">
-                        <table class="table table-sm align-middle mono">
-                            <thead>
-                                <tr>
-                                    <th style="width:52px" class="text-center">#</th>
-                                    <th>Pickup</th>
-                                    <th>Item</th>
-                                    <th style="width:220px">Qty</th>
-                                    <th style="width:130px" class="text-center">OK</th>
-                                    <th style="width:130px" class="text-center">RJ</th>
-                                    <th style="width:240px">Catatan</th>
-                                </tr>
-                            </thead>
+                                    $remaining = (float) ($line->remaining_qty ?? 0);
+                                    $wip = (float) ($line->wip_stock ?? 0);
 
-                            <tbody>
-                                @forelse($lines as $idx => $line)
-                                    @php
-                                        /** @var \App\Models\SewingPickupLine $line */
-                                        $bundle = $line->bundle;
-                                        $pickup = $line->sewingPickup ?? $selectedPickup;
-                                        $lot = $bundle?->cuttingJob?->lot;
+                                    $oldRow = old("results.$idx", []);
+                                    $okVal = $oldRow['qty_ok'] ?? '';
+                                    $rjVal = $oldRow['qty_reject'] ?? '';
+                                    $notes = $oldRow['notes'] ?? '';
+                                    $showNotes = (float) ($rjVal ?: 0) > 0 || trim((string) $notes) !== '';
+                                @endphp
 
-                                        $remainingPickup = (float) ($line->remaining_qty ?? 0);
+                                <div class="cardx mono fin-item" data-code="{{ $code }}"
+                                    data-item="{{ $code }}" data-pickupdate="{{ $pickupDateRaw }}"
+                                    data-remaining="{{ $remaining }}" data-wip="{{ $wip }}">
+                                    <div class="cardx-h">
+                                        <div class="cardx-left">
+                                            <input type="checkbox" class="chk row-check">
+                                            <div>
+                                                <div class="code">{{ $code }}</div>
+                                                <div class="meta-inline">
+                                                    <span class="dot">•</span>
+                                                    <span>{{ $pickupDateText }}</span>
+                                                    @if ($opLabel !== '')
+                                                        <span class="dot">•</span>
+                                                        <span class="truncate" title="{{ $opLabel }}">OP:
+                                                            {{ $opLabel }}</span>
+                                                    @endif
+                                                </div>
+                                            </div>
+                                        </div>
 
-                                        $itemId = (int) ($bundle?->finishedItem?->id ?? 0);
-                                        $wipStock = (float) ($line->wip_stock ?? ($wipMap[$itemId] ?? 0));
+                                        <div class="right-metrics">
+                                            BELUM {{ number_format($remaining, 2, ',', '.') }}<br>
+                                            WIP {{ number_format($wip, 2, ',', '.') }}
+                                        </div>
+                                    </div>
 
-                                        $directPicked = (float) ($line->qty_direct_picked ?? 0);
-                                        $hasDirect = $directPicked > 0.000001;
+                                    <div class="cardx-b">
+                                        <div class="grid2">
+                                            <div class="field">
+                                                <label>Di setor</label>
+                                                <input type="number" step="0.01" min="0" inputmode="decimal"
+                                                    class="form-control form-control-sm qty ok num-input select-all-on-focus"
+                                                    name="results[{{ $idx }}][qty_ok]"
+                                                    value="{{ $okVal }}" placeholder="0">
+                                            </div>
 
-                                        $pickupDateLabel = $pickup?->date ? $fmtDay($pickup->date) : '-';
-                                        $pickupCode = $pickup?->code ?? '';
-                                        $operatorCode = $pickup?->operator?->code ?? '';
-                                        $operatorName = $pickup?->operator?->name ?? '';
+                                            <div class="field">
+                                                <label>Reject</label>
+                                                <input type="number" step="0.01" min="0" inputmode="decimal"
+                                                    class="form-control form-control-sm qty rj num-input select-all-on-focus"
+                                                    name="results[{{ $idx }}][qty_reject]"
+                                                    value="{{ $rjVal }}" placeholder="0">
+                                            </div>
+                                        </div>
 
-                                        $oldResult = old('results.' . $idx, []);
-                                        $defaultOk = $oldResult['qty_ok'] ?? null;
-                                        $defaultReject = $oldResult['qty_reject'] ?? null;
-                                        $defaultNotes = $oldResult['notes'] ?? null;
-
-                                        $showNotes =
-                                            (float) ($defaultReject ?? 0) > 0.000001 ||
-                                            (is_string($defaultNotes) && trim($defaultNotes) !== '');
-                                    @endphp
-
-                                    <tr class="return-row row-empty" data-row-index="{{ $idx }}"
-                                        data-remaining="{{ $remainingPickup }}" data-item-id="{{ $itemId }}"
-                                        data-wip-stock="{{ $wipStock }}"
-                                        data-item-code="{{ $bundle?->finishedItem?->code }}"
-                                        data-item-name="{{ $bundle?->finishedItem?->name }}"
-                                        data-operator-code="{{ $operatorCode }}" data-operator-name="{{ $operatorName }}"
-                                        data-pickup-date="{{ $pickupDateLabel }}"
-                                        data-direct-picked="{{ $directPicked }}">
+                                        <div class="notes {{ $showNotes ? 'is-show' : '' }}">
+                                            <input type="text" class="form-control form-control-sm"
+                                                name="results[{{ $idx }}][notes]"
+                                                placeholder="Catatan reject (opsional)" value="{{ $notes }}">
+                                        </div>
 
                                         <input type="hidden" name="results[{{ $idx }}][sewing_pickup_line_id]"
                                             value="{{ $line->id }}">
-                                        <input type="hidden" name="results[{{ $idx }}][bundle_id]"
-                                            value="{{ $bundle?->id }}">
+                                    </div>
+                                </div>
+                            @endforeach
+                        @endif
+                    </div>
 
-                                        {{-- # / Mobile header --}}
-                                        <td class="align-top">
-                                            <div class="d-none d-md-flex justify-content-center">
-                                                <span class="small text-muted">#{{ $loop->iteration }}</span>
+                    {{-- FAB (hanya mode input) --}}
+                    <div class="fab-wrap" id="fab-wrap" style="{{ $isAllMode ? 'display:none;' : '' }}">
+                        <a href="{{ route('production.sewing.returns.index') }}"
+                            class="btn btn-sm btn-outline-secondary fab-back">←</a>
+                        <button type="button" class="btn btn-sm btn-success fab-save" id="btn-open-modal"
+                            disabled>Simpan</button>
+                    </div>
+
+                    {{-- MODAL CONFIRM (hanya mode input) --}}
+                    <div class="modal fade" id="confirmModal" tabindex="-1" aria-hidden="true">
+                        <div class="modal-dialog modal-dialog-centered modal-lg">
+                            <div class="modal-content" style="border-radius:16px;">
+                                <div class="modal-header">
+                                    <h5 class="modal-title">Konfirmasi Simpan</h5>
+                                    <button type="button" class="btn-close" data-bs-dismiss="modal"
+                                        aria-label="Close"></button>
+                                </div>
+
+                                <div class="modal-body">
+                                    <div class="p-3 border bg-light" style="border-radius:14px;">
+                                        <div class="d-flex justify-content-between align-items-start gap-2 flex-wrap">
+                                            <div style="font-weight:900;">Ringkasan</div>
+                                            <div class="text-muted" style="font-weight:800;font-size:.86rem;">
+                                                Baris terisi: <span class="mono" id="m-rows">0</span>
                                             </div>
+                                        </div>
 
-                                            <div class="m-top d-md-none">
-                                                <div class="stack">
-                                                    <div class="item-title">
-                                                        <span
-                                                            class="item-badge">{{ $bundle?->finishedItem?->code ?? '-' }}</span>
-                                                    </div>
+                                        <div class="mt-2" style="font-size:.90rem;font-weight:800;color:var(--muted);">
+                                            Operator: <span class="mono" id="m-op">SEMUA</span><br>
+                                            Total OK: <span class="mono" id="m-ok">0,00</span>
+                                            • Total Reject: <span class="mono" id="m-rj">0,00</span>
+                                        </div>
+                                    </div>
 
-                                                    @if ($bundle?->finishedItem?->name)
-                                                        <div class="mini mini-name">{{ $bundle->finishedItem->name }}</div>
-                                                    @endif
+                                    <div class="mt-3">
+                                        <div class="d-flex justify-content-between align-items-center mb-2">
+                                            <div style="font-weight:900;">Detail Setor</div>
+                                            <div class="text-muted" style="font-weight:800;font-size:.86rem;">
+                                                Item: <span class="mono" id="m-items-count">0</span>
+                                            </div>
+                                        </div>
 
-                                                    <div class="mini">{{ $pickupDateLabel ?: '-' }}</div>
+                                        <div class="border" style="border-radius:14px; overflow:hidden;">
+                                            <div class="px-3 py-2"
+                                                style="background:rgba(148,163,184,.06); border-bottom:1px solid rgba(148,163,184,.18); font-size:.72rem; font-weight:900; color:var(--muted); text-transform:uppercase; letter-spacing:.10em;">
+                                                <div class="d-grid"
+                                                    style="grid-template-columns: 44px 1fr 120px 120px; gap:.5rem; align-items:center;">
+                                                    <div>No</div>
+                                                    <div>Item</div>
+                                                    <div class="text-end">OK / Setor</div>
+                                                    <div class="text-end">Reject</div>
                                                 </div>
+                                            </div>
 
-                                                <div class="qbox">
-                                                    <div class="qinline">
-                                                        <span class="chip belum">
-                                                            Belum <span
-                                                                class="mono">{{ number_format($remainingPickup, 2, ',', '.') }}</span>
-                                                        </span>
-                                                        @if ($hasDirect)
-                                                            <span class="chip dp">
-                                                                DP <span
-                                                                    class="mono">{{ number_format($directPicked, 2, ',', '.') }}</span>
-                                                            </span>
-                                                        @endif
-                                                    </div>
+                                            <div id="m-items"
+                                                style="max-height:40vh; overflow:auto; -webkit-overflow-scrolling:touch;">
+                                                <div class="text-center text-muted py-3" id="m-empty">Tidak ada item.
                                                 </div>
                                             </div>
-                                        </td>
+                                        </div>
+                                    </div>
+                                </div>
 
-                                        {{-- Pickup (desktop) --}}
-                                        <td class="align-top d-none d-md-table-cell">
-                                            <div class="fw-semibold">
-                                                @if ($pickupCode)
-                                                    <span class="mono">{{ $pickupCode }}</span>
-                                                    @if ($pickupDateLabel && $pickupDateLabel !== '-')
-                                                        • {{ $pickupDateLabel }}
-                                                    @endif
-                                                @else
-                                                    {{ $pickupDateLabel ?: '-' }}
-                                                @endif
-                                            </div>
-                                            @if ($operatorCode)
-                                                <div class="text-muted small">{{ $operatorCode }}</div>
-                                            @endif
-                                        </td>
-
-                                        {{-- Item (desktop) --}}
-                                        <td class="align-top d-none d-md-table-cell">
-                                            <div class="fw-semibold">{{ $bundle?->finishedItem?->code ?? '-' }}</div>
-                                            @if ($bundle?->finishedItem?->name)
-                                                <div class="text-muted small">{{ $bundle->finishedItem->name }}</div>
-                                            @endif
-                                            @if ($lot)
-                                                <div class="text-muted small">LOT: <span
-                                                        class="mono">{{ $lot->code }}</span></div>
-                                            @endif
-                                        </td>
-
-                                        {{-- Qty chips (desktop) --}}
-                                        <td class="align-top d-none d-md-table-cell">
-                                            <div class="d-flex flex-wrap gap-1">
-                                                <span class="chip belum">
-                                                    Belum <span
-                                                        class="mono">{{ number_format($remainingPickup, 2, ',', '.') }}</span>
-                                                </span>
-                                                @if ($hasDirect)
-                                                    <span class="chip dp">
-                                                        DP <span
-                                                            class="mono">{{ number_format($directPicked, 2, ',', '.') }}</span>
-                                                    </span>
-                                                @endif
-                                            </div>
-                                        </td>
-
-                                        {{-- Inputs --}}
-                                        <td class="align-top">
-                                            <div class="d-none d-md-block">
-                                                <input type="number" step="0.01" min="0" inputmode="decimal"
-                                                    name="results[{{ $idx }}][qty_ok]"
-                                                    class="form-control form-control-sm qty-input qty-ok-desktop @error("results.$idx.qty_ok") is-invalid @enderror"
-                                                    value="{{ $defaultOk ?? '' }}" placeholder="OK">
-                                            </div>
-
-                                            <div class="cell-qty d-md-none">
-                                                <input type="number" step="0.01" min="0" inputmode="decimal"
-                                                    name="results[{{ $idx }}][qty_ok]"
-                                                    class="form-control form-control-sm qty-input qty-ok-mobile @error("results.$idx.qty_ok") is-invalid @enderror"
-                                                    value="{{ $defaultOk ?? '' }}" placeholder="OK">
-
-                                                <input type="number" step="0.01" min="0" inputmode="decimal"
-                                                    name="results[{{ $idx }}][qty_reject]"
-                                                    class="form-control form-control-sm qty-input qty-reject-mobile @error("results.$idx.qty_reject") is-invalid @enderror"
-                                                    value="{{ $defaultReject ?? '' }}" placeholder="RJ">
-                                            </div>
-
-                                            @error("results.$idx.qty_ok")
-                                                <div class="invalid-feedback d-block">{{ $message }}</div>
-                                            @enderror
-                                            @error("results.$idx.qty_reject")
-                                                <div class="invalid-feedback d-block d-md-none">{{ $message }}</div>
-                                            @enderror
-                                        </td>
-
-                                        {{-- RJ desktop --}}
-                                        <td class="align-top d-none d-md-table-cell">
-                                            <input type="number" step="0.01" min="0" inputmode="decimal"
-                                                name="results[{{ $idx }}][qty_reject]"
-                                                class="form-control form-control-sm qty-input qty-reject-desktop @error("results.$idx.qty_reject") is-invalid @enderror"
-                                                value="{{ $defaultReject ?? '' }}" placeholder="RJ">
-                                            @error("results.$idx.qty_reject")
-                                                <div class="invalid-feedback d-block">{{ $message }}</div>
-                                            @enderror
-                                        </td>
-
-                                        {{-- Notes --}}
-                                        <td class="align-top">
-                                            <div class="notes-wrapper {{ $showNotes ? '' : 'd-none' }}">
-                                                <input type="text" name="results[{{ $idx }}][notes]"
-                                                    class="form-control form-control-sm notes-input @error("results.$idx.notes") is-invalid @enderror"
-                                                    value="{{ $defaultNotes ?? '' }}" placeholder="Catatan (opsional)">
-                                                @error("results.$idx.notes")
-                                                    <div class="invalid-feedback d-block">{{ $message }}</div>
-                                                @enderror
-                                            </div>
-                                        </td>
-                                    </tr>
-                                @empty
-                                    <tr>
-                                        <td colspan="7" class="text-center text-muted small py-3">
-                                            @if ($selectedPickupId)
-                                                Tidak ada baris yang bisa disetor.
-                                            @else
-                                                Pilih pickup dulu.
-                                            @endif
-                                        </td>
-                                    </tr>
-                                @endforelse
-                            </tbody>
-                        </table>
-                    </div>
-                </div>
-            </div>
-
-            {{-- Footer floating --}}
-            <div class="form-footer d-flex align-items-center">
-                <div class="floating-actions">
-                    <a href="{{ route('production.sewing.returns.index') }}"
-                        class="btn btn-outline-secondary btn-sm btn-floating-cancel">
-                        <i class="bi bi-arrow-left"></i>
-                    </a>
-
-                    <button type="button" id="btn-submit-return" class="btn btn-success btn-sm btn-floating-submit"
-                        disabled>
-                        <i class="bi bi-check2 me-1"></i> Simpan
-                        <span class="btn-floating-meta" id="btn-submit-return-meta">Belum ada isi</span>
-                    </button>
-                </div>
-            </div>
-
-            {{-- ===== Friendly Submit Modal (dengan detail item + sisa) ===== --}}
-            <div id="submit-modal-backdrop" class="submit-modal-backdrop" aria-hidden="true"></div>
-
-            <div id="submit-modal" class="submit-modal-sheet" role="dialog" aria-modal="true" aria-hidden="true">
-                <div class="submit-modal-card">
-                    <div class="submit-modal-topbar">
-                        <h3 class="submit-title">
-                            <span class="pill ok" style="margin:0"><i class="bi bi-check2-circle"></i></span>
-                            Konfirmasi Simpan
-                        </h3>
-
-                        <button type="button" class="submit-x" id="btn-close-submit-modal" aria-label="Tutup">
-                            <i class="bi bi-x-lg"></i>
-                        </button>
-                    </div>
-
-                    <div class="submit-modal-body">
-                        <div class="d-flex flex-wrap gap-2">
-                            <span class="pill"><i class="bi bi-list-check"></i> <span id="modal-row-filled">0</span>
-                                baris</span>
-                            <span class="pill ok"><i class="bi bi-check-circle"></i> OK: <span
-                                    id="modal-ok">0,00</span></span>
-                            <span class="pill rj"><i class="bi bi-x-circle"></i> RJ: <span
-                                    id="modal-rj">0,00</span></span>
-                        </div>
-
-                        <div class="submit-kpis">
-                            <div class="kpi">
-                                <div class="k-label">Tanggal</div>
-                                <div class="k-value mono" id="modal-date">-</div>
-                            </div>
-                            <div class="kpi">
-                                <div class="k-label">Pickup</div>
-                                <div class="k-value" id="modal-pickup">-</div>
-                            </div>
-                        </div>
-
-                        {{-- detail barang yang disetor + sisa --}}
-                        <div class="modal-items" id="modal-items">
-                            <div class="modal-items-head">
-                                <span>Detail Setor</span>
-                                <span class="mono" id="modal-items-count">0</span>
-                            </div>
-                            <div class="modal-items-body" id="modal-items-body">
-                                <div class="modal-empty">Tidak ada item.</div>
+                                <div class="modal-footer">
+                                    <button type="button" class="btn btn-sm btn-outline-secondary"
+                                        data-bs-dismiss="modal">Batal</button>
+                                    <button type="button" class="btn btn-sm btn-success"
+                                        id="btn-confirm-submit">Simpan</button>
+                                </div>
                             </div>
                         </div>
                     </div>
 
-                    <div class="submit-modal-actions">
-                        <button type="button" class="btn submit-btn secondary" id="btn-cancel-submit">
-                            <i class="bi bi-arrow-left"></i> Batal
-                        </button>
-                        <button type="button" class="btn submit-btn primary" id="btn-confirm-submit">
-                            <span class="submit-spinner" aria-hidden="true"></span>
-                            <i class="bi bi-check2"></i> Simpan
-                        </button>
-                    </div>
-                </div>
-            </div>
-            {{-- ===== /Modal ===== --}}
-        </form>
+                </div>{{-- panel-b --}}
+            </form>
+        </div>
     </div>
 @endsection
-
 @push('scripts')
     <script>
-        document.addEventListener('DOMContentLoaded', function() {
+        document.addEventListener('DOMContentLoaded', () => {
             const form = document.getElementById('sewing-return-form');
 
-            const rows = Array.from(document.querySelectorAll('.return-row'));
-            const filterSelects = Array.from(document.querySelectorAll('.filter-item-code'));
+            const listAll = document.getElementById('list-all');
+            const listByOp = document.getElementById('list-byop');
 
-            const clientErrorBox = document.getElementById('client-error-box');
-            const clientErrorText = document.getElementById('client-error-text');
+            const operator = document.getElementById('operator');
+            const pickupDate = document.getElementById('pickup-date');
+            const itemFilter = document.getElementById('item-filter');
+            const q = document.getElementById('q');
 
-            const summaryRowFilled = document.getElementById('summary-row-filled');
-            const summaryOk = document.getElementById('summary-ok');
-            const summaryReject = document.getElementById('summary-reject');
+            const topActionsInput = document.getElementById('top-actions-input');
+            const fabWrap = document.getElementById('fab-wrap');
 
-            const submitBtn = document.getElementById('btn-submit-return');
-            const submitMeta = document.getElementById('btn-submit-return-meta');
+            const btnOpenModal = document.getElementById('btn-open-modal');
+            const modalEl = document.getElementById('confirmModal');
+            const btnConfirm = document.getElementById('btn-confirm-submit');
 
-            // modal
-            const modalBackdrop = document.getElementById('submit-modal-backdrop');
-            const modalSheet = document.getElementById('submit-modal');
-            const closeModalBtn = document.getElementById('btn-close-submit-modal');
-            const cancelModalBtn = document.getElementById('btn-cancel-submit');
-            const confirmModalBtn = document.getElementById('btn-confirm-submit');
+            const btnCheckVisible = document.getElementById('btn-check-visible');
+            const btnUncheckAll = document.getElementById('btn-uncheck-all');
 
-            const modalRowFilled = document.getElementById('modal-row-filled');
-            const modalOk = document.getElementById('modal-ok');
-            const modalRj = document.getElementById('modal-rj');
-            const modalDate = document.getElementById('modal-date');
-            const modalPickup = document.getElementById('modal-pickup');
+            const mOp = document.getElementById('m-op');
+            const mOk = document.getElementById('m-ok');
+            const mRj = document.getElementById('m-rj');
+            const mRows = document.getElementById('m-rows');
+            const mItemsCount = document.getElementById('m-items-count');
+            const mItems = document.getElementById('m-items');
+            const mEmpty = document.getElementById('m-empty');
 
-            const modalItemsBody = document.getElementById('modal-items-body');
-            const modalItemsCount = document.getElementById('modal-items-count');
+            const statTotalRows = document.getElementById('stat-total-rows');
+            const statPickedRows = document.getElementById('stat-picked-rows');
+            const statTotalOk = document.getElementById('stat-total-ok');
 
-            const dateInput = form?.querySelector('input[name="date"]');
-            const pickupSelect = form?.querySelector('select[name="pickup_id"]');
+            const body = document.body;
+            const $$ = (sel, root = document) => Array.from(root.querySelectorAll(sel));
 
-            const isMobile = () => window.innerWidth <= 767;
+            const isAllMode = () => !((operator?.value || '').toString().trim());
 
-            let nf;
-            try {
-                nf = new Intl.NumberFormat('id-ID', {
-                    minimumFractionDigits: 2,
-                    maximumFractionDigits: 2
-                });
-            } catch (e) {
-                nf = {
-                    format: n => (n || 0).toFixed(2)
+            (function initVV() {
+                if (!window.visualViewport) return;
+                const vv = window.visualViewport;
+                const set = () => {
+                    const kbd = Math.max(0, (window.innerHeight - vv.height - vv.offsetTop));
+                    document.documentElement.style.setProperty('--vv-kbd', `${kbd}px`);
+                };
+                vv.addEventListener('resize', set);
+                vv.addEventListener('scroll', set);
+                set();
+            })();
+
+            function reloadWithFilters() {
+                const url = new URL(window.location.href);
+                const op = (operator?.value || '').toString();
+                const pd = (pickupDate?.value || '').toString();
+
+                if (op) url.searchParams.set('operator_id', op);
+                else url.searchParams.delete('operator_id');
+
+                if (pd) url.searchParams.set('pickup_date', pd);
+                else url.searchParams.delete('pickup_date');
+
+                window.location.href = url.toString();
+            }
+
+            operator?.addEventListener('change', reloadWithFilters);
+            pickupDate?.addEventListener('change', reloadWithFilters);
+
+            function sanitizeNum(v) {
+                v = (v ?? '').toString().trim();
+                if (v === '') return '';
+                const n = parseFloat(v);
+                if (Number.isNaN(n) || n < 0) return '';
+                return String(n);
+            }
+
+            function getEls(card) {
+                return {
+                    ok: card.querySelector('input[name*="[qty_ok]"]'),
+                    rj: card.querySelector('input[name*="[qty_reject]"]'),
+                    notesWrap: card.querySelector('.notes'),
+                    cb: card.querySelector('.row-check'),
                 };
             }
 
-            const parseNum = (val) => {
-                const n = parseFloat(val);
-                return isNaN(n) ? 0 : n;
-            };
+            function clampCard(card, changed) {
+                const rem = parseFloat(card.dataset.remaining || '0') || 0;
+                const wip = parseFloat(card.dataset.wip || '0') || 0;
+                const {
+                    ok,
+                    rj
+                } = getEls(card);
 
-            function escapeHtml(s) {
+                let a = parseFloat(ok?.value || '0');
+                if (!Number.isFinite(a) || a < 0) a = 0;
+                let b = parseFloat(rj?.value || '0');
+                if (!Number.isFinite(b) || b < 0) b = 0;
+
+                if (a + b > rem) {
+                    const diff = (a + b) - rem;
+                    if (changed === 'rj') b = Math.max(0, b - diff);
+                    else a = Math.max(0, a - diff);
+                }
+
+                if (a + b > wip) {
+                    const diff2 = (a + b) - wip;
+                    if (changed === 'rj') b = Math.max(0, b - diff2);
+                    else a = Math.max(0, a - diff2);
+                }
+
+                if (ok) ok.value = (a <= 0) ? '' : String(a);
+                if (rj) rj.value = (b <= 0) ? '' : String(b);
+            }
+
+            function syncNotes(card) {
+                const {
+                    rj,
+                    notesWrap
+                } = getEls(card);
+                if (!notesWrap) return;
+                const v = parseFloat(rj?.value || '0') || 0;
+                if (v > 0) notesWrap.classList.add('is-show');
+                else notesWrap.classList.remove('is-show');
+            }
+
+            function syncCheck(card) {
+                const {
+                    ok,
+                    rj,
+                    cb
+                } = getEls(card);
+                const a = parseFloat(ok?.value || '0') || 0;
+                const b = parseFloat(rj?.value || '0') || 0;
+                if (cb) cb.checked = ((a + b) > 0);
+            }
+
+            function autoFillCard(card) {
+                const rem = parseFloat(card.dataset.remaining || '0') || 0;
+                const wip = parseFloat(card.dataset.wip || '0') || 0;
+                const fill = Math.max(0, Math.min(rem, wip));
+
+                const {
+                    ok,
+                    rj
+                } = getEls(card);
+                if (ok) ok.value = (fill > 0) ? String(fill) : '';
+                if (rj) rj.value = '';
+                clampCard(card, 'ok');
+                syncNotes(card);
+                syncCheck(card);
+            }
+
+            function setModeUI() {
+                const all = isAllMode();
+
+                // show/hide list
+                if (listAll) listAll.style.display = all ? '' : 'none';
+                if (listByOp) listByOp.style.display = all ? 'none' : '';
+
+                // show/hide top action + FAB
+                if (topActionsInput) topActionsInput.style.display = all ? 'none' : '';
+                if (fabWrap) fabWrap.style.display = all ? 'none' : '';
+
+                // safety: disable modal button on ALL
+                if (btnOpenModal) btnOpenModal.disabled = all ? true : btnOpenModal.disabled;
+            }
+
+            function computeSubmitEnabled() {
+                if (!btnOpenModal || !listByOp) return 0;
+
+                if (isAllMode()) {
+                    btnOpenModal.disabled = true;
+                    return 0;
+                }
+
+                let total = 0;
+                $$('.fin-item', listByOp).forEach(card => {
+                    if (card.style.display === 'none') return;
+                    const {
+                        ok,
+                        rj
+                    } = getEls(card);
+                    const a = parseFloat(ok?.value || '0') || 0;
+                    const b = parseFloat(rj?.value || '0') || 0;
+                    total += (a + b);
+                });
+
+                btnOpenModal.disabled = total <= 0;
+                return total;
+            }
+
+            function computeTopSummary() {
+                if (isAllMode() || !listByOp) return;
+
+                let totalRows = 0;
+                let pickedRows = 0;
+                let totalOk = 0;
+
+                $$('.fin-item', listByOp).forEach(card => {
+                    if (card.style.display === 'none') return;
+                    totalRows++;
+
+                    const ok = parseFloat(card.querySelector('input[name*="[qty_ok]"]')?.value || '0') || 0;
+                    const rj = parseFloat(card.querySelector('input[name*="[qty_reject]"]')?.value ||
+                        '0') || 0;
+
+                    if ((ok + rj) > 0) {
+                        pickedRows++;
+                        totalOk += ok;
+                    }
+                });
+
+                if (statTotalRows) statTotalRows.textContent = totalRows.toLocaleString('id-ID');
+                if (statPickedRows) statPickedRows.textContent = pickedRows.toLocaleString('id-ID');
+                if (statTotalOk) {
+                    statTotalOk.textContent = totalOk.toLocaleString('id-ID', {
+                        minimumFractionDigits: 2,
+                        maximumFractionDigits: 2,
+                    });
+                }
+            }
+
+            function applyFilter() {
+                const term = (q?.value || '').toString().trim().toUpperCase();
+                const selItem = (itemFilter?.value || '').toString().trim().toUpperCase();
+
+                if (isAllMode()) {
+                    // filter untuk accordion items
+                    if (!listAll) return;
+                    $$('.acc-item', listAll).forEach(card => {
+                        const code = (card.dataset.code || '').toString().toUpperCase();
+                        const item = (card.dataset.item || '').toString().toUpperCase();
+                        const matchSearch = !term || code.includes(term);
+                        const matchItem = !selItem || item === selItem;
+
+                        card.style.display = (matchSearch && matchItem) ? '' : 'none';
+                    });
+                    return;
+                }
+
+                // filter untuk list input (by operator)
+                if (!listByOp) return;
+                $$('.fin-item', listByOp).forEach(card => {
+                    const code = (card.dataset.code || '').toString().toUpperCase();
+                    const item = (card.dataset.item || '').toString().toUpperCase();
+                    const pd = (card.dataset.pickupdate || '').toString();
+                    const selPd = (pickupDate?.value || '').toString();
+
+                    const matchSearch = !term || code.includes(term);
+                    const matchItem = !selItem || item === selItem;
+                    const matchDate = !selPd || pd === selPd;
+
+                    card.style.display = (matchSearch && matchItem && matchDate) ? '' : 'none';
+                });
+
+                computeSubmitEnabled();
+                computeTopSummary();
+            }
+
+            // ==== input listeners (BYOP only) ====
+            form?.addEventListener('input', (e) => {
+                if (isAllMode()) return;
+
+                const t = e.target;
+                if (!t.classList?.contains('num-input')) return;
+
+                t.value = sanitizeNum(t.value);
+
+                const card = t.closest('.fin-item');
+                if (!card) return;
+
+                const changed = (t.name || '').includes('[qty_reject]') ? 'rj' : 'ok';
+                clampCard(card, changed);
+                syncCheck(card);
+                syncNotes(card);
+
+                computeSubmitEnabled();
+                computeTopSummary();
+            });
+
+            form?.addEventListener('change', (e) => {
+                if (isAllMode()) return;
+
+                const t = e.target;
+                if (!t.classList?.contains('row-check')) return;
+
+                const card = t.closest('.fin-item');
+                if (!card) return;
+
+                const {
+                    ok,
+                    rj
+                } = getEls(card);
+
+                if (t.checked) {
+                    const a = parseFloat(ok?.value || '0') || 0;
+                    const b = parseFloat(rj?.value || '0') || 0;
+                    if ((a + b) <= 0) autoFillCard(card);
+                } else {
+                    if (ok) ok.value = '';
+                    if (rj) rj.value = '';
+                    syncNotes(card);
+                }
+
+                computeSubmitEnabled();
+                computeTopSummary();
+            });
+
+            q?.addEventListener('input', () => {
+                const up = (q.value || '').toString().toUpperCase();
+                if (q.value !== up) q.value = up;
+                applyFilter();
+            });
+
+            itemFilter?.addEventListener('change', applyFilter);
+
+            form?.addEventListener('focusin', (e) => {
+                const t = e.target;
+                if (t?.classList?.contains('select-all-on-focus')) {
+                    setTimeout(() => {
+                        try {
+                            t.select();
+                        } catch (_) {}
+                    }, 0);
+                }
+                if (window.innerWidth < 768) body.classList.add('keyboard-open');
+            });
+            form?.addEventListener('focusout', () => body.classList.remove('keyboard-open'));
+
+            btnCheckVisible?.addEventListener('click', () => {
+                if (isAllMode() || !listByOp) return;
+                $$('.fin-item', listByOp).forEach(card => {
+                    if (card.style.display === 'none') return;
+                    const {
+                        cb
+                    } = getEls(card);
+                    if (!cb) return;
+                    cb.checked = true;
+                    autoFillCard(card);
+                });
+                computeSubmitEnabled();
+                computeTopSummary();
+                applyFilter();
+            });
+
+            btnUncheckAll?.addEventListener('click', () => {
+                if (isAllMode() || !listByOp) return;
+                $$('.fin-item', listByOp).forEach(card => {
+                    const {
+                        cb,
+                        ok,
+                        rj
+                    } = getEls(card);
+                    if (cb) cb.checked = false;
+                    if (ok) ok.value = '';
+                    if (rj) rj.value = '';
+                    syncNotes(card);
+                });
+                computeSubmitEnabled();
+                computeTopSummary();
+                applyFilter();
+            });
+
+            // ===== Modal =====
+            let bsModal = null;
+            if (modalEl && typeof bootstrap !== 'undefined') bsModal = new bootstrap.Modal(modalEl);
+
+            function esc(s) {
                 return String(s ?? '')
                     .replaceAll('&', '&amp;')
                     .replaceAll('<', '&lt;')
@@ -1130,497 +1326,104 @@
                     .replaceAll("'", '&#039;');
             }
 
-            let errTimer = null;
-            const showClientError = (msg) => {
-                if (!clientErrorBox || !clientErrorText) return;
-                clientErrorText.textContent = msg;
-                clientErrorBox.classList.remove('d-none');
-                if (errTimer) clearTimeout(errTimer);
-                errTimer = setTimeout(() => {
-                    clientErrorText.textContent = '';
-                    clientErrorBox.classList.add('d-none');
-                }, 2200);
-            };
+            function rebuildModalItems() {
+                if (!mItems || !listByOp) return;
+                mItems.innerHTML = '';
 
-            function getOk(row) {
-                const d = row.querySelector('.qty-ok-desktop');
-                const m = row.querySelector('.qty-ok-mobile');
-                if (isMobile() && m) return parseNum(m.value);
-                if (d && d.value !== '') return parseNum(d.value);
-                if (m && m.value !== '') return parseNum(m.value);
-                return 0;
-            }
-
-            function getReject(row) {
-                const d = row.querySelector('.qty-reject-desktop');
-                const m = row.querySelector('.qty-reject-mobile');
-                if (isMobile() && m) return parseNum(m.value);
-                if (d && d.value !== '') return parseNum(d.value);
-                if (m && m.value !== '') return parseNum(m.value);
-                return 0;
-            }
-
-            function setOk(row, value) {
-                const d = row.querySelector('.qty-ok-desktop');
-                const m = row.querySelector('.qty-ok-mobile');
-                const v = value > 0 ? value : '';
-                if (d) d.value = v;
-                if (m) m.value = v;
-            }
-
-            function setReject(row, value) {
-                const d = row.querySelector('.qty-reject-desktop');
-                const m = row.querySelector('.qty-reject-mobile');
-                const v = value > 0 ? value : '';
-                if (d) d.value = v;
-                if (m) m.value = v;
-            }
-
-            function rowTotal(row) {
-                return getOk(row) + getReject(row);
-            }
-
-            function itemId(row) {
-                const id = parseInt(row.dataset.itemId || '0', 10);
-                return isNaN(id) ? 0 : id;
-            }
-
-            function itemWip(row) {
-                const v = parseNum(row.dataset.wipStock || '0');
-                return v < 0 ? 0 : v;
-            }
-
-            function sumUsedOtherRows(itId, excludeRow) {
-                let used = 0;
-                rows.forEach(r => {
-                    if (r === excludeRow) return;
-                    if (itemId(r) !== itId) return;
-                    used += rowTotal(r);
-                });
-                return used;
-            }
-
-            function clamp(row, showError = false) {
-                const remainingPickup = parseNum(row.dataset.remaining || '0');
-                let ok = getOk(row);
-                let rj = getReject(row);
-
-                if (ok < 0) ok = 0;
-                if (rj < 0) rj = 0;
-
-                if (ok + rj > remainingPickup + 0.000001) {
-                    const diff = (ok + rj) - remainingPickup;
-                    const last = row.dataset.lastChanged || 'ok';
-                    if (last === 'reject') rj = Math.max(0, rj - diff);
-                    else ok = Math.max(0, ok - diff);
-
-                    if (showError) {
-                        const idx = parseInt(row.dataset.rowIndex || '0', 10) + 1;
-                        showClientError(`Baris #${idx}: OK+RJ melebihi Belum. Disesuaikan.`);
-                    }
-                }
-
-                const itId = itemId(row);
-                if (itId > 0) {
-                    const wip = itemWip(row);
-                    const usedOther = sumUsedOtherRows(itId, row);
-                    const available = Math.max(wip - usedOther, 0);
-
-                    if (ok + rj > available + 0.000001) {
-                        const diff2 = (ok + rj) - available;
-                        const last2 = row.dataset.lastChanged || 'ok';
-                        if (last2 === 'reject') rj = Math.max(0, rj - diff2);
-                        else ok = Math.max(0, ok - diff2);
-
-                        if (showError) {
-                            const code = (row.dataset.itemCode || '').trim() || `Item#${itId}`;
-                            showClientError(`Stok WIP-SEW ${code} sisa ${nf.format(available)}. Disesuaikan.`);
-                        }
-                    }
-                }
-
-                setOk(row, ok);
-                setReject(row, rj);
-            }
-
-            function updateRowVisual(row) {
-                if (rowTotal(row) > 0) {
-                    row.classList.add('row-filled');
-                    row.classList.remove('row-empty');
-                } else {
-                    row.classList.remove('row-filled');
-                    row.classList.add('row-empty');
-                }
-            }
-
-            function updateNotesVisibility(row) {
-                const rj = getReject(row);
-                const wrap = row.querySelector('.notes-wrapper');
-                if (!wrap) return;
-
-                if (rj > 0) {
-                    wrap.classList.remove('d-none');
-                    return;
-                }
-                const input = wrap.querySelector('input[type="text"]');
-                if (!input || input.value.trim() === '') wrap.classList.add('d-none');
-            }
-
-            function computeSummary() {
-                let filled = 0,
+                let rows = 0,
                     okSum = 0,
                     rjSum = 0;
+                const picked = [];
 
-                rows.forEach(row => {
-                    const ok = getOk(row);
-                    const rj = getReject(row);
-                    if (ok + rj > 0) filled++;
-                    okSum += ok;
-                    rjSum += rj;
+                $$('.fin-item', listByOp).forEach(card => {
+                    const {
+                        ok,
+                        rj
+                    } = getEls(card);
+                    const a = parseFloat(ok?.value || '0') || 0;
+                    const b = parseFloat(rj?.value || '0') || 0;
+                    if ((a + b) <= 0) return;
+
+                    rows++;
+                    okSum += a;
+                    rjSum += b;
+
+                    picked.push({
+                        code: (card.dataset.code || '').toString(),
+                        ok: a,
+                        rj: b
+                    });
                 });
 
-                return {
-                    filled,
-                    okSum,
-                    rjSum
-                };
-            }
+                picked.sort((x, y) => (x.code || '').localeCompare(y.code || ''));
 
-            function updateSummary() {
-                const s = computeSummary();
+                if (mRows) mRows.textContent = rows.toLocaleString('id-ID');
+                if (mOk) mOk.textContent = okSum.toLocaleString('id-ID', {
+                    minimumFractionDigits: 2,
+                    maximumFractionDigits: 2
+                });
+                if (mRj) mRj.textContent = rjSum.toLocaleString('id-ID', {
+                    minimumFractionDigits: 2,
+                    maximumFractionDigits: 2
+                });
+                if (mItemsCount) mItemsCount.textContent = picked.length.toLocaleString('id-ID');
 
-                if (summaryRowFilled) summaryRowFilled.textContent = String(s.filled);
-                if (summaryOk) summaryOk.textContent = nf.format(s.okSum);
-                if (summaryReject) summaryReject.textContent = nf.format(s.rjSum);
-
-                if (submitBtn) {
-                    submitBtn.disabled = s.filled <= 0;
-                    if (submitMeta) submitMeta.textContent = s.filled > 0 ? `${s.filled} baris siap` :
-                        'Belum ada isi';
-                }
-            }
-
-            function renderModalItems() {
-                if (!modalItemsBody) return;
-
-                // group per item_code (ringkas)
-                const map = new Map();
-
-                rows.forEach(row => {
-                    const ok = getOk(row);
-                    const rj = getReject(row);
-                    const total = ok + rj;
-                    if (total <= 0) return;
-
-                    const code = (row.dataset.itemCode || '').trim() || '-';
-                    const name = (row.dataset.itemName || '').trim() || '';
-                    const remainingBefore = parseNum(row.dataset.remaining ||
-                        '0'); // "Belum" sebelum setor ini
-                    const sisa = Math.max(remainingBefore - total, 0);
-
-                    const key = code + '||' + name;
-                    if (!map.has(key)) {
-                        map.set(key, {
-                            code,
-                            name,
-                            ok: 0,
-                            rj: 0,
-                            sisa: 0
-                        });
+                if (picked.length === 0) {
+                    if (mEmpty) {
+                        mItems.appendChild(mEmpty);
+                        mEmpty.style.display = '';
                     }
-                    const it = map.get(key);
-                    it.ok += ok;
-                    it.rj += rj;
-                    it.sisa += sisa;
-                });
-
-                const items = Array.from(map.values());
-
-                if (modalItemsCount) modalItemsCount.textContent = String(items.length);
-
-                if (items.length === 0) {
-                    modalItemsBody.innerHTML = `<div class="modal-empty">Tidak ada item.</div>`;
                     return;
                 }
+                if (mEmpty) mEmpty.style.display = 'none';
 
-                items.sort((a, b) => (a.code || '').localeCompare(b.code || ''));
-
-                modalItemsBody.innerHTML = items.map(it => {
-                    const sub = it.name ? `<div class="modal-item-sub">${escapeHtml(it.name)}</div>` : '';
-                    return `
-                        <div class="modal-item-row">
-                            <div>
-                                <div class="modal-item-title">${escapeHtml(it.code || '-')}</div>
-                                ${sub}
-                            </div>
-                            <div class="modal-item-metrics">
-                                <span class="mchip ok"><i class="bi bi-check-circle"></i> <span class="mono">${nf.format(it.ok)}</span></span>
-                                <span class="mchip rj"><i class="bi bi-x-circle"></i> <span class="mono">${nf.format(it.rj)}</span></span>
-                                <span class="mchip sisa"><i class="bi bi-hourglass-split"></i> <span class="mono">${nf.format(it.sisa)}</span></span>
-                            </div>
-                        </div>
-                    `;
-                }).join('');
-            }
-
-            // ===== MODAL logic =====
-            let lastFocus = null;
-
-            function lockScroll(lock) {
-                if (lock) {
-                    document.documentElement.style.overflow = 'hidden';
-                    document.body.style.overflow = 'hidden';
-                } else {
-                    document.documentElement.style.overflow = '';
-                    document.body.style.overflow = '';
-                }
-            }
-
-            function hideFloatingActions(hide) {
-                const footer = document.querySelector('.form-footer');
-                if (!footer) return;
-                footer.style.opacity = hide ? '0' : '';
-                footer.style.pointerEvents = hide ? 'none' : '';
-            }
-
-            function openSubmitModal() {
-                if (!modalBackdrop || !modalSheet) return;
-
-                const s = computeSummary();
-                if (s.filled <= 0) return;
-
-                if (modalRowFilled) modalRowFilled.textContent = String(s.filled);
-                if (modalOk) modalOk.textContent = nf.format(s.okSum);
-                if (modalRj) modalRj.textContent = nf.format(s.rjSum);
-
-                if (modalDate) modalDate.textContent = (dateInput?.value || '-');
-                if (modalPickup) modalPickup.textContent = (pickupSelect?.selectedOptions?.[0]?.textContent
-                    ?.trim() || '-');
-
-                renderModalItems();
-
-                lastFocus = document.activeElement;
-
-                modalBackdrop.classList.add('show');
-                modalSheet.classList.add('show');
-                modalBackdrop.setAttribute('aria-hidden', 'false');
-                modalSheet.setAttribute('aria-hidden', 'false');
-
-                lockScroll(true);
-                hideFloatingActions(true);
-
-                setTimeout(() => confirmModalBtn?.focus(), 30);
-            }
-
-            function closeSubmitModal() {
-                if (!modalBackdrop || !modalSheet) return;
-                modalBackdrop.classList.remove('show');
-                modalSheet.classList.remove('show');
-                modalBackdrop.setAttribute('aria-hidden', 'true');
-                modalSheet.setAttribute('aria-hidden', 'true');
-
-                lockScroll(false);
-                hideFloatingActions(false);
-
-                if (lastFocus && typeof lastFocus.focus === 'function') {
-                    setTimeout(() => lastFocus.focus(), 0);
-                }
-            }
-
-            function setSubmittingState(isSubmitting) {
-                if (confirmModalBtn) {
-                    confirmModalBtn.disabled = !!isSubmitting;
-                    confirmModalBtn.classList.toggle('is-loading', !!isSubmitting);
-                }
-                if (submitBtn) submitBtn.disabled = true;
-            }
-
-            // Bind submit button (ANTI GAGAL)
-            if (submitBtn) {
-                submitBtn.setAttribute('type', 'button');
-                submitBtn.addEventListener('click', function(e) {
-                    e.preventDefault();
-                    e.stopPropagation();
-                    openSubmitModal();
+                picked.forEach((it, i) => {
+                    const row = document.createElement('div');
+                    row.className = 'px-3 py-2';
+                    row.style.borderBottom = '1px solid rgba(148,163,184,.12)';
+                    row.innerHTML = `
+                <div class="d-grid" style="grid-template-columns: 44px 1fr 120px 120px; gap:.5rem; align-items:center;">
+                    <div class="text-muted" style="font-weight:900;">${i+1}</div>
+                    <div style="font-weight:900;" class="mono">${esc(it.code)}</div>
+                    <div class="text-end mono" style="font-weight:900;">${it.ok.toLocaleString('id-ID',{minimumFractionDigits:2,maximumFractionDigits:2})}</div>
+                    <div class="text-end mono" style="font-weight:900; color: var(--rj);">${it.rj.toLocaleString('id-ID',{minimumFractionDigits:2,maximumFractionDigits:2})}</div>
+                </div>
+            `;
+                    mItems.appendChild(row);
                 });
             }
 
-            closeModalBtn?.addEventListener('click', function(e) {
+            btnOpenModal?.addEventListener('click', (e) => {
+                if (isAllMode()) return; // ALL mode ga pakai modal
+                if (btnOpenModal.disabled) return;
+
                 e.preventDefault();
-                closeSubmitModal();
-            });
-            cancelModalBtn?.addEventListener('click', function(e) {
-                e.preventDefault();
-                closeSubmitModal();
-            });
-            modalBackdrop?.addEventListener('click', function(e) {
-                e.preventDefault();
-                closeSubmitModal();
+
+                const opt = operator?.options?.[operator.selectedIndex];
+                if (mOp) mOp.textContent = (operator?.value ? (opt ? opt.text : '-') : 'SEMUA');
+
+                rebuildModalItems();
+                bsModal?.show();
             });
 
-            document.addEventListener('keydown', function(e) {
-                const isOpen = modalSheet?.classList.contains('show');
-                if (!isOpen) return;
-                if (e.key === 'Escape') closeSubmitModal();
+            btnConfirm?.addEventListener('click', () => {
+                bsModal?.hide();
+                form.submit();
             });
 
-            confirmModalBtn?.addEventListener('click', function(e) {
-                e.preventDefault();
-                if (!form) return;
+            // init
+            setModeUI();
 
-                // hard guard double submit
-                if (form.dataset.submitting === '1') return;
-
-                setSubmittingState(true);
-                form.dataset.submitting = '1';
-                setTimeout(() => form.submit(), 20);
-            });
-
-            // prevent enter submits
-            form?.addEventListener('keydown', function(e) {
-                if (e.key !== 'Enter') return;
-                const t = e.target;
-                if (!t) return;
-                if (t.tagName === 'TEXTAREA') return;
-                if (t.tagName === 'INPUT' || t.tagName === 'SELECT') {
-                    e.preventDefault();
-                    return false;
-                }
-            });
-
-            // filter item
-            filterSelects.forEach(sel => {
-                sel.addEventListener('change', function() {
-                    const code = this.value || '';
-                    filterSelects.forEach(s => {
-                        if (s !== sel) s.value = code;
-                    });
-                    rows.forEach(row => {
-                        const rowCode = (row.dataset.itemCode || '').trim();
-                        row.hidden = !!(code && rowCode !== code);
-                    });
+            if (listByOp) {
+                $$('.fin-item', listByOp).forEach(card => {
+                    syncCheck(card);
+                    syncNotes(card);
                 });
-            });
+            }
 
-            // row handlers
-            rows.forEach(row => {
-                const okD = row.querySelector('.qty-ok-desktop');
-                const okM = row.querySelector('.qty-ok-mobile');
-                const rjD = row.querySelector('.qty-reject-desktop');
-                const rjM = row.querySelector('.qty-reject-mobile');
-                const notes = row.querySelector('.notes-wrapper input[type="text"]');
-
-                function scrollRowForInput(input) {
-                    if (!isMobile()) return;
-                    const rr = input.closest('.return-row');
-                    if (!rr) return;
-                    setTimeout(() => rr.scrollIntoView({
-                        block: 'center',
-                        behavior: 'smooth'
-                    }), 250);
-                }
-
-                let touchMoved = false;
-                row.addEventListener('touchstart', () => touchMoved = false, {
-                    passive: true
-                });
-                row.addEventListener('touchmove', () => touchMoved = true, {
-                    passive: true
-                });
-
-                row.addEventListener('click', function(e) {
-                    if (touchMoved) {
-                        touchMoved = false;
-                        return;
-                    }
-                    if (e.target.closest('input, select, textarea, button, a, label')) return;
-
-                    const remaining = parseNum(row.dataset.remaining || '0');
-                    const currentOk = getOk(row);
-                    const currentRj = getReject(row);
-
-                    if (currentOk === remaining && currentRj === 0) {
-                        setOk(row, 0);
-                        setReject(row, 0);
-                    } else {
-                        setOk(row, remaining);
-                        setReject(row, 0);
-                    }
-
-                    row.dataset.lastChanged = 'ok';
-                    clamp(row, true);
-                    updateRowVisual(row);
-                    updateNotesVisibility(row);
-                    updateSummary();
-                });
-
-                [okD, okM].forEach(inp => {
-                    if (!inp) return;
-                    inp.addEventListener('focus', function() {
-                        this.select();
-                        this.classList.add('qty-input-active');
-                        scrollRowForInput(this);
-                    });
-                    inp.addEventListener('blur', function() {
-                        this.classList.remove('qty-input-active');
-                        row.dataset.lastChanged = 'ok';
-                        clamp(row, true);
-                        updateRowVisual(row);
-                        updateSummary();
-                    });
-                    inp.addEventListener('input', function() {
-                        row.dataset.lastChanged = 'ok';
-                        clamp(row, false);
-                        updateRowVisual(row);
-                        updateSummary();
-                    });
-                });
-
-                [rjD, rjM].forEach(inp => {
-                    if (!inp) return;
-                    inp.addEventListener('focus', function() {
-                        this.select();
-                        this.classList.add('qty-input-active');
-                        scrollRowForInput(this);
-                    });
-                    inp.addEventListener('blur', function() {
-                        this.classList.remove('qty-input-active');
-                        row.dataset.lastChanged = 'reject';
-                        clamp(row, true);
-                        updateRowVisual(row);
-                        updateNotesVisibility(row);
-                        updateSummary();
-                    });
-                    inp.addEventListener('input', function() {
-                        row.dataset.lastChanged = 'reject';
-                        clamp(row, false);
-                        updateRowVisual(row);
-                        updateNotesVisibility(row);
-                        updateSummary();
-                    });
-                });
-
-                if (notes) {
-                    notes.addEventListener('focus', function() {
-                        scrollRowForInput(this);
-                    });
-                    notes.addEventListener('input', function() {
-                        if (this.value.trim() !== '') {
-                            const wrap = row.querySelector('.notes-wrapper');
-                            if (wrap) wrap.classList.remove('d-none');
-                        }
-                    });
-                    notes.addEventListener('blur', function() {
-                        updateNotesVisibility(row);
-                    });
-                }
-
-                clamp(row, false);
-                updateRowVisual(row);
-                updateNotesVisibility(row);
-            });
-
-            updateSummary();
+            applyFilter();
+            computeSubmitEnabled();
+            computeTopSummary();
         });
     </script>
 @endpush
