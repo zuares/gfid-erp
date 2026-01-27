@@ -55,16 +55,7 @@
     }
 
     /* ====== SCROLL SAFETY (MOBILE) ====== */
-    html,
-    body {
-        height: auto;
-        min-height: 100%;
-    }
 
-    body {
-        overflow-y: auto;
-        -webkit-overflow-scrolling: touch;
-    }
 
     /* ====== LAYOUT ====== */
     .page-wrap {
@@ -185,11 +176,11 @@
     }
 
     /* ====== CONTROLS ====== */
-    .sticky {
+    /* .sticky {
         position: sticky;
         top: .70rem;
         z-index: 25;
-    }
+    } */
 
     .controls {
         display: grid;
@@ -587,5 +578,9 @@
         #searchInput {
             font-size: 16px;
         }
+
     }
+
+
+
 </style>
