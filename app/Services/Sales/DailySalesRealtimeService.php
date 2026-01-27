@@ -4,6 +4,7 @@ namespace App\Services\Sales;
 
 use App\Models\Shipment;
 use Illuminate\Support\Facades\DB;
+use Illuminate\Support\Facades\Log;
 
 class DailySalesRealtimeService
 {
@@ -16,6 +17,14 @@ class DailySalesRealtimeService
      */
     public function applyShipmentPosted(Shipment $shipment, int $adsDays = 30, bool $onlyActive = true): void
     {
+
+        Log::info('[ADS-REALTIME] applyShipmentPosted', [
+            'shipment_id' => $shipment->id,
+            'code' => $shipment->code,
+            'date' => $shipment->date,
+            'time' => now()->toDateTimeString(),
+        ]);
+
         // lock shipment row to guarantee idempotent even under concurrent requests
         $locked = Shipment::query()
             ->whereKey($shipment->id)
