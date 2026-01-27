@@ -23,13 +23,22 @@ return Application::configure(basePath: dirname(__DIR__))
         // ✅ Ini yang bikin scheduler Laravel 12 aktif
         // Kamu bisa taruh TEST di sini dulu:
 
-        $schedule->call(function () {
-            file_put_contents(
-                storage_path('logs/cron-test.log'),
-                "CRON OK @ " . now() . PHP_EOL,
-                FILE_APPEND
-            );
-        })->everyMinute();
+        // $schedule->call(function () {
+        //     file_put_contents(
+        //         storage_path('logs/cron-test.log'),
+        //         "CRON OK @ " . now() . PHP_EOL,
+        //         FILE_APPEND
+        //     );
+        // })->everyMinute();
+
+        $schedule->command('sales:rebuild-daily-item-sales --days=90')
+            ->dailyAt('01:00')
+            ->withoutOverlapping();
+
+        $schedule->command('inventory:recalc-ads-from-daily --days=30 --only-active=1')
+            ->dailyAt('01:10')
+            ->withoutOverlapping();
+
     })
     ->withExceptions(function (Exceptions $exceptions): void {
         //

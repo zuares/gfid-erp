@@ -32,8 +32,7 @@ class RebuildDailyItemSales extends Command
         $dateTo = $this->option('date-to');
         $truncateAll = ((int) $this->option('truncate')) === 1;
 
-        // Resolve date range (flexible)
-        // If user provides only one side, fill the other
+        // Resolve date range (SQLite, YYYY-MM-DD)
         $today = DB::selectOne("SELECT date('now') AS d")->d;
 
         if ($dateFrom && !$dateTo) {
@@ -41,24 +40,32 @@ class RebuildDailyItemSales extends Command
             $to = $today;
         } elseif (!$dateFrom && $dateTo) {
             $to = $dateTo;
-            $from = DB::selectOne("SELECT date('{$to}','-{$days} day') AS d")->d;
+            $from = DB::selectOne("SELECT date(?, '-' || ? || ' day') AS d", [$to, $days])->d;
         } elseif ($dateFrom && $dateTo) {
             $from = $dateFrom;
             $to = $dateTo;
         } else {
-            $from = DB::selectOne("SELECT date('now','-{$days} day') AS d")->d;
+            $from = DB::selectOne("SELECT date('now', '-' || ? || ' day') AS d", [$days])->d;
             $to = $today;
         }
 
-        $this->info("Rebuilding daily_item_sales for range: {$from} → {$to}" . ($truncateAll ? ' (TRUNCATE ALL)' : ''));
+        // Normalize order just in case user swaps them
+        if ($from > $to) {
+            [$from, $to] = [$to, $from];
+        }
 
-        DB::transaction(function () use ($from, $to, $truncateAll) {
+        $this->info(
+            "Rebuilding daily_item_sales for range: {$from} → {$to}" . ($truncateAll ? ' (TRUNCATE ALL)' : '')
+        );
 
+        $now = now();
+
+        DB::transaction(function () use ($from, $to, $truncateAll, $now) {
+
+            // 0) Delete existing rows first
             if ($truncateAll) {
-                // SQLite-safe "truncate": delete all rows
                 DB::table('daily_item_sales')->delete();
             } else {
-                // Delete only affected date range
                 DB::table('daily_item_sales')
                     ->whereDate('date', '>=', $from)
                     ->whereDate('date', '<=', $to)
@@ -66,31 +73,29 @@ class RebuildDailyItemSales extends Command
             }
 
             /**
-             * Aggregate from shipments + shipment_lines
+             * Aggregate:
+             * - shipments posted (status=posted & posted_at not null)
+             * - not cancelled
+             * - date range filter (whereDate)
              *
-             * Filters:
-             * - shipments.status = posted
-             * - posted_at IS NOT NULL  (lebih valid)
-             * - cancelled_at IS NULL
-             * - ship date within range (date-only)
-             *
-             * Note:
-             * - DATE(s.date) supaya kalau s.date DATETIME, tetap grup per tanggal
+             * value_sold:
+             * - kalau kamu sudah punya kolom unit_hpp di shipment_lines (hist cost per scan),
+             *   ini paling aman & konsisten historis.
+             * - jika unit_hpp belum ada, ganti ke join items & pakai items.hpp (current).
              */
             $rows = DB::table('shipment_lines as sl')
                 ->join('shipments as s', 's.id', '=', 'sl.shipment_id')
-                ->join('items as i', 'i.id', '=', 'sl.item_id')
                 ->where('s.status', 'posted')
                 ->whereNotNull('s.posted_at')
                 ->whereNull('s.cancelled_at')
                 ->whereDate('s.date', '>=', $from)
                 ->whereDate('s.date', '<=', $to)
-                ->groupBy(DB::raw('DATE(s.date)'), 'sl.item_id', 'i.hpp')
+                ->groupBy(DB::raw('DATE(s.date)'), 'sl.item_id')
                 ->selectRaw('
                     DATE(s.date) as date,
                     sl.item_id as item_id,
                     COALESCE(SUM(sl.qty_scanned), 0) as qty_sold,
-                    COALESCE(SUM(sl.qty_scanned), 0) * COALESCE(i.hpp, 0) as value_sold
+                    COALESCE(SUM(sl.qty_scanned * COALESCE(sl.unit_hpp, 0)), 0) as value_sold
                 ')
                 ->get();
 
@@ -98,10 +103,9 @@ class RebuildDailyItemSales extends Command
                 return;
             }
 
-            $now = now();
-
-            $payload = $rows->map(function ($r) use ($now) {
-                return [
+            $payload = [];
+            foreach ($rows as $r) {
+                $payload[] = [
                     'date' => $r->date, // YYYY-MM-DD
                     'item_id' => (int) $r->item_id,
                     'qty_sold' => (float) $r->qty_sold,
@@ -109,11 +113,10 @@ class RebuildDailyItemSales extends Command
                     'created_at' => $now,
                     'updated_at' => $now,
                 ];
-            })->all();
+            }
 
-            // Upsert chunks (unique key: date+item_id)
-            $chunks = array_chunk($payload, 800);
-            foreach ($chunks as $chunk) {
+            // Upsert chunks (unique: date+item_id)
+            foreach (array_chunk($payload, 800) as $chunk) {
                 DB::table('daily_item_sales')->upsert(
                     $chunk,
                     ['date', 'item_id'],

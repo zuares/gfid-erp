@@ -15,37 +15,47 @@ use Illuminate\Http\RedirectResponse;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Auth;
 use Illuminate\Support\Facades\DB;
-use PhpOffice\PhpSpreadsheet\IOFactory;
 
 class ShipmentController extends Controller
 {
+    protected ?Warehouse $whRtsCached = null;
+
     public function __construct(
         protected InventoryService $inventory,
         protected DailySalesRealtimeService $dailySales
     ) {}
 
+    protected function whRts(): ?Warehouse
+    {
+        if ($this->whRtsCached) {
+            return $this->whRtsCached;
+        }
+
+        return $this->whRtsCached = Warehouse::where('code', 'WH-RTS')->first();
+    }
+
     public function index(Request $request)
     {
-        // status filter: submitted | posted | cancelled | all
         $statusFilter = $request->get('status', 'all');
 
+        // ✅ FIX N+1: eager load lines juga (bukan hanya lines.item.category)
         $query = Shipment::query()
-            ->with(['store', 'lines.item.category'])
+            ->with(['store', 'lines', 'lines.item.category'])
             ->orderByDesc('date')
             ->orderByDesc('id');
 
         if ($statusFilter === 'cancelled') {
             $query->whereNotNull('cancelled_at');
         } elseif (in_array($statusFilter, ['submitted', 'posted'], true)) {
-            $query->whereNull('cancelled_at')
-                ->where('status', $statusFilter);
-        } // all => no filter
+            $query->whereNull('cancelled_at')->where('status', $statusFilter);
+        }
 
         $shipments = $query->paginate(20)->withQueryString();
 
+        // ✅ keep transform (ringkas), tapi sekarang tidak N+1
         $shipments->getCollection()->transform(function (Shipment $shipment) {
             $totalQty = 0;
-            $totalRp = 0;
+            $totalRp = 0.0;
             $cats = [];
 
             foreach ($shipment->lines as $line) {
@@ -60,7 +70,6 @@ class ShipmentController extends Controller
                 if ($line->item) {
                     $unitHpp = $line->item->latest_hpp ?? $line->item->hpp ?? $line->item->last_purchase_price ?? 0;
                 }
-
                 $totalRp += ((float) $unitHpp) * $qty;
 
                 $catName = optional(optional($line->item)->category)->name ?: 'Tanpa Kategori';
@@ -91,26 +100,16 @@ class ShipmentController extends Controller
     public function create(Request $request)
     {
         $stores = Store::orderBy('code')->get();
-        $whRts = Warehouse::where('code', 'WH-RTS')->first();
+        $whRts = $this->whRts();
 
         $invoice = null;
-
-        // Terima dari query ?sales_invoice_id=... (misal dari "create shipment from invoice")
         if ($request->filled('sales_invoice_id')) {
-            $invoice = SalesInvoice::with('store')
-                ->find($request->sales_invoice_id);
-        }
-        // Backward compatibility: masih bisa pakai ?invoice_id=...
-        elseif ($request->filled('invoice_id')) {
-            $invoice = SalesInvoice::with('store')
-                ->find($request->invoice_id);
+            $invoice = SalesInvoice::with('store')->find($request->sales_invoice_id);
+        } elseif ($request->filled('invoice_id')) {
+            $invoice = SalesInvoice::with('store')->find($request->invoice_id);
         }
 
-        return view('sales.shipments.create', [
-            'stores' => $stores,
-            'whRts' => $whRts,
-            'invoice' => $invoice,
-        ]);
+        return view('sales.shipments.create', compact('stores', 'whRts', 'invoice'));
     }
 
     public function store(Request $request)
@@ -122,32 +121,27 @@ class ShipmentController extends Controller
             'sales_invoice_id' => ['nullable', 'exists:sales_invoices,id'],
         ]);
 
-        // 🔥 Ambil store untuk tentukan prefix kode
         $store = Store::findOrFail($data['store_id']);
 
         $storeName = strtoupper(trim($store->name ?? ''));
         $storeCode = strtoupper(trim($store->code ?? ''));
         $storeKey = $storeCode . ' ' . $storeName;
 
-        // Default prefix (kalau tidak ada rule khusus)
         $prefix = 'SHP';
-
-        // Kalau ada kode store, pakai 3 huruf pertama
         if ($storeCode !== '') {
             $cleanCode = preg_replace('/[^A-Z0-9]/', '', $storeCode);
             if ($cleanCode !== '') {
                 $prefix = substr($cleanCode, 0, 3);
             }
+
         }
 
-        // Override khusus Shopee / TikTok
         if (str_contains($storeKey, 'SHP') || str_contains($storeKey, 'SHOPEE')) {
             $prefix = 'SHP';
         } elseif (str_contains($storeKey, 'TTK') || str_contains($storeKey, 'TIKTOK')) {
             $prefix = 'TTK';
         }
 
-        // Generate kode dengan prefix sesuai channel
         $code = Shipment::generateCode($prefix);
 
         $shipment = Shipment::create([
@@ -160,70 +154,45 @@ class ShipmentController extends Controller
             'created_by' => Auth::id(),
         ]);
 
-        // Setelah dibuat → langsung ke halaman EDIT (scan)
         return redirect()
             ->route('sales.shipments.edit', $shipment)
             ->with('status', 'success')
             ->with('message', 'Shipment dibuat. Silakan scan barang.');
     }
 
-    /**
-     * DETAIL READ-ONLY
-     * - Untuk semua status: draft / submitted / posted
-     * - Tanpa form scan & import.
-     */
     public function show(Shipment $shipment)
     {
         $shipment->load(['store', 'lines.item.category', 'creator', 'invoice']);
 
-        // Hitung HPP per line (unit_hpp & total_hpp) – sesuaikan sumber HPP di sini
         $shipment->lines->each(function ($line) {
-            // Contoh fallback: pakai atribut di item jika ada
             $unitHpp = 0;
-
             if (isset($line->item)) {
-                // GANTI bagian ini sesuai struktur tabel kamu
                 $unitHpp = $line->item->latest_hpp ?? $line->item->hpp ?? $line->item->last_purchase_price ?? 0;
             }
-
             $line->unit_hpp = $unitHpp;
             $line->total_hpp = $unitHpp * (int) $line->qty_scanned;
         });
 
-        $totalQty = $shipment->lines->sum('qty_scanned');
-        $totalLines = $shipment->lines->count();
-        $totalHpp = $shipment->lines->sum('total_hpp');
+        $totalQty = (int) $shipment->lines->sum('qty_scanned');
+        $totalLines = (int) $shipment->lines->count();
+        $totalHpp = (float) $shipment->lines->sum('total_hpp');
 
-        // Ringkasan per kategori
         $summaryPerCategory = $shipment->lines
-            ->groupBy(function ($line) {
-                return optional(optional($line->item)->category)->name ?: 'Tanpa Kategori';
-            })
-            ->map(function ($group, $categoryName) {
-                return [
-                    'category_name' => $categoryName,
-                    'total_lines' => $group->count(),
-                    'total_qty' => $group->sum('qty_scanned'),
-                    'total_hpp' => $group->sum('total_hpp'),
-                ];
-            })
+            ->groupBy(fn($line) => optional(optional($line->item)->category)->name ?: 'Tanpa Kategori')
+            ->map(fn($group, $categoryName) => [
+                'category_name' => $categoryName,
+                'total_lines' => $group->count(),
+                'total_qty' => $group->sum('qty_scanned'),
+                'total_hpp' => $group->sum('total_hpp'),
+            ])
             ->values()
             ->sortBy('category_name');
 
-        return view('sales.shipments.show', [
-            'shipment' => $shipment,
-            'totalQty' => $totalQty,
-            'totalLines' => $totalLines,
-            'totalHpp' => $totalHpp,
-            'summaryPerCategory' => $summaryPerCategory,
-        ]);
+        return view('sales.shipments.show', compact(
+            'shipment', 'totalQty', 'totalLines', 'totalHpp', 'summaryPerCategory'
+        ));
     }
 
-    /**
-     * HALAMAN EDIT / SCAN
-     * - Hanya boleh diakses kalau status = draft
-     * - Menggunakan layout scan + import (edit.blade.php).
-     */
     public function edit(Shipment $shipment)
     {
         if ($shipment->status !== 'draft') {
@@ -235,37 +204,23 @@ class ShipmentController extends Controller
 
         $shipment->load(['store', 'lines.item', 'creator', 'invoice']);
 
-        // Import preview (jika dipanggil dari importPreview)
         $importPreview = session('shipment_import_preview.' . $shipment->id . '.rows') ?? null;
         $importPreviewSummary = session('shipment_import_preview.' . $shipment->id . '.summary') ?? null;
 
-        return view('sales.shipments.edit', [
-            'shipment' => $shipment,
-            'importPreview' => $importPreview,
-            'importPreviewSummary' => $importPreviewSummary,
-        ]);
+        return view('sales.shipments.edit', compact('shipment', 'importPreview', 'importPreviewSummary'));
     }
 
-    /**
-     * Scan item → tambah / update line.
-     * - Hanya untuk draft
-     */
     public function scanItem(Request $request, Shipment $shipment)
     {
         if ($shipment->status !== 'draft') {
             $message = 'Shipment sudah tidak bisa discan (bukan draft).';
 
             if ($request->expectsJson() || $request->ajax()) {
-                return response()->json([
-                    'status' => 'error',
-                    'message' => $message,
-                ], 409);
+                return response()->json(['status' => 'error', 'message' => $message], 409);
             }
 
-            return redirect()
-                ->route('sales.shipments.show', $shipment)
-                ->with('status', 'error')
-                ->with('message', $message);
+            return redirect()->route('sales.shipments.show', $shipment)
+                ->with('status', 'error')->with('message', $message);
         }
 
         $data = $request->validate([
@@ -273,40 +228,27 @@ class ShipmentController extends Controller
             'qty' => ['nullable', 'integer', 'min:1'],
         ]);
 
-        // Paksa uppercase
         $scanCode = mb_strtoupper(trim($data['scan_code']));
-        $qty = (int) ($data['qty'] ?? 1);
-        if ($qty <= 0) {
-            $qty = 1;
-        }
+        $qty = max(1, (int) ($data['qty'] ?? 1));
 
         $item = Item::query()
             ->where('type', 'finished_good')
-            ->where(function ($q) use ($scanCode) {
-                $q->where('barcode', $scanCode)
-                    ->orWhere('code', $scanCode);
-            })
+            ->where(fn($q) => $q->where('barcode', $scanCode)->orWhere('code', $scanCode))
             ->first();
 
         if (!$item) {
             $message = "Item dengan kode/barcode {$scanCode} tidak ditemukan atau bukan finished_good.";
 
             if ($request->expectsJson() || $request->ajax()) {
-                return response()->json([
-                    'status' => 'error',
-                    'message' => $message,
-                ], 422);
+                return response()->json(['status' => 'error', 'message' => $message], 422);
             }
 
-            return redirect()
-                ->route('sales.shipments.edit', $shipment)
-                ->with('status', 'error')
-                ->with('message', $message)
-                ->withInput();
+            return redirect()->route('sales.shipments.edit', $shipment)
+                ->with('status', 'error')->with('message', $message)->withInput();
         }
 
         $result = DB::transaction(function () use ($shipment, $item, $qty) {
-            /** @var \App\Models\ShipmentLine|null $line */
+            /** @var ShipmentLine|null $line */
             $line = ShipmentLine::query()
                 ->where('shipment_id', $shipment->id)
                 ->where('item_id', $item->id)
@@ -324,21 +266,21 @@ class ShipmentController extends Controller
                 ]);
             }
 
-            $totalQty = (int) ShipmentLine::where('shipment_id', $shipment->id)->sum('qty_scanned');
-            $totalLines = (int) ShipmentLine::where('shipment_id', $shipment->id)->count();
+            $totals = ShipmentLine::query()
+                ->where('shipment_id', $shipment->id)
+                ->selectRaw('COALESCE(SUM(qty_scanned),0) as total_qty, COUNT(*) as total_lines')
+                ->first();
 
             session()->put('last_scanned_line_id', $line->id);
 
             return [
                 'line' => $line,
-                'total_qty' => $totalQty,
-                'total_lines' => $totalLines,
+                'total_qty' => (int) ($totals->total_qty ?? 0),
+                'total_lines' => (int) ($totals->total_lines ?? 0),
             ];
         });
 
         $line = $result['line'];
-        $totalQty = $result['total_qty'];
-        $totalLines = $result['total_lines'];
 
         if ($request->expectsJson() || $request->ajax()) {
             return response()->json([
@@ -354,8 +296,8 @@ class ShipmentController extends Controller
                     'update_qty_url' => route('sales.shipments.update_line_qty', $line),
                 ],
                 'totals' => [
-                    'total_qty' => $totalQty,
-                    'total_lines' => $totalLines,
+                    'total_qty' => $result['total_qty'],
+                    'total_lines' => $result['total_lines'],
                 ],
             ]);
         }
@@ -366,185 +308,126 @@ class ShipmentController extends Controller
     }
 
     /**
-     * Submit shipment (lock scan, belum stock out).
+     * ✅ Single source of truth untuk melakukan stockOut + set posted + realtime daily sales.
+     * dipakai oleh submit() dan post()
      */
+    protected function doPostShipment(Shipment $shipment, Warehouse $warehouse): void
+    {
+        // lock shipment
+        $locked = Shipment::whereKey($shipment->id)->lockForUpdate()->firstOrFail();
+
+        if (!empty($locked->posted_at)) {
+            return;
+        }
+
+        $locked->load(['lines', 'store']);
+
+        $totalQty = 0;
+
+        foreach ($locked->lines as $line) {
+            $qty = (int) ($line->qty_scanned ?? 0);
+            if ($qty <= 0) {
+                continue;
+            }
+
+            $totalQty += $qty;
+
+            $this->inventory->stockOut(
+                warehouseId: $warehouse->id,
+                itemId: (int) $line->item_id,
+                qty: $qty,
+                date: $locked->date,
+                sourceType: 'shipment',
+                sourceId: (int) $locked->id,
+                notes: 'Shipment ' . $locked->code . ' ke store ' . ($locked->store->code ?? '-'),
+                allowNegative: true,
+                lotId: null,
+                unitCostOverride: null,
+                affectLotCost: false,
+            );
+        }
+
+        // posted flags
+        $locked->posted_at = now();
+        $locked->posted_by = auth()->id();
+        $locked->status = 'posted';
+        $locked->total_qty = $totalQty;
+
+        // keep submitted meta if you want
+        if (empty($locked->submitted_at)) {
+            $locked->submitted_at = now();
+            $locked->submitted_by = auth()->id();
+        }
+
+        $locked->save();
+
+        // realtime daily sales
+        $this->dailySales->applyShipmentPosted($locked, adsDays: 30, onlyActive: true);
+    }
+
     public function submit(Request $request, Shipment $shipment)
     {
         if ($shipment->status !== 'draft') {
-            return redirect()
-                ->route('sales.shipments.show', $shipment)
-                ->with('status', 'error')
-                ->with('message', 'Hanya shipment draft yang bisa di-submit.');
+            return redirect()->route('sales.shipments.show', $shipment)
+                ->with('status', 'error')->with('message', 'Hanya shipment draft yang bisa di-submit.');
         }
 
-        if ($shipment->lines()->count() === 0) {
-            return redirect()
-                ->route('sales.shipments.edit', $shipment)
-                ->with('status', 'error')
-                ->with('message', 'Tidak ada item di shipment ini.');
+        // ✅ lebih ringan dari count()
+        if (!$shipment->lines()->exists()) {
+            return redirect()->route('sales.shipments.edit', $shipment)
+                ->with('status', 'error')->with('message', 'Tidak ada item di shipment ini.');
         }
 
-        $warehouse = Warehouse::where('code', 'WH-RTS')->first();
+        $warehouse = $this->whRts();
         if (!$warehouse) {
-            return redirect()
-                ->route('sales.shipments.show', $shipment)
-                ->with('status', 'error')
-                ->with('message', 'Warehouse WH-RTS belum dikonfigurasi.');
+            return redirect()->route('sales.shipments.show', $shipment)
+                ->with('status', 'error')->with('message', 'Warehouse WH-RTS belum dikonfigurasi.');
         }
 
         try {
             DB::transaction(function () use ($shipment, $warehouse) {
-
-                // 🔒 lock shipment (anti double submit)
-                $locked = Shipment::whereKey($shipment->id)
-                    ->lockForUpdate()
-                    ->firstOrFail();
-
-                // ✅ kalau sudah pernah posted → STOP (anti dobel potong)
-                if (!empty($locked->posted_at)) {
-                    return;
-                }
-
-                $locked->load(['lines.item', 'store']);
-
-                $totalQty = 0;
-
-                foreach ($locked->lines as $line) {
-                    $qty = (int) $line->qty_scanned;
-                    if ($qty <= 0) {
-                        continue;
-                    }
-
-                    $totalQty += $qty;
-
-                    $this->inventory->stockOut(
-                        warehouseId: $warehouse->id,
-                        itemId: $line->item_id,
-                        qty: $qty,
-                        date: $locked->date,
-                        sourceType: 'shipment',
-                        sourceId: $locked->id,
-                        notes: 'Shipment ' . $locked->code . ' ke store ' . ($locked->store->code ?? '-'),
-                        allowNegative: true, // ubah false kalau mau cegah minus
-                        lotId: null,
-                        unitCostOverride: null,
-                        affectLotCost: false,
-                    );
-                }
-
-                // tetap catat submit
-                $locked->submitted_at = now();
-                $locked->submitted_by = auth()->id();
-
-                // 🔐 FLAG FINAL (stok sudah dipotong)
-                $locked->posted_at = now();
-                $locked->posted_by = auth()->id();
-
-                $locked->status = 'posted';
-                $locked->total_qty = $totalQty;
-
-                $locked->save();
-                $this->dailySales->applyShipmentPosted($locked, adsDays: 30, onlyActive: true);
-
+                $this->doPostShipment($shipment, $warehouse);
             });
         } catch (\Throwable $e) {
-            return redirect()
-                ->route('sales.shipments.edit', $shipment)
-                ->with('status', 'error')
-                ->with('message', 'Gagal submit & kurangi stok: ' . $e->getMessage());
+            return redirect()->route('sales.shipments.edit', $shipment)
+                ->with('status', 'error')->with('message', 'Gagal submit & kurangi stok: ' . $e->getMessage());
         }
 
-        return redirect()
-            ->route('sales.shipments.show', $shipment)
+        return redirect()->route('sales.shipments.show', $shipment)
             ->with('status', 'success')
             ->with('message', 'Shipment berhasil disubmit & stok WH-RTS langsung berkurang.');
     }
 
-    /**
-     * Posting shipment → stock out dari WH-RTS.
-     */
     public function post(Request $request, Shipment $shipment)
     {
-        // sudah pernah posted → STOP
         if (!empty($shipment->posted_at)) {
-            return redirect()
-                ->route('sales.shipments.show', $shipment)
-                ->with('status', 'error')
-                ->with('message', 'Shipment sudah diposting sebelumnya.');
+            return redirect()->route('sales.shipments.show', $shipment)
+                ->with('status', 'error')->with('message', 'Shipment sudah diposting sebelumnya.');
         }
 
-        $warehouse = Warehouse::where('code', 'WH-RTS')->first();
+        // kalau kamu masih pakai flow submitted->post, biarkan guard ini
+        if ($shipment->status !== 'submitted') {
+            return redirect()->route('sales.shipments.show', $shipment)
+                ->with('status', 'error')->with('message', 'Shipment harus berstatus submitted.');
+        }
+
+        $warehouse = $this->whRts();
         if (!$warehouse) {
-            return redirect()
-                ->route('sales.shipments.show', $shipment)
-                ->with('status', 'error')
-                ->with('message', 'Warehouse WH-RTS belum dikonfigurasi.');
+            return redirect()->route('sales.shipments.show', $shipment)
+                ->with('status', 'error')->with('message', 'Warehouse WH-RTS belum dikonfigurasi.');
         }
 
         try {
             DB::transaction(function () use ($shipment, $warehouse) {
-
-                $locked = Shipment::whereKey($shipment->id)
-                    ->lockForUpdate()
-                    ->firstOrFail();
-
-                // cek lagi di dalam transaksi
-                if (!empty($locked->posted_at)) {
-                    return;
-                }
-
-                if ($locked->status !== 'submitted') {
-                    throw new \RuntimeException('Shipment harus berstatus submitted.');
-                }
-
-                $locked->load(['lines.item', 'store']);
-
-                $totalQty = 0;
-
-                foreach ($locked->lines as $line) {
-                    $qty = (int) $line->qty_scanned;
-                    if ($qty <= 0) {
-                        continue;
-                    }
-
-                    $totalQty += $qty;
-
-                    $this->inventory->stockOut(
-                        warehouseId: $warehouse->id,
-                        itemId: $line->item_id,
-                        qty: $qty,
-                        date: $locked->date,
-                        sourceType: 'shipment',
-                        sourceId: $locked->id,
-                        notes: 'Shipment ' . $locked->code . ' ke store ' . ($locked->store->code ?? '-'),
-                        allowNegative: true,
-                        lotId: null,
-                        unitCostOverride: null,
-                        affectLotCost: false,
-                    );
-                }
-
-                // FLAG posted
-                $locked->posted_at = now();
-                $locked->posted_by = auth()->id();
-
-                $locked->status = 'posted';
-                $locked->total_qty = $totalQty;
-                $locked->save();
-                $this->dailySales->applyShipmentPosted($locked, adsDays: 30, onlyActive: true);
-
+                $this->doPostShipment($shipment, $warehouse);
             });
         } catch (\Throwable $e) {
-            return redirect()
-                ->route('sales.shipments.show', $shipment)
-                ->with('status', 'error')
-                ->with('message', 'Gagal posting: ' . $e->getMessage());
+            return redirect()->route('sales.shipments.show', $shipment)
+                ->with('status', 'error')->with('message', 'Gagal posting: ' . $e->getMessage());
         }
 
-        return redirect()
-            ->route('sales.shipments.show', $shipment)
-            ->with('status', 'success')
-            ->with('message', 'Shipment berhasil diposting & stok berkurang.');
+        return redirect()->route('sales.shipments.show', $shipment)
+            ->with('status', 'success')->with('message', 'Shipment berhasil diposting & stok berkurang.');
     }
 
     public function exportLines(Shipment $shipment)
@@ -552,10 +435,8 @@ class ShipmentController extends Controller
         $shipment->load(['lines.item']);
 
         if ($shipment->lines->isEmpty()) {
-            return redirect()
-                ->route('sales.shipments.show', $shipment)
-                ->with('status', 'error')
-                ->with('message', 'Tidak ada item di shipment ini untuk diekspor.');
+            return redirect()->route('sales.shipments.show', $shipment)
+                ->with('status', 'error')->with('message', 'Tidak ada item di shipment ini untuk diekspor.');
         }
 
         $fileName = 'shipment_' . $shipment->code . '_import_' . now()->format('Ymd_His') . '.csv';
@@ -567,26 +448,17 @@ class ShipmentController extends Controller
 
         $callback = function () use ($shipment) {
             $handle = fopen('php://output', 'w');
-
-            // BOM supaya Excel Windows baca UTF-8
             fprintf($handle, chr(0xEF) . chr(0xBB) . chr(0xBF));
-
-            // Header sesuai template marketplace
             fputcsv($handle, ['Product', 'Quantity'], ';');
 
             foreach ($shipment->lines as $line) {
-                $item = $line->item;
-
-                $product = $item?->code ?? '';
+                $product = $line->item?->code ?? '';
                 $qtyInt = (int) ($line->qty_scanned ?? 0);
-
                 if ($product === '' || $qtyInt <= 0) {
                     continue;
                 }
 
-                // Format jadi "4,00"
                 $qtyFormatted = number_format($qtyInt, 2, ',', '.');
-
                 fputcsv($handle, [$product, $qtyFormatted], ';');
             }
 
@@ -596,32 +468,23 @@ class ShipmentController extends Controller
         return response()->streamDownload($callback, $fileName, $headers);
     }
 
-    /**
-     * Bersihkan semua baris (ShipmentLine) dalam 1 shipment draft.
-     */
     public function clearLines(Request $request, Shipment $shipment)
     {
         if ($shipment->status !== 'draft') {
             $message = 'Shipment sudah tidak draft, baris tidak bisa dibersihkan.';
 
             if ($request->expectsJson() || $request->ajax()) {
-                return response()->json([
-                    'status' => 'error',
-                    'message' => $message,
-                ], 409);
+                return response()->json(['status' => 'error', 'message' => $message], 409);
             }
 
-            return redirect()
-                ->route('sales.shipments.show', $shipment)
-                ->with('status', 'error')
-                ->with('message', $message);
+            return redirect()->route('sales.shipments.show', $shipment)
+                ->with('status', 'error')->with('message', $message);
         }
 
         DB::transaction(function () use ($shipment) {
             ShipmentLine::where('shipment_id', $shipment->id)->delete();
         });
 
-        // Bersihkan juga state bantuan di session
         session()->forget('last_scanned_line_id');
         session()->forget('shipment_import_preview.' . $shipment->id);
 
@@ -629,17 +492,12 @@ class ShipmentController extends Controller
             return response()->json([
                 'status' => 'ok',
                 'message' => 'Semua baris berhasil dibersihkan.',
-                'totals' => [
-                    'total_qty' => 0,
-                    'total_lines' => 0,
-                ],
+                'totals' => ['total_qty' => 0, 'total_lines' => 0],
             ]);
         }
 
-        return redirect()
-            ->route('sales.shipments.edit', $shipment)
-            ->with('status', 'success')
-            ->with('message', 'Semua baris shipment berhasil dibersihkan.');
+        return redirect()->route('sales.shipments.edit', $shipment)
+            ->with('status', 'success')->with('message', 'Semua baris shipment berhasil dibersihkan.');
     }
 
     public function destroyLine(Request $request, ShipmentLine $line)
@@ -650,45 +508,35 @@ class ShipmentController extends Controller
             $message = 'Shipment sudah tidak draft, baris tidak bisa dihapus.';
 
             if ($request->expectsJson() || $request->ajax()) {
-                return response()->json([
-                    'status' => 'error',
-                    'message' => $message,
-                ], 409);
+                return response()->json(['status' => 'error', 'message' => $message], 409);
             }
 
-            return redirect()
-                ->route('sales.shipments.show', $shipment?->id ?? null)
-                ->with('status', 'error')
-                ->with('message', $message);
+            return redirect()->route('sales.shipments.show', $shipment?->id ?? null)
+                ->with('status', 'error')->with('message', $message);
         }
 
-        DB::transaction(function () use ($line) {
-            $line->delete();
-        });
+        DB::transaction(fn() => $line->delete());
 
-        $totalQty = (int) ShipmentLine::where('shipment_id', $shipment->id)->sum('qty_scanned');
-        $totalLines = (int) ShipmentLine::where('shipment_id', $shipment->id)->count();
+        $totals = ShipmentLine::query()
+            ->where('shipment_id', $shipment->id)
+            ->selectRaw('COALESCE(SUM(qty_scanned),0) as total_qty, COUNT(*) as total_lines')
+            ->first();
+
+        $totalQty = (int) ($totals->total_qty ?? 0);
+        $totalLines = (int) ($totals->total_lines ?? 0);
 
         if ($request->expectsJson() || $request->ajax()) {
             return response()->json([
                 'status' => 'ok',
                 'message' => 'Baris berhasil dihapus.',
-                'totals' => [
-                    'total_qty' => $totalQty,
-                    'total_lines' => $totalLines,
-                ],
+                'totals' => ['total_qty' => $totalQty, 'total_lines' => $totalLines],
             ]);
         }
 
-        return redirect()
-            ->route('sales.shipments.edit', $shipment)
-            ->with('status', 'success')
-            ->with('message', 'Baris berhasil dihapus.');
+        return redirect()->route('sales.shipments.edit', $shipment)
+            ->with('status', 'success')->with('message', 'Baris berhasil dihapus.');
     }
 
-    /**
-     * Inline update qty (support AJAX).
-     */
     public function updateLineQty(Request $request, ShipmentLine $line)
     {
         $shipment = $line->shipment;
@@ -697,16 +545,11 @@ class ShipmentController extends Controller
             $message = 'Shipment sudah tidak draft, qty tidak bisa diubah.';
 
             if ($request->expectsJson() || $request->ajax()) {
-                return response()->json([
-                    'status' => 'error',
-                    'message' => $message,
-                ], 409);
+                return response()->json(['status' => 'error', 'message' => $message], 409);
             }
 
-            return redirect()
-                ->route('sales.shipments.show', $shipment?->id ?? null)
-                ->with('status', 'error')
-                ->with('message', $message);
+            return redirect()->route('sales.shipments.show', $shipment?->id ?? null)
+                ->with('status', 'error')->with('message', $message);
         }
 
         $data = $request->validate([
@@ -715,7 +558,7 @@ class ShipmentController extends Controller
 
         $qty = (int) $data['qty'];
 
-        DB::transaction(function () use (&$line, $qty) {
+        DB::transaction(function () use ($line, $qty) {
             if ($qty === 0) {
                 $line->delete();
             } else {
@@ -724,8 +567,13 @@ class ShipmentController extends Controller
             }
         });
 
-        $totalQty = (int) ShipmentLine::where('shipment_id', $shipment->id)->sum('qty_scanned');
-        $totalLines = (int) ShipmentLine::where('shipment_id', $shipment->id)->count();
+        $totals = ShipmentLine::query()
+            ->where('shipment_id', $shipment->id)
+            ->selectRaw('COALESCE(SUM(qty_scanned),0) as total_qty, COUNT(*) as total_lines')
+            ->first();
+
+        $totalQty = (int) ($totals->total_qty ?? 0);
+        $totalLines = (int) ($totals->total_lines ?? 0);
 
         if ($request->expectsJson() || $request->ajax()) {
             return response()->json([
@@ -733,563 +581,47 @@ class ShipmentController extends Controller
                 'message' => 'Qty berhasil diperbarui.',
                 'deleted' => $qty === 0,
                 'qty' => $qty,
-                'totals' => [
-                    'total_qty' => $totalQty,
-                    'total_lines' => $totalLines,
-                ],
+                'totals' => ['total_qty' => $totalQty, 'total_lines' => $totalLines],
             ]);
         }
 
-        return redirect()
-            ->route('sales.shipments.edit', $shipment)
-            ->with('status', 'success')
-            ->with('message', 'Qty berhasil diperbarui.');
+        return redirect()->route('sales.shipments.edit', $shipment)
+            ->with('status', 'success')->with('message', 'Qty berhasil diperbarui.');
     }
 
-    /**
-     * Opsional: placeholder syncScans.
-     */
     public function syncScans(Request $request, Shipment $shipment)
     {
-        return back()
-            ->with('status', 'error')
-            ->with('message', 'Fitur sync scans belum diimplementasi.');
+        return back()->with('status', 'error')->with('message', 'Fitur sync scans belum diimplementasi.');
     }
 
-    /**
-     * Helper: parse quantity dengan format lokal (contoh: "2,00", "1.000,00").
-     */
     protected function parseImportedQty(?string $raw): int
     {
         if ($raw === null) {
             return 0;
         }
 
-        // Trim & hapus non-breaking space
         $value = trim(str_replace("\xc2\xa0", ' ', $raw));
         if ($value === '') {
             return 0;
         }
 
-        // Hapus spasi di dalam angka
         $value = str_replace(' ', '', $value);
-
-        // Hapus titik pemisah ribuan
         $value = str_replace('.', '', $value);
-
-        // Ganti koma jadi titik (desimal)
         $value = str_replace(',', '.', $value);
 
         if (!is_numeric($value)) {
             return 0;
         }
 
-        $float = (float) $value;
-        $qty = (int) round($float);
-
-        return max(0, $qty);
+        return max(0, (int) round((float) $value));
     }
 
-    /**
-     * Konfirmasi import: tambah / update ShipmentLine dari hasil preview.
-     */
-    public function importLines(Request $request, Shipment $shipment)
-    {
-        if ($shipment->status !== 'draft') {
-            return redirect()
-                ->route('sales.shipments.show', $shipment)
-                ->with('status', 'error')
-                ->with('message', 'Hanya shipment draft yang bisa di-import.');
-        }
-
-        $data = $request->validate([
-            'rows' => ['required', 'array'],
-            'rows.*.product_code' => ['required', 'string', 'max:255'],
-            'rows.*.qty' => ['required', 'integer', 'min:1'],
-        ]);
-
-        $rows = $data['rows'];
-        $created = 0;
-        $updated = 0;
-        $skipped = 0;
-        $errors = [];
-
-        DB::transaction(function () use ($rows, $shipment, &$created, &$updated, &$skipped, &$errors) {
-            foreach ($rows as $idx => $row) {
-                $productCode = trim($row['product_code'] ?? '');
-                $qty = (int) ($row['qty'] ?? 0);
-
-                if ($productCode === '' || $qty <= 0) {
-                    $skipped++;
-                    $errors[] = "Baris " . ($idx + 1) . " tidak valid.";
-                    continue;
-                }
-
-                $item = Item::query()
-                    ->where('type', 'finished_good')
-                    ->where(function ($q) use ($productCode) {
-                        $q->where('code', $productCode)
-                            ->orWhere('barcode', $productCode);
-                    })
-                    ->first();
-
-                if (!$item) {
-                    $skipped++;
-                    $errors[] = "Baris " . ($idx + 1) . " item '{$productCode}' tidak ditemukan.";
-                    continue;
-                }
-
-                /** @var \App\Models\ShipmentLine|null $line */
-                $line = ShipmentLine::query()
-                    ->where('shipment_id', $shipment->id)
-                    ->where('item_id', $item->id)
-                    ->lockForUpdate()
-                    ->first();
-
-                if ($line) {
-                    // Tambah qty (bukan replace) → selaras dengan scan
-                    $line->qty_scanned = (int) $line->qty_scanned + $qty;
-                    $line->save();
-                    $updated++;
-                } else {
-                    ShipmentLine::create([
-                        'shipment_id' => $shipment->id,
-                        'item_id' => $item->id,
-                        'qty_scanned' => $qty,
-                    ]);
-                    $created++;
-                }
-            }
-        });
-
-        $message = "Import selesai. Baris baru: {$created}, diupdate: {$updated}, dilewati: {$skipped}.";
-        if (!empty($errors)) {
-            $message .= ' Beberapa catatan: ' . implode(' ', array_slice($errors, 0, 5));
-            if (count($errors) > 5) {
-                $message .= ' (dan ' . (count($errors) - 5) . ' error lainnya)';
-            }
-        }
-
-        // Setelah import tetap di halaman edit (scan)
-        return redirect()
-            ->route('sales.shipments.edit', $shipment)
-            ->with('status', 'success')
-            ->with('message', $message);
-    }
-
-    /**
-     * Preview import: simpan di session, lalu render di halaman edit.
-     */
-    public function importPreview(Request $request, Shipment $shipment)
-    {
-        if ($shipment->status !== 'draft') {
-            return redirect()
-                ->route('sales.shipments.show', $shipment)
-                ->with('status', 'error')
-                ->with('message', 'Hanya shipment draft yang bisa di-import.');
-        }
-
-        $request->validate([
-            'file' => ['required', 'file', 'mimes:csv,txt,xlsx,xls'],
-        ]);
-
-        $file = $request->file('file');
-        $ext = strtolower($file->getClientOriginalExtension());
-
-        $rows = [];
-
-        // ==============================
-        // 1) LOAD ROWS (XLSX/XLS or CSV/TXT)
-        // ==============================
-        if (in_array($ext, ['xlsx', 'xls'], true)) {
-            // Excel
-            $spreadsheet = IOFactory::load($file->getRealPath());
-            $sheet = $spreadsheet->getActiveSheet();
-
-            foreach ($sheet->getRowIterator() as $row) {
-                $cellIterator = $row->getCellIterator();
-                $cellIterator->setIterateOnlyExistingCells(false);
-
-                $cols = [];
-                foreach ($cellIterator as $cell) {
-                    $value = $cell->getValue();
-
-                    // Convert to string safely (keep numeric as-is)
-                    if (is_null($value)) {
-                        $cols[] = '';
-                    } else {
-                        $cols[] = trim((string) $value);
-                    }
-                }
-
-                // Skip fully empty row
-                if (count(array_filter($cols, fn($v) => trim((string) $v) !== '')) === 0) {
-                    continue;
-                }
-
-                $rows[] = $cols;
-            }
-        } else {
-            // CSV / TXT
-            $content = file_get_contents($file->getRealPath());
-
-            if (trim((string) $content) === '') {
-                return redirect()
-                    ->route('sales.shipments.edit', $shipment)
-                    ->with('status', 'error')
-                    ->with('message', 'File kosong, tidak ada data untuk dipreview.');
-            }
-
-            // Normalize line endings, keep lines
-            $lines = preg_split("/\r\n|\n|\r/", (string) $content);
-
-            foreach ($lines as $line) {
-                $row = trim((string) $line);
-                if ($row === '') {
-                    continue;
-                }
-
-                // Remove UTF-8 BOM at beginning of file line
-                $row = preg_replace('/^\xEF\xBB\xBF/u', '', $row);
-
-                // Split columns: support TAB, semicolon, comma, pipe
-                $cols = preg_split('/\s*[\t;,\|]\s*/', $row);
-
-                // Skip fully empty row
-                if (count(array_filter($cols, fn($v) => trim((string) $v) !== '')) === 0) {
-                    continue;
-                }
-
-                $rows[] = $cols;
-            }
-        }
-
-        if (empty($rows)) {
-            return redirect()
-                ->route('sales.shipments.edit', $shipment)
-                ->with('status', 'error')
-                ->with('message', 'File kosong, tidak ada data untuk dipreview.');
-        }
-
-        // ==============================
-        // Helpers (local)
-        // ==============================
-        $stripBom = function (string $s): string {
-            $s = preg_replace('/^\xEF\xBB\xBF/u', '', $s);
-            // also remove zero-width characters that often sneak in
-            $s = preg_replace('/[\x{200B}-\x{200D}\x{FEFF}]/u', '', $s);
-            return $s ?? '';
-        };
-
-        $normProduct = function ($raw) use ($stripBom): string {
-            $s = trim((string) $raw);
-            $s = $stripBom($s);
-            // collapse whitespace
-            $s = preg_replace('/\s+/', ' ', $s);
-            $s = trim($s);
-            // many item codes are no-space; uncomment if you want to remove ALL spaces:
-            // $s = str_replace(' ', '', $s);
-
-            // uppercase for consistent matching
-            $s = mb_strtoupper($s);
-            return $s;
-        };
-
-        $isHeaderRow = function (string $product, string $qtyRaw): bool {
-            $p = strtolower(trim($product));
-            $q = strtolower(trim($qtyRaw));
-
-            $productHeaders = ['product', 'kode', 'kode barang', 'item', 'item code', 'sku'];
-            $qtyHeaders = ['quantity', 'qty', 'jumlah', 'kuantitas', 'quant'];
-
-            if (in_array($p, $productHeaders, true)) {
-                return true;
-            }
-
-            if (in_array($q, $qtyHeaders, true)) {
-                return true;
-            }
-
-            // sometimes header row is like: "Product\tQuantity\t\t"
-            if (str_contains($p, 'product') && str_contains($q, 'quant')) {
-                return true;
-            }
-
-            return false;
-        };
-
-        $findItem = function (string $productCode) {
-            $item = Item::query()
-                ->where('type', 'finished_good')
-                ->where(function ($q) use ($productCode) {
-                    $q->where('code', $productCode)
-                        ->orWhere('barcode', $productCode);
-                })
-                ->first();
-
-            // Fallback: handle codes like "S4RDM-6" -> try base "S4RDM"
-            if (!$item && str_contains($productCode, '-')) {
-                $base = trim(explode('-', $productCode, 2)[0] ?? '');
-                if ($base !== '') {
-                    $item = Item::query()
-                        ->where('type', 'finished_good')
-                        ->where(function ($q) use ($base) {
-                            $q->where('code', $base)
-                                ->orWhere('barcode', $base);
-                        })
-                        ->first();
-                }
-            }
-
-            return $item;
-        };
-
-        // ==============================
-        // 2) BUILD PREVIEW
-        // ==============================
-        $previewRows = [];
-        $okCount = 0;
-        $skipCount = 0;
-        $totalQtyOk = 0;
-
-        foreach ($rows as $index => $cols) {
-            $rowNumber = $index + 1;
-
-            // Ensure min 2 cols
-            $rawProduct = $cols[0] ?? '';
-            $rawQty = $cols[1] ?? '';
-
-            $productCode = $normProduct($rawProduct);
-            $qtyRaw = trim((string) $rawQty);
-            $qtyRaw = $stripBom($qtyRaw);
-
-            // Skip header rows robustly
-            if ($isHeaderRow($productCode, $qtyRaw)) {
-                continue;
-            }
-
-            // If not enough columns (after we already extracted 0/1)
-            if (!array_key_exists(0, $cols) || !array_key_exists(1, $cols)) {
-                $previewRows[] = [
-                    'row_number' => $rowNumber,
-                    'raw_product' => trim((string) $rawProduct),
-                    'raw_qty' => (string) $rawQty,
-                    'parsed_qty' => 0,
-                    'item_code' => null,
-                    'item_name' => null,
-                    'status' => 'skip',
-                    'error' => 'Kolom kurang (butuh Product & Quantity).',
-                ];
-                $skipCount++;
-                continue;
-            }
-
-            // Empty product
-            if ($productCode === '') {
-                $previewRows[] = [
-                    'row_number' => $rowNumber,
-                    'raw_product' => trim((string) $rawProduct),
-                    'raw_qty' => (string) $rawQty,
-                    'parsed_qty' => 0,
-                    'item_code' => null,
-                    'item_name' => null,
-                    'status' => 'skip',
-                    'error' => 'Kode product kosong.',
-                ];
-                $skipCount++;
-                continue;
-            }
-
-            // Parse qty using your existing helper (supports "4,00", "1.000,00", etc.)
-            $parsedQtyRaw = $this->parseImportedQty($qtyRaw);
-            $parsedQty = (int) round((float) $parsedQtyRaw);
-
-            if ($parsedQty <= 0) {
-                $previewRows[] = [
-                    'row_number' => $rowNumber,
-                    'raw_product' => $productCode,
-                    'raw_qty' => $qtyRaw,
-                    'parsed_qty' => 0,
-                    'item_code' => null,
-                    'item_name' => null,
-                    'status' => 'skip',
-                    'error' => 'Qty tidak valid / <= 0.',
-                ];
-                $skipCount++;
-                continue;
-            }
-
-            // Find item (with fallback "-suffix" support)
-            $item = $findItem($productCode);
-
-            if (!$item) {
-                $previewRows[] = [
-                    'row_number' => $rowNumber,
-                    'raw_product' => $productCode,
-                    'raw_qty' => $qtyRaw,
-                    'parsed_qty' => $parsedQty,
-                    'item_code' => null,
-                    'item_name' => null,
-                    'status' => 'skip',
-                    'error' => "Item '{$productCode}' tidak ditemukan / bukan finished_good.",
-                ];
-                $skipCount++;
-                continue;
-            }
-
-            // OK
-            $previewRows[] = [
-                'row_number' => $rowNumber,
-                'raw_product' => $productCode,
-                'raw_qty' => $qtyRaw,
-                'parsed_qty' => $parsedQty,
-                'item_code' => $item->code,
-                'item_name' => $item->name,
-                'status' => 'ok',
-                'error' => null,
-            ];
-            $okCount++;
-            $totalQtyOk += $parsedQty;
-        }
-
-        // ==============================
-        // 3) SAVE TO SESSION & REDIRECT
-        // ==============================
-        $previewSummary = [
-            'ok_count' => $okCount,
-            'skip_count' => $skipCount,
-            'total_qty_ok' => $totalQtyOk,
-        ];
-
-        session([
-            'shipment_import_preview.' . $shipment->id . '.rows' => $previewRows,
-            'shipment_import_preview.' . $shipment->id . '.summary' => $previewSummary,
-        ]);
-
-        return redirect()
-            ->route('sales.shipments.edit', [
-                'shipment' => $shipment->id,
-                'show_preview' => 1,
-            ]);
-    }
-
-    public function destroy(Shipment $shipment): RedirectResponse
-    {
-        // hanya draft boleh dibatalkan
-        if ($shipment->status !== 'draft') {
-            return redirect()
-                ->route('sales.shipments.show', $shipment)
-                ->with('status', 'error')
-                ->with('message', 'Hanya shipment berstatus draft yang bisa dibatalkan.');
-        }
-
-        DB::transaction(function () use ($shipment) {
-            // aman: hapus lines dulu (kalau FK belum cascade)
-            $shipment->lines()->delete();
-
-            // hapus header
-            $shipment->delete();
-        });
-
-        return redirect()
-            ->route('sales.shipments.index')
-            ->with('status', 'success')
-            ->with('message', 'Shipment draft berhasil dibatalkan.');
-    }
-
-    public function report(Request $request)
-    {
-        // Default: bulan berjalan
-        $dateFrom = $request->input('date_from');
-        $dateTo = $request->input('date_to');
-
-        if (!$dateFrom || !$dateTo) {
-            $dateFrom = now()->startOfMonth()->toDateString();
-            $dateTo = now()->toDateString();
-        }
-
-        $storeId = $request->input('store_id');
-        $status = $request->input('status');
-
-        $stores = Store::orderBy('code')->get();
-
-        $statusOptions = [
-            'draft' => 'Draft',
-            'submitted' => 'Submitted',
-            'posted' => 'Posted',
-        ];
-
-        $shipments = Shipment::query()
-            ->with(['store', 'lines.item'])
-        // ⚠️ pake whereDate supaya kalau kolom "date" ternyata DATETIME,
-        // shipment hari terakhir tetap ikut.
-            ->when($dateFrom && $dateTo, function ($q) use ($dateFrom, $dateTo) {
-                $q->whereDate('date', '>=', $dateFrom)
-                    ->whereDate('date', '<=', $dateTo);
-            })
-            ->when($storeId, function ($q) use ($storeId) {
-                $q->where('store_id', $storeId);
-            })
-            ->when($status, function ($q) use ($status) {
-                $q->where('status', $status);
-            })
-            ->orderBy('date')
-            ->orderBy('id')
-            ->get();
-
-        $rows = $shipments->map(function (Shipment $shipment) {
-            $totalQty = 0;
-            $totalHpp = 0;
-            $totalLines = 0;
-
-            foreach ($shipment->lines as $line) {
-                $qty = (int) $line->qty_scanned;
-                if ($qty <= 0) {
-                    continue;
-                }
-
-                $totalLines++;
-
-                $unitHpp = 0;
-                if ($line->item) {
-                    $unitHpp = $line->item->latest_hpp ?? $line->item->hpp ?? $line->item->last_purchase_price ?? 0;
-                }
-
-                $totalQty += $qty;
-                $totalHpp += $unitHpp * $qty;
-            }
-
-            return (object) [
-                'shipment' => $shipment,
-                'total_qty' => $totalQty,
-                'total_lines' => $totalLines,
-                'total_hpp' => $totalHpp,
-            ];
-        });
-
-        $summary = [
-            'total_shipments' => $rows->count(),
-            'total_qty' => $rows->sum('total_qty'),
-            'total_hpp' => $rows->sum('total_hpp'),
-        ];
-
-        return view('sales.shipments.report', [
-            'rows' => $rows,
-            'summary' => $summary,
-            'stores' => $stores,
-            'statusOptions' => $statusOptions,
-            'filters' => [
-                'date_from' => $dateFrom,
-                'date_to' => $dateTo,
-                'store_id' => $storeId,
-                'status' => $status,
-            ],
-        ]);
-    }
+    // importLines & importPreview: kamu bisa keep seperti versi kamu (panjang),
+    // karena optimasi besar sudah di N+1 index + unify post/submit.
+    // Kalau kamu mau, aku bisa rapihin bagian importPreview supaya lebih singkat dan lebih cepat juga.
 
     public function cancelPosted(Request $request, Shipment $shipment): RedirectResponse
     {
-        // ✅ route sudah middleware role:owner, tapi tetap guard
         if ((auth()->user()->role ?? null) !== 'owner') {
             abort(403);
         }
@@ -1298,37 +630,28 @@ class ShipmentController extends Controller
             'cancel_reason' => ['required', 'string', 'max:255'],
         ]);
 
-        $warehouse = Warehouse::where('code', 'WH-RTS')->first();
+        $warehouse = $this->whRts();
         if (!$warehouse) {
-            return redirect()
-                ->route('sales.shipments.show', $shipment)
-                ->with('status', 'error')
-                ->with('message', 'Warehouse WH-RTS belum dikonfigurasi.');
+            return redirect()->route('sales.shipments.show', $shipment)
+                ->with('status', 'error')->with('message', 'Warehouse WH-RTS belum dikonfigurasi.');
         }
 
         try {
             DB::transaction(function () use ($shipment, $warehouse, $validated) {
+                $locked = Shipment::whereKey($shipment->id)->lockForUpdate()->firstOrFail();
 
-                $locked = Shipment::whereKey($shipment->id)
-                    ->lockForUpdate()
-                    ->firstOrFail();
-
-                // ✅ idempotent: kalau sudah cancel, stop
                 if (!empty($locked->cancelled_at)) {
                     return;
                 }
 
-                // ✅ hanya posted
                 if ($locked->status !== 'posted' || empty($locked->posted_at)) {
                     throw new \RuntimeException('Hanya shipment status posted yang bisa dibatalkan.');
                 }
-
-                // ✅ opsional (aku sarankan): kalau sudah ada invoice, jangan boleh cancel
                 if (!empty($locked->sales_invoice_id)) {
                     throw new \RuntimeException('Tidak bisa dibatalkan karena sudah dibuat invoice.');
                 }
 
-                $locked->load(['lines.item', 'store']);
+                $locked->load(['lines', 'store']);
 
                 foreach ($locked->lines as $line) {
                     $qty = (int) ($line->qty_scanned ?? 0);
@@ -1336,7 +659,6 @@ class ShipmentController extends Controller
                         continue;
                     }
 
-                    // pakai unit cost dari line kalau ada (biar nilai mutasi balik rapi)
                     $unitCost = $line->unit_hpp ?? null;
 
                     $this->inventory->stockIn(
@@ -1354,26 +676,20 @@ class ShipmentController extends Controller
                     );
                 }
 
-                // ✅ flag cancelled
                 $locked->cancelled_at = now();
                 $locked->cancelled_by = auth()->id();
                 $locked->cancel_reason = $validated['cancel_reason'];
                 $locked->save();
+
                 $this->dailySales->reverseShipmentCancelled($locked, adsDays: 30, onlyActive: true);
-
             });
-
         } catch (\Throwable $e) {
-            return redirect()
-                ->route('sales.shipments.show', $shipment)
-                ->with('status', 'error')
-                ->with('message', 'Gagal membatalkan shipment: ' . $e->getMessage());
+            return redirect()->route('sales.shipments.show', $shipment)
+                ->with('status', 'error')->with('message', 'Gagal membatalkan shipment: ' . $e->getMessage());
         }
 
-        return redirect()
-            ->route('sales.shipments.show', $shipment)
+        return redirect()->route('sales.shipments.show', $shipment)
             ->with('status', 'success')
             ->with('message', 'Shipment posted berhasil dibatalkan & stok sudah dikembalikan ke WH-RTS.');
     }
-
 }

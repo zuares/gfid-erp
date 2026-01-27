@@ -20,14 +20,18 @@ class RecalculateAdsFromDailySales extends Command
         $onlyActive = ((int) $this->option('only-active')) === 1;
 
         // SQLite cutoff date (YYYY-MM-DD)
-        $cutoff = DB::selectOne("SELECT date('now','-{$days} day') AS d")->d;
+        $cutoff = DB::selectOne("SELECT date('now', '-' || ? || ' day') AS d", [$days])->d;
 
-        $this->info("Recalculating ADS from daily_item_sales for last {$days} days (>= {$cutoff})"
-            . ($onlyActive ? " [only active]" : " [all items]"));
+        $this->info(
+            "Recalculating ADS from daily_item_sales for last {$days} days (>= {$cutoff})"
+            . ($onlyActive ? " [only active]" : " [all items]")
+        );
 
-        DB::transaction(function () use ($days, $cutoff, $onlyActive) {
+        $now = now();
 
-            // 1) update window meta (respect onlyActive)
+        DB::transaction(function () use ($days, $cutoff, $onlyActive, $now) {
+
+            // 1) update window meta
             $metaQ = DB::table('items');
             if ($onlyActive) {
                 $metaQ->where('active', 1);
@@ -36,18 +40,18 @@ class RecalculateAdsFromDailySales extends Command
                 'avg_daily_sales_window' => $days,
             ]);
 
-            // 2) reset ADS to 0 first (for affected scope)
+            // 2) reset ADS first (scope-respecting)
             $resetQ = DB::table('items');
             if ($onlyActive) {
                 $resetQ->where('active', 1);
             }
-
             $resetQ->update([
                 'avg_daily_sales' => 0,
-                'avg_daily_sales_updated_at' => now(),
+                'avg_daily_sales_window' => $days,
+                'avg_daily_sales_updated_at' => $now,
             ]);
 
-            // 3) aggregate per item from daily_item_sales within cutoff
+            // 3) aggregate qty in window
             $agg = DB::table('daily_item_sales')
                 ->selectRaw('item_id, SUM(qty_sold) as qty_sum')
                 ->whereDate('date', '>=', $cutoff)
@@ -58,14 +62,14 @@ class RecalculateAdsFromDailySales extends Command
                 return;
             }
 
-            // 4) update per item in chunks (SQLite friendly)
+            // 4) update per item (SQLite friendly)
             foreach ($agg->chunk(800) as $chunk) {
                 foreach ($chunk as $r) {
-                    $ads = ((float) ($r->qty_sum ?? 0)) / $days;
+                    $itemId = (int) $r->item_id;
+                    $qtySum = (float) ($r->qty_sum ?? 0);
+                    $ads = $qtySum / $days;
 
-                    $q = DB::table('items')
-                        ->where('id', (int) $r->item_id);
-
+                    $q = DB::table('items')->where('id', $itemId);
                     if ($onlyActive) {
                         $q->where('active', 1);
                     }
@@ -73,7 +77,7 @@ class RecalculateAdsFromDailySales extends Command
                     $q->update([
                         'avg_daily_sales' => $ads,
                         'avg_daily_sales_window' => $days,
-                        'avg_daily_sales_updated_at' => now(),
+                        'avg_daily_sales_updated_at' => $now,
                     ]);
                 }
             }

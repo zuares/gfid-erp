@@ -9,21 +9,45 @@ class DailySalesRealtimeService
 {
     /**
      * Apply effect shipment POSTED -> daily_item_sales += qty_scanned, then recalc ADS for affected items.
-     * Idempotent via shipments.daily_sales_applied_at
+     * Idempotent via shipments.daily_sales_applied_at (locked row).
+     *
+     * IMPORTANT:
+     * - Call this INSIDE the same DB::transaction where shipment is posted.
      */
     public function applyShipmentPosted(Shipment $shipment, int $adsDays = 30, bool $onlyActive = true): void
     {
-        // idempotent guard
-        if (!empty($shipment->daily_sales_applied_at)) {
+        // lock shipment row to guarantee idempotent even under concurrent requests
+        $locked = Shipment::query()
+            ->whereKey($shipment->id)
+            ->lockForUpdate()
+            ->first();
+
+        if (!$locked) {
             return;
         }
 
-        $shipment->loadMissing(['lines', 'lines.item']);
+        // must be posted & not cancelled
+        if (($locked->status ?? null) !== 'posted') {
+            return;
+        }
 
-        $date = $shipment->date; // assume YYYY-MM-DD (atau datetime, tetap aman)
+        if (!empty($locked->cancelled_at)) {
+            return;
+        }
+
+        // idempotent guard
+        if (!empty($locked->daily_sales_applied_at)) {
+            return;
+        }
+
+        $locked->loadMissing(['lines']);
+
+        // normalize to DATE only (safe if date is datetime)
+        $shipDate = DB::selectOne("SELECT DATE(?) AS d", [$locked->date])->d;
+
+        // aggregate qty per item
         $itemQty = [];
-
-        foreach ($shipment->lines as $line) {
+        foreach ($locked->lines as $line) {
             $qty = (int) ($line->qty_scanned ?? 0);
             if ($qty <= 0) {
                 continue;
@@ -33,20 +57,29 @@ class DailySalesRealtimeService
             $itemQty[$itemId] = ($itemQty[$itemId] ?? 0) + $qty;
         }
 
+        // mark applied even if empty (anti loop)
         if (empty($itemQty)) {
-            // tetap tandai applied supaya gak muter terus
-            $shipment->daily_sales_applied_at = now();
-            $shipment->save();
+            $locked->daily_sales_applied_at = now();
+            $locked->save();
             return;
         }
 
-        // 1) upsert-add ke daily_item_sales (SQLite friendly: select then update/insert)
+        $itemIds = array_keys($itemQty);
+
+        // fetch hpp in 1 query
+        $hppMap = DB::table('items')
+            ->whereIn('id', $itemIds)
+            ->pluck('hpp', 'id'); // [id => hpp]
+
+        $now = now();
+
+        // increment / insert daily_item_sales
         foreach ($itemQty as $itemId => $deltaQty) {
-            // nilai value_sold pakai HPP sekarang (lebih simple); kalau mau akurat historis, simpan unit cost di line saat posting
-            $hpp = (float) (DB::table('items')->where('id', $itemId)->value('hpp') ?? 0);
+            $hpp = (float) ($hppMap[$itemId] ?? 0);
+            $deltaVal = (float) $deltaQty * $hpp;
 
             $row = DB::table('daily_item_sales')
-                ->whereDate('date', $date)
+                ->whereDate('date', $shipDate)
                 ->where('item_id', $itemId)
                 ->first();
 
@@ -54,52 +87,59 @@ class DailySalesRealtimeService
                 DB::table('daily_item_sales')
                     ->where('id', $row->id)
                     ->update([
-                        'qty_sold' => (float) $row->qty_sold + $deltaQty,
-                        'value_sold' => (float) $row->value_sold + ($deltaQty * $hpp),
-                        'updated_at' => now(),
+                        'qty_sold' => (float) $row->qty_sold + (float) $deltaQty,
+                        'value_sold' => (float) $row->value_sold + $deltaVal,
+                        'updated_at' => $now,
                     ]);
             } else {
                 DB::table('daily_item_sales')->insert([
-                    'date' => $date,
+                    'date' => $shipDate, // YYYY-MM-DD
                     'item_id' => $itemId,
                     'qty_sold' => (float) $deltaQty,
-                    'value_sold' => (float) ($deltaQty * $hpp),
-                    'created_at' => now(),
-                    'updated_at' => now(),
+                    'value_sold' => $deltaVal,
+                    'created_at' => $now,
+                    'updated_at' => $now,
                 ]);
             }
         }
 
-        // 2) tandai applied
-        $shipment->daily_sales_applied_at = now();
-        $shipment->save();
+        // flag applied
+        $locked->daily_sales_applied_at = $now;
+        $locked->save();
 
-        // 3) recalc ADS hanya untuk item yang kena
-        $this->recalcAdsForItemIds(array_keys($itemQty), $adsDays, $onlyActive);
+        // recalc ADS only for affected items
+        $this->recalcAdsForItemIds($itemIds, $adsDays, $onlyActive);
     }
 
     /**
      * Reverse effect when shipment cancelled -> daily_item_sales -= qty_scanned, then recalc ADS.
-     * Idempotent via shipments.daily_sales_reversed_at
+     * Idempotent via shipments.daily_sales_reversed_at (locked row).
+     *
+     * IMPORTANT:
+     * - Call this INSIDE the same DB::transaction where shipment is cancelled.
      */
-    public function reverseShipmentCancelled(Shipment $shipment, int $adsDays = 30, bool $onlyActive = true): void
+    public function reverseShipmentCancelled(Shipment $locked, int $adsDays = 30, bool $onlyActive = true): void
     {
-        // kalau belum pernah applied, ngapain reverse
-        if (empty($shipment->daily_sales_applied_at)) {
+        // controller sudah lockForUpdate, jadi jangan lock lagi di sini
+
+        if (empty($locked->cancelled_at)) {
             return;
         }
 
-        // idempotent guard
-        if (!empty($shipment->daily_sales_reversed_at)) {
+        if (empty($locked->daily_sales_applied_at)) {
             return;
         }
 
-        $shipment->loadMissing(['lines']);
+        if (!empty($locked->daily_sales_reversed_at)) {
+            return;
+        }
 
-        $date = $shipment->date;
+        $locked->loadMissing(['lines']);
+
+        $shipDate = date('Y-m-d', strtotime((string) $locked->date));
+
         $itemQty = [];
-
-        foreach ($shipment->lines as $line) {
+        foreach ($locked->lines as $line) {
             $qty = (int) ($line->qty_scanned ?? 0);
             if ($qty <= 0) {
                 continue;
@@ -109,17 +149,25 @@ class DailySalesRealtimeService
             $itemQty[$itemId] = ($itemQty[$itemId] ?? 0) + $qty;
         }
 
-        if (empty($itemQty)) {
-            $shipment->daily_sales_reversed_at = now();
-            $shipment->save();
+        $now = now();
+
+        if (!$itemQty) {
+            $locked->daily_sales_reversed_at = $now;
+            $locked->daily_sales_applied_at = null; // recommended
+            $locked->save();
             return;
         }
 
+        $itemIds = array_keys($itemQty);
+
+        $hppMap = DB::table('items')->whereIn('id', $itemIds)->pluck('hpp', 'id');
+
         foreach ($itemQty as $itemId => $deltaQty) {
-            $hpp = (float) (DB::table('items')->where('id', $itemId)->value('hpp') ?? 0);
+            $hpp = (float) ($hppMap[$itemId] ?? 0);
+            $deltaVal = (float) $deltaQty * $hpp;
 
             $row = DB::table('daily_item_sales')
-                ->whereDate('date', $date)
+                ->where('date', $shipDate)
                 ->where('item_id', $itemId)
                 ->first();
 
@@ -127,37 +175,43 @@ class DailySalesRealtimeService
                 continue;
             }
 
-            $newQty = max(0, (float) $row->qty_sold - $deltaQty);
-            $newVal = max(0, (float) $row->value_sold - ($deltaQty * $hpp));
+            $newQty = (float) $row->qty_sold - (float) $deltaQty;
+            $newVal = (float) $row->value_sold - (float) $deltaVal;
 
-            if ($newQty <= 0) {
+            if ($newQty <= 0.000001) {
                 DB::table('daily_item_sales')->where('id', $row->id)->delete();
             } else {
                 DB::table('daily_item_sales')->where('id', $row->id)->update([
-                    'qty_sold' => $newQty,
-                    'value_sold' => $newVal,
-                    'updated_at' => now(),
+                    'qty_sold' => max(0, $newQty),
+                    'value_sold' => max(0, $newVal),
+                    'updated_at' => $now,
                 ]);
             }
         }
 
-        $shipment->daily_sales_reversed_at = now();
-        $shipment->save();
+        $locked->daily_sales_reversed_at = $now;
+        $locked->daily_sales_applied_at = null; // recommended
+        $locked->save();
 
-        $this->recalcAdsForItemIds(array_keys($itemQty), $adsDays, $onlyActive);
+        $this->recalcAdsForItemIds($itemIds, $adsDays, $onlyActive);
     }
 
     /**
      * Recalc ADS for selected items only (fast).
+     * ADS = SUM(qty_sold last N days) / N
      */
     public function recalcAdsForItemIds(array $itemIds, int $days = 30, bool $onlyActive = true): void
     {
         $days = max(1, (int) $days);
+        $itemIds = array_values(array_unique(array_map('intval', $itemIds)));
+        if (empty($itemIds)) {
+            return;
+        }
 
-        // cutoff sqlite
         $cutoff = DB::selectOne("SELECT date('now','-{$days} day') AS d")->d;
+        $now = now();
 
-        // reset to 0 for affected items first
+        // reset ADS to 0 for affected items (optional but keeps consistent)
         $reset = DB::table('items')->whereIn('id', $itemIds);
         if ($onlyActive) {
             $reset->where('active', 1);
@@ -166,13 +220,13 @@ class DailySalesRealtimeService
         $reset->update([
             'avg_daily_sales' => 0,
             'avg_daily_sales_window' => $days,
-            'avg_daily_sales_updated_at' => now(),
+            'avg_daily_sales_updated_at' => $now,
         ]);
 
-        // aggregate qty_sum for affected items
+        // aggregate
         $agg = DB::table('daily_item_sales')
-            ->selectRaw('item_id, SUM(qty_sold) as qty_sum')
-            ->where('date', '>=', $cutoff)
+            ->selectRaw('item_id, COALESCE(SUM(qty_sold),0) as qty_sum')
+            ->whereDate('date', '>=', $cutoff)
             ->whereIn('item_id', $itemIds)
             ->groupBy('item_id')
             ->get();
@@ -188,7 +242,7 @@ class DailySalesRealtimeService
             $q->update([
                 'avg_daily_sales' => $ads,
                 'avg_daily_sales_window' => $days,
-                'avg_daily_sales_updated_at' => now(),
+                'avg_daily_sales_updated_at' => $now,
             ]);
         }
     }
