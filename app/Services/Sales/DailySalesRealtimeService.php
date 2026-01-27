@@ -17,14 +17,6 @@ class DailySalesRealtimeService
      */
     public function applyShipmentPosted(Shipment $shipment, int $adsDays = 30, bool $onlyActive = true): void
     {
-
-        Log::info('[ADS-REALTIME] applyShipmentPosted', [
-            'shipment_id' => $shipment->id,
-            'code' => $shipment->code,
-            'date' => $shipment->date,
-            'time' => now()->toDateTimeString(),
-        ]);
-
         // lock shipment row to guarantee idempotent even under concurrent requests
         $locked = Shipment::query()
             ->whereKey($shipment->id)
@@ -35,8 +27,8 @@ class DailySalesRealtimeService
             return;
         }
 
-        // must be posted & not cancelled
-        if (($locked->status ?? null) !== 'posted') {
+        // must be posted & posted_at present & not cancelled
+        if (($locked->status ?? null) !== 'posted' || empty($locked->posted_at)) {
             return;
         }
 
@@ -48,6 +40,14 @@ class DailySalesRealtimeService
         if (!empty($locked->daily_sales_applied_at)) {
             return;
         }
+
+        Log::info('[ADS-REALTIME] applyShipmentPosted', [
+            'shipment_id' => $locked->id,
+            'code' => $locked->code,
+            'date' => $locked->date,
+            'posted_at' => $locked->posted_at,
+            'time' => now()->toDateTimeString(),
+        ]);
 
         $locked->loadMissing(['lines']);
 
@@ -66,9 +66,11 @@ class DailySalesRealtimeService
             $itemQty[$itemId] = ($itemQty[$itemId] ?? 0) + $qty;
         }
 
+        $now = now();
+
         // mark applied even if empty (anti loop)
         if (empty($itemQty)) {
-            $locked->daily_sales_applied_at = now();
+            $locked->daily_sales_applied_at = $now;
             $locked->save();
             return;
         }
@@ -80,8 +82,6 @@ class DailySalesRealtimeService
             ->whereIn('id', $itemIds)
             ->pluck('hpp', 'id'); // [id => hpp]
 
-        $now = now();
-
         // increment / insert daily_item_sales
         foreach ($itemQty as $itemId => $deltaQty) {
             $hpp = (float) ($hppMap[$itemId] ?? 0);
@@ -89,7 +89,7 @@ class DailySalesRealtimeService
 
             $row = DB::table('daily_item_sales')
                 ->whereDate('date', $shipDate)
-                ->where('item_id', $itemId)
+                ->where('item_id', (int) $itemId)
                 ->first();
 
             if ($row) {
@@ -103,16 +103,16 @@ class DailySalesRealtimeService
             } else {
                 DB::table('daily_item_sales')->insert([
                     'date' => $shipDate, // YYYY-MM-DD
-                    'item_id' => $itemId,
+                    'item_id' => (int) $itemId,
                     'qty_sold' => (float) $deltaQty,
-                    'value_sold' => $deltaVal,
+                    'value_sold' => (float) $deltaVal,
                     'created_at' => $now,
                     'updated_at' => $now,
                 ]);
             }
         }
 
-        // flag applied
+        // flag applied (idempotent mark)
         $locked->daily_sales_applied_at = $now;
         $locked->save();
 
