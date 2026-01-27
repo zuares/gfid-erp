@@ -12,3 +12,4 @@ require __DIR__ . '/web/marketplace.php';
 require __DIR__ . '/web/master.php';
 require __DIR__ . '/web/sales.php';
 require __DIR__ . '/web/accounting.php';
+require __DIR__ . '/web/shipments.php';

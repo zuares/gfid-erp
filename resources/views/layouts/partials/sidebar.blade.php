@@ -52,7 +52,7 @@
     $hasMasterItemsIndex = $router->has('master.items.index');
     $hasMasterCustomersIndex = $router->has('master.customers.index');
     $hasMasterSuppliersIndex = $router->has('master.suppliers.index');
-    // ✅ NEW: BOM SKU
+    // ✅ BOM SKU
     $hasMasterItemBomsIndex = $router->has('master.item_boms.index');
 
     // Purchasing (owner)
@@ -71,6 +71,12 @@
     $hasSalesShipmentsCreate = $router->has('sales.shipments.create');
     $hasSalesShipmentReturnsCreate = $router->has('sales.shipment_returns.create');
     $hasSalesShipmentsReport = $router->has('sales.shipments.report');
+
+    // ✅ Sales reports routes (guard)
+    $hasSalesReportPerformance = $router->has('sales.reports.sales_performance.index');
+    $hasSalesReportItemProfit = $router->has('sales.reports.item_profit');
+    $hasSalesReportChannelProfit = $router->has('sales.reports.channel_profit');
+    $hasSalesReportShipmentAnalytics = $router->has('sales.reports.shipment_analytics');
 
     // Production (operating/owner)
     $hasProdCuttingJobsIndex = $router->has('production.cutting_jobs.index');
@@ -114,7 +120,10 @@
     $salesInvoiceOpen = request()->routeIs('sales.invoices.*');
     $salesShipmentOpen = request()->routeIs('sales.shipments.*');
     $salesShipmentReturnOpen = request()->routeIs('sales.shipment_returns.*');
+
+    // ✅ reports open when any sales report OR shipments.report
     $salesReportOpen = request()->routeIs('sales.reports.*') || request()->routeIs('sales.shipments.report');
+
     $salesOpen = $salesInvoiceOpen || $salesShipmentOpen || $salesShipmentReturnOpen || $salesReportOpen;
 
     $invStocksOpen = request()->routeIs('inventory.stocks.*');
@@ -221,24 +230,11 @@
         }
     }
 
-    .sidebar-modern {
-        display: none;
-    }
+    .sidebar-modern { display: none; }
+    @media (min-width: 992px) { .sidebar-modern { display: flex; } }
 
-    @media (min-width: 992px) {
-        .sidebar-modern {
-            display: flex;
-        }
-    }
-
-    .sidebar-modern::-webkit-scrollbar {
-        width: 6px;
-    }
-
-    .sidebar-modern::-webkit-scrollbar-thumb {
-        background: rgba(148, 163, 184, .35);
-        border-radius: 20px;
-    }
+    .sidebar-modern::-webkit-scrollbar { width: 6px; }
+    .sidebar-modern::-webkit-scrollbar-thumb { background: rgba(148, 163, 184, .35); border-radius: 20px; }
 
     .sidebar-brand {
         font-size: 1.3rem;
@@ -248,11 +244,7 @@
         letter-spacing: -.03em;
     }
 
-    .sidebar-nav {
-        list-style: none;
-        margin: 0;
-        padding: 0;
-    }
+    .sidebar-nav { list-style: none; margin: 0; padding: 0; }
 
     .sidebar-link {
         display: flex;
@@ -267,11 +259,7 @@
         position: relative;
     }
 
-    .sidebar-link .icon {
-        width: 22px;
-        font-size: 1.05rem;
-        text-align: center;
-    }
+    .sidebar-link .icon { width: 22px; font-size: 1.05rem; text-align: center; }
 
     .sidebar-link:hover {
         background: color-mix(in srgb, var(--accent-soft) 18%, var(--card) 82%);
@@ -286,35 +274,11 @@
         color: var(--accent);
     }
 
-    .sidebar-toggle {
-        cursor: pointer;
-        border: 0;
-        width: 100%;
-        background: transparent;
-        text-align: left;
-    }
-
-    .sidebar-toggle .chevron {
-        margin-left: auto;
-        font-size: .8rem;
-        opacity: .8;
-        transition: transform .18s ease;
-    }
-
-    .sidebar-toggle[aria-expanded="true"] .chevron {
-        transform: rotate(90deg);
-    }
-
-    .sidebar-toggle.is-open {
-        background: transparent;
-        box-shadow: none;
-        color: var(--accent);
-        font-weight: 600;
-    }
-
-    .sidebar-toggle.is-open .icon {
-        color: var(--accent);
-    }
+    .sidebar-toggle { cursor: pointer; border: 0; width: 100%; background: transparent; text-align: left; }
+    .sidebar-toggle .chevron { margin-left: auto; font-size: .8rem; opacity: .8; transition: transform .18s ease; }
+    .sidebar-toggle[aria-expanded="true"] .chevron { transform: rotate(90deg); }
+    .sidebar-toggle.is-open { background: transparent; box-shadow: none; color: var(--accent); font-weight: 600; }
+    .sidebar-toggle.is-open .icon { color: var(--accent); }
 
     .sidebar-link-sub {
         position: relative;
@@ -330,11 +294,7 @@
         transition: background .18s ease, box-shadow .18s ease, transform .12s ease, color .18s ease;
     }
 
-    .sidebar-link-sub .icon {
-        width: 18px;
-        font-size: .9rem;
-        text-align: center;
-    }
+    .sidebar-link-sub .icon { width: 18px; font-size: .9rem; text-align: center; }
 
     .sidebar-link-sub:hover {
         background: color-mix(in srgb, var(--accent-soft) 16%, var(--card) 84%);
@@ -369,9 +329,7 @@
         font-size: .7rem;
     }
 
-    .simple-group {
-        margin-top: .4rem;
-    }
+    .simple-group { margin-top: .4rem; }
 </style>
 
 <aside class="sidebar-modern flex-column">
@@ -557,7 +515,7 @@
                         </x-sidebar.sub-link>
                     @endif
 
-                    {{-- ✅ NEW: BOM SKU --}}
+                    {{-- ✅ BOM SKU --}}
                     @if ($hasMasterItemBomsIndex)
                         <x-sidebar.sub-link href="{{ route('master.item_boms.index') }}" icon="🧾"
                             :active="request()->routeIs('master.item_boms.*')">
@@ -725,10 +683,41 @@
                         Sales Reports
                     </div>
 
+                    {{-- ✅ NEW: Sales Performance --}}
+                    @if ($hasSalesReportPerformance)
+                        <x-sidebar.sub-link href="{{ route('sales.reports.sales_performance.index') }}" icon="📈"
+                            :active="request()->routeIs('sales.reports.sales_performance.*')">
+                            Sales Performance
+                        </x-sidebar.sub-link>
+                    @endif
+
+                    {{-- existing shipment report --}}
                     @if ($hasSalesShipmentsReport)
                         <x-sidebar.sub-link href="{{ route('sales.shipments.report') }}" icon="📊"
                             :active="request()->routeIs('sales.shipments.report')">
                             Laporan Pengiriman
+                        </x-sidebar.sub-link>
+                    @endif
+
+                    {{-- optional: reports lain (muncul otomatis kalau route ada) --}}
+                    @if ($hasSalesReportItemProfit)
+                        <x-sidebar.sub-link href="{{ route('sales.reports.item_profit') }}" icon="💰"
+                            :active="request()->routeIs('sales.reports.item_profit')">
+                            Profit per Item
+                        </x-sidebar.sub-link>
+                    @endif
+
+                    @if ($hasSalesReportChannelProfit)
+                        <x-sidebar.sub-link href="{{ route('sales.reports.channel_profit') }}" icon="🏷️"
+                            :active="request()->routeIs('sales.reports.channel_profit')">
+                            Profit per Channel
+                        </x-sidebar.sub-link>
+                    @endif
+
+                    @if ($hasSalesReportShipmentAnalytics)
+                        <x-sidebar.sub-link href="{{ route('sales.reports.shipment_analytics') }}" icon="🧠"
+                            :active="request()->routeIs('sales.reports.shipment_analytics')">
+                            Shipment Analytics
                         </x-sidebar.sub-link>
                     @endif
                 </div>
@@ -840,8 +829,7 @@
                 </div>
             </li>
 
-            {{-- STOCK REQUESTS (OWNER) --}}
-            {{-- ✅ UPDATE: tampil juga untuk operating, jadi pakai $canViewRts --}}
+            {{-- STOCK REQUESTS --}}
             @if ($canViewRts && ($hasRtsStockReqIndex || $hasRtsDirectReceiveIndex))
                 <x-sidebar.label text="Stock Requests" />
                 <li class="mb-1">
@@ -865,7 +853,6 @@
                             </x-sidebar.sub-link>
                         @endif
 
-                        {{-- ✅ RTS Dadakan: tetap owner/admin only --}}
                         @if ($canManageRts && $hasRtsDirectReceiveIndex)
                             <x-sidebar.sub-link href="{{ route('rts.direct-receives.index') }}" icon="⚡"
                                 :active="request()->routeIs('rts.direct-receives.*')">
