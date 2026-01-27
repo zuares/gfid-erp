@@ -10,6 +10,7 @@ use App\Models\ShipmentLine;
 use App\Models\Store;
 use App\Models\Warehouse;
 use App\Services\Inventory\InventoryService;
+use App\Services\Sales\DailySalesRealtimeService;
 use Illuminate\Http\RedirectResponse;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Auth;
@@ -19,7 +20,8 @@ use PhpOffice\PhpSpreadsheet\IOFactory;
 class ShipmentController extends Controller
 {
     public function __construct(
-        protected InventoryService $inventory
+        protected InventoryService $inventory,
+        protected DailySalesRealtimeService $dailySales
     ) {}
 
     public function index(Request $request)
@@ -442,6 +444,8 @@ class ShipmentController extends Controller
                 $locked->total_qty = $totalQty;
 
                 $locked->save();
+                $this->dailySales->applyShipmentPosted($locked, adsDays: 30, onlyActive: true);
+
             });
         } catch (\Throwable $e) {
             return redirect()
@@ -527,6 +531,8 @@ class ShipmentController extends Controller
                 $locked->status = 'posted';
                 $locked->total_qty = $totalQty;
                 $locked->save();
+                $this->dailySales->applyShipmentPosted($locked, adsDays: 30, onlyActive: true);
+
             });
         } catch (\Throwable $e) {
             return redirect()
@@ -1353,6 +1359,8 @@ class ShipmentController extends Controller
                 $locked->cancelled_by = auth()->id();
                 $locked->cancel_reason = $validated['cancel_reason'];
                 $locked->save();
+                $this->dailySales->reverseShipmentCancelled($locked, adsDays: 30, onlyActive: true);
+
             });
 
         } catch (\Throwable $e) {

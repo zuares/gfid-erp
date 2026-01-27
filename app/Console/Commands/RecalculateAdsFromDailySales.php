@@ -19,33 +19,38 @@ class RecalculateAdsFromDailySales extends Command
         $days = max(1, (int) $this->option('days'));
         $onlyActive = ((int) $this->option('only-active')) === 1;
 
-        // SQLite cutoff date
+        // SQLite cutoff date (YYYY-MM-DD)
         $cutoff = DB::selectOne("SELECT date('now','-{$days} day') AS d")->d;
 
-        $this->info("Recalculating ADS from daily_item_sales for last {$days} days (>= {$cutoff})");
+        $this->info("Recalculating ADS from daily_item_sales for last {$days} days (>= {$cutoff})"
+            . ($onlyActive ? " [only active]" : " [all items]"));
 
         DB::transaction(function () use ($days, $cutoff, $onlyActive) {
 
-            // update window meta
-            DB::table('items')->update([
+            // 1) update window meta (respect onlyActive)
+            $metaQ = DB::table('items');
+            if ($onlyActive) {
+                $metaQ->where('active', 1);
+            }
+            $metaQ->update([
                 'avg_daily_sales_window' => $days,
             ]);
 
-            // reset to 0 first (only active optional)
-            $resetQuery = DB::table('items');
+            // 2) reset ADS to 0 first (for affected scope)
+            $resetQ = DB::table('items');
             if ($onlyActive) {
-                $resetQuery->where('active', 1);
+                $resetQ->where('active', 1);
             }
 
-            $resetQuery->update([
+            $resetQ->update([
                 'avg_daily_sales' => 0,
                 'avg_daily_sales_updated_at' => now(),
             ]);
 
-            // aggregate per item from daily_item_sales
+            // 3) aggregate per item from daily_item_sales within cutoff
             $agg = DB::table('daily_item_sales')
                 ->selectRaw('item_id, SUM(qty_sold) as qty_sum')
-                ->where('date', '>=', $cutoff)
+                ->whereDate('date', '>=', $cutoff)
                 ->groupBy('item_id')
                 ->get();
 
@@ -53,27 +58,30 @@ class RecalculateAdsFromDailySales extends Command
                 return;
             }
 
-            // update per item in chunks (SQLite friendly)
-            $chunks = $agg->chunk(800);
-
-            foreach ($chunks as $chunk) {
+            // 4) update per item in chunks (SQLite friendly)
+            foreach ($agg->chunk(800) as $chunk) {
                 foreach ($chunk as $r) {
                     $ads = ((float) ($r->qty_sum ?? 0)) / $days;
 
-                    DB::table('items')
-                        ->where('id', (int) $r->item_id)
-                        ->when($onlyActive, fn($q) => $q->where('active', 1))
-                        ->update([
-                            'avg_daily_sales' => $ads,
-                            'avg_daily_sales_window' => $days,
-                            'avg_daily_sales_updated_at' => now(),
-                        ]);
+                    $q = DB::table('items')
+                        ->where('id', (int) $r->item_id);
+
+                    if ($onlyActive) {
+                        $q->where('active', 1);
+                    }
+
+                    $q->update([
+                        'avg_daily_sales' => $ads,
+                        'avg_daily_sales_window' => $days,
+                        'avg_daily_sales_updated_at' => now(),
+                    ]);
                 }
             }
         });
 
         $top = DB::table('items')
             ->select('code', 'avg_daily_sales', 'avg_daily_sales_window')
+            ->when($onlyActive, fn($q) => $q->where('active', 1))
             ->orderByDesc('avg_daily_sales')
             ->limit(5)
             ->get();
