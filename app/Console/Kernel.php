@@ -46,16 +46,19 @@ namespace App\Console;
 
 use Illuminate\Console\Scheduling\Schedule;
 use Illuminate\Foundation\Console\Kernel as ConsoleKernel;
-use Illuminate\Support\Facades\Log;
 
 class Kernel extends ConsoleKernel
 {
     protected function schedule(Schedule $schedule): void
     {
-        // 🔍 TEST CRON – HAPUS SETELAH BERHASIL
         $schedule->call(function () {
-            Log::info('Hostinger cron OK @ ' . now());
+            file_put_contents(
+                storage_path('logs/cron-test.log'),
+                "CRON OK @ " . now() . PHP_EOL,
+                FILE_APPEND
+            );
         })->everyMinute();
+
     }
 
     protected function commands(): void
