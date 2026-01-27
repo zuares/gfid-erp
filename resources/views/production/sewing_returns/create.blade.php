@@ -278,7 +278,6 @@
         }
 
         @media(max-width:767.98px) {
-
             /* FAB tetap fixed, tapi naik kalau keyboard muncul */
             .fab-wrap {
                 transition: transform .15s ease, opacity .15s ease;
@@ -300,6 +299,10 @@
                 box-shadow: none;
             }
         }
+
+        /* === Fix modal "ketutup" di Android / z-index clash === */
+        .modal { z-index: 3000 !important; }
+        .modal-backdrop { z-index: 2990 !important; }
 
         .top-actions {
             display: flex;
@@ -461,21 +464,17 @@
         if ($isAllMode && $lines->isNotEmpty()) {
             $groupsAll = $lines
                 ->map(function ($l) {
-                    $itemCode = strtoupper(
-                        optional($l->finishedItem)->code ?? 'ITEM-' . (int) ($l->finished_item_id ?? 0),
-                    );
+                    $itemCode = strtoupper(optional($l->finishedItem)->code ?? 'ITEM-' . (int) ($l->finished_item_id ?? 0));
 
                     $pickup = $l->sewingPickup;
                     $opCode = $pickup?->operator?->code ?? null;
                     $opName = $pickup?->operator?->name ?? null;
                     $opId = (int) ($pickup?->operator_id ?? 0);
                     $opLabel = trim(($opCode ? $opCode . ' — ' : '') . ($opName ?? ''));
-                    if ($opLabel === '' && $opId > 0) {
-                        $opLabel = 'OP-' . $opId;
-                    }
+                    if ($opLabel === '' && $opId > 0) $opLabel = 'OP-' . $opId;
 
                     $remaining = (float) ($l->remaining_qty ?? 0);
-                    $wip = (float) ($l->wip_stock ?? 0); // per item (bukan per op)
+                    $wip = (float) ($l->wip_stock ?? 0);
 
                     return [
                         'item_code' => $itemCode,
@@ -506,17 +505,12 @@
                         ->sortBy('label')
                         ->values();
 
-                    $opCount = (int) $ops->count();
-                    $remainingSum = (float) $rows->sum('remaining');
-                    $wipMax = (float) $rows->max('wip'); // aman: wip item sama
-                    $pickupDates = $rows->pluck('pickup_date')->filter()->unique()->sortDesc()->values();
-
                     return [
                         'item_code' => $itemCode,
-                        'op_count' => $opCount,
-                        'remaining_sum' => $remainingSum,
-                        'wip' => $wipMax,
-                        'pickup_dates' => $pickupDates,
+                        'op_count' => (int) $ops->count(),
+                        'remaining_sum' => (float) $rows->sum('remaining'),
+                        'wip' => (float) $rows->max('wip'),
+                        'pickup_dates' => $rows->pluck('pickup_date')->filter()->unique()->sortDesc()->values(),
                         'ops' => $ops,
                     ];
                 })
@@ -526,11 +520,7 @@
 
         $summaryItems = $groupsAll->count();
         $summaryRemaining = (float) $groupsAll->sum('remaining_sum');
-        $summaryOps = $groupsAll
-            ->flatMap(fn($g) => collect($g['ops'])->pluck('operator_id'))
-            ->filter(fn($id) => (int) $id > 0)
-            ->unique()
-            ->count();
+        $summaryOps = $groupsAll->flatMap(fn($g) => collect($g['ops'])->pluck('operator_id'))->filter(fn($id) => (int) $id > 0)->unique()->count();
     @endphp
 
     <div class="page-wrap">
@@ -555,9 +545,12 @@
                     <div>
                         <div class="h-title">Sewing Return</div>
                     </div>
-                    <a href="{{ route('production.sewing.returns.index') }}" class="btn btn-sm btn-outline-success"
-                        style="border-radius:999px;">
-                        Riwayat
+
+                    {{-- header action: arahkan ke halaman Sewing Pickup --}}
+                    <a href="{{ route('production.sewing.pickups.create') }}"
+                       class="btn btn-sm btn-outline-success"
+                       style="border-radius:999px;">
+                        Sewing Pickup
                     </a>
                 </div>
             </div>
@@ -669,8 +662,7 @@
                                         <div class="ttl">Summary (Belum Setor)</div>
                                     </div>
                                     <div class="text-end">
-                                        <div class="sub">Update: <span class="mono">{{ now()->format('H:i') }}</span>
-                                        </div>
+                                        <div class="sub">Update: <span class="mono">{{ now()->format('H:i') }}</span></div>
                                     </div>
                                 </div>
                                 <div class="sum-pillrow">
@@ -710,23 +702,17 @@
                                             <button class="accordion-button collapsed acc-op-btn" type="button"
                                                 data-bs-toggle="collapse" data-bs-target="#{{ $collapseId }}"
                                                 aria-expanded="false" aria-controls="{{ $collapseId }}">
-                                                <div
-                                                    class="d-flex w-100 justify-content-between align-items-center gap-2 flex-wrap">
+                                                <div class="d-flex w-100 justify-content-between align-items-center gap-2 flex-wrap">
                                                     <div class="d-flex align-items-center gap-2 min-w-0">
-                                                        <span class="acc-pill"><span
-                                                                class="mono">{{ $no }}</span></span>
-                                                        <div class="mono text-truncate"
-                                                            style="font-weight:900; max-width: 62vw;">
+                                                        <span class="acc-pill"><span class="mono">{{ $no }}</span></span>
+                                                        <div class="mono text-truncate" style="font-weight:900; max-width: 62vw;">
                                                             {{ $itemCode }}
                                                         </div>
                                                     </div>
                                                     <div class="d-flex align-items-center gap-2">
-                                                        <span class="acc-pill">OP <span
-                                                                class="mono">{{ number_format($opCount, 0, ',', '.') }}</span></span>
-                                                        <span class="acc-pill">BELUM <span
-                                                                class="mono">{{ number_format($remainingSum, 2, ',', '.') }}</span></span>
-                                                        <span class="acc-pill">WIP <span
-                                                                class="mono">{{ number_format($wip, 2, ',', '.') }}</span></span>
+                                                        <span class="acc-pill">OP <span class="mono">{{ number_format($opCount, 0, ',', '.') }}</span></span>
+                                                        <span class="acc-pill">BELUM <span class="mono">{{ number_format($remainingSum, 2, ',', '.') }}</span></span>
+                                                        <span class="acc-pill">WIP <span class="mono">{{ number_format($wip, 2, ',', '.') }}</span></span>
                                                     </div>
                                                 </div>
                                             </button>
@@ -736,8 +722,7 @@
                                             aria-labelledby="{{ $headingId }}" data-bs-parent="#all-items-accordion">
                                             <div class="accordion-body" style="padding:.7rem .85rem;">
                                                 @if ($ops->isEmpty())
-                                                    <div class="text-muted text-center py-2">Tidak ada detail operator.
-                                                    </div>
+                                                    <div class="text-muted text-center py-2">Tidak ada detail operator.</div>
                                                 @else
                                                     <div class="table-responsive">
                                                         <table class="table table-sm align-middle mb-0">
@@ -756,12 +741,10 @@
                                                                         <td class="mono" style="font-weight:900;">
                                                                             {{ $op['label'] ?: 'OP-' . $op['operator_id'] }}
                                                                         </td>
-                                                                        <td class="text-end mono"
-                                                                            style="font-weight:900;">
+                                                                        <td class="text-end mono" style="font-weight:900;">
                                                                             {{ number_format((float) $op['remaining_sum'], 2, ',', '.') }}
                                                                         </td>
-                                                                        <td class="text-end mono"
-                                                                            style="font-weight:900;">
+                                                                        <td class="text-end mono" style="font-weight:900;">
                                                                             {{ number_format((int) $op['lines_count'], 0, ',', '.') }}
                                                                         </td>
                                                                     </tr>
@@ -770,8 +753,7 @@
                                                         </table>
                                                     </div>
                                                     <div class="mt-2 acc-sub">
-                                                        Total item: <span
-                                                            class="mono">{{ number_format($remainingSum, 2, ',', '.') }}</span>
+                                                        Total item: <span class="mono">{{ number_format($remainingSum, 2, ',', '.') }}</span>
                                                     </div>
                                                 @endif
                                             </div>
@@ -794,9 +776,7 @@
 
                                     $code = strtoupper($item?->code ?? 'ITEM-' . $line->finished_item_id);
                                     $pickupDateRaw = $pickup?->date ? Carbon::parse($pickup->date)->toDateString() : '';
-                                    $pickupDateText = $pickup?->date
-                                        ? Carbon::parse($pickup->date)->locale('id')->translatedFormat('D, d M')
-                                        : '-';
+                                    $pickupDateText = $pickup?->date ? Carbon::parse($pickup->date)->locale('id')->translatedFormat('D, d M') : '-';
 
                                     $opCode = $pickup?->operator?->code ?? null;
                                     $opName = $pickup?->operator?->name ?? null;
@@ -812,12 +792,15 @@
                                     $showNotes = (float) ($rjVal ?: 0) > 0 || trim((string) $notes) !== '';
                                 @endphp
 
-                                <div class="cardx mono fin-item" data-code="{{ $code }}"
-                                    data-item="{{ $code }}" data-pickupdate="{{ $pickupDateRaw }}"
-                                    data-remaining="{{ $remaining }}" data-wip="{{ $wip }}">
+                                <div class="cardx mono fin-item"
+                                    data-code="{{ $code }}"
+                                    data-item="{{ $code }}"
+                                    data-pickupdate="{{ $pickupDateRaw }}"
+                                    data-remaining="{{ $remaining }}"
+                                    data-wip="{{ $wip }}">
                                     <div class="cardx-h">
                                         <div class="cardx-left">
-                                            <input type="checkbox" class="chk row-check">
+                                            <input type="checkbox" class="chk row-check" aria-label="Pilih baris">
                                             <div>
                                                 <div class="code">{{ $code }}</div>
                                                 <div class="meta-inline">
@@ -825,8 +808,7 @@
                                                     <span>{{ $pickupDateText }}</span>
                                                     @if ($opLabel !== '')
                                                         <span class="dot">•</span>
-                                                        <span class="truncate" title="{{ $opLabel }}">OP:
-                                                            {{ $opLabel }}</span>
+                                                        <span class="truncate" title="{{ $opLabel }}">OP: {{ $opLabel }}</span>
                                                     @endif
                                                 </div>
                                             </div>
@@ -863,8 +845,7 @@
                                                 placeholder="Catatan reject (opsional)" value="{{ $notes }}">
                                         </div>
 
-                                        <input type="hidden" name="results[{{ $idx }}][sewing_pickup_line_id]"
-                                            value="{{ $line->id }}">
+                                        <input type="hidden" name="results[{{ $idx }}][sewing_pickup_line_id]" value="{{ $line->id }}">
                                     </div>
                                 </div>
                             @endforeach
@@ -875,80 +856,87 @@
                     <div class="fab-wrap" id="fab-wrap" style="{{ $isAllMode ? 'display:none;' : '' }}">
                         <a href="{{ route('production.sewing.returns.index') }}"
                             class="btn btn-sm btn-outline-secondary fab-back">←</a>
-                        <button type="button" class="btn btn-sm btn-success fab-save" id="btn-open-modal"
-                            disabled>Simpan</button>
-                    </div>
-
-                    {{-- MODAL CONFIRM (hanya mode input) --}}
-                    <div class="modal fade" id="confirmModal" tabindex="-1" aria-hidden="true">
-                        <div class="modal-dialog modal-dialog-centered modal-lg">
-                            <div class="modal-content" style="border-radius:16px;">
-                                <div class="modal-header">
-                                    <h5 class="modal-title">Konfirmasi Simpan</h5>
-                                    <button type="button" class="btn-close" data-bs-dismiss="modal"
-                                        aria-label="Close"></button>
-                                </div>
-
-                                <div class="modal-body">
-                                    <div class="p-3 border bg-light" style="border-radius:14px;">
-                                        <div class="d-flex justify-content-between align-items-start gap-2 flex-wrap">
-                                            <div style="font-weight:900;">Ringkasan</div>
-                                            <div class="text-muted" style="font-weight:800;font-size:.86rem;">
-                                                Baris terisi: <span class="mono" id="m-rows">0</span>
-                                            </div>
-                                        </div>
-
-                                        <div class="mt-2" style="font-size:.90rem;font-weight:800;color:var(--muted);">
-                                            Operator: <span class="mono" id="m-op">SEMUA</span><br>
-                                            Total OK: <span class="mono" id="m-ok">0,00</span>
-                                            • Total Reject: <span class="mono" id="m-rj">0,00</span>
-                                        </div>
-                                    </div>
-
-                                    <div class="mt-3">
-                                        <div class="d-flex justify-content-between align-items-center mb-2">
-                                            <div style="font-weight:900;">Detail Setor</div>
-                                            <div class="text-muted" style="font-weight:800;font-size:.86rem;">
-                                                Item: <span class="mono" id="m-items-count">0</span>
-                                            </div>
-                                        </div>
-
-                                        <div class="border" style="border-radius:14px; overflow:hidden;">
-                                            <div class="px-3 py-2"
-                                                style="background:rgba(148,163,184,.06); border-bottom:1px solid rgba(148,163,184,.18); font-size:.72rem; font-weight:900; color:var(--muted); text-transform:uppercase; letter-spacing:.10em;">
-                                                <div class="d-grid"
-                                                    style="grid-template-columns: 44px 1fr 120px 120px; gap:.5rem; align-items:center;">
-                                                    <div>No</div>
-                                                    <div>Item</div>
-                                                    <div class="text-end">OK / Setor</div>
-                                                    <div class="text-end">Reject</div>
-                                                </div>
-                                            </div>
-
-                                            <div id="m-items"
-                                                style="max-height:40vh; overflow:auto; -webkit-overflow-scrolling:touch;">
-                                                <div class="text-center text-muted py-3" id="m-empty">Tidak ada item.
-                                                </div>
-                                            </div>
-                                        </div>
-                                    </div>
-                                </div>
-
-                                <div class="modal-footer">
-                                    <button type="button" class="btn btn-sm btn-outline-secondary"
-                                        data-bs-dismiss="modal">Batal</button>
-                                    <button type="button" class="btn btn-sm btn-success"
-                                        id="btn-confirm-submit">Simpan</button>
-                                </div>
-                            </div>
-                        </div>
+                        <button type="button" class="btn btn-sm btn-success fab-save" id="btn-open-modal" disabled>
+                            Simpan
+                        </button>
                     </div>
 
                 </div>{{-- panel-b --}}
             </form>
         </div>
     </div>
+
+    {{-- =========================
+         MODAL CONFIRM
+         NOTE: DITARUH DI LUAR PANEL/FORM (lebih aman di Android)
+         ========================= --}}
+    <div class="modal fade" id="confirmModal" tabindex="-1" aria-hidden="true">
+        <div class="modal-dialog modal-dialog-centered modal-lg">
+            <div class="modal-content" style="border-radius:16px;">
+                <div class="modal-header">
+                    <h5 class="modal-title">Konfirmasi Simpan</h5>
+                    <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
+                </div>
+
+                <div class="modal-body">
+                    <div class="p-3 border bg-light" style="border-radius:14px;">
+                        <div class="d-flex justify-content-between align-items-start gap-2 flex-wrap">
+                            <div style="font-weight:900;">Ringkasan</div>
+                            <div class="text-muted" style="font-weight:800;font-size:.86rem;">
+                                Baris terisi: <span class="mono" id="m-rows">0</span>
+                            </div>
+                        </div>
+
+                        <div class="mt-2" style="font-size:.90rem;font-weight:800;color:var(--muted);">
+                            Operator: <span class="mono" id="m-op">SEMUA</span><br>
+                            Total OK: <span class="mono" id="m-ok">0,00</span>
+                            • Total Reject: <span class="mono" id="m-rj">0,00</span>
+                        </div>
+                    </div>
+
+                    <div class="mt-3">
+                        <div class="d-flex justify-content-between align-items-center mb-2">
+                            <div style="font-weight:900;">Detail Setor</div>
+                            <div class="text-muted" style="font-weight:800;font-size:.86rem;">
+                                Item: <span class="mono" id="m-items-count">0</span>
+                            </div>
+                        </div>
+
+                        <div class="border" style="border-radius:14px; overflow:hidden;">
+                            <div class="px-3 py-2"
+                                style="background:rgba(148,163,184,.06); border-bottom:1px solid rgba(148,163,184,.18); font-size:.72rem; font-weight:900; color:var(--muted); text-transform:uppercase; letter-spacing:.10em;">
+                                <div class="d-grid"
+                                    style="grid-template-columns: 44px 1fr 120px 120px; gap:.5rem; align-items:center;">
+                                    <div>No</div>
+                                    <div>Item</div>
+                                    <div class="text-end">OK / Setor</div>
+                                    <div class="text-end">Reject</div>
+                                </div>
+                            </div>
+
+                            <div id="m-items" style="max-height:40vh; overflow:auto; -webkit-overflow-scrolling:touch;">
+                                <div class="text-center text-muted py-3" id="m-empty">Tidak ada item.</div>
+                            </div>
+                        </div>
+                    </div>
+
+                    {{-- fallback notice kalau bootstrap js tidak kebaca --}}
+                    <div class="mt-3 d-none" id="modal-fallback-note">
+                        <div class="alert alert-warning mb-0">
+                            Modal tidak bisa ditampilkan karena Bootstrap JS belum ter-load (bundle). Tombol <b>Simpan</b> akan submit langsung.
+                        </div>
+                    </div>
+                </div>
+
+                <div class="modal-footer">
+                    <button type="button" class="btn btn-sm btn-outline-secondary" data-bs-dismiss="modal">Batal</button>
+                    <button type="button" class="btn btn-sm btn-success" id="btn-confirm-submit">Simpan</button>
+                </div>
+            </div>
+        </div>
+    </div>
 @endsection
+
 @push('scripts')
     <script>
         document.addEventListener('DOMContentLoaded', () => {
@@ -984,11 +972,13 @@
             const statPickedRows = document.getElementById('stat-picked-rows');
             const statTotalOk = document.getElementById('stat-total-ok');
 
+            const fallbackNote = document.getElementById('modal-fallback-note');
+
             const body = document.body;
             const $$ = (sel, root = document) => Array.from(root.querySelectorAll(sel));
-
             const isAllMode = () => !((operator?.value || '').toString().trim());
 
+            // ===== VisualViewport (kbd) =====
             (function initVV() {
                 if (!window.visualViewport) return;
                 const vv = window.visualViewport;
@@ -1038,10 +1028,7 @@
             function clampCard(card, changed) {
                 const rem = parseFloat(card.dataset.remaining || '0') || 0;
                 const wip = parseFloat(card.dataset.wip || '0') || 0;
-                const {
-                    ok,
-                    rj
-                } = getEls(card);
+                const { ok, rj } = getEls(card);
 
                 let a = parseFloat(ok?.value || '0');
                 if (!Number.isFinite(a) || a < 0) a = 0;
@@ -1065,10 +1052,7 @@
             }
 
             function syncNotes(card) {
-                const {
-                    rj,
-                    notesWrap
-                } = getEls(card);
+                const { rj, notesWrap } = getEls(card);
                 if (!notesWrap) return;
                 const v = parseFloat(rj?.value || '0') || 0;
                 if (v > 0) notesWrap.classList.add('is-show');
@@ -1076,11 +1060,7 @@
             }
 
             function syncCheck(card) {
-                const {
-                    ok,
-                    rj,
-                    cb
-                } = getEls(card);
+                const { ok, rj, cb } = getEls(card);
                 const a = parseFloat(ok?.value || '0') || 0;
                 const b = parseFloat(rj?.value || '0') || 0;
                 if (cb) cb.checked = ((a + b) > 0);
@@ -1091,10 +1071,7 @@
                 const wip = parseFloat(card.dataset.wip || '0') || 0;
                 const fill = Math.max(0, Math.min(rem, wip));
 
-                const {
-                    ok,
-                    rj
-                } = getEls(card);
+                const { ok, rj } = getEls(card);
                 if (ok) ok.value = (fill > 0) ? String(fill) : '';
                 if (rj) rj.value = '';
                 clampCard(card, 'ok');
@@ -1105,15 +1082,12 @@
             function setModeUI() {
                 const all = isAllMode();
 
-                // show/hide list
                 if (listAll) listAll.style.display = all ? '' : 'none';
                 if (listByOp) listByOp.style.display = all ? 'none' : '';
 
-                // show/hide top action + FAB
                 if (topActionsInput) topActionsInput.style.display = all ? 'none' : '';
                 if (fabWrap) fabWrap.style.display = all ? 'none' : '';
 
-                // safety: disable modal button on ALL
                 if (btnOpenModal) btnOpenModal.disabled = all ? true : btnOpenModal.disabled;
             }
 
@@ -1128,10 +1102,7 @@
                 let total = 0;
                 $$('.fin-item', listByOp).forEach(card => {
                     if (card.style.display === 'none') return;
-                    const {
-                        ok,
-                        rj
-                    } = getEls(card);
+                    const { ok, rj } = getEls(card);
                     const a = parseFloat(ok?.value || '0') || 0;
                     const b = parseFloat(rj?.value || '0') || 0;
                     total += (a + b);
@@ -1153,8 +1124,7 @@
                     totalRows++;
 
                     const ok = parseFloat(card.querySelector('input[name*="[qty_ok]"]')?.value || '0') || 0;
-                    const rj = parseFloat(card.querySelector('input[name*="[qty_reject]"]')?.value ||
-                        '0') || 0;
+                    const rj = parseFloat(card.querySelector('input[name*="[qty_reject]"]')?.value || '0') || 0;
 
                     if ((ok + rj) > 0) {
                         pickedRows++;
@@ -1165,10 +1135,7 @@
                 if (statTotalRows) statTotalRows.textContent = totalRows.toLocaleString('id-ID');
                 if (statPickedRows) statPickedRows.textContent = pickedRows.toLocaleString('id-ID');
                 if (statTotalOk) {
-                    statTotalOk.textContent = totalOk.toLocaleString('id-ID', {
-                        minimumFractionDigits: 2,
-                        maximumFractionDigits: 2,
-                    });
+                    statTotalOk.textContent = totalOk.toLocaleString('id-ID', { minimumFractionDigits: 2, maximumFractionDigits: 2 });
                 }
             }
 
@@ -1177,20 +1144,17 @@
                 const selItem = (itemFilter?.value || '').toString().trim().toUpperCase();
 
                 if (isAllMode()) {
-                    // filter untuk accordion items
                     if (!listAll) return;
                     $$('.acc-item', listAll).forEach(card => {
                         const code = (card.dataset.code || '').toString().toUpperCase();
                         const item = (card.dataset.item || '').toString().toUpperCase();
                         const matchSearch = !term || code.includes(term);
                         const matchItem = !selItem || item === selItem;
-
                         card.style.display = (matchSearch && matchItem) ? '' : 'none';
                     });
                     return;
                 }
 
-                // filter untuk list input (by operator)
                 if (!listByOp) return;
                 $$('.fin-item', listByOp).forEach(card => {
                     const code = (card.dataset.code || '').toString().toUpperCase();
@@ -1239,10 +1203,7 @@
                 const card = t.closest('.fin-item');
                 if (!card) return;
 
-                const {
-                    ok,
-                    rj
-                } = getEls(card);
+                const { ok, rj } = getEls(card);
 
                 if (t.checked) {
                     const a = parseFloat(ok?.value || '0') || 0;
@@ -1269,11 +1230,7 @@
             form?.addEventListener('focusin', (e) => {
                 const t = e.target;
                 if (t?.classList?.contains('select-all-on-focus')) {
-                    setTimeout(() => {
-                        try {
-                            t.select();
-                        } catch (_) {}
-                    }, 0);
+                    setTimeout(() => { try { t.select(); } catch (_) {} }, 0);
                 }
                 if (window.innerWidth < 768) body.classList.add('keyboard-open');
             });
@@ -1283,9 +1240,7 @@
                 if (isAllMode() || !listByOp) return;
                 $$('.fin-item', listByOp).forEach(card => {
                     if (card.style.display === 'none') return;
-                    const {
-                        cb
-                    } = getEls(card);
+                    const { cb } = getEls(card);
                     if (!cb) return;
                     cb.checked = true;
                     autoFillCard(card);
@@ -1298,11 +1253,7 @@
             btnUncheckAll?.addEventListener('click', () => {
                 if (isAllMode() || !listByOp) return;
                 $$('.fin-item', listByOp).forEach(card => {
-                    const {
-                        cb,
-                        ok,
-                        rj
-                    } = getEls(card);
+                    const { cb, ok, rj } = getEls(card);
                     if (cb) cb.checked = false;
                     if (ok) ok.value = '';
                     if (rj) rj.value = '';
@@ -1313,9 +1264,26 @@
                 applyFilter();
             });
 
-            // ===== Modal =====
+            // ===== Modal (Android-safe) =====
+            // 1) pastikan modal element ada dan dipindah ke luar form (sudah)
+            // 2) buat instance dengan fallback ke data-api click kalau bootstrap terload
             let bsModal = null;
-            if (modalEl && typeof bootstrap !== 'undefined') bsModal = new bootstrap.Modal(modalEl);
+            const hasBootstrap = (typeof window.bootstrap !== 'undefined' && typeof window.bootstrap.Modal !== 'undefined');
+
+            if (modalEl && hasBootstrap) {
+                // reuse instance kalau sudah ada
+                bsModal = window.bootstrap.Modal.getOrCreateInstance(modalEl, {
+                    backdrop: true,
+                    focus: true
+                });
+
+                // hide FAB while modal open (biar ga ganggu di Android)
+                modalEl.addEventListener('show.bs.modal', () => fabWrap?.classList.add('is-hidden'));
+                modalEl.addEventListener('hidden.bs.modal', () => fabWrap?.classList.remove('is-hidden'));
+            } else {
+                // tampilkan note fallback di modal (kalau user kebuka via data-api pun)
+                if (fallbackNote) fallbackNote.classList.remove('d-none');
+            }
 
             function esc(s) {
                 return String(s ?? '')
@@ -1330,16 +1298,11 @@
                 if (!mItems || !listByOp) return;
                 mItems.innerHTML = '';
 
-                let rows = 0,
-                    okSum = 0,
-                    rjSum = 0;
+                let rows = 0, okSum = 0, rjSum = 0;
                 const picked = [];
 
                 $$('.fin-item', listByOp).forEach(card => {
-                    const {
-                        ok,
-                        rj
-                    } = getEls(card);
+                    const { ok, rj } = getEls(card);
                     const a = parseFloat(ok?.value || '0') || 0;
                     const b = parseFloat(rj?.value || '0') || 0;
                     if ((a + b) <= 0) return;
@@ -1348,24 +1311,14 @@
                     okSum += a;
                     rjSum += b;
 
-                    picked.push({
-                        code: (card.dataset.code || '').toString(),
-                        ok: a,
-                        rj: b
-                    });
+                    picked.push({ code: (card.dataset.code || '').toString(), ok: a, rj: b });
                 });
 
                 picked.sort((x, y) => (x.code || '').localeCompare(y.code || ''));
 
                 if (mRows) mRows.textContent = rows.toLocaleString('id-ID');
-                if (mOk) mOk.textContent = okSum.toLocaleString('id-ID', {
-                    minimumFractionDigits: 2,
-                    maximumFractionDigits: 2
-                });
-                if (mRj) mRj.textContent = rjSum.toLocaleString('id-ID', {
-                    minimumFractionDigits: 2,
-                    maximumFractionDigits: 2
-                });
+                if (mOk) mOk.textContent = okSum.toLocaleString('id-ID', { minimumFractionDigits: 2, maximumFractionDigits: 2 });
+                if (mRj) mRj.textContent = rjSum.toLocaleString('id-ID', { minimumFractionDigits: 2, maximumFractionDigits: 2 });
                 if (mItemsCount) mItemsCount.textContent = picked.length.toLocaleString('id-ID');
 
                 if (picked.length === 0) {
@@ -1382,32 +1335,49 @@
                     row.className = 'px-3 py-2';
                     row.style.borderBottom = '1px solid rgba(148,163,184,.12)';
                     row.innerHTML = `
-                <div class="d-grid" style="grid-template-columns: 44px 1fr 120px 120px; gap:.5rem; align-items:center;">
-                    <div class="text-muted" style="font-weight:900;">${i+1}</div>
-                    <div style="font-weight:900;" class="mono">${esc(it.code)}</div>
-                    <div class="text-end mono" style="font-weight:900;">${it.ok.toLocaleString('id-ID',{minimumFractionDigits:2,maximumFractionDigits:2})}</div>
-                    <div class="text-end mono" style="font-weight:900; color: var(--rj);">${it.rj.toLocaleString('id-ID',{minimumFractionDigits:2,maximumFractionDigits:2})}</div>
-                </div>
-            `;
+                        <div class="d-grid" style="grid-template-columns: 44px 1fr 120px 120px; gap:.5rem; align-items:center;">
+                            <div class="text-muted" style="font-weight:900;">${i+1}</div>
+                            <div style="font-weight:900;" class="mono">${esc(it.code)}</div>
+                            <div class="text-end mono" style="font-weight:900;">${it.ok.toLocaleString('id-ID',{minimumFractionDigits:2,maximumFractionDigits:2})}</div>
+                            <div class="text-end mono" style="font-weight:900; color: var(--rj);">${it.rj.toLocaleString('id-ID',{minimumFractionDigits:2,maximumFractionDigits:2})}</div>
+                        </div>
+                    `;
                     mItems.appendChild(row);
                 });
             }
 
+            // click open modal
             btnOpenModal?.addEventListener('click', (e) => {
-                if (isAllMode()) return; // ALL mode ga pakai modal
+                if (isAllMode()) return;
                 if (btnOpenModal.disabled) return;
 
                 e.preventDefault();
+                e.stopPropagation();
 
                 const opt = operator?.options?.[operator.selectedIndex];
                 if (mOp) mOp.textContent = (operator?.value ? (opt ? opt.text : '-') : 'SEMUA');
 
                 rebuildModalItems();
-                bsModal?.show();
+
+                // kalau bootstrap ga ada, fallback submit langsung (biar Android tetap bisa jalan)
+                if (!bsModal) {
+                    // langsung submit (tanpa konfirmasi) sebagai fallback
+                    form.submit();
+                    return;
+                }
+
+                // pastikan blur dulu supaya keyboard Android turun (sering bikin modal gagal fokus)
+                try { document.activeElement?.blur?.(); } catch (_) {}
+
+                // show modal (pakai requestAnimationFrame biar lebih stabil di Android)
+                requestAnimationFrame(() => {
+                    bsModal.show();
+                });
             });
 
             btnConfirm?.addEventListener('click', () => {
-                bsModal?.hide();
+                // kalau modal ada: hide dulu biar backdrop bersih, baru submit
+                try { bsModal?.hide(); } catch (_) {}
                 form.submit();
             });
 

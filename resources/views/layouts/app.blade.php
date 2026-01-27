@@ -159,15 +159,6 @@
 
     @stack('scripts')
 
-    <script>
-        // Disable double-tap zoom (iOS Safari)
-        let lastTouchEnd = 0;
-        document.addEventListener('touchend', function(event) {
-            const now = Date.now();
-            if (now - lastTouchEnd <= 300) event.preventDefault();
-            lastTouchEnd = now;
-        }, false);
-    </script>
 
     {{-- ✅ GLOBAL ANDROID KEYBOARD FIX (baseline viewport + bottom-nav anti naik) --}}
     <script>

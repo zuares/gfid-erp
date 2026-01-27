@@ -31,6 +31,7 @@ class DatabaseSeeder extends Seeder
             StoreSeeder::class,
             // InventoryTransferDemoSeeder::class,
             PaymentMethodSeeder::class,
+            ItemBomSeeder::class,
 
         ]);
     }

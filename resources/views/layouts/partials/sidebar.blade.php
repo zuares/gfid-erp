@@ -11,6 +11,7 @@
     $isAdmin = $role === 'admin';
 
     // ✅ capability flags
+    // NOTE: Operating boleh LIHAT RTS, tapi tidak boleh "manage" (create/approve dll) kecuali kamu ubah di controller/policy
     $canViewRts = $isOwner || $isAdmin || $isOperating;
     $canManageRts = $isOwner || $isAdmin;
 
@@ -51,6 +52,8 @@
     $hasMasterItemsIndex = $router->has('master.items.index');
     $hasMasterCustomersIndex = $router->has('master.customers.index');
     $hasMasterSuppliersIndex = $router->has('master.suppliers.index');
+    // ✅ NEW: BOM SKU
+    $hasMasterItemBomsIndex = $router->has('master.item_boms.index');
 
     // Purchasing (owner)
     $hasPoIndex = $router->has('purchasing.purchase_orders.index');
@@ -415,18 +418,21 @@
                 @endif
             </li>
 
-            {{-- ✅ RTS menus --}}
+            {{-- ✅ RTS menus: tampil juga di operating --}}
             @if ($canViewRts && ($hasRtsStockReqIndex || $hasRtsDirectReceiveIndex))
                 <x-sidebar.label text="Stock Requests" />
                 <li class="simple-group">
                     @if ($hasRtsStockReqIndex)
                         <x-sidebar.simple-link href="{{ route('rts.stock-requests.index') }}" icon="🛒"
-                            :active="request()->routeIs('rts.stock-requests.*')" :dot-only="$canManageRts && $hasRtsNeedReceive" badge-tone="warn" :badge-title="$rtsBadgeTitle">
+                            :active="request()->routeIs('rts.stock-requests.*')"
+                            :dot-only="$canManageRts && $hasRtsNeedReceive"
+                            badge-tone="warn"
+                            :badge-title="$rtsBadgeTitle">
                             Permintaan Stock (RTS)
                         </x-sidebar.simple-link>
                     @endif
 
-                    {{-- ✅ NEW: RTS Dadakan (owner/admin only) --}}
+                    {{-- ✅ RTS Dadakan (tetap owner/admin only) --}}
                     @if ($canManageRts && $hasRtsDirectReceiveIndex)
                         <x-sidebar.simple-link href="{{ route('rts.direct-receives.index') }}" icon="⚡"
                             :active="request()->routeIs('rts.direct-receives.*')">
@@ -548,6 +554,14 @@
                     @if ($hasMasterItemsIndex)
                         <x-sidebar.sub-link href="{{ route('master.items.index') }}" icon="📦" :active="request()->routeIs('master.items.*')">
                             Items
+                        </x-sidebar.sub-link>
+                    @endif
+
+                    {{-- ✅ NEW: BOM SKU --}}
+                    @if ($hasMasterItemBomsIndex)
+                        <x-sidebar.sub-link href="{{ route('master.item_boms.index') }}" icon="🧾"
+                            :active="request()->routeIs('master.item_boms.*')">
+                            BOM SKU
                         </x-sidebar.sub-link>
                     @endif
 
@@ -827,7 +841,8 @@
             </li>
 
             {{-- STOCK REQUESTS (OWNER) --}}
-            @if ($hasRtsStockReqIndex || $hasRtsDirectReceiveIndex)
+            {{-- ✅ UPDATE: tampil juga untuk operating, jadi pakai $canViewRts --}}
+            @if ($canViewRts && ($hasRtsStockReqIndex || $hasRtsDirectReceiveIndex))
                 <x-sidebar.label text="Stock Requests" />
                 <li class="mb-1">
                     <button class="sidebar-link sidebar-toggle {{ $stockReqOpen ? 'is-open' : '' }}" type="button"
@@ -842,13 +857,16 @@
                     <div class="collapse {{ $stockReqOpen ? 'show' : '' }}" id="navInventoryStockRequests">
                         @if ($hasRtsStockReqIndex)
                             <x-sidebar.sub-link href="{{ route('rts.stock-requests.index') }}" icon="🛒"
-                                :active="request()->routeIs('rts.stock-requests.*')" :dot-only="$hasRtsNeedReceive" badge-tone="warn" :badge-title="$rtsBadgeTitle">
+                                :active="request()->routeIs('rts.stock-requests.*')"
+                                :dot-only="$canManageRts && $hasRtsNeedReceive"
+                                badge-tone="warn"
+                                :badge-title="$rtsBadgeTitle">
                                 Permintaan Stock (RTS)
                             </x-sidebar.sub-link>
                         @endif
 
-                        {{-- ✅ NEW: RTS Dadakan --}}
-                        @if ($hasRtsDirectReceiveIndex)
+                        {{-- ✅ RTS Dadakan: tetap owner/admin only --}}
+                        @if ($canManageRts && $hasRtsDirectReceiveIndex)
                             <x-sidebar.sub-link href="{{ route('rts.direct-receives.index') }}" icon="⚡"
                                 :active="request()->routeIs('rts.direct-receives.*')">
                                 RTS Dadakan
@@ -891,7 +909,7 @@
 
                     @if ($hasProdSewReturnsIndex)
                         <x-sidebar.sub-link href="{{ route('production.sewing.returns.index') }}" icon="📥"
-                            :active="request()->routeIs('production.sewing.returns.*')">
+                            :active="request()->routeIs('production.sewing.returns.index')">
                             Sewing Returns
                         </x-sidebar.sub-link>
                     @endif
