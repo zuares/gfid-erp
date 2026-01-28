@@ -69,4 +69,9 @@ class PurchaseReceipt extends Model
     public function journal()
     {return $this->belongsTo(\App\Models\Journal::class);}
 
+    public function returns()
+    {
+        return $this->hasMany(\App\Models\PurchaseReturn::class, 'purchase_receipt_id');
+    }
+
 }

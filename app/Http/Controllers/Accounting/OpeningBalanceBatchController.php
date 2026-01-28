@@ -1,0 +1,234 @@
+<?php
+
+namespace App\Http\Controllers\Accounting;
+
+use App\Http\Controllers\Controller;
+use App\Models\Account;
+use App\Models\Journal;
+use App\Models\JournalLine;
+use Illuminate\Http\Request;
+use Illuminate\Support\Facades\DB;
+use Illuminate\Validation\ValidationException;
+
+class OpeningBalanceBatchController extends Controller
+{
+    public function index(Request $request)
+    {
+        $q = Journal::query()
+            ->whereIn('source_type', ['opening_balance_batch', 'opening_balance_batch_void'])
+            ->with(['lines.account'])
+            ->orderByDesc('date')
+            ->orderByDesc('id');
+
+        if ($request->filled('from')) {
+            $q->whereDate('date', '>=', $request->date('from'));
+        }
+
+        if ($request->filled('to')) {
+            $q->whereDate('date', '<=', $request->date('to'));
+        }
+
+        if ($request->filled('status')) {
+            $status = $request->string('status')->toString();
+            if ($status === 'active') {
+                $q->whereNull('voided_at');
+            }
+
+            if ($status === 'void') {
+                $q->whereNotNull('voided_at');
+            }
+
+        }
+
+        $journals = $q->paginate(30)->withQueryString();
+
+        return view('accounting.opening_balances_batch.index', compact('journals'));
+    }
+
+    public function create()
+    {
+        $accounts = Account::query()
+            ->where('is_active', true)
+            ->orderBy('code')
+            ->get(['id', 'code', 'name', 'type', 'is_cash']);
+
+        return view('accounting.opening_balances_batch.create', compact('accounts'));
+    }
+
+    public function store(Request $request)
+    {
+        $data = $request->validate([
+            'date' => ['required', 'date'],
+            'description' => ['nullable', 'string', 'max:255'],
+
+            'account_id' => ['required', 'array', 'min:2'],
+            'account_id.*' => ['required', 'integer', 'exists:accounts,id'],
+
+            'debit' => ['required', 'array'],
+            'credit' => ['required', 'array'],
+        ]);
+
+        $accIds = $data['account_id'];
+        $debits = $data['debit'];
+        $credits = $data['credit'];
+
+        if (count($accIds) !== count($debits) || count($accIds) !== count($credits)) {
+            throw ValidationException::withMessages([
+                'account_id' => 'Format baris opening tidak valid.',
+            ]);
+        }
+
+        // build lines, skip empty rows
+        $lines = [];
+        $sumD = 0.0;
+        $sumC = 0.0;
+
+        foreach ($accIds as $i => $aid) {
+            $d = (float) ($debits[$i] ?? 0);
+            $c = (float) ($credits[$i] ?? 0);
+
+            // normalize: tidak boleh dua-duanya isi
+            if ($d > 0 && $c > 0) {
+                throw ValidationException::withMessages([
+                    "debit.$i" => 'Pilih salah satu: debit atau credit.',
+                ]);
+            }
+
+            if ($d <= 0 && $c <= 0) {
+                continue;
+            }
+
+            $lines[] = [
+                'account_id' => (int) $aid,
+                'debit' => max(0, $d),
+                'credit' => max(0, $c),
+            ];
+
+            $sumD += max(0, $d);
+            $sumC += max(0, $c);
+        }
+
+        if (count($lines) < 2) {
+            throw ValidationException::withMessages([
+                'account_id' => 'Minimal 2 baris opening balance.',
+            ]);
+        }
+
+        // harus balance
+        if (round($sumD, 2) !== round($sumC, 2)) {
+            throw ValidationException::withMessages([
+                'account_id' => "Tidak balance. Total Debit " . number_format($sumD, 2) .
+                " != Total Credit " . number_format($sumC, 2),
+            ]);
+        }
+
+        return DB::transaction(function () use ($data, $lines, $sumD) {
+            // Cegah dobel opening batch aktif di tanggal yang sama (opsional, tapi aku sarankan)
+            $exists = Journal::query()
+                ->where('source_type', 'opening_balance_batch')
+                ->whereDate('date', $data['date'])
+                ->whereNull('voided_at')
+                ->exists();
+
+            if ($exists) {
+                throw ValidationException::withMessages([
+                    'date' => 'Opening balance batch aktif pada tanggal ini sudah ada. VOID dulu jika mau ganti.',
+                ]);
+            }
+
+            $desc = $data['description'] ?: 'Opening Balance (Batch)';
+
+            $j = Journal::create([
+                'date' => $data['date'],
+                'description' => $desc,
+                'source_type' => 'opening_balance_batch',
+                'source_id' => null,
+                'posted_at' => now(),
+                'voided_at' => null,
+            ]);
+
+            foreach ($lines as $ln) {
+                JournalLine::create([
+                    'journal_id' => $j->id,
+                    'account_id' => $ln['account_id'],
+                    'debit' => $ln['debit'],
+                    'credit' => $ln['credit'],
+                ]);
+            }
+
+            return redirect()
+                ->route('accounting.opening-balances.index') // atau route batch index kamu
+                ->with('status', 'ok')
+                ->with('message', 'Opening Balance (batch) berhasil diposting.');
+        });
+    }
+
+    public function void(Request $request, Journal $journal)
+    {
+        $data = $request->validate([
+            'reason' => ['nullable', 'string', 'max:255'],
+        ]);
+
+        return DB::transaction(function () use ($journal, $data) {
+            $locked = Journal::query()->whereKey($journal->id)->lockForUpdate()->firstOrFail();
+
+            if ($locked->source_type !== 'opening_balance_batch') {
+                throw ValidationException::withMessages(['journal' => 'Journal ini bukan opening balance batch.']);
+            }
+            if (!$locked->posted_at) {
+                throw ValidationException::withMessages(['journal' => 'Journal belum POSTED.']);
+            }
+            if ($locked->voided_at) {
+                return back()->with('status', 'ok')->with('message', 'Opening Balance sudah VOID.');
+            }
+
+            $already = Journal::query()
+                ->where('source_type', 'opening_balance_batch_void')
+                ->where('source_id', $locked->id)
+                ->exists();
+
+            if ($already) {
+                $locked->update(['voided_at' => now()]);
+                return back()->with('status', 'ok')->with('message', 'Opening Balance sudah pernah di-VOID.');
+            }
+
+            $locked->load('lines');
+
+            if ($locked->lines->isEmpty()) {
+                throw ValidationException::withMessages(['journal' => 'Opening balance tidak punya lines.']);
+            }
+
+            // tandai void original
+            $locked->update(['voided_at' => now()]);
+
+            $desc = 'REVERSAL: ' . ($locked->description ?: 'Opening Balance (Batch)');
+            if (!empty($data['reason'])) {
+                $desc .= ' | ' . $data['reason'];
+            }
+
+            $rev = Journal::create([
+                'date' => $locked->date,
+                'description' => $desc,
+                'source_type' => 'opening_balance_batch_void',
+                'source_id' => $locked->id,
+                'posted_at' => now(),
+                'voided_at' => null,
+            ]);
+
+            // reversal: swap debit/credit per line
+            foreach ($locked->lines as $ln) {
+                JournalLine::create([
+                    'journal_id' => $rev->id,
+                    'account_id' => $ln->account_id,
+                    'debit' => (float) $ln->credit,
+                    'credit' => (float) $ln->debit,
+                ]);
+            }
+
+            return redirect()
+                ->route('accounting.opening-balances.index')
+                ->with('status', 'ok')
+                ->with('message', 'Opening Balance berhasil di-VOID (reversal batch dibuat).');
+        });
+    }
+}

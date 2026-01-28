@@ -26,6 +26,9 @@ class PurchaseReceiptController extends Controller
     {
         $q = PurchaseReceipt::query()
             ->with(['supplier', 'warehouse'])
+        // ✅ biar tahu ada return (tanpa N+1)
+            ->withCount(['returns as return_count'])
+            ->withSum('returns as return_total_sum', 'total') // ✅ kolomnya total (bukan amount)
             ->orderByDesc('date')
             ->orderByDesc('id');
 
@@ -41,7 +44,7 @@ class PurchaseReceiptController extends Controller
         $status = $request->input('status');
         if ($request->has('status')) {
             if ($status !== null && $status !== '') {
-                $q->where('status', $status);
+                $q->where('status', (string) $status);
             }
         } else {
             $q->where('status', 'posted');
@@ -59,6 +62,7 @@ class PurchaseReceiptController extends Controller
 
         // Summary (clone query biar aman)
         $summary = (clone $q)
+            ->reorder()
             ->selectRaw('COUNT(*) as total_receipts')
             ->selectRaw("SUM(CASE WHEN status = 'draft' THEN 1 ELSE 0 END) as draft_count")
             ->selectRaw("SUM(CASE WHEN status = 'posted' THEN 1 ELSE 0 END) as posted_count")

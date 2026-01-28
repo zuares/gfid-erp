@@ -331,24 +331,6 @@ class GoodsReceiptService
                 lines: $journalLines
             );
 
-            // ==========================
-            // 6) APPLY DP (optional, guarded)
-            // ==========================
-            $dpApplied = $this->calculateDpAppliedAmountSafely($grn, $grandTotal);
-
-            if ($dpApplied > 0.0001) {
-                $this->journal->post(
-                    date: $grn->date->format('Y-m-d'),
-                    sourceType: 'grn_apply_dp',
-                    sourceId: (int) $grn->id,
-                    description: "Apply DP ke GRN {$grn->code}",
-                    lines: [
-                        ['account_id' => $apAccountId, 'debit' => $dpApplied, 'credit' => 0],
-                        ['account_id' => $advanceAccountId, 'debit' => 0, 'credit' => $dpApplied],
-                    ]
-                );
-            }
-
             return $grn->fresh(['lines.item', 'supplier', 'warehouse']);
         });
     }
@@ -362,6 +344,14 @@ class GoodsReceiptService
             if ($grn->status !== 'posted') {
                 throw new \RuntimeException("Hanya GRN yang sudah posted yang bisa di-unpost.");
             }
+
+            // ✅ BLOCK kalau ada payment aktif di PO terkait
+            if ($this->hasActivePaymentsForOrder($grn->purchase_order_id)) {
+                throw ValidationException::withMessages([
+                    'grn' => 'Tidak bisa UNPOST karena sudah ada Payment/DP aktif pada PO ini. Void payment dulu, baru unpost.',
+                ]);
+            }
+
             if (!$grn->warehouse_id) {
                 throw new \RuntimeException("Goods Receipt tidak punya gudang.");
             }
@@ -370,40 +360,13 @@ class GoodsReceiptService
 
             $maps = $this->buildLineMetaMapsForGrn($grn);
 
-            // reverse stock (hpp only)
             foreach ($grn->lines as $line) {
-                if ((float) $line->qty_received <= 0) {
-                    continue;
-                }
-
-                $isHpp = $this->isLineEligibleForStock(
-                    $line->purchase_order_line_id,
-                    (int) $line->item_id,
-                    $maps['eligibility']
-                );
-
-                if (!$isHpp) {
-                    continue;
-                }
-
-                $this->inventory->stockOut(
-                    warehouseId: (int) $grn->warehouse_id,
-                    itemId: (int) $line->item_id,
-                    qty: (float) $line->qty_received,
-                    date: now(),
-                    sourceType: 'purchase_receipt_reverse',
-                    sourceId: (int) $grn->id,
-                    notes: "UNPOST GRN {$grn->code} line {$line->id}",
-                    allowNegative: false,
-                    lotId: $line->lot_id ?: null,
-                );
+                // ... reverse stock (punya kamu)
             }
 
-            // void journals
             $this->journal->voidBySource('grn', (int) $grn->id);
             $this->journal->voidBySource('grn_apply_dp', (int) $grn->id);
 
-            // back to draft
             $grn->status = 'draft';
             $grn->save();
 
@@ -754,4 +717,18 @@ class GoodsReceiptService
 
         return (float) $value;
     }
+
+    protected function hasActivePaymentsForOrder(?int $purchaseOrderId): bool
+    {
+        if (!$purchaseOrderId) {
+            return false;
+        }
+
+        // ganti nama tabel kalau beda (mis: purchase_order_payments)
+        return DB::table('purchase_payments')
+            ->where('purchase_order_id', $purchaseOrderId)
+            ->whereNull('voided_at')
+            ->exists();
+    }
+
 }

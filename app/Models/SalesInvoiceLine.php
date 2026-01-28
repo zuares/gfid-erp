@@ -15,9 +15,27 @@ class SalesInvoiceLine extends Model
         'unit_price',
         'line_discount',
         'line_total',
+
+        // snapshot costing
         'hpp_unit_snapshot',
+        'hpp_total_snapshot',
+
+        // margin
         'margin_unit',
         'margin_total',
+    ];
+
+    protected $casts = [
+        'qty' => 'float',
+        'unit_price' => 'float',
+        'line_discount' => 'float',
+        'line_total' => 'float',
+
+        'hpp_unit_snapshot' => 'float',
+        'hpp_total_snapshot' => 'float',
+
+        'margin_unit' => 'float',
+        'margin_total' => 'float',
     ];
 
     public function invoice()

@@ -6,6 +6,11 @@
 @push('head')
     {{-- ========== PAGE WRAP + GLOBAL ========== --}}
     <style>
+        .index-page .status-badge-return{
+            border-color: rgba(239, 68, 68, .40) !important;
+            box-shadow: 0 0 0 2px rgba(239, 68, 68, .10) inset;
+            }
+
         .index-page {
             min-height: 100vh;
         }

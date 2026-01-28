@@ -3,7 +3,9 @@
 use App\Http\Controllers\Accounting\AccountController;
 use App\Http\Controllers\Accounting\CashExpenseController;
 use App\Http\Controllers\Accounting\JournalController;
+use App\Http\Controllers\Accounting\OpeningBalanceBatchController;
 use App\Http\Controllers\Accounting\OpeningBalanceController;
+use App\Http\Controllers\Api\AccountSuggestController;
 
 Route::middleware(['auth'])->prefix('accounting')->name('accounting.')->group(function () {
 
@@ -29,3 +31,13 @@ Route::middleware(['auth'])->prefix('accounting')->name('accounting.')->group(fu
     Route::post('opening-balances', [OpeningBalanceController::class, 'store'])->name('opening-balances.store');
     Route::post('opening-balances/{journal}/void', [OpeningBalanceController::class, 'void'])->name('opening-balances.void');
 });
+
+// routes/web.php
+Route::prefix('accounting/opening-balances-batch')->name('accounting.opening-balances-batch.')->group(function () {
+    Route::get('/', [OpeningBalanceBatchController::class, 'index'])->name('index');
+    Route::get('/create', [OpeningBalanceBatchController::class, 'create'])->name('create');
+    Route::post('/', [OpeningBalanceBatchController::class, 'store'])->name('store');
+    Route::post('/{journal}/void', [OpeningBalanceBatchController::class, 'void'])->name('void');
+});
+
+Route::get('v1/accounts/suggest', AccountSuggestController::class);

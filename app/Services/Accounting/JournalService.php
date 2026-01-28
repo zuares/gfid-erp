@@ -16,12 +16,13 @@ class JournalService
     public const CODE_AP = '2101'; // Hutang Dagang
     public const CODE_INV_RAW = '1201'; // Persediaan Bahan Baku
     public const CODE_ADV_PURCHASE = '1151'; // Uang Muka Pembelian
+    public const CODE_SUPPLIER_CLAIM = '1305'; // Piutang Supplier
 
     // ====== SOURCE TYPES ======
     public const SRC_PURCHASE_PAYMENT = 'purchase_payment';
     public const SRC_GRN_ACCRUAL = 'purchase_receipt_post';
     public const SRC_GRN_APPLY_DP = 'purchase_dp_apply';
-
+    public const SRC_PURCHASE_RETURN = 'purchase_return_post';
     /**
      * Post journal + lines (balanced).
      * Idempotent: jika source_type + source_id (aktif / belum void) sudah ada, return existing.
@@ -154,12 +155,15 @@ class JournalService
                 ($reason ? " | {$reason}" : '')
             );
 
+            // 2) Create reversal journal (swap debit/credit)
+// ✅ tapi karena "void tidak dihitung", reversal juga kita tandai voided
             $rev = Journal::create([
                 'date' => $journal->date,
                 'description' => $revDesc,
                 'source_type' => $journal->source_type,
                 'source_id' => $journal->source_id,
                 'posted_at' => now(),
+                'voided_at' => now(), // ✅ IMPORTANT
             ]);
 
             $rev->lines()->createMany(
@@ -541,23 +545,25 @@ class JournalService
                 ]);
             }
 
-            // 1) Void jurnal lama
+            // 1️⃣ Void jurnal lama
             $journal->forceFill([
                 'voided_at' => now(),
             ])->save();
 
-            // 2) Buat jurnal reversal (balik debit/credit)
-            $revDescription = trim(
+            // 2️⃣ DESKRIPSI reversal (INI YANG TADI HILANG)
+            $revDesc = trim(
                 'Reversal: ' . ($journal->description ?? '-') .
                 ($reason ? " | {$reason}" : '')
             );
 
+            // 3️⃣ Buat jurnal reversal (TAPI langsung di-void)
             $rev = Journal::create([
                 'date' => $journal->date,
                 'description' => $revDescription,
                 'source_type' => $journal->source_type,
                 'source_id' => $journal->source_id,
                 'posted_at' => now(),
+                // ⚠️ JANGAN set voided_at di reversal
             ]);
 
             $rev->lines()->createMany(
@@ -611,6 +617,11 @@ class JournalService
                 $this->recalcPaymentStatus($payment->purchaseOrder);
             }
         });
+    }
+
+    public function voidById(int $journalId, ?string $reason = null): Journal
+    {
+        return $this->voidJournal($journalId, $reason);
     }
 
 }

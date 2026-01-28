@@ -1,6 +1,7 @@
 <?php
 
 // routes/api.php
+use App\Http\Controllers\Api\AccountSuggestController;
 use App\Http\Controllers\Api\CustomerController as ApiCustomerController;
 use App\Http\Controllers\Api\ItemController;
 
@@ -10,6 +11,7 @@ Route::prefix('v1')->group(function () {
     Route::get('/items/{item}', [ItemController::class, 'show']);
     Route::get('/items/by-barcode', [ItemController::class, 'findByBarcode'])
         ->name('items.by_barcode');
+    Route::get('/accounts/suggest', AccountSuggestController::class);
 
 });
 
@@ -26,4 +28,5 @@ Route::prefix('api')
 Route::middleware('auth:sanctum')->group(function () {
     Route::get('customers', [ApiCustomerController::class, 'index'])
         ->name('api.customers.index');
+
 });

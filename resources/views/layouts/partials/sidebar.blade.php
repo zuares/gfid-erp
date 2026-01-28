@@ -46,7 +46,22 @@
 
     // Sales (admin)
     $hasSalesShipmentsIndex = $router->has('sales.shipments.index');
+    $hasSalesShipmentsCreate = $router->has('sales.shipments.create');
     $hasSalesShipmentReturnsIndex = $router->has('sales.shipment_returns.index');
+    $hasSalesShipmentReturnsCreate = $router->has('sales.shipment_returns.create');
+
+    // Sales (owner)
+    $hasSalesInvoicesIndex = $router->has('sales.invoices.index');
+    $hasSalesInvoicesCreate = $router->has('sales.invoices.create');
+
+    // ✅ shipments report (existing)
+    $hasSalesShipmentsReport = $router->has('sales.shipments.report');
+
+    // ✅ Sales reports routes (guard)
+    $hasSalesReportPerformance = $router->has('sales.reports.sales_performance.index');
+    $hasSalesReportItemProfit = $router->has('sales.reports.item_profit');
+    $hasSalesReportChannelProfit = $router->has('sales.reports.channel_profit');
+    $hasSalesReportShipmentAnalytics = $router->has('sales.reports.shipment_analytics');
 
     // Master (owner)
     $hasMasterItemsIndex = $router->has('master.items.index');
@@ -61,22 +76,18 @@
     $hasGrnIndex = $router->has('purchasing.purchase_receipts.index');
     $hasGrnCreate = $router->has('purchasing.purchase_receipts.create');
 
-    // Marketplace (owner)
+    // Marketplace Orders (owner)
     $hasMarketplaceIndex = $router->has('marketplace.orders.index');
     $hasMarketplaceCreate = $router->has('marketplace.orders.create');
 
-    // Sales owner
-    $hasSalesInvoicesIndex = $router->has('sales.invoices.index');
-    $hasSalesInvoicesCreate = $router->has('sales.invoices.create');
-    $hasSalesShipmentsCreate = $router->has('sales.shipments.create');
-    $hasSalesShipmentReturnsCreate = $router->has('sales.shipment_returns.create');
-    $hasSalesShipmentsReport = $router->has('sales.shipments.report');
+    // ✅ Marketplace Shopee tools
+    $hasShopeeImportOrdersForm = $router->has('marketplace.shopee.import_orders.form');
+    $hasShopeeImportOrdersRun  = $router->has('marketplace.shopee.import_orders.run');
+    $hasShopeeImportIncomeForm = $router->has('marketplace.shopee.import-income.form');
+    $hasShopeeImportIncomeRun  = $router->has('marketplace.shopee.import-income.run');
 
-    // ✅ Sales reports routes (guard)
-    $hasSalesReportPerformance = $router->has('sales.reports.sales_performance.index');
-    $hasSalesReportItemProfit = $router->has('sales.reports.item_profit');
-    $hasSalesReportChannelProfit = $router->has('sales.reports.channel_profit');
-    $hasSalesReportShipmentAnalytics = $router->has('sales.reports.shipment_analytics');
+    // ✅ Marketplace Reports
+    $hasMarketplacePayoutReport = $router->has('marketplace.reports.payout.index');
 
     // Production (operating/owner)
     $hasProdCuttingJobsIndex = $router->has('production.cutting_jobs.index');
@@ -115,7 +126,11 @@
     $grnOpen = request()->routeIs('purchasing.purchase_receipts.*');
 
     $masterOpen = request()->routeIs('master.*');
+
     $marketplaceOpen = request()->routeIs('marketplace.orders.*');
+    $marketplaceToolsOpen =
+        request()->routeIs('marketplace.shopee.*') ||
+        request()->routeIs('marketplace.reports.*');
 
     $salesInvoiceOpen = request()->routeIs('sales.invoices.*');
     $salesShipmentOpen = request()->routeIs('sales.shipments.*');
@@ -217,7 +232,7 @@
             background: color-mix(in srgb, var(--card) 92%, var(--bg) 8%);
             backdrop-filter: blur(14px);
             border-right: 1px solid rgba(148, 163, 184, .35);
-            box-shadow: 8px 0 24px rgba(15, 23, 42, .05), 2px 0 8px rgba(15, 23, 42, .03);
+            box-shadow: 8px 0 24px rgba(15,23,42,.05), 2px 0 8px rgba(15,23,42,.03);
             border-radius: 0 22px 22px 0;
             z-index: 1030;
             overflow-y: auto;
@@ -225,9 +240,7 @@
             scrollbar-color: rgba(148, 163, 184, .4) transparent;
         }
 
-        .app-main {
-            margin-left: 240px;
-        }
+        .app-main { margin-left: 240px; }
     }
 
     .sidebar-modern { display: none; }
@@ -304,7 +317,7 @@
     .sidebar-link-sub.active {
         background: transparent;
         font-weight: 600;
-        box-shadow: inset 2px 0 0 var(--accent);
+        box-shadow: inset(2px 0 0 var(--accent));
         opacity: 1;
         color: var(--accent);
     }
@@ -356,7 +369,8 @@
             <x-sidebar.label text="Inventory" />
             <li class="simple-group">
                 @if ($hasInvStocksItems)
-                    <x-sidebar.simple-link href="{{ route('inventory.stocks.items') }}" icon="📦" :active="request()->routeIs('inventory.stocks.items')">
+                    <x-sidebar.simple-link href="{{ route('inventory.stocks.items') }}" icon="📦"
+                        :active="request()->routeIs('inventory.stocks.items')">
                         Stok Barang
                     </x-sidebar.simple-link>
                 @endif
@@ -453,8 +467,8 @@
                     @endif
 
                     @if ($hasProdWipFinAdjIndex)
-                        <x-sidebar.simple-link href="{{ route('production.wip-fin-adjustments.index') }}"
-                            icon="🧾" :active="request()->routeIs('production.wip-fin-adjustments.*')">
+                        <x-sidebar.simple-link href="{{ route('production.wip-fin-adjustments.index') }}" icon="🧾"
+                            :active="request()->routeIs('production.wip-fin-adjustments.*')">
                             Koreksi WIP-FIN
                         </x-sidebar.simple-link>
                     @endif
@@ -492,6 +506,7 @@
                     </x-sidebar.simple-link>
                 @endif
             </li>
+
         @elseif ($isOwner)
             {{-- ===========================
                 OWNER
@@ -510,7 +525,8 @@
 
                 <div class="collapse {{ $masterOpen ? 'show' : '' }}" id="navMaster">
                     @if ($hasMasterItemsIndex)
-                        <x-sidebar.sub-link href="{{ route('master.items.index') }}" icon="📦" :active="request()->routeIs('master.items.*')">
+                        <x-sidebar.sub-link href="{{ route('master.items.index') }}" icon="📦"
+                            :active="request()->routeIs('master.items.*')">
                             Items
                         </x-sidebar.sub-link>
                     @endif
@@ -594,6 +610,7 @@
             {{-- SALES & MARKETPLACE --}}
             <x-sidebar.label text="Sales & Marketplace" />
 
+            {{-- Marketplace Orders --}}
             <li class="mb-1">
                 <button class="sidebar-link sidebar-toggle {{ $marketplaceOpen ? 'is-open' : '' }}" type="button"
                     data-bs-toggle="collapse" data-bs-target="#navMarketplace"
@@ -619,6 +636,53 @@
                 </div>
             </li>
 
+            {{-- ✅ Marketplace Tools (Shopee + Reports) --}}
+            @if ($hasShopeeImportOrdersForm || $hasShopeeImportIncomeForm || $hasMarketplacePayoutReport)
+                <li class="mb-1">
+                    <button class="sidebar-link sidebar-toggle {{ $marketplaceToolsOpen ? 'is-open' : '' }}" type="button"
+                        data-bs-toggle="collapse" data-bs-target="#navMarketplaceTools"
+                        aria-expanded="{{ $marketplaceToolsOpen ? 'true' : 'false' }}" aria-controls="navMarketplaceTools">
+                        <span class="icon">🧰</span>
+                        <span>Marketplace Tools</span>
+                        <span class="chevron">▸</span>
+                    </button>
+
+                    <div class="collapse {{ $marketplaceToolsOpen ? 'show' : '' }}" id="navMarketplaceTools">
+                        <div class="px-3 pt-2 pb-1 text-uppercase"
+                            style="font-size:.68rem; letter-spacing:.12em; color:var(--muted);">
+                            Shopee
+                        </div>
+
+                        @if ($hasShopeeImportOrdersForm)
+                            <x-sidebar.sub-link href="{{ route('marketplace.shopee.import_orders.form') }}" icon="📦"
+                                :active="request()->routeIs('marketplace.shopee.import_orders.*')">
+                                Import Orders
+                            </x-sidebar.sub-link>
+                        @endif
+
+                        @if ($hasShopeeImportIncomeForm)
+                            <x-sidebar.sub-link href="{{ route('marketplace.shopee.import-income.form') }}" icon="💵"
+                                :active="request()->routeIs('marketplace.shopee.import-income.*')">
+                                Import Income
+                            </x-sidebar.sub-link>
+                        @endif
+
+                        @if ($hasMarketplacePayoutReport)
+                            <div class="px-3 pt-3 pb-1 text-uppercase"
+                                style="font-size:.68rem; letter-spacing:.12em; color:var(--muted);">
+                                Reports
+                            </div>
+
+                            <x-sidebar.sub-link href="{{ route('marketplace.reports.payout.index') }}" icon="📊"
+                                :active="request()->routeIs('marketplace.reports.*')">
+                                Payout Dashboard
+                            </x-sidebar.sub-link>
+                        @endif
+                    </div>
+                </li>
+            @endif
+
+            {{-- SALES --}}
             <li class="mb-1">
                 <button class="sidebar-link sidebar-toggle {{ $salesOpen ? 'is-open' : '' }}" type="button"
                     data-bs-toggle="collapse" data-bs-target="#navSales"
@@ -683,7 +747,6 @@
                         Sales Reports
                     </div>
 
-                    {{-- ✅ NEW: Sales Performance --}}
                     @if ($hasSalesReportPerformance)
                         <x-sidebar.sub-link href="{{ route('sales.reports.sales_performance.index') }}" icon="📈"
                             :active="request()->routeIs('sales.reports.sales_performance.*')">
@@ -691,7 +754,6 @@
                         </x-sidebar.sub-link>
                     @endif
 
-                    {{-- existing shipment report --}}
                     @if ($hasSalesShipmentsReport)
                         <x-sidebar.sub-link href="{{ route('sales.shipments.report') }}" icon="📊"
                             :active="request()->routeIs('sales.shipments.report')">
@@ -699,7 +761,6 @@
                         </x-sidebar.sub-link>
                     @endif
 
-                    {{-- optional: reports lain (muncul otomatis kalau route ada) --}}
                     @if ($hasSalesReportItemProfit)
                         <x-sidebar.sub-link href="{{ route('sales.reports.item_profit') }}" icon="💰"
                             :active="request()->routeIs('sales.reports.item_profit')">
@@ -949,8 +1010,8 @@
                     @endif
 
                     @if ($hasProdReportFlow)
-                        <x-sidebar.sub-link href="{{ route('production.reports.production_flow_dashboard') }}"
-                            icon="🌀" :active="request()->routeIs('production.reports.production_flow_dashboard')">
+                        <x-sidebar.sub-link href="{{ route('production.reports.production_flow_dashboard') }}" icon="🌀"
+                            :active="request()->routeIs('production.reports.production_flow_dashboard')">
                             Flow Dashboard
                         </x-sidebar.sub-link>
                     @endif
@@ -1020,13 +1081,13 @@
 
                 <div class="collapse {{ $payrollOpen ? 'show' : '' }}" id="navFinancePayroll">
                     @if ($hasPieceworkIndex)
-                        <x-sidebar.sub-link href="{{ route('payroll.piecework.index', ['module' => 'cutting']) }}"
-                            icon="✂️" :active="$pieceworkCuttingActive">
+                        <x-sidebar.sub-link href="{{ route('payroll.piecework.index', ['module' => 'cutting']) }}" icon="✂️"
+                            :active="$pieceworkCuttingActive">
                             Cutting Payroll
                         </x-sidebar.sub-link>
 
-                        <x-sidebar.sub-link href="{{ route('payroll.piecework.index', ['module' => 'sewing']) }}"
-                            icon="🧵" :active="$pieceworkSewingActive">
+                        <x-sidebar.sub-link href="{{ route('payroll.piecework.index', ['module' => 'sewing']) }}" icon="🧵"
+                            :active="$pieceworkSewingActive">
                             Sewing Payroll
                         </x-sidebar.sub-link>
                     @endif
@@ -1066,8 +1127,8 @@
                     @endif
 
                     @if ($hasProdCostPeriodsIndex)
-                        <x-sidebar.sub-link href="{{ route('costing.production_cost_periods.index') }}"
-                            icon="📆" :active="request()->routeIs('costing.production_cost_periods.*')">
+                        <x-sidebar.sub-link href="{{ route('costing.production_cost_periods.index') }}" icon="📆"
+                            :active="request()->routeIs('costing.production_cost_periods.*')">
                             Production Cost Periods
                         </x-sidebar.sub-link>
                     @endif

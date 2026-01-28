@@ -3,9 +3,20 @@
 @section('title', 'Sales Reports • Penjualan & Performa Produk')
 
 @php
+  use Carbon\Carbon;
+
   $fmtInt = fn($n) => number_format((float)$n, 0, ',', '.');
   $fmtMoney = fn($n) => 'Rp ' . number_format((float)$n, 0, ',', '.');
   $rangeLabel = $fromDate.' s/d '.$toDate;
+
+  // formatter tanggal indo + hari
+  $fmtDateId = function($date) {
+    try {
+      return Carbon::parse($date)->locale('id')->translatedFormat('l, d M Y'); // Selasa, 20 Jan 2026
+    } catch (\Throwable $e) {
+      return (string) $date;
+    }
+  };
 @endphp
 
 @push('head')
@@ -17,7 +28,6 @@
     --r: 16px;
     --r2: 20px;
 
-    /* fallback jika layout app kamu belum define */
     --g-bg: var(--bg, #f6f7fb);
     --g-card: var(--card, #ffffff);
     --g-tx: var(--text, #0f172a);
@@ -29,12 +39,11 @@
 
     --g-accent: var(--accent, #2563eb);
     --g-success: #16a34a;
+    --g-danger: #ef4444;
 
-    --g-shadow: 0 14px 34px rgba(15,23,42,.10), 0 0 0 1px rgba(15,23,42,.03);
     --g-shadow2: 0 10px 26px rgba(15,23,42,.08), 0 0 0 1px rgba(15,23,42,.03);
   }
 
-  /* Dark mode fallback (kalau app pakai data-theme="dark") */
   html[data-theme="dark"]{
     --g-bg: #0b1220;
     --g-card: #0f172a;
@@ -43,7 +52,6 @@
     --g-line: rgba(148,163,184,.18);
     --g-soft: rgba(148,163,184,.10);
     --g-soft2: rgba(148,163,184,.06);
-    --g-shadow: 0 16px 44px rgba(0,0,0,.35), 0 0 0 1px rgba(255,255,255,.03);
     --g-shadow2: 0 12px 30px rgba(0,0,0,.28), 0 0 0 1px rgba(255,255,255,.03);
   }
 
@@ -62,7 +70,6 @@
     flex-wrap: wrap;
     margin-bottom: 12px;
   }
-
   .g-title{
     font-size: 20px;
     font-weight: 900;
@@ -70,7 +77,6 @@
     color: var(--g-tx);
     line-height: 1.15;
   }
-
   .g-sub{
     color: var(--g-muted);
     font-size: 13px;
@@ -80,7 +86,6 @@
     flex-wrap:wrap;
     align-items:center;
   }
-
   .g-chip{
     display:inline-flex;
     align-items:center;
@@ -93,7 +98,6 @@
     font-size: 12px;
     font-weight: 800;
   }
-
   .g-chip b{ color: var(--g-tx); font-weight: 900; }
 
   /* Card */
@@ -103,10 +107,9 @@
     border-radius: var(--r2);
     box-shadow: var(--g-shadow2);
   }
-
   .g-pad{ padding: 14px; }
 
-  /* Toolbar / Filters */
+  /* Filters */
   .g-toolbar{
     display:flex;
     gap:10px;
@@ -114,7 +117,6 @@
     align-items:flex-end;
     justify-content:flex-end;
   }
-
   .g-field{
     display:flex;
     flex-direction:column;
@@ -160,9 +162,7 @@
     background: rgba(37,99,235,.14);
     border-color: rgba(37,99,235,.28);
   }
-  .g-btn.ghost{
-    background: transparent;
-  }
+  .g-btn.ghost{ background: transparent; }
 
   /* KPI */
   .g-kpis{
@@ -178,7 +178,6 @@
     .g-kpis{ grid-template-columns: 1fr; }
     .g-field{ min-width: 140px; }
   }
-
   .g-kpi{
     padding: 14px;
     border-radius: var(--r2);
@@ -208,7 +207,7 @@
   /* Grid */
   .g-grid{
     display:grid;
-    grid-template-columns: 1fr 1fr;
+    grid-template-columns: 1.15fr .85fr;
     gap: 12px;
     margin-top: 12px;
   }
@@ -227,7 +226,7 @@
     margin-top: 4px;
   }
 
-  /* Table wrapper */
+  /* Table */
   .g-tablewrap{
     margin-top: 10px;
     border: 1px solid var(--g-line);
@@ -236,14 +235,11 @@
     background: var(--g-card);
   }
   .g-table-scroll{
-    max-height: 460px;
+    max-height: 520px;
     overflow: auto;
   }
 
-  table{
-    width: 100%;
-    border-collapse: collapse;
-  }
+  table{ width: 100%; border-collapse: collapse; }
   thead th{
     position: sticky;
     top: 0;
@@ -264,21 +260,15 @@
     color: var(--g-tx);
     vertical-align: top;
   }
-  tbody tr:hover td{
-    background: var(--g-soft2);
-  }
+  tbody tr:hover td{ background: var(--g-soft2); }
+
   .right{ text-align:right; font-variant-numeric: tabular-nums; }
   .code{ font-weight: 950; }
   .name{ color: var(--g-muted); font-size: 12px; margin-top: 2px; }
   .uom{ color: var(--g-muted); font-size: 12px; font-weight: 900; }
 
   /* Tabs */
-  .g-tabs{
-    display:flex;
-    gap:8px;
-    flex-wrap: wrap;
-    margin-top: 10px;
-  }
+  .g-tabs{ display:flex; gap:8px; flex-wrap: wrap; margin-top: 10px; }
   .g-tab{
     border: 1px solid var(--g-line);
     background: var(--g-soft2);
@@ -296,8 +286,6 @@
     background: rgba(22,163,74,.12);
     border-color: rgba(22,163,74,.24);
   }
-
-  /* Small badge */
   .g-badge{
     display:inline-flex;
     align-items:center;
@@ -310,6 +298,72 @@
     font-size: 12px;
     font-weight: 950;
   }
+
+  /* Detail button */
+  .g-mini-btn{
+    display:inline-flex;
+    align-items:center;
+    gap:8px;
+    padding: 7px 10px;
+    border-radius: 999px;
+    border: 1px solid var(--g-line);
+    background: var(--g-soft2);
+    color: var(--g-tx);
+    font-size: 12px;
+    font-weight: 950;
+    cursor:pointer;
+    user-select:none;
+    white-space: nowrap;
+  }
+  .g-mini-btn:hover{ background: rgba(37,99,235,.10); border-color: rgba(37,99,235,.22); }
+
+  /* Inline detail accordion row */
+  .g-detail-row td{ padding: 0; border-bottom: 1px solid var(--g-line); }
+  details.g-detail{
+    border-top: 1px solid var(--g-line);
+    background: linear-gradient(180deg, var(--g-soft2), transparent);
+  }
+  details.g-detail summary{
+    list-style:none;
+    cursor:pointer;
+    padding: 10px 12px;
+    display:flex;
+    justify-content:space-between;
+    align-items:center;
+    gap: 10px;
+    user-select:none;
+  }
+  details.g-detail summary::-webkit-details-marker{ display:none; }
+  .g-detail-body{ padding: 0 12px 12px; }
+
+  /* Nested accordion for categories */
+  details.g-cat{
+    border: 1px solid var(--g-line);
+    border-radius: 16px;
+    overflow:hidden;
+    background: var(--g-card);
+    margin-top: 10px;
+  }
+  details.g-cat summary{
+    list-style:none;
+    cursor:pointer;
+    padding: 10px 12px;
+    display:flex;
+    align-items:center;
+    justify-content:space-between;
+    gap:10px;
+    user-select:none;
+    background: linear-gradient(180deg, var(--g-soft2), transparent);
+  }
+  details.g-cat summary::-webkit-details-marker{ display:none; }
+  .g-meta{
+    display:flex; gap:10px; align-items:center;
+    color: var(--g-muted);
+    font-weight: 950;
+    font-variant-numeric: tabular-nums;
+    white-space: nowrap;
+  }
+  .g-dot{ opacity:.6; }
 </style>
 @endpush
 
@@ -375,11 +429,11 @@
   </div>
 
   <div class="g-grid">
-    {{-- LEFT: Tren harian --}}
+    {{-- LEFT: Tren Harian - table ringkas + detail accordion --}}
     <div class="g-card g-pad">
       <div>
         <div class="g-sec-title">Tren Harian</div>
-        <div class="g-sec-sub">Ringkasan qty & value per tanggal.</div>
+        <div class="g-sec-sub">Ringkasan per tanggal. Klik “Detail” untuk lihat kategori & item yang terjual.</div>
       </div>
 
       <div class="g-tablewrap">
@@ -387,24 +441,119 @@
           <table>
             <thead>
               <tr>
-                <th style="width: 140px;">Tanggal</th>
+                <th style="width: 260px;">Tanggal</th>
                 <th class="right">Qty</th>
                 <th class="right">Value</th>
+                <th style="width: 120px;"></th>
               </tr>
             </thead>
             <tbody>
               @forelse($daily as $d)
+                @php
+                  $date = (string) $d->date;
+                  $pack = $accordion[$date] ?? null;
+                  $hasDetail = $pack && !empty($pack['categories'] ?? []);
+                  $detailId = 'd_' . md5($date);
+                @endphp
+
                 <tr>
                   <td>
-                    <div class="code">{{ $d->date }}</div>
-                    <div class="name">Daily aggregate</div>
+                    <div class="code">{{ $fmtDateId($date) }}</div>
+                    <div class="name">{{ $date }}</div>
                   </td>
                   <td class="right">{{ $fmtInt($d->qty) }}</td>
                   <td class="right">{{ $fmtMoney($d->value) }}</td>
+                  <td class="right">
+                    @if($hasDetail)
+                      <button class="g-mini-btn" type="button" data-toggle-detail="{{ $detailId }}">
+                        <i class="bi bi-list-nested"></i> Detail
+                      </button>
+                    @else
+                      <span class="name">—</span>
+                    @endif
+                  </td>
                 </tr>
+
+                @if($hasDetail)
+                  <tr class="g-detail-row" id="{{ $detailId }}" style="display:none;">
+                    <td colspan="4">
+                      <details class="g-detail" open>
+                        <summary>
+                          <div style="min-width:0;">
+                            <div class="code">{{ $fmtDateId($date) }}</div>
+                            <div class="name">Rincian kategori & item terjual</div>
+                          </div>
+                          <div class="g-meta">
+                            <span>{{ $fmtInt($pack['qty'] ?? 0) }} qty</span>
+                            <span class="g-dot">•</span>
+                            <span>{{ $fmtMoney($pack['value'] ?? 0) }}</span>
+                          </div>
+                        </summary>
+
+                        <div class="g-detail-body">
+                          @foreach(($pack['categories'] ?? []) as $catKey => $cat)
+                            @php
+                              $catQty = $cat['qty'] ?? 0;
+                              $catVal = $cat['value'] ?? 0;
+                              $items = $cat['items'] ?? [];
+                            @endphp
+
+                            <details class="g-cat">
+                              <summary>
+                                <div style="min-width:0;">
+                                  <div class="code">{{ $cat['code'] ?? '-' }} — {{ $cat['name'] ?? '(Tanpa Kategori)' }}</div>
+                                  <div class="name">Klik untuk lihat item</div>
+                                </div>
+                                <div class="g-meta">
+                                  <span>{{ $fmtInt($catQty) }} qty</span>
+                                  <span class="g-dot">•</span>
+                                  <span>{{ $fmtMoney($catVal) }}</span>
+                                </div>
+                              </summary>
+
+                              <div style="padding: 10px 12px 12px;">
+                                <div class="g-tablewrap" style="margin-top:0;">
+                                  <div class="g-table-scroll" style="max-height: 320px;">
+                                    <table>
+                                      <thead>
+                                        <tr>
+                                          <th>Item</th>
+                                          <th class="right">Qty</th>
+                                          <th class="right">Value</th>
+                                        </tr>
+                                      </thead>
+                                      <tbody>
+                                        @forelse($items as $it)
+                                          <tr>
+                                            <td>
+                                              <div class="code">{{ $it['code'] }}</div>
+                                              <div class="name">{{ $it['name'] }}</div>
+                                            </td>
+                                            <td class="right">
+                                              <span class="code">{{ $fmtInt($it['qty']) }}</span>
+                                              <span class="uom">{{ $it['unit'] ?? '' }}</span>
+                                            </td>
+                                            <td class="right">{{ $fmtMoney($it['value']) }}</td>
+                                          </tr>
+                                        @empty
+                                          <tr><td colspan="3" style="padding:14px; color:var(--g-muted);">Tidak ada item.</td></tr>
+                                        @endforelse
+                                      </tbody>
+                                    </table>
+                                  </div>
+                                </div>
+                              </div>
+                            </details>
+                          @endforeach
+                        </div>
+                      </details>
+                    </td>
+                  </tr>
+                @endif
+
               @empty
                 <tr>
-                  <td colspan="3" style="padding:14px; color:var(--g-muted);">
+                  <td colspan="4" style="padding:14px; color:var(--g-muted);">
                     Tidak ada data pada range ini.
                   </td>
                 </tr>
@@ -415,21 +564,26 @@
       </div>
     </div>
 
-    {{-- RIGHT: Performa produk --}}
+    {{-- RIGHT: Performa Produk --}}
     <div class="g-card g-pad">
       <div>
         <div class="g-sec-title">Performa Produk</div>
-        <div class="g-sec-sub">Top SKU berdasarkan Qty / Value / ADS (avg per hari).</div>
+        <div class="g-sec-sub">Urutan: Top Kategori → Top Produk → Top Sales → ADS.</div>
       </div>
 
       <div class="g-tabs">
-        <button class="g-tab active" type="button" data-tab="qty">
-          <i class="bi bi-bar-chart-line"></i> Top Qty
+        <button class="g-tab active" type="button" data-tab="cat">
+          <i class="bi bi-tags"></i> Top Kategori
           <span class="g-badge">50</span>
         </button>
 
-        <button class="g-tab" type="button" data-tab="value">
-          <i class="bi bi-cash-stack"></i> Top Value
+        <button class="g-tab" type="button" data-tab="prod">
+          <i class="bi bi-bar-chart-line"></i> Top Produk
+          <span class="g-badge">50</span>
+        </button>
+
+        <button class="g-tab" type="button" data-tab="sales">
+          <i class="bi bi-cash-stack"></i> Top Sales
           <span class="g-badge">50</span>
         </button>
 
@@ -439,8 +593,37 @@
         </button>
       </div>
 
-      {{-- Tab: Qty --}}
-      <div id="tab-qty" class="g-tablewrap">
+      {{-- Tab: Top Kategori (DEFAULT) --}}
+      <div id="tab-cat" class="g-tablewrap">
+        <div class="g-table-scroll">
+          <table>
+            <thead>
+              <tr>
+                <th>Kategori</th>
+                <th class="right">Qty</th>
+                <th class="right">Value</th>
+              </tr>
+            </thead>
+            <tbody>
+              @forelse($topCategories as $r)
+                <tr>
+                  <td>
+                    <div class="code">{{ $r->category_code }}</div>
+                    <div class="name">{{ $r->category_name }}</div>
+                  </td>
+                  <td class="right"><span class="code">{{ $fmtInt($r->qty) }}</span></td>
+                  <td class="right">{{ $fmtMoney($r->value) }}</td>
+                </tr>
+              @empty
+                <tr><td colspan="3" style="padding:14px; color:var(--g-muted);">Tidak ada data.</td></tr>
+              @endforelse
+            </tbody>
+          </table>
+        </div>
+      </div>
+
+      {{-- Tab: Top Produk (by qty) --}}
+      <div id="tab-prod" class="g-tablewrap" style="display:none;">
         <div class="g-table-scroll">
           <table>
             <thead>
@@ -451,7 +634,7 @@
               </tr>
             </thead>
             <tbody>
-              @forelse($topByQty as $r)
+              @forelse($topProducts as $r)
                 <tr>
                   <td>
                     <div class="code">{{ $r->code }}</div>
@@ -471,8 +654,8 @@
         </div>
       </div>
 
-      {{-- Tab: Value --}}
-      <div id="tab-value" class="g-tablewrap" style="display:none;">
+      {{-- Tab: Top Sales (by value) --}}
+      <div id="tab-sales" class="g-tablewrap" style="display:none;">
         <div class="g-table-scroll">
           <table>
             <thead>
@@ -483,7 +666,7 @@
               </tr>
             </thead>
             <tbody>
-              @forelse($topByValue as $r)
+              @forelse($topSales as $r)
                 <tr>
                   <td>
                     <div class="code">{{ $r->code }}</div>
@@ -546,23 +729,40 @@
 @push('scripts')
 <script>
   (function(){
+    // Tabs (performa)
     const btns = document.querySelectorAll('.g-tab');
     const tabs = {
-      qty: document.getElementById('tab-qty'),
-      value: document.getElementById('tab-value'),
+      cat: document.getElementById('tab-cat'),
+      prod: document.getElementById('tab-prod'),
+      sales: document.getElementById('tab-sales'),
       ads: document.getElementById('tab-ads'),
     };
 
-    function show(key){
-      Object.values(tabs).forEach(el => el.style.display = 'none');
+    function showTab(key){
+      Object.values(tabs).forEach(el => { if(el) el.style.display = 'none'; });
       if (tabs[key]) tabs[key].style.display = '';
     }
 
     btns.forEach(b => b.addEventListener('click', () => {
       btns.forEach(x => x.classList.remove('active'));
       b.classList.add('active');
-      show(b.getAttribute('data-tab'));
+      showTab(b.getAttribute('data-tab'));
     }));
+
+    // Detail row toggle (tren harian)
+    document.querySelectorAll('[data-toggle-detail]').forEach(btn => {
+      btn.addEventListener('click', () => {
+        const id = btn.getAttribute('data-toggle-detail');
+        const row = document.getElementById(id);
+        if (!row) return;
+
+        const isOpen = row.style.display !== 'none';
+        row.style.display = isOpen ? 'none' : '';
+        btn.innerHTML = isOpen
+          ? '<i class="bi bi-list-nested"></i> Detail'
+          : '<i class="bi bi-x-lg"></i> Tutup';
+      });
+    });
   })();
 </script>
 @endpush

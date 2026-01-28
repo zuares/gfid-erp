@@ -12,9 +12,10 @@ class AccountSeeder extends Seeder
     {
         /**
          * PRINSIP:
-         * - code = kontrak sistem (dipakai service)
+         * - code = kontrak sistem (dipakai service & journal)
          * - name = deskriptif & manusiawi
          * - type = asset | liability | equity | revenue | expense
+         * - is_cash = hanya true untuk kas/bank
          */
 
         $accounts = [
@@ -23,24 +24,39 @@ class AccountSeeder extends Seeder
             // 1xxx ASSET
             // ==================================================
 
+            // ------------------
             // Cash & Bank
+            // ------------------
             ['code' => '1101', 'name' => 'Kas Tunai', 'type' => 'asset', 'is_cash' => true],
             ['code' => '1111', 'name' => 'Bank Jago (Bisnis)', 'type' => 'asset', 'is_cash' => true],
             ['code' => '1112', 'name' => 'Bank BCA (Operasional)', 'type' => 'asset', 'is_cash' => true],
 
+            // ------------------
             // Inventory
+            // ------------------
             ['code' => '1201', 'name' => 'Persediaan Bahan Baku', 'type' => 'asset'],
             ['code' => '1202', 'name' => 'Persediaan WIP', 'type' => 'asset'],
             ['code' => '1203', 'name' => 'Persediaan Barang Jadi', 'type' => 'asset'],
 
+            // ------------------
             // Receivable
+            // ------------------
             ['code' => '1301', 'name' => 'Piutang Dagang', 'type' => 'asset'],
             ['code' => '1302', 'name' => 'Piutang Marketplace', 'type' => 'asset'],
 
+            // ✅ RETURN PEMBELIAN
+            // Dipakai saat Purchase Return (setelah GRN POSTED)
+            // Dr 1305 / Cr Persediaan atau Expense
+            ['code' => '1305', 'name' => 'Piutang Supplier (Retur / Klaim Pembelian)', 'type' => 'asset'],
+
+            // ------------------
             // Tax
+            // ------------------
             ['code' => '1401', 'name' => 'PPN Masukan', 'type' => 'asset'],
 
+            // ------------------
             // Advance
+            // ------------------
             ['code' => '1151', 'name' => 'Uang Muka Pembelian', 'type' => 'asset'],
 
             // ==================================================
@@ -58,7 +74,7 @@ class AccountSeeder extends Seeder
             // 4xxx REVENUE
             // ==================================================
             ['code' => '4101', 'name' => 'Penjualan', 'type' => 'revenue'],
-            ['code' => '4201', 'name' => 'Retur Penjualan', 'type' => 'revenue'], // contra
+            ['code' => '4201', 'name' => 'Retur Penjualan', 'type' => 'revenue'], // contra revenue
 
             // ==================================================
             // 5xxx COGS / HPP
@@ -74,7 +90,9 @@ class AccountSeeder extends Seeder
             ['code' => '6104', 'name' => 'Biaya ATK', 'type' => 'expense'],
             ['code' => '6110', 'name' => 'Biaya Packing', 'type' => 'expense'],
 
+            // ------------------
             // Marketplace
+            // ------------------
             ['code' => '6201', 'name' => 'Biaya Marketplace', 'type' => 'expense'],
         ];
 
