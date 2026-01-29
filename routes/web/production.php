@@ -116,6 +116,10 @@ Route::middleware(['web', 'auth', 'role:owner,operating'])
                 Route::post('/', [SewingReturnController::class, 'store'])->name('store');
 
                 Route::get('/{return}', [SewingReturnController::class, 'show'])->name('show');
+
+                // ✅ VOID Sewing Return
+                Route::post('/{return}/void', [SewingReturnController::class, 'void'])->name('void');
+
                 Route::delete('/{return}', [SewingReturnController::class, 'destroy'])->name('destroy');
             });
         });

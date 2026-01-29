@@ -18,10 +18,14 @@ class SewingReturn extends Model
         'notes',
         'pickup_id',
         'qty_direct_picked',
+        'voided_at',
+        'voided_by_user_id',
+        'void_reason',
     ];
 
     protected $casts = [
         'date' => 'date',
+        'voided_at' => 'datetime',
     ];
 
     public function lines()
