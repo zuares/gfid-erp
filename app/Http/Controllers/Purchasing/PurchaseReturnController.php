@@ -5,6 +5,7 @@ namespace App\Http\Controllers\Purchasing;
 use App\Helpers\CodeGenerator;
 use App\Http\Controllers\Controller;
 use App\Models\Account;
+use App\Models\Item;
 use App\Models\PurchaseOrder;
 use App\Models\PurchaseReceipt;
 use App\Models\PurchaseReturn;
@@ -12,13 +13,14 @@ use App\Models\PurchaseReturnLine;
 use App\Services\Accounting\JournalService;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\DB;
+use Illuminate\Support\Facades\Schema;
 use Illuminate\Validation\ValidationException;
 
 class PurchaseReturnController extends Controller
 {
     public function __construct(
         protected JournalService $journal,
-        protected \App\Services\Inventory\InventoryService $inventory, // sesuaikan class kamu
+        protected \App\Services\Inventory\InventoryService $inventory,
     ) {}
 
     public function createFromGrn(PurchaseReceipt $purchase_receipt)
@@ -39,7 +41,6 @@ class PurchaseReturnController extends Controller
             'created_by' => (int) auth()->id(),
         ]);
 
-        // preload lines dengan remaining qty
         $remainingMap = $this->remainingByGrnLine($purchase_receipt);
 
         foreach ($purchase_receipt->lines as $ln) {
@@ -53,7 +54,7 @@ class PurchaseReturnController extends Controller
                 'purchase_receipt_line_id' => (int) $ln->id,
                 'item_id' => (int) $ln->item_id,
                 'lot_id' => $ln->lot_id ? (int) $ln->lot_id : null,
-                'qty' => round($rem, 4), // default = remaining (boleh kamu ubah jadi 0 kalau prefer)
+                'qty' => round($rem, 4),
                 'unit_price' => (float) $ln->unit_price,
                 'line_total' => round($rem * (float) $ln->unit_price, 2),
                 'notes' => null,
@@ -133,6 +134,11 @@ class PurchaseReturnController extends Controller
         return back()->with('success', 'Draft Return tersimpan.');
     }
 
+    /**
+     * POST Return:
+     * - INV lines: stockOut + journal INV (Cr 1201, Dr 2101/1305)
+     * - EXP lines: no stock + journal EXP (Cr expense, Dr 2101/1305)
+     */
     public function post(Request $request, PurchaseReturn $purchase_return)
     {
         if ($purchase_return->voided_at) {
@@ -143,13 +149,12 @@ class PurchaseReturnController extends Controller
             return back()->with('error', 'Return sudah posted.');
         }
 
-        $purchase_return->loadMissing(['grn.warehouse', 'grn.lines', 'order', 'lines.grnLine']);
+        $purchase_return->loadMissing(['grn.warehouse', 'grn.lines', 'order', 'lines.grnLine', 'lines.item']);
 
         if (!$purchase_return->grn || $purchase_return->grn->status !== 'posted') {
             return back()->with('error', 'GRN belum posted / tidak valid.');
         }
 
-        // validasi remaining per line (final)
         $remainingMap = $this->remainingByGrnLine($purchase_return->grn, excludeReturnId: (int) $purchase_return->id);
 
         foreach ($purchase_return->lines as $ln) {
@@ -171,36 +176,14 @@ class PurchaseReturnController extends Controller
             return back()->with('error', 'Total return harus > 0.');
         }
 
-        DB::transaction(function () use ($purchase_return, $total) {
+        DB::transaction(function () use ($purchase_return) {
 
             $warehouseId = (int) $purchase_return->grn->warehouse_id;
             if ($warehouseId <= 0) {
                 throw ValidationException::withMessages(['return' => 'GRN tidak punya warehouse.']);
             }
 
-            // 1) STOCK OUT per line (lot aware)
-            foreach ($purchase_return->lines as $ln) {
-                $qty = (float) $ln->qty;
-                if ($qty <= 0.0001) {
-                    continue;
-                }
-
-                $this->inventory->stockOut(
-                    warehouseId: (int) $purchase_return->grn->warehouse_id,
-                    itemId: (int) $ln->item_id,
-                    qty: (float) $ln->qty,
-                    date: $purchase_return->date,
-                    sourceType: 'purchase_return',
-                    sourceId: (int) $purchase_return->id,
-                    notes: "Return {$purchase_return->code} (GRN {$purchase_return->grn->code}) line {$ln->id}",
-                    allowNegative: false,
-                    lotId: $ln->lot_id ? (int) $ln->lot_id : null,
-                    unitCostOverride: $ln->unit_price !== null ? (float) $ln->unit_price : null,
-                    affectLotCost: false, // penting: return jangan ngacak moving average lot kain
-                );
-            }
-
-            // 2) JOURNAL (inventory turun, AP turun / claim naik)
+            // COA
             $invId = (int) Account::where('code', '1201')->value('id');
             $apId = (int) Account::where('code', '2101')->value('id');
             $claimId = (int) Account::where('code', '1305')->value('id');
@@ -211,43 +194,193 @@ class PurchaseReturnController extends Controller
                 ]);
             }
 
+            // hitung AP outstanding (sementara masih basis GRN posted)
             $order = $purchase_return->order;
             $apOutstanding = $order ? $this->calcApOutstandingByGrn($order) : 0.0;
 
-            $apPortion = min($apOutstanding, $total);
-            $claimPortion = max(0, round($total - $apPortion, 2));
+            // split total INV vs EXP
+            $invTotal = 0.0;
+            $expTotal = 0.0;
 
-            $lines = [];
-            // credit inventory
-            $lines[] = ['account_id' => $invId, 'debit' => 0, 'credit' => $total];
+            // map expense account by po_line
+            $expAccMap = $this->expenseAccountMapFromOrderLines($purchase_return);
 
-            if ($apPortion > 0.0001) {
-                $lines[] = ['account_id' => $apId, 'debit' => $apPortion, 'credit' => 0];
+            foreach ($purchase_return->lines as $ln) {
+                $qty = (float) $ln->qty;
+                if ($qty <= 0.0001) {
+                    continue;
+                }
+
+                $amt = (float) ($ln->line_total ?? 0);
+                if ($amt <= 0.0001) {
+                    continue;
+                }
+
+                $isHpp = $this->isHppLine($purchase_return, $ln);
+
+                if ($isHpp) {
+                    $invTotal = round($invTotal + $amt, 2);
+                } else {
+                    $expTotal = round($expTotal + $amt, 2);
+                }
+
             }
-            if ($claimPortion > 0.0001) {
-                $lines[] = ['account_id' => $claimId, 'debit' => $claimPortion, 'credit' => 0];
+
+            // =====================================================
+            // 1) STOCK OUT (INV ONLY)
+            // =====================================================
+            foreach ($purchase_return->lines as $ln) {
+                $qty = (float) $ln->qty;
+                if ($qty <= 0.0001) {
+                    continue;
+                }
+
+                if (!$this->isHppLine($purchase_return, $ln)) {
+                    continue; // expense -> tidak pernah masuk stok
+                }
+
+                $this->inventory->stockOut(
+                    warehouseId: $warehouseId,
+                    itemId: (int) $ln->item_id,
+                    qty: (float) $ln->qty,
+                    date: $purchase_return->date,
+                    sourceType: 'purchase_return',
+                    sourceId: (int) $purchase_return->id,
+                    notes: "Return {$purchase_return->code} (GRN {$purchase_return->grn->code}) line {$ln->id}",
+                    allowNegative: false,
+                    lotId: $ln->lot_id ? (int) $ln->lot_id : null,
+                    unitCostOverride: $ln->unit_price !== null ? (float) $ln->unit_price : null,
+                    affectLotCost: false,
+                );
             }
 
-            $j = $this->journal->post(
-                $purchase_return->date,
-                JournalService::SRC_PURCHASE_RETURN,
-                (int) $purchase_return->id,
-                "Purchase Return {$purchase_return->code} (GRN {$purchase_return->grn->code})",
-                $lines
-            );
+            // =====================================================
+            // 2) JOURNAL INV (jika ada invTotal)
+            // Cr Inventory; Dr AP/Claim
+            // =====================================================
+            if ($invTotal > 0.0001) {
+                $apPortion = min($apOutstanding, $invTotal);
+                $claimPortion = max(0, round($invTotal - $apPortion, 2));
 
+                $linesInv = [];
+                $linesInv[] = ['account_id' => $invId, 'debit' => 0, 'credit' => round($invTotal, 2)];
+
+                if ($apPortion > 0.0001) {
+                    $linesInv[] = ['account_id' => $apId, 'debit' => round($apPortion, 2), 'credit' => 0];
+                }
+
+                if ($claimPortion > 0.0001) {
+                    $linesInv[] = ['account_id' => $claimId, 'debit' => round($claimPortion, 2), 'credit' => 0];
+                }
+
+                $this->journal->post(
+                    $purchase_return->date,
+                    JournalService::SRC_PURCHASE_RETURN_INV,
+                    (int) $purchase_return->id,
+                    "Purchase Return {$purchase_return->code} - Inventory (GRN {$purchase_return->grn->code})",
+                    $linesInv
+                );
+
+                // kurangi AP outstanding yang tersisa untuk expense portion
+                $apOutstanding = max(0, round($apOutstanding - $apPortion, 2));
+            }
+
+            // =====================================================
+            // 3) JOURNAL EXP (jika ada expTotal)
+            // Cr Expense per account; Dr AP/Claim
+            // =====================================================
+            if ($expTotal > 0.0001) {
+                $apPortion = min($apOutstanding, $expTotal);
+                $claimPortion = max(0, round($expTotal - $apPortion, 2));
+
+                // group credit expense by account
+                $creditByAcc = [];
+
+                foreach ($purchase_return->lines as $ln) {
+                    $qty = (float) $ln->qty;
+                    if ($qty <= 0.0001) {
+                        continue;
+                    }
+
+                    $amt = (float) ($ln->line_total ?? 0);
+                    if ($amt <= 0.0001) {
+                        continue;
+                    }
+
+                    if ($this->isHppLine($purchase_return, $ln)) {
+                        continue;
+                    }
+                    // only expense lines
+
+                    $poLineId = (int) ($ln->grnLine?->purchase_order_line_id ?? 0);
+                    $accId = (int) ($expAccMap[$poLineId] ?? 0);
+
+                    // fallback: 6110 kalau kosong
+                    if ($accId <= 0) {
+                        $accId = (int) (Account::where('code', '6110')->value('id') ?? 0);
+                        if ($accId <= 0) {
+                            throw ValidationException::withMessages([
+                                'return' => 'Expense account tidak ditemukan. Set expense_account_id pada PO line, atau buat COA 6110.',
+                            ]);
+                        }
+                    }
+
+                    $creditByAcc[$accId] = round((float) ($creditByAcc[$accId] ?? 0) + $amt, 2);
+                }
+
+                $linesExp = [];
+                // debit AP/Claim
+                if ($apPortion > 0.0001) {
+                    $linesExp[] = ['account_id' => $apId, 'debit' => round($apPortion, 2), 'credit' => 0];
+                }
+
+                if ($claimPortion > 0.0001) {
+                    $linesExp[] = ['account_id' => $claimId, 'debit' => round($claimPortion, 2), 'credit' => 0];
+                }
+
+                // credit expense accounts
+                foreach ($creditByAcc as $accId => $amt) {
+                    if ($amt <= 0.0001) {
+                        continue;
+                    }
+
+                    $linesExp[] = ['account_id' => (int) $accId, 'debit' => 0, 'credit' => round($amt, 2)];
+                }
+
+                if (count($linesExp) < 2) {
+                    throw ValidationException::withMessages([
+                        'return' => 'Jurnal return expense tidak valid (lines < 2).',
+                    ]);
+                }
+
+                $this->journal->post(
+                    $purchase_return->date,
+                    JournalService::SRC_PURCHASE_RETURN_EXP,
+                    (int) $purchase_return->id,
+                    "Purchase Return {$purchase_return->code} - Expense (GRN {$purchase_return->grn->code})",
+                    $linesExp
+                );
+            }
+
+            // =====================================================
+            // 4) Mark posted
+            // =====================================================
             $purchase_return->forceFill([
                 'status' => 'posted',
                 'posted_at' => now(),
                 'posted_by' => (int) auth()->id(),
-                'total' => round($total, 2),
-                'journal_id' => $j->id,
+                'total' => round((float) $purchase_return->lines()->sum('line_total'), 2),
             ])->save();
         });
 
         return back()->with('success', 'Return berhasil diposting.');
     }
 
+    /**
+     * VOID Return:
+     * - Balikin stok hanya untuk INV lines
+     * - Void jurnal inv + exp by source
+     */
     public function void(Request $request, PurchaseReturn $purchase_return)
     {
         if ($purchase_return->voided_at) {
@@ -258,16 +391,20 @@ class PurchaseReturnController extends Controller
             return back()->with('error', 'Return belum posted.');
         }
 
-        $purchase_return->loadMissing(['grn', 'lines']);
+        $purchase_return->loadMissing(['grn', 'lines.grnLine', 'lines.item']);
 
         DB::transaction(function () use ($purchase_return) {
 
-            // 1) balikkan stok (stock in)
             $warehouseId = (int) $purchase_return->grn->warehouse_id;
 
+            // 1) balikkan stok hanya untuk INV lines
             foreach ($purchase_return->lines as $ln) {
                 $qty = (float) $ln->qty;
                 if ($qty <= 0.0001) {
+                    continue;
+                }
+
+                if (!$this->isHppLine($purchase_return, $ln)) {
                     continue;
                 }
 
@@ -284,12 +421,9 @@ class PurchaseReturnController extends Controller
                 );
             }
 
-            // 2) void jurnal by source (atau by journal_id)
-            if (!empty($purchase_return->journal_id)) {
-                $this->journal->voidJournal((int) $purchase_return->journal_id, "VOID Purchase Return {$purchase_return->code}");
-            } else {
-                $this->journal->voidBySource(JournalService::SRC_PURCHASE_RETURN, (int) $purchase_return->id, "VOID Purchase Return {$purchase_return->code}");
-            }
+            // 2) void 2 jurnal
+            $this->journal->voidBySource(JournalService::SRC_PURCHASE_RETURN_INV, (int) $purchase_return->id, "VOID Purchase Return {$purchase_return->code}");
+            $this->journal->voidBySource(JournalService::SRC_PURCHASE_RETURN_EXP, (int) $purchase_return->id, "VOID Purchase Return {$purchase_return->code}");
 
             // 3) mark void
             $purchase_return->forceFill([
@@ -304,6 +438,89 @@ class PurchaseReturnController extends Controller
     // ================================
     // Helpers
     // ================================
+
+    protected function isHppLine(PurchaseReturn $ret, PurchaseReturnLine $ln): bool
+    {
+        // sumber utama: allocation dari purchase_order_lines
+        $poLineId = (int) ($ln->grnLine?->purchase_order_line_id ?? 0);
+
+        if ($poLineId > 0 && Schema::hasColumn('purchase_order_lines', 'allocation')) {
+            $alloc = (string) DB::table('purchase_order_lines')->where('id', $poLineId)->value('allocation');
+            if ($alloc !== '') {
+                return $alloc !== 'expense';
+            }
+        }
+
+        // fallback: items.default_allocation
+        if (Schema::hasColumn('items', 'default_allocation')) {
+            $alloc = (string) Item::query()->whereKey((int) $ln->item_id)->value('default_allocation');
+            if ($alloc !== '') {
+                return $alloc !== 'expense';
+            }
+        }
+
+        return true; // default hpp
+    }
+
+    protected function expenseAccountMapFromOrderLines(PurchaseReturn $ret): array
+    {
+        // 1) ambil po_line_id yang dipakai oleh return lines
+        $poLineIds = $ret->lines
+            ->map(fn($l) => (int) ($l->grnLine?->purchase_order_line_id ?? 0))
+            ->filter(fn($id) => $id > 0)
+            ->unique()
+            ->values()
+            ->all();
+
+        // Map hasil akhir: [po_line_id => expense_account_id]
+        $map = [];
+
+        // 2) dari PO line (paling utama)
+        if (!empty($poLineIds) && Schema::hasColumn('purchase_order_lines', 'expense_account_id')) {
+            $map = DB::table('purchase_order_lines')
+                ->whereIn('id', $poLineIds)
+                ->pluck('expense_account_id', 'id')
+                ->map(fn($v) => (int) ($v ?? 0))
+                ->all();
+        }
+
+        // 3) fallback dari item master jika PO line kosong
+        //    butuh mapping po_line_id -> item_id
+        if (!empty($poLineIds) && Schema::hasColumn('items', 'default_expense_account_id')) {
+            $poLineItemMap = DB::table('purchase_order_lines')
+                ->whereIn('id', $poLineIds)
+                ->pluck('item_id', 'id') // [po_line_id => item_id]
+                ->map(fn($v) => (int) ($v ?? 0))
+                ->all();
+
+            $itemIds = array_values(array_filter(array_unique(array_values($poLineItemMap))));
+            $itemDefaultExp = [];
+
+            if (!empty($itemIds)) {
+                $itemDefaultExp = Item::query()
+                    ->whereIn('id', $itemIds)
+                    ->pluck('default_expense_account_id', 'id') // [item_id => acc_id]
+                    ->map(fn($v) => (int) ($v ?? 0))
+                    ->all();
+            }
+
+            foreach ($poLineItemMap as $poLineId => $itemId) {
+                $poLineId = (int) $poLineId;
+                $itemId = (int) $itemId;
+
+                if (($map[$poLineId] ?? 0) > 0) {
+                    continue; // sudah ada dari PO line
+                }
+
+                $fallbackAcc = (int) ($itemDefaultExp[$itemId] ?? 0);
+                if ($fallbackAcc > 0) {
+                    $map[$poLineId] = $fallbackAcc;
+                }
+            }
+        }
+
+        return $map;
+    }
 
     protected function remainingByGrnLine(PurchaseReceipt $grn, ?int $excludeReturnId = null): array
     {

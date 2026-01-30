@@ -34,6 +34,17 @@ class PurchasePaymentController extends Controller
      */
     public function store(Request $request, PurchaseOrder $purchase_order)
     {
+
+        $grnPostedTotal = (float) $purchase_order->purchaseReceipts()
+            ->where('status', 'posted')
+            ->sum('grand_total');
+
+        if ($grnPostedTotal <= 0.0001) {
+            throw ValidationException::withMessages([
+                'amount' => 'Belum ada GRN POSTED. Pembayaran/DP hanya boleh setelah barang diterima (GRN posted).',
+            ]);
+        }
+
         if (($purchase_order->status ?? '') === 'cancelled') {
             return back()->with('error', 'PO cancelled tidak bisa menerima pembayaran.');
         }

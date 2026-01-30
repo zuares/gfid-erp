@@ -1,0 +1,39 @@
+<?php
+
+use Illuminate\Database\Migrations\Migration;
+use Illuminate\Database\Schema\Blueprint;
+use Illuminate\Support\Facades\Schema;
+
+return new class extends Migration
+{
+    public function up(): void
+    {
+        Schema::table('purchase_orders', function (Blueprint $table) {
+            // nomor invoice supplier (opsional tapi penting)
+            $table->string('supplier_invoice_no', 64)
+                ->nullable()
+                ->after('notes');
+
+            // penanda expense lines sudah dibuat jurnal saat approve
+            $table->datetime('expense_posted_at')
+                ->nullable()
+                ->after('approved_at');
+
+            // optional: simpan id journal biar gampang audit/void
+            $table->unsignedBigInteger('expense_journal_id')
+                ->nullable()
+                ->after('expense_posted_at');
+        });
+    }
+
+    public function down(): void
+    {
+        Schema::table('purchase_orders', function (Blueprint $table) {
+            $table->dropColumn([
+                'supplier_invoice_no',
+                'expense_posted_at',
+                'expense_journal_id',
+            ]);
+        });
+    }
+};

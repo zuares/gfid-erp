@@ -8,11 +8,12 @@ use App\Models\PurchasePayment;
 use App\Models\PurchaseReceipt;
 use Carbon\Carbon;
 use Illuminate\Support\Facades\DB;
+use Illuminate\Support\Facades\Schema;
 use Illuminate\Validation\ValidationException;
 
 class JournalService
 {
-    // ====== COA CODES (sesuai seeder kamu) ======
+    // ====== COA CODES ======
     public const CODE_AP = '2101'; // Hutang Dagang
     public const CODE_INV_RAW = '1201'; // Persediaan Bahan Baku
     public const CODE_ADV_PURCHASE = '1151'; // Uang Muka Pembelian
@@ -23,6 +24,11 @@ class JournalService
     public const SRC_GRN_ACCRUAL = 'purchase_receipt_post';
     public const SRC_GRN_APPLY_DP = 'purchase_dp_apply';
     public const SRC_PURCHASE_RETURN = 'purchase_return_post';
+    public const SRC_PURCHASE_RETURN_INV = 'purchase_return_inv';
+    public const SRC_PURCHASE_RETURN_EXP = 'purchase_return_exp';
+
+    // public const SRC_PO_EXPENSE_APPROVE = 'purchase_order_expense_approve';
+
     /**
      * Post journal + lines (balanced).
      * Idempotent: jika source_type + source_id (aktif / belum void) sudah ada, return existing.
@@ -120,7 +126,9 @@ class JournalService
     }
 
     /**
-     * Void journal (soft).
+     * Void journal (soft) + buat reversal journal (AKTIF).
+     * - jurnal lama di-void (voided_at terisi)
+     * - reversal journal dibuat (swap debit/credit) dan tetap aktif (voided_at NULL)
      */
     public function void(Journal $journal, ?string $reason = null): Journal
     {
@@ -144,26 +152,25 @@ class JournalService
                 ]);
             }
 
-            // 1) Mark void journal lama
+            // 1) Void jurnal lama
             $journal->forceFill([
                 'voided_at' => now(),
             ])->save();
 
-            // 2) Create reversal journal (swap debit/credit)
+            // 2) Deskripsi reversal
             $revDesc = trim(
                 'Reversal: ' . ($journal->description ?? '-') .
                 ($reason ? " | {$reason}" : '')
             );
 
-            // 2) Create reversal journal (swap debit/credit)
-// ✅ tapi karena "void tidak dihitung", reversal juga kita tandai voided
+            // 3) Buat reversal journal (AKTIF)
             $rev = Journal::create([
                 'date' => $journal->date,
                 'description' => $revDesc,
                 'source_type' => $journal->source_type,
                 'source_id' => $journal->source_id,
                 'posted_at' => now(),
-                'voided_at' => now(), // ✅ IMPORTANT
+                // voided_at sengaja NULL
             ]);
 
             $rev->lines()->createMany(
@@ -187,7 +194,6 @@ class JournalService
     {
         return DB::transaction(function () use ($sourceType, $sourceId, $reason) {
 
-            /** @var Journal|null $j */
             $j = Journal::query()
                 ->where('source_type', $sourceType)
                 ->where('source_id', $sourceId)
@@ -199,7 +205,21 @@ class JournalService
                 return null;
             }
 
-            // void() sudah bikin reversal journal
+            return $this->void($j, $reason);
+        });
+    }
+
+    /**
+     * Void by id (helper) – kompatibel dengan PurchasePaymentController kamu.
+     */
+    public function voidById(int $journalId, ?string $reason = null): Journal
+    {
+        return DB::transaction(function () use ($journalId, $reason) {
+            $j = Journal::query()
+                ->with('lines')
+                ->lockForUpdate()
+                ->findOrFail($journalId);
+
             return $this->void($j, $reason);
         });
     }
@@ -209,241 +229,332 @@ class JournalService
     // =========================================================
 
     /**
-     * Payment (uang keluar):
-     * - type=dp     : Dr Uang Muka Pembelian (1151), Cr Kas/Bank
-     * - type=payment: Dr Hutang Dagang (2101), Cr Kas/Bank
+     * Post journal untuk PurchasePayment:
+     * - type=dp      : Dr 1151 / Cr Kas/Bank
+     * - type=payment : Dr 2101 / Cr Kas/Bank
+     * - type=dp_apply: Dr 2101 / Cr 1151 (tanpa kas/bank)
      *
      * NOTE:
-     * - Jika payment method = credit/tempo -> tidak posting jurnal kas/bank (karena tidak ada uang keluar).
-     * - Tidak menyimpan journal_id ke payment (agar tidak tergantung kolom journal_id).
+     * - mode credit/tempo: TIDAK boleh untuk payment (pelunasan), hanya dp atau dp_apply
+     * - Idempotent via (source_type=SRC_PURCHASE_PAYMENT, source_id=payment_id)
+     * - Set payment.journal_id
      */
     public function postPurchasePayment(PurchasePayment $payment): Journal
     {
-        // Load relasi yang dibutuhkan
-        $payment->loadMissing(['purchaseOrder', 'paymentMethod', 'cashAccount']);
+        return DB::transaction(function () use ($payment) {
 
-        // =========================================================
-        // 0) Proteksi: void & amount
-        // =========================================================
-        if ($payment->voided_at) {
-            throw ValidationException::withMessages([
-                'payment' => 'Payment sudah void.',
-            ]);
-        }
+            $payment->loadMissing(['purchaseOrder', 'paymentMethod', 'cashAccount']);
 
-        $amount = (float) $payment->amount;
-        if ($amount <= 0) {
-            throw ValidationException::withMessages([
-                'payment' => 'Amount harus > 0.',
-            ]);
-        }
-
-        // =========================================================
-        // 1) Idempotency + anti double click (row lock)
-        // =========================================================
-        // Kalau sudah ada journal_id, jangan bikin jurnal baru
-        if ($payment->journal_id) {
-            $existing = Journal::query()->find((int) $payment->journal_id);
-            if ($existing) {
-                return $existing;
+            if ($payment->voided_at) {
+                throw ValidationException::withMessages([
+                    'payment' => 'Payment sudah void.',
+                ]);
             }
 
-            // kalau journal_id terisi tapi journal-nya hilang (edge case)
-            // reset agar bisa dipost ulang (optional; atau throw error)
-            $payment->forceFill(['journal_id' => null])->save();
-        }
-
-        // Lock row untuk mencegah race-condition klik 2x
-        $locked = PurchasePayment::query()
-            ->whereKey($payment->id)
-            ->lockForUpdate()
-            ->first();
-
-        if ($locked && $locked->journal_id) {
-            $existing = Journal::query()->find((int) $locked->journal_id);
-            if ($existing) {
-                return $existing;
+            $amount = (float) $payment->amount;
+            if ($amount <= 0) {
+                throw ValidationException::withMessages([
+                    'payment' => 'Amount harus > 0.',
+                ]);
             }
 
-            $locked->forceFill(['journal_id' => null])->save();
-        }
+            // anti double click: kalau sudah punya journal_id dan journal masih ada
+            if (!empty($payment->journal_id)) {
+                $existing = Journal::query()->find((int) $payment->journal_id);
+                if ($existing) {
+                    return $existing;
+                }
+                // edge case: journal hilang -> reset agar bisa post ulang
+                $payment->forceFill(['journal_id' => null])->save();
+            }
 
-        // =========================================================
-        // 2) Ambil akun COA
-        // =========================================================
-        $advId = $this->accountIdByCode(self::CODE_ADV_PURCHASE); // 1151
-        $apId = $this->accountIdByCode(self::CODE_AP); // 2101
+            // row lock
+            $locked = PurchasePayment::query()
+                ->whereKey($payment->id)
+                ->lockForUpdate()
+                ->first();
 
-        // =========================================================
-        // 3) Meta jurnal
-        // =========================================================
-        $po = $payment->purchaseOrder;
-        $poCode = $po?->code ?? '-';
-        $date = $this->dateOnly($payment->date);
+            if ($locked && !empty($locked->journal_id)) {
+                $existing = Journal::query()->find((int) $locked->journal_id);
+                if ($existing) {
+                    return $existing;
+                }
+                $locked->forceFill(['journal_id' => null])->save();
+            }
 
-        $pmName = $payment->paymentMethod?->name;
-        $cashName = $payment->cashAccount?->name;
-        $suffix = trim(implode(' ', array_filter([
-            $pmName ? "via {$pmName}" : null,
-            $cashName ? "({$cashName})" : null,
-        ])));
+            $advId = $this->accountIdByCode(self::CODE_ADV_PURCHASE);
+            $apId = $this->accountIdByCode(self::CODE_AP);
 
-        $sourceType = self::SRC_PURCHASE_PAYMENT;
-        $sourceId = (int) $payment->id;
+            $po = $payment->purchaseOrder;
+            $poCode = $po?->code ?? '-';
+            $date = $this->dateOnly($payment->date);
 
-        // =========================================================
-        // 4) Branch by payment type
-        // =========================================================
+            $pmName = $payment->paymentMethod?->name;
+            $cashName = $payment->cashAccount?->name;
+            $suffix = trim(implode(' ', array_filter([
+                $pmName ? "via {$pmName}" : null,
+                $cashName ? "({$cashName})" : null,
+            ])));
 
-        // 4.1 DP APPLY / OFFSET (tanpa kas/bank)
-        if ($payment->type === 'dp_apply') {
+            $sourceType = self::SRC_PURCHASE_PAYMENT;
+            $sourceId = (int) $payment->id;
+
+            // dp_apply (tanpa kas/bank)
+            if ($payment->type === 'dp_apply') {
+                $journal = $this->post(
+                    $date,
+                    $sourceType,
+                    $sourceId,
+                    trim("Apply DP ke Hutang {$poCode}"),
+                    [
+                        ['account_id' => $apId, 'debit' => $amount, 'credit' => 0],
+                        ['account_id' => $advId, 'debit' => 0, 'credit' => $amount],
+                    ]
+                );
+
+                $payment->forceFill(['journal_id' => $journal->id])->save();
+                return $journal;
+            }
+
+            // dp / payment: wajib kas/bank untuk cash/transfer
+            $mode = $this->detectPaymentModeFromMethod($payment->paymentMethod);
+
+            if (in_array($mode, ['credit', 'tempo'], true)) {
+                // credit/tempo: dp boleh, payment tidak boleh (controller kamu sudah larang payment)
+                if ($payment->type !== 'dp') {
+                    throw ValidationException::withMessages([
+                        'payment' => 'Metode TEMPO/CREDIT tidak membuat jurnal kas/bank.',
+                    ]);
+                }
+                throw ValidationException::withMessages([
+                    'payment' => 'DP dengan mode CREDIT/TEMPO tidak membuat jurnal kas/bank. (DP credit seharusnya hanya catatan non-cash atau gunakan flow lain).',
+                ]);
+            }
+
+            if (!$payment->cash_account_id) {
+                throw ValidationException::withMessages([
+                    'payment' => 'cash_account_id wajib untuk jurnal pembayaran (kas/bank).',
+                ]);
+            }
+
+            $cashAccountId = (int) $payment->cash_account_id;
+            $this->ensureAccountIsCash($cashAccountId);
+
+            // dp
+            if ($payment->type === 'dp') {
+                $journal = $this->post(
+                    $date,
+                    $sourceType,
+                    $sourceId,
+                    trim("DP Pembelian {$poCode} {$suffix}"),
+                    [
+                        ['account_id' => $advId, 'debit' => $amount, 'credit' => 0],
+                        ['account_id' => $cashAccountId, 'debit' => 0, 'credit' => $amount],
+                    ]
+                );
+
+                $payment->forceFill(['journal_id' => $journal->id])->save();
+                return $journal;
+            }
+
+            // payment (pelunasan hutang)
             $journal = $this->post(
                 $date,
                 $sourceType,
                 $sourceId,
-                trim("Apply DP ke Hutang {$poCode}"),
+                trim("Pelunasan Hutang {$poCode} {$suffix}"),
                 [
                     ['account_id' => $apId, 'debit' => $amount, 'credit' => 0],
-                    ['account_id' => $advId, 'debit' => 0, 'credit' => $amount],
-                ]
-            );
-
-            $payment->forceFill(['journal_id' => $journal->id])->save();
-
-            return $journal;
-        }
-
-        // 4.2 DP / PAYMENT biasa -> wajib kas/bank (cash/transfer)
-        $mode = $this->detectPaymentModeFromMethod($payment->paymentMethod);
-
-        if (in_array($mode, ['credit', 'tempo'], true)) {
-            throw ValidationException::withMessages([
-                'payment' => 'Metode TEMPO/CREDIT tidak membuat jurnal kas/bank. Pembayaran kas/bank hanya untuk cash/transfer.',
-            ]);
-        }
-
-        if (!$payment->cash_account_id) {
-            throw ValidationException::withMessages([
-                'payment' => 'cash_account_id wajib untuk jurnal pembayaran (kas/bank).',
-            ]);
-        }
-
-        $cashAccountId = (int) $payment->cash_account_id;
-        $this->ensureAccountIsCash($cashAccountId);
-
-        // 4.2.a DP (uang muka)
-        if ($payment->type === 'dp') {
-            $journal = $this->post(
-                $date,
-                $sourceType,
-                $sourceId,
-                trim("DP Pembelian {$poCode} {$suffix}"),
-                [
-                    ['account_id' => $advId, 'debit' => $amount, 'credit' => 0],
                     ['account_id' => $cashAccountId, 'debit' => 0, 'credit' => $amount],
                 ]
             );
 
             $payment->forceFill(['journal_id' => $journal->id])->save();
-
             return $journal;
-        }
+        });
+    }
+    public function postGrnSplit(PurchaseReceipt $grn): void
+    {
+        DB::transaction(function () use ($grn) {
 
-        // 4.2.b Default: payment (pelunasan hutang)
-        $journal = $this->post(
-            $date,
-            $sourceType,
-            $sourceId,
-            trim("Pelunasan Hutang {$poCode} {$suffix}"),
-            [
-                ['account_id' => $apId, 'debit' => $amount, 'credit' => 0],
-                ['account_id' => $cashAccountId, 'debit' => 0, 'credit' => $amount],
-            ]
-        );
+            $grn->loadMissing(['order', 'lines']);
 
-        $payment->forceFill(['journal_id' => $journal->id])->save();
+            if (!$grn->order) {
+                throw ValidationException::withMessages([
+                    'grn' => 'GRN tidak punya PO.',
+                ]);
+            }
 
-        return $journal;
+            $hasAlloc = Schema::hasColumn('purchase_receipt_lines', 'allocation');
+            $hasExpAcc = Schema::hasColumn('purchase_receipt_lines', 'expense_account_id');
+
+            if (!$hasAlloc) {
+                throw ValidationException::withMessages([
+                    'grn' => 'purchase_receipt_lines.allocation belum ada. Tambahkan kolom allocation agar bisa split jurnal.',
+                ]);
+            }
+
+            // =========================
+            // 1) INV JOURNAL (hpp) -> Dr INV / Cr AP
+            // =========================
+            $invAmount = (float) $grn->lines->where('allocation', 'hpp')->sum('line_total');
+
+            if ($invAmount > 0.0001) {
+                $invId = $this->accountIdByCode(self::CODE_INV_RAW); // 1201 (sementara 1 akun)
+                $apId = $this->accountIdByCode(self::CODE_AP); // 2101
+
+                $this->post(
+                    $this->dateOnly($grn->date),
+                    self::SRC_GRN_ACCRUAL_INV,
+                    (int) $grn->id,
+                    "GRN {$grn->code} - Inventory",
+                    [
+                        ['account_id' => $invId, 'debit' => round($invAmount, 2), 'credit' => 0],
+                        ['account_id' => $apId, 'debit' => 0, 'credit' => round($invAmount, 2)],
+                    ]
+                );
+            }
+
+            // =========================
+            // 2) EXP JOURNAL (expense) -> Dr EXP / Cr AP
+            // =========================
+            $expLines = $grn->lines->where('allocation', 'expense');
+
+            if ($expLines->count() > 0) {
+
+                if (!$hasExpAcc) {
+                    throw ValidationException::withMessages([
+                        'grn' => 'purchase_receipt_lines.expense_account_id belum ada. Tambahkan agar expense bisa dijurnal.',
+                    ]);
+                }
+
+                $groups = [];
+                $expTotal = 0.0;
+
+                foreach ($expLines as $ln) {
+                    $amt = (float) ($ln->line_total ?? 0);
+                    if ($amt <= 0) {
+                        continue;
+                    }
+
+                    $accId = (int) ($ln->expense_account_id ?? 0);
+                    if ($accId <= 0) {
+                        throw ValidationException::withMessages([
+                            'grn' => 'Ada GRN expense line tapi expense_account_id kosong. Pastikan default_expense_account_id di master item, dan line ikut ke GRN.',
+                        ]);
+                    }
+
+                    $groups[$accId] = ($groups[$accId] ?? 0) + $amt;
+                    $expTotal += $amt;
+                }
+
+                $expTotal = round($expTotal, 2);
+
+                if ($expTotal > 0) {
+                    $apId = $this->accountIdByCode(self::CODE_AP);
+
+                    $lines = [];
+                    foreach ($groups as $accId => $amt) {
+                        $lines[] = [
+                            'account_id' => (int) $accId,
+                            'debit' => round((float) $amt, 2),
+                            'credit' => 0,
+                        ];
+                    }
+
+                    $lines[] = [
+                        'account_id' => (int) $apId,
+                        'debit' => 0,
+                        'credit' => $expTotal,
+                    ];
+
+                    $this->post(
+                        $this->dateOnly($grn->date),
+                        self::SRC_GRN_ACCRUAL_EXP,
+                        (int) $grn->id,
+                        "GRN {$grn->code} - Expense",
+                        $lines
+                    );
+                }
+            }
+        });
     }
 
     /**
      * GRN Posted (accrual inventory vs AP) + apply DP.
-     *
-     * - Jurnal 1 (accrual):
-     *   Dr Persediaan (1201) / Cr Hutang Dagang (2101)
-     *
-     * - Jurnal 2 (apply DP):
-     *   Dr Hutang Dagang (2101) / Cr Uang Muka (1151)
-     *
-     * Idempotent by:
-     * - SRC_GRN_ACCRUAL source_id = grn id
-     * - SRC_GRN_APPLY_DP source_id = grn id
+     * (Tetap seperti versi kamu: hanya tempo/credit. Kamu bilang GRN nanti.)
      */
     public function postGrnAccrual(PurchaseReceipt $grn): void
     {
-        $grn->loadMissing(['order.paymentMethod']);
+        DB::transaction(function () use ($grn) {
 
-        $po = $grn->order ?? null;
-        if (!$po) {
-            throw ValidationException::withMessages([
-                'grn' => 'GRN tidak punya PO.',
-            ]);
-        }
+            $grn->loadMissing(['order.paymentMethod']);
 
-        $mode = $this->detectPaymentModeFromMethod($po->paymentMethod);
+            $po = $grn->order ?? null;
+            if (!$po) {
+                throw ValidationException::withMessages([
+                    'grn' => 'GRN tidak punya PO.',
+                ]);
+            }
 
-        // ✅ accrual hutang hanya relevan kalau tempo/credit
-        // kalau kamu mau selalu accrual apapun metodenya, hapus if ini.
-        if (!in_array($mode, ['credit', 'tempo'], true)) {
-            return;
-        }
+            $mode = $this->detectPaymentModeFromMethod($po->paymentMethod);
 
-        $amount = (float) ($grn->grand_total ?? 0);
-        if ($amount <= 0) {
-            throw ValidationException::withMessages([
-                'grn' => 'GRN grand_total harus > 0 untuk accrual.',
-            ]);
-        }
+            // sementara: accrual hutang hanya relevan kalau tempo/credit
+            if (!in_array($mode, ['credit', 'tempo'], true)) {
+                return;
+            }
 
-        $invId = $this->accountIdByCode(self::CODE_INV_RAW); // 1201
-        $apId = $this->accountIdByCode(self::CODE_AP); // 2101
-        $advId = $this->accountIdByCode(self::CODE_ADV_PURCHASE); // 1151
+            $amount = (float) ($grn->grand_total ?? 0);
+            if ($amount <= 0) {
+                throw ValidationException::withMessages([
+                    'grn' => 'GRN grand_total harus > 0 untuk accrual.',
+                ]);
+            }
 
-        $date = $this->dateOnly($grn->date);
+            $invId = $this->accountIdByCode(self::CODE_INV_RAW);
+            $apId = $this->accountIdByCode(self::CODE_AP);
+            $advId = $this->accountIdByCode(self::CODE_ADV_PURCHASE);
 
-        // 1) Accrual inventory vs AP
-        $this->post(
-            $date,
-            self::SRC_GRN_ACCRUAL,
-            (int) $grn->id,
-            "GRN {$grn->code} - Hutang Dagang",
-            [
-                ['account_id' => $invId, 'debit' => $amount, 'credit' => 0],
-                ['account_id' => $apId, 'debit' => 0, 'credit' => $amount],
-            ]
-        );
+            $date = $this->dateOnly($grn->date);
 
-        // 2) Apply DP dari PO (hanya DP aktif)
-        $dpTotal = (float) $po->activePayments()
-            ->where('type', 'dp')
-            ->sum('amount');
+            // 1) Accrual inventory vs AP
+            $this->post(
+                $date,
+                self::SRC_GRN_ACCRUAL,
+                (int) $grn->id,
+                "GRN {$grn->code} - Hutang Dagang",
+                [
+                    ['account_id' => $invId, 'debit' => $amount, 'credit' => 0],
+                    ['account_id' => $apId, 'debit' => 0, 'credit' => $amount],
+                ]
+            );
 
-        if ($dpTotal <= 0.0001) {
-            return;
-        }
+            // 2) Apply DP dari PO (hanya DP aktif)
+            if (!method_exists($po, 'activePayments')) {
+                return;
+            }
 
-        $apply = min($dpTotal, $amount);
+            $dpTotal = (float) $po->activePayments()
+                ->where('type', 'dp')
+                ->sum('amount');
 
-        $this->post(
-            $date,
-            self::SRC_GRN_APPLY_DP,
-            (int) $grn->id,
-            "Apply DP {$po->code} ke Hutang",
-            [
-                ['account_id' => $apId, 'debit' => $apply, 'credit' => 0],
-                ['account_id' => $advId, 'debit' => 0, 'credit' => $apply],
-            ]
-        );
+            if ($dpTotal <= 0.0001) {
+                return;
+            }
+
+            $apply = min($dpTotal, $amount);
+
+            $this->post(
+                $date,
+                self::SRC_GRN_APPLY_DP,
+                (int) $grn->id,
+                "Apply DP {$po->code} ke Hutang",
+                [
+                    ['account_id' => $apId, 'debit' => $apply, 'credit' => 0],
+                    ['account_id' => $advId, 'debit' => 0, 'credit' => $apply],
+                ]
+            );
+        });
     }
 
     // =========================================================
@@ -466,10 +577,6 @@ class JournalService
         return (int) $acc->id;
     }
 
-    /**
-     * Mode deteksi dari PaymentMethod.
-     * Support: cash, transfer, credit, tempo (fallback dari code)
-     */
     protected function detectPaymentModeFromMethod($pm): string
     {
         if (!$pm) {
@@ -499,9 +606,6 @@ class JournalService
         return 'unknown';
     }
 
-    /**
-     * Pastikan accountId memang akun kas/bank.
-     */
     protected function ensureAccountIsCash(int $accountId): void
     {
         $acc = Account::query()->whereKey($accountId)->first();
@@ -522,106 +626,4 @@ class JournalService
     {
         return Carbon::parse($value)->toDateString();
     }
-
-    public function voidJournal(int $journalId, ?string $reason = null): Journal
-    {
-        return DB::transaction(function () use ($journalId, $reason) {
-
-            /** @var Journal $journal */
-            $journal = Journal::query()
-                ->with('lines')
-                ->lockForUpdate()
-                ->findOrFail($journalId);
-
-            if ($journal->voided_at) {
-                throw ValidationException::withMessages([
-                    'journal' => 'Journal sudah void.',
-                ]);
-            }
-
-            if ($journal->lines->count() < 2) {
-                throw ValidationException::withMessages([
-                    'journal' => 'Journal lines tidak valid untuk reversal.',
-                ]);
-            }
-
-            // 1️⃣ Void jurnal lama
-            $journal->forceFill([
-                'voided_at' => now(),
-            ])->save();
-
-            // 2️⃣ DESKRIPSI reversal (INI YANG TADI HILANG)
-            $revDesc = trim(
-                'Reversal: ' . ($journal->description ?? '-') .
-                ($reason ? " | {$reason}" : '')
-            );
-
-            // 3️⃣ Buat jurnal reversal (TAPI langsung di-void)
-            $rev = Journal::create([
-                'date' => $journal->date,
-                'description' => $revDescription,
-                'source_type' => $journal->source_type,
-                'source_id' => $journal->source_id,
-                'posted_at' => now(),
-                // ⚠️ JANGAN set voided_at di reversal
-            ]);
-
-            $rev->lines()->createMany(
-                $journal->lines->map(function ($l) {
-                    return [
-                        'account_id' => (int) $l->account_id,
-                        'debit' => (float) $l->credit,
-                        'credit' => (float) $l->debit,
-                    ];
-                })->all()
-            );
-
-            return $rev;
-        });
-    }
-
-    public function voidPurchasePayment(PurchasePayment $payment, int $userId, ?string $reason = null): void
-    {
-        DB::transaction(function () use ($payment, $userId, $reason) {
-
-            $payment = PurchasePayment::query()
-                ->with(['purchaseOrder'])
-                ->lockForUpdate()
-                ->findOrFail($payment->id);
-
-            if ($payment->voided_at) {
-                throw ValidationException::withMessages([
-                    'payment' => 'Payment sudah void.',
-                ]);
-            }
-
-            // 1) Kalau ada journal -> reversal + void journal lama
-            if ($payment->journal_id) {
-                $this->journalService->voidJournal((int) $payment->journal_id, $reason ?: 'Void purchase payment');
-            }
-
-            // 2) Void payment
-            $payment->forceFill([
-                'voided_at' => now(),
-                'voided_by' => $userId,
-            ])->save();
-
-            // OPTIONAL: kalau kamu mau "payment void" tidak lagi punya journal_id
-            // tapi ingat: audit trail jadi putus kalau kamu null-in.
-            // Aku prefer BIARKAN journal_id tetap ada (menunjuk jurnal lama yg sudah void).
-            // Kalau kamu tetap mau null:
-            // $payment->forceFill(['journal_id' => null])->save();
-
-            // 3) Recalc status PO (DP available, AP outstanding, paid status)
-            if ($payment->purchaseOrder) {
-                $this->recalcPaymentStatus($payment->purchaseOrder);
-            }
-        });
-    }
-
-    public function voidById(int $journalId, ?string $reason = null): Journal
-    {
-        return $this->voidJournal($journalId, $reason);
-    }
-
 }

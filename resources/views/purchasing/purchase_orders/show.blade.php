@@ -308,26 +308,32 @@
                     </a>
                 @endif
 
-                @if ($canPay)
-                    <button type="button" class="btn btn-primary btn-sm btn-action" data-bs-toggle="modal"
-                        data-bs-target="#modalAddPayment">
-                        + Pembayaran / DP
-                    </button>
+             @if ($canPay)
+    @if ($hasAp)
+        <button type="button" class="btn btn-primary btn-sm btn-action" data-bs-toggle="modal"
+            data-bs-target="#modalAddPayment">
+            + Pembayaran
+        </button>
 
-                    <button type="button" class="btn btn-outline-primary btn-sm btn-action" data-bs-toggle="modal"
-                        data-bs-target="#modalApplyDp" @if (!$canApplyDp) disabled @endif
-                        title="{{ $canApplyDp ? '' : 'Offset DP tidak tersedia / hutang belum terbentuk / hutang sudah lunas / PO cancelled' }}">
-                        Offset DP
-                    </button>
+        <button type="button" class="btn btn-outline-primary btn-sm btn-action" data-bs-toggle="modal"
+            data-bs-target="#modalApplyDp" @if (!$canApplyDp) disabled @endif
+            title="{{ $canApplyDp ? '' : 'Offset DP tidak tersedia / hutang sudah lunas / PO cancelled' }}">
+            Offset DP
+        </button>
+    @else
+        <span class="tag mono">
+            Pembayaran aktif setelah GRN <b>POSTED</b>
+        </span>
+    @endif
 
-                    @if ($hasPayments)
-                        <button type="button" class="btn btn-outline-secondary btn-sm btn-action" data-bs-toggle="collapse"
-                            data-bs-target="#paymentHistoryCollapse" aria-expanded="false"
-                            aria-controls="paymentHistoryCollapse">
-                            Riwayat
-                        </button>
-                    @endif
-                @endif
+    @if ($hasPayments)
+        <button type="button" class="btn btn-outline-secondary btn-sm btn-action" data-bs-toggle="collapse"
+            data-bs-target="#paymentHistoryCollapse" aria-expanded="false" aria-controls="paymentHistoryCollapse">
+            Riwayat
+        </button>
+    @endif
+@endif
+
 
                 @if ($user && $user->role === 'owner' && $status === 'draft')
                     <form action="{{ route('purchasing.purchase_orders.approve', $order->id) }}" method="POST"
@@ -858,9 +864,10 @@
                                     <option value="payment" @selected(old('type', 'payment') === 'payment')>Pembayaran (Pelunasan)</option>
                                     <option value="dp" @selected(old('type') === 'dp')>DP (Uang Muka)</option>
                                 </select>
-                                <div class="text-muted small mt-1">
-                                    <span class="mono">DP</span> boleh sebelum GRN posted.
-                                </div>
+                              <div class="text-muted small mt-1">
+    Pembayaran hanya bisa dibuat setelah GRN <b>POSTED</b>.
+</div>
+
                             </div>
 
                             <div class="col-12 col-md-6">
@@ -1092,6 +1099,10 @@
     @push('scripts')
         <script>
             document.addEventListener('DOMContentLoaded', function() {
+                if (grnPostedTotal <= 0.0001) {
+  if (btnSave) btnSave.disabled = true;
+}
+
                 // =========================================================
                 // ADD PAYMENT (existing logic kamu)
                 // =========================================================
@@ -1234,16 +1245,10 @@
                 }
 
                 function syncTypeRules() {
-                    if (typeSelect && grnPostedTotal <= 0.0001) {
-                        typeSelect.value = 'dp';
-                        const optPay = typeSelect.querySelector('option[value="payment"]');
-                        if (optPay) optPay.disabled = true;
-                    } else {
-                        const optPay = typeSelect?.querySelector('option[value="payment"]');
-                        if (optPay) optPay.disabled = false;
-                    }
-                    applyAllValidations();
-                }
+  // tidak ada rule khusus lagi
+  applyAllValidations();
+}
+
 
                 btnFill?.addEventListener('click', function() {
                     if (!amountInput) return;

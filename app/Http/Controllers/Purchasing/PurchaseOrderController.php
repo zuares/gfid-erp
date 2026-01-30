@@ -111,13 +111,21 @@ class PurchaseOrderController extends Controller
 
         $suppliers = Supplier::query()->orderBy('name')->get();
 
+        // ✅ FIX: category_id -> item_category_id
+        // ✅ PACK di atas (OPP/PLY/THR ngumpul dulu)
         $items = Item::query()
-            ->select(['id', 'code', 'name', 'category_id', 'type', 'active'])
+            ->select(['id', 'code', 'name', 'item_category_id', 'type', 'active'])
             ->where('active', 1)
             ->where('type', $orderType)
             ->with(['category:id,code,name'])
+            ->orderByRaw("
+                CASE
+                    WHEN item_category_id = (SELECT id FROM item_categories WHERE code='PACK' LIMIT 1) THEN 0
+                    ELSE 1
+                END
+            ")
             ->orderBy('name')
-            ->limit(200)
+            ->limit(300)
             ->get();
 
         $cashAccounts = Account::query()
@@ -145,6 +153,7 @@ class PurchaseOrderController extends Controller
      */
     public function store(Request $request)
     {
+
         $data = $this->validateData($request);
 
         $data['created_by'] = (int) $request->user()->id;
@@ -211,7 +220,7 @@ class PurchaseOrderController extends Controller
             ->get();
 
         // =========================================================
-        // METRICS hutang berbasis GRN posted
+        // METRICS hutang berbasis GRN posted (tetap dulu, kamu bilang nanti)
         // =========================================================
         $grnPostedTotal = (float) $purchase_order->purchaseReceipts
             ->where('status', 'posted')
@@ -275,10 +284,17 @@ class PurchaseOrderController extends Controller
             (string) ($purchase_order->getAttribute('order_type') ?: $request->input('order_type', 'material'))
         );
 
+        // ✅ biar konsisten: PACK ditaruh di atas juga di edit form
         $itemsBase = Item::query()
             ->where('active', 1)
             ->where('type', $orderType)
             ->with('category')
+            ->orderByRaw("
+                CASE
+                    WHEN item_category_id = (SELECT id FROM item_categories WHERE code='PACK' LIMIT 1) THEN 0
+                    ELSE 1
+                END
+            ")
             ->orderBy('name')
             ->limit(300)
             ->get();
@@ -447,7 +463,6 @@ class PurchaseOrderController extends Controller
             'supplier_id' => ['required', 'integer', 'exists:suppliers,id'],
             'order_type' => ['required', 'in:material,finished_good'],
 
-            // optional
             'payment_method_id' => ['nullable', 'integer', 'exists:payment_methods,id'],
 
             'tax_percent' => ['nullable', 'string'],

@@ -15,29 +15,38 @@ class ItemSeeder extends Seeder
     public function run(): void
     {
         DB::transaction(function () {
+
             $data = $this->seedConfig();
 
             $finishedGoodCategories = ['CRG', 'LJR', 'SJR', 'LCG', 'SHT', 'TJR'];
 
             // ✅ COA SIMPLE
-            // 6110 = Biaya Packing
+            // 6110 = Beban Pengiriman / Biaya Packing (sesuai COA kamu)
             $packingExpenseAccountId = $this->lookupAccountIdByCode('6110'); // nullable kalau accounting belum ada
 
-            // schema guards (biar aman lintas branch/env)
+            // =========================================================
+            // ✅ Schema guards (aman lintas branch/env)
+            // =========================================================
             $hasAffectsHpp = Schema::hasColumn('items', 'affects_hpp');
             $hasDefaultAllocation = Schema::hasColumn('items', 'default_allocation');
             $hasDefaultExpenseAcc = Schema::hasColumn('items', 'default_expense_account_id');
 
+            // NEW columns (migration update_items_add_role_and_stock_flags)
+            $hasItemRole = Schema::hasColumn('items', 'item_role');
+            $hasIsStocked = Schema::hasColumn('items', 'is_stocked');
+            $hasHppBehavior = Schema::hasColumn('items', 'hpp_behavior');
+
             // =========================================================
             // ✅ BACKFILL GLOBAL (penting untuk data yang sudah terlanjur ada)
             // - isi default_expense_account_id untuk PACK expense yang masih NULL/0
-            // - set active=1 untuk semua item PACK (THR/PLY) yang active masih 0
+            // - set active=1 untuk semua item PACK (THR/PLY/OPP) yang active masih 0
+            // - (opsional aman) backfill item_role/is_stocked/hpp_behavior untuk PACK
             // =========================================================
-            if ($hasDefaultExpenseAcc && $packingExpenseAccountId) {
-                $packCatId = DB::table('item_categories')->where('code', 'PACK')->value('id');
+            $packCatId = DB::table('item_categories')->where('code', 'PACK')->value('id');
+            if ($packCatId) {
 
-                if ($packCatId) {
-                    // backfill akun expense untuk PACK expense
+                // backfill akun expense untuk PACK expense
+                if ($hasDefaultExpenseAcc && $packingExpenseAccountId && $hasDefaultAllocation) {
                     DB::table('items')
                         ->where('item_category_id', (int) $packCatId)
                         ->where('default_allocation', 'expense')
@@ -49,19 +58,62 @@ class ItemSeeder extends Seeder
                             'default_expense_account_id' => (int) $packingExpenseAccountId,
                             'updated_at' => now(),
                         ]);
+                }
 
-                    // set active=1 untuk semua item PACK yang masih 0
-                    DB::table('items')
+                // set active=1 untuk semua item PACK yang masih 0
+                DB::table('items')
+                    ->where('item_category_id', (int) $packCatId)
+                    ->where('active', '!=', 1)
+                    ->update([
+                        'active' => 1,
+                        'updated_at' => now(),
+                    ]);
+
+                // backfill item_role/is_stocked/hpp_behavior untuk PACK (aman, hanya isi yang kosong)
+                if ($hasItemRole || $hasIsStocked || $hasHppBehavior) {
+                    $packItems = DB::table('items')
+                        ->select('id', 'code', 'type', 'item_category_id', 'affects_hpp', 'default_allocation', 'item_role', 'is_stocked', 'hpp_behavior')
                         ->where('item_category_id', (int) $packCatId)
-                        ->where('active', '!=', 1)
-                        ->update([
-                            'active' => 1,
-                            'updated_at' => now(),
-                        ]);
+                        ->get();
+
+                    foreach ($packItems as $row) {
+                        $code = (string) $row->code;
+                        $type = (string) ($row->type ?? 'material');
+
+                        $affects = $hasAffectsHpp ? (bool) ($row->affects_hpp ?? 0) : $this->guessAffectsHpp('PACK', $code, $type);
+                        $allocation = $hasDefaultAllocation ? (string) ($row->default_allocation ?? '') : ($affects ? 'hpp' : 'expense');
+                        if ($allocation === '') {
+                            $allocation = $affects ? 'hpp' : 'expense';
+                        }
+
+                        $itemRole = $this->guessItemRole('PACK', $code, $type);
+                        $isStocked = $this->guessIsStocked('PACK', $code, $type, $affects, $allocation, $itemRole);
+                        $hppBehavior = $this->guessHppBehavior($affects, $allocation);
+
+                        $upd = [];
+                        if ($hasItemRole && (($row->item_role ?? null) === null || (string) $row->item_role === '')) {
+                            $upd['item_role'] = $itemRole;
+                        }
+                        if ($hasIsStocked && ($row->is_stocked ?? null) === null) {
+                            $upd['is_stocked'] = $isStocked ? 1 : 0;
+                        }
+                        if ($hasHppBehavior && (($row->hpp_behavior ?? null) === null || (string) $row->hpp_behavior === '')) {
+                            $upd['hpp_behavior'] = $hppBehavior;
+                        }
+
+                        if (!empty($upd)) {
+                            $upd['updated_at'] = now();
+                            DB::table('items')->where('id', (int) $row->id)->update($upd);
+                        }
+                    }
                 }
             }
 
+            // =========================================================
+            // ✅ MAIN SEED
+            // =========================================================
             foreach ($data as $catCode => $config) {
+
                 // Category: update/create (aman)
                 $category = ItemCategory::updateOrCreate(
                     ['code' => $catCode],
@@ -72,6 +124,7 @@ class ItemSeeder extends Seeder
                 );
 
                 foreach (($config['items'] ?? []) as $itemDef) {
+
                     $code = is_array($itemDef) ? (string) ($itemDef['code'] ?? '') : (string) $itemDef;
                     if ($code === '') {
                         continue;
@@ -89,6 +142,11 @@ class ItemSeeder extends Seeder
                     // affects_hpp + allocation
                     $affectsHpp = $this->guessAffectsHpp($catCode, $code, $type);
                     $allocation = $affectsHpp ? 'hpp' : 'expense';
+
+                    // NEW: role/stock/behavior
+                    $itemRole = $this->guessItemRole($catCode, $code, $type);
+                    $isStocked = $this->guessIsStocked($catCode, $code, $type, $affectsHpp, $allocation, $itemRole);
+                    $hppBehavior = $this->guessHppBehavior($affectsHpp, $allocation);
 
                     /** @var Item|null $item */
                     $item = Item::where('code', $code)->first();
@@ -121,6 +179,17 @@ class ItemSeeder extends Seeder
                             } else {
                                 $payload['default_expense_account_id'] = null;
                             }
+                        }
+
+                        // NEW columns (guarded)
+                        if ($hasItemRole) {
+                            $payload['item_role'] = $itemRole;
+                        }
+                        if ($hasIsStocked) {
+                            $payload['is_stocked'] = $isStocked ? 1 : 0;
+                        }
+                        if ($hasHppBehavior) {
+                            $payload['hpp_behavior'] = $hppBehavior;
                         }
 
                         $item = Item::create($payload);
@@ -158,7 +227,7 @@ class ItemSeeder extends Seeder
                             $dirty = true;
                         }
 
-                        // ✅ kamu minta: THR/PLY active harus 1 → force semua item yang ada di seedConfig jadi active=1
+                        // ✅ kamu minta: item di seedConfig harus aktif
                         if ((int) $item->active !== 1) {
                             $item->active = 1;
                             $dirty = true;
@@ -195,12 +264,42 @@ class ItemSeeder extends Seeder
                             }
                         }
 
+                        // NEW columns (set hanya kalau kosong/null)
+                        if ($hasItemRole) {
+                            $attrs = $item->getAttributes();
+                            $cur = $attrs['item_role'] ?? null;
+                            if ($cur === null || $cur === '') {
+                                $item->item_role = $itemRole;
+                                $dirty = true;
+                            }
+                        }
+
+                        if ($hasIsStocked) {
+                            $attrs = $item->getAttributes();
+                            $cur = $attrs['is_stocked'] ?? null;
+                            if ($cur === null) {
+                                $item->is_stocked = $isStocked ? 1 : 0;
+                                $dirty = true;
+                            }
+                        }
+
+                        if ($hasHppBehavior) {
+                            $attrs = $item->getAttributes();
+                            $cur = $attrs['hpp_behavior'] ?? null;
+                            if ($cur === null || $cur === '') {
+                                $item->hpp_behavior = $hppBehavior;
+                                $dirty = true;
+                            }
+                        }
+
                         if ($dirty) {
                             $item->save();
                         }
                     }
 
-                    // === HPP untuk Finished Good (opsional seperti seeder kamu) ===
+                    // =========================================================
+                    // ✅ HPP snapshot untuk Finished Good (opsional)
+                    // =========================================================
                     if ($type === 'finished_good') {
                         $hppGuess = $this->guessHppFromCode($code);
 
@@ -306,18 +405,18 @@ class ItemSeeder extends Seeder
             'PACK' => [
                 'name' => 'Packaging & Shipping',
                 'items' => [
-                    // Thermal (mm)
+                    // Thermal (mm) -> expense, non-stocked
                     ['code' => 'THR57X30', 'unit' => 'roll'],
                     ['code' => 'THR57X40', 'unit' => 'roll'],
                     ['code' => 'THR80X50', 'unit' => 'roll'],
 
-                    // OPP (cm)
+                    // OPP (cm) -> stocked, affects HPP
                     ['code' => 'OPP10X15', 'unit' => 'pack'],
                     ['code' => 'OPP12X20', 'unit' => 'pack'],
                     ['code' => 'OPP15X25', 'unit' => 'pack'],
                     ['code' => 'OPP20X30', 'unit' => 'pack'],
 
-                    // Polymailer (cm)
+                    // Polymailer (cm) -> expense, non-stocked
                     ['code' => 'PLY20X30', 'unit' => 'pack'],
                     ['code' => 'PLY25X35', 'unit' => 'pack'],
                     ['code' => 'PLY30X40', 'unit' => 'pack'],
@@ -326,24 +425,105 @@ class ItemSeeder extends Seeder
         ];
     }
 
+    /**
+     * affects_hpp rules (sesuai keputusan kamu)
+     * - OPP: affects_hpp = true
+     * - THR/PLY: affects_hpp = false (expense, non-stocked)
+     */
     private function guessAffectsHpp(string $catCode, string $code, string $type): bool
     {
         $c = strtoupper($code);
 
-        // PACK rule:
-        // - OPP masuk HPP (nempel produk)
-        // - THR & PLY expense (operasional packing)
         if ($catCode === 'PACK') {
             if (str_starts_with($c, 'OPP')) {
                 return true;
             }
-
             if (str_starts_with($c, 'THR') || str_starts_with($c, 'PLY')) {
                 return false;
             }
         }
 
         return true;
+    }
+
+    /**
+     * NEW: item_role (enterprise-friendly, tapi UKM-safe)
+     */
+    private function guessItemRole(string $catCode, string $code, string $type): string
+    {
+        $c = strtoupper($code);
+
+        if ($type === 'finished_good') {
+            return 'finished_good';
+        }
+
+        if ($catCode === 'PACK') {
+            if (str_starts_with($c, 'OPP')) {
+                return 'production_supply';
+            }
+            // THR & PLY = shipping expense, non-stocked
+            if (str_starts_with($c, 'THR') || str_starts_with($c, 'PLY')) {
+                return 'shipping_supply';
+            }
+        }
+
+        if ($catCode === 'BPU') {
+            return 'production_supply';
+        }
+
+        return 'raw_material';
+    }
+
+    /**
+     * NEW: is_stocked (OPP stocked, THR/PLY non-stocked)
+     */
+    private function guessIsStocked(
+        string $catCode,
+        string $code,
+        string $type,
+        bool $affectsHpp,
+        string $allocation,
+        string $itemRole
+    ): bool {
+        $c = strtoupper($code);
+
+        // finished good always stocked
+        if ($type === 'finished_good') {
+            return true;
+        }
+
+        // PACK:
+        // - OPP stocked
+        // - THR/PLY non-stocked (expense)
+        if ($catCode === 'PACK') {
+            if (str_starts_with($c, 'OPP')) {
+                return true;
+            }
+            if (str_starts_with($c, 'THR') || str_starts_with($c, 'PLY')) {
+                return false;
+            }
+        }
+
+        // default:
+        // if expense allocation -> usually non-stocked; otherwise stocked
+        if ($allocation === 'expense' || !$affectsHpp) {
+            return false;
+        }
+
+        return true;
+    }
+
+    /**
+     * NEW: hpp_behavior (hpp vs non_hpp)
+     */
+    private function guessHppBehavior(bool $affectsHpp, string $allocation): string
+    {
+        // keep consistent: expense implies non_hpp
+        if ($allocation === 'expense') {
+            return 'non_hpp';
+        }
+
+        return $affectsHpp ? 'hpp' : 'non_hpp';
     }
 
     private function generateName(string $catCode, string $code): string

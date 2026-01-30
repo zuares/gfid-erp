@@ -7,12 +7,17 @@ use App\Models\Account;
 use App\Models\Item;
 use App\Models\PurchaseOrder;
 use App\Models\SupplierPrice;
+use App\Services\Accounting\JournalService;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Schema;
 use Illuminate\Validation\ValidationException;
 
 class PurchaseOrderService
 {
+    public function __construct(
+        protected JournalService $journalService
+    ) {}
+
     /**
      * Create Purchase Order baru + detail lines.
      */
@@ -128,21 +133,26 @@ class PurchaseOrderService
     // APPROVE / CANCEL
     // ======================================================================
 
+    /**
+     * Approve PO + post EXPENSE lines (allocation=expense) ke jurnal:
+     * Dr expense_account_id, Cr AP (2101).
+     * Inventory/HPP lines tetap menunggu GRN.
+     */
     public function approve(PurchaseOrder $order, int $approvedBy): PurchaseOrder
     {
         return DB::transaction(function () use ($order, $approvedBy) {
+
             $order->load(['lines', 'supplier', 'paymentMethod']);
 
             if ($order->status !== 'draft') {
                 return $order->fresh(['supplier', 'lines', 'paymentMethod']);
             }
 
-            // =========================
-            // ✅ VALIDASI: expense line harus punya akun biaya (kalau kolom ada)
-            // =========================
+            // feature flags
             $hasLineAllocation = Schema::hasColumn('purchase_order_lines', 'allocation');
             $hasLineExpenseAcc = Schema::hasColumn('purchase_order_lines', 'expense_account_id');
 
+            // ✅ VALIDASI: expense line wajib punya akun biaya (biar GRN bisa jurnal expense)
             if ($hasLineAllocation && $hasLineExpenseAcc) {
                 $bad = $order->lines
                     ->where('allocation', 'expense')
@@ -157,20 +167,11 @@ class PurchaseOrderService
                 }
             }
 
-            // =========================
-            // ✅ APPROVE ORDER (ONLY)
-            // =========================
+            // ✅ APPROVE ORDER (NO JOURNAL)
             $order->status = 'approved';
             $order->approved_by = $approvedBy;
             $order->approved_at = now();
             $order->save();
-
-            // =========================
-            // ✅ IMPORTANT:
-            // PO tidak mem-posting jurnal.
-            // Jurnal pembelian terjadi saat GRN diposting (barang benar-benar masuk),
-            // dan hutang berkurang saat pembayaran.
-            // =========================
 
             return $order->fresh(['supplier', 'lines', 'paymentMethod']);
         });
@@ -179,6 +180,7 @@ class PurchaseOrderService
     public function cancel(PurchaseOrder $order, int $cancelledBy): PurchaseOrder
     {
         return DB::transaction(function () use ($order, $cancelledBy) {
+
             if (!in_array($order->status, ['draft', 'approved'], true)) {
                 return $order->fresh(['supplier', 'lines', 'paymentMethod']);
             }
@@ -186,6 +188,10 @@ class PurchaseOrderService
             if ($order->purchaseReceipts()->exists()) {
                 return $order->fresh(['supplier', 'lines', 'purchaseReceipts', 'paymentMethod']);
             }
+
+            // NOTE: kalau kamu mau cancel PO approved yg sudah mem-post expense journal:
+            // kamu bisa void jurnal by source (SRC_PO_EXPENSE_APPROVE, po_id) di sini.
+            // Tapi kamu bilang GRN nanti, jadi kita keep minimal.
 
             $order->status = 'cancelled';
             $order->cancelled_by = $cancelledBy;
@@ -222,7 +228,8 @@ class PurchaseOrderService
     /**
      * syncLines:
      * - simpan semua line (hpp + expense)
-     * - allocation & expense_account_id ikut jika kolom ada
+     * - allocation & expense_account_id otomatis dari master item (default_allocation, default_expense_account_id)
+     * - line boleh override kalau dikirim
      * - expense account boleh null saat draft (validasi keras ada di approve())
      */
     protected function syncLines(PurchaseOrder $order, array $linesData): float
@@ -285,32 +292,38 @@ class PurchaseOrderService
                 ]);
             }
 
-            // Allocation (hpp/expense)
+            // Allocation (hpp/expense) - auto dari master item, line override kalau ada
             $allocation = 'hpp';
             if ($hasLineAllocation) {
-                $allocRaw = (string) (
-                    $row['allocation'] ?? ($hasItemDefaultAlloc ? ($item->default_allocation ?? null) : null) ?? 'hpp'
-                );
+                $fromLine = $row['allocation'] ?? null;
+
+                if ($fromLine !== null && $fromLine !== '') {
+                    $allocRaw = (string) $fromLine;
+                } else {
+                    $allocRaw = (string) ($hasItemDefaultAlloc ? ($item->default_allocation ?? 'hpp') : 'hpp');
+                }
+
                 $allocation = in_array($allocRaw, ['hpp', 'expense'], true) ? $allocRaw : 'hpp';
             }
 
-            // Expense account if expense
+            // Expense account if expense - auto dari master, line override kalau ada
             $expenseAccountId = null;
             if ($hasLineExpenseAcc && $allocation === 'expense') {
-                $expAccRaw = $row['expense_account_id'] ?? null;
+                $fromLine = $row['expense_account_id'] ?? null;
 
-                if ($expAccRaw !== null && $expAccRaw !== '') {
-                    $expenseAccountId = (int) $expAccRaw;
+                if ($fromLine !== null && $fromLine !== '') {
+                    $expenseAccountId = (int) $fromLine;
                     if ($expenseAccountId <= 0) {
                         $expenseAccountId = null;
                     }
-                } elseif ($hasItemDefaultExpAcc && !empty($item->default_expense_account_id)) {
+                }
+
+                if (!$expenseAccountId && $hasItemDefaultExpAcc && !empty($item->default_expense_account_id)) {
                     $expenseAccountId = (int) $item->default_expense_account_id;
                     if ($expenseAccountId <= 0) {
                         $expenseAccountId = null;
                     }
                 }
-                // NOTE: tidak divalidasi keras di sini (draft friendly)
             }
 
             $lineTotal = max(0, ($qty * $unitPrice) - $discount);
@@ -374,6 +387,22 @@ class PurchaseOrderService
         );
     }
 
+    protected function accountIdByCode(string $code): int
+    {
+        $acc = Account::query()
+            ->where('code', $code)
+            ->where('is_active', 1)
+            ->first();
+
+        if (!$acc) {
+            throw ValidationException::withMessages([
+                'account' => "Account code {$code} tidak ditemukan / tidak aktif.",
+            ]);
+        }
+
+        return (int) $acc->id;
+    }
+
     protected function normalizeOrderType(?string $value): string
     {
         $v = strtolower(trim((string) $value));
@@ -393,12 +422,14 @@ class PurchaseOrderService
         $value = trim((string) $value);
         $value = str_replace(' ', '', $value);
 
+        // format indo: 1.234,56
         if (strpos($value, ',') !== false) {
             $value = str_replace('.', '', $value);
             $value = str_replace(',', '.', $value);
             return (float) $value;
         }
 
+        // ribuan: 1.234.567
         if (preg_match('/^\d{1,3}(\.\d{3})+$/', $value)) {
             $value = str_replace('.', '', $value);
             return (float) $value;
