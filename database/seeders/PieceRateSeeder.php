@@ -9,35 +9,20 @@ class PieceRateSeeder extends Seeder
 {
     public function run(): void
     {
+        // ✅ berlaku sampai akhir Juni 2026
+        $effectiveFrom = '2025-11-30';
+        $effectiveTo = '2026-06-30';
+
         $data = [
+            // =========================
+            // SEWING
+            // =========================
             [
                 'module' => 'sewing',
                 'employee_id' => 6,
                 'item_category_id' => 4,
                 'item_id' => null,
                 'rate_per_pcs' => 5000,
-                'effective_from' => '2025-11-30',
-                'effective_to' => '2026-01-31',
-                'notes' => null,
-            ],
-            [
-                'module' => 'cutting',
-                'employee_id' => 4,
-                'item_category_id' => 4,
-                'item_id' => null,
-                'rate_per_pcs' => 800,
-                'effective_from' => '2025-11-30',
-                'effective_to' => '2025-12-31',
-                'notes' => null,
-            ],
-            [
-                'module' => 'cutting',
-                'employee_id' => 4,
-                'item_category_id' => 5,
-                'item_id' => null,
-                'rate_per_pcs' => 1000,
-                'effective_from' => '2025-11-30',
-                'effective_to' => '2025-12-31',
                 'notes' => null,
             ],
             [
@@ -46,8 +31,6 @@ class PieceRateSeeder extends Seeder
                 'item_category_id' => 5,
                 'item_id' => null,
                 'rate_per_pcs' => 6500,
-                'effective_from' => '2025-11-30',
-                'effective_to' => '2025-12-31',
                 'notes' => null,
             ],
             [
@@ -56,8 +39,6 @@ class PieceRateSeeder extends Seeder
                 'item_category_id' => 5,
                 'item_id' => null,
                 'rate_per_pcs' => 6000,
-                'effective_from' => '2025-11-30',
-                'effective_to' => '2025-12-31',
                 'notes' => null,
             ],
             [
@@ -66,8 +47,26 @@ class PieceRateSeeder extends Seeder
                 'item_category_id' => 4,
                 'item_id' => null,
                 'rate_per_pcs' => 5500,
-                'effective_from' => '2025-11-30',
-                'effective_to' => '2025-12-31',
+                'notes' => null,
+            ],
+
+            // =========================
+            // CUTTING
+            // =========================
+            [
+                'module' => 'cutting',
+                'employee_id' => 4,
+                'item_category_id' => 4,
+                'item_id' => null,
+                'rate_per_pcs' => 800,
+                'notes' => null,
+            ],
+            [
+                'module' => 'cutting',
+                'employee_id' => 4,
+                'item_category_id' => 5,
+                'item_id' => null,
+                'rate_per_pcs' => 1000,
                 'notes' => null,
             ],
         ];
@@ -79,8 +78,8 @@ class PieceRateSeeder extends Seeder
                     'employee_id' => $row['employee_id'],
                     'item_category_id' => $row['item_category_id'],
                     'item_id' => $row['item_id'],
-                    'effective_from' => $row['effective_from'],
-                    'effective_to' => $row['effective_to'],
+                    'effective_from' => $effectiveFrom,
+                    'effective_to' => $effectiveTo,
                 ],
                 [
                     'rate_per_pcs' => $row['rate_per_pcs'],

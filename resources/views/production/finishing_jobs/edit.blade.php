@@ -3,670 +3,355 @@
 @section('title', 'Produksi • Finishing (Edit)')
 
 @push('head')
-    <style>
-        .finishing-create-page {
-            min-height: 100vh;
-        }
-
-        .finishing-create-page .page-wrap {
-            max-width: 1150px;
-            margin-inline: auto;
-            padding: 1rem 1rem 4rem;
-        }
-
-        body[data-theme="light"] .finishing-create-page .page-wrap {
-            background:
-                radial-gradient(circle at top left,
-                    rgba(59, 130, 246, 0.12) 0,
-                    rgba(45, 212, 191, 0.10) 26%,
-                    #f9fafb 60%);
-        }
-
-        body[data-theme="dark"] .finishing-create-page .page-wrap {
-            background:
-                radial-gradient(circle at top left,
-                    rgba(59, 130, 246, 0.25) 0,
-                    rgba(45, 212, 191, 0.15) 26%,
-                    #020617 60%);
-        }
-
-        .finishing-create-page .card-main {
-            background: var(--card);
-            border-radius: 16px;
-            border: 1px solid rgba(148, 163, 184, 0.35);
-            box-shadow:
-                0 14px 45px rgba(15, 23, 42, 0.22),
-                0 10px 18px rgba(15, 23, 42, 0.18);
-        }
-
-        .finishing-create-page .card-header-bar {
-            padding: 0.85rem 1.1rem;
-            border-bottom: 1px solid rgba(148, 163, 184, 0.35);
-            display: flex;
-            align-items: center;
-            gap: .75rem;
-            justify-content: space-between;
-        }
-
-        .finishing-create-page .card-header-title {
-            display: flex;
-            flex-direction: column;
-            gap: .15rem;
-        }
-
-        .finishing-create-page .card-header-title h1 {
-            font-size: 1.15rem;
-            font-weight: 600;
-            letter-spacing: .02em;
-            margin: 0;
-        }
-
-        .finishing-create-page .card-header-subtitle {
-            font-size: .77rem;
-            color: var(--muted-foreground);
-        }
-
-        .finishing-create-page .badge-soft-info {
-            font-size: .7rem;
-            border-radius: 999px;
-            padding: .25rem .55rem;
-            background: rgba(37, 99, 235, 0.08);
-            border: 1px solid rgba(59, 130, 246, 0.25);
-            color: #1d4ed8;
-            display: inline-flex;
-            align-items: center;
-            gap: .25rem;
-        }
-
-        .finishing-create-page .card-body-main {
-            padding: 1rem 1.1rem 1.1rem;
-        }
-
-        .finishing-create-page .section-title {
-            font-size: .8rem;
-            font-weight: 600;
-            text-transform: uppercase;
-            letter-spacing: .12em;
-            color: var(--muted-foreground);
-            margin-bottom: .45rem;
-        }
-
-        .finishing-create-page .summary-pill {
-            border-radius: 999px;
-            border: 1px dashed rgba(148, 163, 184, 0.7);
-            font-size: .75rem;
-            padding: .3rem .75rem;
-            display: inline-flex;
-            align-items: center;
-            gap: .25rem;
-            background: rgba(15, 23, 42, 0.02);
-        }
-
-        .finishing-create-page .summary-pill strong {
-            font-weight: 600;
-        }
-
-        .finishing-table-wrap {
-            border-radius: 12px;
-            border: 1px solid rgba(148, 163, 184, 0.35);
-            overflow: hidden;
-            background: var(--card);
-        }
-
-        .finishing-table {
-            margin-bottom: 0;
-        }
-
-        .finishing-table thead th {
-            background: rgba(15, 23, 42, 0.03);
-            font-size: .75rem;
-            text-transform: uppercase;
-            letter-spacing: .08em;
-            color: var(--muted-foreground);
-            border-bottom-width: 1px;
-            padding-block: .55rem;
-            white-space: nowrap;
-            position: sticky;
-            top: 0;
-            z-index: 5;
-        }
-
-        .finishing-table tbody td {
-            vertical-align: middle;
-            padding-block: .4rem;
-            font-size: .8rem;
-        }
-
-        .finishing-table tbody tr:nth-child(even) {
-            background: rgba(148, 163, 184, 0.06);
-        }
-
-        .finishing-table tbody tr:hover {
-            background: rgba(59, 130, 246, 0.08);
-        }
-
-        .finishing-create-page .item-label-main {
-            font-weight: 600;
-            font-size: .82rem;
-        }
-
-        .finishing-create-page .item-label-sub {
-            font-size: .72rem;
-            color: var(--muted-foreground);
-        }
-
-        .finishing-create-page .wip-badge {
-            display: inline-flex;
-            align-items: center;
-            gap: .3rem;
-            padding: .2rem .5rem;
-            border-radius: 999px;
-            font-size: .72rem;
-            background: rgba(16, 185, 129, 0.08);
-            color: #047857;
-        }
-
-        .finishing-create-page .wip-badge span {
-            font-weight: 600;
-        }
-
-        .qty-ok-input {
-            border-color: rgba(34, 197, 94, 0.6);
-        }
-
-        .qty-reject-input {
-            border-color: rgba(239, 68, 68, 0.6);
-        }
-
-        .finishing-create-page .form-control-sm,
-        .finishing-create-page .form-select-sm {
-            font-size: .8rem;
-            padding-block: .25rem;
-        }
-
-        .finishing-create-page .btn-save {
-            border-radius: 999px;
-            padding-inline: 1.5rem;
-            box-shadow:
-                0 10px 25px rgba(34, 197, 94, .35);
-            font-weight: 600;
-            letter-spacing: .03em;
-        }
-
-        .finishing-create-page .footer-actions {
-            display: flex;
-            justify-content: flex-end;
-            gap: .75rem;
-            margin-top: 1rem;
-            padding-top: .75rem;
-            border-top: 1px dashed rgba(148, 163, 184, 0.55);
-        }
-
-        @media (max-width: 767.98px) {
-            .finishing-table-wrap {
-                border-radius: 10px;
-            }
-
-            .finishing-table thead th {
-                font-size: .68rem;
-                padding-block: .4rem;
-            }
-
-            .finishing-table tbody td {
-                font-size: .72rem;
-                padding-block: .3rem;
-            }
-
-            .finishing-create-page .item-label-main {
-                font-size: .78rem;
-            }
-
-            .finishing-create-page .item-label-sub {
-                font-size: .68rem;
-            }
-
-            .finishing-create-page .wip-badge {
-                font-size: .68rem;
-                padding: .18rem .45rem;
-            }
-
-            .finishing-create-page .card-header-bar {
-                flex-direction: column;
-                align-items: flex-start;
-            }
-
-            .finishing-create-page .footer-actions {
-                flex-direction: column-reverse;
-                align-items: stretch;
-            }
-
-            .finishing-create-page .btn-save {
-                width: 100%;
-                justify-content: center;
-            }
-        }
-    </style>
+<style>
+  .page-wrap{max-width:1150px;margin:0 auto;padding:1rem 1rem 4rem}
+  .card-main{background:var(--card);border-radius:14px;border:1px solid rgba(148,163,184,.35);box-shadow:0 10px 30px rgba(15,23,42,.14)}
+  .card-head{padding:.9rem 1.1rem;border-bottom:1px solid rgba(148,163,184,.35);display:flex;gap:.75rem;align-items:flex-start;justify-content:space-between}
+  .card-head h1{font-size:1.05rem;font-weight:700;margin:0}
+  .muted{color:var(--muted-foreground)}
+  .pill{display:inline-flex;align-items:center;gap:.35rem;border-radius:999px;padding:.25rem .6rem;font-size:.72rem;border:1px solid rgba(148,163,184,.35);background:rgba(148,163,184,.08)}
+  .pill-info{background:rgba(37,99,235,.08);border-color:rgba(59,130,246,.25);color:#1d4ed8}
+  .pill-warn{background:rgba(245,158,11,.10);border-color:rgba(245,158,11,.25);color:#92400e}
+  .body{padding:1rem 1.1rem}
+  .table-wrap{border-radius:12px;border:1px solid rgba(148,163,184,.35);overflow:hidden}
+  .table thead th{background:rgba(15,23,42,.03);font-size:.72rem;text-transform:uppercase;letter-spacing:.08em;color:var(--muted-foreground);white-space:nowrap}
+  .table td{vertical-align:middle}
+  .badge-in{display:inline-flex;align-items:center;gap:.35rem;border-radius:999px;padding:.22rem .55rem;font-size:.72rem;background:rgba(16,185,129,.08);color:#047857}
+  .qty-ok{border-color:rgba(34,197,94,.55)}
+  .qty-rj{border-color:rgba(239,68,68,.55)}
+  .footer{display:flex;gap:.75rem;justify-content:flex-end;margin-top:1rem;padding-top:.8rem;border-top:1px dashed rgba(148,163,184,.5)}
+  .btn-save{border-radius:999px;padding-inline:1.25rem;font-weight:700}
+  .small-note{font-size:.72rem}
+  .req{color:rgba(239,68,68,.9);font-weight:800}
+  @media(max-width:768px){ .card-head{flex-direction:column} .footer{flex-direction:column-reverse} .btn-save{width:100%} }
+</style>
 @endpush
 
 @section('content')
-    @php
-        // fallback dateDefault untuk menghindari Undefined variable
-        $dateDefault = old('date', optional($job->date)->format('Y-m-d') ?? now()->format('Y-m-d'));
+@php
+  $dateDefault = old('date', optional($job->date)->format('Y-m-d') ?? now()->format('Y-m-d'));
+  $linesData = old('lines') ?? $lines;
+  $isPosted = (string)($job->status ?? '') === 'posted';
 
-        $oldLines = old('lines');
-        $linesData = $oldLines ?? $lines;
+  $totalLines = is_iterable($linesData) ? count($linesData) : 0;
+@endphp
 
-        $totalLines = is_iterable($linesData) ? count($linesData) : 0;
-        $totalOk = 0;
-        $totalReject = 0;
-
-        // apakah job sudah posted? (jika posted -> nonaktifkan form)
-        $isPosted = (string) ($job->status ?? '') === 'posted';
-    @endphp
-
-    <div class="finishing-create-page">
-        <div class="page-wrap">
-            @if ($errors->any())
-                <div class="alert alert-danger alert-dismissible fade show mb-3" role="alert">
-                    <strong>Oops!</strong> Ada error input. Silakan cek form di bawah.
-                    <button type="button" class="btn-close" data-bs-dismiss="alert" aria-label="Close"></button>
-                </div>
-            @endif
-
-            @if ($isPosted)
-                <div class="alert alert-info mb-3">
-                    <i class="bi bi-lock-fill"></i>
-                    Finishing Job ini sudah <strong>POSTED</strong>. Form dinonaktifkan untuk mencegah perubahan data yang
-                    sudah diproses.
-                </div>
-            @endif
-
-            <div class="card card-main">
-                {{-- HEADER --}}
-                <div class="card-header-bar">
-                    <div class="card-header-title">
-                        <h1>Edit Finishing</h1>
-                        <div class="card-header-subtitle">
-                            Kode: <strong>{{ $job->code }}</strong> &middot;
-                            Tanggal lama: <strong>{{ optional($job->date)->format('d M Y') ?? '-' }}</strong>
-                        </div>
-                    </div>
-
-                    <div class="d-flex flex-column flex-sm-row gap-2 align-items-sm-center">
-                        <div class="badge-soft-info">
-                            <i class="bi bi-pencil-square"></i>
-                            <span>Update qty OK / Reject per bundle.</span>
-                        </div>
-                    </div>
-                </div>
-
-                <form action="{{ route('production.finishing_jobs.update', $job->id) }}" method="POST"
-                    @if ($isPosted) onsubmit="return false;" @endif novalidate>
-                    @csrf
-                    @method('PUT')
-
-                    <div class="card-body-main">
-                        {{-- HEADER FORM --}}
-                        <div class="row g-3 mb-3">
-                            <div class="col-6 col-md-3">
-                                <label class="form-label form-label-sm mb-1">Tanggal</label>
-                                <input type="date" name="date"
-                                    class="form-control form-control-sm @error('date') is-invalid @enderror"
-                                    value="{{ $dateDefault }}" @disabled($isPosted)>
-                                @error('date')
-                                    <div class="invalid-feedback">{{ $message }}</div>
-                                @enderror
-                            </div>
-
-                            <div class="col-6 col-md-3">
-                                <label class="form-label form-label-sm mb-1">Status</label>
-                                <input type="text" class="form-control form-control-sm bg-light"
-                                    value="{{ strtoupper($job->status) }}" readonly>
-                            </div>
-
-                            <div class="col-12 col-md-6">
-                                <label class="form-label form-label-sm mb-1">Catatan</label>
-                                <textarea name="notes" rows="1" class="form-control form-control-sm @error('notes') is-invalid @enderror"
-                                    placeholder="Catatan tambahan untuk transaksi ini" @disabled($isPosted)>{{ old('notes', $job->notes) }}</textarea>
-                                @error('notes')
-                                    <div class="invalid-feedback">{{ $message }}</div>
-                                @enderror
-                            </div>
-                        </div>
-
-                        {{-- TABEL EDIT --}}
-                        <div class="finishing-table-wrap mb-2">
-                            <div class="table-responsive">
-                                <table class="table table-sm table-hover align-middle finishing-table mb-0">
-                                    <thead>
-                                        <tr>
-                                            <th style="width: 5%;" class="text-center">No</th>
-                                            <th style="width: 30%;">Item &amp; Bundle</th>
-                                            <th style="width: 12%;" class="text-end">Qty IN</th>
-                                            <th style="width: 12%;" class="text-end">Qty OK</th>
-                                            <th style="width: 12%;" class="text-end">Qty Reject</th>
-                                            <th style="width: 20%;">Alasan Reject</th>
-                                        </tr>
-                                    </thead>
-                                    <tbody>
-                                        @forelse ($linesData as $idx => $line)
-                                            @php
-                                                $isOld = is_array($line);
-
-                                                $lineId = $isOld ? $line['id'] ?? null : $line->id ?? null;
-                                                $bundleId = $isOld
-                                                    ? $line['bundle_id'] ?? null
-                                                    : $line->bundle_id ?? null;
-                                                $itemId = $isOld ? $line['item_id'] ?? null : $line->item_id ?? null;
-
-                                                // hitung qty_in dengan aman
-                                                if ($isOld) {
-                                                    $qtyIn =
-                                                        $line['qty_in'] ??
-                                                        (float) ($line['qty_ok'] ?? 0) +
-                                                            (float) ($line['qty_reject'] ?? 0);
-                                                } else {
-                                                    $qtyIn =
-                                                        $line->qty_in ??
-                                                        (float) ($line->qty_ok ?? 0) + (float) ($line->qty_reject ?? 0);
-                                                }
-
-                                                $qtyOk = old(
-                                                    "lines.$idx.qty_ok",
-                                                    $isOld ? $line['qty_ok'] ?? 0 : $line->qty_ok ?? 0,
-                                                );
-                                                $qtyReject = old(
-                                                    "lines.$idx.qty_reject",
-                                                    $isOld ? $line['qty_reject'] ?? 0 : $line->qty_reject ?? 0,
-                                                );
-                                                $rejectReason = old(
-                                                    "lines.$idx.reject_reason",
-                                                    $isOld ? $line['reject_reason'] ?? '' : $line->reject_reason ?? '',
-                                                );
-
-                                                // ambil model bundle & item secara aman (bila form old, fallback cari model)
-                                                $bundleModel = $isOld
-                                                    ? \App\Models\CuttingJobBundle::find($bundleId)
-                                                    : $line->bundle ?? null;
-
-                                                $item = $isOld
-                                                    ? \App\Models\Item::find($itemId)
-                                                    : $line->item ?? ($bundleModel?->item ?? null);
-
-                                                // label bundle
-                                                $bundleLabel = $bundleModel?->code
-                                                    ? $bundleModel->code
-                                                    : '#' . ($bundleModel?->id ?? '-');
-
-                                                $totalOk += (float) $qtyOk;
-                                                $totalReject += (float) $qtyReject;
-                                            @endphp
-
-                                            <tr>
-                                                {{-- hidden fields --}}
-                                                <td class="text-center">
-                                                    {{ $loop->iteration }}
-
-                                                    <input type="hidden" name="lines[{{ $idx }}][id]"
-                                                        value="{{ $lineId }}">
-                                                    <input type="hidden" name="lines[{{ $idx }}][bundle_id]"
-                                                        value="{{ $bundleId }}">
-                                                    <input type="hidden" name="lines[{{ $idx }}][item_id]"
-                                                        value="{{ $itemId }}">
-                                                    <input type="hidden" name="lines[{{ $idx }}][qty_in]"
-                                                        value="{{ $qtyIn }}">
-                                                </td>
-
-                                                {{-- ITEM + BUNDLE --}}
-                                                <td>
-                                                    <div class="item-label-main">
-                                                        @if ($item)
-                                                            {{-- Mobile: hanya kode item --}}
-                                                            <span class="d-inline d-md-none">
-                                                                {{ $item->code }}
-                                                            </span>
-
-                                                            {{-- Desktop: kode + nama --}}
-                                                            <span class="d-none d-md-inline">
-                                                                {{ $item->code }} — {{ $item->name }}
-                                                            </span>
-                                                        @else
-                                                            <em>Item tidak ditemukan</em>
-                                                        @endif
-                                                    </div>
-
-                                                    {{-- Item ID & Bundle hanya tampil di desktop --}}
-                                                    <div class="item-label-sub d-none d-md-block">
-                                                        Item ID: {{ optional($item)->id ?? '-' }}
-                                                    </div>
-
-                                                    <div class="item-label-sub mt-1 d-none d-md-block">
-                                                        <i class="bi bi-box-seam"></i>
-                                                        Bundle:
-                                                        <strong>{{ $bundleLabel }}</strong>
-                                                    </div>
-
-                                                    @error("lines.$idx.bundle_id")
-                                                        <div class="text-danger small mt-1">{{ $message }}</div>
-                                                    @enderror
-                                                </td>
-
-                                                {{-- QTY IN (readonly) --}}
-                                                <td class="text-end">
-                                                    <span class="wip-badge">
-                                                        <i class="bi bi-arrow-up-circle"></i>
-                                                        <span>{{ number_format($qtyIn, 0, ',', '.') }}</span>
-                                                        <small>pcs</small>
-                                                    </span>
-                                                </td>
-
-                                                {{-- QTY OK (editable) --}}
-                                                <td class="text-end">
-                                                    <input type="number" name="lines[{{ $idx }}][qty_ok]"
-                                                        class="form-control form-control-sm text-end qty-ok-input @error("lines.$idx.qty_ok") is-invalid @enderror"
-                                                        value="{{ (int) $qtyOk }}" min="0" step="1"
-                                                        inputmode="numeric" pattern="\d*" @disabled($isPosted)>
-                                                    @error("lines.$idx.qty_ok")
-                                                        <div class="invalid-feedback d-block text-start">
-                                                            {{ $message }}
-                                                        </div>
-                                                    @enderror
-                                                </td>
-
-                                                {{-- QTY REJECT (editable) --}}
-                                                <td class="text-end">
-                                                    <input type="number" name="lines[{{ $idx }}][qty_reject]"
-                                                        class="form-control form-control-sm text-end qty-reject-input @error("lines.$idx.qty_reject") is-invalid @enderror"
-                                                        value="{{ (int) $qtyReject }}" min="0" step="1"
-                                                        inputmode="numeric" pattern="\d*" @disabled($isPosted)>
-                                                    @error("lines.$idx.qty_reject")
-                                                        <div class="invalid-feedback d-block text-start">
-                                                            {{ $message }}
-                                                        </div>
-                                                    @enderror
-                                                </td>
-
-                                                {{-- ALASAN REJECT --}}
-                                                <td>
-                                                    <input type="text" name="lines[{{ $idx }}][reject_reason]"
-                                                        class="form-control form-control-sm @error("lines.$idx.reject_reason") is-invalid @enderror"
-                                                        placeholder="Alasan singkat (opsional)"
-                                                        value="{{ $rejectReason }}" @disabled($isPosted)>
-                                                    @error("lines.$idx.reject_reason")
-                                                        <div class="invalid-feedback">
-                                                            {{ $message }}
-                                                        </div>
-                                                    @enderror
-                                                </td>
-                                            </tr>
-                                        @empty
-                                            <tr>
-                                                <td colspan="6" class="text-center py-4 text-muted">
-                                                    Tidak ada detail untuk diedit.
-                                                </td>
-                                            </tr>
-                                        @endforelse
-                                    </tbody>
-                                </table>
-                            </div>
-                        </div>
-
-                        {{-- RINGKASAN --}}
-                        <div class="mb-3 d-flex flex-wrap gap-2 align-items-center">
-                            <div class="section-title mb-0">Ringkasan</div>
-
-                            <div class="summary-pill">
-                                <i class="bi bi-collection"></i>
-                                <span>Lines:</span>
-                                <strong>{{ $totalLines }} baris</strong>
-                            </div>
-
-                            <div class="summary-pill">
-                                <i class="bi bi-check2-circle"></i>
-                                <span>Total OK:</span>
-                                <strong>{{ number_format($totalOk, 0, ',', '.') }} pcs</strong>
-                            </div>
-
-                            <div class="summary-pill">
-                                <i class="bi bi-x-octagon"></i>
-                                <span>Total Reject:</span>
-                                <strong>{{ number_format($totalReject, 0, ',', '.') }} pcs</strong>
-                            </div>
-                        </div>
-
-                        {{-- FOOTER ACTIONS --}}
-                        <div class="footer-actions">
-                            <a href="{{ route('production.finishing_jobs.show', $job->id) }}"
-                                class="btn btn-sm btn-outline-secondary">
-                                <i class="bi bi-arrow-left"></i>
-                                <span class="ms-1">Batal</span>
-                            </a>
-
-                            @if ($isPosted)
-                                <button type="button"
-                                    class="btn btn-sm btn-secondary d-inline-flex align-items-center gap-1" disabled>
-                                    <i class="bi bi-lock-fill"></i>
-                                    <span>DIPOSTED — Tidak bisa diubah</span>
-                                </button>
-                            @else
-                                <button type="submit"
-                                    class="btn btn-sm btn-success d-inline-flex align-items-center gap-1 btn-save">
-                                    <i class="bi bi-check2-circle"></i>
-                                    <span class="text-white">Simpan Perubahan</span>
-                                </button>
-                            @endif
-                        </div>
-                    </div>
-                </form>
-            </div>
-
-        </div>
+<div class="page-wrap">
+  @if ($errors->any())
+    <div class="alert alert-danger alert-dismissible fade show mb-3" role="alert">
+      <strong>Oops!</strong> Ada error input. Silakan cek form di bawah.
+      <button type="button" class="btn-close" data-bs-dismiss="alert" aria-label="Close"></button>
     </div>
+  @endif
+
+  @if ($isPosted)
+    <div class="alert alert-info mb-3">
+      <i class="bi bi-lock-fill"></i>
+      Finishing Job ini sudah <strong>POSTED</strong>. Form dinonaktifkan.
+    </div>
+  @endif
+
+  <div class="card card-main">
+    <div class="card-head">
+      <div>
+        <h1>Edit Finishing</h1>
+        <div class="muted small mt-1">
+          Kode: <strong>{{ $job->code }}</strong> ·
+          Tanggal: <strong>{{ optional($job->date)->format('d M Y') ?? '-' }}</strong> ·
+          Status: <strong>{{ strtoupper((string)$job->status) }}</strong>
+        </div>
+      </div>
+
+      <div class="d-flex flex-wrap gap-2">
+        <span class="pill pill-info">
+          <i class="bi bi-pencil-square"></i>
+          Draft: OK + Reject ≤ IN (sisa direlease)
+        </span>
+        <span class="pill pill-warn">
+          <i class="bi bi-arrow-counterclockwise"></i>
+          Sisa = IN - (OK+Reject)
+        </span>
+      </div>
+    </div>
+
+    <form action="{{ route('production.finishing_jobs.update', $job->id) }}" method="POST"
+          @if($isPosted) onsubmit="return false;" @endif novalidate>
+      @csrf
+      @method('PUT')
+
+      <div class="body">
+        {{-- header form --}}
+        <div class="row g-3 mb-3">
+          <div class="col-6 col-md-3">
+            <label class="form-label form-label-sm mb-1">Tanggal</label>
+            <input type="date" name="date"
+                   class="form-control form-control-sm @error('date') is-invalid @enderror"
+                   value="{{ $dateDefault }}" @disabled($isPosted)>
+            @error('date') <div class="invalid-feedback">{{ $message }}</div> @enderror
+          </div>
+
+          <div class="col-12 col-md-9">
+            <label class="form-label form-label-sm mb-1">Catatan</label>
+            <textarea name="notes" rows="1"
+                      class="form-control form-control-sm @error('notes') is-invalid @enderror"
+                      placeholder="Catatan tambahan" @disabled($isPosted)>{{ old('notes', $job->notes) }}</textarea>
+            @error('notes') <div class="invalid-feedback">{{ $message }}</div> @enderror
+          </div>
+        </div>
+
+        {{-- table --}}
+        <div class="table-wrap mb-2">
+          <div class="table-responsive">
+            <table class="table table-sm table-hover align-middle mb-0 finishing-table">
+              <thead>
+                <tr>
+                  <th class="text-center" style="width:5%;">No</th>
+                  <th style="width:34%;">Item & Bundle</th>
+                  <th class="text-end" style="width:11%;">Qty IN</th>
+                  <th class="text-end" style="width:11%;">Qty OK</th>
+                  <th class="text-end" style="width:11%;">Qty Reject</th>
+                  <th class="text-end" style="width:11%;">Sisa</th>
+                  <th style="width:17%;">Alasan Reject</th>
+                </tr>
+              </thead>
+              <tbody>
+                @forelse($linesData as $idx => $line)
+                  @php
+                    $isOld = is_array($line);
+
+                    $lineId   = $isOld ? ($line['id'] ?? null) : ($line->id ?? null);
+                    $bundleId = $isOld ? ($line['bundle_id'] ?? null) : ($line->bundle_id ?? null);
+                    $itemId   = $isOld ? ($line['item_id'] ?? null) : ($line->item_id ?? null);
+
+                    $qtyIn = $isOld
+                      ? (int)round((float)($line['qty_in'] ?? ((float)($line['qty_ok'] ?? 0) + (float)($line['qty_reject'] ?? 0))))
+                      : (int)round((float)($line->qty_in ?? ((float)($line->qty_ok ?? 0) + (float)($line->qty_reject ?? 0))));
+
+                    $qtyOk = (int) old("lines.$idx.qty_ok", $isOld ? ($line['qty_ok'] ?? 0) : ($line->qty_ok ?? 0));
+                    $qtyRj = (int) old("lines.$idx.qty_reject", $isOld ? ($line['qty_reject'] ?? 0) : ($line->qty_reject ?? 0));
+                    $reason = old("lines.$idx.reject_reason", $isOld ? ($line['reject_reason'] ?? '') : ($line->reject_reason ?? ''));
+
+                    // (opsional) kalau mau super cepat tanpa N+1, preload item+bundle di controller.
+                    $bundleModel = $isOld ? \App\Models\CuttingJobBundle::find($bundleId) : ($line->bundle ?? null);
+                    $item = $isOld ? \App\Models\Item::find($itemId) : ($line->item ?? ($bundleModel?->item ?? null));
+                    $bundleLabel = $bundleModel?->code ? $bundleModel->code : ('#' . ($bundleModel?->id ?? '-'));
+                    $sisa = max(0, $qtyIn - ($qtyOk + $qtyRj));
+                  @endphp
+
+                  <tr data-idx="{{ $idx }}">
+                    <td class="text-center">
+                      {{ $loop->iteration }}
+
+                      <input type="hidden" name="lines[{{ $idx }}][id]" value="{{ $lineId }}">
+                      {{-- qty_in ini hanya untuk JS clamp, server tetap pakai qty_in DB line saat update --}}
+                      <input type="hidden" class="js-in" name="lines[{{ $idx }}][qty_in]" value="{{ $qtyIn }}">
+                    </td>
+
+                    <td>
+                      <div class="fw-semibold">
+                        {{ $item?->code ?? 'ITEM' }} — {{ $item?->name ?? 'Tidak ditemukan' }}
+                      </div>
+                      <div class="muted small-note">
+                        Item ID: {{ $item?->id ?? '-' }} · Bundle: <strong>{{ $bundleLabel }}</strong>
+                      </div>
+                      @error("lines.$idx.id")
+                        <div class="text-danger small mt-1">{{ $message }}</div>
+                      @enderror
+                    </td>
+
+                    <td class="text-end">
+                      <span class="badge-in">
+                        <i class="bi bi-arrow-up-circle"></i>
+                        <span class="js-in-text">{{ number_format($qtyIn, 0, ',', '.') }}</span> pcs
+                      </span>
+                    </td>
+
+                    <td class="text-end">
+                      <input type="number" min="0" step="1" inputmode="numeric" pattern="\d*"
+                             name="lines[{{ $idx }}][qty_ok]"
+                             class="form-control form-control-sm text-end qty-ok js-ok qty-ok @error("lines.$idx.qty_ok") is-invalid @enderror"
+                             value="{{ $qtyOk }}" @disabled($isPosted)>
+                      @error("lines.$idx.qty_ok")
+                        <div class="invalid-feedback d-block text-start">{{ $message }}</div>
+                      @enderror
+                    </td>
+
+                    <td class="text-end">
+                      <input type="number" min="0" step="1" inputmode="numeric" pattern="\d*"
+                             name="lines[{{ $idx }}][qty_reject]"
+                             class="form-control form-control-sm text-end qty-rj js-rj @error("lines.$idx.qty_reject") is-invalid @enderror"
+                             value="{{ $qtyRj }}" @disabled($isPosted)>
+                      @error("lines.$idx.qty_reject")
+                        <div class="invalid-feedback d-block text-start">{{ $message }}</div>
+                      @enderror
+                    </td>
+
+                    <td class="text-end">
+                      <span class="fw-semibold js-sisa">{{ number_format($sisa, 0, ',', '.') }}</span>
+                    </td>
+
+                    <td>
+                      <input type="text"
+                             name="lines[{{ $idx }}][reject_reason]"
+                             class="form-control form-control-sm js-reason @error("lines.$idx.reject_reason") is-invalid @enderror"
+                             placeholder="Wajib jika reject > 0"
+                             value="{{ $reason }}" @disabled($isPosted)">
+                      <div class="small-note muted mt-1 js-reason-hint" style="{{ $qtyRj > 0 ? '' : 'display:none;' }}">
+                        <span class="req">*</span> Wajib isi jika Reject > 0
+                      </div>
+                      @error("lines.$idx.reject_reason")
+                        <div class="invalid-feedback">{{ $message }}</div>
+                      @enderror
+                    </td>
+                  </tr>
+                @empty
+                  <tr>
+                    <td colspan="7" class="text-center py-4 text-muted">
+                      Tidak ada detail untuk diedit.
+                    </td>
+                  </tr>
+                @endforelse
+              </tbody>
+            </table>
+          </div>
+        </div>
+
+        {{-- summary --}}
+        <div class="d-flex flex-wrap gap-2 align-items-center mt-3">
+          <span class="pill"><i class="bi bi-collection"></i> Lines: <strong>{{ $totalLines }}</strong></span>
+          <span class="pill"><i class="bi bi-check2-circle"></i> Total OK: <strong id="sumOk">0</strong></span>
+          <span class="pill"><i class="bi bi-x-octagon"></i> Total Reject: <strong id="sumRj">0</strong></span>
+          <span class="pill pill-warn"><i class="bi bi-arrow-counterclockwise"></i> Total Sisa: <strong id="sumSisa">0</strong></span>
+        </div>
+
+        {{-- actions --}}
+        <div class="footer">
+          <a href="{{ route('production.finishing_jobs.show', $job->id) }}" class="btn btn-sm btn-outline-secondary">
+            <i class="bi bi-arrow-left"></i> <span class="ms-1">Batal</span>
+          </a>
+
+          @if($isPosted)
+            <button type="button" class="btn btn-sm btn-secondary" disabled>
+              <i class="bi bi-lock-fill"></i> Diposted — tidak bisa diubah
+            </button>
+          @else
+            <button type="submit" class="btn btn-sm btn-success btn-save">
+              <i class="bi bi-check2-circle"></i> <span class="ms-1 text-white">Simpan Perubahan</span>
+            </button>
+          @endif
+        </div>
+      </div>
+    </form>
+  </div>
+</div>
 @endsection
 
 @push('scripts')
-    <script>
-        document.addEventListener('DOMContentLoaded', function() {
-            const isPosted = @json($isPosted);
+<script>
+document.addEventListener('DOMContentLoaded', function () {
+  const isPosted = @json($isPosted);
+  if (isPosted) return;
 
-            // safety: jika posted, disable all interactive controls (double-safety)
-            if (isPosted) {
-                const form = document.querySelector('form');
-                if (form) {
-                    // disable non-link controls
-                    const controls = form.querySelectorAll('input, textarea, select, button');
-                    controls.forEach(c => {
-                        if (c.tagName === 'A') return;
-                        // keep hidden inputs enabled so server receives them
-                        if (c.type && c.type.toLowerCase() === 'hidden') return;
-                        c.setAttribute('disabled', 'disabled');
-                    });
-                }
-            }
+  const table = document.querySelector('.finishing-table');
+  if (!table) return;
 
-            // --- NEW: Block decimals by sanitizing input characters immediately
-            const integerInputs = document.querySelectorAll('input[name*="[qty_ok]"], input[name*="[qty_reject]"]');
+  const sumOkEl = document.getElementById('sumOk');
+  const sumRjEl = document.getElementById('sumRj');
+  const sumSisaEl = document.getElementById('sumSisa');
 
-            integerInputs.forEach(el => {
-                // sanitize on paste as well
-                el.addEventListener('paste', function(e) {
-                    e.preventDefault();
-                    const text = (e.clipboardData || window.clipboardData).getData('text');
-                    const digits = text.replace(/[^0-9]/g, '');
-                    document.execCommand('insertText', false, digits);
-                });
+  const toInt = (v) => {
+    const n = parseInt(String(v ?? '').replace(/[^0-9]/g,''), 10);
+    return Number.isFinite(n) ? n : 0;
+  };
+  const fmt = (n) => (n || 0).toLocaleString('id-ID');
 
-                el.addEventListener('input', function() {
-                    // keep only digits (remove dots, commas, minus, spaces, letters)
-                    const clean = this.value.replace(/[^0-9]/g, '');
-                    // prevent leading zeros (optional): keep as-is to not surprise user
-                    if (this.value !== clean) {
-                        this.value = clean;
-                    }
-                });
+  // digits only (ok & reject)
+  const integerInputs = document.querySelectorAll('input[name*="[qty_ok]"], input[name*="[qty_reject]"]');
+  integerInputs.forEach(el => {
+    el.addEventListener('paste', function(e){
+      e.preventDefault();
+      const text = (e.clipboardData || window.clipboardData).getData('text');
+      const digits = String(text || '').replace(/[^0-9]/g,'');
+      document.execCommand('insertText', false, digits);
+    });
+    el.addEventListener('input', function(){
+      const clean = String(this.value || '').replace(/[^0-9]/g,'');
+      if (String(this.value) !== clean) this.value = clean;
+    });
+    el.addEventListener('wheel', function(e){
+      if (document.activeElement === this) e.preventDefault();
+    }, {passive:false});
+  });
 
-                // optional: prevent wheel changing number on focus (UI annoyance)
-                el.addEventListener('wheel', function(e) {
-                    if (document.activeElement === this) {
-                        e.preventDefault();
-                    }
-                }, {
-                    passive: false
-                });
-            });
+  function clampRow(row) {
+    const idx = row.getAttribute('data-idx');
+    const inEl = row.querySelector('.js-in');
+    const okEl = row.querySelector('.js-ok');
+    const rjEl = row.querySelector('.js-rj');
+    const sisaEl = row.querySelector('.js-sisa');
+    const reasonEl = row.querySelector('.js-reason');
+    const hintEl = row.querySelector('.js-reason-hint');
 
-            // UX guard: pastikan qty_reject tidak boleh lebih besar dari qty_in
-            const table = document.querySelector('.finishing-table');
-            if (!table) return;
+    const qtyIn = toInt(inEl?.value || 0);
+    let ok = toInt(okEl?.value || 0);
+    let rj = toInt(rjEl?.value || 0);
 
-            table.addEventListener('input', function(e) {
-                const el = e.target;
-                if (!el.name) return;
+    // clamp 0..IN
+    if (ok > qtyIn) ok = qtyIn;
+    if (rj > qtyIn) rj = qtyIn;
 
-                const match = el.name.match(/lines\[(\d+)\]\[(\w+)\]/);
-                if (!match) return;
-                const idx = match[1];
-                const field = match[2];
+    // clamp OK+Reject <= IN (TIDAK auto-balance)
+    const maxRj = Math.max(0, qtyIn - ok);
+    if (rj > maxRj) rj = maxRj;
 
-                const qtyInEl = document.querySelector(`[name="lines[${idx}][qty_in]"]`);
-                const qtyOkEl = document.querySelector(`[name="lines[${idx}][qty_ok]"]`);
-                const qtyRejectEl = document.querySelector(`[name="lines[${idx}][qty_reject]"]`);
+    if (okEl) okEl.value = String(ok);
+    if (rjEl) rjEl.value = String(rj);
 
-                const qtyIn = parseFloat(qtyInEl?.value || 0);
-                let qtyOk = parseFloat(qtyOkEl?.value || 0);
-                let qtyReject = parseFloat(qtyRejectEl?.value || 0);
+    const sisa = Math.max(0, qtyIn - (ok + rj));
+    if (sisaEl) sisaEl.textContent = fmt(sisa);
 
-                // ensure numeric (NaN -> 0)
-                if (isNaN(qtyOk)) qtyOk = 0;
-                if (isNaN(qtyReject)) qtyReject = 0;
+    // reason required if reject > 0 (UI only)
+    if (hintEl) hintEl.style.display = (rj > 0) ? 'block' : 'none';
+    if (reasonEl) reasonEl.required = (rj > 0);
+  }
 
-                // don't let OK + REJECT exceed IN
-                if (qtyOk + qtyReject > qtyIn) {
-                    // adjust the field that was changed
-                    if (field === 'qty_ok') {
-                        qtyOk = Math.max(0, qtyIn - qtyReject);
-                        if (qtyOkEl) qtyOkEl.value = Math.floor(qtyOk);
-                    } else if (field === 'qty_reject') {
-                        qtyReject = Math.max(0, qtyIn - qtyOk);
-                        if (qtyRejectEl) qtyRejectEl.value = Math.floor(qtyReject);
-                    } else {
-                        // fallback: clamp both
-                        if (qtyOkEl) qtyOkEl.value = Math.max(0, Math.min(qtyOk, qtyIn));
-                        if (qtyRejectEl) qtyRejectEl.value = Math.max(0, Math.min(qtyReject, qtyIn -
-                        qtyOk));
-                    }
-                }
+  function recomputeTotals(){
+    let totOk=0, totRj=0, totSisa=0;
 
-                // ensure reject <= qty_in
-                if (qtyReject > qtyIn) {
-                    if (qtyRejectEl) qtyRejectEl.value = Math.floor(qtyIn);
-                }
+    document.querySelectorAll('tr[data-idx]').forEach(row => {
+      const inEl = row.querySelector('.js-in');
+      const okEl = row.querySelector('.js-ok');
+      const rjEl = row.querySelector('.js-rj');
 
-                // ensure ok <= qty_in
-                if (qtyOk > qtyIn) {
-                    if (qtyOkEl) qtyOkEl.value = Math.floor(qtyIn);
-                }
-            });
-        });
-    </script>
+      const qtyIn = toInt(inEl?.value || 0);
+      const ok = toInt(okEl?.value || 0);
+      const rj = toInt(rjEl?.value || 0);
+
+      totOk += ok;
+      totRj += rj;
+      totSisa += Math.max(0, qtyIn - (ok + rj));
+    });
+
+    if (sumOkEl) sumOkEl.textContent = `${fmt(totOk)} pcs`;
+    if (sumRjEl) sumRjEl.textContent = `${fmt(totRj)} pcs`;
+    if (sumSisaEl) sumSisaEl.textContent = `${fmt(totSisa)} pcs`;
+  }
+
+  // init
+  document.querySelectorAll('tr[data-idx]').forEach(row => clampRow(row));
+  recomputeTotals();
+
+  table.addEventListener('input', function(e){
+    const el = e.target;
+    if (!el || !el.name) return;
+    if (!el.name.includes('[qty_ok]') && !el.name.includes('[qty_reject]')) return;
+
+    const row = el.closest('tr[data-idx]');
+    if (!row) return;
+
+    clampRow(row);
+    recomputeTotals();
+  });
+});
+</script>
 @endpush

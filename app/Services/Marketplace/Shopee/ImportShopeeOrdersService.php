@@ -13,22 +13,6 @@ use PhpOffice\PhpSpreadsheet\Shared\Date as ExcelDate;
 
 class ImportShopeeOrdersService
 {
-    /**
-     * Import Shopee Orders (shipping/completed) -> SalesInvoice + SalesInvoiceLine
-     *
-     * Rules:
-     * - DRY RUN preview (no write)
-     * - onMissing: stop|skip|create
-     * - SKU pack: BASE-3 => qty_eff = qty * 3
-     * - Harga: toPrice() fix Excel numeric 56.979 => 56979
-     * - HPP: pakai master items.hpp
-     *   - hpp_unit_snapshot = items.hpp
-     *   - hpp_total_snapshot = items.hpp * qty_eff
-     *   - margin_total = line_total - hpp_total_snapshot
-     *   - margin_unit = margin_total / qty_eff
-     *
-     * @return array<string,mixed>
-     */
     public function run(
         UploadedFile $file,
         int $storeId,
@@ -36,6 +20,7 @@ class ImportShopeeOrdersService
         string $channel = 'shopee',
         string $onMissing = 'stop', // stop|skip|create
         bool $dryRun = true,
+        bool $skipExisting = true, // ✅ default UX: skip existing
     ): array {
         // ----------------------------
         // Validate args
@@ -155,43 +140,45 @@ class ImportShopeeOrdersService
             ->keyBy('code');
 
         $missingBase = $baseCodes->filter(fn($c) => !$itemsByCode->has($c))->values();
-
         $createdItems = 0;
 
-        if ($missingBase->count() > 0) {
-            if ($onMissing === 'stop') {
-                return [
-                    'ok' => false,
-                    'message' => 'Ada BASE SKU yang belum ada di items.code. Mode stop.',
-                    'missing_base_skus' => $missingBase->all(),
-                ];
-            }
+        if ($missingBase->count() > 0 && $onMissing === 'stop') {
+            return [
+                'ok' => false,
+                'message' => 'Ada BASE SKU yang belum ada di items.code. Mode stop.',
+                'missing_base_skus' => $missingBase->all(),
+            ];
+        }
 
-            if ($onMissing === 'create' && !$dryRun) {
-                foreach ($missingBase as $code) {
-                    $existing = Item::where('code', $code)->first();
-                    if ($existing) {
-                        $itemsByCode->put($existing->code, $existing);
-                        continue;
-                    }
-
-                    $new = Item::create([
-                        'code' => $code,
-                        'name' => $code . ' (AUTO from Shopee)',
-                        'unit' => 'pcs',
-                        'type' => 'finished_good',
-                        'active' => 1,
-                        'hpp' => 0,
-                        'last_purchase_price' => 0,
-                    ]);
-
-                    $itemsByCode->put($new->code, $new);
-                    $createdItems++;
+        if ($missingBase->count() > 0 && $onMissing === 'create' && !$dryRun) {
+            foreach ($missingBase as $code) {
+                $existing = Item::where('code', $code)->first();
+                if ($existing) {
+                    $itemsByCode->put($existing->code, $existing);
+                    continue;
                 }
+
+                $new = Item::create([
+                    'code' => $code,
+                    'name' => $code . ' (AUTO from Shopee)',
+                    'unit' => 'pcs',
+                    'type' => 'finished_good',
+                    'active' => 1,
+                    'hpp' => 0,
+                    'last_purchase_price' => 0,
+                ]);
+
+                $itemsByCode->put($new->code, $new);
+                $createdItems++;
             }
         }
 
+        // group by order
         $byOrder = collect($rows)->groupBy('order_no');
+        $orderNos = $byOrder->keys()->values()->all();
+
+        // existing map (bulk)
+        $existingMap = $this->existingOrdersMap($storeId, $channel, $orderNos);
 
         // ----------------------------
         // DRY RUN preview
@@ -199,7 +186,7 @@ class ImportShopeeOrdersService
         if ($dryRun) {
             $skippedLines = 0;
 
-            $preview = $byOrder->map(function ($g, $orderNo) use ($itemsByCode, $onMissing, &$skippedLines) {
+            $list = $byOrder->map(function ($g, $orderNo) use ($itemsByCode, $onMissing, &$skippedLines, $existingMap) {
                 $paidAt = $g->first()['paid_at'] ?? null;
 
                 $qtyPcs = 0;
@@ -220,57 +207,95 @@ class ImportShopeeOrdersService
                     $subtotal += (float) ($l['line_total'] ?? 0);
                 }
 
+                $exists = array_key_exists($orderNo, $existingMap);
+
                 return [
                     'order_no' => $orderNo,
-                    'rows' => $g->count(),
-                    'kept_rows' => $keptRows,
-                    'qty_pcs' => $qtyPcs,
-                    'subtotal' => (int) round($subtotal, 0),
                     'paid_at' => $paidAt ? $paidAt->format('Y-m-d H:i:s') : null,
+
+                    'qty_pcs' => (int) $qtyPcs,
+                    'subtotal' => (int) round($subtotal, 0),
+
+                    'rows' => (int) $g->count(),
+                    'kept_rows' => (int) $keptRows,
+
+                    'exists' => $exists,
+                    'existing_invoice_id' => $exists ? (int) $existingMap[$orderNo] : null,
                 ];
             })->values()->all();
+
+            $totalOrders = count($list);
+            $existingOrders = count(array_filter($list, fn($x) => (bool) ($x['exists'] ?? false)));
+            $newOrders = $totalOrders - $existingOrders;
+
+            $sumAmount = array_sum(array_map(fn($x) => (float) ($x['subtotal'] ?? 0), $list));
+            $sumQty = array_sum(array_map(fn($x) => (int) ($x['qty_pcs'] ?? 0), $list));
+
+            // optional: amount/qty khusus NEW saja (buat UX lebih jelas)
+            $sumAmountNew = array_sum(array_map(fn($x) => (bool) ($x['exists'] ?? false) ? 0 : (float) ($x['subtotal'] ?? 0), $list));
+            $sumQtyNew = array_sum(array_map(fn($x) => (bool) ($x['exists'] ?? false) ? 0 : (int) ($x['qty_pcs'] ?? 0), $list));
 
             return [
                 'ok' => true,
                 'mode' => 'dry-run',
-                'orders' => $byOrder->count(),
+                'message' => 'Preview OK. Baris yang sudah ada akan otomatis di-skip saat Confirm.',
+                'summary' => [
+                    'total_orders' => $totalOrders,
+                    'new_orders' => $newOrders,
+                    'existing_orders' => $existingOrders,
+
+                    'total_amount' => (int) round($sumAmount, 0),
+                    'total_qty' => (int) $sumQty,
+
+                    'new_amount' => (int) round($sumAmountNew, 0),
+                    'new_qty' => (int) $sumQtyNew,
+                ],
                 'created_items' => $createdItems,
                 'skipped_lines' => $skippedLines,
                 'missing_base_skus' => $missingBase->all(),
-                'preview' => array_slice($preview, 0, 50),
-                'note' => 'Preview ditampilkan max 50 order.',
+
+                // UI tampil max 80 biar enak
+                'preview' => array_slice($list, 0, 80),
+                'note' => 'Preview ditampilkan max 80 order.',
             ];
         }
 
         // ----------------------------
-        // WRITE MODE
+        // WRITE MODE (Confirm)
         // ----------------------------
-        $created = 0;
-        $updated = 0;
-        $lineCount = 0;
-        $skippedLines = 0;
+        $createdInvoices = 0;
+        $linesCreated = 0;
         $skippedOrders = 0;
+        $skippedLines = 0;
 
         DB::transaction(function () use (
             $byOrder,
             $itemsByCode,
+            $existingMap,
             $storeId,
             $channel,
             $type,
             $onMissing,
-            &$created,
-            &$updated,
-            &$lineCount,
-            &$skippedLines,
-            &$skippedOrders
+            $skipExisting,
+            &$createdInvoices,
+            &$linesCreated,
+            &$skippedOrders,
+            &$skippedLines
         ) {
             foreach ($byOrder as $orderNo => $lines) {
+
+                // ✅ skip existing
+                if ($skipExisting && isset($existingMap[$orderNo])) {
+                    $skippedOrders++;
+                    continue;
+                }
+
                 /** @var Carbon $paidAt */
                 $paidAt = $lines->first()['paid_at'];
                 $completedAt = $lines->first()['completed_at'] ?? null;
                 $awb = $lines->first()['awb'] ?? null;
 
-                // skip/create dan semua line missing -> skip order
+                // Kalau onMissing=skip/create: jika semua line missing -> skip order
                 if ($onMissing !== 'stop') {
                     $hasAnyValid = false;
                     foreach ($lines as $tmp) {
@@ -283,41 +308,23 @@ class ImportShopeeOrdersService
                     }
                 }
 
-                $invoice = SalesInvoice::query()
-                    ->where('store_id', $storeId)
-                    ->where('channel', $channel)
-                    ->where('channel_order_no', $orderNo)
-                    ->first();
-
-                $isNew = false;
-                if (!$invoice) {
-                    $invoice = new SalesInvoice();
-                    $invoice->code = $this->generateInvoiceCode();
-                    $invoice->store_id = $storeId;
-                    $invoice->warehouse_id = $this->guessWarehouseId(); // TODO: map ke WH-RTS id
-                    $invoice->status = 'draft';
-                    $invoice->currency = 'IDR';
-                    $isNew = true;
-                }
+                $invoice = new SalesInvoice();
+                $invoice->code = $this->generateInvoiceCode();
+                $invoice->store_id = $storeId;
+                $invoice->warehouse_id = $this->guessWarehouseId(); // TODO: map ke WH-RTS id kamu
+                $invoice->status = 'draft';
+                $invoice->currency = 'IDR';
 
                 $invoice->channel = $channel;
                 $invoice->channel_order_no = $orderNo;
                 $invoice->paid_at = $paidAt;
-                $invoice->completed_at = $type === 'completed'
-                ? ($completedAt ?: $invoice->completed_at)
-                : $invoice->completed_at;
+                $invoice->completed_at = $type === 'completed' ? ($completedAt ?: null): null;
                 $invoice->marketplace_status = $type;
-                $invoice->awb = $awb ?: $invoice->awb;
+                $invoice->awb = $awb ?: null;
                 $invoice->date = $paidAt->toDateString();
 
                 $invoice->save();
-
-                if ($isNew) {
-                    $created++;
-                } else {
-                    $updated++;
-                    $invoice->lines()->delete();
-                }
+                $createdInvoices++;
 
                 $subtotal = 0.0;
                 $writtenLines = 0;
@@ -343,7 +350,7 @@ class ImportShopeeOrdersService
 
                     $subtotal += $lineTotal;
 
-                    // ✅ HPP snapshot
+                    // snapshot HPP
                     $hppUnit = (float) ($item->hpp ?? 0.0);
                     $hppTotal = $hppUnit * $qtyEff;
 
@@ -365,12 +372,14 @@ class ImportShopeeOrdersService
                         'margin_total' => $marginTotal,
                     ]);
 
-                    $lineCount++;
+                    $linesCreated++;
                     $writtenLines++;
                 }
 
+                // kalau semua line ke-skip (onMissing=skip) -> hapus invoice biar bersih
                 if ($writtenLines === 0 && $onMissing === 'skip') {
                     $invoice->delete();
+                    $createdInvoices--;
                     $skippedOrders++;
                     continue;
                 }
@@ -380,7 +389,6 @@ class ImportShopeeOrdersService
                 $invoice->tax_percent = 0;
                 $invoice->tax_amount = 0;
                 $invoice->grand_total = $subtotal;
-
                 $invoice->save();
             }
         });
@@ -388,13 +396,15 @@ class ImportShopeeOrdersService
         return [
             'ok' => true,
             'mode' => 'write',
-            'orders' => $byOrder->count(),
-            'created_invoices' => $created,
-            'updated_invoices' => $updated,
+            'message' => 'Import selesai.',
+            'summary' => [
+                'orders_in_file' => $byOrder->count(),
+                'created_invoices' => $createdInvoices,
+                'skipped_orders' => $skippedOrders, // includes existing
+                'lines_created' => $linesCreated,
+                'skipped_lines' => $skippedLines,
+            ],
             'created_items' => $createdItems,
-            'lines' => $lineCount,
-            'skipped_lines' => $skippedLines,
-            'skipped_orders' => $skippedOrders,
             'missing_base_skus' => $missingBase->all(),
         ];
     }
@@ -402,6 +412,19 @@ class ImportShopeeOrdersService
     // =========================================================
     // Helpers
     // =========================================================
+    private function existingOrdersMap(int $storeId, string $channel, array $orderNos): array
+    {
+        if (empty($orderNos)) {
+            return [];
+        }
+
+        return SalesInvoice::query()
+            ->where('store_id', $storeId)
+            ->where('channel', $channel)
+            ->whereIn('channel_order_no', $orderNos)
+            ->pluck('id', 'channel_order_no') // [order_no => invoice_id]
+            ->all();
+    }
 
     private function readXlsxRows(string $file): array
     {
@@ -423,10 +446,6 @@ class ImportShopeeOrdersService
         return $idx;
     }
 
-    /**
-     * SKU pack format: BASE-3 -> base=BASE, pack=3
-     * fallback: BASE -> pack=1
-     */
     private function splitPackSku(string $sku): array
     {
         $sku = trim($sku);
@@ -456,14 +475,12 @@ class ImportShopeeOrdersService
         $s = trim((string) $value);
         $s = str_replace(["Rp", "rp", " ", "\u{00A0}"], '', $s);
 
-        // Indonesia: 1.234,56
         if (preg_match('/^\-?\d{1,3}(\.\d{3})+(,\d+)?$/', $s)) {
             $s = str_replace('.', '', $s);
             $s = str_replace(',', '.', $s);
             return (float) $s;
         }
 
-        // Intl: 1,234.56
         if (preg_match('/^\-?\d{1,3}(,\d{3})+(\.\d+)?$/', $s)) {
             $s = str_replace(',', '', $s);
             return (float) $s;
@@ -475,10 +492,6 @@ class ImportShopeeOrdersService
         return is_numeric($s) ? (float) $s : 0.0;
     }
 
-    /**
-     * Parser khusus harga (IDR).
-     * Fix Excel numeric: 56.979 => 56979
-     */
     private function toPrice($value): float
     {
         if ($value === null || $value === '') {
@@ -487,18 +500,16 @@ class ImportShopeeOrdersService
 
         if (is_numeric($value)) {
             $v = (float) $value;
-
-            // kalau < 1000 dan ada pecahan -> anggap ribuan yang kebaca desimal
             if ($v < 1000 && floor($v) !== $v) {
                 return (float) round($v * 1000, 0);
             }
+
             return $v;
         }
 
         $s = trim((string) $value);
         $s = str_replace(["Rp", "rp", " ", "\u{00A0}"], '', $s);
 
-        // Indonesia: 56.979 / 1.234.567,89
         if (preg_match('/^\-?\d{1,3}(\.\d{3})+(,\d+)?$/', $s)) {
             $s = str_replace('.', '', $s);
             $s = str_replace(',', '.', $s);
@@ -544,8 +555,7 @@ class ImportShopeeOrdersService
 
     private function guessWarehouseId(): int
     {
-        // TODO: ganti ke WH-RTS id kamu
-        return 1;
+        return 1; // TODO: ganti ke WH-RTS id kamu
     }
 
     private function fail(string $message): array

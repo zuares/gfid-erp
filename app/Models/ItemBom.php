@@ -16,6 +16,7 @@ class ItemBom extends Model
 
     protected $casts = [
         'active' => 'boolean',
+        'qty' => 'decimal:4',
     ];
 
     public function item(): BelongsTo

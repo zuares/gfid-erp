@@ -2,7 +2,6 @@
 
 namespace App\Models;
 
-use App\Models\SalesInvoice;
 use Illuminate\Database\Eloquent\Factories\HasFactory;
 use Illuminate\Database\Eloquent\Model;
 
@@ -13,31 +12,60 @@ class Shipment extends Model
     protected $fillable = [
         'code',
         'store_id',
-        'sales_invoice_id', // ← tambahkan ini
+        'warehouse_id',
+        'sales_invoice_id',
+
         'date',
         'status',
-        'notes',
         'total_qty',
+        'notes',
+
+        // optional: if exists in DB
+        'awb',
+
+        // audit
         'created_by',
         'submitted_at',
         'submitted_by',
         'posted_at',
         'posted_by',
-        'sales_invoice_id',
 
+        // cancel fields (if exists)
+        'cancelled_at',
+        'cancelled_by',
+        'cancel_reason',
+
+        // daily sales hooks (if exists)
+        'daily_sales_applied_at',
+        'daily_sales_reversed_at',
     ];
 
     protected $casts = [
         'date' => 'date',
         'submitted_at' => 'datetime',
         'posted_at' => 'datetime',
+
+        // optional
+        'cancelled_at' => 'datetime',
+        'daily_sales_applied_at' => 'datetime',
+        'daily_sales_reversed_at' => 'datetime',
     ];
+
+    /* =====================
+     * RELATIONS
+     * ===================== */
 
     public function store()
     {
         return $this->belongsTo(Store::class);
     }
 
+    public function warehouse()
+    {
+        return $this->belongsTo(Warehouse::class);
+    }
+
+    // kamu pakai ShipmentLine sebagai detail scan
     public function lines()
     {
         return $this->hasMany(ShipmentLine::class);
@@ -48,16 +76,39 @@ class Shipment extends Model
         return $this->belongsTo(User::class, 'created_by');
     }
 
+    public function submitter()
+    {
+        return $this->belongsTo(User::class, 'submitted_by');
+    }
+
     public function poster()
     {
         return $this->belongsTo(User::class, 'posted_by');
     }
 
+    public function canceller()
+    {
+        return $this->belongsTo(User::class, 'cancelled_by');
+    }
+
+    public function invoice()
+    {
+        return $this->belongsTo(SalesInvoice::class, 'sales_invoice_id');
+    }
+
+    public function marketplaceReconciliations()
+    {
+        return $this->hasMany(\App\Models\MpReconciliation::class, 'shipment_id');
+    }
+
+    /* =====================
+     * HELPERS
+     * ===================== */
+
     public static function generateCode(string $prefix = 'SHP'): string
     {
         $today = now()->format('Ymd');
 
-        // Cari shipment terakhir hari ini dengan prefix yang sama
         $last = static::whereDate('created_at', now()->toDateString())
             ->where('code', 'like', $prefix . '-' . $today . '-%')
             ->orderByDesc('id')
@@ -71,13 +122,13 @@ class Shipment extends Model
         return $prefix . '-' . $today . '-' . str_pad($seq, 3, '0', STR_PAD_LEFT);
     }
 
-    public function warehouse()
+    public function isCancelled(): bool
     {
-        return $this->belongsTo(Warehouse::class);
+        return !empty($this->cancelled_at);
     }
 
-    public function invoice()
+    public function isPosted(): bool
     {
-        return $this->belongsTo(SalesInvoice::class, 'sales_invoice_id');
+        return !empty($this->posted_at);
     }
 }

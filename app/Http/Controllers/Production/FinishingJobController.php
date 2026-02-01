@@ -13,10 +13,10 @@ use App\Models\ItemCostSnapshot;
 use App\Models\Warehouse;
 use App\Services\Costing\HppService;
 use App\Services\Inventory\InventoryService;
+use App\Services\Production\FinishingBomService;
 use Carbon\Carbon;
 use Illuminate\Http\RedirectResponse;
 use Illuminate\Http\Request;
-use Illuminate\Support\Facades\Auth;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Validation\ValidationException;
 use Illuminate\View\View;
@@ -26,6 +26,7 @@ class FinishingJobController extends Controller
     public function __construct(
         protected InventoryService $inventory,
         protected HppService $hpp,
+        protected FinishingBomService $finBom, // ✅ NEW
     ) {}
 
     /* ============================================================
@@ -42,7 +43,6 @@ class FinishingJobController extends Controller
             ->withCount('lines as bundle_count')
             ->withSum('lines as total_ok', 'qty_ok')
             ->withSum('lines as total_reject', 'qty_reject')
-        // urut terbaru: yang terakhir berubah di atas
             ->orderByDesc('date')
             ->orderByDesc('updated_at')
             ->orderByDesc('id');
@@ -54,7 +54,6 @@ class FinishingJobController extends Controller
             });
         }
 
-        // FILTER STATUS pakai kolom status (bukan posted_at)
         if ($status === 'draft') {
             $query->where('status', 'draft');
         } elseif ($status === 'posted') {
@@ -78,7 +77,7 @@ class FinishingJobController extends Controller
     }
 
     /* ============================================================
-     * CREATE S
+     * CREATE
      * ============================================================
      */
     public function create(Request $request): View
@@ -187,7 +186,7 @@ class FinishingJobController extends Controller
             ->orderBy('b.finished_item_id')
             ->get();
 
-        // 5) eligible WIP per item+op (biar BYOP ga ngaco)
+        // 5) eligible WIP per item+op
         $qEligibleBundles = DB::table('cutting_job_bundles as b')
             ->join('sewing_pickup_lines as spl', 'spl.cutting_job_bundle_id', '=', 'b.id')
             ->join('sewing_return_lines as srl', 'srl.sewing_pickup_line_id', '=', 'spl.id')
@@ -222,7 +221,6 @@ class FinishingJobController extends Controller
             $eligibleWipByItemOp[$key] = ($eligibleWipByItemOp[$key] ?? 0) + (int) round((float) ($r->bundle_wip ?? 0));
         }
 
-        // 6) build lines
         $linesByOp = collect($rowsByOp)->map(function ($r) use ($items, $eligibleWipByItemOp) {
             $itemId = (int) $r->item_id;
             $opId = (int) ($r->operator_id ?? 0);
@@ -287,7 +285,7 @@ class FinishingJobController extends Controller
     }
 
     /* ============================================================
-     * STORE (Draft + LOCK SewingReturn finished_qty)
+     * STORE (Draft)
      * ============================================================
      */
     public function store(Request $request): RedirectResponse
@@ -331,7 +329,7 @@ class FinishingJobController extends Controller
         $wipFinWarehouseId = Warehouse::where('code', 'WIP-FIN')->value('id');
         if (!$wipFinWarehouseId) {
             return back()->withInput()->withErrors([
-                'warehouse' => 'Gudang WIP-FIN belum dikonfigurasi. Set kode warehouse WIP-FIN terlebih dahulu.',
+                'warehouse' => 'Gudang WIP-FIN belum dikonfigurasi.',
             ]);
         }
 
@@ -373,7 +371,6 @@ class FinishingJobController extends Controller
                 ]);
             }
 
-            // Remaining OK operator per item (berdasarkan sewing_return_lines)
             $qRemaining = DB::table('sewing_return_lines as srl')
                 ->join('sewing_returns as sr', 'sr.id', '=', 'srl.sewing_return_id')
                 ->join('sewing_pickup_lines as spl', 'spl.id', '=', 'srl.sewing_pickup_line_id')
@@ -405,7 +402,6 @@ class FinishingJobController extends Controller
                 ]);
             }
 
-            // Total WIP-FIN per item
             $totalWip = (int) round((float) CuttingJobBundle::query()
                     ->readyForFinishing($wipFinWarehouseId)
                     ->where('finished_item_id', $itemId)
@@ -546,7 +542,7 @@ class FinishingJobController extends Controller
 
                     $takeOk = $takeIn - $takeReject;
 
-                    // ✅ LOCK/RESERVE sewing_return_lines.finished_qty untuk qty_in (OK+Reject)
+                    // lock reserve sewing_return_lines.finished_qty untuk qty_in
                     $toConsume = $takeIn;
 
                     $qRows = DB::table('sewing_return_lines as srl')
@@ -688,13 +684,6 @@ class FinishingJobController extends Controller
                 ->with('error', 'Finishing yang sudah POSTED tidak bisa diubah.');
         }
 
-        // ⚠️ WARNING: job draft sudah reserve finished_qty pada sewing_return_lines.
-        // Kalau diedit, idealnya release reservation dulu. Kalau belum ada mekanismenya:
-        // DISARANKAN: jangan edit draft, bikin job baru / batalkan.
-        // Kamu bisa block dengan:
-        // return redirect()->route('production.finishing_jobs.show', $finishingJob->id)
-        //     ->with('error', 'Draft ini sudah melakukan reservasi Sewing Return. Untuk saat ini tidak bisa diedit.');
-
         $lines = $finishingJob->lines()->with(['bundle.item', 'sewingOperator'])->get();
 
         return view('production.finishing_jobs.edit', [
@@ -712,15 +701,141 @@ class FinishingJobController extends Controller
                 ->with('error', 'Finishing yang sudah POSTED tidak bisa diubah.');
         }
 
-        // ⚠️ PENTING:
-        // Karena store() sudah reserve finished_qty, update draft tanpa release reservation akan bikin mismatch.
-        // Rekomendasi aman: BLOCK update draft.
+        $validated = $req->validate([
+            'date' => ['required', 'date'],
+            'notes' => ['nullable', 'string'],
+            'lines' => ['required', 'array', 'min:1'],
+            'lines.*.id' => ['required', 'integer', 'exists:finishing_job_lines,id'],
+            'lines.*.qty_ok' => ['required', 'integer', 'min:0'],
+            'lines.*.qty_reject' => ['required', 'integer', 'min:0'],
+            'lines.*.reject_reason' => ['nullable', 'string', 'max:100'],
+            'lines.*.reject_notes' => ['nullable', 'string'],
+        ]);
+
+        $finishingJob->loadMissing(['lines']);
+        $lineById = $finishingJob->lines->keyBy('id');
+
+        $hasSplVoided = \Schema::hasColumn('sewing_pickup_lines', 'voided_at');
+        $hasSrVoided = \Schema::hasColumn('sewing_returns', 'voided_at');
+
+        DB::transaction(function () use ($finishingJob, $validated, $lineById, $hasSplVoided, $hasSrVoided) {
+            $finishingJob->update([
+                'date' => $validated['date'],
+                'notes' => $validated['notes'] ?? null,
+                'updated_by' => auth()->id(),
+            ]);
+
+            foreach ($validated['lines'] as $i => $payload) {
+                $lineId = (int) $payload['id'];
+
+                /** @var \App\Models\FinishingJobLine|null $line */
+                $line = $lineById->get($lineId);
+                if (!$line) {
+                    throw ValidationException::withMessages([
+                        "lines.{$i}.id" => 'Line tidak ditemukan / bukan milik finishing job ini.',
+                    ]);
+                }
+
+                $oldIn = (int) round((float) ($line->qty_in ?? 0));
+                $qtyOk = max(0, (int) ($payload['qty_ok'] ?? 0));
+                $qtyRj = max(0, (int) ($payload['qty_reject'] ?? 0));
+                $newUsed = $qtyOk + $qtyRj;
+
+                if ($newUsed <= 0) {
+                    throw ValidationException::withMessages([
+                        "lines.{$i}.qty_ok" => 'Minimal OK+Reject harus > 0 (kalau mau batal, lebih aman void/cancel flow khusus).',
+                    ]);
+                }
+
+                if ($newUsed > $oldIn) {
+                    throw ValidationException::withMessages([
+                        "lines.{$i}.qty_ok" => "OK+Reject tidak boleh melebihi Qty IN lama ({$oldIn}).",
+                    ]);
+                }
+
+                // ✅ kalau turun, release lock finished_qty di sewing_return_lines
+                $release = $oldIn - $newUsed;
+                if ($release > 0) {
+                    $bundleId = (int) $line->bundle_id;
+                    $itemId = (int) $line->item_id;
+                    $opId = (int) $line->sewing_operator_id;
+
+                    // ambil baris srl yang punya finished_qty > 0, lalu kurangi dari yang paling akhir (LIFO)
+                    $q = DB::table('sewing_return_lines as srl')
+                        ->join('sewing_returns as sr', 'sr.id', '=', 'srl.sewing_return_id')
+                        ->join('sewing_pickup_lines as spl', 'spl.id', '=', 'srl.sewing_pickup_line_id')
+                        ->where('spl.cutting_job_bundle_id', $bundleId)
+                        ->where('spl.finished_item_id', $itemId)
+                        ->where('sr.operator_id', $opId)
+                        ->whereRaw('COALESCE(srl.finished_qty,0) > 0');
+
+                    if ($hasSplVoided) {
+                        $q->whereNull('spl.voided_at');
+                    }
+
+                    if ($hasSrVoided) {
+                        $q->whereNull('sr.voided_at');
+                    }
+
+                    $rows = $q->select([
+                        'srl.id',
+                        DB::raw('COALESCE(srl.finished_qty,0) as finished_qty'),
+                    ])
+                        ->orderByDesc('srl.id')
+                        ->lockForUpdate()
+                        ->get();
+
+                    $toRelease = $release;
+
+                    foreach ($rows as $r) {
+                        if ($toRelease <= 0) {
+                            break;
+                        }
+
+                        $cur = (int) $r->finished_qty;
+                        if ($cur <= 0) {
+                            continue;
+                        }
+
+                        $dec = min($cur, $toRelease);
+
+                        DB::table('sewing_return_lines')
+                            ->where('id', $r->id)
+                            ->update([
+                                'finished_qty' => DB::raw('COALESCE(finished_qty,0) - ' . (int) $dec),
+                                'updated_at' => now(),
+                            ]);
+
+                        $toRelease -= $dec;
+                    }
+
+                    if ($toRelease > 0) {
+                        throw ValidationException::withMessages([
+                            "lines.{$i}.qty_ok" => "Gagal release {$release}. Data berubah/lock tidak cukup. Refresh lalu coba lagi.",
+                        ]);
+                    }
+
+                    // ✅ qty_in kita turunkan supaya konsisten (dan sisa dianggap kembali available WIP-FIN)
+                    $line->qty_in = $newUsed;
+                }
+
+                if ($qtyRj > $line->qty_in) {
+                    throw ValidationException::withMessages([
+                        "lines.{$i}.qty_reject" => "Reject tidak boleh > Qty IN ({$line->qty_in}).",
+                    ]);
+                }
+
+                $line->qty_ok = $qtyOk;
+                $line->qty_reject = $qtyRj;
+                $line->reject_reason = $payload['reject_reason'] ?? null;
+                $line->reject_notes = $payload['reject_notes'] ?? null;
+                $line->save();
+            }
+        });
+
         return redirect()
             ->route('production.finishing_jobs.show', $finishingJob->id)
-            ->with('error', 'Untuk saat ini draft finishing yang sudah dibuat tidak bisa di-edit karena sudah mengunci saldo Sewing Return. Buat Finishing baru atau tambahkan fitur "release reservation" dulu.');
-
-        // Kalau kamu mau aku bikinin versi update yang "release reservation + reserve ulang",
-        // tinggal bilang: nanti aku buat fungsi releaseFinishedQtyForDraftJob($job) + reserve ulang.
+            ->with('status', 'Draft Finishing berhasil di-update. Sisa qty sudah direlease kembali ke WIP-FIN (available).');
     }
 
     /* ============================================================
@@ -729,7 +844,7 @@ class FinishingJobController extends Controller
      */
     public function post(FinishingJob $finishing_job): RedirectResponse
     {
-        $job = $finishing_job->loadMissing(['lines', 'lines.bundle', 'lines.item']);
+        $job = $finishing_job->loadMissing(['lines', 'lines.bundle.cuttingJob', 'lines.item']);
 
         if (!$job || !$job->id) {
             return redirect()
@@ -743,7 +858,8 @@ class FinishingJobController extends Controller
                 ->with('status', 'Finishing Job ini sudah diposting sebelumnya.');
         }
 
-        $requiredCodes = ['WIP-FIN', 'WH-PRD', 'REJECT'];
+        // ✅ tambah RM karena kita akan stockOut SUP dari RM saat post
+        $requiredCodes = ['WIP-FIN', 'WH-PRD', 'REJECT', 'RM'];
         $warehouses = $this->getRequiredWarehouses($requiredCodes);
 
         $missing = array_diff($requiredCodes, $warehouses->keys()->all());
@@ -755,10 +871,12 @@ class FinishingJobController extends Controller
 
         $movementDate = $this->resolveMovementDate($job);
 
-        // ✅ PENTING: karena finished_qty sudah di-lock di store(),
-        // post() JANGAN validasi sewing_return lagi dan JANGAN allocate finished_qty lagi.
-
         DB::transaction(function () use ($job, $warehouses, $movementDate) {
+
+            // ✅ 0) Apply BOM SUP-only (skip FLC) per line, idempotent by bom_applied_at
+            $this->finBom->applySupOnlyForPostedJob($job, $movementDate);
+
+            // ✅ 1) Move stok WIP-FIN -> WH-PRD / REJECT (existing logic)
             $this->applyPostingMovements(
                 job: $job,
                 wipFinWarehouseId: $warehouses['WIP-FIN']->id,
@@ -782,19 +900,23 @@ class FinishingJobController extends Controller
 
         return redirect()
             ->route('production.finishing_jobs.show', $job->id)
-            ->with('status', 'Finishing Job berhasil diposting. Stok dipindahkan dari WIP-FIN ke WH-PRD/REJECT.');
+            ->with('status', 'Finishing Job berhasil diposting. BOM SUP ter-apply + stok dipindahkan dari WIP-FIN ke WH-PRD/REJECT.');
     }
 
     /* ============================================================
      * HELPERS
      * ============================================================
      */
-    protected function getRequiredWarehouses(array $codes)
+    protected function getRequiredWarehouses(array $codes): \Illuminate\Support\Collection
     {
-        return Warehouse::query()
-            ->whereIn('code', $codes)
-            ->get()
-            ->keyBy('code');
+        $norm = fn($v) => strtoupper(trim((string) $v));
+        $want = array_values(array_unique(array_map($norm, $codes)));
+
+        $rows = \App\Models\Warehouse::query()
+            ->whereIn('code', $want)
+            ->get();
+
+        return $rows->keyBy(fn($w) => $norm($w->code));
     }
 
     protected function resolveMovementDate(FinishingJob $job): \DateTimeInterface
@@ -803,15 +925,24 @@ class FinishingJobController extends Controller
         if ($date instanceof \DateTimeInterface) {
             return $date;
         }
-
         return Carbon::parse($date ?? now());
     }
 
     /**
      * Apply mutasi stok + snapshot HPP RM-only.
-     * NOTE PENTING:
+     * NOTE:
      * - finished_qty sewing_return_lines SUDAH di-lock saat store().
      * - Jadi di sini TIDAK BOLEH allocate / update finished_qty lagi.
+     */
+    /**
+     * Posting movements Finishing:
+     * - OUT  : WIP-FIN (qty_ok + qty_reject)
+     * - IN   : WH-PRD (qty_ok)
+     * - IN   : REJECT (qty_reject)
+     *
+     * Notes:
+     * - source of truth = qty_ok + qty_reject
+     * - qty_in hanya sebagai optional consistency check (kalau dipakai di UI)
      */
     protected function applyPostingMovements(
         FinishingJob $job,
@@ -819,109 +950,211 @@ class FinishingJobController extends Controller
         int $prodWarehouseId,
         int $rejectWarehouseId,
         \DateTimeInterface $movementDate,
-        string $notesPrefix = 'Finishing'
+        string $notesPrefix = 'Finishing',
+        bool $enforceQtyInMatch = false// ✅ sementara optional
     ): void {
         $job->loadMissing(['lines.bundle', 'lines.item']);
 
-        foreach ($job->lines as $line) {
-            $qtyOk = (int) ($line->qty_ok ?? 0);
-            $qtyReject = (int) ($line->qty_reject ?? 0);
-            $qtyInField = (int) ($line->qty_in ?? 0);
-
-            $qtyUsed = $qtyOk + $qtyReject;
-
-            // fallback untuk data lama
-            if ($qtyUsed <= 0 && $qtyInField > 0) {
-                $qtyUsed = $qtyInField;
+        // helper: normalize jadi int aman
+        $toInt = static function ($v): int {
+            if ($v === null || $v === '') {
+                return 0;
             }
 
-            if ($qtyUsed <= 0) {
-                continue;
-            }
+            return (int) round((float) $v);
+        };
 
-            $unitCostWipFin = $this->inventory->getItemIncomingUnitCost(
-                warehouseId: $wipFinWarehouseId,
-                itemId: (int) $line->item_id,
-            );
-            $movementUnitCost = $unitCostWipFin > 0 ? $unitCostWipFin : null;
+        DB::transaction(function () use (
+            $job,
+            $wipFinWarehouseId,
+            $prodWarehouseId,
+            $rejectWarehouseId,
+            $movementDate,
+            $notesPrefix,
+            $enforceQtyInMatch,
+            $toInt
+        ) {
+            foreach ($job->lines as $line) {
+                // =========================
+                // 0) Normalize qty
+                // =========================
+                $qtyOk = $toInt($line->qty_ok ?? 0);
+                $qtyReject = $toInt($line->qty_reject ?? 0);
+                $qtyIn = $toInt($line->qty_in ?? 0);
 
-            // 1) OUT WIP-FIN (OK+Reject)
-            $this->inventory->stockOut(
-                warehouseId: $wipFinWarehouseId,
-                itemId: (int) $line->item_id,
-                qty: $qtyUsed,
-                date: $movementDate,
-                sourceType: FinishingJob::class,
-                sourceId: $job->id,
-                notes: $notesPrefix,
-                allowNegative: false,
-                lotId: null,
-                unitCostOverride: $movementUnitCost,
-                affectLotCost: false,
-            );
+                $qtyUsed = $qtyOk + $qtyReject;
 
-            // 2) IN WH-PRD (OK)
-            if ($qtyOk > 0) {
-                $this->inventory->stockIn(
-                    warehouseId: $prodWarehouseId,
-                    itemId: (int) $line->item_id,
-                    qty: $qtyOk,
-                    date: $movementDate,
-                    sourceType: FinishingJob::class,
-                    sourceId: $job->id,
-                    notes: $notesPrefix . ' OK',
-                    lotId: null,
-                    unitCost: $movementUnitCost,
-                    affectLotCost: false,
-                );
+                // kalau kosong ya skip
+                if ($qtyUsed <= 0) {
+                    // tapi kalau qty_in diisi (di UI) -> warning keras biar kebaca
+                    if ($qtyIn > 0) {
+                        throw new \RuntimeException(
+                            "Finishing line {$line->id} invalid: qty_in={$qtyIn} tapi qty_ok+qty_reject=0. "
+                            . "Isi qty_ok/qty_reject, atau kosongkan qty_in."
+                        );
+                    }
+                    continue;
+                }
 
-                if ($movementUnitCost !== null && $movementUnitCost > 0) {
-                    $this->hpp->createSnapshot(
-                        itemId: (int) $line->item_id,
-                        warehouseId: null,
-                        snapshotDate: $movementDate->format('Y-m-d'),
-                        referenceType: 'auto_hpp_rm_only_finishing',
-                        referenceId: $job->id,
-                        qtyBasis: $qtyOk,
-                        rmUnitCost: $movementUnitCost,
-                        cuttingUnitCost: 0,
-                        sewingUnitCost: 0,
-                        finishingUnitCost: 0,
-                        packagingUnitCost: 0,
-                        overheadUnitCost: 0,
-                        notes: 'Auto HPP RM-only dari ' . $notesPrefix,
-                        setActive: false,
+                // optional consistency check: qty_in harus sama qtyUsed
+                if ($enforceQtyInMatch && $qtyIn > 0 && $qtyIn !== $qtyUsed) {
+                    throw new \RuntimeException(
+                        "Finishing line {$line->id} inconsistent: qty_in={$qtyIn} != qty_ok+qty_reject={$qtyUsed}."
                     );
                 }
-            }
 
-            // 3) IN REJECT
-            if ($qtyReject > 0) {
-                $this->inventory->stockIn(
-                    warehouseId: $rejectWarehouseId,
-                    itemId: (int) $line->item_id,
-                    qty: $qtyReject,
-                    date: $movementDate,
-                    sourceType: FinishingJob::class,
-                    sourceId: $job->id,
-                    notes: $notesPrefix . ' REJECT',
-                    lotId: null,
-                    unitCost: $movementUnitCost,
-                    affectLotCost: false,
+                // =========================
+                // 1) Ambil unit cost dari incoming WIP-FIN (moving average / last incoming)
+                // =========================
+                $unitCostWipFin = (float) $this->inventory->getItemIncomingUnitCost(
+                    $wipFinWarehouseId,
+                    (int) $line->item_id
                 );
-            }
 
-            // 4) Kurangi wip_qty bundle (OK+Reject)
-            if ($line->bundle) {
-                $bundle = $line->bundle;
-                $current = (int) round((float) ($bundle->wip_qty ?? 0));
-                $usedFromBundle = $qtyUsed;
+                $movementUnitCost = ($unitCostWipFin > 0) ? $unitCostWipFin : null;
 
-                if ($usedFromBundle > 0) {
-                    $bundle->wip_qty = max(0, $current - $usedFromBundle);
-                    $bundle->save();
+                // =========================
+                // 2) Guard stok WIP-FIN cukup (pakai lock biar aman saat concurrent)
+                // =========================
+                $currentStock = (float) DB::table('inventory_stocks')
+                    ->where('warehouse_id', $wipFinWarehouseId)
+                    ->where('item_id', (int) $line->item_id)
+                    ->lockForUpdate()
+                    ->value('qty');
+
+                $eps = 0.0000001;
+                if (($currentStock + $eps) < $qtyUsed) {
+                    throw new \RuntimeException(
+                        "WIP-FIN stock tidak cukup untuk item {$line->item_id}. "
+                        . "Stok: {$currentStock}, mau keluar: {$qtyUsed}. "
+                        . "Cek sumber WIP-FIN (sewing_return_ok / transfer / adjustment)."
+                    );
+                }
+
+                // =========================
+                // 3) OUT WIP-FIN (OK+Reject)
+                // =========================
+                // ✅ hindari named-arg mismatch -> pakai positional args
+                // Pastikan signature InventoryService::stockOut sesuai urutan ini:
+                // stockOut($warehouseId, $itemId, $qty, $date, $sourceType, $sourceId, $notes, $allowNegative=false, $lotId=null, $unitCostOverride=null, $affectLotCost=false)
+                $this->inventory->stockOut(
+                    $wipFinWarehouseId,
+                    (int) $line->item_id,
+                    (int) $qtyUsed,
+                    $movementDate,
+                    FinishingJob::class,
+                    $job->id,
+                    $notesPrefix . " OUT (WIP-FIN)",
+                    false,
+                    null,
+                    $movementUnitCost,
+                    false
+                );
+
+                // =========================
+                // 4) IN WH-PRD (OK)
+                // =========================
+                if ($qtyOk > 0) {
+                    // stockIn($warehouseId, $itemId, $qty, $date, $sourceType, $sourceId, $notes, $lotId=null, $unitCost=null, $affectLotCost=false)
+                    $this->inventory->stockIn(
+                        $prodWarehouseId,
+                        (int) $line->item_id,
+                        (int) $qtyOk,
+                        $movementDate,
+                        FinishingJob::class,
+                        $job->id,
+                        $notesPrefix . " OK (WIP-FIN→PRD)",
+                        null,
+                        $movementUnitCost,
+                        false
+                    );
+
+                    // snapshot HPP (kalau cost ada)
+                    if ($movementUnitCost !== null && $movementUnitCost > 0) {
+                        $supUnitCost = (float) $this->getSupUnitCostFromFinishingBom(
+                            (int) $line->id,
+                            (float) $qtyOk
+                        );
+
+                        $this->hpp->createSnapshot([
+                            'item_id' => (int) $line->item_id,
+                            'warehouse_id' => null,
+                            'snapshot_date' => $movementDate->format('Y-m-d'),
+                            'reference_type' => 'auto_hpp_rm_only_finishing',
+                            'reference_id' => $job->id,
+                            'qty_basis' => (int) $qtyOk,
+
+                            'rm_unit_cost' => (float) $movementUnitCost,
+                            'cutting_unit_cost' => 0,
+                            'sewing_unit_cost' => 0,
+                            'finishing_unit_cost' => (float) $supUnitCost,
+                            'packaging_unit_cost' => 0,
+                            'overhead_unit_cost' => 0,
+
+                            'notes' => 'Auto HPP: RM(WIP-FIN) + SUP(BOM) dari ' . $notesPrefix,
+                            'is_active' => false,
+                        ]);
+                    }
+                }
+
+                // =========================
+                // 5) IN REJECT
+                // =========================
+                if ($qtyReject > 0) {
+                    $this->inventory->stockIn(
+                        $rejectWarehouseId,
+                        (int) $line->item_id,
+                        (int) $qtyReject,
+                        $movementDate,
+                        FinishingJob::class,
+                        $job->id,
+                        $notesPrefix . " REJECT (WIP-FIN→REJECT)",
+                        null,
+                        $movementUnitCost,
+                        false
+                    );
+                }
+
+                // =========================
+                // 6) Reduce bundle->wip_qty (OK+Reject)
+                // =========================
+                if ($line->bundle) {
+                    $bundle = $line->bundle;
+
+                    $currentWip = $toInt($bundle->wip_qty ?? 0);
+                    $newWip = $currentWip - $qtyUsed;
+
+                    if ($newWip < 0) {
+                        // ✅ keras biar kelihatan mismatch data bundle vs movement
+                        throw new \RuntimeException(
+                            "Bundle {$bundle->id} wip_qty tidak cukup. "
+                            . "wip_qty={$currentWip}, dipakai={$qtyUsed} (line {$line->id})."
+                        );
+                    }
+
+                    if ($newWip !== $currentWip) {
+                        $bundle->wip_qty = $newWip;
+                        $bundle->save();
+                    }
                 }
             }
+        });
+    }
+
+    protected function getSupUnitCostFromFinishingBom(int $finishingLineId, float $qtyOk): float
+    {
+        if ($qtyOk <= 0) {
+            return 0.0;
         }
+
+        $totalSupCost = (float) DB::table('inventory_mutations')
+            ->where('source_type', 'finishing_bom')
+            ->where('source_id', $finishingLineId)
+            ->sum('total_cost');
+
+        // total_cost stockOut biasanya NEGATIF, jadi dibuat positif
+        $totalSupCost = abs($totalSupCost);
+
+        return round($totalSupCost / $qtyOk, 4);
     }
 }

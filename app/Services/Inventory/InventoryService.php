@@ -105,6 +105,7 @@ class InventoryService
         float | int | string | null $unitCostOverride = null, // untuk WIP, bisa pakai unit_cost custom
         bool $affectLotCost = true, // hanya true untuk pemakaian kain mentah
     ): ?InventoryMutation {
+
         $qty = $this->num($qty);
         if ($qty <= 0) {
             return null;

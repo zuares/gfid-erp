@@ -7,145 +7,114 @@ use App\Models\SalesInvoice;
 use App\Models\SalesInvoiceLine;
 use Carbon\Carbon;
 use Illuminate\Console\Command;
+use Illuminate\Support\Collection;
 use Illuminate\Support\Facades\DB;
 use PhpOffice\PhpSpreadsheet\IOFactory;
 use PhpOffice\PhpSpreadsheet\Shared\Date as ExcelDate;
 
-class ImportShopeeOrdersToSalesInvoices extends Command
+class ImportMarketplaceOrders extends Command
 {
-    protected $signature = 'shopee:import-orders
+    protected $signature = 'orders:import
+        {--platform= : shopee|tiktok|lazada|tokopedia (wajib)}
         {--file= : Path ke file .xlsx (wajib)}
         {--store_id= : store_id (wajib)}
         {--type=shipping : shipping|completed}
-        {--channel=shopee : channel label, default shopee}
-        {--on-missing=stop : stop|skip|create (default stop). Missing BASE SKU: stop=batal, skip=lewati baris, create=auto buat Item}
+        {--channel= : optional override channel label (default = platform)}
+        {--on-missing=stop : stop|skip|create}
         {--dry-run=0 : 1 untuk test tanpa write DB}
     ';
 
-    protected $description = 'Import Shopee Order Shipping/Completed (xlsx) ke sales_invoices + sales_invoice_lines (upsert by store_id + channel_order_no). date memakai paid_at. Support SKU clean (K7BLK) dan SKU pack suffix angka (K5NVY-6 => base K5NVY, qty x 6). Missing BASE SKU bisa stop/skip/create.';
+    protected $description = 'Import orders multi-platform -> sales_invoices + lines (upsert by store_id + channel + channel_order_no).';
 
     public function handle(): int
     {
+        $platform = strtolower(trim((string) $this->option('platform')));
         $file = (string) $this->option('file');
         $storeId = (int) $this->option('store_id');
         $type = strtolower((string) $this->option('type'));
-        $channel = (string) $this->option('channel');
+        $channel = trim((string) $this->option('channel')) ?: $platform;
         $onMissing = strtolower((string) $this->option('on-missing'));
         $dryRun = ((int) $this->option('dry-run')) === 1;
 
+        if (!in_array($platform, ['shopee', 'tiktok', 'lazada', 'tokopedia'], true)) {
+            $this->error("platform wajib: shopee|tiktok|lazada|tokopedia");
+            return 1;
+        }
         if (!$file || !is_file($file)) {
             $this->error("File tidak ditemukan: {$file}");
             return 1;
         }
-
         if ($storeId <= 0) {
-            $this->error("store_id wajib diisi. Contoh: --store_id=3");
+            $this->error("store_id wajib diisi.");
             return 1;
         }
-
         if (!in_array($type, ['shipping', 'completed'], true)) {
             $this->error("type harus shipping atau completed.");
             return 1;
         }
-
         if (!in_array($onMissing, ['stop', 'skip', 'create'], true)) {
-            $this->error("on-missing harus stop|skip|create. Contoh: --on-missing=skip");
+            $this->error("on-missing harus stop|skip|create.");
             return 1;
         }
 
         $this->info("Reading: {$file}");
         $sheetRows = $this->readXlsxRows($file);
-
         if (count($sheetRows) === 0) {
             $this->error("Tidak ada data rows terbaca.");
             return 1;
         }
 
-        // 1) Map header → index
         $header = array_map(fn($v) => trim((string) $v), $sheetRows[0]);
-        $idx = $this->buildHeaderIndex($header);
 
-        // Kolom minimal yang kita butuhkan
-        $requiredCols = [
-            'No. Pesanan',
-            'Waktu Pembayaran Dilakukan',
-            'Nomor Referensi SKU',
-            'Jumlah',
-            'Harga Setelah Diskon',
-            'Total Harga Produk',
-        ];
+        // 1) pilih adapter
+        $adapter = match ($platform) {
+            'shopee' => new PlatformAdapters\ShopeeAdapter(),
+            'tiktok' => new PlatformAdapters\TiktokAdapter(),
+            'lazada' => new PlatformAdapters\LazadaAdapter(),
+            'tokopedia' => new PlatformAdapters\TokopediaAdapter(),
+        };
 
-        foreach ($requiredCols as $col) {
-            if (!isset($idx[$col])) {
-                $this->error("Kolom wajib tidak ketemu: '{$col}'. Pastikan format report Shopee sesuai.");
-                return 1;
+        // 2) validasi header wajib
+        $missingCols = $adapter->missingRequiredColumns($header);
+        if (!empty($missingCols)) {
+            $this->error("Kolom wajib tidak ketemu untuk {$platform}:");
+            foreach ($missingCols as $c) {
+                $this->line(" - {$c}");
             }
+
+            return 1;
         }
 
-        // 2) Parse rows → normalize structure
-        $rows = [];
+        // 3) normalize rows (line-level)
+        $idx = $this->buildHeaderIndex($header);
+        $lines = [];
 
         for ($i = 1; $i < count($sheetRows); $i++) {
             $r = $sheetRows[$i];
-
             if (!is_array($r) || count(array_filter($r, fn($x) => $x !== null && $x !== '')) === 0) {
                 continue;
             }
 
-            $orderNo = trim((string) ($r[$idx['No. Pesanan']] ?? ''));
-            if ($orderNo === '') {
-                continue;
+            $line = $adapter->parseRow($r, $idx, function ($val) {
+                return $this->parseDateTime($val);
+            }, function ($val) {
+                return $this->toNumber($val);
+            }, function (string $sku) {
+                return $this->splitPackSku($sku);
+            });
+
+            if ($line) {
+                $lines[] = $line;
             }
-
-            $paidAt = $this->parseDateTime($r[$idx['Waktu Pembayaran Dilakukan']] ?? null);
-            if (!$paidAt) {
-                continue; // paid_at wajib
-            }
-
-            $skuRef = trim((string) ($r[$idx['Nomor Referensi SKU']] ?? ''));
-            $qty = (int) $this->toNumber($r[$idx['Jumlah']] ?? 0);
-
-            $unitPrice = (float) $this->toNumber($r[$idx['Harga Setelah Diskon']] ?? 0);
-            $lineTotal = (float) $this->toNumber($r[$idx['Total Harga Produk']] ?? 0);
-
-            if ($qty <= 0 || $skuRef === '') {
-                continue;
-            }
-
-            $completedAt = null;
-            if (isset($idx['Waktu Pesanan Selesai'])) {
-                $completedAt = $this->parseDateTime($r[$idx['Waktu Pesanan Selesai']] ?? null);
-            }
-
-            $awb = null;
-            if (isset($idx['No. Resi'])) {
-                $awb = trim((string) ($r[$idx['No. Resi']] ?? '')) ?: null;
-            }
-
-            $rows[] = [
-                'order_no' => $orderNo,
-                'paid_at' => $paidAt, // Carbon
-                'completed_at' => $completedAt, // ?Carbon
-                'awb' => $awb,
-                'sku_ref' => $skuRef,
-                'qty' => $qty, // jumlah pack / jumlah unit di report
-                'unit_price' => $unitPrice,
-                'line_total' => $lineTotal > 0 ? $lineTotal : ($qty * $unitPrice),
-            ];
         }
 
-        if (count($rows) === 0) {
-            $this->error("Tidak ada rows valid (cek kolom paid_at / qty / sku_ref).");
+        if (count($lines) === 0) {
+            $this->error("Tidak ada rows valid setelah parsing adapter.");
             return 1;
         }
 
-        // 3) Pre-check BASE SKU mapping ke items.code
-        $uniqueSkus = collect($rows)->pluck('sku_ref')->unique()->values();
-
-        $baseCodes = $uniqueSkus->map(function ($sku) {
-            [$base, $pack] = $this->splitPackSku((string) $sku);
-            return $base;
-        })->unique()->values();
+        // 4) pre-check item mapping (BASE SKU -> items.code)
+        $baseCodes = collect($lines)->pluck('base_sku')->unique()->values();
 
         $itemsByCode = Item::query()
             ->whereIn('code', $baseCodes->all())
@@ -162,39 +131,29 @@ class ImportShopeeOrdersToSalesInvoices extends Command
 
             if ($onMissing === 'stop') {
                 $this->error("Mode on-missing=stop → import dibatalkan.");
-                $this->line("Jalankan ulang dengan salah satu:");
-                $this->line(" - --on-missing=skip   (lewati baris SKU missing)");
-                $this->line(" - --on-missing=create (auto buat Item untuk base SKU missing)");
                 return 1;
             }
 
             if ($onMissing === 'create') {
                 if ($dryRun) {
-                    $this->warn("DRY-RUN + on-missing=create → tidak akan create item. (Info saja)");
+                    $this->warn("DRY-RUN + on-missing=create → tidak create item.");
                 } else {
-                    $this->warn("Mode on-missing=create → AUTO-CREATE Item untuk base SKU missing...");
-
                     foreach ($missing as $code) {
                         $existing = Item::where('code', $code)->first();
-                        if ($existing) {
-                            $itemsByCode->put($existing->code, $existing);
-                            continue;
-                        }
+                        if ($existing) {$itemsByCode->put($existing->code, $existing);
+                            continue;}
 
-                        // Sesuaikan field wajib item kamu bila ada yang required (mis. item_category_id)
                         $new = Item::create([
                             'code' => $code,
-                            'name' => $code . ' (AUTO from Shopee)',
+                            'name' => $code . ' (AUTO ' . strtoupper($platform) . ')',
                             'unit' => 'pcs',
                             'type' => 'finished_good',
                             'active' => 1,
                             'hpp' => 0,
                             'last_purchase_price' => 0,
                         ]);
-
                         $itemsByCode->put($new->code, $new);
                     }
-
                     $this->info("Auto-create item done. created=" . $missing->count());
                 }
             }
@@ -204,11 +163,12 @@ class ImportShopeeOrdersToSalesInvoices extends Command
             }
         }
 
-        // 4) Group by order_no
-        $byOrder = collect($rows)->groupBy('order_no');
+        // 5) group per order
+        $byOrder = collect($lines)->groupBy('order_no');
 
         $this->info("Orders ditemukan: " . $byOrder->count());
-        $this->info("Mode: " . ($dryRun ? "DRY-RUN (no DB write)" : "WRITE"));
+        $this->info("Platform={$platform} Channel={$channel} Type={$type}");
+        $this->info("Mode: " . ($dryRun ? "DRY-RUN" : "WRITE"));
         $this->info("on-missing: {$onMissing}");
 
         $created = 0;
@@ -218,85 +178,54 @@ class ImportShopeeOrdersToSalesInvoices extends Command
         $skippedOrders = 0;
 
         if ($dryRun) {
-            $preview = $byOrder->map(function ($g, $orderNo) use ($itemsByCode, $onMissing, &$skippedLines) {
+            $preview = $byOrder->map(function (Collection $g, $orderNo) use ($itemsByCode, $onMissing, &$skippedLines) {
                 $paidAt = $g->first()['paid_at'] ?? null;
 
-                $qtyPcs = 0;
-                $keptRows = 0;
+                $qtyPcs = 0; $kept = 0;
 
                 foreach ($g as $l) {
-                    [$base, $pack] = $this->splitPackSku((string) $l['sku_ref']);
-                    $hasItem = $itemsByCode->has($base);
-
-                    if (!$hasItem && $onMissing === 'skip') {
+                    $hasItem = $itemsByCode->has($l['base_sku']);
+                    if (!$hasItem && in_array($onMissing, ['skip', 'create'], true)) {
                         $skippedLines++;
                         continue;
                     }
-
-                    // jika create, di dry-run item belum dibuat, jadi treat missing as skipped (biar keliatan)
-                    if (!$hasItem && $onMissing === 'create') {
-                        $skippedLines++;
-                        continue;
-                    }
-
-                    $keptRows++;
-                    $qtyPcs += ((int) $l['qty']) * $pack;
+                    $kept++;
+                    $qtyPcs += (int) $l['qty_eff'];
                 }
 
                 return [
                     $orderNo,
                     $g->count(),
-                    $keptRows,
+                    $kept,
                     $qtyPcs,
                     optional($paidAt)->format('Y-m-d H:i:s'),
                 ];
             })->values()->all();
 
             $this->table(['order_no', 'rows', 'kept_rows', 'qty_pcs', 'paid_at'], $preview);
-
-            if ($onMissing !== 'stop') {
-                $this->line("Info: skipped_lines={$skippedLines} (karena base SKU missing di mode {$onMissing})");
-            }
-
+            $this->line("Info: skipped_lines={$skippedLines}");
             return 0;
         }
 
         DB::transaction(function () use (
-            $byOrder,
-            $itemsByCode,
-            $storeId,
-            $channel,
-            $type,
-            $onMissing,
-            &$created,
-            &$updated,
-            &$lineCount,
-            &$skippedLines,
-            &$skippedOrders
+            $byOrder, $itemsByCode, $storeId, $channel, $type, $onMissing,
+            &$created, &$updated, &$lineCount, &$skippedLines, &$skippedOrders
         ) {
             foreach ($byOrder as $orderNo => $lines) {
-                /** @var \Carbon\Carbon $paidAt */
+                /** @var Carbon $paidAt */
                 $paidAt = $lines->first()['paid_at'];
                 $completedAt = $lines->first()['completed_at'] ?? null;
                 $awb = $lines->first()['awb'] ?? null;
 
-                // kalau mode skip/create dan order ini semua barisnya missing → jangan buat invoice kosong
-                $hasAnyValidLine = false;
-                foreach ($lines as $tmp) {
-                    [$base, $pack] = $this->splitPackSku((string) $tmp['sku_ref']);
-                    if ($itemsByCode->has($base)) {
-                        $hasAnyValidLine = true;
-                        break;
-                    }
-                }
-
-                if (!$hasAnyValidLine && $onMissing !== 'stop') {
+                $hasAnyValid = $lines->contains(fn($l) => $itemsByCode->has($l['base_sku']));
+                if (!$hasAnyValid && $onMissing !== 'stop') {
                     $skippedOrders++;
                     continue;
                 }
 
                 $invoice = SalesInvoice::query()
                     ->where('store_id', $storeId)
+                    ->where('channel', $channel)
                     ->where('channel_order_no', $orderNo)
                     ->first();
 
@@ -311,7 +240,6 @@ class ImportShopeeOrdersToSalesInvoices extends Command
                     $isNew = true;
                 }
 
-                // Header marketplace fields
                 $invoice->channel = $channel;
                 $invoice->channel_order_no = $orderNo;
                 $invoice->paid_at = $paidAt;
@@ -320,8 +248,6 @@ class ImportShopeeOrdersToSalesInvoices extends Command
                 : $invoice->completed_at;
                 $invoice->marketplace_status = $type;
                 $invoice->awb = $awb ?: $invoice->awb;
-
-                // date invoice = paid_at
                 $invoice->date = $paidAt->toDateString();
 
                 $invoice->save();
@@ -334,27 +260,17 @@ class ImportShopeeOrdersToSalesInvoices extends Command
                 }
 
                 $subtotal = 0.0;
-                $writtenLinesForInvoice = 0;
+                $written = 0;
 
                 foreach ($lines as $l) {
-                    [$baseCode, $packQty] = $this->splitPackSku((string) $l['sku_ref']);
-
-                    $item = $itemsByCode->get($baseCode);
+                    $item = $itemsByCode->get($l['base_sku']);
                     if (!$item) {
-                        if ($onMissing === 'skip') {
-                            $skippedLines++;
-                            continue;
-                        }
-
-                        // seharusnya tidak terjadi di create karena sudah dibuat di precheck,
-                        // tapi jaga-jaga:
-                        throw new \RuntimeException("Base SKU tidak ketemu di items: {$baseCode} (from {$l['sku_ref']})");
+                        if ($onMissing === 'skip') {$skippedLines++;continue;}
+                        throw new \RuntimeException("Base SKU tidak ketemu: {$l['base_sku']}");
                     }
 
-                    $qtyOrder = (int) $l['qty']; // jumlah di report (pack)
-                    $qtyEff = $qtyOrder * $packQty; // qty real pcs
-
-                    $lineTotal = (float) $l['line_total']; // TETAP dari Shopee (jangan dikali pack)
+                    $lineTotal = (float) $l['line_total'];
+                    $qtyEff = (int) $l['qty_eff'];
                     $unitPrice = $qtyEff > 0 ? round($lineTotal / $qtyEff, 2) : 0.0;
 
                     $subtotal += $lineTotal;
@@ -372,17 +288,15 @@ class ImportShopeeOrdersToSalesInvoices extends Command
                     ]);
 
                     $lineCount++;
-                    $writtenLinesForInvoice++;
+                    $written++;
                 }
 
-                // kalau akhirnya kosong (semua baris di-skip) → hapus invoice ini
-                if ($writtenLinesForInvoice === 0 && $onMissing === 'skip') {
+                if ($written === 0 && $onMissing === 'skip') {
                     $invoice->delete();
                     $skippedOrders++;
                     continue;
                 }
 
-                // totals
                 $invoice->subtotal = $subtotal;
                 $invoice->discount_total = 0;
                 $invoice->tax_percent = 0;
@@ -396,33 +310,26 @@ class ImportShopeeOrdersToSalesInvoices extends Command
         return 0;
     }
 
-    /**
-     * Support SKU:
-     * - Clean: K7BLK => base K7BLK, pack 1
-     * - Pack : K5NVY-6 => base K5NVY, pack 6
-     */
+    // ===== Helpers (sama seperti punyamu) =====
+
     private function splitPackSku(string $sku): array
     {
         $sku = trim($sku);
-
-        // suffix angka di ujung
         if (preg_match('/^(.*)-(\d+)$/', $sku, $m)) {
             $base = trim($m[1]);
             $pack = (int) $m[2];
-
             if ($base !== '' && $pack > 0) {
                 return [$base, $pack];
             }
-        }
 
+        }
         return [$sku, 1];
     }
 
     private function readXlsxRows(string $file): array
     {
         $spreadsheet = IOFactory::load($file);
-        $sheet = $spreadsheet->getActiveSheet();
-        return $sheet->toArray(null, true, true, false);
+        return $spreadsheet->getActiveSheet()->toArray(null, true, true, false);
     }
 
     private function buildHeaderIndex(array $header): array
@@ -433,6 +340,7 @@ class ImportShopeeOrdersToSalesInvoices extends Command
             if ($name !== '') {
                 $idx[$name] = $i;
             }
+
         }
         return $idx;
     }
@@ -461,14 +369,10 @@ class ImportShopeeOrdersToSalesInvoices extends Command
             return null;
         }
 
-        // Excel serial date
         if (is_numeric($value)) {
             try {
-                $dt = ExcelDate::excelToDateTimeObject($value);
-                return Carbon::instance($dt);
-            } catch (\Throwable $e) {
-                return null;
-            }
+                return Carbon::instance(ExcelDate::excelToDateTimeObject($value));
+            } catch (\Throwable) {return null;}
         }
 
         $s = trim((string) $value);
@@ -476,11 +380,7 @@ class ImportShopeeOrdersToSalesInvoices extends Command
             return null;
         }
 
-        try {
-            return Carbon::parse($s);
-        } catch (\Throwable $e) {
-            return null;
-        }
+        try {return Carbon::parse($s);} catch (\Throwable) {return null;}
     }
 
     private function generateInvoiceCode(): string
@@ -491,8 +391,5 @@ class ImportShopeeOrdersToSalesInvoices extends Command
     }
 
     private function guessWarehouseId(): int
-    {
-        // sementara: set manual (misal WH-RTS id)
-        return 1;
-    }
+    {return 1;}
 }

@@ -19,5 +19,6 @@ class AppServiceProvider extends ServiceProvider
 
         // Kalau mau pakai Bootstrap 4:
         // Paginator::useBootstrapFour();
+
     }
 }

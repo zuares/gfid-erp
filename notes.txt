@@ -1,0 +1,14 @@
+
+
+MP SHIPMENT
+
+IMPORT SHOPEE
+- Penulisan angka harga jual dan lain lain
+    "unit_price" => "74.95",
+    "subtotal" => "74.95",
+
+    Harusnya
+    "unit_price" => "74950",
+    "subtotal" => "74950",
+
+perlukah di update untuk yang lain

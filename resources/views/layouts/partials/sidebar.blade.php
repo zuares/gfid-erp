@@ -67,9 +67,8 @@
     $hasPoCreate  = $router->has('purchasing.purchase_orders.create');
     $hasGrnIndex  = $router->has('purchasing.purchase_receipts.index');
     $hasGrnCreate = $router->has('purchasing.purchase_receipts.create');
-    // Note: supplier_price itu endpoint ajax, biasanya nggak perlu menu.
 
-    // Marketplace
+    // Marketplace (internal orders module)
     $hasMarketplaceIndex = $router->has('marketplace.orders.index');
     $hasMarketplaceCreate = $router->has('marketplace.orders.create');
 
@@ -77,6 +76,14 @@
     $hasShopeeImportIncomeForm = $router->has('marketplace.shopee.import-income.form');
 
     $hasMarketplacePayoutReport = $router->has('marketplace.reports.payout.index');
+
+    // ✅ Imports (NEW - sesuai routes yang kamu paste)
+    $hasImportsMarketplaceIndex  = $router->has('imports.marketplace.index');
+    $hasImportsMarketplaceCreate = $router->has('imports.marketplace.create');
+    $hasImportsMarketplaceDraft  = $router->has('imports.marketplace.draft');
+    $hasImportsMarketplaceExport = $router->has('imports.marketplace.export');
+    // data/show/preview/commit/cancel biasanya bukan menu
+    $hasImportsMarketplaceIncomeCreate = $router->has('imports.marketplace_income.create');
 
     // Production
     $hasProdCuttingJobsIndex = $router->has('production.cutting_jobs.index');
@@ -121,6 +128,9 @@
     $marketplaceToolsOpen =
         request()->routeIs('marketplace.shopee.*') ||
         request()->routeIs('marketplace.reports.*');
+
+    // ✅ Imports open
+    $importsOpen = request()->routeIs('imports.marketplace.*') || request()->routeIs('imports.marketplace_income.*');
 
     $salesInvoiceOpen = request()->routeIs('sales.invoices.*');
     $salesShipmentOpen = request()->routeIs('sales.shipments.*');
@@ -185,7 +195,7 @@
                 ->where('r.purpose', 'rts_replenish')
                 ->whereIn('r.status', ['submitted', 'shipped', 'partial'])
                 ->selectRaw(
-                    'COALESCE(SUM(CASE WHEN (COALESCE(l.qty_dispatched,0) - COALESCE(l.qty_received,0)) > 0 THEN (COALESCE(l.qty_dispatched,0) - COALESCE(l.qty_received,0)) ELSE 0 END),0) as s',
+                    'COALESCE(SUM(CASE WHEN (COALESCE(l.qty_dispatched,0) - COALESCE(l.qty_received,0)) > 0 THEN (COALESCE(l.qty_dispatched,0) - COALESCE(l.qty_received,0)) ELSE 0 END),0) as s'
                 )
                 ->value('s');
 
@@ -305,7 +315,6 @@
     .sidebar-link-sub.active {
         background: transparent;
         font-weight: 600;
-        /* ✅ FIX: sebelumnya salah "inset(2px ...)" */
         box-shadow: inset 2px 0 0 var(--accent);
         opacity: 1;
         color: var(--accent);
@@ -398,6 +407,33 @@
                         <x-sidebar.simple-link href="{{ route('rts.direct-receives.index') }}" icon="⚡"
                             :active="request()->routeIs('rts.direct-receives.*')">
                             RTS Dadakan
+                        </x-sidebar.simple-link>
+                    @endif
+                </li>
+            @endif
+
+            {{-- Imports (admin: marketplace shipments/income import) --}}
+            @if ($isAdmin && ($hasImportsMarketplaceIndex || $hasImportsMarketplaceCreate || $hasImportsMarketplaceDraft || $hasImportsMarketplaceIncomeCreate))
+                <x-sidebar.label text="Imports" />
+                <li class="simple-group">
+                    @if ($hasImportsMarketplaceIndex)
+                        <x-sidebar.simple-link href="{{ route('imports.marketplace.index') }}" icon="⬆️"
+                            :active="request()->routeIs('imports.marketplace.*')">
+                            Import Marketplace Shipments
+                        </x-sidebar.simple-link>
+                    @endif
+
+                    @if ($hasImportsMarketplaceDraft)
+                        <x-sidebar.simple-link href="{{ route('imports.marketplace.draft') }}" icon="🕘"
+                            :active="request()->routeIs('imports.marketplace.draft')">
+                            Draft Import (Terakhir)
+                        </x-sidebar.simple-link>
+                    @endif
+
+                    @if ($hasImportsMarketplaceIncomeCreate)
+                        <x-sidebar.simple-link href="{{ route('imports.marketplace_income.create') }}" icon="💵"
+                            :active="request()->routeIs('imports.marketplace_income.*')">
+                            Import Marketplace Income
                         </x-sidebar.simple-link>
                     @endif
                 </li>
@@ -557,7 +593,7 @@
                 </div>
             </li>
 
-            {{-- ✅ PURCHASING (owner/admin routes; owner menu lengkap) --}}
+            {{-- ✅ PURCHASING --}}
             @if ($hasPoIndex || $hasPoCreate || $hasGrnIndex || $hasGrnCreate)
                 <x-sidebar.label text="Purchasing" />
                 <li class="mb-1">
@@ -678,6 +714,66 @@
                             <x-sidebar.sub-link href="{{ route('marketplace.reports.payout.index') }}" icon="📊"
                                 :active="request()->routeIs('marketplace.reports.*')">
                                 Payout Dashboard
+                            </x-sidebar.sub-link>
+                        @endif
+                    </div>
+                </li>
+            @endif
+
+            {{-- ✅ IMPORTS (NEW) --}}
+            @if ($hasImportsMarketplaceIndex || $hasImportsMarketplaceCreate || $hasImportsMarketplaceDraft || $hasImportsMarketplaceExport || $hasImportsMarketplaceIncomeCreate)
+                <li class="mb-1">
+                    <button class="sidebar-link sidebar-toggle {{ $importsOpen ? 'is-open' : '' }}" type="button"
+                        data-bs-toggle="collapse" data-bs-target="#navImports"
+                        aria-expanded="{{ $importsOpen ? 'true' : 'false' }}" aria-controls="navImports">
+                        <span class="icon">⬆️</span>
+                        <span>Imports</span>
+                        <span class="chevron">▸</span>
+                    </button>
+
+                    <div class="collapse {{ $importsOpen ? 'show' : '' }}" id="navImports">
+                        <div class="px-3 pt-2 pb-1 text-uppercase"
+                            style="font-size:.68rem; letter-spacing:.12em; color:var(--muted);">
+                            Marketplace Shipments
+                        </div>
+
+                        @if ($hasImportsMarketplaceIndex)
+                            <x-sidebar.sub-link href="{{ route('imports.marketplace.index') }}" icon="≡"
+                                :active="request()->routeIs('imports.marketplace.index') || request()->routeIs('imports.marketplace.show')">
+                                Daftar Import
+                            </x-sidebar.sub-link>
+                        @endif
+
+                        @if ($hasImportsMarketplaceCreate)
+                            <x-sidebar.sub-link href="{{ route('imports.marketplace.create') }}" icon="＋"
+                                :active="request()->routeIs('imports.marketplace.create')">
+                                Import Baru
+                            </x-sidebar.sub-link>
+                        @endif
+
+                        @if ($hasImportsMarketplaceDraft)
+                            <x-sidebar.sub-link href="{{ route('imports.marketplace.draft') }}" icon="🕘"
+                                :active="request()->routeIs('imports.marketplace.draft')">
+                                Draft Terakhir
+                            </x-sidebar.sub-link>
+                        @endif
+
+                        @if ($hasImportsMarketplaceExport)
+                            <x-sidebar.sub-link href="{{ route('imports.marketplace.export') }}" icon="⤓"
+                                :active="request()->routeIs('imports.marketplace.export')">
+                                Export
+                            </x-sidebar.sub-link>
+                        @endif
+
+                        <div class="px-3 pt-3 pb-1 text-uppercase"
+                            style="font-size:.68rem; letter-spacing:.12em; color:var(--muted);">
+                            Marketplace Income
+                        </div>
+
+                        @if ($hasImportsMarketplaceIncomeCreate)
+                            <x-sidebar.sub-link href="{{ route('imports.marketplace_income.create') }}" icon="💵"
+                                :active="request()->routeIs('imports.marketplace_income.*')">
+                                Import Income
                             </x-sidebar.sub-link>
                         @endif
                     </div>

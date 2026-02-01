@@ -28,46 +28,60 @@ class StockOpnameController extends Controller
      */
     public function index(Request $request): View
     {
-        $warehouses = Warehouse::orderBy('code')->get();
+        $warehouses = Warehouse::query()->orderBy('code')->get();
 
-        $query = StockOpname::with(['warehouse', 'creator'])
+        $query = StockOpname::query()
+            ->with(['warehouse', 'creator'])
             ->withCount('lines')
             ->orderByDesc('date')
             ->orderByDesc('id');
 
+        // Warehouse
         if ($request->filled('warehouse_id')) {
             $query->where('warehouse_id', $request->integer('warehouse_id'));
         }
 
-        // status: draft/counting/reviewed/finalized/all
-        if ($request->filled('status')) {
-            $status = $request->string('status')->toString();
-            if (
-                $status !== 'all'
-                && in_array($status, [
-                    StockOpname::STATUS_DRAFT,
-                    StockOpname::STATUS_COUNTING,
-                    StockOpname::STATUS_REVIEWED,
-                    StockOpname::STATUS_FINALIZED,
-                ], true)
-            ) {
+        // Status: draft/counting/reviewed/finalized/cancelled/all
+        $status = $request->string('status')->toString();
+        if ($status !== '' && $status !== 'all') {
+            $allowedStatuses = [
+                StockOpname::STATUS_DRAFT,
+                StockOpname::STATUS_COUNTING,
+                StockOpname::STATUS_REVIEWED,
+                StockOpname::STATUS_FINALIZED,
+                StockOpname::STATUS_CANCELLED,
+            ];
+
+            if (in_array($status, $allowedStatuses, true)) {
                 $query->where('status', $status);
             }
         }
 
-        if ($request->filled('type')) {
-            $type = $request->string('type')->toString();
-            if ($type !== 'all' && in_array($type, [StockOpname::TYPE_PERIODIC, StockOpname::TYPE_OPENING], true)) {
+        // Type: periodic/opening/all
+        $type = $request->string('type')->toString();
+        if ($type !== '' && $type !== 'all') {
+            $allowedTypes = [StockOpname::TYPE_PERIODIC, StockOpname::TYPE_OPENING];
+            if (in_array($type, $allowedTypes, true)) {
                 $query->where('type', $type);
             }
         }
 
+        // Date range
         if ($request->filled('date_from')) {
             $query->whereDate('date', '>=', Carbon::parse($request->input('date_from'))->toDateString());
         }
 
         if ($request->filled('date_to')) {
             $query->whereDate('date', '<=', Carbon::parse($request->input('date_to'))->toDateString());
+        }
+
+        // Search (optional): code / notes
+        $q = trim((string) $request->get('q', ''));
+        if ($q !== '') {
+            $query->where(function ($w) use ($q) {
+                $w->where('code', 'like', "%{$q}%")
+                    ->orWhere('notes', 'like', "%{$q}%");
+            });
         }
 
         $opnames = $query->paginate(20)->appends($request->query());
@@ -234,7 +248,8 @@ class StockOpnameController extends Controller
 
         $adjustment = \App\Models\InventoryAdjustment::query()
             ->where('source_type', \App\Models\StockOpname::class)
-            ->where('source_id', $stock_opname->id ?? $stockOpname->id)
+            ->where('source_id', $stockOpname->id)
+
             ->latest('id')
             ->first();
 
@@ -686,7 +701,8 @@ class StockOpnameController extends Controller
 
                 if ($physicalQty !== null) {
                     $difference = $physicalQty - $systemQty;
-                    $$isCounted = ($physicalQty !== null);;
+                    $isCounted = ($physicalQty !== null);
+
                 }
 
                 if ($isOpening && $physicalQty === null) {
@@ -822,4 +838,62 @@ class StockOpnameController extends Controller
             ->with('status', 'success')
             ->with('message', 'Stock Opname dibuka kembali untuk counting.');
     }
+
+    public function cancel(Request $request, StockOpname $stockOpname): RedirectResponse
+    {
+        // rules aman:
+        // - tidak boleh cancel kalau finalized
+        if ($stockOpname->status === StockOpname::STATUS_FINALIZED) {
+            return back()
+                ->with('status', 'error')
+                ->with('message', 'SO sudah FINALIZED. Tidak bisa dibatalkan karena stok sudah berubah (ada Adjustment).');
+        }
+
+        // tidak perlu cancel kalau sudah cancelled
+        if (($stockOpname->status ?? null) === StockOpname::STATUS_CANCELLED) {
+            return back()
+                ->with('status', 'info')
+                ->with('message', 'SO ini sudah dibatalkan sebelumnya.');
+        }
+
+        // role: minimal admin/owner (kalau kamu mau operating boleh, tinggal tambah)
+        $role = auth()->user()->role ?? null;
+        if (!in_array($role, ['admin', 'owner'], true)) {
+            return back()
+                ->with('status', 'error')
+                ->with('message', 'Anda tidak punya akses untuk membatalkan SO.');
+        }
+
+        $validated = $request->validate([
+            'cancel_reason' => ['nullable', 'string', 'max:255'],
+        ]);
+
+        DB::transaction(function () use ($stockOpname, $validated) {
+            // extra guard: kalau sudah sempat bikin adjustment (harusnya tidak di flow kamu),
+            // tetap jangan dibatalkan
+            $adj = \App\Models\InventoryAdjustment::query()
+                ->where('source_type', \App\Models\StockOpname::class)
+                ->where('source_id', $stockOpname->id)
+                ->latest('id')
+                ->first();
+
+            if ($adj) {
+                throw ValidationException::withMessages([
+                    'cancel_reason' => 'SO ini sudah punya Adjustment. Batalkan/void Adjustment dulu, baru bisa batalkan SO.',
+                ]);
+            }
+
+            $stockOpname->status = StockOpname::STATUS_CANCELLED;
+            $stockOpname->cancelled_at = now();
+            $stockOpname->cancelled_by = auth()->id();
+            $stockOpname->cancel_reason = $validated['cancel_reason'] ?? null;
+            $stockOpname->save();
+        });
+
+        return redirect()
+            ->route('inventory.stock_opnames.show', $stockOpname)
+            ->with('status', 'success')
+            ->with('message', 'SO berhasil dibatalkan.');
+    }
+
 }

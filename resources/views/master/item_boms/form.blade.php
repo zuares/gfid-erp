@@ -5,24 +5,16 @@
 @push('head')
 <link href="https://cdn.jsdelivr.net/npm/select2@4.1.0-rc.0/dist/css/select2.min.css" rel="stylesheet" />
 <style>
-/* =========================
-   GFID BOM Form (inherit global theme)
-   -> JANGAN define --bg/--card/--text lagi
-   ========================= */
-
 :root{
   --bom-r: 16px;
   --bom-shadow: 0 14px 34px rgba(15,23,42,.10), 0 0 0 1px rgba(15,23,42,.04);
   --bom-shadow2: 0 10px 26px rgba(15,23,42,.08), 0 0 0 1px rgba(15,23,42,.03);
 }
-
 .page-wrap{
   max-width: 1020px;
   margin: 0 auto;
   padding: 14px 12px calc(110px + env(safe-area-inset-bottom));
 }
-
-/* Card GFID */
 .cardx{
   background: var(--card);
   border: 1px solid var(--line);
@@ -35,30 +27,14 @@
   background: color-mix(in srgb, var(--card) 92%, var(--bg) 8%);
   box-shadow: none;
 }
-
 .rowx{display:flex;gap:10px;flex-wrap:wrap;align-items:center}
 .grid{display:grid;gap:12px}
 @media(min-width:768px){ .grid{grid-template-columns: 1.35fr 1fr;} }
 
-.h1{
-  font-size: 18px;
-  font-weight: 950;
-  letter-spacing: -.02em;
-  color: var(--text);
-}
-.sub{
-  margin-top: 2px;
-  font-size: .92rem;
-  color: var(--muted);
-  font-weight: 700;
-}
-.lbl{
-  font-weight: 900;
-  color: var(--text);
-  margin-bottom: 6px;
-}
+.h1{font-size:18px;font-weight:950;letter-spacing:-.02em;color:var(--text)}
+.subt{margin-top:2px;font-size:.92rem;color:var(--muted);font-weight:700}
+.lbl{font-weight:900;color:var(--text);margin-bottom:6px}
 
-/* Inputs */
 .inp{
   border: 1px solid var(--line);
   border-radius: 14px;
@@ -74,10 +50,8 @@
   border-color: var(--accent);
   box-shadow: 0 0 0 3px color-mix(in srgb, var(--accent-soft) 70%, var(--accent) 30%);
 }
-
 .mono{font-variant-numeric: tabular-nums; font-family: ui-monospace, SFMono-Regular, Menlo, Consolas, "Liberation Mono";}
 
-/* Buttons */
 .btnx{
   border: 1px solid var(--line);
   border-radius: 14px;
@@ -90,6 +64,7 @@
   align-items: center;
   gap: 8px;
   transition: transform .05s ease, box-shadow .15s ease, border-color .15s ease, filter .15s ease;
+  text-decoration:none;
 }
 .btnx:hover{ box-shadow: var(--bom-shadow2); }
 .btnx:active{ transform: translateY(1px); }
@@ -100,11 +75,7 @@
   color: #06120a;
 }
 [data-theme="dark"] .btnx.primary{ color: #031108; }
-
-.btnx.ghost{
-  background: transparent;
-}
-
+.btnx.ghost{ background: transparent; }
 .btnx.danger{
   background: var(--danger);
   border-color: color-mix(in srgb, var(--danger) 70%, var(--line) 30%);
@@ -113,17 +84,11 @@
   border-radius: 12px;
 }
 
-/* Chips */
 .chip{
-  display:inline-flex;
-  align-items:center;
-  gap:8px;
-  padding:8px 10px;
-  border-radius:999px;
-  border: 1px solid var(--line);
+  display:inline-flex;align-items:center;gap:8px;
+  padding:8px 10px;border-radius:999px;border:1px solid var(--line);
   background: color-mix(in srgb, var(--card) 92%, var(--bg) 8%);
-  color: var(--text);
-  font-weight: 900;
+  color: var(--text);font-weight:900;
 }
 .dot{
   width:10px;height:10px;border-radius:999px;
@@ -134,36 +99,19 @@
 .hr{ height:1px; background: var(--line); margin: 12px 0; }
 .small{ font-size:.92rem; color: var(--muted); font-weight: 800; }
 
-/* Table */
-.table-wrap{
-  overflow:auto;
-  border-radius: 14px;
-  border: 1px solid var(--line);
-}
-.table-bom{
-  min-width: 980px;
-  margin: 0;
-  background: transparent;
-}
+.table-wrap{ overflow:auto; border-radius:14px; border:1px solid var(--line); }
+.table-bom{ min-width:980px; margin:0; background:transparent; }
 .table-bom thead th{
-  position: sticky;
-  top: 0;
-  z-index: 1;
+  position:sticky; top:0; z-index:1;
   background: color-mix(in srgb, var(--card) 88%, var(--bg) 12%);
   color: var(--text) !important;
-  border-bottom: 1px solid var(--line);
-  font-weight: 800;
+  border-bottom:1px solid var(--line);
+  font-weight:800;
 }
-.table-bom td{
-  border-top-color: var(--line);
-  color: var(--text);
-  vertical-align: middle;
-}
-.table-bom tbody tr:hover td{
-  background: color-mix(in srgb, var(--accent-soft) 18%, transparent 82%);
-}
+.table-bom td{ border-top-color: var(--line); color: var(--text); vertical-align: middle; }
+.table-bom tbody tr:hover td{ background: color-mix(in srgb, var(--accent-soft) 18%, transparent 82%); }
 
-/* Select2 ikut theme */
+/* Select2 theme */
 .select2-container{ width:100% !important; }
 .select2-container .select2-selection--single{
   height: 46px;
@@ -209,7 +157,6 @@
   color: var(--text) !important;
 }
 
-/* Alert */
 .alert-danger{
   border-radius: 14px;
   border: 1px solid color-mix(in srgb, var(--danger) 35%, var(--line) 65%);
@@ -221,8 +168,19 @@
 
 @section('content')
 @php
-  $isEdit = (bool)$bom;
-  $action = $isEdit ? route('master.item_boms.update',$bom) : route('master.item_boms.store');
+  $isEdit = (bool) $bom;
+  $action = $isEdit ? route('master.item_boms.update', $bom) : route('master.item_boms.store');
+
+  // controller sebaiknya kirim $rows (sudah kamu punya)
+  $rows = $rows ?? old('lines') ?? [[
+    'material_item_id' => null,
+    'material_text' => null,
+    'qty' => '',
+    'uom' => 'pcs',
+    'scrap_pct' => 0,
+    'is_optional' => 0,
+    'sort_order' => 10,
+  ]];
 @endphp
 
 <div class="page-wrap">
@@ -233,7 +191,9 @@
     <div class="rowx" style="justify-content:space-between;align-items:flex-start">
       <div>
         <div class="h1">{{ $isEdit ? 'Edit BOM' : 'Buat BOM' }}</div>
-        <div class="sub">BOM per SKU — material dari items (FLC280BLK, RIB280BLK, dll).</div>
+        <div class="subt">
+          QTY tampil <b>raw persis DB</b> (contoh: <span class="mono">0.31</span>, <span class="mono">0.019</span>, <span class="mono">0.009</span>).
+        </div>
         <div class="rowx" style="margin-top:10px">
           <span class="chip"><span class="dot"></span> GFID • BOM SKU</span>
         </div>
@@ -286,7 +246,7 @@
       <div class="rowx" style="justify-content:space-between;align-items:flex-start">
         <div>
           <div class="lbl" style="margin:0">Lines</div>
-          <div class="small">Tambah material: <span class="mono">FLC280BLK</span>, <span class="mono">RIB280BLK</span>, <span class="mono">TLKADDS</span>, <span class="mono">KRT4CM</span>, <span class="mono">BNGJHT</span>, dll.</div>
+          <div class="small">Tampilan angka mengikuti DB (tanpa format Indo / tanpa rounding).</div>
         </div>
         <button type="button" class="btnx" id="btn-add">+ Tambah Baris</button>
       </div>
@@ -297,7 +257,7 @@
             <tr>
               <th style="width:56px">#</th>
               <th style="min-width:380px">Material</th>
-              <th style="width:140px">Qty</th>
+              <th style="width:160px">Qty (raw)</th>
               <th style="width:110px">UOM</th>
               <th style="width:120px">Scrap %</th>
               <th style="width:110px">Optional</th>
@@ -306,53 +266,49 @@
             </tr>
           </thead>
           <tbody id="lines">
-            @php
-              $old = old('lines');
-              $rows = [];
-              if (is_array($old)) $rows = $old;
-              elseif($isEdit) {
-                $rows = $bom->lines->map(fn($l)=>[
-                  'material_item_id'=>$l->material_item_id,
-                  'material_text'=>($l->material->code.' — '.$l->material->name),
-                  'qty'=>(string)$l->qty,
-                  'uom'=>$l->uom,
-                  'scrap_pct'=>(string)$l->scrap_pct,
-                  'is_optional'=>$l->is_optional?1:0,
-                  'sort_order'=>$l->sort_order,
-                ])->toArray();
-              } else {
-                $rows = [[
-                  'material_item_id'=>'',
-                  'material_text'=>'',
-                  'qty'=>'',
-                  'uom'=>'pcs',
-                  'scrap_pct'=>'0',
-                  'is_optional'=>0,
-                  'sort_order'=>10,
-                ]];
-              }
-            @endphp
-
             @foreach($rows as $i => $r)
+              @php
+                $mid = data_get($r,'material_item_id');
+                $mtext = data_get($r,'material_text');
+              @endphp
               <tr class="line" data-i="{{ $i }}">
                 <td class="mono idx" style="font-weight:950">{{ $i+1 }}</td>
                 <td>
                   <select class="mat" name="lines[{{ $i }}][material_item_id]" style="width:100%">
-                    @if(!empty($r['material_item_id']))
-                      <option value="{{ $r['material_item_id'] }}" selected>{{ $r['material_text'] }}</option>
+                    @if(!empty($mid))
+                      <option value="{{ $mid }}" selected>{{ $mtext ?: 'Material terpilih' }}</option>
                     @endif
                   </select>
                 </td>
-                <td><input class="inp mono" name="lines[{{ $i }}][qty]" value="{{ $r['qty'] }}" placeholder="0.00"></td>
-                <td><input class="inp mono" name="lines[{{ $i }}][uom]" value="{{ $r['uom'] ?? 'pcs' }}" placeholder="pcs"></td>
-                <td><input class="inp mono" name="lines[{{ $i }}][scrap_pct]" value="{{ $r['scrap_pct'] ?? '0' }}" placeholder="0"></td>
+                <td>
+                  <input class="inp mono qty"
+                         name="lines[{{ $i }}][qty]"
+                         value="{{ (string) data_get($r,'qty','') }}"
+                         placeholder="0.00">
+                </td>
+                <td>
+                  <input class="inp mono uom"
+                         name="lines[{{ $i }}][uom]"
+                         value="{{ (string) data_get($r,'uom','pcs') }}"
+                         placeholder="pcs">
+                </td>
+                <td>
+                  <input class="inp mono scrap"
+                         name="lines[{{ $i }}][scrap_pct]"
+                         value="{{ (string) data_get($r,'scrap_pct',0) }}"
+                         placeholder="0">
+                </td>
                 <td>
                   <select class="inp mono" name="lines[{{ $i }}][is_optional]">
-                    <option value="0" {{ (int)($r['is_optional']??0)===0?'selected':'' }}>No</option>
-                    <option value="1" {{ (int)($r['is_optional']??0)===1?'selected':'' }}>Yes</option>
+                    <option value="0" {{ (int) data_get($r,'is_optional',0)===0 ? 'selected':'' }}>No</option>
+                    <option value="1" {{ (int) data_get($r,'is_optional',0)===1 ? 'selected':'' }}>Yes</option>
                   </select>
                 </td>
-                <td><input class="inp mono" name="lines[{{ $i }}][sort_order]" value="{{ $r['sort_order'] ?? ($i*10) }}"></td>
+                <td>
+                  <input class="inp mono"
+                         name="lines[{{ $i }}][sort_order]"
+                         value="{{ (string) data_get($r,'sort_order',($i*10)) }}">
+                </td>
                 <td><button type="button" class="btnx danger btn-del">Hapus</button></td>
               </tr>
             @endforeach
@@ -379,6 +335,7 @@
 
     $el.select2({
       placeholder: 'Cari SKU...',
+      allowClear: true,
       ajax: {
         url: ajaxUrl,
         dataType: 'json',
@@ -394,6 +351,7 @@
   function initMaterialSelect($select){
     $select.select2({
       placeholder: 'Cari material...',
+      allowClear: true,
       ajax: {
         url: ajaxUrl,
         dataType: 'json',
@@ -404,12 +362,39 @@
       },
       width: 'resolve'
     });
+
+    // auto set UOM from ajaxItems() -> unit
+    $select.on('select2:select', function(e){
+      const data = e.params.data || {};
+      const unit = data.unit || '';
+      if (!unit) return;
+
+      const $row = $(this).closest('tr.line');
+      const $uom = $row.find('input.uom');
+      if ($uom.length && (!$uom.val() || $uom.val().trim() === 'pcs')) {
+        $uom.val(unit);
+      }
+    });
   }
 
   function renumber(){
     $('#lines tr.line').each(function(idx){
+      $(this).attr('data-i', idx);
       $(this).find('.idx').text(idx+1);
+
+      // rename index after delete
+      $(this).find('select.mat').attr('name', `lines[${idx}][material_item_id]`);
+      $(this).find('input.qty').attr('name', `lines[${idx}][qty]`);
+      $(this).find('input.uom').attr('name', `lines[${idx}][uom]`);
+      $(this).find('input.scrap').attr('name', `lines[${idx}][scrap_pct]`);
+      $(this).find('select[name*="[is_optional]"]').attr('name', `lines[${idx}][is_optional]`);
+      $(this).find('input[name*="[sort_order]"]').attr('name', `lines[${idx}][sort_order]`);
     });
+  }
+
+  function ensureOneRow(){
+    const $tbody = $('#lines');
+    if ($tbody.find('tr.line').length === 0) addRow();
   }
 
   function addRow(){
@@ -421,9 +406,9 @@
       <tr class="line" data-i="${i}">
         <td class="mono idx" style="font-weight:950">${i+1}</td>
         <td><select class="mat" name="lines[${i}][material_item_id]" style="width:100%"></select></td>
-        <td><input class="inp mono" name="lines[${i}][qty]" placeholder="0.00"></td>
-        <td><input class="inp mono" name="lines[${i}][uom]" value="pcs" placeholder="pcs"></td>
-        <td><input class="inp mono" name="lines[${i}][scrap_pct]" value="0" placeholder="0"></td>
+        <td><input class="inp mono qty" name="lines[${i}][qty]" placeholder="0.00"></td>
+        <td><input class="inp mono uom" name="lines[${i}][uom]" value="pcs" placeholder="pcs"></td>
+        <td><input class="inp mono scrap" name="lines[${i}][scrap_pct]" value="0" placeholder="0"></td>
         <td>
           <select class="inp mono" name="lines[${i}][is_optional]">
             <option value="0" selected>No</option>
@@ -443,6 +428,7 @@
   $(document).on('click', '#btn-add', addRow);
   $(document).on('click', '.btn-del', function(){
     $(this).closest('tr').remove();
+    ensureOneRow();
     renumber();
   });
 

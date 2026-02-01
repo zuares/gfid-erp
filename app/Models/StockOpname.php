@@ -18,6 +18,9 @@ class StockOpname extends Model
     public const STATUS_REVIEWED = 'reviewed';
     public const STATUS_FINALIZED = 'finalized';
 
+    // ✅ TAMBAHKAN INI
+    public const STATUS_CANCELLED = 'cancelled';
+
     protected $fillable = [
         'code',
         'date',
@@ -30,12 +33,16 @@ class StockOpname extends Model
         'finalized_by',
         'reviewed_at',
         'finalized_at',
+        'cancelled_by', 'cancelled_at', 'cancel_reason',
     ];
 
     protected $casts = [
         'date' => 'date',
         'reviewed_at' => 'datetime',
         'finalized_at' => 'datetime',
+
+        // ✅ add
+        'cancelled_at' => 'datetime',
     ];
 
     // 🔗 Relasi
@@ -138,10 +145,10 @@ class StockOpname extends Model
      */
     public function canModifyLines(): bool
     {
-        return !in_array($this->status, [
-            self::STATUS_REVIEWED,
-            self::STATUS_FINALIZED,
-        ]);
+        return in_array($this->status, [
+            self::STATUS_DRAFT,
+            self::STATUS_COUNTING,
+        ], true);
     }
 
     /**
@@ -150,8 +157,7 @@ class StockOpname extends Model
      */
     public function canFinalize(): bool
     {
-        return $this->status === self::STATUS_REVIEWED
-        && !$this->isFinalized();
+        return $this->status === self::STATUS_REVIEWED;
     }
 
     // ==========================
@@ -182,4 +188,14 @@ class StockOpname extends Model
 
         return $this->status === self::STATUS_REVIEWED;
     }
+
+    public function isCancelled(): bool
+    {
+        return ($this->status ?? null) === self::STATUS_CANCELLED;
+    }
+    public function cancelledBy()
+    {
+        return $this->belongsTo(\App\Models\User::class, 'cancelled_by');
+    }
+
 }
