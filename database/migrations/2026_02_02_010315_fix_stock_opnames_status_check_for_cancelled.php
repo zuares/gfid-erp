@@ -5,11 +5,22 @@ use Illuminate\Support\Facades\DB;
 
 return new class extends Migration
 {
+    private function sqliteHasColumn(string $table, string $column): bool
+    {
+        $rows = DB::select("PRAGMA table_info('$table')");
+        foreach ($rows as $r) {
+            if (($r->name ?? null) === $column) {
+                return true;
+            }
+
+        }
+        return false;
+    }
+
     public function up(): void
     {
         // hanya untuk sqlite
         if (DB::getDriverName() !== 'sqlite') {
-            // kalau MySQL/Postgres, nanti beda approach (ENUM / CHECK).
             return;
         }
 
@@ -52,7 +63,13 @@ return new class extends Migration
             );
         ");
 
-        // 3) copy data (pastikan kolom cancelled_* memang sudah ada di old)
+        // 3) copy data (sqlite-safe: kalau kolom cancelled_* belum ada di old, isi NULL)
+        $old = 'stock_opnames_old';
+
+        $cancelledAtExpr = $this->sqliteHasColumn($old, 'cancelled_at') ? 'cancelled_at' : 'NULL AS cancelled_at';
+        $cancelledByExpr = $this->sqliteHasColumn($old, 'cancelled_by') ? 'cancelled_by' : 'NULL AS cancelled_by';
+        $cancelReasonExpr = $this->sqliteHasColumn($old, 'cancel_reason') ? 'cancel_reason' : 'NULL AS cancel_reason';
+
         DB::statement("
             INSERT INTO stock_opnames (
                 id, code, date, warehouse_id, type, status, notes,
@@ -63,9 +80,9 @@ return new class extends Migration
             SELECT
                 id, code, date, warehouse_id, type, status, notes,
                 created_by, reviewed_by, finalized_by, reviewed_at, finalized_at,
-                cancelled_at, cancelled_by, cancel_reason,
+                $cancelledAtExpr, $cancelledByExpr, $cancelReasonExpr,
                 created_at, updated_at
-            FROM stock_opnames_old;
+            FROM {$old};
         ");
 
         // 4) drop old
@@ -76,6 +93,6 @@ return new class extends Migration
 
     public function down(): void
     {
-        // rollback tidak aku buat (ribet), bisa dibuat kalau kamu mau.
+        // rollback tidak dibuat
     }
 };

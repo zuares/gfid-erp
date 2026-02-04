@@ -5,44 +5,45 @@ use App\Http\Controllers\Imports\MarketplaceImportController;
 use App\Http\Controllers\Imports\MarketplaceIncomeImportController;
 use Illuminate\Support\Facades\Route;
 
-Route::middleware(['web'])->prefix('imports')->name('imports.')->group(function () {
+Route::middleware(['web'])
+    ->prefix('imports')
+    ->name('imports.')
+    ->group(function () {
 
-    // =========================
-    // Marketplace Shipments
-    // =========================
-    Route::prefix('marketplace')->name('marketplace.')->group(function () {
+        // =========================
+        // Marketplace Shipments (Import Wizard)
+        // =========================
+        Route::prefix('marketplace')->name('marketplace.')->group(function () {
 
-        // ✅ API JSON (HARUS di atas /{shipment})
-        Route::get('/data', [MarketplaceShipmentController::class, 'index'])
-            ->name('data');
+            // API JSON (datatable) — keep di atas /{...}
+            Route::get('data', [MarketplaceShipmentController::class, 'index'])->name('data');
 
-        // pages + actions
-        Route::get('/', [MarketplaceImportController::class, 'index'])->name('index');
-        Route::get('/export', [MarketplaceImportController::class, 'export'])->name('export');
-        Route::get('/create', [MarketplaceImportController::class, 'create'])->name('create');
+            // pages
+            Route::get('/', [MarketplaceImportController::class, 'index'])->name('index');
+            Route::get('create', [MarketplaceImportController::class, 'create'])->name('create');
+            Route::get('export', [MarketplaceImportController::class, 'export'])->name('export');
 
-        Route::get('/draft', [MarketplaceImportController::class, 'draft'])->name('draft');
+            // draft/session helpers
+            Route::get('draft', [MarketplaceImportController::class, 'draft'])->name('draft');
 
-        Route::post('/preview', [MarketplaceImportController::class, 'preview'])->name('preview');
-        Route::post('/commit', [MarketplaceImportController::class, 'commit'])->name('commit');
-        Route::post('/cancel', [MarketplaceImportController::class, 'cancel'])->name('cancel');
+            // actions
+            Route::post('preview', [MarketplaceImportController::class, 'preview'])->name('preview');
+            Route::post('commit', [MarketplaceImportController::class, 'commit'])->name('commit');
+            Route::post('cancel', [MarketplaceImportController::class, 'cancel'])->name('cancel');
 
-        // ✅ taruh paling bawah + batasi hanya angka biar gak nyangkut kata "data"
-        Route::get('/{shipment}', [MarketplaceImportController::class, 'show'])
-            ->whereNumber('shipment')
-            ->name('show');
+            // detail import/draft (opsional)
+            Route::get('{import}', [MarketplaceImportController::class, 'show'])
+                ->whereNumber('import')
+                ->name('show');
+        });
 
-        // ✅ NEW: resume draft -> buka preview dari session
+        // =========================
+        // Marketplace Income (Import Wizard)
+        // =========================
+        Route::prefix('marketplace-income')->name('marketplace_income.')->group(function () {
+            Route::get('/', [MarketplaceIncomeImportController::class, 'create'])->name('create');
+            Route::post('preview', [MarketplaceIncomeImportController::class, 'preview'])->name('preview');
+            Route::post('commit', [MarketplaceIncomeImportController::class, 'commit'])->name('commit');
+            Route::post('cancel', [MarketplaceIncomeImportController::class, 'cancel'])->name('cancel');
+        });
     });
-
-    // =========================
-    // Marketplace Income
-    // =========================
-    Route::prefix('marketplace-income')->name('marketplace_income.')->group(function () {
-        Route::get('/', [MarketplaceIncomeImportController::class, 'create'])->name('create');
-        Route::post('/preview', [MarketplaceIncomeImportController::class, 'preview'])->name('preview');
-        Route::post('/commit', [MarketplaceIncomeImportController::class, 'commit'])->name('commit');
-        Route::post('/cancel', [MarketplaceIncomeImportController::class, 'cancel'])->name('cancel');
-    });
-
-});

@@ -5,6 +5,7 @@ namespace App\Services\Marketplace\Import;
 use App\Models\MpShipment;
 use App\Models\MpShipmentItem;
 use App\Services\Marketplace\Import\Adapters\MpImportAdapterInterface;
+use App\Services\Marketplace\MpPacketItemSyncService;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Str;
 
@@ -15,7 +16,6 @@ class MpImportService
 
     public function __construct()
     {
-        // register adapters here (simple)
         $this->register(app(\App\Services\Marketplace\Import\Adapters\ShopeeImportAdapter::class));
         $this->register(app(\App\Services\Marketplace\Import\Adapters\TiktokImportAdapter::class));
     }
@@ -25,9 +25,15 @@ class MpImportService
         $this->adapters[$adapter->channel()] = $adapter;
     }
 
-    public function import(string $channel, string $path, int $storeId, string $sourceFile, bool $dryRun = false): array
-    {
+    public function import(
+        string $channel,
+        string $path,
+        int $storeId,
+        string $sourceFile,
+        bool $dryRun = false
+    ): array {
         $channel = strtolower(trim($channel));
+
         if (!isset($this->adapters[$channel])) {
             throw new \InvalidArgumentException("Adapter untuk channel '{$channel}' belum ada.");
         }
@@ -38,7 +44,6 @@ class MpImportService
 
         $normalized = $adapter->parse($path, $storeId, $sourceFile);
 
-        // stats
         $stats = [
             'channel' => $channel,
             'store_id' => $storeId,
@@ -56,16 +61,31 @@ class MpImportService
             return compact('stats', 'normalized');
         }
 
-        DB::transaction(function () use ($normalized, $batchId, $now, &$stats) {
+        DB::transaction(function () use (
+            $normalized,
+            $batchId,
+            $now,
+            $storeId,
+            &$stats
+        ) {
+            $packetSync = app(MpPacketItemSyncService::class);
 
             foreach ($normalized as $s) {
-                // compute totals if not present
                 $items = $s['items'] ?? [];
-                $totalQty = (int) ($s['total_qty'] ?? array_sum(array_map(fn($i) => (int) ($i['qty'] ?? 0), $items)));
-                $grand = (float) ($s['grand_total'] ?? array_sum(array_map(fn($i) => (float) ($i['subtotal'] ?? 0), $items)));
 
-                // Find existing shipment to avoid duplicates:
-                // Prefer match by (channel + platform_order_id + platform_shipment_id)
+                $totalQty = (int) (
+                    $s['total_qty'] ?? array_sum(array_map(fn($i) => (int) ($i['qty'] ?? 0), $items))
+                );
+
+                $grand = (float) (
+                    $s['grand_total'] ?? array_sum(array_map(fn($i) => (float) ($i['subtotal'] ?? 0), $items))
+                );
+
+                /**
+                 * ======================================
+                 * UPSERT mp_shipment
+                 * ======================================
+                 */
                 $mp = MpShipment::query()
                     ->where('store_id', $s['store_id'] ?? $storeId)
                     ->where('channel', $s['channel'])
@@ -81,7 +101,6 @@ class MpImportService
 
                 $payload = [
                     'store_id' => (int) ($s['store_id'] ?? $storeId),
-
                     'channel' => $s['channel'],
                     'platform_order_id' => $s['platform_order_id'],
                     'platform_shipment_id' => $s['platform_shipment_id'] ?? null,
@@ -118,10 +137,8 @@ class MpImportService
                     $mp = MpShipment::create($payload);
                     $stats['inserted_shipments']++;
                 } else {
-                    // update only if new info exists (avoid wiping existing)
                     $update = $payload;
 
-                    // keep previous tracking if already has, unless new is non-empty
                     if (empty($update['tracking_no'])) {
                         unset($update['tracking_no']);
                     }
@@ -142,8 +159,11 @@ class MpImportService
                     $stats['updated_shipments']++;
                 }
 
-                // Items: simplest safe way is delete & recreate per mp_shipment per batch
-                // (mp_shipment_items is marketplace reference; OK to refresh)
+                /**
+                 * ======================================
+                 * REFRESH mp_shipment_items (raw)
+                 * ======================================
+                 */
                 MpShipmentItem::where('mp_shipment_id', $mp->id)->delete();
 
                 foreach ($items as $it) {
@@ -159,6 +179,34 @@ class MpImportService
                         'raw_line' => $it['raw_line'] ?? null,
                     ]);
                     $stats['inserted_items']++;
+                }
+
+                /**
+                 * ======================================
+                 * BUILD mp_packet_items (ERP-aware)
+                 * ======================================
+                 */
+                $skuQtyMap = [];
+
+                foreach ($items as $it) {
+                    $sku = $it['sku_code'] ?? $it['sku_parent'] ?? null;
+                    $qty = (int) ($it['qty'] ?? 0);
+
+                    if ($sku && $qty > 0) {
+                        $sku = strtoupper(trim($sku));
+                        $skuQtyMap[$sku] = ($skuQtyMap[$sku] ?? 0) + $qty;
+                    }
+                }
+
+                if ($skuQtyMap) {
+                    $packetSync->syncAutoSkuMap(
+                        (string) $mp->id,
+                        $skuQtyMap,
+                        [
+                            'channel' => $mp->channel,
+                            'store' => 'store#' . $mp->store_id,
+                        ]
+                    );
                 }
             }
         });

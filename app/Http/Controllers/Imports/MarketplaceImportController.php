@@ -268,10 +268,10 @@ class MarketplaceImportController extends Controller
     /* ============================================================
      * SHOW
      * ============================================================ */
-    public function show(MpShipment $shipment): View
+    public function show(MpShipment $import): View
     {
         return view('imports.marketplace.show', [
-            's' => $shipment->load(['store:id,name', 'items']),
+            's' => $import->load(['store:id,name', 'items']),
         ]);
     }
 
@@ -329,5 +329,58 @@ class MarketplaceImportController extends Controller
         }
 
         return null;
+    }
+
+    public function reconcilePreview(Request $request, MarketplaceReconcileService $svc)
+    {
+        $data = $request->validate([
+            'date' => ['required', 'date'],
+            'channel' => ['required', 'in:shopee,tiktok'],
+            'store_id' => ['nullable', 'integer'],
+            'window' => ['required', 'integer', 'min:0', 'max:7'],
+            'threshold' => ['required', 'integer', 'min:0', 'max:100'],
+        ]);
+
+        $res = $svc->reconcileByDate(
+            dateYmd: $data['date'],
+            channel: $data['channel'],
+            storeId: $data['store_id'] ? (int) $data['store_id'] : null,
+            windowDays: (int) $data['window'],
+            threshold: (int) $data['threshold'],
+            dryRun: true
+        );
+
+        // simpan preview ke session biar bisa ditampilkan di halaman import
+        session()->put('mp_reconcile_preview', [
+            'params' => $data,
+            'result' => $res,
+        ]);
+
+        return back()->with('ok', 'Preview siap.');
+    }
+
+    public function reconcileCommit(Request $request, MarketplaceReconcileService $svc)
+    {
+        $data = $request->validate([
+            'date' => ['required', 'date'],
+            'channel' => ['required', 'in:shopee,tiktok'],
+            'store_id' => ['nullable', 'integer'],
+            'window' => ['required', 'integer', 'min:0', 'max:7'],
+            'threshold' => ['required', 'integer', 'min:0', 'max:100'],
+        ]);
+
+        $res = $svc->reconcileByDate(
+            dateYmd: $data['date'],
+            channel: $data['channel'],
+            storeId: $data['store_id'] ? (int) $data['store_id'] : null,
+            windowDays: (int) $data['window'],
+            threshold: (int) $data['threshold'],
+            dryRun: false
+        );
+
+        // optional: clear preview supaya gak bikin bingung
+        session()->forget('mp_reconcile_preview');
+
+        return back()->with('ok', 'Reconcile berhasil disimpan. Auto: ' . ($res['stats']['matched'] ?? 0) . ' • Review: ' . ($res['stats']['needs_review'] ?? 0));
     }
 }

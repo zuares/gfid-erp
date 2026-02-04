@@ -40,6 +40,8 @@ Route::middleware(['web', 'auth', 'role:owner,admin'])
                 Route::get('{shipment}/export-lines', 'exportLines')->name('export_lines');
                 Route::post('{shipment}/import-lines', 'importLines')->name('import_lines');
                 Route::post('{shipment}/import-preview', 'importPreview')->name('import_preview');
+                Route::get('/{shipment}/reconcile', [ShipmentController::class, 'reconcile'])
+                    ->name('reconcile');
 
                 Route::post('{shipment}/cancel', 'cancelPosted')
                     ->name('cancel')

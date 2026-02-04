@@ -4,6 +4,7 @@ namespace App\Http\Controllers\Sales;
 
 use App\Http\Controllers\Controller;
 use App\Models\Item;
+use App\Models\MpReconciliation;
 use App\Models\SalesInvoice;
 use App\Models\Shipment;
 use App\Models\ShipmentLine;
@@ -162,34 +163,73 @@ class ShipmentController extends Controller
 
     public function show(Shipment $shipment)
     {
-        $shipment->load(['store', 'lines.item.category', 'creator', 'invoice']);
+        // Core data shipment
+        $shipment->load([
+            'store',
+            'lines.item.category',
+            'creator',
+            'invoice',
+        ]);
 
+        // Hitung HPP per line untuk tampilan
         $shipment->lines->each(function ($line) {
             $unitHpp = 0;
             if (isset($line->item)) {
                 $unitHpp = $line->item->latest_hpp ?? $line->item->hpp ?? $line->item->last_purchase_price ?? 0;
             }
             $line->unit_hpp = $unitHpp;
-            $line->total_hpp = $unitHpp * (int) $line->qty_scanned;
+            $line->total_hpp = $unitHpp * (int) ($line->qty_scanned ?? 0);
         });
 
         $totalQty = (int) $shipment->lines->sum('qty_scanned');
         $totalLines = (int) $shipment->lines->count();
         $totalHpp = (float) $shipment->lines->sum('total_hpp');
 
+        // Summary per category
         $summaryPerCategory = $shipment->lines
             ->groupBy(fn($line) => optional(optional($line->item)->category)->name ?: 'Tanpa Kategori')
             ->map(fn($group, $categoryName) => [
                 'category_name' => $categoryName,
                 'total_lines' => $group->count(),
-                'total_qty' => $group->sum('qty_scanned'),
-                'total_hpp' => $group->sum('total_hpp'),
+                'total_qty' => (int) $group->sum('qty_scanned'),
+                'total_hpp' => (float) $group->sum('total_hpp'),
             ])
             ->values()
             ->sortBy('category_name');
 
+        // =========================
+        // Marketplace Packets in this batch
+        // =========================
+        $mpPackets = MpReconciliation::query()
+            ->where('shipment_id', $shipment->id)
+            ->whereIn('status', ['needs_review', 'auto_matched', 'resolved']) // atau cukup tanpa whereIn
+            ->with(['mpShipment' => fn($q) => $q->with('items')])
+            ->orderByDesc('match_confidence')
+            ->get();
+        // dd($mpPackets);
+
+        $mpTotalQty = (int) $mpPackets->sum(function ($rec) {
+            return (int) ($rec->mpShipment?->total_qty ?? 0);
+        });
+
+        // batchQty pakai shipment.total_qty kalau ada; fallback ke totalQty (sum lines)
+        $batchQty = (int) ($shipment->total_qty ?? 0);
+        if ($batchQty <= 0) {
+            $batchQty = $totalQty;
+        }
+
+        $deltaQty = $batchQty - $mpTotalQty; // + = batch lebih besar, - = mp lebih besar
+
         return view('sales.shipments.show', compact(
-            'shipment', 'totalQty', 'totalLines', 'totalHpp', 'summaryPerCategory'
+            'shipment',
+            'totalQty',
+            'totalLines',
+            'totalHpp',
+            'summaryPerCategory',
+            'mpPackets',
+            'mpTotalQty',
+            'batchQty',
+            'deltaQty'
         ));
     }
 
@@ -692,4 +732,49 @@ class ShipmentController extends Controller
             ->with('status', 'success')
             ->with('message', 'Shipment posted berhasil dibatalkan & stok sudah dikembalikan ke WH-RTS.');
     }
+
+    public function reconcile(Shipment $shipment)
+    {
+        $shipment->load(['store', 'creator']);
+
+        // Filter status untuk UI: all|needs_review|resolved|skipped|auto_matched
+        $status = request('status', 'needs_review'); // default langsung ke review biar enak
+
+        $base = \App\Models\MpReconciliation::query()
+            ->where('shipment_id', $shipment->id);
+
+        $mpCounts = (clone $base)
+            ->selectRaw("status, COUNT(*) as c")
+            ->groupBy('status')
+            ->pluck('c', 'status');
+
+        $mpStats = (clone $base)
+            ->selectRaw("
+            SUM(status = 'resolved')     as resolved,
+            SUM(status = 'needs_review') as needs_review,
+            SUM(status = 'skipped')      as skipped,
+            SUM(status = 'auto_matched') as auto_matched,
+            COUNT(*)                     as total
+        ")
+            ->first();
+
+        $mpPacketsQ = (clone $base)
+            ->with(['mpShipment']) // penting untuk platform_order_id
+            ->orderByDesc('id');
+
+        if ($status !== 'all') {
+            $mpPacketsQ->where('status', $status);
+        }
+
+        $mpPackets = $mpPacketsQ->paginate(50)->withQueryString();
+
+        return view('sales.shipments.reconcile', compact(
+            'shipment',
+            'status',
+            'mpPackets',
+            'mpCounts',
+            'mpStats'
+        ));
+    }
+
 }

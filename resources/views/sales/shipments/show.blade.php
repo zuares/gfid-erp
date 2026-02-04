@@ -1,784 +1,283 @@
-{{-- resources/views/sales/shipments/show.blade.php --}}
 @extends('layouts.app')
 
 @section('title', 'Detail Shipment • ' . $shipment->code)
 
 @push('head')
-    <style>
-        .page-wrap {
-            max-width: 1150px;
-            margin-inline: auto;
-            padding: .75rem .75rem 3.5rem;
-            min-height: 100vh;
-        }
+<style>
+    .page-wrap{ max-width:1080px; margin-inline:auto; padding:16px; }
+    .cardx{ background:var(--card); border:1px solid var(--line); border-radius:14px; overflow:hidden; }
+    .cardx-hd{ padding:14px 16px; border-bottom:1px solid var(--line); }
+    .cardx-bd{ padding:14px 16px; }
+    .grid{ display:grid; gap:12px; }
+    .grid-3{ grid-template-columns: repeat(3, minmax(0, 1fr)); }
+    @media (max-width: 860px){ .grid-3{ grid-template-columns:1fr; } }
 
-        body[data-theme="light"] .page-wrap {
-            background: #f3f4f6;
-        }
+    .mono{ font-variant-numeric: tabular-nums; font-family: ui-monospace, SFMono-Regular, Menlo, Consolas, "Liberation Mono"; }
+    .muted{ opacity:.75; }
+    .tag{ border-radius:999px; padding:.18rem .65rem; font-size:.72rem; border:1px solid var(--line); background: rgba(148, 163, 184, .12); white-space:nowrap; }
+    .tag-ok{ background: rgba(34,197,94,.12); border-color: rgba(34,197,94,.25); }
+    .tag-warn{ background: rgba(245,158,11,.12); border-color: rgba(245,158,11,.25); }
+    .tag-info{ background: rgba(59,130,246,.10); border-color: rgba(59,130,246,.18); }
 
-        body[data-theme="light"] .page-wrap.page-theme-shopee {
-            background: #fff7ed;
-        }
-
-        body[data-theme="light"] .page-wrap.page-theme-tiktok {
-            background: #ecfeff;
-        }
-
-        body[data-theme="dark"] .page-wrap {
-            background: radial-gradient(circle at top left, rgba(15, 23, 42, 0.9) 0, #020617 65%);
-        }
-
-        body[data-theme="dark"] .page-wrap.page-theme-shopee {
-            background: radial-gradient(circle at top left, rgba(148, 27, 19, 0.9) 0, #020617 65%);
-        }
-
-        body[data-theme="dark"] .page-wrap.page-theme-tiktok {
-            background: radial-gradient(circle at top left, rgba(8, 47, 73, 0.9) 0, #020617 65%);
-        }
-
-        .card-main {
-            background: var(--card);
-            border-radius: 14px;
-            border: 1px solid rgba(148, 163, 184, 0.18);
-            box-shadow: 0 4px 18px rgba(15, 23, 42, 0.05);
-        }
-
-        body[data-theme="dark"] .card-main {
-            border-color: rgba(30, 64, 175, 0.6);
-            box-shadow: 0 12px 32px rgba(15, 23, 42, 0.8);
-        }
-
-        .meta-label {
-            font-size: .68rem;
-            text-transform: uppercase;
-            letter-spacing: .08em;
-            color: #6b7280;
-        }
-
-        body[data-theme="dark"] .meta-label {
-            color: #9ca3af;
-        }
-
-        .badge-status {
-            border-radius: 999px;
-            padding: .18rem .7rem;
-            font-size: .72rem;
-            letter-spacing: .08em;
-            text-transform: uppercase;
-        }
-
-        .badge-status-draft {
-            background: rgba(251, 191, 36, 0.10);
-            color: #92400e;
-            border: 1px solid rgba(245, 158, 11, 0.25);
-        }
-
-        .badge-status-submitted {
-            background: rgba(59, 130, 246, 0.10);
-            color: #1d4ed8;
-            border: 1px solid rgba(59, 130, 246, 0.3);
-        }
-
-        .badge-status-posted {
-            background: rgba(34, 197, 94, 0.10);
-            color: #166534;
-            border: 1px solid rgba(34, 197, 94, 0.25);
-        }
-
-        /* ✅ cancelled badge */
-        .badge-status-cancelled {
-            background: rgba(239, 68, 68, 0.10);
-            color: #b91c1c;
-            border: 1px solid rgba(239, 68, 68, 0.28);
-        }
-
-        body[data-theme="dark"] .badge-status-draft {
-            background: rgba(251, 191, 36, 0.22);
-            color: #fef9c3;
-            border-color: rgba(245, 158, 11, 0.65);
-        }
-
-        body[data-theme="dark"] .badge-status-submitted {
-            background: rgba(59, 130, 246, 0.22);
-            color: #bfdbfe;
-            border-color: rgba(59, 130, 246, 0.65);
-        }
-
-        body[data-theme="dark"] .badge-status-posted {
-            background: rgba(34, 197, 94, 0.22);
-            color: #bbf7d0;
-            border-color: rgba(34, 197, 94, 0.65);
-        }
-
-        body[data-theme="dark"] .badge-status-cancelled {
-            background: rgba(239, 68, 68, 0.18);
-            color: #fecaca;
-            border-color: rgba(239, 68, 68, 0.55);
-        }
-
-        .summary-pill {
-            border-radius: 999px;
-            padding: .25rem .8rem;
-            font-size: .8rem;
-            border: 1px solid rgba(148, 163, 184, 0.3);
-            background: rgba(248, 250, 252, 0.96);
-        }
-
-        body[data-theme="dark"] .summary-pill {
-            background: rgba(15, 23, 42, 0.98);
-            border-color: rgba(30, 64, 175, 0.7);
-            color: #e5e7eb;
-        }
-
-        .store-badge {
-            display: inline-flex;
-            align-items: center;
-            padding: .2rem .6rem;
-            border-radius: 999px;
-            border: 1px solid rgba(148, 163, 184, .6);
-            font-size: .75rem;
-        }
-
-        .page-theme-shopee .store-badge {
-            border-color: #f97316;
-            color: #9a3412;
-        }
-
-        .page-theme-tiktok .store-badge {
-            border-color: #06b6d4;
-            color: #0f766e;
-        }
-
-        .info-label {
-            font-size: .68rem;
-            text-transform: uppercase;
-            letter-spacing: .08em;
-            color: #9ca3af;
-        }
-
-        body[data-theme="dark"] .info-label {
-            color: #6b7280;
-        }
-
-        .info-pill {
-            display: inline-flex;
-            flex-direction: column;
-            justify-content: center;
-            padding: .25rem .7rem;
-            border-radius: 999px;
-            border: 1px solid rgba(148, 163, 184, 0.35);
-            font-size: .75rem;
-            background: rgba(248, 250, 252, 0.96);
-        }
-
-        .info-pill-label {
-            font-size: .64rem;
-            text-transform: uppercase;
-            letter-spacing: .08em;
-            color: #9ca3af;
-        }
-
-        .info-pill-value {
-            font-size: .8rem;
-        }
-
-        body[data-theme="dark"] .info-pill {
-            background: rgba(15, 23, 42, 0.98);
-            border-color: rgba(30, 64, 175, 0.75);
-            color: #e5e7eb;
-        }
-
-        body[data-theme="dark"] .info-pill-label {
-            color: #6b7280;
-        }
-
-        /* ====== NOTICE (submitted) ====== */
-        .notice-submitted {
-            border-radius: 12px;
-            padding: .7rem .85rem;
-            border: 1px solid rgba(59, 130, 246, 0.28);
-            background: rgba(59, 130, 246, 0.06);
-            color: #1d4ed8;
-            font-size: .88rem;
-        }
-
-        body[data-theme="dark"] .notice-submitted {
-            border-color: rgba(59, 130, 246, 0.6);
-            background: rgba(59, 130, 246, 0.18);
-            color: #bfdbfe;
-        }
-
-        /* ========= TABLE ========= */
-        .lines-wrapper {
-            max-height: 50vh;
-            overflow-y: auto;
-            overscroll-behavior: contain;
-            scroll-behavior: smooth;
-            scrollbar-width: thin;
-            scrollbar-color: rgba(148, 163, 184, 0.7) transparent;
-        }
-
-        .lines-wrapper::-webkit-scrollbar {
-            width: 6px;
-        }
-
-        .lines-wrapper::-webkit-scrollbar-track {
-            background: transparent;
-        }
-
-        .lines-wrapper::-webkit-scrollbar-thumb {
-            background: rgba(148, 163, 184, 0.7);
-            border-radius: 999px;
-        }
-
-        .table-lines {
-            margin-bottom: 0;
-        }
-
-        .table-lines thead th {
-            position: sticky;
-            top: 0;
-            z-index: 6;
-            border-bottom-width: 1px;
-            font-size: .75rem;
-            text-transform: uppercase;
-            letter-spacing: .06em;
-            color: #6b7280;
-            background: rgba(248, 250, 252, 0.98);
-        }
-
-        body[data-theme="dark"] .table-lines thead th {
-            background: rgba(15, 23, 42, 0.98);
-            border-bottom-color: rgba(30, 64, 175, 0.75);
-            color: #9ca3af;
-        }
-
-        .table-lines tbody td {
-            vertical-align: middle;
-            border-top-color: rgba(148, 163, 184, 0.18);
-            padding-top: .35rem;
-            padding-bottom: .35rem;
-        }
-
-        body[data-theme="dark"] .table-lines tbody td {
-            border-top-color: rgba(51, 65, 85, 0.85);
-        }
-
-        .table-lines tbody tr:nth-child(even) {
-            background-color: rgba(249, 250, 251, 0.86);
-        }
-
-        body[data-theme="dark"] .table-lines tbody tr:nth-child(even) {
-            background-color: rgba(15, 23, 42, 0.96);
-        }
-
-        .item-code {
-            font-weight: 600;
-            font-size: .9rem;
-        }
-
-        body[data-theme="dark"] .item-code {
-            color: #e5e7eb;
-        }
-
-        .category-summary-table thead th {
-            font-size: .72rem;
-            text-transform: uppercase;
-            letter-spacing: .06em;
-        }
-
-        .category-summary-table tbody td {
-            font-size: .82rem;
-            vertical-align: middle;
-        }
-
-        /* buttons */
-        .btn-theme-outline,
-        .btn-theme-main {
-            border-radius: 999px;
-            font-size: .78rem;
-            letter-spacing: .06em;
-            text-transform: uppercase;
-            padding-inline: 1rem;
-            padding-block: .35rem;
-            border-width: 1px;
-        }
-
-        .btn-theme-outline {
-            background: transparent;
-        }
-
-        /* default theme */
-        .page-theme-default .btn-theme-main {
-            background: #2563eb;
-            border-color: #2563eb;
-            color: #eff6ff;
-        }
-
-        .page-theme-default .btn-theme-outline {
-            border-color: rgba(148, 163, 184, .7);
-            color: #4b5563;
-        }
-
-        /* shopee */
-        .page-theme-shopee .btn-theme-main {
-            background: #f97316;
-            border-color: #f97316;
-            color: #fff7ed;
-        }
-
-        .page-theme-shopee .btn-theme-outline {
-            border-color: rgba(248, 113, 113, .9);
-            color: #b91c1c;
-        }
-
-        /* tiktok */
-        .page-theme-tiktok .btn-theme-main {
-            background: #0f766e;
-            border-color: #0f766e;
-            color: #e0f2fe;
-        }
-
-        .page-theme-tiktok .btn-theme-outline {
-            border-color: rgba(45, 212, 191, .8);
-            color: #0f766e;
-        }
-
-        body[data-theme="dark"] .btn-theme-outline {
-            color: #e5e7eb;
-            border-color: rgba(148, 163, 184, .6);
-        }
-    </style>
+    .table-wrap{ overflow:auto; border:1px solid var(--line); border-radius:12px; }
+    table{ width:100%; border-collapse:collapse; }
+    th, td{ padding:10px 12px; border-bottom:1px solid var(--line); vertical-align:top; }
+    th{ text-align:left; font-size:.85rem; position:sticky; top:0; background:var(--card); z-index:1; }
+    tr:hover td{ background: rgba(148, 163, 184, .06); }
+    td.r{ text-align:right; }
+</style>
 @endpush
 
 @section('content')
-    @php
-        $storeName = $shipment->store->name ?? '';
-        $storeCode = $shipment->store->code ?? '';
-        $storeKey = strtoupper($storeCode . ' ' . $storeName);
+<div class="page-wrap">
 
-        $scanTheme = 'default';
-        if (str_contains($storeKey, 'SHP') || str_contains($storeKey, 'SHOPEE')) {
-            $scanTheme = 'shopee';
-        } elseif (str_contains($storeKey, 'TTK') || str_contains($storeKey, 'TIKTOK')) {
-            $scanTheme = 'tiktok';
-        }
-
-        $isOwner = (auth()->user()->role ?? null) === 'owner';
-        $isCancelled = !empty($shipment->cancelled_at);
-
-        // ✅ Pesan konfirmasi hapus draft (delete permanen)
-        $confirmDeleteMsg =
-            "⚠️ KONFIRMASI HAPUS\n\n" .
-            "Shipment {$shipment->code} akan DIHAPUS PERMANEN.\n" .
-            "Semua item scan/baris shipment juga akan ikut terhapus.\n" .
-            "Tindakan ini TIDAK BISA DIBATALKAN.\n\n" .
-            'Lanjutkan hapus?';
-
-        // ✅ Pesan konfirmasi cancel posted (reversal stok)
-        $confirmCancelMsg =
-            "⚠️ KONFIRMASI BATALKAN (POSTED)\n\n" .
-            "Shipment {$shipment->code} akan DIBATALKAN.\n" .
-            "Stok akan DIBALIKKAN ke WH-RTS.\n" .
-            "Tindakan ini tidak bisa dibatalkan dengan mudah.\n\n" .
-            'Lanjutkan batalkan?';
-    @endphp
-
-    <div class="page-wrap page-theme-{{ $scanTheme }}">
-        {{-- HEADER --}}
-        <div class="d-flex justify-content-between align-items-start mb-3 flex-wrap gap-2">
+    {{-- Header --}}
+    <div class="cardx">
+        <div class="cardx-hd" style="display:flex;align-items:flex-start;justify-content:space-between;gap:12px;">
             <div>
-                <div class="meta-label mb-1">Shipment</div>
-                <div class="d-flex flex-wrap align-items-center gap-2 mb-1">
-                    <h1 class="h5 mb-0">{{ $shipment->code }}</h1>
-
-                    @if ($isCancelled)
-                        <span class="badge-status badge-status-cancelled">Cancelled</span>
-                    @else
-                        @if ($shipment->status === 'draft')
-                            <span class="badge-status badge-status-draft">Draft</span>
-                        @elseif ($shipment->status === 'submitted')
-                            <span class="badge-status badge-status-submitted">Submitted</span>
-                        @else
-                            <span class="badge-status badge-status-posted">Posted</span>
-                        @endif
-                    @endif
-                </div>
-
-                <div class="small text-muted">
-                    {{ id_date($shipment->date) }}
-                    @if ($shipment->store)
-                        &bull; {{ $shipment->store->name }}
-                        @if ($shipment->store->code ?? false)
-                            ({{ strtoupper($shipment->store->code) }})
-                        @endif
-                    @else
-                        &bull; Channel belum diisi
+                <div style="font-weight:800; font-size:1.1rem;">Shipment {{ $shipment->code }}</div>
+                <div class="muted" style="margin-top:4px;">
+                    Store: <span class="mono">{{ $shipment->store?->code ?? '-' }}</span> •
+                    Tanggal: <span class="mono">{{ optional($shipment->date)->format('Y-m-d') ?? '-' }}</span> •
+                    Status: <span class="tag mono">{{ strtoupper($shipment->status ?? '-') }}</span>
+                    @if(!empty($shipment->awb))
+                        • AWB: <span class="tag mono">{{ $shipment->awb }}</span>
                     @endif
                 </div>
             </div>
 
-            <div class="text-end small text-muted">
-                <div class="meta-label mb-1">Dibuat oleh</div>
-                <div class="fw-semibold">{{ $shipment->creator?->name ?? '-' }}</div>
-                <div>{{ id_datetime($shipment->created_at) }}</div>
-            </div>
-        </div>
-
-        {{-- FLASH --}}
-        @if (session('status') === 'error')
-            <div class="alert alert-danger js-auto-hide-alert" role="alert">{{ session('message') }}</div>
-        @elseif (session('status') === 'success')
-            <div class="alert alert-success js-auto-hide-alert" role="alert">{{ session('message') }}</div>
-        @endif
-
-        {{-- NOTICE untuk CANCELLED --}}
-        @if ($isCancelled)
-            <div class="alert alert-warning mb-3" role="alert">
-                <b>DIBATALKAN:</b> {{ id_datetime($shipment->cancelled_at) }}
-                @if ($shipment->cancel_reason)
-                    <div class="small mt-1">Alasan: {{ $shipment->cancel_reason }}</div>
-                @endif
-            </div>
-        @endif
-
-        {{-- NOTICE untuk SUBMITTED --}}
-        @if (!$isCancelled && $shipment->status === 'submitted')
-            <div class="notice-submitted mb-3">
-                <b>Submitted:</b> scan sudah dikunci. <b>Stok belum berkurang</b>.
-                Silakan klik <b>Posting Stok</b> untuk mengurangi stok dari WH-RTS.
-            </div>
-        @endif
-
-        {{-- INFO UTAMA --}}
-        <div class="card card-main mb-3">
-            <div class="card-body">
-                <div class="d-flex justify-content-between align-items-center mb-2">
-                    <span class="meta-label">Info Utama</span>
-
-                    <div class="d-flex gap-2 flex-wrap">
-                        {{-- DRAFT --}}
-                        @if ($shipment->status === 'draft')
-                            <a href="{{ route('sales.shipments.edit', $shipment) }}" class="btn btn-sm btn-theme-outline">
-                                Edit &amp; Scan
-                            </a>
-
-                            <form action="{{ route('sales.shipments.destroy', $shipment) }}" method="POST"
-                                class="d-inline" onsubmit="return confirm(@js($confirmDeleteMsg));">
-                                @csrf
-                                @method('DELETE')
-                                <button type="submit" class="btn btn-sm btn-theme-main">
-                                    Batalkan (Hapus)
-                                </button>
-                            </form>
-                        @endif
-
-                        {{-- SUBMITTED --}}
-                        @if (!$isCancelled && $shipment->status === 'submitted')
-                            <form action="{{ route('sales.shipments.post', $shipment) }}" method="POST"
-                                onsubmit="return confirm('Posting stok untuk shipment ini? Stok WH-RTS akan berkurang.')">
-                                @csrf
-                                <button type="submit" class="btn btn-sm btn-theme-main">
-                                    Posting Stok
-                                </button>
-                            </form>
-                        @endif
-
-                        {{-- POSTED (CANCEL) - OWNER ONLY --}}
-                        @if (!$isCancelled && $shipment->status === 'posted' && $isOwner)
-                            <form action="{{ route('sales.shipments.cancel', $shipment) }}" method="POST" class="d-inline"
-                                onsubmit="
-                                    const reason = prompt('Masukkan alasan pembatalan (wajib):');
-                                    if (!reason) return false;
-                                    this.querySelector('input[name=cancel_reason]').value = reason;
-                                    return confirm(@js($confirmCancelMsg));
-                                ">
-                                @csrf
-                                <input type="hidden" name="cancel_reason" value="">
-                                <button type="submit" class="btn btn-sm btn-theme-main">
-                                    Batalkan Pengiriman (Owner)
-                                </button>
-                            </form>
-                        @endif
-                    </div>
-                </div>
-
-                <div class="d-flex flex-wrap justify-content-between align-items-start gap-3 mb-2">
-                    <div>
-                        <div class="info-label mb-1">Channel / Store</div>
-
-                        @if ($shipment->store)
-                            <div class="d-flex flex-wrap align-items-center gap-2">
-                                <div class="fw-semibold">{{ $shipment->store->name }}</div>
-
-                                @if ($shipment->store->code ?? false)
-                                    <div class="store-badge">{{ strtoupper($shipment->store->code) }}</div>
-                                @endif
-                            </div>
-                        @else
-                            <div class="text-muted small">Tidak diisi.</div>
-                        @endif
-                    </div>
-
-                    <div class="small text-muted text-end">
-                        <div class="info-label mb-1">Dibuat / Update</div>
-                        <div>
-                            {{ id_datetime($shipment->created_at) }}<br>
-                            <span class="text-muted">Update: {{ id_datetime($shipment->updated_at) }}</span>
-                        </div>
-                    </div>
-                </div>
-
-                <div class="mb-2">
-                    <div class="info-label mb-1">Catatan</div>
-                    @if ($shipment->notes)
-                        <div class="small">{!! nl2br(e($shipment->notes)) !!}</div>
-                    @else
-                        <div class="text-muted small">Tidak ada catatan.</div>
-                    @endif
-                </div>
-
-                <div class="d-flex flex-wrap gap-2">
-                    <span class="info-pill">
-                        <span class="info-pill-label">Tanggal</span>
-                        <span class="info-pill-value">{{ id_date($shipment->date) }}</span>
-                    </span>
-
-                    <span class="info-pill">
-                        <span class="info-pill-label">Status</span>
-                        <span class="info-pill-value text-capitalize">
-                            {{ $isCancelled ? 'cancelled' : $shipment->status }}
-                        </span>
-                    </span>
-
-                    @if ($shipment->status === 'submitted')
-                        <span class="info-pill">
-                            <span class="info-pill-label">Submitted At</span>
-                            <span class="info-pill-value">
-                                {{ $shipment->submitted_at ? id_datetime($shipment->submitted_at) : '-' }}
-                            </span>
-                        </span>
-                    @endif
-
-                    @if ($shipment->status === 'posted')
-                        <span class="info-pill">
-                            <span class="info-pill-label">Posted At</span>
-                            <span class="info-pill-value">
-                                {{ $shipment->posted_at ? id_datetime($shipment->posted_at) : '-' }}
-                            </span>
-                        </span>
-                    @endif
-
-                    @if ($isCancelled)
-                        <span class="info-pill">
-                            <span class="info-pill-label">Cancelled At</span>
-                            <span class="info-pill-value">{{ id_datetime($shipment->cancelled_at) }}</span>
-                        </span>
-                    @endif
-
-                    <span class="info-pill">
-                        <span class="info-pill-label">Total Baris</span>
-                        <span class="info-pill-value">{{ number_format($totalLines, 0, ',', '.') }}</span>
-                    </span>
-
-                    <span class="info-pill">
-                        <span class="info-pill-label">Total Qty</span>
-                        <span class="info-pill-value">{{ number_format($totalQty, 0, ',', '.') }}</span>
-                    </span>
-
-                    <span class="info-pill">
-                        <span class="info-pill-label">Total HPP</span>
-                        <span class="info-pill-value">Rp {{ number_format($totalHpp, 0, ',', '.') }}</span>
-                    </span>
-                </div>
-            </div>
-        </div>
-
-        {{-- RINGKASAN PER KATEGORI --}}
-        <div class="card card-main mb-3">
-            <div class="card-body">
-                <div class="d-flex justify-content-between align-items-center mb-2">
-                    <span class="meta-label">Ringkasan per Kategori</span>
-                </div>
-
-                @if ($summaryPerCategory->isNotEmpty())
-                    <div class="table-responsive">
-                        <table class="table table-sm align-middle mb-0 category-summary-table">
-                            <thead>
-                                <tr class="text-muted">
-                                    <th style="width: 40px;">#</th>
-                                    <th>Kategori</th>
-                                    <th class="text-end" style="width: 110px;">Baris</th>
-                                    <th class="text-end" style="width: 130px;">Total Qty</th>
-                                    <th class="text-end" style="width: 160px;">Total HPP (Rp)</th>
-                                </tr>
-                            </thead>
-                            <tbody>
-                                @foreach ($summaryPerCategory as $idx => $cat)
-                                    <tr>
-                                        <td class="text-muted">{{ $idx + 1 }}</td>
-                                        <td>{{ $cat['category_name'] }}</td>
-                                        <td class="text-end">{{ number_format($cat['total_lines'], 0, ',', '.') }}</td>
-                                        <td class="text-end">{{ number_format($cat['total_qty'], 0, ',', '.') }}</td>
-                                        <td class="text-end">{{ number_format($cat['total_hpp'], 0, ',', '.') }}</td>
-                                    </tr>
-                                @endforeach
-                            </tbody>
-                        </table>
-                    </div>
+            <div style="text-align:right;">
+                @if(!empty($shipment->cancelled_at))
+                    <span class="tag tag-warn">CANCELLED</span>
+                @elseif(!empty($shipment->posted_at))
+                    <span class="tag tag-ok">POSTED</span>
                 @else
-                    <div class="text-muted small">Belum ada data kategori untuk shipment ini.</div>
+                    <span class="tag tag-info">DRAFT</span>
                 @endif
+                <div class="muted" style="margin-top:6px; font-size:.85rem;">
+                    Created by: {{ $shipment->creator?->name ?? '-' }}
+                </div>
             </div>
         </div>
 
-        {{-- LINES --}}
-        <div class="card card-main">
-            <div class="card-body">
-                <div class="d-flex justify-content-between align-items-center mb-2">
-                    <div>
-                        <div class="meta-label mb-1">Daftar Barang Keluar</div>
+        <div class="cardx-bd">
+            <div class="grid grid-3">
+                <div class="cardx" style="border-radius:12px;">
+                    <div class="cardx-bd">
+                        <div class="muted" style="font-size:.85rem;">Total Qty (scan)</div>
+                        <div class="mono" style="font-size:1.4rem; font-weight:800;">{{ number_format($totalQty) }}</div>
                     </div>
-
-                    <div class="d-flex flex-wrap gap-2 align-items-center">
-                        <div class="summary-pill">
-                            Baris: <span class="fw-semibold ms-1">{{ number_format($totalLines, 0, ',', '.') }}</span>
-                        </div>
-                        <div class="summary-pill">
-                            Total qty: <span class="fw-semibold ms-1">{{ number_format($totalQty, 0, ',', '.') }}</span>
-                        </div>
-                        <div class="summary-pill">
-                            Total HPP: <span class="fw-semibold ms-1">Rp
-                                {{ number_format($totalHpp, 0, ',', '.') }}</span>
+                </div>
+                <div class="cardx" style="border-radius:12px;">
+                    <div class="cardx-bd">
+                        <div class="muted" style="font-size:.85rem;">Total Lines</div>
+                        <div class="mono" style="font-size:1.4rem; font-weight:800;">{{ number_format($totalLines) }}</div>
+                    </div>
+                </div>
+                <div class="cardx" style="border-radius:12px;">
+                    <div class="cardx-bd">
+                        <div class="muted" style="font-size:.85rem;">Estimasi HPP</div>
+                        <div class="mono" style="font-size:1.4rem; font-weight:800;">
+                            {{ number_format($totalHpp, 0, ',', '.') }}
                         </div>
                     </div>
                 </div>
+            </div>
 
-                <div class="lines-wrapper">
-                    <table class="table align-middle table-lines">
+            @if(!empty($shipment->notes))
+                <div style="margin-top:12px;" class="muted">
+                    Notes: {{ $shipment->notes }}
+                </div>
+            @endif
+        </div>
+    </div>
+
+    {{-- Lines --}}
+    <div class="cardx" style="margin-top:12px;">
+        <div class="cardx-hd">
+            <div style="font-weight:800;">Items in Shipment</div>
+            <div class="muted" style="font-size:.85rem;">Berbasis qty_scanned.</div>
+        </div>
+        <div class="cardx-bd">
+            @if($shipment->lines->isEmpty())
+                <div class="muted">Belum ada item.</div>
+            @else
+                <div class="table-wrap">
+                    <table>
                         <thead>
                             <tr>
-                                <th style="width: 40px;">#</th>
-                                <th style="width: 140px;">Kode</th>
-                                <th>Nama Barang</th>
-                                <th style="width: 110px;" class="text-end">Qty</th>
-                                <th style="width: 130px;" class="text-end">HPP / Unit</th>
-                                <th style="width: 150px;" class="text-end">Total HPP</th>
+                                <th class="sticky">Item</th>
+                                <th class="sticky">Kategori</th>
+                                <th class="sticky r">Qty</th>
+                                <th class="sticky r">Unit HPP</th>
+                                <th class="sticky r">Total HPP</th>
                             </tr>
                         </thead>
                         <tbody>
-                            @forelse ($shipment->lines as $line)
+                            @foreach($shipment->lines as $line)
                                 <tr>
-                                    <td class="text-muted small">{{ $loop->iteration }}</td>
                                     <td>
-                                        <div class="item-code">{{ $line->item?->code ?? '-' }}</div>
+                                        <div class="mono" style="font-weight:700;">
+                                            {{ $line->item?->code ?? '-' }}
+                                        </div>
+                                        <div class="muted">{{ $line->item?->name ?? '-' }}</div>
                                     </td>
-                                    <td>
-                                        <div class="small">{{ $line->item?->name ?? '-' }}</div>
-                                        @if ($line->remarks)
-                                            <div class="small text-muted">Catatan: {{ $line->remarks }}</div>
-                                        @endif
+                                    <td class="muted">
+                                        {{ $line->item?->category?->name ?? 'Tanpa Kategori' }}
                                     </td>
-                                    <td class="text-end">{{ number_format($line->qty_scanned, 0, ',', '.') }}</td>
-                                    <td class="text-end">Rp {{ number_format($line->unit_hpp ?? 0, 0, ',', '.') }}</td>
-                                    <td class="text-end">Rp {{ number_format($line->total_hpp ?? 0, 0, ',', '.') }}</td>
+                                    <td class="mono r">{{ number_format((int)$line->qty_scanned) }}</td>
+                                    <td class="mono r">{{ number_format((float)($line->unit_hpp ?? 0), 0, ',', '.') }}</td>
+                                    <td class="mono r">{{ number_format((float)($line->total_hpp ?? 0), 0, ',', '.') }}</td>
                                 </tr>
-                            @empty
+                            @endforeach
+                        </tbody>
+                        <tfoot>
+                            <tr>
+                                <td colspan="2" class="r" style="font-weight:800;">TOTAL</td>
+                                <td class="mono r" style="font-weight:800;">{{ number_format($totalQty) }}</td>
+                                <td></td>
+                                <td class="mono r" style="font-weight:800;">{{ number_format($totalHpp, 0, ',', '.') }}</td>
+                            </tr>
+                        </tfoot>
+                    </table>
+                </div>
+            @endif
+        </div>
+    </div>
+
+    {{-- Summary per category --}}
+    <div class="cardx" style="margin-top:12px;">
+        <div class="cardx-hd">
+            <div style="font-weight:800;">Summary per Category</div>
+        </div>
+        <div class="cardx-bd">
+            @if(($summaryPerCategory ?? collect())->isEmpty())
+                <div class="muted">Tidak ada data kategori.</div>
+            @else
+                <div class="table-wrap">
+                    <table>
+                        <thead>
+                            <tr>
+                                <th class="sticky">Kategori</th>
+                                <th class="sticky r">Lines</th>
+                                <th class="sticky r">Qty</th>
+                                <th class="sticky r">HPP</th>
+                            </tr>
+                        </thead>
+                        <tbody>
+                            @foreach($summaryPerCategory as $row)
                                 <tr>
-                                    <td colspan="6" class="text-center text-muted py-4">
-                                        Belum ada item yang discan.
-                                    </td>
+                                    <td>{{ $row['category_name'] }}</td>
+                                    <td class="mono r">{{ number_format((int)$row['total_lines']) }}</td>
+                                    <td class="mono r">{{ number_format((int)$row['total_qty']) }}</td>
+                                    <td class="mono r">{{ number_format((float)$row['total_hpp'], 0, ',', '.') }}</td>
                                 </tr>
-                            @endforelse
+                            @endforeach
                         </tbody>
                     </table>
                 </div>
+            @endif
+        </div>
+    </div>
 
-                {{-- FOOTER BUTTONS --}}
-                <div class="mt-3 d-flex flex-wrap justify-content-between align-items-center small text-muted gap-2">
-                    <div>
-                        Dibuat: {{ id_datetime($shipment->created_at) }}<br>
-                        Update: {{ id_datetime($shipment->updated_at) }}
-                    </div>
+    {{-- Marketplace Packets --}}
+    <div class="cardx" style="margin-top:12px;">
+        <div class="cardx-hd" style="display:flex;align-items:flex-start;justify-content:space-between;gap:12px;">
+            <div>
+                <div style="font-weight:800;">Marketplace Packets in this Batch</div>
+                <div class="muted" style="font-size:.85rem;">
+                    Hasil rekonsiliasi MP shipments yang masuk ke batch ini.
+                </div>
+            </div>
 
-                    <div class="d-flex flex-wrap gap-2">
-                        <a href="{{ route('sales.shipments.index') }}" class="btn btn-theme-outline">
-                            &larr; Kembali ke list
-                        </a>
+            @php
+                $deltaLabel = $deltaQty === 0 ? 'Match' : ($deltaQty > 0 ? 'Batch > MP' : 'MP > Batch');
+            @endphp
 
-                        @if ($shipment->lines->isNotEmpty())
-                            <a href="{{ route('sales.shipments.export_lines', $shipment) }}"
-                                class="btn btn-theme-outline">
-                                Export Barang (CSV)
-                            </a>
-                        @endif
-
-                        {{-- Draft delete (footer) --}}
-                        @if ($shipment->status === 'draft')
-                            <form action="{{ route('sales.shipments.destroy', $shipment) }}" method="POST"
-                                class="d-inline" onsubmit="return confirm(@js($confirmDeleteMsg));">
-                                @csrf
-                                @method('DELETE')
-                                <button type="submit" class="btn btn-theme-main">
-                                    Batalkan (Hapus)
-                                </button>
-                            </form>
-                        @endif
-
-                        {{-- Cancel posted (footer) - owner only --}}
-                        @if (!$isCancelled && $shipment->status === 'posted' && $isOwner)
-                            <form action="{{ route('sales.shipments.cancel', $shipment) }}" method="POST"
-                                class="d-inline"
-                                onsubmit="
-                                    const reason = prompt('Masukkan alasan pembatalan (wajib):');
-                                    if (!reason) return false;
-                                    this.querySelector('input[name=cancel_reason]').value = reason;
-                                    return confirm(@js($confirmCancelMsg));
-                                ">
-                                @csrf
-                                <input type="hidden" name="cancel_reason" value="">
-                                <button type="submit" class="btn btn-theme-main">
-                                    Batalkan Pengiriman (Owner)
-                                </button>
-                            </form>
-                        @endif
-
-                        {{-- Invoice hanya untuk posted --}}
-                        @if ($shipment->status === 'posted')
-                            @if (empty($shipment->sales_invoice_id))
-                                <a href="{{ route('sales.invoices.create_from_shipment', $shipment) }}"
-                                    class="btn btn-theme-outline">
-                                    Buat Invoice dari Shipment ini
-                                </a>
-                            @else
-                                <a href="{{ route('sales.invoices.show', $shipment->sales_invoice_id) }}"
-                                    class="btn btn-theme-outline">
-                                    Lihat Invoice {{ $shipment->invoice?->code ?? '' }}
-                                </a>
-                            @endif
-                        @endif
-                    </div>
+            <div style="text-align:right;">
+                <div class="mono" style="font-weight:800;">
+                    MP: {{ number_format($mpTotalQty) }} / Batch: {{ number_format($batchQty) }}
+                </div>
+                <div style="margin-top:6px;">
+                    @if($deltaQty === 0)
+                        <span class="tag tag-ok">✅ {{ $deltaLabel }} (Δ 0)</span>
+                    @else
+                        <span class="tag tag-warn">⚠️ {{ $deltaLabel }} (Δ {{ $deltaQty }})</span>
+                    @endif
                 </div>
             </div>
         </div>
-    </div>
-@endsection
 
-@push('scripts')
-    <script>
-        (function() {
-            const autoAlerts = document.querySelectorAll('.js-auto-hide-alert');
-            if (autoAlerts.length) {
-                setTimeout(() => {
-                    autoAlerts.forEach((el) => {
-                        el.style.transition = 'opacity .4s ease';
-                        el.style.opacity = '0';
-                        setTimeout(() => {
-                            if (el && el.parentNode) el.parentNode.removeChild(el);
-                        }, 450);
-                    });
-                }, 2600);
-            }
-        })();
-    </script>
-@endpush
+        <div class="cardx-bd">
+            @if(($mpPackets ?? collect())->isEmpty())
+                <div class="muted">Belum ada MP packets yang ter-link ke shipment ini.</div>
+            @else
+                <div class="table-wrap">
+                    <table>
+                        <thead>
+                            <tr>
+                                <th class="sticky">MP Shipment</th>
+                                <th class="sticky">Tracking</th>
+                                <th class="sticky">Order</th>
+                                <th class="sticky r">Qty</th>
+                                <th class="sticky">Confidence</th>
+                                <th class="sticky">Key</th>
+                                <th class="sticky">Shipped</th>
+                            </tr>
+                        </thead>
+                        <tbody>
+                            @foreach($mpPackets as $rec)
+                                @php
+                                    $mp = $rec->mpShipment;
+                                    $qty = (int) ($mp->total_qty ?? 0);
+                                    $conf = (int) ($rec->match_confidence ?? 0);
+
+                                    $confClass = $conf >= 90 ? 'tag-ok' : ($conf >= 80 ? 'tag-info' : 'tag-warn');
+                                    $shipAt = $mp?->shipped_at ?? $mp?->order_created_at;
+                                @endphp
+                                <tr>
+                                    <td class="mono">#{{ $rec->mp_shipment_id }}</td>
+                                    <td class="mono">{{ $mp->tracking_no ?? '-' }}</td>
+                                    <td class="mono">{{ $mp->platform_order_id ?? '-' }}</td>
+                                    <td class="mono r">{{ number_format($qty) }}</td>
+                                    <td>
+                                        <span class="tag mono {{ $confClass }}">{{ $conf }}</span>
+                                    </td>
+                                    <td class="mono">{{ $rec->match_key ?? '-' }}</td>
+                                    <td class="mono">{{ $shipAt ? $shipAt->format('Y-m-d H:i') : '-' }}</td>
+                                </tr>
+
+                                {{-- OPTIONAL: show first few MP item lines --}}
+                                @if($mp && $mp->relationLoaded('items') && $mp->items->isNotEmpty())
+                                    <tr>
+                                        <td colspan="7" style="background: rgba(148,163,184,.06);">
+                                            <div class="muted" style="font-size:.85rem;">
+                                                @foreach($mp->items->take(8) as $it)
+                                                    <span class="tag mono">
+                                                        {{ $it->sku_code ?? '-' }} × {{ (int)($it->qty ?? 0) }}
+                                                    </span>
+                                                @endforeach
+                                                @if($mp->items->count() > 8)
+                                                    <span class="muted">+{{ $mp->items->count() - 8 }} lagi</span>
+                                                @endif
+                                            </div>
+                                        </td>
+                                    </tr>
+                                @endif
+                            @endforeach
+                        </tbody>
+                        <tfoot>
+                            <tr>
+                                <td colspan="3" class="r" style="font-weight:800;">TOTAL MP Qty</td>
+                                <td class="mono r" style="font-weight:800;">{{ number_format($mpTotalQty) }}</td>
+                                <td colspan="3"></td>
+                            </tr>
+                        </tfoot>
+                    </table>
+                </div>
+            @endif
+        </div>
+    </div>
+
+</div>
+@endsection

@@ -9,14 +9,15 @@ use Illuminate\Console\Command;
 class MarketplaceReconcileCommand extends Command
 {
     protected $signature = 'marketplace:reconcile
-        {--date= : YYYY-MM-DD}
-        {--channel= : shopee|tiktok}
-        {--store_id= : store id}
-        {--window=1 : window days (default 1)}
+        {--date= : YYYY-MM-DD (default today)}
+        {--channel= : shopee|tiktok (default ALL)}
+        {--store_id= : store id (default ALL)}
+        {--window=1 : window days +/- (default 1)}
         {--threshold=80 : auto match threshold (0-100)}
-        {--dry-run : do not write mp_reconciliations}';
+        {--dry-run : do not write mp_reconciliations}
+        {--show=10 : show top N samples for matches & reviews (default 10)}';
 
-    protected $description = 'Reconcile marketplace shipments to operational shipments by date/qty (and AWB if exists).';
+    protected $description = 'Reconcile marketplace shipped packets (mp_shipments) to operational batch shipments by AWB (if exists) then SKU overlap allocation (batch-aware).';
 
     public function handle(MarketplaceReconcileService $svc): int
     {
@@ -37,6 +38,7 @@ class MarketplaceReconcileCommand extends Command
         // =====================
         $window = (int) $this->option('window');
         $threshold = (int) $this->option('threshold');
+        $show = (int) $this->option('show');
 
         if ($window < 0) {
             $this->error("--window must be >= 0");
@@ -45,6 +47,11 @@ class MarketplaceReconcileCommand extends Command
 
         if ($threshold < 0 || $threshold > 100) {
             $this->error("--threshold must be between 0 and 100");
+            return self::FAILURE;
+        }
+
+        if ($show < 0) {
+            $this->error("--show must be >= 0");
             return self::FAILURE;
         }
 
@@ -60,23 +67,71 @@ class MarketplaceReconcileCommand extends Command
             dryRun: (bool) $this->option('dry-run'),
         );
 
-        $stats = $res['stats'];
+        $stats = $res['stats'] ?? [];
+        $matches = $res['matches'] ?? [];
+        $reviews = $res['reviews'] ?? [];
 
         // =====================
-        // Output
+        // Output summary
         // =====================
-        $this->info("Marketplace Reconcile");
-        $this->line("Date       : {$stats['date']}");
-        $this->line("Window     : {$stats['window']}");
+        $this->info("Marketplace Reconcile (Batch)");
+        $this->line("Date       : " . ($stats['date'] ?? $date));
+        $this->line("Window     : " . ($stats['window'] ?? '-'));
         $this->line("Channel    : " . ($this->option('channel') ?: 'ALL'));
         $this->line("Store      : " . ($this->option('store_id') ?: 'ALL'));
-        $this->line("AWB Match  : " . ($stats['awb_enabled'] ? 'ENABLED' : 'DISABLED'));
-        $this->line(str_repeat('-', 40));
-        $this->line("Scanned    : {$stats['scanned']}");
-        $this->line("Matched    : {$stats['matched']}");
-        $this->line("NeedReview : {$stats['needs_review']}");
-        $this->line("Skipped    : {$stats['skipped']}");
-        $this->line("Dry-run    : " . ($stats['dry_run'] ? 'YES' : 'NO'));
+        $this->line("AWB Match  : " . (!empty($stats['awb_enabled']) ? 'ENABLED' : 'DISABLED'));
+        $this->line("Threshold  : {$threshold}");
+        $this->line(str_repeat('-', 56));
+        $this->line("Scanned       : " . ($stats['scanned'] ?? 0));
+        $this->line("Auto Matched  : " . ($stats['matched'] ?? count($matches)));
+        $this->line("Need Review   : " . ($stats['needs_review'] ?? count($reviews)));
+        $this->line("Skipped       : " . ($stats['skipped'] ?? 0));
+        $this->line("Dry-run       : " . (!empty($stats['dry_run']) ? 'YES' : 'NO'));
+
+        // =====================
+        // Show samples
+        // =====================
+        if ($show > 0) {
+            $this->line(str_repeat('-', 56));
+
+            $this->info("Samples: Auto Matches (top {$show})");
+            if (empty($matches)) {
+                $this->line("- none");
+            } else {
+                foreach (array_slice($matches, 0, $show) as $m) {
+                    $this->line(sprintf(
+                        "- mp_shipment_id=%s -> shipment_id=%s | conf=%s | key=%s",
+                        $m['mp_shipment_id'] ?? '-',
+                        $m['shipment_id'] ?? '-',
+                        $m['confidence'] ?? '-',
+                        $m['match_key'] ?? '-',
+                    ));
+                }
+            }
+
+            $this->line('');
+
+            $this->info("Samples: Needs Review (top {$show})");
+            if (empty($reviews)) {
+                $this->line("- none");
+            } else {
+                foreach (array_slice($reviews, 0, $show) as $r) {
+                    $this->line(sprintf(
+                        "- mp_shipment_id=%s -> suggested_shipment_id=%s | conf=%s | key=%s",
+                        $r['mp_shipment_id'] ?? '-',
+                        $r['shipment_id'] ?? '-',
+                        $r['confidence'] ?? '-',
+                        $r['match_key'] ?? '-',
+                    ));
+                }
+            }
+        }
+
+        // Friendly hint
+        if (!empty($stats['dry_run'])) {
+            $this->line('');
+            $this->comment("Tip: jalankan tanpa --dry-run untuk menyimpan ke mp_reconciliations.");
+        }
 
         return self::SUCCESS;
     }

@@ -98,7 +98,8 @@ class MpShipment extends Model
 
     public function isReconciled(): bool
     {
-        return $this->reconciliation !== null;
+        return $this->reconciliation !== null
+        && !empty($this->reconciliation->matched_at);
     }
 
 }

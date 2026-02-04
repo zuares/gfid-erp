@@ -32,6 +32,7 @@ class DatabaseSeeder extends Seeder
             // InventoryTransferDemoSeeder::class,
             PaymentMethodSeeder::class,
             ItemBomSeeder::class,
+            MpSkuRecipeSeeder::class,
 
         ]);
     }

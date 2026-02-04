@@ -27,25 +27,13 @@ class MpReconciliation extends Model
         'matched_at' => 'datetime',
     ];
 
-    /* =====================
-     * RELATIONS
-     * ===================== */
-
-    /** Marketplace shipment */
     public function mpShipment(): BelongsTo
     {
         return $this->belongsTo(MpShipment::class, 'mp_shipment_id');
     }
 
-    /** Operasional shipment */
     public function shipment(): BelongsTo
     {
         return $this->belongsTo(Shipment::class, 'shipment_id');
-    }
-
-    /** User who matched (users.id) */
-    public function matchedBy(): BelongsTo
-    {
-        return $this->belongsTo(User::class, 'matched_by');
     }
 }

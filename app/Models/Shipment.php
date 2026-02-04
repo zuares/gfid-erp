@@ -4,6 +4,7 @@ namespace App\Models;
 
 use Illuminate\Database\Eloquent\Factories\HasFactory;
 use Illuminate\Database\Eloquent\Model;
+use Illuminate\Database\Eloquent\Relations\HasMany;
 
 class Shipment extends Model
 {
@@ -131,4 +132,10 @@ class Shipment extends Model
     {
         return !empty($this->posted_at);
     }
+
+    public function mpReconciliations(): HasMany
+    {
+        return $this->hasMany(MpReconciliation::class, 'shipment_id');
+    }
+
 }

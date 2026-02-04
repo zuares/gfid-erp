@@ -208,6 +208,7 @@
 
   /* KPI delta */
   .kpi-delta{ font-size:.82rem; margin-top:.12rem; }
+
 </style>
 @endpush
 
@@ -269,6 +270,32 @@
     Draft ada (upload ulang)
   </a>
 @endif
+
+
+
+@php
+  // ambil tanggal paling masuk akal dari range filter
+  $jumpDate = $to ?: ($from ?: now()->toDateString());
+
+  // channel & store ikut filter index (kalau user pilih)
+  $jumpChannel = $filters['channel'] ?? null;
+  $jumpStoreId = $filters['store_id'] ?? null;
+
+  // Actionable: needs_review + linked + exclude no_ops_on_day
+  $queueUrl = route('marketplace.reconcile.queue', array_filter([
+      'status' => 'needs_review',
+      'actionable' => 1,
+      'date' => $jumpDate,     // ini nanti dipakai di queue filter (kalau sudah kamu tambahkan)
+      'channel' => $jumpChannel,
+      'store_id' => $jumpStoreId,
+  ], fn($v) => $v !== null && $v !== ''));
+@endphp
+
+<a class="btn btn-outline-primary btn-sm px-3" href="{{ $queueUrl }}">
+  Reconcile
+</a>
+
+
 
 
       <a class="btn btn-success btn-sm px-3" href="{{ route('imports.marketplace.create') }}">+ Import</a>
