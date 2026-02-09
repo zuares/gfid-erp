@@ -85,7 +85,6 @@
                     <a class="btnx" href="{{ route('sales.shipments.index') }}">← Back</a>
 
                     @if(($shipment->status ?? '') === 'draft' && empty($shipment->posted_at) && empty($shipment->cancelled_at))
-                        {{-- ✅ Tombol lanjut input --}}
                         <a class="btnx btnx-primary" href="{{ route('sales.shipments.edit', $shipment) }}">
                             ➕ Lanjut Input / Scan
                         </a>
@@ -98,7 +97,7 @@
             <div class="grid grid-3">
                 <div class="cardx" style="border-radius:12px;">
                     <div class="cardx-bd">
-                        <div class="muted" style="font-size:.85rem;">Total Qty (scan)</div>
+                        <div class="muted" style="font-size:.85rem;">Total Qty</div>
                         <div class="mono" style="font-size:1.4rem; font-weight:800;">{{ number_format($totalQty) }}</div>
                     </div>
                 </div>
@@ -120,11 +119,55 @@
         </div>
     </div>
 
+    {{-- Summary per Kategori --}}
+    <div class="cardx" style="margin-top:12px;">
+        <div class="cardx-hd" style="display:flex;align-items:center;justify-content:space-between;gap:10px;flex-wrap:wrap;">
+            <div style="font-weight:800;">Summary per Kategori</div>
+            <div class="tag mono">{{ number_format($summaryPerCategory->count()) }} kategori</div>
+        </div>
+
+        <div class="cardx-bd">
+            @if($summaryPerCategory->isEmpty())
+                <div class="muted">-</div>
+            @else
+                <div class="table-wrap">
+                    <table>
+                        <thead>
+                            <tr>
+                                <th>Kategori</th>
+                                <th class="r">Lines</th>
+                                <th class="r">Qty</th>
+                                <th class="r">Total HPP</th>
+                            </tr>
+                        </thead>
+                        <tbody>
+                            @foreach($summaryPerCategory as $row)
+                                <tr>
+                                    <td>{{ $row['category_name'] }}</td>
+                                    <td class="mono r">{{ number_format((int)$row['total_lines']) }}</td>
+                                    <td class="mono r">{{ number_format((int)$row['total_qty']) }}</td>
+                                    <td class="mono r">{{ number_format((float)$row['total_hpp'], 0, ',', '.') }}</td>
+                                </tr>
+                            @endforeach
+                        </tbody>
+                        <tfoot>
+                            <tr>
+                                <td class="r" style="font-weight:800;">TOTAL</td>
+                                <td class="mono r" style="font-weight:800;">{{ number_format((int)$summaryPerCategory->sum('total_lines')) }}</td>
+                                <td class="mono r" style="font-weight:800;">{{ number_format((int)$summaryPerCategory->sum('total_qty')) }}</td>
+                                <td class="mono r" style="font-weight:800;">{{ number_format((float)$summaryPerCategory->sum('total_hpp'), 0, ',', '.') }}</td>
+                            </tr>
+                        </tfoot>
+                    </table>
+                </div>
+            @endif
+        </div>
+    </div>
+
     {{-- Lines --}}
     <div class="cardx" style="margin-top:12px;">
         <div class="cardx-hd">
             <div style="font-weight:800;">Items in Shipment</div>
-            <div class="muted" style="font-size:.85rem;">Berbasis qty_scanned.</div>
         </div>
 
         <div class="cardx-bd">
@@ -150,7 +193,7 @@
                                         <div class="muted">{{ $line->item?->name ?? '-' }}</div>
                                     </td>
                                     <td class="muted">{{ $line->item?->category?->name ?? 'Tanpa Kategori' }}</td>
-                                    <td class="mono r">{{ number_format((int)$line->qty_scanned) }}</td>
+                                    <td class="mono r">{{ number_format((int)($line->qty_scanned ?? 0)) }}</td>
                                     <td class="mono r">{{ number_format((float)($line->unit_hpp ?? 0), 0, ',', '.') }}</td>
                                     <td class="mono r">{{ number_format((float)($line->total_hpp ?? 0), 0, ',', '.') }}</td>
                                 </tr>

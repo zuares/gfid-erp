@@ -163,7 +163,6 @@ class ShipmentController extends Controller
 
     public function show(Shipment $shipment)
     {
-        // Core data shipment
         $shipment->load([
             'store',
             'lines.item.category',
@@ -171,54 +170,62 @@ class ShipmentController extends Controller
             'invoice',
         ]);
 
-        // Hitung HPP per line untuk tampilan
-        $shipment->lines->each(function ($line) {
-            $unitHpp = 0;
-            if (isset($line->item)) {
-                $unitHpp = $line->item->latest_hpp ?? $line->item->hpp ?? $line->item->last_purchase_price ?? 0;
+        // Cache HPP per item_id untuk hemat proses (dan aman kalau accessor)
+        $hppCache = [];
+
+        $shipment->lines->each(function ($line) use (&$hppCache) {
+            $qty = (int) ($line->qty_scanned ?? 0);
+
+            $itemId = (int) ($line->item_id ?? 0);
+            if (!array_key_exists($itemId, $hppCache)) {
+                $unitHpp = 0;
+                if ($line->item) {
+                    $unitHpp = (float) (
+                        $line->item->latest_hpp ?? $line->item->hpp ?? $line->item->last_purchase_price ?? 0
+                    );
+                }
+                $hppCache[$itemId] = $unitHpp;
             }
-            $line->unit_hpp = $unitHpp;
-            $line->total_hpp = $unitHpp * (int) ($line->qty_scanned ?? 0);
+
+            $line->unit_hpp = (float) $hppCache[$itemId];
+            $line->total_hpp = (float) ($line->unit_hpp * $qty);
         });
 
-        $totalQty = (int) $shipment->lines->sum('qty_scanned');
+        $totalQty = (int) $shipment->lines->sum(fn($l) => (int) ($l->qty_scanned ?? 0));
         $totalLines = (int) $shipment->lines->count();
-        $totalHpp = (float) $shipment->lines->sum('total_hpp');
+        $totalHpp = (float) $shipment->lines->sum(fn($l) => (float) ($l->total_hpp ?? 0));
 
-        // Summary per category
+        // Summary per category (basis qty_scanned + total_hpp)
         $summaryPerCategory = $shipment->lines
-            ->groupBy(fn($line) => optional(optional($line->item)->category)->name ?: 'Tanpa Kategori')
-            ->map(fn($group, $categoryName) => [
-                'category_name' => $categoryName,
-                'total_lines' => $group->count(),
-                'total_qty' => (int) $group->sum('qty_scanned'),
-                'total_hpp' => (float) $group->sum('total_hpp'),
-            ])
+            ->groupBy(fn($line) => $line->item?->category?->name ?: 'Tanpa Kategori')
+            ->map(function ($group, $categoryName) {
+                return [
+                    'category_name' => $categoryName,
+                    'total_lines' => (int) $group->count(),
+                    'total_qty' => (int) $group->sum(fn($l) => (int) ($l->qty_scanned ?? 0)),
+                    'total_hpp' => (float) $group->sum(fn($l) => (float) ($l->total_hpp ?? 0)),
+                ];
+            })
             ->values()
-            ->sortBy('category_name');
+            ->sortBy('category_name')
+            ->values();
 
-        // =========================
-        // Marketplace Packets in this batch
-        // =========================
+        // Marketplace packets (biarkan seperti kamu punya)
         $mpPackets = MpReconciliation::query()
             ->where('shipment_id', $shipment->id)
-            ->whereIn('status', ['needs_review', 'auto_matched', 'resolved']) // atau cukup tanpa whereIn
+            ->whereIn('status', ['needs_review', 'auto_matched', 'resolved'])
             ->with(['mpShipment' => fn($q) => $q->with('items')])
             ->orderByDesc('match_confidence')
             ->get();
-        // dd($mpPackets);
 
-        $mpTotalQty = (int) $mpPackets->sum(function ($rec) {
-            return (int) ($rec->mpShipment?->total_qty ?? 0);
-        });
+        $mpTotalQty = (int) $mpPackets->sum(fn($rec) => (int) ($rec->mpShipment?->total_qty ?? 0));
 
-        // batchQty pakai shipment.total_qty kalau ada; fallback ke totalQty (sum lines)
         $batchQty = (int) ($shipment->total_qty ?? 0);
         if ($batchQty <= 0) {
             $batchQty = $totalQty;
         }
 
-        $deltaQty = $batchQty - $mpTotalQty; // + = batch lebih besar, - = mp lebih besar
+        $deltaQty = $batchQty - $mpTotalQty;
 
         return view('sales.shipments.show', compact(
             'shipment',

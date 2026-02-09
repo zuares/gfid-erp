@@ -20,39 +20,61 @@ class MarketplaceOrderController extends Controller
             ->get();
 
         $query = MarketplaceOrder::query()
-            ->with(['store.channel', 'customer']) // <- tambahin customer biar ga N+1
+            ->with([
+                'store.channel',
+                'customer',
+            ])
             ->withCount('items');
 
         if ($storeId = $request->input('store_id')) {
-            $query->where('store_id', $storeId);
+            $query->where('store_id', (int) $storeId);
         }
 
         if ($status = $request->input('status')) {
             $query->where('status', $status);
         }
 
-        // 🔹 Filter by CUSTOMER
+        // Filter by CUSTOMER
         if ($customerId = $request->input('customer_id')) {
-            $query->where('customer_id', $customerId);
+            $query->where('customer_id', (int) $customerId);
         }
 
-        if ($q = $request->input('q')) {
+        if ($q = trim((string) $request->input('q'))) {
             $query->where(function ($sub) use ($q) {
                 $sub->where('external_order_id', 'like', '%' . $q . '%')
                     ->orWhere('buyer_name', 'like', '%' . $q . '%');
             });
         }
 
+        /**
+         * Filter tanggal:
+         * - Basis utama: shipped_at
+         * - Fallback: kalau shipped_at NULL, pakai order_date
+         * (jadi order yang belum shipped tetap bisa ikut range)
+         */
         if ($dateFrom = $request->input('date_from')) {
-            $query->whereDate('order_date', '>=', $dateFrom);
+            $query->where(function ($w) use ($dateFrom) {
+                $w->whereDate('shipped_at', '>=', $dateFrom)
+                    ->orWhere(function ($x) use ($dateFrom) {
+                        $x->whereNull('shipped_at')
+                            ->whereDate('order_date', '>=', $dateFrom);
+                    });
+            });
         }
 
         if ($dateTo = $request->input('date_to')) {
-            $query->whereDate('order_date', '<=', $dateTo);
+            $query->where(function ($w) use ($dateTo) {
+                $w->whereDate('shipped_at', '<=', $dateTo)
+                    ->orWhere(function ($x) use ($dateTo) {
+                        $x->whereNull('shipped_at')
+                            ->whereDate('order_date', '<=', $dateTo);
+                    });
+            });
         }
 
+        // ✅ Order utama berdasarkan shipped_at, fallback order_date kalau null
         $orders = $query
-            ->orderByDesc('order_date')
+            ->orderByRaw('COALESCE(shipped_at, order_date) DESC')
             ->orderByDesc('id')
             ->paginate(25)
             ->withQueryString();

@@ -19,14 +19,14 @@ class MarketplaceShipmentController extends Controller
         // ---------- Filters ----------
         $filters = [
             'q' => trim((string) $request->get('q', '')),
-            'channel' => (string) $request->get('channel', ''), // mp_shipments.channel (shopee/tiktok)
+            'channel' => (string) $request->get('channel', ''), // shopee/tiktok
             'store_id' => (string) $request->get('store_id', ''),
             'status' => (string) $request->get('status', ''),
             'from' => (string) $request->get('from', ''),
             'to' => (string) $request->get('to', ''),
         ];
 
-        // ---------- Date Range ----------
+        // ---------- Date Range (DEFAULT last 7 days) ----------
         $today = Carbon::now($tz)->startOfDay();
 
         $from = $filters['from']
@@ -37,7 +37,7 @@ class MarketplaceShipmentController extends Controller
         ? Carbon::parse($filters['to'], $tz)->endOfDay()
         : (clone $today)->endOfDay();
 
-        // normalize for response / UI
+        // normalize for response/UI
         $filters['from'] = $from->format('Y-m-d');
         $filters['to'] = $to->format('Y-m-d');
 
@@ -47,15 +47,23 @@ class MarketplaceShipmentController extends Controller
         $prevTo = (clone $from)->subDay()->endOfDay();
         $prevFrom = (clone $prevTo)->subDays($days - 1)->startOfDay();
 
-        // ---------- Base Query Builder ----------
+        /**
+         * BASE QUERY:
+         * - tampil berdasarkan shipped_at
+         * - fallback: kalau shipped_at null, pakai order_created_at (biar record gak "hilang")
+         *
+         * ✅ Kalau kamu mau STRICT (yang shipped_at null tidak tampil):
+         *    ganti blok where(...) ini menjadi: ->whereBetween('shipped_at', [$f, $t])
+         */
         $makeBase = function (Carbon $f, Carbon $t) use ($filters) {
             return MpShipment::query()
-            // NOTE:
-            // kalau order_created_at null, record akan hilang dari range.
-            // kita tetap pakai order_created_at karena itu basis bisnisnya,
-            // tapi kamu WAJIB pastikan import mengisi order_created_at.
-                ->whereBetween('order_created_at', [$f, $t])
-
+                ->where(function ($q) use ($f, $t) {
+                    $q->whereBetween('shipped_at', [$f, $t])
+                        ->orWhere(function ($w) use ($f, $t) {
+                            $w->whereNull('shipped_at')
+                                ->whereBetween('order_created_at', [$f, $t]);
+                        });
+                })
                 ->when($filters['channel'] !== '', fn($q) => $q->where('channel', $filters['channel']))
                 ->when($filters['store_id'] !== '', fn($q) => $q->where('store_id', (int) $filters['store_id']))
                 ->when($filters['status'] !== '', fn($q) => $q->where('status_norm', $filters['status']))
@@ -71,7 +79,7 @@ class MarketplaceShipmentController extends Controller
 
         $base = $makeBase($from, $to);
 
-        // ---------- KPI Cache (versioned so we can bust on commit) ----------
+        // ---------- KPI Cache (versioned, can bust on import/commit) ----------
         $ver = (int) Cache::get('mp_shipments:kpi:ver', 1);
 
         $cacheKey = 'mp_shipments:kpi:v' . $ver . ':' . md5(json_encode([
@@ -80,28 +88,50 @@ class MarketplaceShipmentController extends Controller
             'to' => $to->toISOString(),
             'prev_from' => $prevFrom->toISOString(),
             'prev_to' => $prevTo->toISOString(),
+            'basis' => 'shipped_at_fallback_order_created_at',
         ]));
 
         $kpiPayload = Cache::remember($cacheKey, 30, function () use ($base, $makeBase, $prevFrom, $prevTo) {
 
+            $agg = function ($qb) {
+                $row = (clone $qb)->selectRaw('
+                    COUNT(*) as rows,
+                    COALESCE(SUM(total_qty), 0) as sum_qty,
+                    COALESCE(SUM(grand_total), 0) as sum_grand_total,
+
+                    SUM(CASE WHEN status_norm = "delivered" THEN 1 ELSE 0 END) as delivered,
+                    SUM(CASE WHEN status_norm = "in_transit" THEN 1 ELSE 0 END) as in_transit,
+                    SUM(CASE WHEN status_norm = "canceled" THEN 1 ELSE 0 END) as canceled,
+                    SUM(CASE WHEN tracking_no IS NULL THEN 1 ELSE 0 END) as untracked
+                ')->first();
+
+                return [
+                    'rows' => (int) ($row->rows ?? 0),
+                    'sum_qty' => (int) ($row->sum_qty ?? 0),
+                    'sum_grand_total' => (float) ($row->sum_grand_total ?? 0),
+
+                    'delivered' => (int) ($row->delivered ?? 0),
+                    'in_transit' => (int) ($row->in_transit ?? 0),
+                    'canceled' => (int) ($row->canceled ?? 0),
+                    'untracked' => (int) ($row->untracked ?? 0),
+                ];
+            };
+
             // ===== CURRENT =====
-            $summaryRows = (int) (clone $base)->count();
+            $curAgg = $agg($base);
 
             $summary = [
-                'rows' => $summaryRows,
-                'sum_qty' => (int) (clone $base)->sum('total_qty'),
-                'sum_grand_total' => (float) (clone $base)->sum('grand_total'),
+                'rows' => $curAgg['rows'],
+                'sum_qty' => $curAgg['sum_qty'],
+                'sum_grand_total' => $curAgg['sum_grand_total'],
             ];
 
-            $deliveredCount = (int) (clone $base)->where('status_norm', 'delivered')->count();
-            $inTransitCount = (int) (clone $base)->where('status_norm', 'in_transit')->count();
-
             $orders = [
-                'sales' => (float) (clone $base)->sum('grand_total'),
-                'orders' => $summaryRows,
-                'items' => (int) (clone $base)->sum('total_qty'),
-                'delivered' => $deliveredCount,
-                'in_transit' => $inTransitCount,
+                'sales' => $curAgg['sum_grand_total'],
+                'orders' => $curAgg['rows'],
+                'items' => $curAgg['sum_qty'],
+                'delivered' => $curAgg['delivered'],
+                'in_transit' => $curAgg['in_transit'],
             ];
 
             $orders['delivery_rate'] =
@@ -110,10 +140,10 @@ class MarketplaceShipmentController extends Controller
             : 0;
 
             $ship = [
-                'in_transit' => $inTransitCount,
-                'delivered' => $deliveredCount,
-                'canceled' => (int) (clone $base)->where('status_norm', 'canceled')->count(),
-                'untracked' => (int) (clone $base)->whereNull('tracking_no')->count(),
+                'in_transit' => $curAgg['in_transit'],
+                'delivered' => $curAgg['delivered'],
+                'canceled' => $curAgg['canceled'],
+                'untracked' => $curAgg['untracked'],
                 'avg_delivery_days' => (clone $base)
                     ->whereNotNull('shipped_at')
                     ->whereNotNull('delivered_at')
@@ -122,17 +152,14 @@ class MarketplaceShipmentController extends Controller
 
             // ===== PREVIOUS =====
             $prev = $makeBase($prevFrom, $prevTo);
-
-            $prevRows = (int) (clone $prev)->count();
-            $prevDelivered = (int) (clone $prev)->where('status_norm', 'delivered')->count();
-            $prevInTransit = (int) (clone $prev)->where('status_norm', 'in_transit')->count();
+            $prevAgg = $agg($prev);
 
             $prevOrders = [
-                'sales' => (float) (clone $prev)->sum('grand_total'),
-                'orders' => $prevRows,
-                'items' => (int) (clone $prev)->sum('total_qty'),
-                'delivered' => $prevDelivered,
-                'in_transit' => $prevInTransit,
+                'sales' => $prevAgg['sum_grand_total'],
+                'orders' => $prevAgg['rows'],
+                'items' => $prevAgg['sum_qty'],
+                'delivered' => $prevAgg['delivered'],
+                'in_transit' => $prevAgg['in_transit'],
             ];
 
             $prevOrders['delivery_rate'] =
@@ -141,9 +168,9 @@ class MarketplaceShipmentController extends Controller
             : 0;
 
             $prevShip = [
-                'in_transit' => $prevInTransit,
-                'delivered' => $prevDelivered,
-                'untracked' => (int) (clone $prev)->whereNull('tracking_no')->count(),
+                'in_transit' => $prevAgg['in_transit'],
+                'delivered' => $prevAgg['delivered'],
+                'untracked' => $prevAgg['untracked'],
                 'avg_delivery_days' => (clone $prev)
                     ->whereNotNull('shipped_at')
                     ->whereNotNull('delivered_at')
@@ -154,10 +181,10 @@ class MarketplaceShipmentController extends Controller
             $pct = function (?float $cur, ?float $prev) {
                 $cur = (float) ($cur ?? 0);
                 $prev = (float) ($prev ?? 0);
-
                 if ($prev == 0.0) {
                     return $cur == 0.0 ? 0.0 : 100.0;
                 }
+
                 return (($cur - $prev) / abs($prev)) * 100.0;
             };
 
@@ -165,13 +192,11 @@ class MarketplaceShipmentController extends Controller
                 'orders_sales' => $pct($orders['sales'], $prevOrders['sales']),
                 'orders_orders' => $pct($orders['orders'], $prevOrders['orders']),
                 'orders_items' => $pct($orders['items'], $prevOrders['items']),
-                // percentage points (not growth)
                 'orders_delivery_rate' => (float) ($orders['delivery_rate'] - $prevOrders['delivery_rate']),
 
                 'ship_in_transit' => $pct($ship['in_transit'], $prevShip['in_transit']),
                 'ship_delivered' => $pct($ship['delivered'], $prevShip['delivered']),
                 'ship_untracked' => $pct($ship['untracked'], $prevShip['untracked']),
-                // days difference
                 'ship_avg_days' => (float) ((float) ($ship['avg_delivery_days'] ?? 0) - (float) ($prevShip['avg_delivery_days'] ?? 0)),
             ];
 
@@ -196,8 +221,10 @@ class MarketplaceShipmentController extends Controller
         // ---------- Pagination (NOT cached) ----------
         $shipments = (clone $base)
             ->with(['store:id,name'])
-            ->orderByDesc('order_created_at')
-            ->paginate(20);
+            // ✅ tampil berdasarkan shipped_at (fallback order_created_at)
+            ->orderByRaw('COALESCE(shipped_at, order_created_at) DESC')
+            ->paginate(20)
+            ->appends($request->query());
 
         $rows = collect($shipments->items())->map(fn($s) => [
             'id' => $s->id,
@@ -207,7 +234,12 @@ class MarketplaceShipmentController extends Controller
             'store' => $s->store?->name,
             'tracking_no' => $s->tracking_no,
             'status_norm' => $s->status_norm,
+
+            // ✅ tampilkan shipped_at juga
+            'shipped_at' => optional($s->shipped_at)->toISOString(),
+            'delivered_at' => optional($s->delivered_at)->toISOString(),
             'order_created_at' => optional($s->order_created_at)->toISOString(),
+
             'total_qty' => (int) $s->total_qty,
             'grand_total' => (float) $s->grand_total,
         ]);
@@ -218,6 +250,7 @@ class MarketplaceShipmentController extends Controller
                 'from' => $from->toISOString(),
                 'to' => $to->toISOString(),
                 'days' => $days,
+                'basis' => 'shipped_at (fallback order_created_at when null)',
             ],
             'prev_period' => [
                 'from' => $prevFrom->toISOString(),
