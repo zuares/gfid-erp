@@ -81,15 +81,24 @@
                     Created by: {{ $shipment->creator?->name ?? '-' }}
                 </div>
 
-                <div class="actions" style="margin-top:10px;">
-                    <a class="btnx" href="{{ route('sales.shipments.index') }}">← Back</a>
+              <div class="actions" style="margin-top:10px;">
+    <a class="btnx" href="{{ route('sales.shipments.index') }}">← Back</a>
 
-                    @if(($shipment->status ?? '') === 'draft' && empty($shipment->posted_at) && empty($shipment->cancelled_at))
-                        <a class="btnx btnx-primary" href="{{ route('sales.shipments.edit', $shipment) }}">
-                            ➕ Lanjut Input / Scan
-                        </a>
-                    @endif
-                </div>
+    @if($shipment->lines->isNotEmpty())
+        <a class="btnx" href="{{ route('sales.shipments.export_lines', $shipment) }}">
+            ⬇️ Export CSV
+        </a>
+    @else
+        <span class="btnx" style="opacity:.5; pointer-events:none;">⬇️ Export CSV</span>
+    @endif
+
+    @if(($shipment->status ?? '') === 'draft' && empty($shipment->posted_at) && empty($shipment->cancelled_at))
+        <a class="btnx btnx-primary" href="{{ route('sales.shipments.edit', $shipment) }}">
+            ➕ Lanjut Input / Scan
+        </a>
+    @endif
+</div>
+
             </div>
         </div>
 

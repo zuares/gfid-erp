@@ -17,6 +17,7 @@ class MpReconciliationController extends Controller
      *
      * Actions:
      * - link_to_shipment
+     * - apply_to_lines        ✅ NEW (apply MP items -> shipment_lines)
      * - mark_needs_review
      * - mark_skipped
      * - mark_resolved
@@ -26,17 +27,30 @@ class MpReconciliationController extends Controller
         $data = $request->validate([
             'action' => ['required', Rule::in([
                 'link_to_shipment',
+                'apply_to_lines',
                 'mark_needs_review',
                 'mark_skipped',
                 'mark_resolved',
             ])],
             'shipment_id' => ['nullable', 'integer', 'exists:shipments,id'],
             'notes' => ['nullable', 'string', 'max:5000'],
+
+            // optional: untuk apply_to_lines
+            // replace = set qty_scanned = mp_qty (default, paling aman)
+            // add     = qty_scanned += mp_qty
+            'mode' => ['nullable', Rule::in(['replace', 'add'])],
         ]);
 
         $action = $data['action'];
-        $notes = $data['notes'] ?? null;
 
+        $notes = array_key_exists('notes', $data) ? trim((string) ($data['notes'] ?? '')) : null;
+        if ($notes === '') {
+            $notes = null;
+        }
+
+        // -------------------------
+        // link_to_shipment
+        // -------------------------
         if ($action === 'link_to_shipment') {
             if (empty($data['shipment_id'])) {
                 return back()
@@ -59,10 +73,64 @@ class MpReconciliationController extends Controller
             return back()->with('ok', 'Reconcile: linked to shipment.');
         }
 
+        // -------------------------
+        // apply_to_lines ✅ NEW
+        // -------------------------
+        if ($action === 'apply_to_lines') {
+            // kalau request kirim shipment_id, set dulu (biar bisa apply walau belum pernah link)
+            if (!empty($data['shipment_id'])) {
+                $rec->shipment_id = (int) $data['shipment_id'];
+            }
+
+            if (!$rec->shipment_id) {
+                return back()->with('error', 'Apply ditolak: shipment_id belum dipilih.');
+            }
+
+            $mode = $data['mode'] ?? 'replace'; // default replace
+
+            $apply = $this->applyMpItemsToShipmentLines(
+                shipmentId: (int) $rec->shipment_id,
+                mpShipmentId: (string) $rec->mp_shipment_id,
+                mode: $mode
+            );
+
+            if (!($apply['ok'] ?? false)) {
+                return back()->with('error', $apply['message'] ?? 'Apply gagal.');
+            }
+
+            // setelah apply, set resolved
+            $rec->status = 'resolved';
+            $rec->match_key = $rec->match_key ?: ('apply_lines:' . $mode);
+            $rec->match_confidence = max((int) ($rec->match_confidence ?? 0), 95);
+            $rec->matched_by = Auth::id();
+            $rec->matched_at = now();
+
+            if ($notes !== null) {
+                $rec->notes = $notes;
+            }
+
+            $rec->save();
+
+            return back()->with('ok', 'Applied to shipment_lines: '
+                . ($apply['lines_upserted'] ?? 0) . ' line(s)'
+                . ' • unmapped sku: ' . ($apply['unmapped_sku_count'] ?? 0)
+            );
+        }
+
+        // -------------------------
+        // mark_needs_review
+        // -------------------------
         if ($action === 'mark_needs_review') {
             $rec->status = 'needs_review';
+
+            // reset hasil match (balik review)
+            $rec->match_key = null;
+            $rec->match_confidence = null;
             $rec->matched_by = null;
             $rec->matched_at = null;
+
+            // shipment_id tetap (kalau mau unlink, aktifkan)
+            // $rec->shipment_id = null;
 
             if ($notes !== null) {
                 $rec->notes = $notes;
@@ -72,8 +140,17 @@ class MpReconciliationController extends Controller
             return back()->with('ok', 'Reconcile: marked needs_review.');
         }
 
+        // -------------------------
+        // mark_resolved
+        // -------------------------
         if ($action === 'mark_resolved') {
+            if (!$rec->shipment_id) {
+                return back()->with('error', 'Tidak bisa mark_resolved tanpa shipment_id. Link dulu.');
+            }
+
             $rec->status = 'resolved';
+            $rec->match_key = $rec->match_key ?: 'manual';
+            $rec->match_confidence = $rec->match_confidence ?: 100;
             $rec->matched_by = Auth::id();
             $rec->matched_at = now();
 
@@ -85,7 +162,9 @@ class MpReconciliationController extends Controller
             return back()->with('ok', 'Reconcile: marked resolved.');
         }
 
+        // -------------------------
         // mark_skipped (default)
+        // -------------------------
         $rec->status = 'skipped';
         $rec->matched_by = Auth::id();
         $rec->matched_at = now();
@@ -96,6 +175,89 @@ class MpReconciliationController extends Controller
 
         $rec->save();
         return back()->with('ok', 'Reconcile: skipped.');
+    }
+
+    /**
+     * Apply MP items (mp_packet_items) to shipment_lines.
+     *
+     * mode:
+     * - replace: qty_scanned = mp_qty (default, aman untuk "rekonsiliasi")
+     * - add: qty_scanned += mp_qty
+     */
+    private function applyMpItemsToShipmentLines(int $shipmentId, string $mpShipmentId, string $mode = 'replace'): array
+    {
+        // 1) aggregate MP items yang sudah mapped (item_id NOT NULL)
+        $mpItems = DB::table('mp_packet_items as mpi')
+            ->selectRaw('mpi.item_id as item_id, SUM(mpi.qty) as mp_qty')
+            ->whereRaw("CAST(mpi.mp_shipment_id AS TEXT) = ?", [$mpShipmentId])
+            ->whereNotNull('mpi.item_id')
+            ->groupBy('mpi.item_id')
+            ->get();
+
+        // 2) cek unmapped sku count (buat info user)
+        $unmappedSkuCount = (int) DB::table('mp_packet_items as mpi')
+            ->whereRaw("CAST(mpi.mp_shipment_id AS TEXT) = ?", [$mpShipmentId])
+            ->whereNull('mpi.item_id')
+            ->distinct()
+            ->count('sku');
+
+        if ($mpItems->isEmpty()) {
+            return [
+                'ok' => false,
+                'message' => 'Tidak ada mp_packet_items yang sudah termapping (item_id null semua). Map SKU dulu.',
+                'unmapped_sku_count' => $unmappedSkuCount,
+            ];
+        }
+
+        $now = now();
+
+        DB::transaction(function () use ($shipmentId, $mpItems, $mode, $now) {
+            foreach ($mpItems as $r) {
+                $itemId = (int) $r->item_id;
+                $qty = (int) $r->mp_qty;
+
+                // cari existing line
+                $lineId = DB::table('shipment_lines')
+                    ->where('shipment_id', $shipmentId)
+                    ->where('item_id', $itemId)
+                    ->value('id');
+
+                if ($lineId) {
+                    if ($mode === 'add') {
+                        DB::table('shipment_lines')
+                            ->where('id', $lineId)
+                            ->update([
+                                'qty_scanned' => DB::raw('COALESCE(qty_scanned,0) + ' . $qty),
+                                'updated_at' => $now,
+                            ]);
+                    } else {
+                        // replace
+                        DB::table('shipment_lines')
+                            ->where('id', $lineId)
+                            ->update([
+                                'qty_scanned' => $qty,
+                                'updated_at' => $now,
+                            ]);
+                    }
+                } else {
+                    DB::table('shipment_lines')->insert([
+                        'shipment_id' => $shipmentId,
+                        'item_id' => $itemId,
+                        'qty_scanned' => $qty,
+                        'notes' => null,
+                        'created_at' => $now,
+                        'updated_at' => $now,
+                    ]);
+                }
+            }
+        });
+
+        return [
+            'ok' => true,
+            'lines_upserted' => $mpItems->count(),
+            'unmapped_sku_count' => $unmappedSkuCount,
+            'mode' => $mode,
+        ];
     }
 
     /**

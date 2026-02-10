@@ -568,4 +568,54 @@ class MarketplaceReconcileService
         }
         return false;
     }
+
+    public function applyToShipmentLines(int $shipmentId, string $mpShipmentId): array
+    {
+        // ambil mp items yang sudah mapped (item_id not null)
+        $mpItems = DB::table('mp_packet_items')
+            ->select('item_id', DB::raw('SUM(qty) as qty'))
+            ->whereRaw("CAST(mp_shipment_id AS TEXT) = ?", [$mpShipmentId])
+            ->whereNotNull('item_id')
+            ->groupBy('item_id')
+            ->get();
+
+        if ($mpItems->isEmpty()) {
+            return ['ok' => false, 'message' => 'Tidak ada mp_packet_items yang sudah termapping (item_id null semua).'];
+        }
+
+        // upsert ke shipment_lines: tambah qty_scanned
+        DB::transaction(function () use ($shipmentId, $mpItems) {
+            foreach ($mpItems as $r) {
+                $itemId = (int) $r->item_id;
+                $qty = (int) $r->qty;
+
+                // cari existing line
+                $lineId = DB::table('shipment_lines')
+                    ->where('shipment_id', $shipmentId)
+                    ->where('item_id', $itemId)
+                    ->value('id');
+
+                if ($lineId) {
+                    DB::table('shipment_lines')
+                        ->where('id', $lineId)
+                        ->update([
+                            'qty_scanned' => DB::raw('COALESCE(qty_scanned,0) + ' . $qty),
+                            'updated_at' => now(),
+                        ]);
+                } else {
+                    DB::table('shipment_lines')->insert([
+                        'shipment_id' => $shipmentId,
+                        'item_id' => $itemId,
+                        'qty_scanned' => $qty,
+                        'notes' => null,
+                        'created_at' => now(),
+                        'updated_at' => now(),
+                    ]);
+                }
+            }
+        });
+
+        return ['ok' => true, 'lines' => $mpItems->count()];
+    }
+
 }

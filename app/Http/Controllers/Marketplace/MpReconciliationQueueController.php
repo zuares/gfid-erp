@@ -16,7 +16,7 @@ class MpReconciliationQueueController extends Controller
 
     public function index(Request $request)
     {
-        $status = $request->get('status', 'needs_review');
+        $status = (string) $request->get('status', 'needs_review');
         $q = trim((string) $request->get('q', ''));
 
         $channel = $request->get('channel'); // shopee|tiktok|null
@@ -34,48 +34,56 @@ class MpReconciliationQueueController extends Controller
 
         /**
          * SCOPE = dataset konteks (mempengaruhi counts & keys)
-         * Opsi A:
-         * - scope: channel/store/date/q + quick toggles
+         * - scope: channel/store/date + q (tanpa membypass)
+         * - quick toggles masuk scope
          * - detail filters (min/max conf, has_shipment, key, status chip) hanya untuk rows
          */
         $scope = MpReconciliation::query();
 
-        // 1) scope by mpShipment (channel/store/date) + search (q)
-        $scope->when($channel || $storeId || $date || $q !== '', function ($x) use ($channel, $storeId, $date, $q) {
-            $x->where(function ($w) use ($channel, $storeId, $date, $q) {
+        // -----------------------------
+        // 1) Scope by mpShipment (channel/store/date)
+        // -----------------------------
+        $hasShipmentScope = (bool) ($channel || $storeId || $date);
 
-                $w->whereHas('mpShipment', function ($m) use ($channel, $storeId, $date, $q) {
-                    $m->when($channel, fn($mq) => $mq->where('channel', $channel))
-                        ->when($storeId, fn($mq) => $mq->where('store_id', (int) $storeId));
+        if ($hasShipmentScope) {
+            $scope->whereHas('mpShipment', function ($mq) use ($channel, $storeId, $date) {
+                $mq->when($channel, fn($z) => $z->where('channel', $channel))
+                    ->when($storeId, fn($z) => $z->where('store_id', (int) $storeId));
 
-                    if ($date) {
-                        $m->where(function ($dq) use ($date) {
-                            $dq->whereDate('shipped_at', $date)
-                                ->orWhere(function ($qq) use ($date) {
-                                    $qq->whereNull('shipped_at')
-                                        ->whereDate('order_created_at', $date);
-                                });
-                        });
-                    }
-
-                    if ($q !== '') {
-                        $m->where(function ($sq) use ($q) {
-                            $sq->where('platform_order_id', 'like', "%{$q}%")
-                                ->orWhere('tracking_no', 'like', "%{$q}%")
-                                ->orWhere('platform_shipment_id', 'like', "%{$q}%");
-                        });
-                    }
-                });
-
-                // search juga langsung di mp_reconciliations
-                if ($q !== '') {
-                    $w->orWhere('mp_shipment_id', 'like', "%{$q}%")
-                        ->orWhere('match_key', 'like', "%{$q}%");
+                if ($date) {
+                    $mq->where(function ($dq) use ($date) {
+                        $dq->whereDate('shipped_at', $date)
+                            ->orWhere(function ($qq) use ($date) {
+                                $qq->whereNull('shipped_at')
+                                    ->whereDate('order_created_at', $date);
+                            });
+                    });
                 }
             });
-        });
+        }
 
-        // 2) scope by quick toggles (mode kerja)
+        // -----------------------------
+        // 2) Search q (TIDAK membypass scope)
+        // - kalau scope channel/store/date aktif => q harus match salah satu field di mpShipment ATAU reconciliation
+        // - kalau scope tidak aktif => q bisa cari global (mpShipment atau reconciliation)
+        // -----------------------------
+        if ($q !== '') {
+            $scope->where(function ($w) use ($q) {
+                $w->whereHas('mpShipment', function ($mq) use ($q) {
+                    $mq->where(function ($sq) use ($q) {
+                        $sq->where('platform_order_id', 'like', "%{$q}%")
+                            ->orWhere('tracking_no', 'like', "%{$q}%")
+                            ->orWhere('platform_shipment_id', 'like', "%{$q}%");
+                    });
+                })
+                    ->orWhere('mp_shipment_id', 'like', "%{$q}%")
+                    ->orWhere('match_key', 'like', "%{$q}%");
+            });
+        }
+
+        // -----------------------------
+        // 3) Scope by quick toggles (mode kerja)
+        // -----------------------------
         $scope
             ->when($actionable, function ($x) {
                 $x->where('status', 'needs_review')
@@ -94,9 +102,15 @@ class MpReconciliationQueueController extends Controller
                     ->whereNull('shipment_id');
             });
 
-        // 3) rows = scope + detail filters
+        // -----------------------------
+        // 4) Rows = scope + detail filters
+        // -----------------------------
         $base = (clone $scope)
-            ->with(['mpShipment', 'shipment'])
+            ->with([
+                // batasi kolom agar ringan
+                'mpShipment:id,store_id,channel,platform_order_id,platform_shipment_id,tracking_no,shipped_at,order_created_at,total_qty,status_norm,grand_total',
+                'shipment:id,code,date,status,awb',
+            ])
 
             // status chip normal hanya kalau actionable tidak aktif
             ->when(!$actionable && $status !== 'all', fn($x) => $x->where('status', $status))
@@ -112,25 +126,28 @@ class MpReconciliationQueueController extends Controller
 
         $rows = $base->paginate(50)->withQueryString();
 
-        // 4) counts scoped (ngikut dataset scope + toggles)
+        // -----------------------------
+        // 5) counts (scoped)
+        // -----------------------------
         $counts = (clone $scope)
-            ->selectRaw("status, COUNT(*) as c")
+            ->selectRaw('status, COUNT(*) as c')
             ->groupBy('status')
             ->pluck('c', 'status');
 
-        // 5) keys scoped (ngikut dataset scope + toggles)
+        // -----------------------------
+        // 6) keys (scoped) - batasi biar tidak berat
+        // -----------------------------
         $keys = (clone $scope)
             ->select('match_key')
             ->whereNotNull('match_key')
             ->groupBy('match_key')
             ->orderBy('match_key')
+            ->limit(200)
             ->pluck('match_key');
 
         $stores = Store::orderBy('code')->get(['id', 'code', 'name']);
 
         $preview = session(self::PREVIEW_SESSION_KEY);
-
-        // bantu persist window/threshold di Blade
         $window = $preview['params']['window'] ?? null;
         $threshold = $preview['params']['threshold'] ?? null;
 
@@ -157,13 +174,19 @@ class MpReconciliationQueueController extends Controller
         ]);
 
         $targetStatus = $data['action'] === 'approve' ? 'resolved' : 'skipped';
-        $notes = $data['notes'] ?? null;
 
-        DB::transaction(function () use ($data, $targetStatus, $notes) {
-            MpReconciliation::whereIn('id', $data['ids'])->update([
-                'status' => $targetStatus,
-                'notes' => $notes ? trim($notes) : DB::raw('notes'),
-            ]);
+        // bedakan: notes tidak dikirim vs dikirim tapi kosong (mau clear)
+        $hasNotes = array_key_exists('notes', $data);
+
+        DB::transaction(function () use ($data, $targetStatus, $hasNotes) {
+            $payload = ['status' => $targetStatus];
+
+            if ($hasNotes) {
+                $notes = trim((string) ($data['notes'] ?? ''));
+                $payload['notes'] = $notes === '' ? null : $notes;
+            }
+
+            MpReconciliation::whereIn('id', $data['ids'])->update($payload);
         });
 
         return back()->with('ok', 'Bulk update: ' . count($data['ids']) . ' row → ' . $targetStatus);

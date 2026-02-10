@@ -477,7 +477,7 @@ class ShipmentController extends Controller
             ->with('status', 'success')->with('message', 'Shipment berhasil diposting & stok berkurang.');
     }
 
-    public function exportLines(Shipment $shipment)
+    public function exportLines(Request $request, Shipment $shipment)
     {
         $shipment->load(['lines.item']);
 
@@ -486,27 +486,46 @@ class ShipmentController extends Controller
                 ->with('status', 'error')->with('message', 'Tidak ada item di shipment ini untuk diekspor.');
         }
 
-        $fileName = 'shipment_' . $shipment->code . '_import_' . now()->format('Ymd_His') . '.csv';
+        $format = (string) $request->get('format', 'default'); // default|mp|comma
+
+        $delimiter = ';';
+        if ($format === 'comma') {
+            $delimiter = ',';
+        }
+
+        $fileName = 'shipment_' . $shipment->code . '_export_' . now()->format('Ymd_His') . '.csv';
 
         $headers = [
             'Content-Type' => 'text/csv; charset=UTF-8',
             'Content-Disposition' => 'attachment; filename="' . $fileName . '"',
         ];
 
-        $callback = function () use ($shipment) {
+        $callback = function () use ($shipment, $delimiter, $format) {
             $handle = fopen('php://output', 'w');
+
+            // UTF-8 BOM for Excel
             fprintf($handle, chr(0xEF) . chr(0xBB) . chr(0xBF));
-            fputcsv($handle, ['Product', 'Quantity'], ';');
+
+            // Header
+            fputcsv($handle, ['Product', 'Quantity'], $delimiter);
 
             foreach ($shipment->lines as $line) {
                 $product = $line->item?->code ?? '';
                 $qtyInt = (int) ($line->qty_scanned ?? 0);
+
                 if ($product === '' || $qtyInt <= 0) {
                     continue;
                 }
 
-                $qtyFormatted = number_format($qtyInt, 2, ',', '.');
-                fputcsv($handle, [$product, $qtyFormatted], ';');
+                if ($format === 'default') {
+                    // versi kamu: 2 desimal ala excel indonesia
+                    $qtyFormatted = number_format($qtyInt, 2, ',', '.');
+                } else {
+                    // mp / comma: lebih aman integer
+                    $qtyFormatted = (string) $qtyInt;
+                }
+
+                fputcsv($handle, [$product, $qtyFormatted], $delimiter);
             }
 
             fclose($handle);

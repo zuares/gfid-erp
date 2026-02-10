@@ -41,9 +41,18 @@ Route::middleware(['web'])
         // Marketplace Income (Import Wizard)
         // =========================
         Route::prefix('marketplace-income')->name('marketplace_income.')->group(function () {
-            Route::get('/', [MarketplaceIncomeImportController::class, 'create'])->name('create');
-            Route::post('preview', [MarketplaceIncomeImportController::class, 'preview'])->name('preview');
-            Route::post('commit', [MarketplaceIncomeImportController::class, 'commit'])->name('commit');
-            Route::post('cancel', [MarketplaceIncomeImportController::class, 'cancel'])->name('cancel');
+            Route::get('/', [MarketplaceIncomeImportController::class, 'index'])->name('index');
+            Route::get('/create', [MarketplaceIncomeImportController::class, 'create'])->name('create');
+            Route::post('/preview', [MarketplaceIncomeImportController::class, 'preview'])->name('preview');
+            Route::post('/commit', [MarketplaceIncomeImportController::class, 'commit'])->name('commit');
+            Route::post('/cancel', [MarketplaceIncomeImportController::class, 'cancel'])->name('cancel');
+            Route::get('/draft', [MarketplaceIncomeImportController::class, 'draft'])->name('draft');
+
+            // ✅ show batch & show order(items)
+            Route::get('/batches/{batch}', [MarketplaceIncomeImportController::class, 'showBatch'])->name('show');
+            Route::get('/orders/{income}', [MarketplaceIncomeImportController::class, 'showOrder'])->name('order.show');
+
+            Route::post('/batches/{batch}/apply', [MarketplaceIncomeImportController::class, 'apply'])->name('apply');
         });
+
     });

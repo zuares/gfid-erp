@@ -3,7 +3,6 @@
 namespace App\Services\Marketplace\Income;
 
 use App\Models\MpIncome;
-use App\Models\MpShipment;
 use App\Services\Marketplace\Income\Adapters\MpIncomeAdapterInterface;
 use Carbon\Carbon;
 use Illuminate\Support\Facades\DB;
@@ -14,8 +13,9 @@ class MpIncomeImportService
     /** @var array<string, MpIncomeAdapterInterface> */
     protected array $adapters = [];
 
-    public function __construct()
-    {
+    public function __construct(
+        protected ApplyIncomeService $applyIncome
+    ) {
         $this->register(app(\App\Services\Marketplace\Income\Adapters\ShopeeIncomeAdapter::class));
         $this->register(app(\App\Services\Marketplace\Income\Adapters\TiktokIncomeAdapter::class));
     }
@@ -26,12 +26,20 @@ class MpIncomeImportService
     }
 
     /**
-     * Import income/payout report.
-     * - Save per-order payout into mp_incomes (source of truth, avoids double count on split shipments)
-     * - Optionally apply payout snapshot into mp_shipments (primary shipment only)
+     * Import income:
+     * - parse file
+     * - dedupe per platform_order_id (last wins)
+     * - upsert ke mp_incomes
+     * - langsung apply ke mp_shipments (primary) via ApplyIncomeService
      */
-    public function import(string $channel, string $path, string $sourceFile, int $storeId, bool $dryRun = false): array
-    {
+    public function import(
+        string $channel,
+        string $path,
+        string $sourceFile,
+        int $storeId,
+        bool $dryRun = false,
+        string $tz = 'Asia/Jakarta'
+    ): array {
         $channel = strtolower(trim($channel));
         if (!isset($this->adapters[$channel])) {
             throw new \InvalidArgumentException("Income adapter '{$channel}' belum ada.");
@@ -43,35 +51,11 @@ class MpIncomeImportService
         $adapter = $this->adapters[$channel];
         $batchId = (string) Str::uuid();
 
+        // 1) Parse
         $rows = $adapter->parse($path, $sourceFile);
 
-        // Unique per order id (avoid double counting)
-        $orderIds = [];
-        $rowByOrder = [];
-        foreach ($rows as $r) {
-            $oid = trim((string) ($r['platform_order_id'] ?? ''));
-            if ($oid === '') {
-                continue;
-            }
-
-            $orderIds[$oid] = true;
-            $rowByOrder[$oid] = $r; // last wins
-        }
-        $uniqueOrderIds = array_keys($orderIds);
-
-        // Pre-check matching to shipments (for stats & optional apply)
-        $matchedSet = [];
-        if (!empty($uniqueOrderIds)) {
-            $matchedSet = MpShipment::query()
-                ->where('store_id', $storeId)
-                ->where('channel', $channel)
-                ->whereIn('platform_order_id', $uniqueOrderIds)
-                ->select('platform_order_id')
-                ->distinct()
-                ->pluck('platform_order_id')
-                ->all();
-        }
-        $matchedLookup = array_fill_keys($matchedSet, true);
+        // 2) Dedupe by platform_order_id (last wins)
+        [$uniqueOrderIds, $rowByOrder, $skippedNoOrderId, $skippedDedupe] = $this->dedupeRowsByOrderId($rows);
 
         $stats = [
             'channel' => $channel,
@@ -82,152 +66,171 @@ class MpIncomeImportService
             'rows_parsed' => count($rows),
             'orders_parsed' => count($uniqueOrderIds),
 
-            // mp_incomes
             'incomes_upserted' => 0,
 
-            // shipments matching (informational)
-            'orders_matched_shipments' => count($matchedSet),
-            'orders_unmatched_shipments' => max(0, count($uniqueOrderIds) - count($matchedSet)),
-
-            // apply-to-shipment (primary only)
+            'orders_matched_shipments' => 0,
+            'orders_unmatched_shipments' => 0,
             'shipments_updated' => 0,
             'orders_with_multi_shipments' => 0,
 
-            'rows_skipped' => max(0, count($rows) - count($uniqueOrderIds)),
+            'rows_skipped_no_order_id' => $skippedNoOrderId,
+            'rows_skipped_dedupe' => $skippedDedupe,
+
             'dry_run' => $dryRun,
         ];
 
         if (empty($uniqueOrderIds)) {
-            $sample = [];
-            return compact('stats', 'sample');
+            return ['stats' => $stats, 'sample' => []];
         }
 
         if ($dryRun) {
             $sample = [];
             foreach (array_slice($uniqueOrderIds, 0, 5) as $oid) {
-                $sample[] = $rowByOrder[$oid];
+                $sample[] = $rowByOrder[$oid] ?? [];
             }
-            return compact('stats', 'sample');
+            return ['stats' => $stats, 'sample' => $sample];
         }
+
+        $now = now();
+        $chunkSize = 800;
 
         DB::transaction(function () use (
             $uniqueOrderIds,
             $rowByOrder,
-            $matchedLookup,
             $channel,
             $storeId,
             $sourceFile,
             $batchId,
+            $chunkSize,
+            $now,
+            $tz,
             &$stats
         ) {
-            foreach ($uniqueOrderIds as $orderId) {
-                $r = $rowByOrder[$orderId];
+            foreach (array_chunk($uniqueOrderIds, $chunkSize) as $orderChunk) {
+                // ---------- UPSERT mp_incomes ----------
+                $incomeRows = [];
 
-                $fee = (float) ($r['platform_fee_total'] ?? 0);
-                $refund = (float) ($r['refund_total'] ?? 0);
-                $net = (float) ($r['net_payout_actual'] ?? 0);
-                $releasedAt = $r['released_at'] ?? null;
+                foreach ($orderChunk as $orderId) {
+                    $r = $rowByOrder[$orderId] ?? [];
 
-                // released_date (WIB) for reconciliation/reporting
-                $releasedDate = null;
-                if (!empty($releasedAt)) {
-                    $releasedDate = Carbon::parse($releasedAt)
-                        ->timezone('Asia/Jakarta')
-                        ->toDateString();
-                }
+                    $fee = (float) ($r['platform_fee_total'] ?? 0);
+                    $netRaw = $r['net_payout_actual'] ?? null;
+                    $net = (is_numeric($netRaw) ? (float) $netRaw : 0.0);
 
-                // 1) UPSERT per-order income (source of truth)
-                MpIncome::updateOrCreate(
-                    [
+                    // refund: kalau kosong tapi net negatif => abs(net)
+                    $refundRaw = $r['refund_total'] ?? null;
+                    $refund = 0.0;
+                    if ($refundRaw !== null && $refundRaw !== '' && is_numeric($refundRaw)) {
+                        $refund = max(0.0, (float) $refundRaw);
+                    } elseif ($net < 0) {
+                        $refund = abs($net);
+                    }
+
+                    $releasedAt = $r['released_at'] ?? null;
+                    $releasedDate = null;
+                    if (!empty($releasedAt)) {
+                        $releasedDate = Carbon::parse($releasedAt, $tz)->toDateString();
+                    }
+
+                    $payload = [
+                        'income' => [
+                            'batch' => $batchId,
+                            'source_file' => $sourceFile,
+                            'platform_fee_total' => $fee,
+                            'refund_total' => $refund,
+                            'net_payout_actual' => $netRaw, // simpan mentah juga (biar trace)
+                            'released_at' => $releasedAt,
+                            'released_date' => $releasedDate,
+                            'raw' => $r['raw'] ?? null,
+                        ],
+                    ];
+
+                    $incomeRows[] = [
                         'store_id' => $storeId,
                         'channel' => $channel,
                         'platform_order_id' => $orderId,
-                    ],
-                    [
+
                         'released_at' => $releasedAt,
-                        'released_date' => $releasedDate, // <-- IMPORTANT
+                        'released_date' => $releasedDate,
+
                         'platform_fee_total' => $fee,
                         'refund_total' => $refund,
-                        'net_payout_actual' => $net,
+                        'net_payout_actual' => (is_numeric($netRaw) ? (float) $netRaw : 0.0),
+
                         'currency' => 'IDR',
                         'source_file' => $sourceFile,
                         'import_batch_id' => $batchId,
-                        'raw_payload' => [
-                            'income' => [
-                                'batch' => $batchId,
-                                'source_file' => $sourceFile,
-                                'platform_fee_total' => $fee,
-                                'refund_total' => $refund,
-                                'net_payout_actual' => $net,
-                                'released_at' => $releasedAt,
-                                'released_date' => $releasedDate,
-                                'raw' => $r['raw'] ?? null,
-                            ],
-                        ],
+
+                        'raw_payload' => json_encode($payload, JSON_UNESCAPED_UNICODE | JSON_UNESCAPED_SLASHES),
+
+                        'updated_at' => $now,
+                        'created_at' => $now,
+                    ];
+                }
+
+                MpIncome::query()->upsert(
+                    $incomeRows,
+                    ['store_id', 'channel', 'platform_order_id'],
+                    [
+                        'released_at',
+                        'released_date',
+                        'platform_fee_total',
+                        'refund_total',
+                        'net_payout_actual',
+                        'currency',
+                        'source_file',
+                        'import_batch_id',
+                        'raw_payload',
+                        'updated_at',
                     ]
                 );
 
-                $stats['incomes_upserted']++;
+                $stats['incomes_upserted'] += count($incomeRows);
 
-                // 2) OPTIONAL apply to mp_shipments (primary shipment only)
-                if (!isset($matchedLookup[$orderId])) {
-                    continue;
-                }
+                // ---------- APPLY KE SHIPMENTS (langsung) ----------
+                $applyRes = $this->applyIncome->applyFromParsedRows(
+                    $storeId,
+                    $channel,
+                    $orderChunk,
+                    $rowByOrder,
+                    $batchId,
+                    $sourceFile,
+                    $tz
+                );
 
-                // Count shipments under this order (split packages)
-                $shipCount = (int) MpShipment::query()
-                    ->where('store_id', $storeId)
-                    ->where('channel', $channel)
-                    ->where('platform_order_id', $orderId)
-                    ->count();
-
-                if ($shipCount > 1) {
-                    $stats['orders_with_multi_shipments']++;
-                }
-
-                // Choose primary shipment: smallest id
-                $primary = MpShipment::query()
-                    ->where('store_id', $storeId)
-                    ->where('channel', $channel)
-                    ->where('platform_order_id', $orderId)
-                    ->orderBy('id', 'asc')
-                    ->first();
-
-                if (!$primary) {
-                    continue;
-                }
-
-                $updated = MpShipment::query()
-                    ->whereKey($primary->id)
-                    ->update([
-                        'platform_fee_total' => $fee,
-                        'refund_total' => $refund,
-                        'net_payout_actual' => $net,
-                        'released_at' => $releasedAt,
-                        'imported_at' => now(),
-                        'source_file' => $sourceFile,
-                        'import_batch_id' => $batchId,
-                    ]);
-
-                $stats['shipments_updated'] += (int) $updated;
-
-                // Merge raw income snapshot into primary raw_payload only
-                $raw = $primary->raw_payload ?? [];
-                $raw['income'] = [
-                    'batch' => $batchId,
-                    'source_file' => $sourceFile,
-                    'platform_fee_total' => $fee,
-                    'refund_total' => $refund,
-                    'net_payout_actual' => $net,
-                    'released_at' => $releasedAt,
-                    'released_date' => $releasedDate,
-                    'raw' => $r['raw'] ?? null,
-                ];
-                $primary->raw_payload = $raw;
-                $primary->save();
+                $stats['orders_matched_shipments'] += (int) ($applyRes['matched_orders'] ?? 0);
+                $stats['shipments_updated'] += (int) ($applyRes['updated_shipments'] ?? 0);
+                $stats['orders_with_multi_shipments'] += (int) ($applyRes['multi_ship_orders'] ?? 0);
             }
         });
 
-        return compact('stats');
+        $stats['orders_unmatched_shipments'] = max(0, $stats['orders_parsed'] - $stats['orders_matched_shipments']);
+
+        return ['stats' => $stats];
+    }
+
+    private function dedupeRowsByOrderId(array $rows): array
+    {
+        $orderIds = [];
+        $rowByOrder = [];
+        $skippedNoOrderId = 0;
+        $skippedDedupe = 0;
+
+        foreach ($rows as $r) {
+            $oid = trim((string) ($r['platform_order_id'] ?? ''));
+            if ($oid === '') {
+                $skippedNoOrderId++;
+                continue;
+            }
+
+            if (isset($orderIds[$oid])) {
+                $skippedDedupe++; // ada duplikat, last wins
+            }
+
+            $orderIds[$oid] = true;
+            $rowByOrder[$oid] = $r;
+        }
+
+        return [array_keys($orderIds), $rowByOrder, $skippedNoOrderId, $skippedDedupe];
     }
 }

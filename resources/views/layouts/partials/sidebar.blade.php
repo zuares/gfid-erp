@@ -77,17 +77,43 @@
     $hasShopeeImportIncomeForm = $router->has('marketplace.shopee.import-income.form');
     $hasMarketplacePayoutReport = $router->has('marketplace.reports.payout.index');
 
-    // Marketplace Reconcile Queue (NEW)
+    // Marketplace Reconcile
     $hasMarketplaceReconcileQueue = $router->has('marketplace.reconcile.queue');
+    $hasMarketplaceReconcileQueueBulk = $router->has('marketplace.reconcile.queue.bulk');
+    $hasMarketplaceReconcilePreview = $router->has('marketplace.reconcile.preview');
+    $hasMarketplaceReconcileCommit = $router->has('marketplace.reconcile.commit');
 
-    // Imports (routes terbaru)
+    $hasMarketplaceReconciliationsResolve = $router->has('marketplace.reconciliations.resolve');
+    $hasMarketplaceReconciliationsDiff = $router->has('marketplace.reconciliations.diff');
+
+    $hasMarketplaceReconcileItemsIndex = $router->has('marketplace.reconcile.items');
+    $hasMarketplaceReconcileItemsApply = $router->has('marketplace.reconcile.items.apply');
+    $hasMarketplaceReconcileItemsPackets = $router->has('marketplace.reconcile.items.packets');
+
+    // =========================================================
+    // IMPORTS (UPDATED sesuai routes terbaru yang kamu kasih)
+    // =========================================================
+
+    // imports.marketplace.*
     $hasImportsMarketplaceIndex  = $router->has('imports.marketplace.index');
     $hasImportsMarketplaceCreate = $router->has('imports.marketplace.create');
-    $hasImportsMarketplaceDraft  = $router->has('imports.marketplace.draft');
     $hasImportsMarketplaceExport = $router->has('imports.marketplace.export');
-    $hasImportsMarketplaceShow   = $router->has('imports.marketplace.show');
+    $hasImportsMarketplaceDraft  = $router->has('imports.marketplace.draft');
+    $hasImportsMarketplacePreview = $router->has('imports.marketplace.preview');
+    $hasImportsMarketplaceCommit  = $router->has('imports.marketplace.commit');
+    $hasImportsMarketplaceCancel  = $router->has('imports.marketplace.cancel');
+    $hasImportsMarketplaceShow    = $router->has('imports.marketplace.show');
 
+    // imports.marketplace_income.*
+    $hasImportsMarketplaceIncomeIndex  = $router->has('imports.marketplace_income.index');
     $hasImportsMarketplaceIncomeCreate = $router->has('imports.marketplace_income.create');
+    $hasImportsMarketplaceIncomeDraft  = $router->has('imports.marketplace_income.draft');
+    $hasImportsMarketplaceIncomePreview = $router->has('imports.marketplace_income.preview');
+    $hasImportsMarketplaceIncomeCommit  = $router->has('imports.marketplace_income.commit');
+    $hasImportsMarketplaceIncomeCancel  = $router->has('imports.marketplace_income.cancel');
+    $hasImportsMarketplaceIncomeShow    = $router->has('imports.marketplace_income.show');
+    $hasImportsMarketplaceIncomeOrderShow = $router->has('imports.marketplace_income.order.show');
+    $hasImportsMarketplaceIncomeApply = $router->has('imports.marketplace_income.apply');
 
     // Production
     $hasProdCuttingJobsIndex = $router->has('production.cutting_jobs.index');
@@ -125,16 +151,16 @@
     $open = fn ($pattern) => request()->routeIs($pattern);
 
     $openMaster = $open('master.*');
-
     $openPurchasing = $open('purchasing.*');
-
     $openMarketplaceOrders = $open('marketplace.orders.*');
 
     $openMarketplaceTools =
         $open('marketplace.shopee.*') ||
         $open('marketplace.reports.*') ||
-        $open('marketplace.reconcile.*');
+        $open('marketplace.reconcile.*') ||
+        $open('marketplace.reconciliations.*');
 
+    // ✅ updated: imports route groups terbaru
     $openImports =
         $open('imports.marketplace.*') ||
         $open('imports.marketplace_income.*');
@@ -224,12 +250,8 @@
     $pieceworkSewingActive = request()->routeIs('payroll.piecework.*') && $activeModule === 'sewing';
 
     // =========================================================
-    // QUICK HELPERS (rapihin markup)
+    // QUICK HELPERS
     // =========================================================
-    $section = function (string $label) {
-        echo '<x-sidebar.label text="' . e($label) . '" />';
-    };
-
     $subhead = function (string $text) {
         echo '<div class="sidebar-subhead">' . e($text) . '</div>';
     };
@@ -243,7 +265,7 @@
             position: fixed;
             top: 0;
             left: 0;
-            width: 250px;
+            width: 260px;
             height: 100vh;
             padding: 1rem 1rem 1.6rem;
             display: flex;
@@ -261,7 +283,7 @@
         }
 
         .app-main {
-            margin-left: 250px;
+            margin-left: 260px;
         }
     }
 
@@ -371,14 +393,6 @@
         background: var(--accent);
     }
 
-    .menu-label {
-        color: var(--muted);
-        padding-left: .5rem;
-        margin-bottom: .25rem;
-        letter-spacing: .08em;
-        font-size: .7rem;
-    }
-
     .sidebar-subhead{
         padding: .35rem .9rem .15rem 1.05rem;
         font-size:.68rem;
@@ -422,12 +436,12 @@
         {{-- GUEST --}}
         @if (!$user)
             {{-- no menu --}}
+
         @elseif ($isAdmin || $isOperating)
             {{-- =========================================================
                 ADMIN / OPERATING (simple, non-collapsible)
             ========================================================= --}}
 
-            {{-- Inventory Core --}}
             <x-sidebar.label text="Operations" />
             <li class="simple-group">
                 @if ($hasInvStocksItems)
@@ -475,16 +489,38 @@
                 </li>
             @endif
 
+            {{-- Marketplace Reconcile --}}
+            @if ($canShow($hasMarketplaceReconcileQueue, $hasMarketplaceReconcileItemsIndex))
+                <x-sidebar.label text="Marketplace" />
+                <li class="simple-group">
+                    @if ($hasMarketplaceReconcileQueue)
+                        <x-sidebar.simple-link href="{{ route('marketplace.reconcile.queue') }}" icon="🧩"
+                            :active="request()->routeIs('marketplace.reconcile.*') || request()->routeIs('marketplace.reconciliations.*')">
+                            Reconcile Queue
+                        </x-sidebar.simple-link>
+                    @endif
+
+                    @if ($hasMarketplaceReconcileItemsIndex)
+                        <x-sidebar.simple-link href="{{ route('marketplace.reconcile.items') }}" icon="🧾"
+                            :active="request()->routeIs('marketplace.reconcile.items*')">
+                            Reconcile Items
+                        </x-sidebar.simple-link>
+                    @endif
+                </li>
+            @endif
+
             {{-- Imports (admin only) --}}
             @if ($isAdmin && $canShow(
                 $hasImportsMarketplaceIndex,
                 $hasImportsMarketplaceDraft,
                 $hasImportsMarketplaceCreate,
                 $hasImportsMarketplaceExport,
-                $hasImportsMarketplaceIncomeCreate
+                $hasImportsMarketplaceIncomeCreate,
+                $hasImportsMarketplaceIncomeIndex
             ))
                 <x-sidebar.label text="Imports" />
                 <li class="simple-group">
+
                     @if ($hasImportsMarketplaceIndex)
                         <x-sidebar.simple-link href="{{ route('imports.marketplace.index') }}" icon="⬆️"
                             :active="request()->routeIs('imports.marketplace.*')">
@@ -495,16 +531,24 @@
                     @if ($hasImportsMarketplaceDraft)
                         <x-sidebar.simple-link href="{{ route('imports.marketplace.draft') }}" icon="🕘"
                             :active="request()->routeIs('imports.marketplace.draft')">
-                            Draft Import (Terakhir)
+                            Draft Shipments
                         </x-sidebar.simple-link>
                     @endif
 
-                    @if ($hasImportsMarketplaceIncomeCreate)
-                        <x-sidebar.simple-link href="{{ route('imports.marketplace_income.create') }}" icon="💵"
+                    @if ($hasImportsMarketplaceIncomeIndex)
+                        <x-sidebar.simple-link href="{{ route('imports.marketplace_income.index') }}" icon="💵"
                             :active="request()->routeIs('imports.marketplace_income.*')">
                             Import Marketplace Income
                         </x-sidebar.simple-link>
                     @endif
+
+                    @if ($hasImportsMarketplaceIncomeDraft)
+                        <x-sidebar.simple-link href="{{ route('imports.marketplace_income.draft') }}" icon="🕘"
+                            :active="request()->routeIs('imports.marketplace_income.draft')">
+                            Draft Income
+                        </x-sidebar.simple-link>
+                    @endif
+
                 </li>
             @endif
 
@@ -583,7 +627,7 @@
                 </li>
             @endif
 
-            {{-- Finance (admin + operating) --}}
+            {{-- Finance --}}
             @if ($canShow(
                 $hasCashExpensesIndex,
                 $hasJournalsIndex,
@@ -753,7 +797,13 @@
             @endif
 
             {{-- Marketplace Tools --}}
-            @if ($canShow($hasMarketplaceReconcileQueue, $hasShopeeImportOrdersForm, $hasShopeeImportIncomeForm, $hasMarketplacePayoutReport))
+            @if ($canShow(
+                $hasMarketplaceReconcileQueue,
+                $hasMarketplaceReconcileItemsIndex,
+                $hasShopeeImportOrdersForm,
+                $hasShopeeImportIncomeForm,
+                $hasMarketplacePayoutReport
+            ))
                 <li class="mb-1">
                     <button class="sidebar-link sidebar-toggle {{ $openMarketplaceTools ? 'is-open' : '' }}" type="button"
                         data-bs-toggle="collapse" data-bs-target="#navMarketplaceTools"
@@ -765,12 +815,29 @@
 
                     <div class="collapse {{ $openMarketplaceTools ? 'show' : '' }}" id="navMarketplaceTools">
 
-                        @if ($hasMarketplaceReconcileQueue)
+                        @if ($canShow($hasMarketplaceReconcileQueue, $hasMarketplaceReconcileItemsIndex))
                             @php $subhead('Reconcile'); @endphp
-                            <x-sidebar.sub-link href="{{ route('marketplace.reconcile.queue') }}" icon="🧩"
-                                :active="request()->routeIs('marketplace.reconcile.*')">
-                                Reconcile Queue
-                            </x-sidebar.sub-link>
+
+                            @if ($hasMarketplaceReconcileQueue)
+                                <x-sidebar.sub-link href="{{ route('marketplace.reconcile.queue') }}" icon="🧩"
+                                    :active="request()->routeIs('marketplace.reconcile.*') || request()->routeIs('marketplace.reconciliations.*')">
+                                    Reconcile Queue
+                                </x-sidebar.sub-link>
+                            @endif
+
+                            @if ($hasMarketplaceReconcileItemsIndex)
+                                <x-sidebar.sub-link href="{{ route('marketplace.reconcile.items') }}" icon="🧾"
+                                    :active="request()->routeIs('marketplace.reconcile.items*')">
+                                    Reconcile Items
+                                </x-sidebar.sub-link>
+                            @endif
+
+                            @if ($hasMarketplaceReconcileItemsPackets)
+                                <x-sidebar.sub-link href="{{ route('marketplace.reconcile.items.packets') }}" icon="📦"
+                                    :active="request()->routeIs('marketplace.reconcile.items.packets')">
+                                    Packets (Debug)
+                                </x-sidebar.sub-link>
+                            @endif
                         @endif
 
                         @if ($hasShopeeImportOrdersForm || $hasShopeeImportIncomeForm)
@@ -800,13 +867,15 @@
                 </li>
             @endif
 
-            {{-- IMPORTS --}}
+            {{-- IMPORTS (UPDATED 100%) --}}
             @if ($canShow(
                 $hasImportsMarketplaceIndex,
                 $hasImportsMarketplaceCreate,
                 $hasImportsMarketplaceDraft,
                 $hasImportsMarketplaceExport,
-                $hasImportsMarketplaceIncomeCreate
+                $hasImportsMarketplaceIncomeIndex,
+                $hasImportsMarketplaceIncomeCreate,
+                $hasImportsMarketplaceIncomeDraft
             ))
                 <x-sidebar.label text="Data Ingest" />
                 <li class="mb-1">
@@ -820,24 +889,28 @@
 
                     <div class="collapse {{ $openImports ? 'show' : '' }}" id="navImports">
                         @php $subhead('Marketplace Shipments'); @endphp
+
                         @if ($hasImportsMarketplaceIndex)
                             <x-sidebar.sub-link href="{{ route('imports.marketplace.index') }}" icon="≡"
                                 :active="request()->routeIs('imports.marketplace.index') || request()->routeIs('imports.marketplace.show')">
                                 Daftar Import
                             </x-sidebar.sub-link>
                         @endif
+
                         @if ($hasImportsMarketplaceCreate)
                             <x-sidebar.sub-link href="{{ route('imports.marketplace.create') }}" icon="＋"
                                 :active="request()->routeIs('imports.marketplace.create')">
                                 Import Baru
                             </x-sidebar.sub-link>
                         @endif
+
                         @if ($hasImportsMarketplaceDraft)
                             <x-sidebar.sub-link href="{{ route('imports.marketplace.draft') }}" icon="🕘"
                                 :active="request()->routeIs('imports.marketplace.draft')">
                                 Draft Terakhir
                             </x-sidebar.sub-link>
                         @endif
+
                         @if ($hasImportsMarketplaceExport)
                             <x-sidebar.sub-link href="{{ route('imports.marketplace.export') }}" icon="⤓"
                                 :active="request()->routeIs('imports.marketplace.export')">
@@ -846,17 +919,41 @@
                         @endif
 
                         @php $subhead('Marketplace Income'); @endphp
-                        @if ($hasImportsMarketplaceIncomeCreate)
-                            <x-sidebar.sub-link href="{{ route('imports.marketplace_income.create') }}" icon="💵"
-                                :active="request()->routeIs('imports.marketplace_income.*')">
-                                Import Income
+
+                        @if ($hasImportsMarketplaceIncomeIndex)
+                            <x-sidebar.sub-link href="{{ route('imports.marketplace_income.index') }}" icon="≡"
+                                :active="request()->routeIs('imports.marketplace_income.index')">
+                                Daftar Batch Income
                             </x-sidebar.sub-link>
                         @endif
+
+                        @if ($hasImportsMarketplaceIncomeCreate)
+                            <x-sidebar.sub-link href="{{ route('imports.marketplace_income.create') }}" icon="＋"
+                                :active="request()->routeIs('imports.marketplace_income.create')">
+                                Import Income Baru
+                            </x-sidebar.sub-link>
+                        @endif
+
+                        @if ($hasImportsMarketplaceIncomeDraft)
+                            <x-sidebar.sub-link href="{{ route('imports.marketplace_income.draft') }}" icon="🕘"
+                                :active="request()->routeIs('imports.marketplace_income.draft')">
+                                Draft Income (Terakhir)
+                            </x-sidebar.sub-link>
+                        @endif
+
+                        {{-- helper links saat sedang di halaman show/order --}}
+                        @if ($hasImportsMarketplaceIncomeShow || $hasImportsMarketplaceIncomeOrderShow)
+                            <x-sidebar.sub-link href="{{ route('imports.marketplace_income.index') }}" icon="↩️"
+                                :active="false">
+                                Kembali ke List Income
+                            </x-sidebar.sub-link>
+                        @endif
+
                     </div>
                 </li>
             @endif
 
-            {{-- SALES (Invoices / Shipments / Reports) --}}
+            {{-- SALES --}}
             @if ($canShow(
                 $hasSalesInvoicesIndex,
                 $hasSalesInvoicesCreate,
@@ -879,7 +976,6 @@
                     </button>
 
                     <div class="collapse {{ $openSales ? 'show' : '' }}" id="navSales">
-
                         @php $subhead('Invoices'); @endphp
                         @if ($hasSalesInvoicesIndex)
                             <x-sidebar.sub-link href="{{ route('sales.invoices.index') }}" icon="≡"

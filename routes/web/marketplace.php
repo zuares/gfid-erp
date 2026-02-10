@@ -2,6 +2,7 @@
 
 use App\Http\Controllers\Marketplace\MarketplaceOrderController;
 use App\Http\Controllers\Marketplace\MpReconciliationController;
+use App\Http\Controllers\Marketplace\MpReconciliationItemsController;
 use App\Http\Controllers\Marketplace\MpReconciliationQueueController;
 use Illuminate\Support\Facades\Route;
 
@@ -36,4 +37,14 @@ Route::middleware(['web', 'auth'])
             ->name('reconciliations.resolve');
         Route::get('reconciliations/{rec}/diff', [MpReconciliationController::class, 'diff'])
             ->name('reconciliations.diff');
+
+        Route::get('reconcile-items', [MpReconciliationItemsController::class, 'index'])
+            ->name('reconcile.items');
+
+        Route::post('reconcile-items/apply', [MpReconciliationItemsController::class, 'apply'])
+            ->name('reconcile.items.apply');
+
+        Route::get('reconcile-items/packets', [MpReconciliationItemsController::class, 'packets'])
+            ->name('reconcile.items.packets');
+
     });
