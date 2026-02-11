@@ -12,7 +12,7 @@ use Illuminate\Support\Facades\DB;
 use PhpOffice\PhpSpreadsheet\IOFactory;
 use PhpOffice\PhpSpreadsheet\Shared\Date as ExcelDate;
 
-class ImportMarketplaceOrders extends Command
+class ImportShopeeOrdersToSalesInvoices extends Command
 {
     protected $signature = 'orders:import
         {--platform= : shopee|tiktok|lazada|tokopedia (wajib)}
