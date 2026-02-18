@@ -4,7 +4,6 @@ use App\Http\Controllers\Marketplace\MarketplaceOrderController;
 use App\Http\Controllers\Marketplace\MpReconciliationController;
 use App\Http\Controllers\Marketplace\MpReconciliationItemsController;
 use App\Http\Controllers\Marketplace\MpReconciliationQueueController;
-use Illuminate\Support\Facades\Route;
 
 Route::middleware(['web', 'auth'])
     ->prefix('marketplace')
@@ -17,10 +16,15 @@ Route::middleware(['web', 'auth'])
         Route::resource('orders', MarketplaceOrderController::class)
             ->only(['index', 'show', 'create', 'store']);
 
+        Route::get('reports/sales', [MarketplaceOrderController::class, 'salesSummary'])
+            ->name('reports.sales');
+
+        Route::get('reports/sales/export', [MarketplaceOrderController::class, 'salesSummaryCsv'])
+            ->name('reports.sales.export');
+
         // =========================
         // Marketplace Reconciliation (Domain)
         // =========================
-
         Route::get('reconcile/queue', [MpReconciliationQueueController::class, 'index'])
             ->name('reconcile.queue');
 
@@ -35,6 +39,7 @@ Route::middleware(['web', 'auth'])
 
         Route::post('reconciliations/{rec}/resolve', [MpReconciliationController::class, 'resolve'])
             ->name('reconciliations.resolve');
+
         Route::get('reconciliations/{rec}/diff', [MpReconciliationController::class, 'diff'])
             ->name('reconciliations.diff');
 
@@ -46,5 +51,4 @@ Route::middleware(['web', 'auth'])
 
         Route::get('reconcile-items/packets', [MpReconciliationItemsController::class, 'packets'])
             ->name('reconcile.items.packets');
-
     });
