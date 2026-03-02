@@ -41,21 +41,12 @@ Route::middleware(['web', 'auth', 'role:owner,operating'])
 
         /*
     |--------------------------------------------------------------------------
-    | QC (List)
+    | QC
     |--------------------------------------------------------------------------
      */
         Route::get('/qc', [QcController::class, 'index'])->name('qc.index');
 
-        /*
-    |--------------------------------------------------------------------------
-    | QC (Actions)
-    |--------------------------------------------------------------------------
-     */
         Route::prefix('qc')->name('qc.')->group(function () {
-
-            // ==========================================================
-            // QC CUTTING
-            // ==========================================================
             Route::get('/cutting/{cuttingJob}/edit', [QcController::class, 'editCutting'])
                 ->name('cutting.edit');
 
@@ -66,21 +57,13 @@ Route::middleware(['web', 'auth', 'role:owner,operating'])
                 ->middleware('role:owner')
                 ->name('cutting.cancel');
 
-            // ✅ NEW: revert status Cutting Job sent_to_qc -> cutting (OWNER ONLY)
-            // name: production.qc.cutting.revert_to_cutting
             Route::post('/cutting/{cuttingJob}/revert-to-cutting', [QcController::class, 'revertCuttingToCutting'])
                 ->middleware('role:owner')
                 ->name('cutting.revert_to_cutting');
 
-            // ✅ QC Adjustment per bundle (OWNER ONLY)
-            // name FINAL: production.qc.cutting.bundle_adjust
             Route::post('/cutting/{cuttingJob}/bundles/{bundle}/adjust', [QcController::class, 'adjustCuttingBundle'])
                 ->middleware('role:owner')
                 ->name('cutting.bundle_adjust');
-
-            // ==========================================================
-            // (opsional) nanti QC SEWING / QC FINISHING / QC PACKING bisa masuk sini
-            // ==========================================================
         });
 
         /*
@@ -112,15 +95,20 @@ Route::middleware(['web', 'auth', 'role:owner,operating'])
             Route::prefix('returns')->name('returns.')->group(function () {
                 Route::get('/', [SewingReturnController::class, 'index'])->name('index');
 
-                Route::get('/create', [SewingReturnController::class, 'create'])->name('create');
-                Route::post('/', [SewingReturnController::class, 'store'])->name('store');
+                // ❌ create & store DIPINDAH ke group role:owner,admin,operating (lihat bawah)
 
-                Route::get('/{return}', [SewingReturnController::class, 'show'])->name('show');
+                // ✅ penting: biar "create" gak ketangkep /{return}
+                Route::get('/{return}', [SewingReturnController::class, 'show'])
+                    ->whereNumber('return')
+                    ->name('show');
 
-                // ✅ VOID Sewing Return
-                Route::post('/{return}/void', [SewingReturnController::class, 'void'])->name('void');
+                Route::post('/{return}/void', [SewingReturnController::class, 'void'])
+                    ->whereNumber('return')
+                    ->name('void');
 
-                Route::delete('/{return}', [SewingReturnController::class, 'destroy'])->name('destroy');
+                Route::delete('/{return}', [SewingReturnController::class, 'destroy'])
+                    ->whereNumber('return')
+                    ->name('destroy');
             });
         });
 
@@ -187,7 +175,7 @@ Route::middleware(['web', 'auth', 'role:owner,operating'])
 
         /*
     |--------------------------------------------------------------------------
-    | SEWING REPORTS (production.reports.*)
+    | SEWING REPORTS
     |--------------------------------------------------------------------------
      */
         Route::prefix('sewing/reports')->name('reports.')->group(function () {
@@ -205,14 +193,29 @@ Route::middleware(['web', 'auth', 'role:owner,operating'])
 
 /*
 |--------------------------------------------------------------------------
-| PRODUCTION (Owner + Admin + Operating) — WIP-FIN ADJUSTMENTS
+| PRODUCTION (Owner + Admin + Operating) — Sewing Return CREATE + STORE
 |--------------------------------------------------------------------------
+| ✅ ini yang membuka akses admin ke:
+|   GET  /production/sewing/returns/create
+|   POST /production/sewing/returns
  */
 Route::middleware(['web', 'auth', 'role:owner,admin,operating'])
     ->prefix('production')
     ->name('production.')
     ->group(function () {
 
+        Route::prefix('sewing')->name('sewing.')->group(function () {
+            Route::prefix('returns')->name('returns.')->group(function () {
+                Route::get('/create', [SewingReturnController::class, 'create'])->name('create');
+                Route::post('/', [SewingReturnController::class, 'store'])->name('store');
+            });
+        });
+
+        /*
+    |--------------------------------------------------------------------------
+    | WIP-FIN ADJUSTMENTS
+    |--------------------------------------------------------------------------
+     */
         Route::resource('wip-fin-adjustments', WipFinAdjustmentController::class)
             ->except(['destroy']);
 

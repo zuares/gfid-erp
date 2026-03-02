@@ -154,15 +154,15 @@
         catch (\Throwable $e) { return $d; }
     };
 
-    // tujuan gudang (expect dari controller)
+    // controller mengirim:
+    // - $destinationWarehouses (collection)
+    // - $defaultDestWarehouseId (int)
+    // - $canChooseDestination (bool) => true hanya owner
     $destinationWarehouses = $destinationWarehouses ?? collect();
-    // default: WH-PRD kalau ada, kalau tidak ambil pertama
-    $defaultDestId = (int) (
-        $destinationWarehouses->firstWhere('code','WH-PRD')->id
-        ?? $destinationWarehouses->first()->id
-        ?? 0
-    );
-    $selectedDestId = (int) old('destination_warehouse_id', $defaultDestId);
+    $defaultDestWarehouseId = (int) ($defaultDestWarehouseId ?? 0);
+
+    $selectedDestId = (int) old('destination_warehouse_id', $defaultDestWarehouseId);
+    $canChooseDestination = (bool) ($canChooseDestination ?? false);
 
     // ===== ALL MODE: build accordion per item -> operator breakdown (sum remaining)
     $groupsAll = collect();
@@ -295,30 +295,32 @@
                             @enderror
                         </div>
 
-                      <div class="col-6 col-md-3">
-    <label class="form-label form-label-sm">Tujuan Barang Jadi</label>
+                        {{-- ✅ Tujuan Barang Jadi: OWNER boleh pilih; non-owner disembunyikan (hidden input) --}}
+                        <div class="col-6 col-md-3" id="dest-wrap" style="{{ $canChooseDestination ? '' : 'display:none;' }}">
+                            <label class="form-label form-label-sm">Tujuan Barang Jadi</label>
 
-    <select name="destination_warehouse_id"
-        class="form-select form-select-sm @error('destination_warehouse_id') is-invalid @enderror">
+                            <select id="destination" name="destination_warehouse_id"
+                                class="form-select form-select-sm @error('destination_warehouse_id') is-invalid @enderror">
+                                @foreach($destinationWarehouses as $wh)
+                                    <option value="{{ $wh->id }}"
+                                        @selected((int) old('destination_warehouse_id', $defaultDestWarehouseId) === (int) $wh->id)>
+                                        {{ $wh->code }} — {{ $wh->name }}
+                                        @if($wh->code === 'WH-RTS')
+                                            (Owner Only)
+                                        @endif
+                                    </option>
+                                @endforeach
+                            </select>
 
-        @foreach($destWarehouses as $wh)
-            <option value="{{ $wh->id }}"
-                @selected(old('destination_warehouse_id', $defaultDestWarehouseId) == $wh->id)>
-                {{ $wh->code }} — {{ $wh->name }}
-                @if($wh->code === 'WH-RTS')
-                    (Owner Only)
-                @endif
-            </option>
-        @endforeach
+                            @error('destination_warehouse_id')
+                                <div class="invalid-feedback">{{ $message }}</div>
+                            @enderror
+                        </div>
 
-    </select>
+                        @if(!$canChooseDestination)
+                            <input type="hidden" name="destination_warehouse_id" value="{{ (int) $defaultDestWarehouseId }}">
+                        @endif
 
-    @error('destination_warehouse_id')
-        <div class="invalid-feedback">{{ $message }}</div>
-    @enderror
-
-
-</div>
                         <div class="col-6 col-md-2">
                             <label class="form-label form-label-sm">Filter item</label>
                             <select id="item-filter" class="form-select form-select-sm">
@@ -644,6 +646,7 @@ document.addEventListener('DOMContentLoaded', () => {
     const itemFilter = document.getElementById('item-filter');
     const q = document.getElementById('q');
 
+    // ✅ fixed: sekarang id-nya beneran ada
     const destWrap = document.getElementById('dest-wrap');
     const destination = document.getElementById('destination');
 
@@ -783,7 +786,8 @@ document.addEventListener('DOMContentLoaded', () => {
         if (topActionsInput) topActionsInput.style.display = all ? 'none' : '';
         if (fabWrap) fabWrap.style.display = all ? 'none' : '';
 
-        if (destWrap) destWrap.style.display = all ? 'none' : '';
+        // tujuan hanya relevan untuk mode input
+        if (destWrap) destWrap.style.display = all ? 'none' : (destWrap.style.display || '');
 
         if (btnOpenModal) btnOpenModal.disabled = all ? true : btnOpenModal.disabled;
     }
@@ -793,7 +797,8 @@ document.addEventListener('DOMContentLoaded', () => {
 
         if (isAllMode()) { btnOpenModal.disabled = true; return 0; }
 
-        // wajib tujuan (kalau select available)
+        // tujuan wajib ada nilainya (select owner / hidden input non-owner)
+        // kalau owner: select exist
         if (destination && destination.value === '') { btnOpenModal.disabled = true; return 0; }
 
         let total = 0;

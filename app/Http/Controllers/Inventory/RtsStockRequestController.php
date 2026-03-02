@@ -29,37 +29,48 @@ class RtsStockRequestController extends Controller
      */
     public function index(Request $request): View
     {
-        $statusFilter = $request->input('status', 'submitted'); // submitted|completed|all
-        $period = $request->input('period', 'today'); // today|week|month|all
+        // ✅ Default tab: ALL untuk status & period
+        $statusFilter = (string) $request->input('status', 'all'); // submitted|completed|all
+        $period = (string) $request->input('period', 'all'); // today|week|month|all
+
+        // Normalisasi input (biar aman dari input aneh)
+        if (!in_array($statusFilter, ['submitted', 'completed', 'all'], true)) {
+            $statusFilter = 'all';
+        }
+        if (!in_array($period, ['today', 'week', 'month', 'all'], true)) {
+            $period = 'all';
+        }
+
+        $now = Carbon::now();
 
         $dateFrom = null;
         $dateTo = null;
 
         switch ($period) {
-            case 'week':
-                $dateFrom = Carbon::now()->startOfWeek();
-                $dateTo = Carbon::now()->endOfWeek();
-                break;
-            case 'month':
-                $dateFrom = Carbon::now()->startOfMonth();
-                $dateTo = Carbon::now()->endOfMonth();
-                break;
-            case 'all':
-                break;
             case 'today':
+                $dateFrom = $now->copy()->startOfDay();
+                $dateTo = $now->copy()->endOfDay();
+                break;
+
+            case 'week':
+                $dateFrom = $now->copy()->startOfWeek();
+                $dateTo = $now->copy()->endOfWeek();
+                break;
+
+            case 'month':
+                $dateFrom = $now->copy()->startOfMonth();
+                $dateTo = $now->copy()->endOfMonth();
+                break;
+
+            case 'all':
             default:
-                $dateFrom = Carbon::today();
-                $dateTo = Carbon::today();
-                $period = 'today';
+                // no date filter
                 break;
         }
 
         $applyDateFilter = function ($query) use ($dateFrom, $dateTo) {
             if ($dateFrom && $dateTo) {
-                $query->whereBetween('date', [
-                    $dateFrom->copy()->startOfDay(),
-                    $dateTo->copy()->endOfDay(),
-                ]);
+                $query->whereBetween('date', [$dateFrom, $dateTo]);
             }
             return $query;
         };
@@ -92,20 +103,16 @@ class RtsStockRequestController extends Controller
 
         $listQuery = clone $baseQuery;
 
-        switch ($statusFilter) {
-            case 'submitted':
-            case 'completed':
-                $listQuery->where('status', $statusFilter);
-                break;
-            case 'all':
-            default:
-                $statusFilter = 'all';
-                break;
+        // status filter
+        if (in_array($statusFilter, ['submitted', 'completed'], true)) {
+            $listQuery->where('status', $statusFilter);
+        } else {
+            $statusFilter = 'all';
         }
 
         $stockRequests = $listQuery
-            ->orderBy('date', 'DESC')
-            ->orderBy('id', 'DESC')
+            ->orderByDesc('date')
+            ->orderByDesc('id')
             ->paginate(20)
             ->withQueryString();
 

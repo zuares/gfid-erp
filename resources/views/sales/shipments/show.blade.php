@@ -9,9 +9,13 @@
     .cardx{ background:var(--card); border:1px solid var(--line); border-radius:14px; overflow:hidden; }
     .cardx-hd{ padding:14px 16px; border-bottom:1px solid var(--line); }
     .cardx-bd{ padding:14px 16px; }
+
     .grid{ display:grid; gap:12px; }
     .grid-3{ grid-template-columns: repeat(3, minmax(0, 1fr)); }
-    @media (max-width: 860px){ .grid-3{ grid-template-columns:1fr; } }
+    .grid-2{ grid-template-columns: repeat(2, minmax(0, 1fr)); }
+    @media (max-width: 860px){
+        .grid-3, .grid-2{ grid-template-columns:1fr; }
+    }
 
     .mono{ font-variant-numeric: tabular-nums; font-family: ui-monospace, SFMono-Regular, Menlo, Consolas; }
     .muted{ opacity:.75; }
@@ -42,6 +46,16 @@
 @endpush
 
 @section('content')
+@php
+    $canSeeNominal = $canSeeNominal ?? ((auth()->user()->role ?? null) !== 'admin');
+
+    $shipDateTxt = '-';
+    if (!empty($shipment->date)) {
+        try { $shipDateTxt = \Illuminate\Support\Carbon::parse($shipment->date)->format('Y-m-d'); }
+        catch (\Throwable $e) { $shipDateTxt = is_string($shipment->date) ? $shipment->date : '-'; }
+    }
+@endphp
+
 <div class="page-wrap">
 
     {{-- Header --}}
@@ -49,14 +63,6 @@
         <div class="cardx-hd" style="display:flex;align-items:flex-start;justify-content:space-between;gap:12px; flex-wrap:wrap;">
             <div>
                 <div style="font-weight:800; font-size:1.1rem;">Shipment {{ $shipment->code }}</div>
-
-                @php
-                    $shipDateTxt = '-';
-                    if (!empty($shipment->date)) {
-                        try { $shipDateTxt = \Illuminate\Support\Carbon::parse($shipment->date)->format('Y-m-d'); }
-                        catch (\Throwable $e) { $shipDateTxt = is_string($shipment->date) ? $shipment->date : '-'; }
-                    }
-                @endphp
 
                 <div class="muted" style="margin-top:4px;">
                     Store: <span class="mono">{{ $shipment->store?->code ?? '-' }}</span> •
@@ -81,49 +87,48 @@
                     Created by: {{ $shipment->creator?->name ?? '-' }}
                 </div>
 
-              <div class="actions" style="margin-top:10px;">
-    <a class="btnx" href="{{ route('sales.shipments.index') }}">← Back</a>
+                <div class="actions" style="margin-top:10px;">
+                    <a class="btnx" href="{{ route('sales.shipments.index') }}">← Back</a>
 
-    @if($shipment->lines->isNotEmpty())
-        <a class="btnx" href="{{ route('sales.shipments.export_lines', $shipment) }}">
-            ⬇️ Export CSV
-        </a>
-    @else
-        <span class="btnx" style="opacity:.5; pointer-events:none;">⬇️ Export CSV</span>
-    @endif
+                    @if($shipment->lines->isNotEmpty())
+                        <a class="btnx" href="{{ route('sales.shipments.export_lines', $shipment) }}">⬇️ Export CSV</a>
+                    @else
+                        <span class="btnx" style="opacity:.5; pointer-events:none;">⬇️ Export CSV</span>
+                    @endif
 
-    @if(($shipment->status ?? '') === 'draft' && empty($shipment->posted_at) && empty($shipment->cancelled_at))
-        <a class="btnx btnx-primary" href="{{ route('sales.shipments.edit', $shipment) }}">
-            ➕ Lanjut Input / Scan
-        </a>
-    @endif
-</div>
-
+                    @if(($shipment->status ?? '') === 'draft' && empty($shipment->posted_at) && empty($shipment->cancelled_at))
+                        <a class="btnx btnx-primary" href="{{ route('sales.shipments.edit', $shipment) }}">➕ Lanjut Input / Scan</a>
+                    @endif
+                </div>
             </div>
         </div>
 
         <div class="cardx-bd">
-            <div class="grid grid-3">
+            <div class="grid {{ $canSeeNominal ? 'grid-3' : 'grid-2' }}">
                 <div class="cardx" style="border-radius:12px;">
                     <div class="cardx-bd">
                         <div class="muted" style="font-size:.85rem;">Total Qty</div>
                         <div class="mono" style="font-size:1.4rem; font-weight:800;">{{ number_format($totalQty) }}</div>
                     </div>
                 </div>
+
                 <div class="cardx" style="border-radius:12px;">
                     <div class="cardx-bd">
                         <div class="muted" style="font-size:.85rem;">Total Lines</div>
                         <div class="mono" style="font-size:1.4rem; font-weight:800;">{{ number_format($totalLines) }}</div>
                     </div>
                 </div>
-                <div class="cardx" style="border-radius:12px;">
-                    <div class="cardx-bd">
-                        <div class="muted" style="font-size:.85rem;">Estimasi HPP</div>
-                        <div class="mono" style="font-size:1.4rem; font-weight:800;">
-                            {{ number_format($totalHpp, 0, ',', '.') }}
+
+                @if($canSeeNominal)
+                    <div class="cardx" style="border-radius:12px;">
+                        <div class="cardx-bd">
+                            <div class="muted" style="font-size:.85rem;">Estimasi HPP</div>
+                            <div class="mono" style="font-size:1.4rem; font-weight:800;">
+                                {{ number_format($totalHpp, 0, ',', '.') }}
+                            </div>
                         </div>
                     </div>
-                </div>
+                @endif
             </div>
         </div>
     </div>
@@ -146,7 +151,9 @@
                                 <th>Kategori</th>
                                 <th class="r">Lines</th>
                                 <th class="r">Qty</th>
-                                <th class="r">Total HPP</th>
+                                @if($canSeeNominal)
+                                    <th class="r">Total HPP</th>
+                                @endif
                             </tr>
                         </thead>
                         <tbody>
@@ -155,7 +162,9 @@
                                     <td>{{ $row['category_name'] }}</td>
                                     <td class="mono r">{{ number_format((int)$row['total_lines']) }}</td>
                                     <td class="mono r">{{ number_format((int)$row['total_qty']) }}</td>
-                                    <td class="mono r">{{ number_format((float)$row['total_hpp'], 0, ',', '.') }}</td>
+                                    @if($canSeeNominal)
+                                        <td class="mono r">{{ number_format((float)$row['total_hpp'], 0, ',', '.') }}</td>
+                                    @endif
                                 </tr>
                             @endforeach
                         </tbody>
@@ -164,7 +173,9 @@
                                 <td class="r" style="font-weight:800;">TOTAL</td>
                                 <td class="mono r" style="font-weight:800;">{{ number_format((int)$summaryPerCategory->sum('total_lines')) }}</td>
                                 <td class="mono r" style="font-weight:800;">{{ number_format((int)$summaryPerCategory->sum('total_qty')) }}</td>
-                                <td class="mono r" style="font-weight:800;">{{ number_format((float)$summaryPerCategory->sum('total_hpp'), 0, ',', '.') }}</td>
+                                @if($canSeeNominal)
+                                    <td class="mono r" style="font-weight:800;">{{ number_format((float)$summaryPerCategory->sum('total_hpp'), 0, ',', '.') }}</td>
+                                @endif
                             </tr>
                         </tfoot>
                     </table>
@@ -190,8 +201,11 @@
                                 <th>Item</th>
                                 <th>Kategori</th>
                                 <th class="r">Qty</th>
-                                <th class="r">Unit HPP</th>
-                                <th class="r">Total HPP</th>
+
+                                @if($canSeeNominal)
+                                    <th class="r">Unit HPP</th>
+                                    <th class="r">Total HPP</th>
+                                @endif
                             </tr>
                         </thead>
                         <tbody>
@@ -203,17 +217,24 @@
                                     </td>
                                     <td class="muted">{{ $line->item?->category?->name ?? 'Tanpa Kategori' }}</td>
                                     <td class="mono r">{{ number_format((int)($line->qty_scanned ?? 0)) }}</td>
-                                    <td class="mono r">{{ number_format((float)($line->unit_hpp ?? 0), 0, ',', '.') }}</td>
-                                    <td class="mono r">{{ number_format((float)($line->total_hpp ?? 0), 0, ',', '.') }}</td>
+
+                                    @if($canSeeNominal)
+                                        <td class="mono r">{{ number_format((float)($line->unit_hpp ?? 0), 0, ',', '.') }}</td>
+                                        <td class="mono r">{{ number_format((float)($line->total_hpp ?? 0), 0, ',', '.') }}</td>
+                                    @endif
                                 </tr>
                             @endforeach
                         </tbody>
+
                         <tfoot>
                             <tr>
                                 <td colspan="2" class="r" style="font-weight:800;">TOTAL</td>
                                 <td class="mono r" style="font-weight:800;">{{ number_format($totalQty) }}</td>
-                                <td></td>
-                                <td class="mono r" style="font-weight:800;">{{ number_format($totalHpp, 0, ',', '.') }}</td>
+
+                                @if($canSeeNominal)
+                                    <td></td>
+                                    <td class="mono r" style="font-weight:800;">{{ number_format($totalHpp, 0, ',', '.') }}</td>
+                                @endif
                             </tr>
                         </tfoot>
                     </table>

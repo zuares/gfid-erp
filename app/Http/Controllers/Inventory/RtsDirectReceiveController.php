@@ -70,9 +70,9 @@ class RtsDirectReceiveController extends Controller
 
         return view('inventory.rts_direct_receives.create', compact(
             'date',
-            'fromWarehouse',
-            'toWarehouse',
-            'wipSewWarehouse',
+            'fromWarehouse', // WIP-FIN
+            'toWarehouse', // WH-RTS
+            'wipSewWarehouse', // WIP-SEW / WH-SEWING
             'operators',
             'items'
         ));

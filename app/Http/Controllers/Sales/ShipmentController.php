@@ -35,11 +35,20 @@ class ShipmentController extends Controller
         return $this->whRtsCached = Warehouse::where('code', 'WH-RTS')->first();
     }
 
+    /**
+     * ADMIN: tidak boleh lihat nominal sama sekali.
+     * (Kalau mau hanya owner yang boleh lihat nominal, bilang ya nanti aku ubah ke whitelist.)
+     */
+    protected function canSeeNominal(): bool
+    {
+        return (auth()->user()->role ?? null) !== 'admin';
+    }
+
     public function index(Request $request)
     {
         $statusFilter = $request->get('status', 'all');
+        $canSeeNominal = $this->canSeeNominal();
 
-        // ✅ FIX N+1: eager load lines juga (bukan hanya lines.item.category)
         $query = Shipment::query()
             ->with(['store', 'lines', 'lines.item.category'])
             ->orderByDesc('date')
@@ -53,8 +62,8 @@ class ShipmentController extends Controller
 
         $shipments = $query->paginate(20)->withQueryString();
 
-        // ✅ keep transform (ringkas), tapi sekarang tidak N+1
-        $shipments->getCollection()->transform(function (Shipment $shipment) {
+        // ✅ Transform ringkas + admin tidak menghitung nominal
+        $shipments->getCollection()->transform(function (Shipment $shipment) use ($canSeeNominal) {
             $totalQty = 0;
             $totalRp = 0.0;
             $cats = [];
@@ -67,11 +76,13 @@ class ShipmentController extends Controller
 
                 $totalQty += $qty;
 
-                $unitHpp = 0;
-                if ($line->item) {
-                    $unitHpp = $line->item->latest_hpp ?? $line->item->hpp ?? $line->item->last_purchase_price ?? 0;
+                if ($canSeeNominal) {
+                    $unitHpp = 0;
+                    if ($line->item) {
+                        $unitHpp = $line->item->latest_hpp ?? $line->item->hpp ?? $line->item->last_purchase_price ?? 0;
+                    }
+                    $totalRp += ((float) $unitHpp) * $qty;
                 }
-                $totalRp += ((float) $unitHpp) * $qty;
 
                 $catName = optional(optional($line->item)->category)->name ?: 'Tanpa Kategori';
                 $cats[$catName] = true;
@@ -81,7 +92,7 @@ class ShipmentController extends Controller
             sort($names);
 
             $shipment->total_qty_calc = $totalQty;
-            $shipment->total_rp_calc = $totalRp;
+            $shipment->total_rp_calc = $canSeeNominal ? $totalRp : null; // admin: null
             $shipment->category_count_calc = count($names);
 
             if (count($names) === 0) {
@@ -95,8 +106,101 @@ class ShipmentController extends Controller
             return $shipment;
         });
 
-        return view('sales.shipments.index', compact('shipments', 'statusFilter'));
+        return view('sales.shipments.index', compact('shipments', 'statusFilter', 'canSeeNominal'));
     }
+
+    public function show(Shipment $shipment)
+    {
+        $canSeeNominal = $this->canSeeNominal();
+
+        $shipment->load([
+            'store',
+            'lines.item.category',
+            'creator',
+            'invoice',
+        ]);
+
+        // admin: jangan set unit_hpp / total_hpp sama sekali
+        $hppCache = [];
+
+        $shipment->lines->each(function ($line) use (&$hppCache, $canSeeNominal) {
+            $qty = (int) ($line->qty_scanned ?? 0);
+
+            if (!$canSeeNominal) {
+                $line->unit_hpp = null;
+                $line->total_hpp = null;
+                return;
+            }
+
+            $itemId = (int) ($line->item_id ?? 0);
+            if (!array_key_exists($itemId, $hppCache)) {
+                $unitHpp = 0;
+                if ($line->item) {
+                    $unitHpp = (float) (
+                        $line->item->latest_hpp ?? $line->item->hpp ?? $line->item->last_purchase_price ?? 0
+                    );
+                }
+                $hppCache[$itemId] = $unitHpp;
+            }
+
+            $line->unit_hpp = (float) $hppCache[$itemId];
+            $line->total_hpp = (float) ($line->unit_hpp * $qty);
+        });
+
+        $totalQty = (int) $shipment->lines->sum(fn($l) => (int) ($l->qty_scanned ?? 0));
+        $totalLines = (int) $shipment->lines->count();
+        $totalHpp = $canSeeNominal
+        ? (float) $shipment->lines->sum(fn($l) => (float) ($l->total_hpp ?? 0))
+        : 0.0;
+
+        $summaryPerCategory = $shipment->lines
+            ->groupBy(fn($line) => $line->item?->category?->name ?: 'Tanpa Kategori')
+            ->map(function ($group, $categoryName) use ($canSeeNominal) {
+                return [
+                    'category_name' => $categoryName,
+                    'total_lines' => (int) $group->count(),
+                    'total_qty' => (int) $group->sum(fn($l) => (int) ($l->qty_scanned ?? 0)),
+                    'total_hpp' => $canSeeNominal
+                    ? (float) $group->sum(fn($l) => (float) ($l->total_hpp ?? 0))
+                    : 0.0,
+                ];
+            })
+            ->values()
+            ->sortBy('category_name')
+            ->values();
+
+        $mpPackets = MpReconciliation::query()
+            ->where('shipment_id', $shipment->id)
+            ->whereIn('status', ['needs_review', 'auto_matched', 'resolved'])
+            ->with(['mpShipment' => fn($q) => $q->with('items')])
+            ->orderByDesc('match_confidence')
+            ->get();
+
+        $mpTotalQty = (int) $mpPackets->sum(fn($rec) => (int) ($rec->mpShipment?->total_qty ?? 0));
+
+        $batchQty = (int) ($shipment->total_qty ?? 0);
+        if ($batchQty <= 0) {
+            $batchQty = $totalQty;
+        }
+
+        $deltaQty = $batchQty - $mpTotalQty;
+
+        return view('sales.shipments.show', compact(
+            'shipment',
+            'totalQty',
+            'totalLines',
+            'totalHpp',
+            'summaryPerCategory',
+            'mpPackets',
+            'mpTotalQty',
+            'batchQty',
+            'deltaQty',
+            'canSeeNominal'
+        ));
+    }/**
+     * ADMIN: tidak boleh lihat nominal sama sekali.
+     * (Kalau mau hanya owner yang boleh lihat nominal, bilang ya nanti aku ubah ke whitelist.)
+     */
 
     public function create(Request $request)
     {
@@ -159,85 +263,6 @@ class ShipmentController extends Controller
             ->route('sales.shipments.edit', $shipment)
             ->with('status', 'success')
             ->with('message', 'Shipment dibuat. Silakan scan barang.');
-    }
-
-    public function show(Shipment $shipment)
-    {
-        $shipment->load([
-            'store',
-            'lines.item.category',
-            'creator',
-            'invoice',
-        ]);
-
-        // Cache HPP per item_id untuk hemat proses (dan aman kalau accessor)
-        $hppCache = [];
-
-        $shipment->lines->each(function ($line) use (&$hppCache) {
-            $qty = (int) ($line->qty_scanned ?? 0);
-
-            $itemId = (int) ($line->item_id ?? 0);
-            if (!array_key_exists($itemId, $hppCache)) {
-                $unitHpp = 0;
-                if ($line->item) {
-                    $unitHpp = (float) (
-                        $line->item->latest_hpp ?? $line->item->hpp ?? $line->item->last_purchase_price ?? 0
-                    );
-                }
-                $hppCache[$itemId] = $unitHpp;
-            }
-
-            $line->unit_hpp = (float) $hppCache[$itemId];
-            $line->total_hpp = (float) ($line->unit_hpp * $qty);
-        });
-
-        $totalQty = (int) $shipment->lines->sum(fn($l) => (int) ($l->qty_scanned ?? 0));
-        $totalLines = (int) $shipment->lines->count();
-        $totalHpp = (float) $shipment->lines->sum(fn($l) => (float) ($l->total_hpp ?? 0));
-
-        // Summary per category (basis qty_scanned + total_hpp)
-        $summaryPerCategory = $shipment->lines
-            ->groupBy(fn($line) => $line->item?->category?->name ?: 'Tanpa Kategori')
-            ->map(function ($group, $categoryName) {
-                return [
-                    'category_name' => $categoryName,
-                    'total_lines' => (int) $group->count(),
-                    'total_qty' => (int) $group->sum(fn($l) => (int) ($l->qty_scanned ?? 0)),
-                    'total_hpp' => (float) $group->sum(fn($l) => (float) ($l->total_hpp ?? 0)),
-                ];
-            })
-            ->values()
-            ->sortBy('category_name')
-            ->values();
-
-        // Marketplace packets (biarkan seperti kamu punya)
-        $mpPackets = MpReconciliation::query()
-            ->where('shipment_id', $shipment->id)
-            ->whereIn('status', ['needs_review', 'auto_matched', 'resolved'])
-            ->with(['mpShipment' => fn($q) => $q->with('items')])
-            ->orderByDesc('match_confidence')
-            ->get();
-
-        $mpTotalQty = (int) $mpPackets->sum(fn($rec) => (int) ($rec->mpShipment?->total_qty ?? 0));
-
-        $batchQty = (int) ($shipment->total_qty ?? 0);
-        if ($batchQty <= 0) {
-            $batchQty = $totalQty;
-        }
-
-        $deltaQty = $batchQty - $mpTotalQty;
-
-        return view('sales.shipments.show', compact(
-            'shipment',
-            'totalQty',
-            'totalLines',
-            'totalHpp',
-            'summaryPerCategory',
-            'mpPackets',
-            'mpTotalQty',
-            'batchQty',
-            'deltaQty'
-        ));
     }
 
     public function edit(Shipment $shipment)
@@ -801,6 +826,16 @@ class ShipmentController extends Controller
             'mpCounts',
             'mpStats'
         ));
+    }
+
+    public function report(Request $request)
+    {
+        // TODO: sesuaikan view yang kamu punya
+        // return view('sales.shipments.report');
+
+        // sementara biar route tidak 500:
+        return redirect()->route('sales.shipments.index')
+            ->with('info', 'Report belum diimplementasikan.');
     }
 
 }

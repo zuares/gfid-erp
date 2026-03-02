@@ -270,8 +270,10 @@
         $role = strtolower((string) (auth()->user()?->role ?? ''));
         $canManage = in_array($role, ['owner', 'admin'], true);
 
-        $statusNow = $statusFilter ?? request('status', 'submitted');
-        $periodNow = $period ?? request('period', 'week');
+        // ✅ Default tab = ALL (status & period)
+        $statusNow = $statusFilter ?? request('status', 'all');
+        $periodNow = $period ?? request('period', 'all');
+
         $fmt = fn($n) => rtrim(rtrim(number_format((float) $n, 2, '.', ''), '0'), '.');
     @endphp
 
@@ -355,8 +357,7 @@
                         </div>
 
                         <div class="top-actions">
-                            <span class="{{ $cls }}">{{ $txt }} · <span
-                                    class="mono">{{ $fmt($out) }}</span></span>
+                            <span class="{{ $cls }}">{{ $txt }} · <span class="mono">{{ $fmt($out) }}</span></span>
                             <x-status-pill :status="$sr->status" />
                             <a href="{{ route('rts.stock-requests.show', $sr) }}" class="btn-mini"
                                 onclick="event.stopPropagation();">
@@ -366,12 +367,9 @@
                     </div>
 
                     <div class="metrics">
-                        <div class="m"><span class="k">Req</span><span class="v mono">{{ $fmt($req) }}</span>
-                        </div>
-                        <div class="m"><span class="k">Terima</span><span
-                                class="v mono">{{ $fmt($recv) }}</span></div>
-                        <div class="m"><span class="k">Sisa</span><span class="v mono">{{ $fmt($out) }}</span>
-                        </div>
+                        <div class="m"><span class="k">Req</span><span class="v mono">{{ $fmt($req) }}</span></div>
+                        <div class="m"><span class="k">Terima</span><span class="v mono">{{ $fmt($recv) }}</span></div>
+                        <div class="m"><span class="k">Sisa</span><span class="v mono">{{ $fmt($out) }}</span></div>
                     </div>
                 </div>
             @empty

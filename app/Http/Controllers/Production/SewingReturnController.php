@@ -151,17 +151,30 @@ class SewingReturnController extends Controller
             $pickupDate = null;
         }
 
+        $role = strtolower((string) (auth()->user()->role ?? ''));
+
         $wipSewWarehouse = Warehouse::query()
             ->whereIn('code', ['WIP-SEW', 'WH-SEWING'])
             ->first();
 
-        // tujuan OK: WH-PRD (default), WH-RTS (opsional, owner-only)
-        $destWarehouses = Warehouse::query()
+        // owner boleh pilih; selain owner disembunyikan
+        $canChooseDestination = ($role === 'owner');
+
+        // ambil gudang tujuan
+        $destinationWarehouses = Warehouse::query()
             ->whereIn('code', ['WH-PRD', 'WH-RTS'])
             ->orderByRaw("CASE code WHEN 'WH-PRD' THEN 1 WHEN 'WH-RTS' THEN 2 ELSE 99 END")
             ->get(['id', 'code', 'name']);
 
-        $defaultDestWarehouseId = optional($destWarehouses->firstWhere('code', 'WH-PRD'))->id;
+        $whPrdId = (int) optional($destinationWarehouses->firstWhere('code', 'WH-PRD'))->id;
+        $whRtsId = (int) optional($destinationWarehouses->firstWhere('code', 'WH-RTS'))->id;
+
+        // default per role
+        $defaultDestWarehouseId = match ($role) {
+            'admin' => $whRtsId ?: $whPrdId,
+            'operating' => $whPrdId ?: $whRtsId,
+            default => $whPrdId ?: $whRtsId, // owner fallback
+        };
 
         // operator list dari SewingPickup (yang pernah ada)
         $operatorIds = SewingPickup::query()
@@ -190,8 +203,9 @@ class SewingReturnController extends Controller
                 'lines',
                 'wipSewWarehouse',
                 'wipStockByItemId',
-                'destWarehouses',
+                'destinationWarehouses',
                 'defaultDestWarehouseId',
+                'canChooseDestination',
             ));
         }
 
@@ -261,8 +275,9 @@ class SewingReturnController extends Controller
             'lines',
             'wipSewWarehouse',
             'wipStockByItemId',
-            'destWarehouses',
+            'destinationWarehouses',
             'defaultDestWarehouseId',
+            'canChooseDestination',
         ));
     }
 
@@ -276,8 +291,8 @@ class SewingReturnController extends Controller
             'date' => ['required', 'date'],
             'operator_id' => ['required', 'integer', 'exists:employees,id'],
 
-            // ✅ Opsi B
-            'destination_warehouse_id' => ['nullable', 'integer', 'exists:warehouses,id'],
+            // selalu ada nilai (owner select / non-owner hidden)
+            'destination_warehouse_id' => ['required', 'integer', 'exists:warehouses,id'],
 
             'results' => ['required', 'array', 'min:1'],
             'results.*.sewing_pickup_line_id' => ['required', 'integer', 'exists:sewing_pickup_lines,id'],
@@ -289,7 +304,9 @@ class SewingReturnController extends Controller
         $date = Carbon::parse($validated['date'])->toDateString();
         $operatorId = (int) $validated['operator_id'];
 
-        return DB::transaction(function () use ($validated, $date, $operatorId): RedirectResponse {
+        $role = strtolower((string) (auth()->user()->role ?? ''));
+
+        return DB::transaction(function () use ($validated, $date, $operatorId, $role): RedirectResponse {
 
             $wipSewWarehouse = Warehouse::query()
                 ->whereIn('code', ['WIP-SEW', 'WH-SEWING'])
@@ -299,33 +316,41 @@ class SewingReturnController extends Controller
                 throw ValidationException::withMessages(['results' => 'Gudang WIP-SEW / WH-SEWING belum ada.']);
             }
 
-            // ✅ default tujuan OK: WH-PRD
-            $defaultDest = Warehouse::query()->where('code', 'WH-PRD')->first();
-            if (!$defaultDest) {
-                throw ValidationException::withMessages(['destination_warehouse_id' => 'Gudang default WH-PRD belum ada.']);
+            // ambil id WH-PRD / WH-RTS
+            $whPrd = Warehouse::query()->where('code', 'WH-PRD')->first();
+            $whRts = Warehouse::query()->where('code', 'WH-RTS')->first();
+
+            if (!$whPrd && !$whRts) {
+                throw ValidationException::withMessages(['destination_warehouse_id' => 'Gudang tujuan (WH-PRD/WH-RTS) belum ada.']);
             }
 
-            $destWarehouseId = (int) ($validated['destination_warehouse_id'] ?? 0);
-            $destWarehouse = $destWarehouseId > 0
-            ? $destWarehouses = Warehouse::query()
-                ->whereIn('code', ['WH-PRD', 'WH-RTS'])
-                ->whereKey($destWarehouseId)
-                ->first()
-            : $defaultDest;
+            // enforce destination by role
+            $requestedDestId = (int) $validated['destination_warehouse_id'];
 
-            if (!$destWarehouse) {
-                throw ValidationException::withMessages(['destination_warehouse_id' => 'Gudang tujuan tidak valid.']);
-            }
+            $destWarehouse = null;
 
-            // Batasi pilihan hanya WH-PRD / WH-RTS
-            $allowedCodes = ['WH-PRD', 'WH-RTS'];
-            if (!in_array($destWarehouse->code, $allowedCodes, true)) {
-                throw ValidationException::withMessages(['destination_warehouse_id' => 'Gudang tujuan tidak diizinkan.']);
-            }
+            if ($role === 'owner') {
+                // owner boleh pilih PRD/RTS saja
+                $destWarehouse = Warehouse::query()
+                    ->whereIn('code', ['WH-PRD', 'WH-RTS'])
+                    ->whereKey($requestedDestId)
+                    ->first();
 
-            // WH-RTS hanya owner (biar RTS steril)
-            if ($destWarehouse->code === 'WH-RTS' && strtolower(auth()->user()->role ?? '') !== 'owner') {
-                throw ValidationException::withMessages(['destination_warehouse_id' => 'WH-RTS hanya boleh dipilih oleh owner.']);
+                if (!$destWarehouse) {
+                    throw ValidationException::withMessages(['destination_warehouse_id' => 'Gudang tujuan tidak valid (hanya WH-PRD/WH-RTS).']);
+                }
+            } elseif ($role === 'admin') {
+                // admin: paksa RTS
+                if (!$whRts) {
+                    throw ValidationException::withMessages(['destination_warehouse_id' => 'Gudang WH-RTS belum ada (dibutuhkan untuk admin).']);
+                }
+                $destWarehouse = $whRts;
+            } else {
+                // operating (dan role lain dalam group): paksa PRD
+                if (!$whPrd) {
+                    throw ValidationException::withMessages(['destination_warehouse_id' => 'Gudang WH-PRD belum ada (dibutuhkan untuk operating).']);
+                }
+                $destWarehouse = $whPrd;
             }
 
             $rejectWarehouse = Warehouse::query()->where('code', 'REJECT')->first();
@@ -447,7 +472,7 @@ class SewingReturnController extends Controller
                 : ('SR-' . Carbon::parse($date)->format('Ymd') . '-' . str_pad((string) random_int(1, 999), 3, '0', STR_PAD_LEFT)),
                 'date' => $date,
                 'warehouse_id' => (int) $wipSewWarehouse->id,
-                'destination_warehouse_id' => (int) $destWarehouse->id, // ✅ simpan tujuan
+                'destination_warehouse_id' => (int) $destWarehouse->id,
                 'pickup_id' => $headerPickupId,
                 'operator_id' => $operatorId,
                 'created_by_user_id' => auth()->id(),
@@ -517,7 +542,7 @@ class SewingReturnController extends Controller
                     }
                 }
 
-                // OK: OUT WIP-SEW, IN DEST (WH-PRD / WH-RTS) + labor
+                // OK: OUT WIP-SEW, IN DEST + labor
                 if ($qtyOk > 0.000001) {
                     $unitCostWipSew = (float) $this->inventory->getItemIncomingUnitCost(
                         warehouseId: $wipSewWarehouse->id,
@@ -611,6 +636,7 @@ class SewingReturnController extends Controller
                     } else {
                         $pickup->status = ($totalProgress > 0.000001) ? 'partial' : 'draft';
                     }
+
                     $pickup->save();
                 }
             }
