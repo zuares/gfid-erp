@@ -13,6 +13,7 @@ class SewingReturn extends Model
         'code',
         'date',
         'warehouse_id',
+        'destination_warehouse_id', // ✅ NEW
         'operator_id',
         'status',
         'notes',
@@ -43,6 +44,12 @@ class SewingReturn extends Model
         return $this->belongsTo(Warehouse::class, 'warehouse_id');
     }
 
+    // ✅ NEW: gudang tujuan OK (WH-PRD / WH-RTS)
+    public function destinationWarehouse()
+    {
+        return $this->belongsTo(Warehouse::class, 'destination_warehouse_id');
+    }
+
     public function pickup()
     {
         return $this->belongsTo(SewingPickup::class, 'pickup_id');
@@ -52,5 +59,4 @@ class SewingReturn extends Model
     {
         return $this->hasMany(\App\Models\DirectPickupLine::class, 'sewing_return_id');
     }
-
 }

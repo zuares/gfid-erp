@@ -43,7 +43,8 @@ class SewingReturnController extends Controller
         $query = SewingReturn::query()
             ->with([
                 'operator',
-                'warehouse',
+                'warehouse', // asal (WIP-SEW)
+                'destinationWarehouse', // ✅ tujuan (WH-PRD / WH-RTS)
                 'pickup',
                 'lines.sewingPickupLine',
             ])
@@ -83,6 +84,7 @@ class SewingReturnController extends Controller
     {
         $return->load([
             'warehouse',
+            'destinationWarehouse',
             'operator',
             'pickup.operator',
             'lines.sewingPickupLine.sewingPickup',
@@ -92,13 +94,11 @@ class SewingReturnController extends Controller
 
         $lines = $return->lines ?? collect();
 
-        // Total pickup (qty_bundle)
         $totalPickup = (float) $lines->sum(function ($line) {
             $pl = $line->sewingPickupLine;
             return (float) ($pl->qty_bundle ?? 0);
         });
 
-        // Raw OK & Reject dari SR
         $totalOk = (float) $lines->sum('qty_ok');
         $totalReject = (float) $lines->sum('qty_reject');
         $totalProcessed = $totalOk + $totalReject;
@@ -106,7 +106,6 @@ class SewingReturnController extends Controller
         $okPercent = $totalProcessed > 0 ? round(($totalOk / $totalProcessed) * 100, 1) : 0.0;
         $rejectPercent = $totalProcessed > 0 ? round(($totalReject / $totalProcessed) * 100, 1) : 0.0;
 
-        // unique pickup lines (safe)
         $uniquePickupLines = $lines->pluck('sewingPickupLine')
             ->filter()
             ->keyBy(fn($pl) => (int) $pl->id);
@@ -114,7 +113,6 @@ class SewingReturnController extends Controller
         $totalDirectPick = (float) $uniquePickupLines->sum(fn($pl) => (float) ($pl->qty_direct_picked ?? 0));
         $totalProgressAdjusted = (float) $uniquePickupLines->sum(fn($pl) => (float) ($pl->qty_progress_adjusted ?? 0));
 
-        // Remaining = qty_bundle - (returned_ok + returned_reject + direct_pick + progress_adjusted)
         $totalRemaining = (float) $uniquePickupLines->sum(function ($pl) {
             $qtyBundle = (float) ($pl->qty_bundle ?? 0);
             $returnedOk = (float) ($pl->qty_returned_ok ?? 0);
@@ -157,6 +155,14 @@ class SewingReturnController extends Controller
             ->whereIn('code', ['WIP-SEW', 'WH-SEWING'])
             ->first();
 
+        // tujuan OK: WH-PRD (default), WH-RTS (opsional, owner-only)
+        $destWarehouses = Warehouse::query()
+            ->whereIn('code', ['WH-PRD', 'WH-RTS'])
+            ->orderByRaw("CASE code WHEN 'WH-PRD' THEN 1 WHEN 'WH-RTS' THEN 2 ELSE 99 END")
+            ->get(['id', 'code', 'name']);
+
+        $defaultDestWarehouseId = optional($destWarehouses->firstWhere('code', 'WH-PRD'))->id;
+
         // operator list dari SewingPickup (yang pernah ada)
         $operatorIds = SewingPickup::query()
             ->whereNull('voided_at')
@@ -184,6 +190,8 @@ class SewingReturnController extends Controller
                 'lines',
                 'wipSewWarehouse',
                 'wipStockByItemId',
+                'destWarehouses',
+                'defaultDestWarehouseId',
             ));
         }
 
@@ -191,7 +199,6 @@ class SewingReturnController extends Controller
             ->whereNull('voided_at')
             ->whereHas('sewingPickup', function ($qq) use ($operatorId, $pickupDate) {
                 $qq->whereNull('voided_at');
-
                 if ($operatorId) {
                     $qq->where('operator_id', $operatorId);
                 }
@@ -254,6 +261,8 @@ class SewingReturnController extends Controller
             'lines',
             'wipSewWarehouse',
             'wipStockByItemId',
+            'destWarehouses',
+            'defaultDestWarehouseId',
         ));
     }
 
@@ -266,6 +275,9 @@ class SewingReturnController extends Controller
         $validated = $request->validate([
             'date' => ['required', 'date'],
             'operator_id' => ['required', 'integer', 'exists:employees,id'],
+
+            // ✅ Opsi B
+            'destination_warehouse_id' => ['nullable', 'integer', 'exists:warehouses,id'],
 
             'results' => ['required', 'array', 'min:1'],
             'results.*.sewing_pickup_line_id' => ['required', 'integer', 'exists:sewing_pickup_lines,id'],
@@ -287,9 +299,33 @@ class SewingReturnController extends Controller
                 throw ValidationException::withMessages(['results' => 'Gudang WIP-SEW / WH-SEWING belum ada.']);
             }
 
-            $wipFinWarehouse = Warehouse::query()->where('code', 'WIP-FIN')->first();
-            if (!$wipFinWarehouse) {
-                throw ValidationException::withMessages(['results' => 'Gudang tujuan WIP-FIN belum ada.']);
+            // ✅ default tujuan OK: WH-PRD
+            $defaultDest = Warehouse::query()->where('code', 'WH-PRD')->first();
+            if (!$defaultDest) {
+                throw ValidationException::withMessages(['destination_warehouse_id' => 'Gudang default WH-PRD belum ada.']);
+            }
+
+            $destWarehouseId = (int) ($validated['destination_warehouse_id'] ?? 0);
+            $destWarehouse = $destWarehouseId > 0
+            ? $destWarehouses = Warehouse::query()
+                ->whereIn('code', ['WH-PRD', 'WH-RTS'])
+                ->whereKey($destWarehouseId)
+                ->first()
+            : $defaultDest;
+
+            if (!$destWarehouse) {
+                throw ValidationException::withMessages(['destination_warehouse_id' => 'Gudang tujuan tidak valid.']);
+            }
+
+            // Batasi pilihan hanya WH-PRD / WH-RTS
+            $allowedCodes = ['WH-PRD', 'WH-RTS'];
+            if (!in_array($destWarehouse->code, $allowedCodes, true)) {
+                throw ValidationException::withMessages(['destination_warehouse_id' => 'Gudang tujuan tidak diizinkan.']);
+            }
+
+            // WH-RTS hanya owner (biar RTS steril)
+            if ($destWarehouse->code === 'WH-RTS' && strtolower(auth()->user()->role ?? '') !== 'owner') {
+                throw ValidationException::withMessages(['destination_warehouse_id' => 'WH-RTS hanya boleh dipilih oleh owner.']);
             }
 
             $rejectWarehouse = Warehouse::query()->where('code', 'REJECT')->first();
@@ -331,10 +367,7 @@ class SewingReturnController extends Controller
 
             // touched pickups
             $touchedPickupIds = $pickupLines->pluck('sewing_pickup_id')
-                ->filter()
-                ->unique()
-                ->values()
-                ->all();
+                ->filter()->unique()->values()->all();
 
             $pickupsMap = SewingPickup::query()
                 ->whereIn('id', $touchedPickupIds)
@@ -345,10 +378,7 @@ class SewingReturnController extends Controller
 
             // touched bundles
             $bundleIds = $pickupLines->pluck('cutting_job_bundle_id')
-                ->filter()
-                ->unique()
-                ->values()
-                ->all();
+                ->filter()->unique()->values()->all();
 
             $bundlesMap = CuttingJobBundle::query()
                 ->whereIn('id', $bundleIds)
@@ -358,10 +388,7 @@ class SewingReturnController extends Controller
 
             // lock stock WIP-SEW per item
             $itemIds = $pickupLines->pluck('finished_item_id')
-                ->filter()
-                ->unique()
-                ->values()
-                ->all();
+                ->filter()->unique()->values()->all();
 
             $stocksWipSew = InventoryStock::query()
                 ->where('warehouse_id', $wipSewWarehouse->id)
@@ -420,6 +447,7 @@ class SewingReturnController extends Controller
                 : ('SR-' . Carbon::parse($date)->format('Ymd') . '-' . str_pad((string) random_int(1, 999), 3, '0', STR_PAD_LEFT)),
                 'date' => $date,
                 'warehouse_id' => (int) $wipSewWarehouse->id,
+                'destination_warehouse_id' => (int) $destWarehouse->id, // ✅ simpan tujuan
                 'pickup_id' => $headerPickupId,
                 'operator_id' => $operatorId,
                 'created_by_user_id' => auth()->id(),
@@ -489,18 +517,13 @@ class SewingReturnController extends Controller
                     }
                 }
 
-                // OK: move WIP-SEW -> WIP-FIN
-                // OK: OUT WIP-SEW, IN WIP-FIN dengan unit cost + labor (piece rate)
+                // OK: OUT WIP-SEW, IN DEST (WH-PRD / WH-RTS) + labor
                 if ($qtyOk > 0.000001) {
-
-                    // 1) Ambil unit cost dari WIP-SEW (sebelum dipindah)
                     $unitCostWipSew = (float) $this->inventory->getItemIncomingUnitCost(
                         warehouseId: $wipSewWarehouse->id,
                         itemId: $itemId
                     );
 
-                    // 2) Ambil rate jahit dari PieceRate (module=sewing)
-                    // operatorId di SewingReturn = operator jahit (sesuai form kamu)
                     $rate = (float) app(PieceRateService::class)->requireRatePerPcs(
                         module: 'sewing',
                         employeeId: $operatorId,
@@ -508,10 +531,8 @@ class SewingReturnController extends Controller
                         date: $date
                     );
 
-                    // 3) Unit cost baru di WIP-FIN = RM+proses sebelumnya + jahit
                     $unitCostWithLabor = $unitCostWipSew + $rate;
 
-                    // 4) OUT dari WIP-SEW (nilai mengikuti average WIP-SEW)
                     $this->inventory->stockOut(
                         warehouseId: $wipSewWarehouse->id,
                         itemId: $itemId,
@@ -519,22 +540,21 @@ class SewingReturnController extends Controller
                         date: $date,
                         sourceType: 'sewing_return_ok',
                         sourceId: $sewingReturn->id,
-                        notes: "Sewing Return {$sewingReturn->code} (OK) OUT WIP-SEW",
+                        notes: "Sewing Return {$sewingReturn->code} (OK) OUT {$wipSewWarehouse->code}",
                         allowNegative: false,
                         lotId: null,
                         unitCostOverride: null,
                         affectLotCost: false,
                     );
 
-                    // 5) IN ke WIP-FIN dengan unit cost sudah + labor
                     $this->inventory->stockIn(
-                        warehouseId: $wipFinWarehouse->id,
+                        warehouseId: $destWarehouse->id,
                         itemId: $itemId,
                         qty: $qtyOk,
                         date: $date,
                         sourceType: 'sewing_return_ok',
                         sourceId: $sewingReturn->id,
-                        notes: "Sewing Return {$sewingReturn->code} (OK) IN WIP-FIN + labor @{$rate}/pcs",
+                        notes: "Sewing Return {$sewingReturn->code} (OK) IN {$destWarehouse->code} + labor @{$rate}/pcs",
                         lotId: null,
                         unitCost: $unitCostWithLabor,
                         affectLotCost: false,
@@ -542,17 +562,17 @@ class SewingReturnController extends Controller
 
                     $okByBundle[$bundleId] = ($okByBundle[$bundleId] ?? 0) + $qtyOk;
                 }
-
             }
 
+            // bundle: set "posisi terakhir"
             foreach ($okByBundle as $bundleId => $sumOk) {
                 $b = $bundlesMap->get($bundleId);
                 if (!$b) {
                     continue;
                 }
 
-                $b->wip_warehouse_id = (int) $wipFinWarehouse->id;
-                $b->wip_qty = (float) ($b->wip_qty ?? 0) + (float) $sumOk; // ✅ increment, not overwrite
+                $b->wip_warehouse_id = (int) $destWarehouse->id;
+                $b->wip_qty = (float) ($b->wip_qty ?? 0) + (float) $sumOk;
                 $b->save();
             }
 
@@ -602,7 +622,7 @@ class SewingReturnController extends Controller
 
             return redirect()
                 ->route('production.sewing.returns.show', $sewingReturn)
-                ->with('success', 'Sewing Return berhasil disimpan (multi-pickup).');
+                ->with('success', 'Sewing Return berhasil disimpan.');
         });
     }
 
@@ -636,7 +656,6 @@ class SewingReturnController extends Controller
             $return->load(['lines.sewingPickupLine']);
             $lines = $return->lines ?? collect();
 
-            // ✅ pakai DateTimeInterface (InventoryService akan normalize ke Y-m-d)
             $voidAt = now('Asia/Jakarta');
             $voidDate = $voidAt;
 
@@ -645,12 +664,15 @@ class SewingReturnController extends Controller
                 if ($return->isFillable('voided_by_user_id')) {
                     $return->voided_by_user_id = auth()->id();
                 }
+
                 if ($return->isFillable('void_reason')) {
                     $return->void_reason = trim((string) ($validated['reason'] ?? '')) ?: null;
                 }
+
                 if ($return->isFillable('status')) {
                     $return->status = 'void';
                 }
+
                 $return->save();
 
                 return redirect()
@@ -663,9 +685,16 @@ class SewingReturnController extends Controller
                 throw ValidationException::withMessages(['reason' => 'Gudang WIP-SEW / WH-SEWING belum ada.']);
             }
 
-            $wipFinWarehouse = Warehouse::query()->where('code', 'WIP-FIN')->first();
-            if (!$wipFinWarehouse) {
-                throw ValidationException::withMessages(['reason' => 'Gudang WIP-FIN belum ada.']);
+            // ✅ DEST dinamis (WH-PRD / WH-RTS), fallback ke WH-PRD
+            $destWarehouse = null;
+            if (!empty($return->destination_warehouse_id)) {
+                $destWarehouse = Warehouse::query()->whereKey((int) $return->destination_warehouse_id)->first();
+            }
+            if (!$destWarehouse) {
+                $destWarehouse = Warehouse::query()->where('code', 'WH-PRD')->first();
+            }
+            if (!$destWarehouse) {
+                throw ValidationException::withMessages(['reason' => 'Gudang tujuan SR tidak ditemukan (WH-PRD / WH-RTS).']);
             }
 
             $rejectWarehouse = Warehouse::query()->where('code', 'REJECT')->first();
@@ -701,8 +730,9 @@ class SewingReturnController extends Controller
 
             $itemIds = $pickupLines->pluck('finished_item_id')->filter()->unique()->values()->all();
 
-            $stocksWipFin = InventoryStock::query()
-                ->where('warehouse_id', $wipFinWarehouse->id)
+            // ✅ lock stok di gudang tujuan (WH-PRD/WH-RTS)
+            $stocksDest = InventoryStock::query()
+                ->where('warehouse_id', $destWarehouse->id)
                 ->whereIn('item_id', $itemIds)
                 ->lockForUpdate()
                 ->get()
@@ -731,48 +761,46 @@ class SewingReturnController extends Controller
                 $itemId = (int) $pl->finished_item_id;
                 $bundleId = (int) $pl->cutting_job_bundle_id;
 
-                // ✅ normalize to INT
                 $qtyOk = (int) round((float) ($line->qty_ok ?? 0));
                 $qtyRj = (int) round((float) ($line->qty_reject ?? 0));
 
-                // reverse pickup counters (keep float columns? tapi isi int aman)
+                // reverse pickup counters
                 $pl->qty_returned_ok = max((float) ($pl->qty_returned_ok ?? 0) - $qtyOk, 0);
                 $pl->qty_returned_reject = max((float) ($pl->qty_returned_reject ?? 0) - $qtyRj, 0);
                 $pl->save();
 
-                // ✅ guard: kalau ada reject tapi gudang REJECT gak ada → jangan create stock dari udara
                 if ($qtyRj > 0 && !$rejectWarehouse) {
                     throw ValidationException::withMessages([
                         'reason' => "Tidak bisa VOID: qty_reject ada tapi gudang REJECT belum ada (item #{$itemId}).",
                     ]);
                 }
 
-                // reverse OK: WIP-FIN -> WIP-SEW
+                // reverse OK: DEST -> WIP-SEW
                 if ($qtyOk > 0) {
-                    $finStock = $stocksWipFin->get($itemId);
-                    $finAvail = (float) ($finStock?->qty ?? 0);
+                    $destStock = $stocksDest->get($itemId);
+                    $destAvail = (float) ($destStock?->qty ?? 0);
 
-                    if (($finAvail + 0.0000001) < $qtyOk) {
+                    if (($destAvail + 0.0000001) < $qtyOk) {
                         throw ValidationException::withMessages([
-                            'reason' => "Tidak bisa VOID: stok WIP-FIN item #{$itemId} tidak cukup. Butuh {$qtyOk}, stok {$finAvail}.",
+                            'reason' => "Tidak bisa VOID: stok {$destWarehouse->code} item #{$itemId} tidak cukup. Butuh {$qtyOk}, stok {$destAvail}.",
                         ]);
                     }
 
                     $this->inventory->move(
                         $itemId,
-                        $wipFinWarehouse->id,
+                        $destWarehouse->id,
                         $wipSewWarehouse->id,
                         $qtyOk,
                         'sewing_return_void_ok',
                         $return->id,
-                        "VOID {$return->code} (OK) WIP-FIN → WIP-SEW",
+                        "VOID {$return->code} (OK) {$destWarehouse->code} → {$wipSewWarehouse->code}",
                         $voidDate,
                         false,
                         null
                     );
 
-                    // update local snapshot
-                    $stocksWipFin->put($itemId, (object) ['qty' => $finAvail - $qtyOk]);
+                    // snapshot update
+                    $stocksDest->put($itemId, (object) ['qty' => $destAvail - $qtyOk]);
 
                     $okByBundleVoid[$bundleId] = ($okByBundleVoid[$bundleId] ?? 0) + $qtyOk;
                 }
@@ -795,7 +823,7 @@ class SewingReturnController extends Controller
                         $qtyRj,
                         'sewing_return_void_reject',
                         $return->id,
-                        "VOID {$return->code} (RJ) REJECT → WIP-SEW",
+                        "VOID {$return->code} (RJ) REJECT → {$wipSewWarehouse->code}",
                         $voidDate,
                         false,
                         null
@@ -805,7 +833,7 @@ class SewingReturnController extends Controller
                 }
             }
 
-            // decrement bundle wip_qty (mirror store increment)
+            // decrement bundle tracker
             foreach ($okByBundleVoid as $bundleId => $sumOk) {
                 $b = $bundlesMap->get($bundleId);
                 if (!$b) {
@@ -816,7 +844,7 @@ class SewingReturnController extends Controller
                 $b->save();
             }
 
-            // update pickup status (include progress_adjusted)
+            // update pickup status
             foreach ($touchedPickupIds as $pid) {
                 $pickup = $pickupsMap->get((int) $pid);
                 if (!$pickup) {
@@ -860,12 +888,15 @@ class SewingReturnController extends Controller
             if ($return->isFillable('voided_by_user_id')) {
                 $return->voided_by_user_id = auth()->id();
             }
+
             if ($return->isFillable('void_reason')) {
                 $return->void_reason = trim((string) ($validated['reason'] ?? '')) ?: null;
             }
+
             if ($return->isFillable('status')) {
                 $return->status = 'void';
             }
+
             $return->save();
 
             return redirect()
@@ -873,5 +904,4 @@ class SewingReturnController extends Controller
                 ->with('success', 'Sewing Return berhasil di-VOID dan stok/counter sudah dibalik.');
         });
     }
-
 }
