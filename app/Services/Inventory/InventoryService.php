@@ -31,6 +31,7 @@ class InventoryService
         ?int $lotId = null, // optional LOT
         float | int | string | null $unitCost = null, // harga per unit (untuk moving average / nilai mutasi)
         bool $affectLotCost = true, // apakah mutasi ini ikut update LotCost (hanya untuk kain mentah)
+        ?int $cuttingJobBundleId = null, // FASE 1: tag dimensi produksi (per bundle) di ledger
     ): ?InventoryMutation {
         $qty = $this->num($qty);
         if ($qty <= 0) {
@@ -75,6 +76,7 @@ class InventoryService
             'direction' => 'in',
             'source_type' => $sourceType,
             'source_id' => $sourceId,
+            'cutting_job_bundle_id' => $cuttingJobBundleId,
             'notes' => $notes,
             'lot_id' => $lotId ?: null,
             'unit_cost' => $unitCostValue,
@@ -104,6 +106,7 @@ class InventoryService
         ?int $lotId = null, // optional LOT
         float | int | string | null $unitCostOverride = null, // untuk WIP, bisa pakai unit_cost custom
         bool $affectLotCost = true, // hanya true untuk pemakaian kain mentah
+        ?int $cuttingJobBundleId = null, // FASE 1: tag dimensi produksi (per bundle) di ledger
     ): ?InventoryMutation {
 
         $qty = $this->num($qty);
@@ -187,6 +190,7 @@ class InventoryService
             'direction' => 'out',
             'source_type' => $sourceType,
             'source_id' => $sourceId,
+            'cutting_job_bundle_id' => $cuttingJobBundleId,
             'notes' => $notes,
             'lot_id' => $lotId,
             'unit_cost' => $avgCost,
@@ -215,6 +219,7 @@ class InventoryService
         ?string $notes = null,
         bool $allowNegative = false,
         ?int $lotId = null, // kalau lot-nya ikut pindah gudang
+        ?int $cuttingJobBundleId = null, // FASE 1: tag dimensi produksi (per bundle)
     ): array {
         $qty = $this->num($qty);
         if ($qty <= 0) {
@@ -235,6 +240,7 @@ class InventoryService
             $notes,
             $allowNegative,
             $lotId,
+            $cuttingJobBundleId,
             &$mutations
         ) {
             // 🔹 Tentukan unit cost yang akan dibawa di transfer ini
@@ -269,6 +275,7 @@ class InventoryService
                 lotId: $lotId,
                 unitCostOverride: $unitCostOverride, // ✅ total_cost OUT ikut cost ini
                 affectLotCost: (bool) $lotId, // LotCost hanya berubah kalau pakai LOT
+                cuttingJobBundleId: $cuttingJobBundleId,
             );
 
             // 2️⃣ IN ke gudang tujuan
@@ -283,6 +290,7 @@ class InventoryService
                 lotId: $lotId,
                 unitCost: $unitCostOverride, // ✅ cost ikut kebawa
                 affectLotCost: (bool) $lotId,
+                cuttingJobBundleId: $cuttingJobBundleId,
             );
         });
 
@@ -579,6 +587,7 @@ class InventoryService
         string | \DateTimeInterface  | null $date = null,
         bool $allowNegative = false,
         ?int $lotId = null,
+        ?int $cuttingJobBundleId = null, // FASE 1: tag dimensi produksi (per bundle)
     ): array {
         return $this->transfer(
             fromWarehouseId: $fromWarehouseId,
@@ -591,6 +600,7 @@ class InventoryService
             notes: $notes,
             allowNegative: $allowNegative,
             lotId: $lotId,
+            cuttingJobBundleId: $cuttingJobBundleId,
         );
     }
 
@@ -609,6 +619,7 @@ class InventoryService
         bool $allowNegative = false,
         float | int | string | null $unitCostOverride = null,
         bool $affectLotCost = true,
+        ?int $cuttingJobBundleId = null, // FASE 1: tag dimensi produksi (per bundle)
     ): ?InventoryMutation {
         $diff = $this->num($qtyChange);
         if (abs($diff) < 0.0000001) {
@@ -629,6 +640,7 @@ class InventoryService
                 lotId: $lotId,
                 unitCost: $unitCostOverride,
                 affectLotCost: $affectLotCost,
+                cuttingJobBundleId: $cuttingJobBundleId,
             );
         }
 
@@ -644,6 +656,7 @@ class InventoryService
             lotId: $lotId,
             unitCostOverride: $unitCostOverride,
             affectLotCost: $affectLotCost,
+            cuttingJobBundleId: $cuttingJobBundleId,
         );
     }
 
@@ -761,6 +774,7 @@ class InventoryService
                 allowNegative: false,
                 unitCostOverride: $m->unit_cost !== null ? (float) $m->unit_cost : null,
                 affectLotCost: false,
+                cuttingJobBundleId: $m->cutting_job_bundle_id ? (int) $m->cutting_job_bundle_id : null,
             );
         }
     }

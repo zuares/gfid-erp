@@ -15,6 +15,7 @@ class InventoryMutation extends Model
         'direction',
         'source_type',
         'source_id',
+        'cutting_job_bundle_id',
         'notes',
         'lot_id', // ⭐ WAJIB
         'unit_cost', // ⭐ WAJIB

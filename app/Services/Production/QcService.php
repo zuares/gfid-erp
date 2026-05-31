@@ -152,6 +152,11 @@ class QcService
             $totalProcessedByItem = []; // [item_id => total (OK+Reject)]
             $totalOkByItem = []; // [item_id => total OK]
             $totalRejectByItem = []; // [item_id => total Reject]
+            // FASE 1: pecah per bundle agar setiap mutasi WIP-SEW/WIP-FIN/REJ-SEW
+            // membawa cutting_job_bundle_id (readiness ledger butuh atribusi per bundle).
+            $processedByBundleItem = []; // [bundle_id => [item_id => qty (OK+Reject)]]
+            $okByBundleItem = []; // [bundle_id => [item_id => qty OK]]
+            $rejectByBundleItem = []; // [bundle_id => [item_id => qty Reject]]
             $hasAnyMovement = false;
 
             // ===========================
@@ -221,17 +226,23 @@ class QcService
                     if ($processedQty > 0) {
                         $totalProcessedByItem[$itemId] =
                             ($totalProcessedByItem[$itemId] ?? 0) + $processedQty;
+                        $processedByBundleItem[$bundleId][$itemId] =
+                            ($processedByBundleItem[$bundleId][$itemId] ?? 0) + $processedQty;
                         $hasAnyMovement = true;
                     }
 
                     if ($qtyOk > 0) {
                         $totalOkByItem[$itemId] =
                             ($totalOkByItem[$itemId] ?? 0) + $qtyOk;
+                        $okByBundleItem[$bundleId][$itemId] =
+                            ($okByBundleItem[$bundleId][$itemId] ?? 0) + $qtyOk;
                     }
 
                     if ($qtyReject > 0) {
                         $totalRejectByItem[$itemId] =
                             ($totalRejectByItem[$itemId] ?? 0) + $qtyReject;
+                        $rejectByBundleItem[$bundleId][$itemId] =
+                            ($rejectByBundleItem[$bundleId][$itemId] ?? 0) + $qtyReject;
                     }
                 }
             }
@@ -254,65 +265,74 @@ class QcService
                 $unitCostWipSewPerItem[$itemId] = $unit > 0 ? $unit : null;
             }
 
-            // 2.a OUT dari WIP-SEW
-            foreach ($totalProcessedByItem as $itemId => $qtyProcessed) {
-                if ($qtyProcessed <= 0) {
-                    continue;
-                }
+            // 2.a OUT dari WIP-SEW (per bundle agar mutasi ber-tag)
+            foreach ($processedByBundleItem as $bundleId => $byItem) {
+                foreach ($byItem as $itemId => $qtyProcessed) {
+                    if ($qtyProcessed <= 0) {
+                        continue;
+                    }
 
-                $this->inventory->stockOut(
-                    warehouseId: $wipSewWarehouseId,
-                    itemId: $itemId,
-                    qty: $qtyProcessed,
-                    date: $qcDate,
-                    sourceType: 'sewing_qc_out',
-                    sourceId: $job->id,
-                    notes: "QC Sewing OUT {$qtyProcessed} pcs dari WIP-SEW untuk job {$job->code}",
-                    allowNegative: false,
-                    lotId: null,
-                    unitCostOverride: $unitCostWipSewPerItem[$itemId] ?? null,
-                    affectLotCost: false,
-                );
+                    $this->inventory->stockOut(
+                        warehouseId: $wipSewWarehouseId,
+                        itemId: $itemId,
+                        qty: $qtyProcessed,
+                        date: $qcDate,
+                        sourceType: 'sewing_qc_out',
+                        sourceId: $job->id,
+                        notes: "QC Sewing OUT {$qtyProcessed} pcs dari WIP-SEW untuk job {$job->code} (bundle #{$bundleId})",
+                        allowNegative: false,
+                        lotId: null,
+                        unitCostOverride: $unitCostWipSewPerItem[$itemId] ?? null,
+                        affectLotCost: false,
+                        cuttingJobBundleId: $bundleId,
+                    );
+                }
             }
 
-            // 2.b IN ke WIP-FIN (OK)
-            foreach ($totalOkByItem as $itemId => $qtyOkItem) {
-                if ($qtyOkItem <= 0) {
-                    continue;
-                }
+            // 2.b IN ke WIP-FIN (OK, per bundle)
+            foreach ($okByBundleItem as $bundleId => $byItem) {
+                foreach ($byItem as $itemId => $qtyOkItem) {
+                    if ($qtyOkItem <= 0) {
+                        continue;
+                    }
 
-                $this->inventory->stockIn(
-                    warehouseId: $wipFinWarehouseId,
-                    itemId: $itemId,
-                    qty: $qtyOkItem,
-                    date: $qcDate,
-                    sourceType: 'sewing_qc_in',
-                    sourceId: $job->id,
-                    notes: "QC Sewing IN WIP-FIN {$qtyOkItem} pcs untuk job {$job->code}",
-                    lotId: null,
-                    unitCost: $unitCostWipSewPerItem[$itemId] ?? null,
-                    affectLotCost: false,
-                );
+                    $this->inventory->stockIn(
+                        warehouseId: $wipFinWarehouseId,
+                        itemId: $itemId,
+                        qty: $qtyOkItem,
+                        date: $qcDate,
+                        sourceType: 'sewing_qc_in',
+                        sourceId: $job->id,
+                        notes: "QC Sewing IN WIP-FIN {$qtyOkItem} pcs untuk job {$job->code} (bundle #{$bundleId})",
+                        lotId: null,
+                        unitCost: $unitCostWipSewPerItem[$itemId] ?? null,
+                        affectLotCost: false,
+                        cuttingJobBundleId: $bundleId,
+                    );
+                }
             }
 
-            // 2.c IN ke REJ-SEW (Reject)
-            foreach ($totalRejectByItem as $itemId => $qtyRejectItem) {
-                if ($qtyRejectItem <= 0) {
-                    continue;
-                }
+            // 2.c IN ke REJ-SEW (Reject, per bundle)
+            foreach ($rejectByBundleItem as $bundleId => $byItem) {
+                foreach ($byItem as $itemId => $qtyRejectItem) {
+                    if ($qtyRejectItem <= 0) {
+                        continue;
+                    }
 
-                $this->inventory->stockIn(
-                    warehouseId: $rejSewWarehouseId,
-                    itemId: $itemId,
-                    qty: $qtyRejectItem,
-                    date: $qcDate,
-                    sourceType: 'sewing_qc_reject',
-                    sourceId: $job->id,
-                    notes: "QC Sewing REJECT {$qtyRejectItem} pcs untuk job {$job->code}",
-                    lotId: null,
-                    unitCost: $unitCostWipSewPerItem[$itemId] ?? null,
-                    affectLotCost: false,
-                );
+                    $this->inventory->stockIn(
+                        warehouseId: $rejSewWarehouseId,
+                        itemId: $itemId,
+                        qty: $qtyRejectItem,
+                        date: $qcDate,
+                        sourceType: 'sewing_qc_reject',
+                        sourceId: $job->id,
+                        notes: "QC Sewing REJECT {$qtyRejectItem} pcs untuk job {$job->code} (bundle #{$bundleId})",
+                        lotId: null,
+                        unitCost: $unitCostWipSewPerItem[$itemId] ?? null,
+                        affectLotCost: false,
+                        cuttingJobBundleId: $bundleId,
+                    );
+                }
             }
         });
     }
@@ -348,6 +368,11 @@ class QcService
             $totalProcessedByItem = []; // [item_id => (OK + Reject)]
             $totalOkByItem = []; // [item_id => total OK]
             $totalRejectByItem = []; // [item_id => total Reject]
+            // FASE 1: pecah per bundle agar OUT WIP-FIN membawa cutting_job_bundle_id
+            // (saldo ledger per bundle balik ke 0 saat finishing dikonsumsi).
+            $processedByBundleItem = []; // [bundle_id => [item_id => qty (OK+Reject)]]
+            $okByBundleItem = []; // [bundle_id => [item_id => qty OK]]
+            $rejectByBundleItem = []; // [bundle_id => [item_id => qty Reject]]
             $hasAnyMovement = false;
 
             foreach ($rows as $row) {
@@ -420,17 +445,23 @@ class QcService
                     if ($processedQty > 0) {
                         $totalProcessedByItem[$itemId] =
                             ($totalProcessedByItem[$itemId] ?? 0) + $processedQty;
+                        $processedByBundleItem[$bundleId][$itemId] =
+                            ($processedByBundleItem[$bundleId][$itemId] ?? 0) + $processedQty;
                         $hasAnyMovement = true;
                     }
 
                     if ($qtyOk > 0) {
                         $totalOkByItem[$itemId] =
                             ($totalOkByItem[$itemId] ?? 0) + $qtyOk;
+                        $okByBundleItem[$bundleId][$itemId] =
+                            ($okByBundleItem[$bundleId][$itemId] ?? 0) + $qtyOk;
                     }
 
                     if ($qtyReject > 0) {
                         $totalRejectByItem[$itemId] =
                             ($totalRejectByItem[$itemId] ?? 0) + $qtyReject;
+                        $rejectByBundleItem[$bundleId][$itemId] =
+                            ($rejectByBundleItem[$bundleId][$itemId] ?? 0) + $qtyReject;
                     }
                 }
             }
@@ -455,65 +486,74 @@ class QcService
 
             $movementDate = $qcDate;
 
-            // 1.a OUT dari WIP-FIN (OK + Reject)
-            foreach ($totalProcessedByItem as $itemId => $qtyProcessed) {
-                if ($qtyProcessed <= 0) {
-                    continue;
-                }
+            // 1.a OUT dari WIP-FIN (OK + Reject, per bundle agar saldo ledger balik 0)
+            foreach ($processedByBundleItem as $bundleId => $byItem) {
+                foreach ($byItem as $itemId => $qtyProcessed) {
+                    if ($qtyProcessed <= 0) {
+                        continue;
+                    }
 
-                $this->inventory->stockOut(
-                    warehouseId: $wipFinWarehouseId,
-                    itemId: $itemId,
-                    qty: $qtyProcessed,
-                    date: $movementDate,
-                    sourceType: 'finishing_qc_out',
-                    sourceId: $job->id,
-                    notes: "QC Finishing OUT {$qtyProcessed} pcs dari WIP-FIN untuk job {$job->code}",
-                    allowNegative: false,
-                    lotId: null, // WIP tidak pakai LOT
-                    unitCostOverride: $unitCostWipFinPerItem[$itemId] ?? null,
-                    affectLotCost: false,
-                );
+                    $this->inventory->stockOut(
+                        warehouseId: $wipFinWarehouseId,
+                        itemId: $itemId,
+                        qty: $qtyProcessed,
+                        date: $movementDate,
+                        sourceType: 'finishing_qc_out',
+                        sourceId: $job->id,
+                        notes: "QC Finishing OUT {$qtyProcessed} pcs dari WIP-FIN untuk job {$job->code} (bundle #{$bundleId})",
+                        allowNegative: false,
+                        lotId: null, // WIP tidak pakai LOT
+                        unitCostOverride: $unitCostWipFinPerItem[$itemId] ?? null,
+                        affectLotCost: false,
+                        cuttingJobBundleId: $bundleId,
+                    );
+                }
             }
 
-            // 1.b IN ke FG (OK)
-            foreach ($totalOkByItem as $itemId => $qtyOkItem) {
-                if ($qtyOkItem <= 0) {
-                    continue;
-                }
+            // 1.b IN ke FG (OK, per bundle)
+            foreach ($okByBundleItem as $bundleId => $byItem) {
+                foreach ($byItem as $itemId => $qtyOkItem) {
+                    if ($qtyOkItem <= 0) {
+                        continue;
+                    }
 
-                $this->inventory->stockIn(
-                    warehouseId: $fgWarehouseId,
-                    itemId: $itemId,
-                    qty: $qtyOkItem,
-                    date: $movementDate,
-                    sourceType: 'finishing_qc_in_fg',
-                    sourceId: $job->id,
-                    notes: "QC Finishing IN FG {$qtyOkItem} pcs dari job {$job->code}",
-                    lotId: null,
-                    unitCost: $unitCostWipFinPerItem[$itemId] ?? null,
-                    affectLotCost: false,
-                );
+                    $this->inventory->stockIn(
+                        warehouseId: $fgWarehouseId,
+                        itemId: $itemId,
+                        qty: $qtyOkItem,
+                        date: $movementDate,
+                        sourceType: 'finishing_qc_in_fg',
+                        sourceId: $job->id,
+                        notes: "QC Finishing IN FG {$qtyOkItem} pcs dari job {$job->code} (bundle #{$bundleId})",
+                        lotId: null,
+                        unitCost: $unitCostWipFinPerItem[$itemId] ?? null,
+                        affectLotCost: false,
+                        cuttingJobBundleId: $bundleId,
+                    );
+                }
             }
 
-            // 1.c IN ke REJ-FIN (Reject finishing)
-            foreach ($totalRejectByItem as $itemId => $qtyRejectItem) {
-                if ($qtyRejectItem <= 0) {
-                    continue;
-                }
+            // 1.c IN ke REJ-FIN (Reject finishing, per bundle)
+            foreach ($rejectByBundleItem as $bundleId => $byItem) {
+                foreach ($byItem as $itemId => $qtyRejectItem) {
+                    if ($qtyRejectItem <= 0) {
+                        continue;
+                    }
 
-                $this->inventory->stockIn(
-                    warehouseId: $rejFinWarehouseId,
-                    itemId: $itemId,
-                    qty: $qtyRejectItem,
-                    date: $movementDate,
-                    sourceType: 'finishing_qc_reject',
-                    sourceId: $job->id,
-                    notes: "QC Finishing REJECT {$qtyRejectItem} pcs dari job {$job->code}",
-                    lotId: null,
-                    unitCost: $unitCostWipFinPerItem[$itemId] ?? null,
-                    affectLotCost: false,
-                );
+                    $this->inventory->stockIn(
+                        warehouseId: $rejFinWarehouseId,
+                        itemId: $itemId,
+                        qty: $qtyRejectItem,
+                        date: $movementDate,
+                        sourceType: 'finishing_qc_reject',
+                        sourceId: $job->id,
+                        notes: "QC Finishing REJECT {$qtyRejectItem} pcs dari job {$job->code} (bundle #{$bundleId})",
+                        lotId: null,
+                        unitCost: $unitCostWipFinPerItem[$itemId] ?? null,
+                        affectLotCost: false,
+                        cuttingJobBundleId: $bundleId,
+                    );
+                }
             }
 
             // 💥 AUTO HPP RM-only per FinishingJob (MULTI-LOT) — tetap jalan seperti sebelumnya
@@ -768,6 +808,7 @@ class QcService
                     lotId: null,
                     unitCost: null,
                     affectLotCost: false,
+                    cuttingJobBundleId: $bundle->id,
                 );
             } elseif ($deltaOk < 0) {
                 // kalau sudah kepakai sewing, stok WIP-CUT bisa tidak cukup → InventoryService akan throw
@@ -783,6 +824,7 @@ class QcService
                     lotId: null,
                     unitCostOverride: null,
                     affectLotCost: false,
+                    cuttingJobBundleId: $bundle->id,
                 );
             }
 
@@ -801,6 +843,7 @@ class QcService
                     lotId: null,
                     unitCost: null,
                     affectLotCost: false,
+                    cuttingJobBundleId: $bundle->id,
                 );
             } elseif ($deltaReject < 0) {
                 $this->inventory->stockOut(
@@ -815,6 +858,7 @@ class QcService
                     lotId: null,
                     unitCostOverride: null,
                     affectLotCost: false,
+                    cuttingJobBundleId: $bundle->id,
                 );
             }
 

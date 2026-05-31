@@ -373,6 +373,7 @@ class WipFinAdjustmentController extends Controller
                         lotId: null,
                         unitCost: null,
                         affectLotCost: false,
+                        cuttingJobBundleId: (int) $line->bundle_id,
                     );
 
                     $bundle = CuttingJobBundle::find($line->bundle_id);
@@ -393,6 +394,7 @@ class WipFinAdjustmentController extends Controller
                         lotId: null,
                         unitCostOverride: null,
                         affectLotCost: false,
+                        cuttingJobBundleId: (int) $line->bundle_id,
                     );
 
                     $bundle = CuttingJobBundle::find($line->bundle_id);
@@ -460,6 +462,7 @@ class WipFinAdjustmentController extends Controller
                         lotId: null,
                         unitCostOverride: null,
                         affectLotCost: false,
+                        cuttingJobBundleId: (int) $line->bundle_id,
                     );
 
                     $bundle = CuttingJobBundle::find($line->bundle_id);
@@ -480,6 +483,7 @@ class WipFinAdjustmentController extends Controller
                         lotId: null,
                         unitCost: null,
                         affectLotCost: false,
+                        cuttingJobBundleId: (int) $line->bundle_id,
                     );
 
                     $bundle = CuttingJobBundle::find($line->bundle_id);

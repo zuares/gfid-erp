@@ -261,11 +261,72 @@ class CuttingJobBundle extends Model
      */
     public function getQtyReadyForSewingAttribute(): float
     {
+        // FASE 3: sumber ledger → kesiapan = saldo fisik WIP-CUT per bundle
+        // (sudah net dari pickup), dibatasi hasil QC. Bebas stok hantu.
+        if (config('inventory.readiness_source') === 'ledger') {
+            $qtyOk = $this->qty_cutting_ok;
+            $bal = $this->ledgerBalanceAt(config('inventory.warehouses.wip_cut', 'WIP-CUT'));
+
+            return max(0.0, min($qtyOk, $bal));
+        }
+
         $qtyOk = $this->qty_cutting_ok; // hasil QC (atau fallback)
         $cutWip = (float) ($this->cut_wip_qty ?? 0); // stok WIP cutting (WIP-CUT)
         $picked = (float) ($this->sewing_picked_qty ?? 0);
 
         return max(0, min($qtyOk, $cutWip) - $picked);
+    }
+
+    /**
+     * FASE 3 — saldo LEDGER per-bundle di sebuah gudang (kode), dihitung dari
+     * inventory_mutations.cutting_job_bundle_id. Ini sumber kebenaran fisik
+     * (bebas hantu). Hanya membaca; tidak menyentuh costing.
+     *
+     * Memakai kolom hasil eager-subquery (scopeWithLedgerBalances) bila tersedia
+     * agar tidak N+1; kalau tidak, query langsung.
+     */
+    public function ledgerBalanceAt(string $warehouseCode): float
+    {
+        $alias = 'ledger_' . str_replace('-', '_', strtolower($warehouseCode)) . '_qty';
+        if (array_key_exists($alias, $this->attributes)) {
+            return (float) $this->attributes[$alias];
+        }
+
+        if (!$this->exists || !$this->getKey()) {
+            return 0.0;
+        }
+
+        return (float) \DB::table('inventory_mutations as im')
+            ->join('warehouses as w', 'w.id', '=', 'im.warehouse_id')
+            ->where('im.cutting_job_bundle_id', $this->getKey())
+            ->where('w.code', $warehouseCode)
+            ->sum('im.qty_change');
+    }
+
+    /**
+     * FASE 3 — eager-load saldo ledger per-bundle sebagai kolom subquery
+     * (mis. ledger_wip_cut_qty, ledger_wip_fin_qty) untuk daftar tanpa N+1.
+     */
+    public function scopeWithLedgerBalances($query, array $warehouseCodes = ['WIP-CUT', 'WIP-FIN'])
+    {
+        $table = $this->getTable();
+
+        if (empty($query->getQuery()->columns)) {
+            $query->addSelect($table . '.*');
+        }
+
+        foreach ($warehouseCodes as $code) {
+            $alias = 'ledger_' . str_replace('-', '_', strtolower($code)) . '_qty';
+            $query->selectSub(function ($q) use ($code, $table) {
+                $q->from('inventory_mutations as im')
+                    ->join('warehouses as w', 'w.id', '=', 'im.warehouse_id')
+                    ->whereColumn('im.cutting_job_bundle_id', $table . '.id')
+                    ->where('w.code', $code)
+                    ->selectRaw('COALESCE(SUM(im.qty_change), 0)');
+            }, $alias);
+        }
+
+        return $query;
     }
 
     // ------------------------------------------------------------------
@@ -305,6 +366,19 @@ class CuttingJobBundle extends Model
      */
     public function scopeReadyForSewing($query, ?int $wipCutWarehouseId = null)
     {
+        // FASE 3: turunkan dari saldo ledger WIP-CUT per bundle (bebas hantu).
+        if (config('inventory.readiness_source') === 'ledger') {
+            $code = config('inventory.warehouses.wip_cut', 'WIP-CUT');
+            $table = $this->getTable();
+
+            return $query->whereRaw(
+                'COALESCE((SELECT SUM(im.qty_change) FROM inventory_mutations im '
+                . 'INNER JOIN warehouses w ON w.id = im.warehouse_id '
+                . 'WHERE im.cutting_job_bundle_id = ' . $table . '.id AND w.code = ?), 0) > 0.0001',
+                [$code]
+            );
+        }
+
         if ($wipCutWarehouseId) {
             $query->where('cut_wip_warehouse_id', $wipCutWarehouseId);
         }
@@ -331,6 +405,22 @@ class CuttingJobBundle extends Model
      */
     public function scopeReadyForFinishing($query, ?int $warehouseId = null)
     {
+        // FASE 3b: turunkan dari saldo ledger WIP-FIN per bundle (bebas hantu).
+        // Penjaga fisik sebenarnya tetap di ledger (lock inventory_stocks +
+        // stockOut allowNegative=false saat posting finishing); cache wip_qty
+        // hanya cermin. Toggle via config inventory.readiness_source.
+        if (config('inventory.readiness_source') === 'ledger') {
+            $code = config('inventory.warehouses.wip_fin', 'WIP-FIN');
+            $table = $this->getTable();
+
+            return $query->whereRaw(
+                'COALESCE((SELECT SUM(im.qty_change) FROM inventory_mutations im '
+                . 'INNER JOIN warehouses w ON w.id = im.warehouse_id '
+                . 'WHERE im.cutting_job_bundle_id = ' . $table . '.id AND w.code = ?), 0) > 0.0001',
+                [$code]
+            );
+        }
+
         if ($warehouseId) {
             $query->where('wip_warehouse_id', $warehouseId);
         }

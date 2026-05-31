@@ -131,6 +131,7 @@ class PreviewCutWipRejectFix extends Command
         DB::transaction(function () use ($plans, $inventory, $wipCut, $rejCut, $date) {
             foreach ($plans as $p) {
                 $notes = "Koreksi reject salah masuk WIP-CUT → REJ-CUT (bundle {$p['code']})";
+                $bundleId = isset($p['bundle']) && $p['bundle'] ? (int) $p['bundle']->id : null;
                 $inventory->stockOut(
                     warehouseId: $wipCut->id,
                     itemId: $p['item_id'],
@@ -143,6 +144,7 @@ class PreviewCutWipRejectFix extends Command
                     lotId: null,
                     unitCostOverride: null,
                     affectLotCost: false,
+                    cuttingJobBundleId: $bundleId,
                 );
                 $inventory->stockIn(
                     warehouseId: $rejCut->id,
@@ -155,6 +157,7 @@ class PreviewCutWipRejectFix extends Command
                     lotId: null,
                     unitCost: null,
                     affectLotCost: false,
+                    cuttingJobBundleId: $bundleId,
                 );
             }
         });

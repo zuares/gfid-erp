@@ -115,9 +115,7 @@ class SewingPickupController extends Controller
                 'cuttingJob.lot.item',
                 'latestCuttingQc',
             ])
-            ->where('cut_wip_warehouse_id', $wipCutWarehouseId)
-            ->where('cut_wip_qty', '>', 0)
-            ->whereColumn('sewing_picked_qty', '<', 'cut_wip_qty')
+            ->readyForSewing($wipCutWarehouseId)
             ->orderBy('id')
             ->get();
 
@@ -316,6 +314,7 @@ class SewingPickupController extends Controller
                     lotId: null,
                     unitCostOverride: $unitCostPerPiece,
                     affectLotCost: false,
+                    cuttingJobBundleId: $bundle->id,
                 );
 
                 // 2️⃣ IN ke gudang sewing (WIP-SEW)
@@ -330,6 +329,7 @@ class SewingPickupController extends Controller
                     lotId: null,
                     unitCost: $unitCostPerPiece,
                     affectLotCost: false,
+                    cuttingJobBundleId: $bundle->id,
                 );
 
                 $createdLines++;
@@ -528,6 +528,7 @@ class SewingPickupController extends Controller
                     lotId: null,
                     unitCostOverride: $unitCost,
                     affectLotCost: false,
+                    cuttingJobBundleId: $bundle->id,
                 );
 
                 $this->inventory->stockIn(
@@ -541,6 +542,7 @@ class SewingPickupController extends Controller
                     lotId: null,
                     unitCost: $unitCost,
                     affectLotCost: false,
+                    cuttingJobBundleId: $bundle->id,
                 );
 
                 $line->status = 'void';
@@ -654,6 +656,7 @@ class SewingPickupController extends Controller
                 lotId: null,
                 unitCostOverride: $unitCost,
                 affectLotCost: false,
+                cuttingJobBundleId: $bundle->id,
             );
 
             // IN ke WIP-CUT
@@ -668,6 +671,7 @@ class SewingPickupController extends Controller
                 lotId: null,
                 unitCost: $unitCost,
                 affectLotCost: false,
+                cuttingJobBundleId: $bundle->id,
             );
 
             // mark line void

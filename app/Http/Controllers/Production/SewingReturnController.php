@@ -524,6 +524,7 @@ class SewingReturnController extends Controller
                         lotId: null,
                         unitCostOverride: null,
                         affectLotCost: false,
+                        cuttingJobBundleId: $bundleId,
                     );
 
                     if ($rejectWarehouse) {
@@ -538,6 +539,7 @@ class SewingReturnController extends Controller
                             lotId: null,
                             unitCost: null,
                             affectLotCost: false,
+                            cuttingJobBundleId: $bundleId,
                         );
                     }
                 }
@@ -570,6 +572,7 @@ class SewingReturnController extends Controller
                         lotId: null,
                         unitCostOverride: null,
                         affectLotCost: false,
+                        cuttingJobBundleId: $bundleId,
                     );
 
                     $this->inventory->stockIn(
@@ -583,6 +586,7 @@ class SewingReturnController extends Controller
                         lotId: null,
                         unitCost: $unitCostWithLabor,
                         affectLotCost: false,
+                        cuttingJobBundleId: $bundleId,
                     );
 
                     $okByBundle[$bundleId] = ($okByBundle[$bundleId] ?? 0) + $qtyOk;
@@ -826,7 +830,8 @@ class SewingReturnController extends Controller
                         "VOID {$return->code} (OK) {$destWarehouse->code} → {$wipSewWarehouse->code}",
                         $voidDate,
                         false,
-                        null
+                        null,
+                        $bundleId
                     );
 
                     // snapshot update
@@ -856,7 +861,8 @@ class SewingReturnController extends Controller
                         "VOID {$return->code} (RJ) REJECT → {$wipSewWarehouse->code}",
                         $voidDate,
                         false,
-                        null
+                        null,
+                        $bundleId
                     );
 
                     $stocksReject->put($itemId, (object) ['qty' => $rejAvail - $qtyRj]);

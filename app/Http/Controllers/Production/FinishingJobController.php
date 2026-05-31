@@ -29,6 +29,28 @@ class FinishingJobController extends Controller
         protected FinishingBomService $finBom, // ✅ NEW
     ) {}
 
+    /**
+     * FASE 3b — apakah kesiapan finishing dibaca dari ledger (bukan cache).
+     */
+    private function readinessFromLedger(): bool
+    {
+        return config('inventory.readiness_source') === 'ledger';
+    }
+
+    /**
+     * FASE 3b — SQL fragment saldo WIP-FIN per bundle dari LEDGER.
+     * $alias = alias tabel cutting_job_bundles pada query pemanggil.
+     * Kode gudang berasal dari config (tepercaya), aman di-inline.
+     */
+    private function wipFinLedgerSql(string $alias = 'b'): string
+    {
+        $code = config('inventory.warehouses.wip_fin', 'WIP-FIN');
+
+        return 'COALESCE((SELECT SUM(im.qty_change) FROM inventory_mutations im '
+            . 'INNER JOIN warehouses w ON w.id = im.warehouse_id '
+            . "WHERE im.cutting_job_bundle_id = {$alias}.id AND w.code = '{$code}'), 0)";
+    }
+
     /* ============================================================
      * INDEX
      * ============================================================
@@ -106,7 +128,6 @@ class FinishingJobController extends Controller
         $itemIds = CuttingJobBundle::query()
             ->readyForFinishing($wipFinWarehouseId)
             ->whereNotNull('finished_item_id')
-            ->where('wip_qty', '>', 0)
             ->selectRaw('finished_item_id as item_id')
             ->groupBy('finished_item_id')
             ->pluck('item_id')
@@ -128,11 +149,14 @@ class FinishingJobController extends Controller
             ->keyBy('id');
 
         // 2) WIP sum per item
+        $wipSumExpr = $this->readinessFromLedger()
+            ? 'finished_item_id as item_id, SUM(' . $this->wipFinLedgerSql('cutting_job_bundles') . ') as wip_sum'
+            : 'finished_item_id as item_id, SUM(wip_qty) as wip_sum';
+
         $wipByItem = CuttingJobBundle::query()
             ->readyForFinishing($wipFinWarehouseId)
             ->whereIn('finished_item_id', $itemIds)
-            ->where('wip_qty', '>', 0)
-            ->selectRaw('finished_item_id as item_id, SUM(wip_qty) as wip_sum')
+            ->selectRaw($wipSumExpr)
             ->groupBy('finished_item_id')
             ->get()
             ->keyBy('item_id');
@@ -144,8 +168,14 @@ class FinishingJobController extends Controller
             ->join('sewing_returns as sr', 'sr.id', '=', 'srl.sewing_return_id')
             ->leftJoin('sewing_pickups as sp', 'sp.id', '=', 'spl.sewing_pickup_id')
             ->leftJoin('employees as e', 'e.id', '=', 'sr.operator_id')
-            ->where('b.wip_warehouse_id', $wipFinWarehouseId)
-            ->where('b.wip_qty', '>', 0)
+            ->where(function ($q) use ($wipFinWarehouseId) {
+                if ($this->readinessFromLedger()) {
+                    $q->whereRaw($this->wipFinLedgerSql('b') . ' > 0.0001');
+                } else {
+                    $q->where('b.wip_warehouse_id', $wipFinWarehouseId)
+                        ->where('b.wip_qty', '>', 0);
+                }
+            })
             ->whereIn('b.finished_item_id', $itemIds)
             ->whereNotNull('b.finished_item_id')
             ->whereRaw('(COALESCE(srl.qty_ok,0) - COALESCE(srl.finished_qty,0)) > 0');
@@ -191,8 +221,14 @@ class FinishingJobController extends Controller
             ->join('sewing_pickup_lines as spl', 'spl.cutting_job_bundle_id', '=', 'b.id')
             ->join('sewing_return_lines as srl', 'srl.sewing_pickup_line_id', '=', 'spl.id')
             ->join('sewing_returns as sr', 'sr.id', '=', 'srl.sewing_return_id')
-            ->where('b.wip_warehouse_id', $wipFinWarehouseId)
-            ->where('b.wip_qty', '>', 0)
+            ->where(function ($q) use ($wipFinWarehouseId) {
+                if ($this->readinessFromLedger()) {
+                    $q->whereRaw($this->wipFinLedgerSql('b') . ' > 0.0001');
+                } else {
+                    $q->where('b.wip_warehouse_id', $wipFinWarehouseId)
+                        ->where('b.wip_qty', '>', 0);
+                }
+            })
             ->whereIn('b.finished_item_id', $itemIds)
             ->whereNotNull('b.finished_item_id')
             ->whereRaw('(COALESCE(srl.qty_ok,0) - COALESCE(srl.finished_qty,0)) > 0');
@@ -205,12 +241,16 @@ class FinishingJobController extends Controller
             $qEligibleBundles->whereNull('sr.voided_at');
         }
 
+        $bundleWipExpr = $this->readinessFromLedger()
+            ? 'MAX(' . $this->wipFinLedgerSql('b') . ')'
+            : 'MAX(b.wip_qty)';
+
         $eligibleBundleRows = $qEligibleBundles
             ->selectRaw('
                 b.id as bundle_id,
                 b.finished_item_id as item_id,
                 sr.operator_id as operator_id,
-                MAX(b.wip_qty) as bundle_wip
+                ' . $bundleWipExpr . ' as bundle_wip
             ')
             ->groupBy('b.id', 'b.finished_item_id', 'sr.operator_id')
             ->get();
@@ -402,10 +442,12 @@ class FinishingJobController extends Controller
                 ]);
             }
 
-            $totalWip = (int) round((float) CuttingJobBundle::query()
-                    ->readyForFinishing($wipFinWarehouseId)
-                    ->where('finished_item_id', $itemId)
-                    ->sum('wip_qty'));
+            $totalWipQuery = CuttingJobBundle::query()
+                ->readyForFinishing($wipFinWarehouseId)
+                ->where('finished_item_id', $itemId);
+            $totalWip = (int) round((float) ($this->readinessFromLedger()
+                ? $totalWipQuery->sum(DB::raw($this->wipFinLedgerSql('cutting_job_bundles')))
+                : $totalWipQuery->sum('wip_qty')));
 
             if ($totalWip <= 0) {
                 throw ValidationException::withMessages([
@@ -504,7 +546,9 @@ class FinishingJobController extends Controller
                         break;
                     }
 
-                    $bundleWip = (int) round((float) ($bundle->wip_qty ?? 0));
+                    $bundleWip = (int) round($this->readinessFromLedger()
+                        ? $bundle->ledgerBalanceAt(config('inventory.warehouses.wip_fin', 'WIP-FIN'))
+                        : (float) ($bundle->wip_qty ?? 0));
                     if ($bundleWip <= 0) {
                         continue;
                     }
@@ -1031,12 +1075,15 @@ class FinishingJobController extends Controller
                     );
                 }
 
+                // FASE 1: tag dimensi produksi (per bundle) di ledger
+                $lineBundleId = $line->bundle_id ? (int) $line->bundle_id : null;
+
                 // =========================
                 // 3) OUT WIP-FIN (OK+Reject)
                 // =========================
                 // ✅ hindari named-arg mismatch -> pakai positional args
                 // Pastikan signature InventoryService::stockOut sesuai urutan ini:
-                // stockOut($warehouseId, $itemId, $qty, $date, $sourceType, $sourceId, $notes, $allowNegative=false, $lotId=null, $unitCostOverride=null, $affectLotCost=false)
+                // stockOut($warehouseId, $itemId, $qty, $date, $sourceType, $sourceId, $notes, $allowNegative=false, $lotId=null, $unitCostOverride=null, $affectLotCost=false, $cuttingJobBundleId=null)
                 $this->inventory->stockOut(
                     $wipFinWarehouseId,
                     (int) $line->item_id,
@@ -1048,7 +1095,8 @@ class FinishingJobController extends Controller
                     false,
                     null,
                     $movementUnitCost,
-                    false
+                    false,
+                    $lineBundleId
                 );
 
                 // =========================
@@ -1066,7 +1114,8 @@ class FinishingJobController extends Controller
                         $notesPrefix . " OK (WIP-FIN→PRD)",
                         null,
                         $movementUnitCost,
-                        false
+                        false,
+                        $lineBundleId
                     );
 
                     // snapshot HPP (kalau cost ada)
@@ -1111,7 +1160,8 @@ class FinishingJobController extends Controller
                         $notesPrefix . " REJECT (WIP-FIN→REJECT)",
                         null,
                         $movementUnitCost,
-                        false
+                        false,
+                        $lineBundleId
                     );
                 }
 
@@ -1125,11 +1175,29 @@ class FinishingJobController extends Controller
                     $newWip = $currentWip - $qtyUsed;
 
                     if ($newWip < 0) {
-                        // ✅ keras biar kelihatan mismatch data bundle vs movement
-                        throw new \RuntimeException(
-                            "Bundle {$bundle->id} wip_qty tidak cukup. "
-                            . "wip_qty={$currentWip}, dipakai={$qtyUsed} (line {$line->id})."
-                        );
+                        if ($this->readinessFromLedger()) {
+                            // Mode ledger: penjaga fisik sudah di ledger (lock stok WIP-FIN
+                            // + stockOut allowNegative=false). Cache wip_qty hanya cermin —
+                            // jangan blokir operasi yang sah, cukup floor ke 0.
+                            // TAPI catat drift-nya supaya bisa diselidiki & jadi tolok ukur
+                            // kesiapan Fase 4 (kalau log ini nol = cache aman dibuang).
+                            \Log::warning('[FASE3b] cache wip_qty drift saat finishing', [
+                                'bundle_id' => $bundle->id,
+                                'finishing_line_id' => $line->id,
+                                'job_id' => $job->id,
+                                'item_id' => (int) $line->item_id,
+                                'cache_wip_qty' => $currentWip,
+                                'qty_used' => $qtyUsed,
+                                'shortfall' => $qtyUsed - $currentWip,
+                            ]);
+                            $newWip = 0;
+                        } else {
+                            // ✅ keras biar kelihatan mismatch data bundle vs movement
+                            throw new \RuntimeException(
+                                "Bundle {$bundle->id} wip_qty tidak cukup. "
+                                . "wip_qty={$currentWip}, dipakai={$qtyUsed} (line {$line->id})."
+                            );
+                        }
                     }
 
                     if ($newWip !== $currentWip) {

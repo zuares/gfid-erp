@@ -420,6 +420,7 @@ class RtsDirectReceiveController extends Controller
                 $ok = (float) $r['qty_ok'];
                 $rj = (float) $r['qty_reject'];
                 $total = (float) $r['total'];
+                $bundleId = $pl?->cutting_job_bundle_id ? (int) $pl->cutting_job_bundle_id : null; // FASE 1: tag bundle
 
                 // save line (qty total)
                 RtsDirectReceiveLine::create([
@@ -444,6 +445,7 @@ class RtsDirectReceiveController extends Controller
                         lotId: null,
                         unitCostOverride: null,
                         affectLotCost: false,
+                        cuttingJobBundleId: $bundleId,
                     );
 
                     if ($rejectWh) {
@@ -458,6 +460,7 @@ class RtsDirectReceiveController extends Controller
                             lotId: null,
                             unitCost: null,
                             affectLotCost: false,
+                            cuttingJobBundleId: $bundleId,
                         );
                     }
                 }
@@ -475,6 +478,7 @@ class RtsDirectReceiveController extends Controller
                         date: $date,
                         allowNegative: false,
                         lotId: null,
+                        cuttingJobBundleId: $bundleId,
                     );
 
                     $this->inventory->move(
@@ -488,6 +492,7 @@ class RtsDirectReceiveController extends Controller
                         date: $date,
                         allowNegative: false,
                         lotId: null,
+                        cuttingJobBundleId: $bundleId,
                     );
                 }
 

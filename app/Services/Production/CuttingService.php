@@ -538,6 +538,7 @@ class CuttingService
                     lotId: null,
                     unitCost: $unitCostPerPcs,
                     affectLotCost: false,
+                    cuttingJobBundleId: $bundle->id,
                 );
 
                 $bundle->wip_warehouse_id = $bundleWipWarehouseId;
@@ -565,6 +566,7 @@ class CuttingService
                     lotId: null,
                     unitCost: $unitCostPerPcs,
                     affectLotCost: false,
+                    cuttingJobBundleId: $bundle->id,
                 );
             }
 
