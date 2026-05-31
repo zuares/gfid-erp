@@ -738,7 +738,7 @@
                                     ? $row->qcResults->where('stage', 'cutting')->sortByDesc('qc_date')->first()
                                     : null;
 
-                                $wip = (float) ($row->wip_qty ?? 0);
+                                $wip = (float) ($row->cut_wip_qty ?? 0);
                                 $picked = (float) ($row->sewing_picked_qty ?? 0);
 
                                 $qtyOkAccessor = $row->qty_cutting_ok ?? null;
@@ -879,7 +879,7 @@
                                     ? $row->qcResults->where('stage', 'cutting')->sortByDesc('qc_date')->first()
                                     : null;
 
-                                $wip = (float) ($row->wip_qty ?? 0);
+                                $wip = (float) ($row->cut_wip_qty ?? 0);
                                 $picked = (float) ($row->sewing_picked_qty ?? 0);
 
                                 $qtyOkAccessor = $row->qty_cutting_ok ?? null;

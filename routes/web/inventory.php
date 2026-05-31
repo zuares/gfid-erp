@@ -10,6 +10,7 @@ use App\Http\Controllers\Inventory\StockCardController;
 use App\Http\Controllers\Inventory\StockOpnameController;
 use App\Http\Controllers\Inventory\TransferController;
 use App\Http\Controllers\Inventory\WipAdjustmentController;
+use App\Http\Controllers\Inventory\WipCutReconcileController;
 use Illuminate\Support\Facades\Route;
 
 /*
@@ -58,6 +59,14 @@ Route::middleware(['web', 'auth', 'role:owner,admin,operating'])->group(function
             Route::get('/{item}/locations', [InventoryStockController::class, 'itemLocations'])->name('item_locations');
 
             Route::get('/items-legacy', [InventoryStockController::class, 'itemsLegacy'])->name('items_legacy');
+        });
+
+        // ================== WIP-CUT RECONCILE (owner only) ==================
+        Route::middleware('role:owner')->group(function () {
+            Route::get('wip-cut-reconcile', [WipCutReconcileController::class, 'index'])
+                ->name('wip_cut_reconcile.index');
+            Route::get('wip-cut-reconcile/{item}', [WipCutReconcileController::class, 'show'])
+                ->name('wip_cut_reconcile.show');
         });
 
         // ================== STOCK OPNAME ==================

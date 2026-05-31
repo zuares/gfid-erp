@@ -7,6 +7,45 @@ use Illuminate\Database\Eloquent\Relations\BelongsTo;
 
 class CuttingJobBundle extends Model
 {
+    /**
+     * GUARD (proteksi ganda) untuk kolom cutting-WIP.
+     *
+     * Invarian: cut_wip_warehouse_id HANYA boleh null atau menunjuk ke gudang
+     * berkode WIP-CUT. Kolom ini milik tahap cutting; tahap hilir (retur jahit,
+     * finishing) TIDAK boleh mengarahkannya ke gudang lain (mis. WH-PRD) —
+     * itulah yang dulu membuat sisa cutting hilang dari halaman Ambil Jahit.
+     *
+     * Kalau ada kode (sekarang / di masa depan) mencoba mengeset kolom ini ke
+     * gudang non-WIP-CUT, simpan akan ditolak dengan pesan jelas.
+     */
+    protected static ?int $wipCutWarehouseIdCache = null;
+
+    protected static function booted(): void
+    {
+        static::saving(function (self $bundle) {
+            // hanya cek bila kolom ini berubah & tidak null
+            if (!$bundle->isDirty('cut_wip_warehouse_id')) {
+                return;
+            }
+
+            $value = $bundle->cut_wip_warehouse_id;
+            if ($value === null) {
+                return; // null = belum/diset-ulang (reset cutting) → boleh
+            }
+
+            $wipCutId = static::$wipCutWarehouseIdCache
+                ??= (int) (Warehouse::where('code', 'WIP-CUT')->value('id') ?? 0);
+
+            if ($wipCutId > 0 && (int) $value !== $wipCutId) {
+                throw new \RuntimeException(
+                    "cut_wip_warehouse_id bundle #{$bundle->id} hanya boleh gudang WIP-CUT "
+                    . "(id {$wipCutId}), bukan id {$value}. Kolom cutting-WIP tidak boleh "
+                    . 'ditimpa oleh tahap jahit/finishing.'
+                );
+            }
+        });
+    }
+
     // ------------------------------------------------------------------
     // BASIC SETUP
     // ------------------------------------------------------------------
@@ -27,6 +66,8 @@ class CuttingJobBundle extends Model
         'qty_qc_reject',
         'wip_warehouse_id',
         'wip_qty',
+        'cut_wip_warehouse_id',
+        'cut_wip_qty',
         'sewing_picked_qty',
     ];
 
@@ -36,6 +77,7 @@ class CuttingJobBundle extends Model
         'qty_qc_ok' => 'float',
         'qty_qc_reject' => 'float',
         'wip_qty' => 'float',
+        'cut_wip_qty' => 'float',
         'sewing_picked_qty' => 'float',
 
         // kalau di tabel memang ada kolom tanggal di bundle,
@@ -95,6 +137,18 @@ class CuttingJobBundle extends Model
     public function wipWarehouse(): BelongsTo
     {
         return $this->belongsTo(Warehouse::class, 'wip_warehouse_id');
+    }
+
+    /**
+     * Warehouse WIP hasil cutting (normalnya WIP-CUT).
+     *
+     * Berbeda dengan wipWarehouse(): kolom ini DI-SET SEKALI saat QC Cutting dan
+     * TIDAK pernah ditimpa oleh tahap jahit/finishing — jadi sisa cutting tidak
+     * pernah "hilang" dari halaman Ambil Jahit.
+     */
+    public function cutWipWarehouse(): BelongsTo
+    {
+        return $this->belongsTo(Warehouse::class, 'cut_wip_warehouse_id');
     }
 
     /**
@@ -195,20 +249,23 @@ class CuttingJobBundle extends Model
      * Qty READY untuk sewing dengan memperhitungkan WIP-CUT.
      *
      * Rumus:
-     *   ready = max(0, min(qty_cutting_ok, wip_qty) - sewing_picked_qty)
+     *   ready = max(0, min(qty_cutting_ok, cut_wip_qty) - sewing_picked_qty)
      *
      * Artinya:
      * - Tidak boleh melebihi hasil QC (qty_cutting_ok).
-     * - Tidak boleh melebihi stok WIP yang ada di gudang WIP-CUT.
+     * - Tidak boleh melebihi stok WIP cutting (cut_wip_qty di gudang WIP-CUT).
      * - Dikurangi qty yang sudah pernah dipick ke sewing.
+     *
+     * CATATAN: sengaja pakai cut_wip_qty (bukan wip_qty) karena wip_qty bisa
+     * ditimpa tahap hilir (retur jahit / finishing). cut_wip_qty kebal dari itu.
      */
     public function getQtyReadyForSewingAttribute(): float
     {
         $qtyOk = $this->qty_cutting_ok; // hasil QC (atau fallback)
-        $wipQty = (float) ($this->wip_qty ?? 0); // stok WIP dari gudang WIP-CUT
+        $cutWip = (float) ($this->cut_wip_qty ?? 0); // stok WIP cutting (WIP-CUT)
         $picked = (float) ($this->sewing_picked_qty ?? 0);
 
-        return max(0, min($qtyOk, $wipQty) - $picked);
+        return max(0, min($qtyOk, $cutWip) - $picked);
     }
 
     // ------------------------------------------------------------------
@@ -237,21 +294,24 @@ class CuttingJobBundle extends Model
      * Scope: bundle yang siap dijahit
      * dengan mempertimbangkan WIP-CUT & qty pick.
      *
-     * - wip_qty > 0
-     * - sewing_picked_qty < wip_qty
+     * - cut_wip_qty > 0
+     * - sewing_picked_qty < cut_wip_qty
      * - punya hasil cutting (qty_qc_ok atau QC Cutting > 0 atau qty_pcs > 0)
      *
      * Opsional: filter per gudang WIP-CUT via $wipCutWarehouseId.
+     *
+     * CATATAN: memakai kolom cut_wip_* (bukan wip_*) supaya bundle yang sudah
+     * pernah retur jahit / pindah ke WH-PRD tidak menyembunyikan sisa cutting-nya.
      */
     public function scopeReadyForSewing($query, ?int $wipCutWarehouseId = null)
     {
         if ($wipCutWarehouseId) {
-            $query->where('wip_warehouse_id', $wipCutWarehouseId);
+            $query->where('cut_wip_warehouse_id', $wipCutWarehouseId);
         }
 
         return $query
-            ->where('wip_qty', '>', 0)
-            ->whereColumn('sewing_picked_qty', '<', 'wip_qty')
+            ->where('cut_wip_qty', '>', 0)
+            ->whereColumn('sewing_picked_qty', '<', 'cut_wip_qty')
             ->where(function ($q) {
                 $q->where('qty_qc_ok', '>', 0)
                     ->orWhereHas('qcResults', function ($qq) {

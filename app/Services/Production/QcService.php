@@ -664,6 +664,10 @@ class QcService
                 $bundle->wip_warehouse_id = null;
                 $bundle->wip_posted_at = null; // ✅ ini yang baru & wajib
 
+                // reset kolom cutting-WIP juga (otoritatif untuk Ambil Jahit)
+                $bundle->cut_wip_qty = 0;
+                $bundle->cut_wip_warehouse_id = null;
+
                 $bundle->save();
             }
 
@@ -841,6 +845,13 @@ class QcService
             $bundle->qty_qc_reject = $newReject;
             $bundle->status = $status;
             $bundle->wip_qty = $newOk;
+
+            // Sinkronkan kolom cutting-WIP (otoritatif untuk Ambil Jahit).
+            // cut WIP selalu di WIP-CUT (invarian dijaga model guard).
+            $bundle->cut_wip_qty = $newOk;
+            if (empty($bundle->cut_wip_warehouse_id)) {
+                $bundle->cut_wip_warehouse_id = $wipCutWarehouseId;
+            }
             $bundle->save();
 
             // header status tetap qc_done

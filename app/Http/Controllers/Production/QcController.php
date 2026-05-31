@@ -506,6 +506,8 @@ class QcController extends Controller
                 $b->wip_qty = 0;
                 $b->wip_warehouse_id = null;
                 $b->wip_posted_at = null;
+                $b->cut_wip_qty = 0;
+                $b->cut_wip_warehouse_id = null;
                 $b->save();
             }
 

@@ -115,9 +115,9 @@ class SewingPickupController extends Controller
                 'cuttingJob.lot.item',
                 'latestCuttingQc',
             ])
-            ->where('wip_warehouse_id', $wipCutWarehouseId)
-            ->where('wip_qty', '>', 0)
-            ->whereColumn('sewing_picked_qty', '<', 'wip_qty')
+            ->where('cut_wip_warehouse_id', $wipCutWarehouseId)
+            ->where('cut_wip_qty', '>', 0)
+            ->whereColumn('sewing_picked_qty', '<', 'cut_wip_qty')
             ->orderBy('id')
             ->get();
 
@@ -224,15 +224,15 @@ class SewingPickupController extends Controller
                     continue;
                 }
 
-                // ✅ WAJIB: bundle ini harus berada di WIP-CUT
-                if ((int) $bundle->wip_warehouse_id !== (int) $wipCutWarehouseId) {
+                // ✅ WAJIB: bundle ini harus berada di WIP-CUT (kolom cutting-WIP).
+                if ((int) $bundle->cut_wip_warehouse_id !== (int) $wipCutWarehouseId) {
                     throw ValidationException::withMessages([
                         'lines' => "Bundle {$bundle->bundle_code} bukan berada di gudang WIP-CUT.",
                     ]);
                 }
 
-                // WIP per bundle
-                $wipQty = (float) ($bundle->wip_qty ?? 0);
+                // WIP per bundle (pakai kolom cutting-WIP yang kebal dari tahap hilir)
+                $wipQty = (float) ($bundle->cut_wip_qty ?? 0);
                 $alreadyPicked = (float) ($bundle->sewing_picked_qty ?? 0);
                 $maxFromWip = max($wipQty - $alreadyPicked, 0.0);
 

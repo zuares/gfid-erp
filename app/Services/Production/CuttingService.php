@@ -95,6 +95,8 @@ class CuttingService
                     'notes' => $row['notes'] ?? null,
                     'wip_warehouse_id' => null,
                     'wip_qty' => 0,
+                    'cut_wip_warehouse_id' => null,
+                    'cut_wip_qty' => 0,
                 ]);
 
                 $running++;
@@ -501,8 +503,22 @@ class CuttingService
             }
 
             if (!empty($bundle->wip_posted_at)) {
+                $dirty = false;
                 if ($this->num($bundle->wip_qty ?? 0) !== $qtyOk) {
                     $bundle->wip_qty = $qtyOk;
+                    $dirty = true;
+                }
+                // Jaga konsistensi kolom cutting-WIP (kebal dari tahap hilir).
+                if ($this->num($bundle->cut_wip_qty ?? 0) !== $qtyOk) {
+                    $bundle->cut_wip_qty = $qtyOk;
+                    $dirty = true;
+                }
+                if (empty($bundle->cut_wip_warehouse_id)) {
+                    // cut WIP selalu di WIP-CUT (invarian dijaga model guard).
+                    $bundle->cut_wip_warehouse_id = $wipCutWarehouseId;
+                    $dirty = true;
+                }
+                if ($dirty) {
                     $bundle->save();
                 }
                 continue;
@@ -526,8 +542,15 @@ class CuttingService
 
                 $bundle->wip_warehouse_id = $bundleWipWarehouseId;
                 $bundle->wip_qty = $qtyOk;
+
+                // ✅ Kolom cutting-WIP yang otoritatif untuk "Ambil Jahit".
+                // Di-set sekali di sini dan TIDAK boleh ditimpa tahap hilir.
+                // cut WIP selalu di WIP-CUT (invarian dijaga model guard).
+                $bundle->cut_wip_warehouse_id = $wipCutWarehouseId;
+                $bundle->cut_wip_qty = $qtyOk;
             } else {
                 $bundle->wip_qty = 0;
+                $bundle->cut_wip_qty = 0;
             }
 
             if ($qtyReject > 0) {

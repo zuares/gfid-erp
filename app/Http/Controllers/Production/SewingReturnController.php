@@ -596,6 +596,10 @@ class SewingReturnController extends Controller
                     continue;
                 }
 
+                // Posisi hilir (pasca-jahit) → kolom wip_* boleh dipindah ke WH-PRD/WH-RTS.
+                // ⚠️ JANGAN pernah menyentuh cut_wip_warehouse_id / cut_wip_qty di sini:
+                // kolom itu milik tahap cutting (otoritatif untuk Ambil Jahit) dan dijaga
+                // invarian di CuttingJobBundle::booted(). Menimpanya = bug "stok nyangkut".
                 $b->wip_warehouse_id = (int) $destWarehouse->id;
                 $b->wip_qty = (float) ($b->wip_qty ?? 0) + (float) $sumOk;
                 $b->save();

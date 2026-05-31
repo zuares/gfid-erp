@@ -36,6 +36,7 @@
     $hasInvExternalCreate = $router->has('inventory.external_transfers.create');
 
     $hasInvWipAdjIndex = $router->has('inventory.wip_adjustments.index');
+    $hasInvWipCutReconcile = $router->has('inventory.wip_cut_reconcile.index');
 
     // RTS
     $hasRtsStockReqIndex = $router->has('rts.stock-requests.index');
@@ -1127,6 +1128,13 @@
                             <x-sidebar.sub-link href="{{ route('inventory.wip_adjustments.index') }}" icon="🧾"
                                 :active="request()->routeIs('inventory.wip_adjustments.*')">
                                 Koreksi WIP
+                            </x-sidebar.sub-link>
+                        @endif
+
+                        @if ($hasInvWipCutReconcile)
+                            <x-sidebar.sub-link href="{{ route('inventory.wip_cut_reconcile.index') }}" icon="🔍"
+                                :active="request()->routeIs('inventory.wip_cut_reconcile.*')">
+                                Rekonsiliasi WIP-CUT
                             </x-sidebar.sub-link>
                         @endif
 

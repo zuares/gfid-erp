@@ -293,6 +293,7 @@
     $hasInvTransfersCreate = $router->has('inventory.transfers.create');
     $hasInvAdjustmentsIndex = $router->has('inventory.adjustments.index');
     $hasInvWipAdjIndex = $router->has('inventory.wip_adjustments.index');
+    $hasInvWipCutReconcile = $router->has('inventory.wip_cut_reconcile.index');
     $hasInvOpnamesIndex = $router->has('inventory.stock_opnames.index');
     $hasInvOpnamesCreate = $router->has('inventory.stock_opnames.create');
     $hasInvExternalIndex = $router->has('inventory.external_transfers.index');
@@ -943,6 +944,13 @@
                                 <a href="{{ route('inventory.wip_adjustments.index') }}"
                                    class="mobile-sidebar-link mobile-sidebar-link-sub {{ request()->routeIs('inventory.wip_adjustments.*') ? 'active' : '' }}">
                                     <span class="icon">🧾</span><span>Koreksi WIP</span>
+                                </a>
+                            @endif
+
+                            @if ($hasInvWipCutReconcile)
+                                <a href="{{ route('inventory.wip_cut_reconcile.index') }}"
+                                   class="mobile-sidebar-link mobile-sidebar-link-sub {{ request()->routeIs('inventory.wip_cut_reconcile.*') ? 'active' : '' }}">
+                                    <span class="icon">🔍</span><span>Rekonsiliasi WIP-CUT</span>
                                 </a>
                             @endif
 
