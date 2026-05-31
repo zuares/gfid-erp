@@ -3,9 +3,23 @@
 use Illuminate\Database\Migrations\Migration;
 use Illuminate\Database\Schema\Blueprint;
 use Illuminate\Support\Facades\Schema;
+use Illuminate\Support\Facades\DB;
 
 return new class extends Migration
 {
+
+    private function sqliteIndexExists(string $table, string $index): bool
+    {
+        $indexes = DB::select("PRAGMA index_list('$table')");
+
+        foreach ($indexes as $row) {
+            if (($row->name ?? null) === $index) {
+                return true;
+            }
+        }
+
+        return false;
+    }
     public function up(): void
     {
         Schema::table('sales_invoices', function (Blueprint $table) {
@@ -16,14 +30,18 @@ return new class extends Migration
             $table->string('marketplace_status', 30)->nullable()->index();
             $table->string('awb', 80)->nullable()->index();
 
-            $table->index(['store_id', 'channel_order_no'], 'si_store_order_lookup');
+            if (! $this->sqliteIndexExists('sales_invoices', 'si_store_order_lookup')) {
+                $table->index(['store_id', 'channel_order_no'], 'si_store_order_lookup');
+            }
         });
     }
 
     public function down(): void
     {
         Schema::table('sales_invoices', function (Blueprint $table) {
-            $table->dropIndex('si_store_order_lookup');
+            if ($this->sqliteIndexExists('sales_invoices', 'si_store_order_lookup')) {
+                $table->dropIndex('si_store_order_lookup');
+            }
             $table->dropColumn(['channel', 'channel_order_no', 'paid_at', 'completed_at', 'marketplace_status', 'awb']);
         });
     }
