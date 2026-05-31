@@ -3,6 +3,7 @@
 use App\Http\Controllers\Master\CustomerController;
 use App\Http\Controllers\Master\EmployeeController;
 use App\Http\Controllers\Master\ItemBomController;
+use App\Http\Controllers\Master\ItemCategoryController;
 use App\Http\Controllers\Master\ItemController;
 use App\Http\Controllers\Master\SupplierController;
 use Illuminate\Support\Facades\Route;
@@ -17,6 +18,20 @@ Route::middleware(['web', 'auth'])->group(function () {
         |--------------------------------------------------------------------------
          */
         Route::resource('items', ItemController::class);
+
+        // ✅ Bulk update (kategori / tipe / HPP) untuk beberapa item sekaligus
+        Route::post('items/bulk-update', [ItemController::class, 'bulkUpdate'])
+            ->name('items.bulk_update');
+
+        /*
+        |--------------------------------------------------------------------------
+        | KATEGORI ITEM (CRUD halaman terpisah)
+        |--------------------------------------------------------------------------
+         */
+        Route::resource('item-categories', ItemCategoryController::class)
+            ->only(['index', 'store', 'update', 'destroy'])
+            ->parameters(['item-categories' => 'item_category'])
+            ->names('item_categories');
 
         // HPP sementara master item
         Route::get('items/{item}/hpp-temp', [ItemController::class, 'editHppTemp'])

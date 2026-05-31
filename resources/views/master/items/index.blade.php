@@ -179,8 +179,12 @@
                     Daftar item + jumlah barcode terdaftar + status HPP aktif.
                 </div>
             </div>
-            <div class="ms-3 text-white">
-                <a href="{{ route('master.items.create') }}" class="btn btn-primary btn-sm btn-add-item ">
+            <div class="ms-3 d-flex gap-2">
+                <a href="{{ route('master.item_categories.index') }}"
+                    class="btn btn-outline-secondary btn-sm btn-add-item">
+                    <span>Kategori Item</span>
+                </a>
+                <a href="{{ route('master.items.create') }}" class="btn btn-primary btn-sm btn-add-item text-white">
                     <span class="me-1">＋</span>
                     <span>Tambah Item</span>
                 </a>
@@ -216,8 +220,7 @@
                         </select>
                     </div>
 
-                    {{-- Kategori (opsional) --}}
-                    {{--
+                    {{-- Kategori --}}
                     <div class="col-md-3">
                         <label class="form-label mb-1">Kategori</label>
                         <select name="item_category_id" class="form-select form-select-sm">
@@ -229,7 +232,6 @@
                             @endforeach
                         </select>
                     </div>
-                    --}}
 
                     <div class="col-md-2 d-flex gap-2">
                         <button class="btn btn-outline-secondary btn-sm w-100">
@@ -246,6 +248,31 @@
             </div>
         </div>
 
+        {{-- FLASH --}}
+        @if (session('success'))
+            <div class="alert alert-success py-2 px-3 mb-3" style="font-size:.82rem;">{{ session('success') }}</div>
+        @endif
+        @if (session('error'))
+            <div class="alert alert-danger py-2 px-3 mb-3" style="font-size:.82rem;">{{ session('error') }}</div>
+        @endif
+
+        {{-- BULK TOOLBAR (muncul saat ada item terpilih) --}}
+        <div id="bulkToolbar" class="card card-main mb-3 d-none">
+            <div class="card-body py-2 d-flex flex-wrap align-items-center gap-2">
+                <span class="fw-semibold" style="font-size:.82rem;">
+                    <span id="bulkCount">0</span> item terpilih
+                </span>
+                <span class="text-muted" style="font-size:.78rem;">— pilih aksi:</span>
+                <button type="button" class="btn btn-outline-primary btn-sm" data-bs-toggle="modal"
+                    data-bs-target="#bulkCategoryModal">Ubah Kategori</button>
+                <button type="button" class="btn btn-outline-primary btn-sm" data-bs-toggle="modal"
+                    data-bs-target="#bulkTypeModal">Ubah Tipe</button>
+                <button type="button" class="btn btn-outline-success btn-sm" data-bs-toggle="modal"
+                    data-bs-target="#bulkHppModal">Set HPP</button>
+                <button type="button" class="btn btn-link btn-sm text-muted ms-auto" id="bulkClear">Batal pilih</button>
+            </div>
+        </div>
+
         {{-- TABLE --}}
         <div class="card card-main">
             <div class="card-body p-0">
@@ -253,6 +280,10 @@
                     <table class="table table-sm align-middle table-gfid">
                         <thead>
                             <tr class="text-muted">
+                                <th style="width: 3%" class="text-center">
+                                    <input type="checkbox" class="form-check-input" id="checkAll"
+                                        title="Pilih semua di halaman ini">
+                                </th>
                                 <th style="width: 5%" class="text-center">No.</th>
                                 <th style="width: 9%">Kode</th>
                                 <th>Nama</th>
@@ -275,6 +306,10 @@
                                     ];
                                 @endphp
                                 <tr>
+                                    <td class="text-center">
+                                        <input type="checkbox" class="form-check-input row-check"
+                                            value="{{ $item->id }}" data-name="{{ $item->code }} — {{ $item->name }}">
+                                    </td>
                                     {{-- PENOMORAN GLOBAL (ikut paginasi) --}}
                                     <td class="text-center text-muted">
                                         {{ $items->firstItem() + $loop->index }}
@@ -366,7 +401,7 @@
                                 </tr>
                             @empty
                                 <tr>
-                                    <td colspan="9" class="text-center text-muted py-4">
+                                    <td colspan="10" class="text-center text-muted py-4">
                                         Belum ada item.
                                     </td>
                                 </tr>
@@ -395,4 +430,169 @@
             </div>
         </div>
     </div>
+
+    {{-- ========================= MODALS BULK ========================= --}}
+
+    {{-- Ubah Kategori --}}
+    <div class="modal fade" id="bulkCategoryModal" tabindex="-1" aria-hidden="true">
+        <div class="modal-dialog modal-dialog-centered">
+            <form method="POST" action="{{ route('master.items.bulk_update') }}" class="modal-content bulk-form">
+                @csrf
+                <input type="hidden" name="action" value="set_category">
+                <div class="modal-header">
+                    <h6 class="modal-title">Ubah Kategori (<span class="sel-count">0</span> item)</h6>
+                    <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
+                </div>
+                <div class="modal-body">
+                    <label class="form-label mb-1" style="font-size:.8rem;">Kategori baru</label>
+                    <select name="item_category_id" class="form-select form-select-sm">
+                        <option value="">— Kosongkan kategori —</option>
+                        @foreach ($categories as $cat)
+                            <option value="{{ $cat->id }}">{{ $cat->name }}</option>
+                        @endforeach
+                    </select>
+                    <div class="ids-container"></div>
+                </div>
+                <div class="modal-footer">
+                    <button type="button" class="btn btn-outline-secondary btn-sm" data-bs-dismiss="modal">Batal</button>
+                    <button type="submit" class="btn btn-primary btn-sm">Terapkan</button>
+                </div>
+            </form>
+        </div>
+    </div>
+
+    {{-- Ubah Tipe --}}
+    <div class="modal fade" id="bulkTypeModal" tabindex="-1" aria-hidden="true">
+        <div class="modal-dialog modal-dialog-centered">
+            <form method="POST" action="{{ route('master.items.bulk_update') }}" class="modal-content bulk-form">
+                @csrf
+                <input type="hidden" name="action" value="set_type">
+                <div class="modal-header">
+                    <h6 class="modal-title">Ubah Tipe (<span class="sel-count">0</span> item)</h6>
+                    <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
+                </div>
+                <div class="modal-body">
+                    <label class="form-label mb-1" style="font-size:.8rem;">Tipe baru</label>
+                    <select name="type" class="form-select form-select-sm" required>
+                        <option value="material">Material</option>
+                        <option value="wip">WIP</option>
+                        <option value="finished_good">Finished Good</option>
+                    </select>
+                    <div class="ids-container"></div>
+                </div>
+                <div class="modal-footer">
+                    <button type="button" class="btn btn-outline-secondary btn-sm" data-bs-dismiss="modal">Batal</button>
+                    <button type="submit" class="btn btn-primary btn-sm">Terapkan</button>
+                </div>
+            </form>
+        </div>
+    </div>
+
+    {{-- Set HPP --}}
+    <div class="modal fade" id="bulkHppModal" tabindex="-1" aria-hidden="true">
+        <div class="modal-dialog modal-dialog-centered">
+            <form method="POST" action="{{ route('master.items.bulk_update') }}" class="modal-content bulk-form">
+                @csrf
+                <input type="hidden" name="action" value="set_hpp">
+                <div class="modal-header">
+                    <h6 class="modal-title">Set HPP Sementara (<span class="sel-count">0</span> item)</h6>
+                    <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
+                </div>
+                <div class="modal-body">
+                    <div class="alert alert-warning py-2 px-3 mb-3" style="font-size:.78rem;">
+                        Nilai ini akan jadi <strong>HPP sementara</strong> (snapshot baru) untuk
+                        <strong class="sel-count">0</strong> item terpilih. Snapshot lama dinonaktifkan.
+                        Tidak menyentuh jurnal / lot cost yang sudah ada.
+                    </div>
+                    <label class="form-label mb-1" style="font-size:.8rem;">HPP per unit (Rp)</label>
+                    <input type="number" step="0.01" min="0" name="unit_cost" class="form-control form-control-sm"
+                        placeholder="0" required>
+                    <label class="form-label mb-1 mt-2" style="font-size:.8rem;">Catatan (opsional)</label>
+                    <input type="text" name="notes" class="form-control form-control-sm" maxlength="255"
+                        placeholder="HPP sementara dari Master Item">
+                    <div class="ids-container"></div>
+                </div>
+                <div class="modal-footer">
+                    <button type="button" class="btn btn-outline-secondary btn-sm" data-bs-dismiss="modal">Batal</button>
+                    <button type="submit" class="btn btn-success btn-sm">Terapkan HPP</button>
+                </div>
+            </form>
+        </div>
+    </div>
 @endsection
+
+@push('scripts')
+    <script>
+        (function () {
+            const checkAll = document.getElementById('checkAll');
+            const toolbar = document.getElementById('bulkToolbar');
+            const bulkCount = document.getElementById('bulkCount');
+            const bulkClear = document.getElementById('bulkClear');
+
+            function rowChecks() {
+                return Array.from(document.querySelectorAll('.row-check'));
+            }
+            function selected() {
+                return rowChecks().filter(c => c.checked);
+            }
+
+            function refresh() {
+                const sel = selected();
+                const n = sel.length;
+                bulkCount.textContent = n;
+                document.querySelectorAll('.sel-count').forEach(el => el.textContent = n);
+                toolbar.classList.toggle('d-none', n === 0);
+
+                const all = rowChecks();
+                if (checkAll) {
+                    checkAll.checked = n > 0 && n === all.length;
+                    checkAll.indeterminate = n > 0 && n < all.length;
+                }
+            }
+
+            if (checkAll) {
+                checkAll.addEventListener('change', function () {
+                    rowChecks().forEach(c => c.checked = checkAll.checked);
+                    refresh();
+                });
+            }
+
+            rowChecks().forEach(c => c.addEventListener('change', refresh));
+
+            if (bulkClear) {
+                bulkClear.addEventListener('click', function () {
+                    rowChecks().forEach(c => c.checked = false);
+                    if (checkAll) { checkAll.checked = false; checkAll.indeterminate = false; }
+                    refresh();
+                });
+            }
+
+            // Saat submit form bulk, inject hidden item_ids[] dari yang terpilih
+            document.querySelectorAll('.bulk-form').forEach(form => {
+                form.addEventListener('submit', function (e) {
+                    const sel = selected();
+                    if (sel.length === 0) {
+                        e.preventDefault();
+                        alert('Tidak ada item terpilih.');
+                        return;
+                    }
+                    const container = form.querySelector('.ids-container');
+                    container.innerHTML = '';
+                    sel.forEach(c => {
+                        const input = document.createElement('input');
+                        input.type = 'hidden';
+                        input.name = 'item_ids[]';
+                        input.value = c.value;
+                        container.appendChild(input);
+                    });
+
+                    if (!confirm('Terapkan perubahan ke ' + sel.length + ' item terpilih?')) {
+                        e.preventDefault();
+                    }
+                });
+            });
+
+            refresh();
+        })();
+    </script>
+@endpush

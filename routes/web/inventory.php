@@ -56,6 +56,11 @@ Route::middleware(['web', 'auth', 'role:owner,admin,operating'])->group(function
             Route::get('/items', [InventoryStockController::class, 'items'])->name('items');
             Route::get('/lots', [InventoryStockController::class, 'lots'])->name('lots');
 
+            // Sync HPP master → kolom items.hpp (owner only, cost-neutral)
+            Route::post('/sync-hpp', [InventoryStockController::class, 'syncHpp'])
+                ->middleware('role:owner')
+                ->name('sync_hpp');
+
             Route::get('/{item}/locations', [InventoryStockController::class, 'itemLocations'])->name('item_locations');
 
             Route::get('/items-legacy', [InventoryStockController::class, 'itemsLegacy'])->name('items_legacy');

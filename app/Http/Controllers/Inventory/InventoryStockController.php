@@ -5,6 +5,7 @@ namespace App\Http\Controllers\Inventory;
 use App\Http\Controllers\Controller;
 use App\Models\InventoryStock;
 use App\Models\Item;
+use App\Models\ItemCostSnapshot;
 use App\Models\Warehouse;
 use App\Services\Inventory\InventoryService;
 use Illuminate\Http\Request;
@@ -322,6 +323,62 @@ class InventoryStockController extends Controller
             ],
             'warehouses' => $warehouses,
         ]);
+    }
+
+    // ==========================================================
+    // ✅ SYNC HPP : tarik HPP master (snapshot aktif) ke kolom items.hpp
+    //    Tujuannya menyelaraskan valuasi stok (qty × items.hpp) dengan
+    //    "HPP Aktif" di Master Item. COST-NEUTRAL:
+    //    - HANYA menulis kolom items.hpp (HPP referensi/statis).
+    //    - TIDAK menyentuh Lot.avg_cost / total_cost / jurnal.
+    // ==========================================================
+    public function syncHpp(Request $request)
+    {
+        $updated = 0;
+        $scanned = 0;
+
+        DB::transaction(function () use (&$updated, &$scanned) {
+            // Snapshot aktif global (warehouse_id NULL) — ambil yang terbaru per item.
+            $snapshots = ItemCostSnapshot::query()
+                ->active()
+                ->whereNull('warehouse_id')
+                ->where('unit_cost', '>', 0)
+                ->orderBy('item_id')
+                ->orderByDesc('snapshot_date')
+                ->orderByDesc('id')
+                ->get(['item_id', 'unit_cost']);
+
+            $seen = [];
+
+            foreach ($snapshots as $snap) {
+                // ambil snapshot terbaru saja per item (sesuai urutan di atas)
+                if (isset($seen[$snap->item_id])) {
+                    continue;
+                }
+                $seen[$snap->item_id] = true;
+                $scanned++;
+
+                // hanya update kalau beda → hemat & jelas hitungannya
+                $affected = Item::where('id', $snap->item_id)
+                    ->where(function ($q) use ($snap) {
+                        $q->where('hpp', '!=', $snap->unit_cost)
+                            ->orWhereNull('hpp');
+                    })
+                    ->update(['hpp' => $snap->unit_cost]);
+
+                $updated += $affected;
+            }
+        });
+
+        $msg = "Sync HPP selesai: {$updated} item diperbarui dari HPP master (dari {$scanned} item ber-snapshot). Valuasi stok kini mengikuti HPP master.";
+
+        if ($request->wantsJson() || $request->ajax()) {
+            return response()->json(['ok' => true, 'updated' => $updated, 'scanned' => $scanned, 'message' => $msg]);
+        }
+
+        return redirect()
+            ->route('inventory.stocks.items')
+            ->with('success', $msg);
     }
 
     // ==========================================================

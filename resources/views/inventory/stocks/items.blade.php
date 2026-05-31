@@ -5,6 +5,30 @@
 
 @push('head')
     @include('inventory.stocks.items.styles')
+    <style>
+        /* Sticky thead saat tabel di-scroll vertikal */
+        .stock-table-scroll {
+            max-height: 65vh;
+            overflow-y: auto;
+        }
+
+        .stock-table-scroll table thead th {
+            position: sticky;
+            top: 0;
+            z-index: 3;
+            background: var(--card);
+            /* tutup celah border saat scroll */
+            box-shadow: inset 0 -1px 0 var(--br);
+        }
+
+        body[data-theme="light"] .stock-table-scroll table thead th {
+            background: #ffffff;
+        }
+
+        body[data-theme="dark"] .stock-table-scroll table thead th {
+            background: #0b1220;
+        }
+    </style>
 @endpush
 
 @section('content')
@@ -86,6 +110,13 @@
         data-hide-rts="{{ $role === 'operating' ? '1' : '0' }}" data-is-owner="{{ $isOwner ? '1' : '0' }}"
         data-selected-warehouse-id="{{ $warehouseId }}">
 
+        @if (session('success'))
+            <div class="alert alert-success py-2 px-3 mb-2" style="font-size:.82rem;">{{ session('success') }}</div>
+        @endif
+        @if (session('error'))
+            <div class="alert alert-danger py-2 px-3 mb-2" style="font-size:.82rem;">{{ session('error') }}</div>
+        @endif
+
         {{-- TOP BAR --}}
         <div class="topbar">
             <div class="d-flex align-items-start justify-content-between flex-wrap gap-2">
@@ -125,10 +156,22 @@
                     <div class="d-flex align-items-center justify-content-between gap-2 flex-wrap">
                         <div class="meta">Owner Insights (current page)</div>
 
-                        <button class="btn btn-outline-secondary btn-sm" type="button" data-bs-toggle="collapse"
-                            data-bs-target="#hppByCatCollapse" aria-expanded="false" aria-controls="hppByCatCollapse">
-                            <i class="bi bi-diagram-3"></i> HPP by Kategori
-                        </button>
+                        <div class="d-flex align-items-center gap-2">
+                            <form method="POST" action="{{ route('inventory.stocks.sync_hpp') }}"
+                                onsubmit="return confirm('Sync HPP: tarik HPP master (snapshot aktif) ke kolom HPP item untuk valuasi stok?\n\nIni TIDAK menyentuh harga lot / jurnal — hanya HPP referensi.');"
+                                class="m-0">
+                                @csrf
+                                <button class="btn btn-outline-success btn-sm" type="submit"
+                                    title="Tarik HPP master ke valuasi stok (items.hpp)">
+                                    <i class="bi bi-arrow-repeat"></i> Sync HPP
+                                </button>
+                            </form>
+
+                            <button class="btn btn-outline-secondary btn-sm" type="button" data-bs-toggle="collapse"
+                                data-bs-target="#hppByCatCollapse" aria-expanded="false" aria-controls="hppByCatCollapse">
+                                <i class="bi bi-diagram-3"></i> HPP by Kategori
+                            </button>
+                        </div>
                     </div>
 
                     <div class="summary">
@@ -263,7 +306,7 @@
             <div class="cardx-b p-0">
                 {{-- Desktop table --}}
                 <div class="d-none d-sm-block">
-                    <div class="table-responsive">
+                    <div class="table-responsive stock-table-scroll">
                         <table class="table table-hover mb-0 align-middle">
                             <thead>
                                 <tr>

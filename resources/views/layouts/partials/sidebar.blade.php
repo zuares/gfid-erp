@@ -59,6 +59,7 @@
 
     // Master
     $hasMasterItemsIndex = $router->has('master.items.index');
+    $hasMasterItemCategoriesIndex = $router->has('master.item_categories.index');
     $hasMasterCustomersIndex = $router->has('master.customers.index');
     $hasMasterSuppliersIndex = $router->has('master.suppliers.index');
     $hasMasterItemBomsIndex = $router->has('master.item_boms.index');
@@ -711,6 +712,13 @@
                         <x-sidebar.sub-link href="{{ route('master.items.index') }}" icon="📦"
                             :active="request()->routeIs('master.items.*')">
                             Items
+                        </x-sidebar.sub-link>
+                    @endif
+
+                    @if ($hasMasterItemCategoriesIndex)
+                        <x-sidebar.sub-link href="{{ route('master.item_categories.index') }}" icon="🗂️"
+                            :active="request()->routeIs('master.item_categories.*')">
+                            Kategori Item
                         </x-sidebar.sub-link>
                     @endif
 

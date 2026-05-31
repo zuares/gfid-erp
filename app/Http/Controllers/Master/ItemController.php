@@ -45,7 +45,9 @@ class ItemController extends Controller
             ->paginate(25)
             ->withQueryString();
 
-        return view('master.items.index', compact('items'));
+        $categories = ItemCategory::orderBy('name')->get();
+
+        return view('master.items.index', compact('items', 'categories'));
     }
 
     public function create()
@@ -103,6 +105,10 @@ class ItemController extends Controller
             ItemCostSnapshot::where('item_id', $item->id)
                 ->active()
                 ->update(['is_active' => 0]);
+
+            // Sinkronkan kolom items.hpp agar valuasi Inventory Stock ikut.
+            // (HPP referensi/statis — tidak menyentuh Lot.avg_cost / jurnal.)
+            $item->update(['hpp' => $validated['unit_cost']]);
 
             // Buat snapshot baru sebagai HPP sementara dari master
             ItemCostSnapshot::create([
@@ -194,6 +200,105 @@ class ItemController extends Controller
         return redirect()
             ->route('master.items.index')
             ->with('success', 'Item berhasil dihapus.');
+    }
+
+    /**
+     * Bulk update beberapa item sekaligus.
+     * Aksi yang didukung: set_category, set_type, set_hpp.
+     *
+     * Catatan biaya: set_hpp memakai mekanisme snapshot 'master_temp' yang
+     * sama dengan storeHppTemp() — menonaktifkan snapshot aktif lalu membuat
+     * snapshot baru. Tidak menyentuh ledger / jurnal / lot cost.
+     */
+    public function bulkUpdate(Request $request)
+    {
+        $data = $request->validate([
+            'action' => ['required', 'string', Rule::in(['set_category', 'set_type', 'set_hpp'])],
+            'item_ids' => ['required', 'array', 'min:1'],
+            'item_ids.*' => ['integer', 'exists:items,id'],
+
+            // Bergantung action:
+            'item_category_id' => ['nullable', 'integer', 'exists:item_categories,id'],
+            'type' => ['nullable', 'string', Rule::in(['material', 'finished_good', 'wip'])],
+            'unit_cost' => ['nullable', 'numeric', 'min:0'],
+            'notes' => ['nullable', 'string', 'max:255'],
+        ]);
+
+        $ids = array_values(array_unique($data['item_ids']));
+        $action = $data['action'];
+        $count = 0;
+
+        DB::transaction(function () use ($action, $ids, $data, &$count) {
+
+            if ($action === 'set_category') {
+                // item_category_id boleh null (artinya kosongkan kategori)
+                $count = Item::whereIn('id', $ids)
+                    ->update(['item_category_id' => $data['item_category_id'] ?? null]);
+                return;
+            }
+
+            if ($action === 'set_type') {
+                if (empty($data['type'])) {
+                    abort(422, 'Tipe wajib dipilih untuk aksi ubah tipe.');
+                }
+                $count = Item::whereIn('id', $ids)
+                    ->update(['type' => $data['type']]);
+                return;
+            }
+
+            if ($action === 'set_hpp') {
+                if (!isset($data['unit_cost'])) {
+                    abort(422, 'Nilai HPP wajib diisi untuk aksi set HPP.');
+                }
+
+                $now = Carbon::now();
+                $unitCost = $data['unit_cost'];
+                $notes = $data['notes'] ?? 'HPP sementara (bulk) dari Master Item';
+
+                // Sinkronkan kolom items.hpp agar valuasi Inventory Stock ikut.
+                // (HPP referensi/statis — tidak menyentuh Lot.avg_cost / jurnal.)
+                Item::whereIn('id', $ids)->update(['hpp' => $unitCost]);
+
+                foreach ($ids as $itemId) {
+                    // Nonaktifkan snapshot aktif sebelumnya
+                    ItemCostSnapshot::where('item_id', $itemId)
+                        ->active()
+                        ->update(['is_active' => 0]);
+
+                    // Buat snapshot baru sebagai HPP sementara dari master
+                    ItemCostSnapshot::create([
+                        'item_id' => $itemId,
+                        'warehouse_id' => null,
+                        'snapshot_date' => $now->toDateString(),
+                        'reference_type' => 'master_temp',
+                        'reference_id' => null,
+                        'qty_basis' => 0,
+                        'rm_unit_cost' => $unitCost,
+                        'cutting_unit_cost' => 0,
+                        'sewing_unit_cost' => 0,
+                        'finishing_unit_cost' => 0,
+                        'packaging_unit_cost' => 0,
+                        'overhead_unit_cost' => 0,
+                        'unit_cost' => $unitCost,
+                        'notes' => $notes,
+                        'is_active' => 1,
+                        'created_by' => Auth::id(),
+                    ]);
+                    $count++;
+                }
+                return;
+            }
+        });
+
+        $labels = [
+            'set_category' => 'kategori',
+            'set_type' => 'tipe',
+            'set_hpp' => 'HPP',
+        ];
+
+        return redirect()
+            ->route('master.items.index')
+            ->with('success', "Berhasil memperbarui {$labels[$action]} untuk {$count} item.");
     }
 
     /**

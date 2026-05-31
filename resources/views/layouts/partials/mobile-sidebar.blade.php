@@ -683,6 +683,13 @@
                                 </a>
                             @endif
 
+                            @if ($router->has('master.item_categories.index'))
+                                <a href="{{ route('master.item_categories.index') }}"
+                                   class="mobile-sidebar-link mobile-sidebar-link-sub {{ request()->routeIs('master.item_categories.*') ? 'active' : '' }}">
+                                    <span class="icon">🗂️</span><span>Kategori Item</span>
+                                </a>
+                            @endif
+
                             @if ($hasMasterItemBomsIndex)
                                 <a href="{{ route('master.item_boms.index') }}"
                                    class="mobile-sidebar-link mobile-sidebar-link-sub {{ request()->routeIs('master.item_boms.*') ? 'active' : '' }}">
