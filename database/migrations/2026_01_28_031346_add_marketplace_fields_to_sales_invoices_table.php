@@ -1,28 +1,17 @@
 <?php
 
 use Illuminate\Database\Migrations\Migration;
-use Illuminate\Database\Schema\Blueprint;
-use Illuminate\Support\Facades\Schema;
 
 return new class extends Migration
 {
-    /**
-     * Run the migrations.
-     */
     public function up(): void
     {
-        Schema::table('sales_invoices', function (Blueprint $table) {
-            //
-        });
+        // NO-OP: Sudah digantikan oleh 2026_01_28_031440_add_marketplace_fields_to_sales_invoices_table
+        // Migration ini sengaja dikosongkan untuk menghindari duplicate column/table/index.
     }
 
-    /**
-     * Reverse the migrations.
-     */
     public function down(): void
     {
-        Schema::table('sales_invoices', function (Blueprint $table) {
-            //
-        });
+        //
     }
 };
