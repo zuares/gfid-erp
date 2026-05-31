@@ -114,7 +114,7 @@
                                 <td>
                                     {{ number_format($row['sewing_ok'], 2, ',', '.') }}
                                     @foreach ($row['sewing_returns'] as $rid)
-                                        <a href="{{ route('production.sewing_returns.show', $rid) }}"
+                                        <a href="{{ route('production.sewing.returns.show', $rid) }}"
                                             class="badge bg-success badge-link text-decoration-none">
                                             SWR-{{ $rid }}
                                         </a>

@@ -142,7 +142,7 @@
 
                                 {{-- 🔗 Drilldown: klik jumlah Sewing Return --}}
                                 <td>
-                                    <a href="{{ route('production.sewing_returns.index', [
+                                    <a href="{{ route('production.sewing.returns.index', [
                                         'date_from' => $filters['date_from'] ?? null,
                                         'date_to' => $filters['date_to'] ?? null,
                                         'operator_id' => $filters['operator_id'] ?? null,
@@ -155,7 +155,7 @@
 
                                 {{-- Tombol Detail (opsional, menuju daftar SWR) --}}
                                 <td>
-                                    <a href="{{ route('production.sewing_returns.index', [
+                                    <a href="{{ route('production.sewing.returns.index', [
                                         'date_from' => $filters['date_from'] ?? null,
                                         'date_to' => $filters['date_to'] ?? null,
                                         'operator_id' => $filters['operator_id'] ?? null,

@@ -12,7 +12,7 @@
     $isCuttingTab = request()->routeIs('production.cutting_jobs.*');
     $isQcTab = request()->routeIs('production.qc.*');
     $isSewingTab =
-        request()->routeIs('production.sewing_pickups.*') || request()->routeIs('production.sewing_returns.*');
+        request()->routeIs('production.sewing.pickups.*') || request()->routeIs('production.sewing.returns.*');
     $isFinishingTab = request()->routeIs('production.finishing_jobs.*');
 
     // Dashboard tab khusus operating → pakai halaman Sewing Operator Summary
@@ -233,8 +233,8 @@
 
             $qcIndexHref = Route::has('production.qc.index') ? route('production.qc.index') : '#';
 
-            $sewingCreateHref = Route::has('production.sewing_returns.create')
-                ? route('production.sewing_returns.create')
+            $sewingCreateHref = Route::has('production.sewing.returns.create')
+                ? route('production.sewing.returns.create')
                 : '#';
 
             $finishingCreateHref = Route::has('production.finishing_jobs.create')
@@ -335,7 +335,7 @@
         </a>
 
         @php
-            $fabHref = Route::has('production.sewing_pickups.create') ? route('production.sewing_pickups.create') : '#';
+            $fabHref = Route::has('production.sewing.pickups.create') ? route('production.sewing.pickups.create') : '#';
         @endphp
 
         <a href="{{ $fabHref }}" class="nav-item center-btn">

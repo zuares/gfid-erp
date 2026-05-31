@@ -109,7 +109,7 @@
                                 {{-- 🔗 DRILLDOWN: SEWING PICKUP (SWP-...) --}}
                                 <td>
                                     @if ($pickup)
-                                        <a href="{{ route('production.sewing_pickups.show', $pickup) }}"
+                                        <a href="{{ route('production.sewing.pickups.show', $pickup) }}"
                                             class="text-decoration-none fw-semibold">
                                             {{ $pickup->code }}
                                         </a>

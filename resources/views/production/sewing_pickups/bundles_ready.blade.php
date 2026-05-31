@@ -465,13 +465,13 @@
                     </div>
 
                     <div class="d-flex flex-column flex-md-row gap-2">
-                        <a href="{{ route('production.sewing_pickups.index') }}"
+                        <a href="{{ route('production.sewing.pickups.index') }}"
                             class="btn btn-sm btn-header-pill btn-header-muted d-flex align-items-center gap-2">
                             <i class="bi bi-list-ul"></i>
                             <span>Daftar Sewing Pickup</span>
                         </a>
 
-                        <a href="{{ route('production.sewing_pickups.create') }}"
+                        <a href="{{ route('production.sewing.pickups.create') }}"
                             class="btn btn-sm btn-header-pill btn-header-accent d-flex align-items-center gap-2">
                             <i class="bi bi-plus-circle"></i>
                             <span>Pickup baru (manual)</span>
@@ -532,7 +532,7 @@
                                     }
 
                                     $rowNumber++;
-                                    $pickUrl = route('production.sewing_pickups.create', ['bundle_id' => $b->id]);
+                                    $pickUrl = route('production.sewing.pickups.create', ['bundle_id' => $b->id]);
 
                                     $lot = $b->cuttingJob?->lot;
                                     $finishedItem = $b->finishedItem;

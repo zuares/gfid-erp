@@ -630,13 +630,13 @@
                                             </span>
                                         </td>
                                         <td>
-                                            @if (Route::has('production.sewing_returns.show'))
-                                                <a href="{{ route('production.sewing_returns.show', $ret) }}"
+                                            @if (Route::has('production.sewing.returns.show'))
+                                                <a href="{{ route('production.sewing.returns.show', $ret) }}"
                                                     class="btn btn-sm btn-outline-primary">
                                                     Detail
                                                 </a>
-                                            @elseif ($pickup && Route::has('production.sewing_pickups.show'))
-                                                <a href="{{ route('production.sewing_pickups.show', $pickup) }}"
+                                            @elseif ($pickup && Route::has('production.sewing.pickups.show'))
+                                                <a href="{{ route('production.sewing.pickups.show', $pickup) }}"
                                                     class="btn btn-sm btn-outline-primary">
                                                     Pickup
                                                 </a>
