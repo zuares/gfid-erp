@@ -61,6 +61,7 @@
     $hasMasterCustomersIndex = $router->has('master.customers.index');
     $hasMasterSuppliersIndex = $router->has('master.suppliers.index');
     $hasMasterItemBomsIndex = $router->has('master.item_boms.index');
+    $hasMasterEmployeesIndex = $router->has('master.employees.index');
 
     // Purchasing
     $hasPoIndex   = $router->has('purchasing.purchase_orders.index');
@@ -730,6 +731,13 @@
                         <x-sidebar.sub-link href="{{ route('master.customers.index') }}" icon="👤"
                             :active="request()->routeIs('master.customers.*')">
                             Customers
+                        </x-sidebar.sub-link>
+                    @endif
+
+                    @if ($hasMasterEmployeesIndex)
+                        <x-sidebar.sub-link href="{{ route('master.employees.index') }}" icon="🧑‍🏭"
+                            :active="request()->routeIs('master.employees.*')">
+                            Karyawan
                         </x-sidebar.sub-link>
                     @endif
                 </div>

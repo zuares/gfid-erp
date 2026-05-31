@@ -1,6 +1,7 @@
 <?php
 
 use App\Http\Controllers\Master\CustomerController;
+use App\Http\Controllers\Master\EmployeeController;
 use App\Http\Controllers\Master\ItemBomController;
 use App\Http\Controllers\Master\ItemController;
 use App\Http\Controllers\Master\SupplierController;
@@ -37,6 +38,15 @@ Route::middleware(['web', 'auth'])->group(function () {
         |--------------------------------------------------------------------------
          */
         Route::resource('customers', CustomerController::class)->except(['show']);
+
+        /*
+        |--------------------------------------------------------------------------
+        | EMPLOYEES (owner only)
+        |--------------------------------------------------------------------------
+         */
+        Route::resource('employees', EmployeeController::class)
+            ->except(['show'])
+            ->middleware('role:owner');
 
         /*
         |--------------------------------------------------------------------------
