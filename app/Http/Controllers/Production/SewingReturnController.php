@@ -47,6 +47,8 @@ class SewingReturnController extends Controller
                 'destinationWarehouse', // ✅ tujuan (WH-PRD / WH-RTS)
                 'pickup',
                 'lines.sewingPickupLine',
+                // ✅ untuk chip detail barang di index
+                'lines.sewingPickupLine.finishedItem:id,code,name',
             ])
             ->when($filters['status'], fn($q, $status) => $q->where('status', $status))
             ->when($filters['operator_id'], fn($q, $opId) => $q->where('operator_id', $opId))

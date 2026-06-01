@@ -15,9 +15,9 @@
         request()->routeIs('production.sewing.pickups.*') || request()->routeIs('production.sewing.returns.*');
     $isFinishingTab = request()->routeIs('production.finishing_jobs.*');
 
-    // Dashboard tab khusus operating → pakai halaman Sewing Operator Summary
+    // Dashboard tab khusus operating → Dashboard Produksi
     if ($userRole === 'operating') {
-        $isDashboardTab = request()->routeIs('production.reports.operators');
+        $isDashboardTab = request()->routeIs('production.dashboard');
     } else {
         $isDashboardTab = $isDashboard;
     }
@@ -221,8 +221,8 @@
     @if ($userRole === 'operating')
         {{-- ====== VARIAN UNTUK ROLE OPERATING ====== --}}
         @php
-            $dashboardHref = Route::has('production.reports.operators')
-                ? route('production.reports.operators')
+            $dashboardHref = Route::has('production.dashboard')
+                ? route('production.dashboard')
                 : (Route::has('dashboard')
                     ? route('dashboard')
                     : '#');

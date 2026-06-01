@@ -8,11 +8,11 @@
     $isInventory = request()->routeIs('inventory.*');
     $isProfile = request()->routeIs('profile.*') || request()->routeIs('settings.*');
 
-    // Khusus operating: dashboard = halaman Flow Production
+    // Khusus operating: dashboard = Dashboard Produksi
     if ($userRole === 'operating') {
         $isDashboardTab =
-            request()->routeIs('production.reports.flow-dashboard') ||
-            request()->is('production/reports/flow-dashboard');
+            request()->routeIs('production.dashboard') ||
+            request()->is('production/dashboard');
     } else {
         $isDashboardTab = $isDashboard;
     }
@@ -232,10 +232,10 @@
     @if ($userRole === 'operating')
         {{-- ====== VARIAN UNTUK ROLE OPERATING ====== --}}
         @php
-            // Dashboard = Flow Production (flow-dashboard)
-            $dashboardHref = Route::has('production.reports.flow-dashboard')
-                ? route('production.reports.flow-dashboard')
-                : url('/production/reports/flow-dashboard');
+            // Dashboard = Dashboard Produksi (konsolidasi)
+            $dashboardHref = Route::has('production.dashboard')
+                ? route('production.dashboard')
+                : url('/production/dashboard');
 
             // ✅ Cutting: ke INDEX, bukan CREATE
             $cuttingIndexHref = Route::has('production.cutting_jobs.index')

@@ -31,7 +31,13 @@ class RtsDirectReceiveController extends Controller
         $q = trim((string) $request->get('q', ''));
 
         $rows = RtsDirectReceive::query()
-            ->with(['fromWarehouse', 'toWarehouse', 'operator'])
+            ->with([
+                'fromWarehouse',
+                'toWarehouse',
+                'operator',
+                // ✅ chip detail barang di index
+                'lines.item:id,code,name',
+            ])
             ->when($q, function ($qq) use ($q) {
                 $qq->where('code', 'like', "%{$q}%")
                     ->orWhere('notes', 'like', "%{$q}%");
@@ -98,7 +104,12 @@ class RtsDirectReceiveController extends Controller
         $pickups = SewingPickup::query()
             ->whereNull('voided_at')
             ->where('operator_id', $operatorId)
-            ->with(['lines.bundle.finishedItem:id,code,name'])
+            ->with([
+                // ✅ samakan dgn SewingReturn: pickup LINE yang voided tidak boleh muncul
+                //    (cegah "kartu hantu" yang memicu selisih)
+                'lines' => fn($q) => $q->whereNull('voided_at'),
+                'lines.bundle.finishedItem:id,code,name',
+            ])
             ->orderByDesc('date')
             ->orderByDesc('id')
             ->get();
@@ -340,8 +351,15 @@ class RtsDirectReceiveController extends Controller
                 ->get()
                 ->keyBy('id');
 
-            // Validasi: pickup line harus milik operator
+            // Validasi: pickup line harus milik operator + tidak voided
             foreach ($pickupLines as $pl) {
+                // ✅ tolak line yang sudah void (cegah selisih dari form basi)
+                if ($pl->voided_at) {
+                    throw ValidationException::withMessages([
+                        'lines' => "Pickup line #{$pl->id} sudah void, tidak bisa diproses.",
+                    ]);
+                }
+
                 $pickup = $pl->sewingPickup;
                 if (!$pickup || (int) $pickup->operator_id !== $operatorId) {
                     throw ValidationException::withMessages([

@@ -62,6 +62,98 @@
             font-size: .7rem;
         }
 
+        /* chips item (global) */
+        .item-chips {
+            display: flex;
+            flex-wrap: wrap;
+            gap: .25rem;
+        }
+
+        .item-chip {
+            display: inline-flex;
+            align-items: baseline;
+            gap: .25rem;
+            font-size: .72rem;
+            line-height: 1.1;
+            padding: .2rem .45rem;
+            border-radius: 999px;
+            background: rgba(148, 163, 184, 0.14);
+            border: 1px solid rgba(148, 163, 184, 0.18);
+            white-space: nowrap;
+        }
+
+        .item-chip b {
+            font-weight: 700;
+            letter-spacing: .02em;
+        }
+
+        .item-chip .q {
+            color: var(--muted);
+        }
+
+        .item-chip-more {
+            background: transparent;
+            color: var(--muted);
+        }
+
+        /* progress (global) */
+        .prog-wrap {
+            min-width: 150px;
+        }
+
+        .prog {
+            height: 6px;
+            border-radius: 999px;
+            overflow: hidden;
+            background: rgba(148, 163, 184, 0.22);
+        }
+
+        .prog>span {
+            display: block;
+            height: 100%;
+            border-radius: 999px;
+            transition: width .3s ease;
+        }
+
+        .fill-done {
+            background: linear-gradient(90deg, #16a34a, #22c55e);
+        }
+
+        .fill-part {
+            background: linear-gradient(90deg, #2563eb, #38bdf8);
+        }
+
+        .fill-rej {
+            background: linear-gradient(90deg, #e11d48, #fb7185);
+        }
+
+        .fill-zero {
+            background: rgba(148, 163, 184, 0.5);
+        }
+
+        .prog-num {
+            font-size: .72rem;
+            color: var(--muted);
+            margin-top: .25rem;
+            display: flex;
+            justify-content: space-between;
+            gap: .5rem;
+        }
+
+        .prog-num b {
+            color: inherit;
+            font-weight: 700;
+        }
+
+        .qc-row {
+            cursor: pointer;
+            transition: background-color .12s ease;
+        }
+
+        .qc-row:hover {
+            background: color-mix(in srgb, var(--card) 84%, #3b82f6 6%);
+        }
+
         .qc-header {
             display: flex;
             justify-content: space-between;
@@ -369,11 +461,10 @@
                         <table class="table table-sm align-middle mono">
                             <thead>
                                 <tr>
-                                    <th style="width: 40px;">#</th>
-                                    <th style="width: 110px;">Tanggal</th>
-                                    <th style="width: 200px;">Lot</th>
-                                    <th style="width: 160px;">Bundles (Qty)</th>
-                                    <th style="width: 120px;">Status</th>
+                                    <th style="width: 170px;">Cutting</th>
+                                    <th style="width: 130px;">Status</th>
+                                    <th>Barang</th>
+                                    <th style="width: 200px;">Progress QC</th>
                                     <th style="width: 90px;"></th>
                                 </tr>
                             </thead>
@@ -382,7 +473,22 @@
                                     @php
                                         $totalBundles = $job->bundles->count();
                                         $totalQty = $job->bundles->sum('qty_pcs');
-                                        $totalFabric = $job->bundles->sum('qty_used_fabric');
+
+                                        // progress QC: bundle yang sudah punya qcResult (stage cutting)
+                                        $qcdBundles = $job->bundles->filter(fn($b) => $b->qcResults->isNotEmpty())->count();
+                                        $pct = $totalBundles > 0 ? (int) round($qcdBundles / $totalBundles * 100) : 0;
+                                        $fill = $totalBundles <= 0 ? 'fill-zero' : ($pct >= 100 ? 'fill-done' : 'fill-part');
+
+                                        // chip barang jadi
+                                        $items = $job->bundles
+                                            ->groupBy('finished_item_id')
+                                            ->map(fn($g) => [
+                                                'code' => optional($g->first()->finishedItem)->code ?? '—',
+                                                'name' => optional($g->first()->finishedItem)->name ?? '',
+                                                'qty' => (int) $g->sum('qty_pcs'),
+                                            ])
+                                            ->sortByDesc('qty')
+                                            ->values();
 
                                         $rawStatus = $job->status ?? '-';
 
@@ -398,38 +504,55 @@
 
                                         $cfg = $map[$rawStatus] ?? [strtoupper($rawStatus), 'secondary'];
                                         [$statusLabel, $statusClass] = $cfg;
+                                        $href = route('production.qc.cutting.edit', $job);
                                     @endphp
-                                    <tr>
-                                        <td>{{ $loop->iteration + ($records->currentPage() - 1) * $records->perPage() }}
-                                        </td>
-                                        <td>{{ $job->date?->format('Y-m-d') ?? $job->date }}</td>
+                                    <tr class="qc-row" data-href="{{ $href }}">
                                         <td>
-                                            {{ $job->lot?->item?->code ?? '-' }}
-                                            @if ($job->lot)
-                                                <span class="badge-soft bg-light border text-muted">
-                                                    {{ $job->lot->code }}
-                                                </span>
+                                            <div class="fw-bold">{{ $job->lot?->item?->code ?? '-' }}</div>
+                                            <div class="text-muted" style="font-size:.74rem;">
+                                                {{ $job->date?->format('d M Y') ?? $job->date }}
+                                                @if ($job->lot)
+                                                    • {{ $job->lot->code }}
+                                                @endif
+                                            </div>
+                                        </td>
+                                        <td>
+                                            <span class="badge bg-{{ $statusClass }}">{{ $statusLabel }}</span>
+                                        </td>
+                                        <td>
+                                            @if ($items->isEmpty())
+                                                <span class="text-muted small">-</span>
+                                            @else
+                                                <div class="item-chips">
+                                                    @foreach ($items->take(4) as $it)
+                                                        <span class="item-chip" title="{{ $it['name'] }}">
+                                                            <b>{{ $it['code'] }}</b>
+                                                            <span class="q">{{ number_format($it['qty'], 0, ',', '.') }}</span>
+                                                        </span>
+                                                    @endforeach
+                                                    @if ($items->count() > 4)
+                                                        <span class="item-chip item-chip-more">+{{ $items->count() - 4 }}</span>
+                                                    @endif
+                                                </div>
                                             @endif
                                         </td>
                                         <td>
-                                            {{ $totalBundles }} bundle /
-                                            {{ number_format($totalQty, 2, ',', '.') }} pcs
+                                            <div class="prog-wrap">
+                                                <div class="prog"><span class="{{ $fill }}" style="width: {{ $pct }}%"></span></div>
+                                                <div class="prog-num">
+                                                    <span><b>{{ $pct }}%</b></span>
+                                                    <span>{{ $qcdBundles }}/{{ $totalBundles }} iket • {{ number_format($totalQty, 0, ',', '.') }} pcs</span>
+                                                </div>
+                                            </div>
                                         </td>
                                         <td>
-                                            <span class="badge bg-{{ $statusClass }}">
-                                                {{ $statusLabel }}
-                                            </span>
-                                        </td>
-                                        <td>
-                                            <a href="{{ route('production.qc.cutting.edit', $job) }}"
-                                                class="btn btn-sm btn-outline-primary">
-                                                QC
-                                            </a>
+                                            <a href="{{ $href }}" class="btn btn-sm btn-outline-primary"
+                                                onclick="event.stopPropagation();">QC</a>
                                         </td>
                                     </tr>
                                 @empty
                                     <tr>
-                                        <td colspan="6" class="text-center text-muted small">
+                                        <td colspan="5" class="text-center text-muted small">
                                             Belum ada data QC Cutting.
                                         </td>
                                     </tr>
@@ -451,6 +574,10 @@
                                         $totalBundles = $job->bundles->count();
                                         $totalQty = $job->bundles->sum('qty_pcs');
                                         $totalFabric = $job->bundles->sum('qty_used_fabric');
+
+                                        $qcdBundles = $job->bundles->filter(fn($b) => $b->qcResults->isNotEmpty())->count();
+                                        $pct = $totalBundles > 0 ? (int) round($qcdBundles / $totalBundles * 100) : 0;
+                                        $fill = $totalBundles <= 0 ? 'fill-zero' : ($pct >= 100 ? 'fill-done' : 'fill-part');
 
                                         $rawStatus = $job->status ?? '-';
 
@@ -535,6 +662,15 @@
                                                     {{ number_format($totalQty, 0, ',', '.') }} pcs
                                                 </div>
                                             </div>
+
+                                            {{-- Progress QC --}}
+                                            <div class="prog-wrap mt-1" style="min-width:0;">
+                                                <div class="prog"><span class="{{ $fill }}" style="width: {{ $pct }}%"></span></div>
+                                                <div class="prog-num">
+                                                    <span><b>{{ $pct }}%</b> QC</span>
+                                                    <span>{{ $qcdBundles }}/{{ $totalBundles }} iket</span>
+                                                </div>
+                                            </div>
                                         </div>
                                     </div>
                                 @endforeach
@@ -560,20 +696,36 @@
                 @elseif ($stage === 'sewing')
                     <h2 class="h6 mb-2">Daftar QC Sewing</h2>
 
-                    <div class="table-wrap">
+                    @php
+                        $sewStatusMap = [
+                            'draft' => ['DRAFT', 'secondary'],
+                            'posted' => ['POSTED', 'primary'],
+                            'closed' => ['CLOSED', 'success'],
+                        ];
+
+                        // chip barang per return (group by finished item code, qty = qty_ok)
+                        $sewItems = function ($ret) {
+                            return collect($ret->lines)
+                                ->groupBy(fn($l) => optional(optional($l->pickupLine)->bundle?->finishedItem)->code ?: '—')
+                                ->map(fn($g) => [
+                                    'code' => optional(optional($g->first()->pickupLine)->bundle?->finishedItem)->code ?: '—',
+                                    'name' => optional(optional($g->first()->pickupLine)->bundle?->finishedItem)->name ?: '',
+                                    'qty' => (int) $g->sum(fn($l) => (int) ($l->qty_ok ?? 0)),
+                                ])
+                                ->sortByDesc('qty')
+                                ->values();
+                        };
+                    @endphp
+
+                    {{-- DESKTOP TABLE --}}
+                    <div class="table-wrap d-none d-md-block">
                         <table class="table table-sm align-middle mono">
                             <thead>
                                 <tr>
-                                    <th style="width: 40px;">#</th>
-                                    <th style="width: 130px;">Return Code</th>
-                                    <th style="width: 110px;">Tanggal</th>
-                                    <th style="width: 140px;">Pickup Code</th>
-                                    <th style="width: 160px;">Gudang Sewing</th>
-                                    <th style="width: 170px;">Operator Jahit</th>
-                                    <th style="width: 130px;">Bundles</th>
-                                    <th style="width: 130px;">Qty OK</th>
-                                    <th style="width: 130px;">Qty Reject</th>
+                                    <th style="width: 180px;">Return</th>
                                     <th style="width: 110px;">Status</th>
+                                    <th>Barang (OK)</th>
+                                    <th style="width: 200px;">Yield OK</th>
                                     <th style="width: 90px;"></th>
                                 </tr>
                             </thead>
@@ -582,76 +734,151 @@
                                     @php
                                         $lines = $ret->lines;
                                         $totalBundles = $lines->count();
-                                        $qtyOk = $lines->sum('qty_ok');
-                                        $qtyReject = $lines->sum('qty_reject');
+                                        $qtyOk = (int) $lines->sum('qty_ok');
+                                        $qtyReject = (int) $lines->sum('qty_reject');
+                                        $base = $qtyOk + $qtyReject;
+                                        $pct = $base > 0 ? (int) round($qtyOk / $base * 100) : 0;
+                                        $fill = $base <= 0 ? 'fill-zero' : ($pct >= 100 ? 'fill-done' : 'fill-part');
 
                                         $firstLine = $lines->first();
-                                        $pickupLine = $firstLine?->pickupLine;
-                                        $pickup = $pickupLine?->pickup;
-                                        $warehouse = $pickup?->warehouse;
+                                        $pickup = $firstLine?->pickupLine?->pickup;
 
-                                        $statusMap = [
-                                            'draft' => ['DRAFT', 'secondary'],
-                                            'posted' => ['POSTED', 'primary'],
-                                            'closed' => ['CLOSED', 'success'],
-                                        ];
-                                        $cfg = $statusMap[$ret->status] ?? [
-                                            strtoupper($ret->status ?? '-'),
-                                            'secondary',
-                                        ];
+                                        $cfg = $sewStatusMap[$ret->status] ?? [strtoupper($ret->status ?? '-'), 'secondary'];
+                                        $items = $sewItems($ret);
+                                        $href = Route::has('production.sewing.returns.show')
+                                            ? route('production.sewing.returns.show', $ret)
+                                            : ($pickup && Route::has('production.sewing.pickups.show') ? route('production.sewing.pickups.show', $pickup) : null);
                                     @endphp
-                                    <tr>
-                                        <td>{{ $loop->iteration + ($records->currentPage() - 1) * $records->perPage() }}
-                                        </td>
-                                        <td>{{ $ret->code }}</td>
-                                        <td>{{ $ret->date?->format('Y-m-d') ?? $ret->date }}</td>
-                                        <td>{{ $pickup?->code ?? '-' }}</td>
+                                    <tr class="{{ $href ? 'qc-row' : '' }}" @if ($href) data-href="{{ $href }}" @endif>
                                         <td>
-                                            {{ $warehouse?->code ?? '-' }}
-                                            @if ($warehouse)
-                                                <span class="badge-soft bg-light border text-muted">
-                                                    {{ $warehouse->name }}
-                                                </span>
-                                            @endif
+                                            <div class="fw-bold">{{ $ret->code }}</div>
+                                            <div class="text-muted" style="font-size:.74rem;">
+                                                {{ $ret->date?->format('d M Y') ?? $ret->date }}
+                                                @if ($ret->operator)
+                                                    • {{ $ret->operator->code }}
+                                                @endif
+                                            </div>
                                         </td>
                                         <td>
-                                            @if ($ret->operator)
-                                                {{ $ret->operator->code }} — {{ $ret->operator->name }}
+                                            <div class="d-flex flex-wrap gap-1">
+                                                <span class="badge bg-{{ $cfg[1] }}">{{ $cfg[0] }}</span>
+                                                @if ($qtyReject > 0)
+                                                    <span class="badge bg-danger">R {{ $qtyReject }}</span>
+                                                @endif
+                                            </div>
+                                        </td>
+                                        <td>
+                                            @if ($items->isEmpty())
+                                                <span class="text-muted small">-</span>
                                             @else
-                                                -
+                                                <div class="item-chips">
+                                                    @foreach ($items->take(4) as $it)
+                                                        <span class="item-chip" title="{{ $it['name'] }}">
+                                                            <b>{{ $it['code'] }}</b>
+                                                            <span class="q">{{ number_format($it['qty'], 0, ',', '.') }}</span>
+                                                        </span>
+                                                    @endforeach
+                                                    @if ($items->count() > 4)
+                                                        <span class="item-chip item-chip-more">+{{ $items->count() - 4 }}</span>
+                                                    @endif
+                                                </div>
                                             @endif
                                         </td>
-                                        <td>{{ $totalBundles }} bundle</td>
-                                        <td>{{ number_format($qtyOk, 2, ',', '.') }}</td>
-                                        <td>{{ number_format($qtyReject, 2, ',', '.') }}</td>
                                         <td>
-                                            <span class="badge bg-{{ $cfg[1] }}">
-                                                {{ $cfg[0] }}
-                                            </span>
+                                            <div class="prog-wrap">
+                                                <div class="prog"><span class="{{ $fill }}" style="width: {{ $pct }}%"></span></div>
+                                                <div class="prog-num">
+                                                    <span><b>{{ $pct }}%</b></span>
+                                                    <span>OK {{ $qtyOk }} / R {{ $qtyReject }} • {{ $totalBundles }} bundle</span>
+                                                </div>
+                                            </div>
                                         </td>
                                         <td>
-                                            @if (Route::has('production.sewing.returns.show'))
-                                                <a href="{{ route('production.sewing.returns.show', $ret) }}"
-                                                    class="btn btn-sm btn-outline-primary">
-                                                    Detail
-                                                </a>
-                                            @elseif ($pickup && Route::has('production.sewing.pickups.show'))
-                                                <a href="{{ route('production.sewing.pickups.show', $pickup) }}"
-                                                    class="btn btn-sm btn-outline-primary">
-                                                    Pickup
-                                                </a>
+                                            @if ($href)
+                                                <a href="{{ $href }}" class="btn btn-sm btn-outline-primary"
+                                                    onclick="event.stopPropagation();">Detail</a>
                                             @endif
                                         </td>
                                     </tr>
                                 @empty
                                     <tr>
-                                        <td colspan="11" class="text-center text-muted small">
+                                        <td colspan="5" class="text-center text-muted small">
                                             Belum ada data QC Sewing.
                                         </td>
                                     </tr>
                                 @endforelse
                             </tbody>
                         </table>
+                    </div>
+
+                    {{-- MOBILE LIST --}}
+                    <div class="d-block d-md-none">
+                        @if ($records->isEmpty())
+                            <div class="text-center text-muted small py-2">Belum ada data QC Sewing.</div>
+                        @else
+                            <div class="qc-mobile-list mono">
+                                @foreach ($records as $ret)
+                                    @php
+                                        $lines = $ret->lines;
+                                        $totalBundles = $lines->count();
+                                        $qtyOk = (int) $lines->sum('qty_ok');
+                                        $qtyReject = (int) $lines->sum('qty_reject');
+                                        $base = $qtyOk + $qtyReject;
+                                        $pct = $base > 0 ? (int) round($qtyOk / $base * 100) : 0;
+                                        $fill = $base <= 0 ? 'fill-zero' : ($pct >= 100 ? 'fill-done' : 'fill-part');
+
+                                        $firstLine = $lines->first();
+                                        $pickup = $firstLine?->pickupLine?->pickup;
+                                        $cfg = $sewStatusMap[$ret->status] ?? [strtoupper($ret->status ?? '-'), 'secondary'];
+                                        $items = $sewItems($ret);
+                                        $href = Route::has('production.sewing.returns.show')
+                                            ? route('production.sewing.returns.show', $ret)
+                                            : ($pickup && Route::has('production.sewing.pickups.show') ? route('production.sewing.pickups.show', $pickup) : null);
+                                    @endphp
+                                    <div class="qc-mobile-card" @if ($href) data-href="{{ $href }}" @endif>
+                                        <div class="qc-mobile-card-header">
+                                            <div class="qc-mobile-date-pill">{{ $ret->date?->format('d M Y') ?? $ret->date }}</div>
+                                            <div class="d-flex gap-1 align-items-center">
+                                                <span class="badge qc-mobile-status-pill bg-{{ $cfg[1] }}">{{ $cfg[0] }}</span>
+                                                @if ($qtyReject > 0)
+                                                    <span class="badge qc-mobile-status-pill bg-danger">R {{ $qtyReject }}</span>
+                                                @endif
+                                            </div>
+                                        </div>
+                                        <div class="qc-mobile-card-body">
+                                            <div class="qc-mobile-row-line">
+                                                <div class="fw-bold">{{ $ret->code }}</div>
+                                                <div class="qc-mobile-metadata text-muted">
+                                                    {{ $ret->operator?->code ?? '-' }} • {{ $totalBundles }} bundle
+                                                </div>
+                                            </div>
+
+                                            @if ($items->isNotEmpty())
+                                                <div class="item-chips">
+                                                    @foreach ($items->take(4) as $it)
+                                                        <span class="item-chip" title="{{ $it['name'] }}">
+                                                            <b>{{ $it['code'] }}</b>
+                                                            <span class="q">{{ number_format($it['qty'], 0, ',', '.') }}</span>
+                                                        </span>
+                                                    @endforeach
+                                                    @if ($items->count() > 4)
+                                                        <span class="item-chip item-chip-more">+{{ $items->count() - 4 }}</span>
+                                                    @endif
+                                                </div>
+                                            @endif
+
+                                            <div class="prog-wrap" style="min-width:0;">
+                                                <div class="prog"><span class="{{ $fill }}" style="width: {{ $pct }}%"></span></div>
+                                                <div class="prog-num">
+                                                    <span><b>{{ $pct }}%</b> Yield OK</span>
+                                                    <span>OK {{ $qtyOk }} / R {{ $qtyReject }}</span>
+                                                </div>
+                                            </div>
+                                        </div>
+                                    </div>
+                                @endforeach
+                            </div>
+                        @endif
                     </div>
 
                     @if ($records instanceof \Illuminate\Pagination\AbstractPaginator)
@@ -679,14 +906,12 @@
 @push('scripts')
     <script>
         document.addEventListener('DOMContentLoaded', function() {
-            // MOBILE: Klik card → masuk ke halaman input QC Cutting
-            const cards = document.querySelectorAll('.qc-mobile-card');
-            cards.forEach(card => {
-                card.addEventListener('click', function() {
+            // Klik card mobile / baris desktop → ke halaman detail/QC
+            document.querySelectorAll('.qc-mobile-card[data-href], .qc-row[data-href]').forEach(el => {
+                el.addEventListener('click', function(e) {
+                    if (e.target.closest('a,button')) return;
                     const href = this.getAttribute('data-href');
-                    if (href) {
-                        window.location.href = href;
-                    }
+                    if (href) window.location.href = href;
                 });
             });
         });

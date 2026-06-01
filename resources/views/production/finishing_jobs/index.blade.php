@@ -206,6 +206,31 @@
             white-space: nowrap;
         }
 
+        /* chips item */
+        .item-chips { display: flex; flex-wrap: wrap; gap: .25rem; }
+        .item-chip {
+            display: inline-flex; align-items: baseline; gap: .25rem;
+            font-size: .72rem; line-height: 1.1; padding: .2rem .45rem; border-radius: 999px;
+            background: rgba(148, 163, 184, 0.14); border: 1px solid rgba(148, 163, 184, 0.18); white-space: nowrap;
+        }
+        .item-chip b { font-weight: 700; letter-spacing: .02em; }
+        .item-chip .q { color: var(--muted); }
+        .item-chip-more { background: transparent; color: var(--muted); }
+
+        /* progress */
+        .prog-wrap { min-width: 150px; }
+        .prog { height: 6px; border-radius: 999px; overflow: hidden; background: rgba(148, 163, 184, 0.22); }
+        .prog > span { display: block; height: 100%; border-radius: 999px; transition: width .3s ease; }
+        .fill-done { background: linear-gradient(90deg, #16a34a, #22c55e); }
+        .fill-part { background: linear-gradient(90deg, #2563eb, #38bdf8); }
+        .fill-rej { background: linear-gradient(90deg, #e11d48, #fb7185); }
+        .fill-zero { background: rgba(148, 163, 184, 0.5); }
+        .prog-num { font-size: .72rem; color: var(--muted); margin-top: .25rem; display: flex; justify-content: space-between; gap: .5rem; }
+        .prog-num b { color: inherit; font-weight: 700; }
+
+        .job-row { cursor: pointer; transition: background-color .12s ease; }
+        .job-row:hover { background: color-mix(in srgb, var(--card) 84%, #22c55e 6%); }
+
         @media(max-width:768px) {
             .page-wrap {
                 padding: 12px 10px 92px;
@@ -219,6 +244,20 @@
         $user = auth()->user();
         $role = $user?->role ?? null;
         $isOperating = $role === 'operating';
+
+        // chip detail barang per job (group lines by item code, qty = qty_ok)
+        $jobItems = function ($job) {
+            $lines = $job->lines ?? collect();
+            return $lines
+                ->groupBy(fn($l) => optional($l->item)->code ?: '—')
+                ->map(fn($g) => [
+                    'code' => optional($g->first()->item)->code ?: '—',
+                    'name' => optional($g->first()->item)->name ?: '',
+                    'qty' => (int) $g->sum(fn($l) => (int) ($l->qty_ok ?? 0)),
+                ])
+                ->sortByDesc('qty')
+                ->values();
+        };
     @endphp
 
     <div class="page-wrap">
@@ -266,12 +305,10 @@
                     <table class="table table-sm align-middle mono table-jobs mb-0">
                         <thead>
                             <tr>
-                                <th style="width:130px;">Tanggal</th>
-                                <th style="width:170px;">Kode</th>
-                                <th style="width:200px;">Status</th>
-                                <th style="width:110px;" class="text-end">Bundle</th>
-                                <th style="width:160px;" class="text-end">OK / Reject</th>
-                                <th>Catatan</th>
+                                <th style="width:160px;">Job</th>
+                                <th style="width:150px;">Status</th>
+                                <th>Barang (OK)</th>
+                                <th style="width:200px;">Yield OK</th>
                                 <th style="width:90px;"></th>
                             </tr>
                         </thead>
@@ -280,16 +317,19 @@
                                 @php
                                     // ✅ tanpa posted_at (sqlite compat)
                                     $isPosted = ($job->status ?? 'draft') === 'posted';
-                                    $hasReject = ((int) ($job->total_reject ?? 0)) > 0;
+                                    $ok = (int) ($job->total_ok ?? 0);
+                                    $rj = (int) ($job->total_reject ?? 0);
+                                    $base = $ok + $rj;
+                                    $pct = $base > 0 ? (int) round($ok / $base * 100) : 0;
+                                    $hasReject = $rj > 0;
+                                    $fill = $base <= 0 ? 'fill-zero' : ($pct >= 100 ? 'fill-done' : 'fill-part');
+                                    $items = $jobItems($job);
+                                    $href = route('production.finishing_jobs.show', $job);
                                 @endphp
-                                <tr>
-                                    <td>{{ optional($job->date)->format('d M Y') ?? '-' }}</td>
-
+                                <tr class="job-row" data-href="{{ $href }}">
                                     <td>
-                                        <a href="{{ route('production.finishing_jobs.show', $job) }}"
-                                            class="text-decoration-none fin-code">
-                                            {{ $job->code }}
-                                        </a>
+                                        <div class="fin-code">{{ $job->code }}</div>
+                                        <div class="text-muted" style="font-size:.74rem;">{{ optional($job->date)->format('d M Y') ?? '-' }} • {{ (int) ($job->bundle_count ?? 0) }} bundle</div>
                                     </td>
 
                                     <td>
@@ -298,29 +338,42 @@
                                                 {{ $isPosted ? 'Posted' : 'Draft' }}
                                             </span>
                                             @if ($hasReject)
-                                                <span class="status-pill status-reject">Has Reject</span>
+                                                <span class="status-pill status-reject">Reject {{ $rj }}</span>
                                             @endif
                                         </div>
                                     </td>
 
-                                    <td class="text-end fw-semibold">{{ (int) ($job->bundle_count ?? 0) }}</td>
-
-                                    <td class="text-end">
-                                        OK: <span class="fw-semibold">{{ (int) ($job->total_ok ?? 0) }}</span>
-                                        <span class="text-muted">/</span>
-                                        R: <span
-                                            class="fw-semibold text-danger">{{ (int) ($job->total_reject ?? 0) }}</span>
+                                    <td>
+                                        @if ($items->isEmpty())
+                                            <span class="text-muted small">-</span>
+                                        @else
+                                            <div class="item-chips">
+                                                @foreach ($items->take(4) as $it)
+                                                    <span class="item-chip" title="{{ $it['name'] }}">
+                                                        <b>{{ $it['code'] }}</b>
+                                                        <span class="q">{{ number_format($it['qty'], 0, ',', '.') }}</span>
+                                                    </span>
+                                                @endforeach
+                                                @if ($items->count() > 4)
+                                                    <span class="item-chip item-chip-more">+{{ $items->count() - 4 }}</span>
+                                                @endif
+                                            </div>
+                                        @endif
                                     </td>
 
-                                    <td class="small text-muted text-truncate" style="max-width:360px;">
-                                        {{ $job->notes }}
+                                    <td>
+                                        <div class="prog-wrap">
+                                            <div class="prog"><span class="{{ $fill }}" style="width: {{ $pct }}%"></span></div>
+                                            <div class="prog-num">
+                                                <span><b>{{ $pct }}%</b></span>
+                                                <span>OK {{ $ok }} / R {{ $rj }}</span>
+                                            </div>
+                                        </div>
                                     </td>
 
                                     <td class="text-end">
-                                        <a href="{{ route('production.finishing_jobs.show', $job) }}"
-                                            class="btn btn-sm btn-outline-primary" style="border-radius:999px;">
-                                            Detail
-                                        </a>
+                                        <a href="{{ $href }}" class="btn btn-sm btn-outline-primary" style="border-radius:999px;"
+                                            onclick="event.stopPropagation();">Detail</a>
                                     </td>
                                 </tr>
                             @endforeach
@@ -335,10 +388,16 @@
                             @php
                                 // ✅ FIX: pakai status (bukan posted_at)
                                 $isPosted = ($job->status ?? 'draft') === 'posted';
-                                $hasReject = ((int) ($job->total_reject ?? 0)) > 0;
+                                $ok = (int) ($job->total_ok ?? 0);
+                                $rj = (int) ($job->total_reject ?? 0);
+                                $base = $ok + $rj;
+                                $pct = $base > 0 ? (int) round($ok / $base * 100) : 0;
+                                $hasReject = $rj > 0;
+                                $fill = $base <= 0 ? 'fill-zero' : ($pct >= 100 ? 'fill-done' : 'fill-part');
+                                $items = $jobItems($job);
 
                                 $href = route('production.finishing_jobs.show', $job);
-                                $datePill = optional($job->date)->format('Y-m-d') ?? '-';
+                                $datePill = optional($job->date)->format('d M Y') ?? '-';
                             @endphp
 
                             <div class="fin-mobile-card" data-href="{{ $href }}">
@@ -349,7 +408,7 @@
                                             {{ $isPosted ? 'Posted' : 'Draft' }}
                                         </span>
                                         @if ($hasReject)
-                                            <span class="status-pill status-reject">Reject</span>
+                                            <span class="status-pill status-reject">Reject {{ $rj }}</span>
                                         @endif
                                     </div>
                                 </div>
@@ -362,21 +421,27 @@
                                         </div>
                                     </div>
 
-                                    <div class="fin-mobile-row-line">
-                                        <div class="fin-mobile-secondary">
-                                            OK: <strong>{{ (int) ($job->total_ok ?? 0) }}</strong>
-                                            &nbsp;•&nbsp;
-                                            R: <strong class="text-danger">{{ (int) ($job->total_reject ?? 0) }}</strong>
-                                        </div>
-                                    </div>
-
-                                    @if (!empty($job->notes))
-                                        <div class="fin-mobile-row-line">
-                                            <div class="fin-mobile-secondary text-truncate" style="max-width:100%;">
-                                                {{ $job->notes }}
-                                            </div>
+                                    @if ($items->isNotEmpty())
+                                        <div class="item-chips">
+                                            @foreach ($items->take(4) as $it)
+                                                <span class="item-chip" title="{{ $it['name'] }}">
+                                                    <b>{{ $it['code'] }}</b>
+                                                    <span class="q">{{ number_format($it['qty'], 0, ',', '.') }}</span>
+                                                </span>
+                                            @endforeach
+                                            @if ($items->count() > 4)
+                                                <span class="item-chip item-chip-more">+{{ $items->count() - 4 }}</span>
+                                            @endif
                                         </div>
                                     @endif
+
+                                    <div class="prog-wrap" style="min-width:0;">
+                                        <div class="prog"><span class="{{ $fill }}" style="width: {{ $pct }}%"></span></div>
+                                        <div class="prog-num">
+                                            <span><b>{{ $pct }}%</b> Yield OK</span>
+                                            <span>OK {{ $ok }} / R {{ $rj }}</span>
+                                        </div>
+                                    </div>
                                 </div>
                             </div>
                         @endforeach
@@ -403,10 +468,11 @@
 @push('scripts')
     <script>
         document.addEventListener('DOMContentLoaded', () => {
-            // Klik seluruh kartu mobile -> ke detail
-            document.querySelectorAll('.fin-mobile-card[data-href]').forEach(card => {
-                card.addEventListener('click', () => {
-                    const href = card.getAttribute('data-href');
+            // Klik kartu mobile / baris desktop -> ke detail
+            document.querySelectorAll('.fin-mobile-card[data-href], .job-row[data-href]').forEach(el => {
+                el.addEventListener('click', (e) => {
+                    if (e.target.closest('a,button')) return;
+                    const href = el.getAttribute('data-href');
                     if (href) window.location.href = href;
                 });
             });

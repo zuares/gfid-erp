@@ -65,6 +65,9 @@ class FinishingJobController extends Controller
             ->withCount('lines as bundle_count')
             ->withSum('lines as total_ok', 'qty_ok')
             ->withSum('lines as total_reject', 'qty_reject')
+            ->withSum('lines as total_in', 'qty_in')
+            // ✅ untuk chip detail barang di index
+            ->with(['lines.item:id,code,name'])
             ->orderByDesc('date')
             ->orderByDesc('updated_at')
             ->orderByDesc('id');

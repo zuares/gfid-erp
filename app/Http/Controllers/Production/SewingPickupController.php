@@ -29,6 +29,8 @@ class SewingPickupController extends Controller
                 'warehouse',
                 'operator',
                 'lines',
+                // ✅ untuk menampilkan detail barang (chip item) di index
+                'lines.finishedItem:id,code,name',
             ])
             ->orderByDesc('date')
             ->orderByDesc('id')
