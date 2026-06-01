@@ -4,10 +4,12 @@ use App\Http\Controllers\Inventory\InventoryAdjustmentController;
 use App\Http\Controllers\Production\CuttingJobController;
 use App\Http\Controllers\Production\FinishingJobController;
 use App\Http\Controllers\Production\PackingJobController;
+use App\Http\Controllers\Production\ProductionDashboardController;
+use App\Http\Controllers\Production\ProductionMovementController;
+use App\Http\Controllers\Production\ProductionPriorityController;
 use App\Http\Controllers\Production\ProductionReportController;
 use App\Http\Controllers\Production\QcController;
 use App\Http\Controllers\Production\SewingPickupController;
-use App\Http\Controllers\Production\SewingReportController;
 use App\Http\Controllers\Production\SewingReturnController;
 use App\Http\Controllers\Production\WipFinAdjustmentController;
 
@@ -137,12 +139,6 @@ Route::middleware(['web', 'auth', 'role:owner,operating'])
 
         Route::resource('finishing_jobs', FinishingJobController::class)->except(['destroy']);
 
-        Route::get('finishing_jobs/report/per-item', [FinishingJobController::class, 'reportPerItem'])
-            ->name('finishing_jobs.report_per_item');
-
-        Route::get('finishing_jobs/report/per-item/{item}', [FinishingJobController::class, 'reportPerItemDetail'])
-            ->name('finishing_jobs.report_per_item_detail');
-
         /*
     |--------------------------------------------------------------------------
     | PACKING
@@ -161,34 +157,43 @@ Route::middleware(['web', 'auth', 'role:owner,operating'])
 
         /*
     |--------------------------------------------------------------------------
-    | PRODUCTION REPORTS (GLOBAL)
+    | PRODUCTION DASHBOARD (konsolidasi semua report)
     |--------------------------------------------------------------------------
      */
-        Route::prefix('reports')->name('reports.')->group(function () {
-            Route::get('daily-production', [ProductionReportController::class, 'dailyProduction'])->name('daily_production');
-            Route::get('reject-detail', [ProductionReportController::class, 'rejectDetail'])->name('reject_detail');
-            Route::get('wip-sewing-age', [ProductionReportController::class, 'wipSewingAge'])->name('wip_sewing_age');
-            Route::get('sewing-per-item', [ProductionReportController::class, 'sewingPerItem'])->name('sewing_per_item');
-            Route::get('finishing-jobs', [ProductionReportController::class, 'finishingJobs'])->name('finishing_jobs');
-            Route::get('flow-dashboard', [ProductionReportController::class, 'productionFlowDashboard'])->name('production_flow_dashboard');
-        });
+        Route::get('dashboard', [ProductionDashboardController::class, 'index'])
+            ->name('dashboard');
+
+        // API lazy-load per tab + filter AJAX
+        Route::get('dashboard/data', [ProductionDashboardController::class, 'data'])
+            ->name('dashboard.data');
 
         /*
     |--------------------------------------------------------------------------
-    | SEWING REPORTS
+    | MUTASI PRODUKSI (tombol aksi pindah status)
     |--------------------------------------------------------------------------
      */
-        Route::prefix('sewing/reports')->name('reports.')->group(function () {
-            Route::get('/operators', [SewingReportController::class, 'operatorSummary'])->name('operators');
-            Route::get('/outstanding', [SewingReportController::class, 'outstanding'])->name('outstanding');
-            Route::get('/aging-wip-sew', [SewingReportController::class, 'agingWipSew'])->name('aging_wip_sew');
-            Route::get('/productivity', [SewingReportController::class, 'productivity'])->name('productivity');
-            Route::get('/partial-pickup', [SewingReportController::class, 'partialPickup'])->name('partial_pickup');
-            Route::get('/reject-analysis', [SewingReportController::class, 'rejectAnalysis'])->name('reject_analysis');
-            Route::get('/dashboard', [SewingReportController::class, 'dailyDashboard'])->name('dashboard');
-            Route::get('/lead-time', [SewingReportController::class, 'leadTime'])->name('lead_time');
-            Route::get('/operator-behavior', [SewingReportController::class, 'operatorBehavior'])->name('operator_behavior');
-        });
+        Route::get('movements', [ProductionMovementController::class, 'index'])
+            ->name('movements.index');
+        Route::post('movements', [ProductionMovementController::class, 'store'])
+            ->name('movements.store');
+
+        /*
+    |--------------------------------------------------------------------------
+    | PRIORITAS PRODUKSI (skor prioritas per SKU)
+    |--------------------------------------------------------------------------
+     */
+        Route::get('priority', [ProductionPriorityController::class, 'index'])
+            ->name('priority.index');
+
+        /*
+    |--------------------------------------------------------------------------
+    | LAPORAN PRODUKSI (rekap throughput + export CSV/XLSX)
+    |--------------------------------------------------------------------------
+     */
+        Route::get('reports', [ProductionReportController::class, 'index'])
+            ->name('reports.index');
+        Route::get('reports/export', [ProductionReportController::class, 'export'])
+            ->name('reports.export');
     });
 
 /*
