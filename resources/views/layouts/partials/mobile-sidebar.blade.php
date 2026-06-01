@@ -318,24 +318,13 @@
 
     $hasProdWipFinAdjIndex = $router->has('production.wip-fin-adjustments.index');
     $hasProdQcIndex = $router->has('production.qc.index');
+    $hasProdPackingIndex = $router->has('production.packing_jobs.index');
+    $hasProdMovementsIndex = $router->has('production.movements.index');
+    $hasProdPriorityIndex = $router->has('production.priority.index');
+    $hasProdReportsIndex = $router->has('production.reports.index');
 
-    // Production reports (dari route list kamu)
-    $hasProdReportDashboard = $router->has('production.reports.dashboard'); // dailyDashboard (sewing)
-    $hasProdReportOutstanding = $router->has('production.reports.outstanding');
-    $hasProdReportAgingWipSew = $router->has('production.reports.aging_wip_sew');
-    $hasProdReportLeadTime = $router->has('production.reports.lead_time');
-    $hasProdReportProductivity = $router->has('production.reports.productivity');
-    $hasProdReportPartialPickup = $router->has('production.reports.partial_pickup');
-    $hasProdReportRejectAnalysis = $router->has('production.reports.reject_analysis');
-    $hasProdReportOperatorSummary = $router->has('production.reports.operators');
-    $hasProdReportOperatorBehavior = $router->has('production.reports.operator_behavior');
-
-    $hasProdReportFlow = $router->has('production.reports.production_flow_dashboard');
-    $hasProdReportDaily = $router->has('production.reports.daily_production');
-    $hasProdReportFinishingJobs = $router->has('production.reports.finishing_jobs');
-    $hasProdReportWipSewAge = $router->has('production.reports.wip_sewing_age');
-    $hasProdReportRejectDetail = $router->has('production.reports.reject_detail');
-    $hasProdReportSewingPerItem = $router->has('production.reports.sewing_per_item');
+    // Production dashboard (konsolidasi semua report)
+    $hasProdDashboard = $router->has('production.dashboard');
 
     // Finance (Accounting)
     $hasCashExpensesIndex = $router->has('accounting.cash-expenses.index');
@@ -383,8 +372,11 @@
         request()->routeIs('production.finishing_jobs.*') ||
         request()->routeIs('production.wip-fin-adjustments.*') ||
         request()->routeIs('production.qc.*') ||
-        request()->routeIs('production.reports.*') ||
-        request()->routeIs('production.packing_jobs.*');
+        request()->routeIs('production.dashboard') ||
+        request()->routeIs('production.packing_jobs.*') ||
+        request()->routeIs('production.movements.*') ||
+        request()->routeIs('production.priority.*') ||
+        request()->routeIs('production.reports.*');
 
     $accountingOpen =
         request()->routeIs('accounting.cash-expenses.*') ||
@@ -592,6 +584,15 @@
                     @if ($isOperating)
                         <div class="mobile-sidebar-section-label">Production</div>
 
+                        @if ($hasProdDashboard)
+                            <li>
+                                <a href="{{ route('production.dashboard') }}"
+                                   class="mobile-sidebar-link {{ request()->routeIs('production.dashboard') ? 'active' : '' }}">
+                                    <span class="icon">📊</span><span>Dashboard Produksi</span>
+                                </a>
+                            </li>
+                        @endif
+
                         @if ($hasProdCuttingJobsIndex)
                             <li>
                                 <a href="{{ route('production.cutting_jobs.index') }}"
@@ -641,7 +642,43 @@
                             <li>
                                 <a href="{{ route('production.qc.index') }}"
                                    class="mobile-sidebar-link {{ request()->routeIs('production.qc.*') ? 'active' : '' }}">
-                                    <span class="icon">✅</span><span>QC Cutting</span>
+                                    <span class="icon">✅</span><span>QC Produksi</span>
+                                </a>
+                            </li>
+                        @endif
+
+                        @if ($hasProdPackingIndex)
+                            <li>
+                                <a href="{{ route('production.packing_jobs.index') }}"
+                                   class="mobile-sidebar-link {{ request()->routeIs('production.packing_jobs.*') ? 'active' : '' }}">
+                                    <span class="icon">📦</span><span>Packing</span>
+                                </a>
+                            </li>
+                        @endif
+
+                        @if ($hasProdMovementsIndex)
+                            <li>
+                                <a href="{{ route('production.movements.index') }}"
+                                   class="mobile-sidebar-link {{ request()->routeIs('production.movements.*') ? 'active' : '' }}">
+                                    <span class="icon">🔄</span><span>Mutasi Produksi</span>
+                                </a>
+                            </li>
+                        @endif
+
+                        @if ($hasProdPriorityIndex)
+                            <li>
+                                <a href="{{ route('production.priority.index') }}"
+                                   class="mobile-sidebar-link {{ request()->routeIs('production.priority.*') ? 'active' : '' }}">
+                                    <span class="icon">🎯</span><span>Prioritas Produksi</span>
+                                </a>
+                            </li>
+                        @endif
+
+                        @if ($hasProdReportsIndex)
+                            <li>
+                                <a href="{{ route('production.reports.index') }}"
+                                   class="mobile-sidebar-link {{ request()->routeIs('production.reports.*') ? 'active' : '' }}">
+                                    <span class="icon">📈</span><span>Laporan Produksi</span>
                                 </a>
                             </li>
                         @endif
@@ -1046,7 +1083,30 @@
                         </button>
 
                         <div class="collapse {{ $prodOpen ? 'show' : '' }}" id="navProductionMobile">
-                            <div class="mobile-sidebar-section-label" style="margin-top:.55rem;">Jobs</div>
+                            <div class="mobile-sidebar-section-label" style="margin-top:.55rem;">Monitoring</div>
+
+                            @if ($hasProdDashboard)
+                                <a href="{{ route('production.dashboard') }}"
+                                   class="mobile-sidebar-link mobile-sidebar-link-sub {{ request()->routeIs('production.dashboard') ? 'active' : '' }}">
+                                    <span class="icon">📊</span><span>Dashboard Produksi</span>
+                                </a>
+                            @endif
+
+                            @if ($hasProdPriorityIndex)
+                                <a href="{{ route('production.priority.index') }}"
+                                   class="mobile-sidebar-link mobile-sidebar-link-sub {{ request()->routeIs('production.priority.*') ? 'active' : '' }}">
+                                    <span class="icon">🎯</span><span>Prioritas Produksi</span>
+                                </a>
+                            @endif
+
+                            @if ($hasProdReportsIndex)
+                                <a href="{{ route('production.reports.index') }}"
+                                   class="mobile-sidebar-link mobile-sidebar-link-sub {{ request()->routeIs('production.reports.*') ? 'active' : '' }}">
+                                    <span class="icon">📈</span><span>Laporan Produksi</span>
+                                </a>
+                            @endif
+
+                            <div class="mobile-sidebar-section-label" style="margin-top:.55rem;">Alur Produksi</div>
 
                             @if ($hasProdCuttingJobsIndex)
                                 <a href="{{ route('production.cutting_jobs.index') }}"
@@ -1069,6 +1129,13 @@
                                 </a>
                             @endif
 
+                            @if ($hasProdQcIndex)
+                                <a href="{{ route('production.qc.index') }}"
+                                   class="mobile-sidebar-link mobile-sidebar-link-sub {{ request()->routeIs('production.qc.*') ? 'active' : '' }}">
+                                    <span class="icon">✅</span><span>QC Produksi</span>
+                                </a>
+                            @endif
+
                             @if ($hasProdFinishingJobsIndex)
                                 <a href="{{ route('production.finishing_jobs.index') }}"
                                    class="mobile-sidebar-link mobile-sidebar-link-sub {{ request()->routeIs('production.finishing_jobs.*') ? 'active' : '' }}">
@@ -1076,124 +1143,26 @@
                                 </a>
                             @endif
 
+                            @if ($hasProdPackingIndex)
+                                <a href="{{ route('production.packing_jobs.index') }}"
+                                   class="mobile-sidebar-link mobile-sidebar-link-sub {{ request()->routeIs('production.packing_jobs.*') ? 'active' : '' }}">
+                                    <span class="icon">📦</span><span>Packing</span>
+                                </a>
+                            @endif
+
+                            <div class="mobile-sidebar-section-label" style="margin-top:.55rem;">Stok & Koreksi</div>
+
+                            @if ($hasProdMovementsIndex)
+                                <a href="{{ route('production.movements.index') }}"
+                                   class="mobile-sidebar-link mobile-sidebar-link-sub {{ request()->routeIs('production.movements.*') ? 'active' : '' }}">
+                                    <span class="icon">🔄</span><span>Mutasi Produksi</span>
+                                </a>
+                            @endif
+
                             @if ($hasProdWipFinAdjIndex)
                                 <a href="{{ route('production.wip-fin-adjustments.index') }}"
                                    class="mobile-sidebar-link mobile-sidebar-link-sub {{ request()->routeIs('production.wip-fin-adjustments.*') ? 'active' : '' }}">
                                     <span class="icon">🧾</span><span>Koreksi WIP-FIN</span>
-                                </a>
-                            @endif
-
-                            @if ($hasProdQcIndex)
-                                <a href="{{ route('production.qc.index') }}"
-                                   class="mobile-sidebar-link mobile-sidebar-link-sub {{ request()->routeIs('production.qc.*') ? 'active' : '' }}">
-                                    <span class="icon">✅</span><span>QC Cutting</span>
-                                </a>
-                            @endif
-
-                            <div class="mobile-sidebar-section-label" style="margin-top:.55rem;">Reports</div>
-
-                            @if ($hasProdReportDashboard)
-                                <a href="{{ route('production.reports.dashboard') }}"
-                                   class="mobile-sidebar-link mobile-sidebar-link-sub {{ request()->routeIs('production.reports.dashboard') ? 'active' : '' }}">
-                                    <span class="icon">📊</span><span>Sewing Dashboard</span>
-                                </a>
-                            @endif
-
-                            @if ($hasProdReportOutstanding)
-                                <a href="{{ route('production.reports.outstanding') }}"
-                                   class="mobile-sidebar-link mobile-sidebar-link-sub {{ request()->routeIs('production.reports.outstanding') ? 'active' : '' }}">
-                                    <span class="icon">⏳</span><span>Outstanding WIP-SEW</span>
-                                </a>
-                            @endif
-
-                            @if ($hasProdReportAgingWipSew)
-                                <a href="{{ route('production.reports.aging_wip_sew') }}"
-                                   class="mobile-sidebar-link mobile-sidebar-link-sub {{ request()->routeIs('production.reports.aging_wip_sew') ? 'active' : '' }}">
-                                    <span class="icon">📆</span><span>Aging WIP-SEW</span>
-                                </a>
-                            @endif
-
-                            @if ($hasProdReportLeadTime)
-                                <a href="{{ route('production.reports.lead_time') }}"
-                                   class="mobile-sidebar-link mobile-sidebar-link-sub {{ request()->routeIs('production.reports.lead_time') ? 'active' : '' }}">
-                                    <span class="icon">⏱️</span><span>Lead Time</span>
-                                </a>
-                            @endif
-
-                            @if ($hasProdReportProductivity)
-                                <a href="{{ route('production.reports.productivity') }}"
-                                   class="mobile-sidebar-link mobile-sidebar-link-sub {{ request()->routeIs('production.reports.productivity') ? 'active' : '' }}">
-                                    <span class="icon">📈</span><span>Productivity</span>
-                                </a>
-                            @endif
-
-                            @if ($hasProdReportPartialPickup)
-                                <a href="{{ route('production.reports.partial_pickup') }}"
-                                   class="mobile-sidebar-link mobile-sidebar-link-sub {{ request()->routeIs('production.reports.partial_pickup') ? 'active' : '' }}">
-                                    <span class="icon">🧩</span><span>Partial Pickup</span>
-                                </a>
-                            @endif
-
-                            @if ($hasProdReportRejectAnalysis)
-                                <a href="{{ route('production.reports.reject_analysis') }}"
-                                   class="mobile-sidebar-link mobile-sidebar-link-sub {{ request()->routeIs('production.reports.reject_analysis') ? 'active' : '' }}">
-                                    <span class="icon">🧯</span><span>Reject Analysis</span>
-                                </a>
-                            @endif
-
-                            @if ($hasProdReportOperatorSummary)
-                                <a href="{{ route('production.reports.operators') }}"
-                                   class="mobile-sidebar-link mobile-sidebar-link-sub {{ request()->routeIs('production.reports.operators') ? 'active' : '' }}">
-                                    <span class="icon">👥</span><span>Operator Summary</span>
-                                </a>
-                            @endif
-
-                            @if ($hasProdReportOperatorBehavior)
-                                <a href="{{ route('production.reports.operator_behavior') }}"
-                                   class="mobile-sidebar-link mobile-sidebar-link-sub {{ request()->routeIs('production.reports.operator_behavior') ? 'active' : '' }}">
-                                    <span class="icon">🧠</span><span>Operator Behavior</span>
-                                </a>
-                            @endif
-
-                            @if ($hasProdReportFlow)
-                                <a href="{{ route('production.reports.production_flow_dashboard') }}"
-                                   class="mobile-sidebar-link mobile-sidebar-link-sub {{ request()->routeIs('production.reports.production_flow_dashboard') ? 'active' : '' }}">
-                                    <span class="icon">🌀</span><span>Flow Dashboard</span>
-                                </a>
-                            @endif
-
-                            @if ($hasProdReportDaily)
-                                <a href="{{ route('production.reports.daily_production') }}"
-                                   class="mobile-sidebar-link mobile-sidebar-link-sub {{ request()->routeIs('production.reports.daily_production') ? 'active' : '' }}">
-                                    <span class="icon">📅</span><span>Daily Production</span>
-                                </a>
-                            @endif
-
-                            @if ($hasProdReportFinishingJobs)
-                                <a href="{{ route('production.reports.finishing_jobs') }}"
-                                   class="mobile-sidebar-link mobile-sidebar-link-sub {{ request()->routeIs('production.reports.finishing_jobs') ? 'active' : '' }}">
-                                    <span class="icon">🧶</span><span>Finishing Jobs Report</span>
-                                </a>
-                            @endif
-
-                            @if ($hasProdReportWipSewAge)
-                                <a href="{{ route('production.reports.wip_sewing_age') }}"
-                                   class="mobile-sidebar-link mobile-sidebar-link-sub {{ request()->routeIs('production.reports.wip_sewing_age') ? 'active' : '' }}">
-                                    <span class="icon">🕒</span><span>WIP Sewing Age</span>
-                                </a>
-                            @endif
-
-                            @if ($hasProdReportRejectDetail)
-                                <a href="{{ route('production.reports.reject_detail') }}"
-                                   class="mobile-sidebar-link mobile-sidebar-link-sub {{ request()->routeIs('production.reports.reject_detail') ? 'active' : '' }}">
-                                    <span class="icon">🧾</span><span>Reject Detail</span>
-                                </a>
-                            @endif
-
-                            @if ($hasProdReportSewingPerItem)
-                                <a href="{{ route('production.reports.sewing_per_item') }}"
-                                   class="mobile-sidebar-link mobile-sidebar-link-sub {{ request()->routeIs('production.reports.sewing_per_item') ? 'active' : '' }}">
-                                    <span class="icon">🧵</span><span>Sewing Per Item</span>
                                 </a>
                             @endif
                         </div>

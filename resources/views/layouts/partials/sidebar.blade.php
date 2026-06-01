@@ -128,12 +128,12 @@
     $hasProdFinishingJobsIndex = $router->has('production.finishing_jobs.index');
     $hasProdWipFinAdjIndex = $router->has('production.wip-fin-adjustments.index');
     $hasProdQcIndex = $router->has('production.qc.index');
+    $hasProdPackingIndex = $router->has('production.packing_jobs.index');
+    $hasProdMovementsIndex = $router->has('production.movements.index');
+    $hasProdPriorityIndex = $router->has('production.priority.index');
+    $hasProdReportsIndex = $router->has('production.reports.index');
 
-    $hasProdReportDashboard = $router->has('production.reports.dashboard');
-    $hasProdReportOutstanding = $router->has('production.reports.outstanding');
-    $hasProdReportAgingWipSew = $router->has('production.reports.aging_wip_sew');
-    $hasProdReportFlow = $router->has('production.reports.production_flow_dashboard');
-    $hasProdReportDaily = $router->has('production.reports.daily_production');
+    $hasProdDashboard = $router->has('production.dashboard');
 
     // Accounting
     $hasAccountsIndex = $router->has('accounting.accounts.index');
@@ -196,8 +196,11 @@
         $open('production.finishing_jobs.*') ||
         $open('production.wip-fin-adjustments.*') ||
         $open('production.qc.*') ||
-        $open('production.reports.*') ||
-        $open('production.packing_jobs.*');
+        $open('production.dashboard') ||
+        $open('production.packing_jobs.*') ||
+        $open('production.movements.*') ||
+        $open('production.priority.*') ||
+        $open('production.reports.*');
 
     $openAccounting =
         $open('accounting.cash-expenses.*') ||
@@ -591,15 +594,27 @@
 
             {{-- Production (operating only) --}}
             @if ($isOperating && $canShow(
+                $hasProdDashboard,
                 $hasProdCuttingJobsIndex,
                 $hasProdSewPickupsIndex,
                 $hasProdSewReturnsIndex,
                 $hasProdFinishingJobsIndex,
+                $hasProdPackingIndex,
                 $hasProdWipFinAdjIndex,
-                $hasProdQcIndex
+                $hasProdQcIndex,
+                $hasProdMovementsIndex,
+                $hasProdPriorityIndex,
+                $hasProdReportsIndex
             ))
                 <x-sidebar.label text="Production" />
                 <li class="simple-group">
+                    @if ($hasProdDashboard)
+                        <x-sidebar.simple-link href="{{ route('production.dashboard') }}" icon="📊"
+                            :active="request()->routeIs('production.dashboard')">
+                            Dashboard Produksi
+                        </x-sidebar.simple-link>
+                    @endif
+
                     @if ($hasProdCuttingJobsIndex)
                         <x-sidebar.simple-link href="{{ route('production.cutting_jobs.index') }}" icon="✂️"
                             :active="request()->routeIs('production.cutting_jobs.*')">
@@ -621,6 +636,13 @@
                         </x-sidebar.simple-link>
                     @endif
 
+                    @if ($hasProdQcIndex)
+                        <x-sidebar.simple-link href="{{ route('production.qc.index') }}" icon="✅"
+                            :active="request()->routeIs('production.qc.*')">
+                            QC Produksi
+                        </x-sidebar.simple-link>
+                    @endif
+
                     @if ($hasProdFinishingJobsIndex)
                         <x-sidebar.simple-link href="{{ route('production.finishing_jobs.index') }}" icon="🧶"
                             :active="request()->routeIs('production.finishing_jobs.*')">
@@ -628,17 +650,38 @@
                         </x-sidebar.simple-link>
                     @endif
 
+                    @if ($hasProdPackingIndex)
+                        <x-sidebar.simple-link href="{{ route('production.packing_jobs.index') }}" icon="📦"
+                            :active="request()->routeIs('production.packing_jobs.*')">
+                            Packing
+                        </x-sidebar.simple-link>
+                    @endif
+
+                    @if ($hasProdMovementsIndex)
+                        <x-sidebar.simple-link href="{{ route('production.movements.index') }}" icon="🔄"
+                            :active="request()->routeIs('production.movements.*')">
+                            Mutasi Produksi
+                        </x-sidebar.simple-link>
+                    @endif
+
+                    @if ($hasProdPriorityIndex)
+                        <x-sidebar.simple-link href="{{ route('production.priority.index') }}" icon="🎯"
+                            :active="request()->routeIs('production.priority.*')">
+                            Prioritas Produksi
+                        </x-sidebar.simple-link>
+                    @endif
+
+                    @if ($hasProdReportsIndex)
+                        <x-sidebar.simple-link href="{{ route('production.reports.index') }}" icon="📈"
+                            :active="request()->routeIs('production.reports.*')">
+                            Laporan Produksi
+                        </x-sidebar.simple-link>
+                    @endif
+
                     @if ($hasProdWipFinAdjIndex)
                         <x-sidebar.simple-link href="{{ route('production.wip-fin-adjustments.index') }}" icon="🧾"
                             :active="request()->routeIs('production.wip-fin-adjustments.*')">
                             Koreksi WIP-FIN
-                        </x-sidebar.simple-link>
-                    @endif
-
-                    @if ($hasProdQcIndex)
-                        <x-sidebar.simple-link href="{{ route('production.qc.index') }}" icon="✅"
-                            :active="request()->routeIs('production.qc.*')">
-                            QC
                         </x-sidebar.simple-link>
                     @endif
                 </li>
@@ -1217,13 +1260,13 @@
                 $hasProdSewPickupsIndex,
                 $hasProdSewReturnsIndex,
                 $hasProdFinishingJobsIndex,
+                $hasProdPackingIndex,
                 $hasProdWipFinAdjIndex,
                 $hasProdQcIndex,
-                $hasProdReportDashboard,
-                $hasProdReportOutstanding,
-                $hasProdReportAgingWipSew,
-                $hasProdReportFlow,
-                $hasProdReportDaily
+                $hasProdDashboard,
+                $hasProdMovementsIndex,
+                $hasProdPriorityIndex,
+                $hasProdReportsIndex
             ))
                 <x-sidebar.label text="Production" />
                 <li class="mb-1">
@@ -1236,7 +1279,27 @@
                     </button>
 
                     <div class="collapse {{ $openProduction ? 'show' : '' }}" id="navProduction">
-                        @php $subhead('Jobs'); @endphp
+                        @php $subhead('Monitoring'); @endphp
+                        @if ($hasProdDashboard)
+                            <x-sidebar.sub-link href="{{ route('production.dashboard') }}" icon="📊"
+                                :active="request()->routeIs('production.dashboard')">
+                                Dashboard Produksi
+                            </x-sidebar.sub-link>
+                        @endif
+                        @if ($hasProdPriorityIndex)
+                            <x-sidebar.sub-link href="{{ route('production.priority.index') }}" icon="🎯"
+                                :active="request()->routeIs('production.priority.*')">
+                                Prioritas Produksi
+                            </x-sidebar.sub-link>
+                        @endif
+                        @if ($hasProdReportsIndex)
+                            <x-sidebar.sub-link href="{{ route('production.reports.index') }}" icon="📈"
+                                :active="request()->routeIs('production.reports.*')">
+                                Laporan Produksi
+                            </x-sidebar.sub-link>
+                        @endif
+
+                        @php $subhead('Alur Produksi'); @endphp
                         @if ($hasProdCuttingJobsIndex)
                             <x-sidebar.sub-link href="{{ route('production.cutting_jobs.index') }}" icon="✂️"
                                 :active="request()->routeIs('production.cutting_jobs.*')">
@@ -1255,54 +1318,36 @@
                                 Sewing Returns
                             </x-sidebar.sub-link>
                         @endif
+                        @if ($hasProdQcIndex)
+                            <x-sidebar.sub-link href="{{ route('production.qc.index') }}" icon="✅"
+                                :active="request()->routeIs('production.qc.*')">
+                                QC Produksi
+                            </x-sidebar.sub-link>
+                        @endif
                         @if ($hasProdFinishingJobsIndex)
                             <x-sidebar.sub-link href="{{ route('production.finishing_jobs.index') }}" icon="🧶"
                                 :active="request()->routeIs('production.finishing_jobs.*')">
                                 Finishing Jobs
                             </x-sidebar.sub-link>
                         @endif
+                        @if ($hasProdPackingIndex)
+                            <x-sidebar.sub-link href="{{ route('production.packing_jobs.index') }}" icon="📦"
+                                :active="request()->routeIs('production.packing_jobs.*')">
+                                Packing
+                            </x-sidebar.sub-link>
+                        @endif
+
+                        @php $subhead('Stok & Koreksi'); @endphp
+                        @if ($hasProdMovementsIndex)
+                            <x-sidebar.sub-link href="{{ route('production.movements.index') }}" icon="🔄"
+                                :active="request()->routeIs('production.movements.*')">
+                                Mutasi Produksi
+                            </x-sidebar.sub-link>
+                        @endif
                         @if ($hasProdWipFinAdjIndex)
                             <x-sidebar.sub-link href="{{ route('production.wip-fin-adjustments.index') }}" icon="🧾"
                                 :active="request()->routeIs('production.wip-fin-adjustments.*')">
                                 Koreksi WIP-FIN
-                            </x-sidebar.sub-link>
-                        @endif
-                        @if ($hasProdQcIndex)
-                            <x-sidebar.sub-link href="{{ route('production.qc.index') }}" icon="✅"
-                                :active="request()->routeIs('production.qc.*')">
-                                QC
-                            </x-sidebar.sub-link>
-                        @endif
-
-                        @php $subhead('Reports'); @endphp
-                        @if ($hasProdReportDashboard)
-                            <x-sidebar.sub-link href="{{ route('production.reports.dashboard') }}" icon="📊"
-                                :active="request()->routeIs('production.reports.dashboard')">
-                                Sewing Dashboard
-                            </x-sidebar.sub-link>
-                        @endif
-                        @if ($hasProdReportOutstanding)
-                            <x-sidebar.sub-link href="{{ route('production.reports.outstanding') }}" icon="⏳"
-                                :active="request()->routeIs('production.reports.outstanding')">
-                                Outstanding WIP-SEW
-                            </x-sidebar.sub-link>
-                        @endif
-                        @if ($hasProdReportAgingWipSew)
-                            <x-sidebar.sub-link href="{{ route('production.reports.aging_wip_sew') }}" icon="📆"
-                                :active="request()->routeIs('production.reports.aging_wip_sew')">
-                                Aging WIP-SEW
-                            </x-sidebar.sub-link>
-                        @endif
-                        @if ($hasProdReportFlow)
-                            <x-sidebar.sub-link href="{{ route('production.reports.production_flow_dashboard') }}" icon="🌀"
-                                :active="request()->routeIs('production.reports.production_flow_dashboard')">
-                                Flow Dashboard
-                            </x-sidebar.sub-link>
-                        @endif
-                        @if ($hasProdReportDaily)
-                            <x-sidebar.sub-link href="{{ route('production.reports.daily_production') }}" icon="📅"
-                                :active="request()->routeIs('production.reports.daily_production')">
-                                Daily Production
                             </x-sidebar.sub-link>
                         @endif
                     </div>
