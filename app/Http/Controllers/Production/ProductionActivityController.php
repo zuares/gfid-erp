@@ -7,6 +7,12 @@ use App\Models\ProductionActivity;
 use App\Models\ProductionOrder;
 use Illuminate\Http\Request;
 
+/**
+ * @deprecated Modul produksi generasi lama (production_activities). Digantikan alur
+ * aktif Cutting → QC → Sewing → Finishing → Packing (lihat routes/web/production.php).
+ * Tabel pendukung 0 baris per 2026-06. Dipertahankan untuk backward-compatibility;
+ * jangan dihapus tanpa persetujuan. Route: routes/web/production-legacy.php.
+ */
 class ProductionActivityController extends Controller
 {
     public function store(Request $request, ProductionOrder $order)

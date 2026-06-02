@@ -7,6 +7,12 @@ use App\Models\ProductionOrder;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\DB;
 
+/**
+ * @deprecated Modul produksi generasi lama (production_orders). Digantikan alur
+ * aktif Cutting → QC → Sewing → Finishing → Packing (lihat routes/web/production.php).
+ * Tabel pendukung 0 baris per 2026-06. Dipertahankan untuk backward-compatibility;
+ * jangan dihapus tanpa persetujuan. Route: routes/web/production-legacy.php.
+ */
 class ProductionOrderController extends Controller
 {
     /**
