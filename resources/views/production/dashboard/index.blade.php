@@ -6,308 +6,30 @@
 @php
     $tabs = [
         'ringkasan' => 'Ringkasan',
-        'wip' => 'Alur WIP',
-        'bottleneck' => 'Bottleneck/Pipeline',
-        'outstanding' => 'Outstanding & Aging',
-        'operator' => 'Performa Operator',
+        'siap-jahit' => 'Siap Jahit',
+        'sedang-jahit' => 'Sedang Jahit',
+        'setor-qc' => 'Setor & QC',
         'reject' => 'Reject',
-        'item' => 'Output per Item',
+        'penjahit' => 'Penjahit',
+        'prioritas' => 'Prioritas',
     ];
 @endphp
 
 @push('head')
+    @include('production.dashboard.partials._gf-styles')
     <style>
-        :root {
-            --r: 16px;
-            --b: rgba(148, 163, 184, .22);
-            --muted: #6b7280;
-            --shadow: 0 12px 30px rgba(15, 23, 42, .10), 0 0 0 1px rgba(15, 23, 42, .03);
-        }
-
-        .page-wrap {
-            max-width: 1180px;
-            margin: 0 auto;
-            padding: 14px 12px 96px;
-        }
-
-        body[data-theme="light"] .page-wrap {
-            background: radial-gradient(circle at top left, rgba(59, 130, 246, .12) 0, rgba(45, 212, 191, .10) 28%, rgba(255, 255, 255, 1) 75%);
-            border-radius: 18px;
-        }
-
-        body[data-theme="dark"] .page-wrap {
-            background: radial-gradient(circle at top left, rgba(59, 130, 246, .22) 0, rgba(45, 212, 191, .16) 26%, #020617 68%);
-            border-radius: 18px;
-        }
-
-        .mono {
-            font-variant-numeric: tabular-nums;
-            font-family: ui-monospace, SFMono-Regular, Menlo, Consolas;
-        }
-
-        .card-main {
-            background: var(--card);
-            border: 1px solid var(--b);
-            border-radius: var(--r);
-            box-shadow: var(--shadow);
-        }
-
-        .btn-pill {
-            border-radius: 999px !important;
-            font-weight: 800;
-        }
-
-        /* KPI */
-        .kpi-grid {
-            display: grid;
-            grid-template-columns: repeat(auto-fit, minmax(150px, 1fr));
-            gap: .7rem;
-        }
-
-        .kpi {
-            border: 1px solid var(--b);
-            border-radius: 14px;
-            padding: .75rem .85rem;
-            background: var(--card);
-        }
-
-        .kpi .label {
-            font-size: .72rem;
-            font-weight: 800;
-            color: var(--muted);
-            text-transform: uppercase;
-            letter-spacing: .04em;
-        }
-
-        .kpi .val {
-            font-size: 1.5rem;
-            font-weight: 900;
-            line-height: 1.1;
-            margin-top: .15rem;
-        }
-
-        .kpi .sub {
-            font-size: .72rem;
-            color: var(--muted);
-            margin-top: .1rem;
-        }
-
-        .kpi.accent-green {
-            border-left: 4px solid #22c55e;
-        }
-
-        .kpi.accent-blue {
-            border-left: 4px solid #3b82f6;
-        }
-
-        .kpi.accent-red {
-            border-left: 4px solid #ef4444;
-        }
-
-        .kpi.accent-amber {
-            border-left: 4px solid #f59e0b;
-        }
-
-        /* TABS */
-        .tabs {
-            display: flex;
-            gap: .35rem;
-            overflow-x: auto;
-            padding-bottom: .25rem;
-        }
-
-        .tab-btn {
-            border: 1px solid var(--b);
-            background: var(--card);
-            color: var(--muted);
-            border-radius: 999px;
-            padding: .4rem .9rem;
-            font-weight: 800;
-            font-size: .82rem;
-            white-space: nowrap;
-            cursor: pointer;
-        }
-
-        .tab-btn.active {
-            background: #2563eb;
-            border-color: #2563eb;
-            color: #fff;
-        }
-
-        .tab-pane {
-            display: none;
-        }
-
-        .tab-pane.active {
-            display: block;
-        }
-
-        /* TABLE */
-        .tbl {
-            width: 100%;
-            border-collapse: collapse;
-        }
-
-        .tbl thead th {
-            font-size: .7rem;
-            text-transform: uppercase;
-            letter-spacing: .06em;
-            color: var(--muted);
-            font-weight: 900;
-            border-bottom: 1px solid rgba(148, 163, 184, .18);
-            padding: .55rem .5rem;
-            text-align: left;
-        }
-
-        .tbl tbody td {
-            border-top: 1px solid rgba(148, 163, 184, .10);
-            padding: .5rem .5rem;
-            vertical-align: middle;
-        }
-
-        .tbl .num {
-            text-align: right;
-        }
-
-        .chip {
-            display: inline-flex;
-            align-items: baseline;
-            gap: .25rem;
-            font-size: .72rem;
-            padding: .15rem .45rem;
-            border-radius: 999px;
-            background: rgba(148, 163, 184, .14);
-            border: 1px solid rgba(148, 163, 184, .18);
-        }
-
-        .badge-grade {
-            display: inline-block;
-            font-size: .68rem;
-            font-weight: 900;
-            padding: .12rem .5rem;
-            border-radius: 999px;
-        }
-
-        .g-excellent {
-            background: rgba(34, 197, 94, .15);
-            color: #166534;
-        }
-
-        .g-good {
-            background: rgba(59, 130, 246, .15);
-            color: #1e40af;
-        }
-
-        .g-cukup {
-            background: rgba(245, 158, 11, .16);
-            color: #92400e;
-        }
-
-        .g-risk {
-            background: rgba(239, 68, 68, .15);
-            color: #991b1b;
-        }
-
-        .prog {
-            height: 6px;
-            border-radius: 999px;
-            overflow: hidden;
-            background: rgba(148, 163, 184, .22);
-            min-width: 90px;
-        }
-
-        .prog>span {
-            display: block;
-            height: 100%;
-            border-radius: 999px;
-            background: linear-gradient(90deg, #2563eb, #38bdf8);
-        }
-
-        .stage-card {
-            border: 1px solid var(--b);
-            border-radius: 14px;
-            padding: .8rem;
-            background: var(--card);
-        }
-
-        .stage-card h3 {
-            font-size: .78rem;
-            font-weight: 900;
-            text-transform: uppercase;
-            letter-spacing: .05em;
-            color: var(--muted);
-            margin: 0 0 .2rem;
-        }
-
-        .stage-card .big {
-            font-size: 1.6rem;
-            font-weight: 900;
-        }
-
-        .bar-row {
-            display: flex;
-            align-items: center;
-            gap: .5rem;
-            margin-top: .35rem;
-            font-size: .74rem;
-        }
-
-        .bar-track {
-            flex: 1;
-            height: 8px;
-            border-radius: 999px;
-            background: rgba(148, 163, 184, .18);
-            overflow: hidden;
-        }
-
-        .bar-fill {
-            height: 100%;
-            border-radius: 999px;
-            background: linear-gradient(90deg, #16a34a, #22c55e);
-        }
-
-        .age-pill {
-            font-size: .68rem;
-            font-weight: 800;
-            padding: .1rem .45rem;
-            border-radius: 999px;
-            background: rgba(148, 163, 184, .15);
-            color: var(--muted);
-        }
-
-        .age-old {
-            background: rgba(239, 68, 68, .15);
-            color: #991b1b;
-        }
-
-        .filter-input {
-            padding: .45rem .6rem;
-            border: 1px solid var(--b);
-            border-radius: 10px;
-            background: var(--card);
-            color: inherit;
-            font-size: .85rem;
-        }
-
-        .empty {
-            text-align: center;
-            color: var(--muted);
-            font-size: .82rem;
-            padding: 1.4rem;
-        }
-
-        /* LAZY LOADING */
-        .tab-loading {
+        /* Lazy-load helpers (khusus dashboard produksi) */
+        .prod-tab-loading {
             display: flex;
             align-items: center;
             justify-content: center;
             gap: .6rem;
-            color: var(--muted);
+            color: var(--gf-muted);
             font-size: .85rem;
             padding: 2.4rem 1rem;
         }
 
-        .tab-spinner {
+        .prod-tab-spinner {
             width: 18px;
             height: 18px;
             border-radius: 50%;
@@ -317,120 +39,254 @@
         }
 
         @keyframes prodspin {
-            to {
-                transform: rotate(360deg);
-            }
+            to { transform: rotate(360deg); }
         }
 
-        .filter-busy {
-            opacity: .55;
-            pointer-events: none;
+        .prod-filter-busy { opacity: .55; pointer-events: none; }
+
+        /* Select filter pill (penjahit / kategori / sku) — selaras header marketplace */
+        .gf-header-select {
+            min-height: 38px;
+            max-width: 168px;
+            border-radius: 999px !important;
+            font-size: .78rem;
+            font-weight: 700;
+            padding-left: .85rem;
+            padding-right: 1.9rem;
+            border-color: rgba(15, 23, 42, .10);
+            box-shadow: none !important;
+            text-overflow: ellipsis;
         }
+
+        @media (max-width: 576px) {
+            .gf-header-select { max-width: 100%; width: 100%; }
+        }
+
+        .prod-empty {
+            text-align: center;
+            color: var(--gf-muted);
+            font-size: .85rem;
+            padding: 1.6rem;
+        }
+
+        /* Toolbar filter realtime (tab Siap Jahit) */
+        .sj-toolbar {
+            display: flex;
+            flex-wrap: wrap;
+            gap: .5rem;
+            align-items: center;
+            margin-bottom: .9rem;
+        }
+
+        .sj-toolbar .form-control,
+        .sj-toolbar .form-select {
+            min-height: 36px;
+            border-radius: 999px;
+            font-size: .8rem;
+            font-weight: 600;
+            border-color: rgba(15, 23, 42, .12);
+            box-shadow: none;
+        }
+
+        .sj-toolbar .sj-search {
+            flex: 1 1 220px;
+            min-width: 180px;
+            max-width: 330px;
+        }
+
+        .sj-toolbar .form-select {
+            width: auto;
+            padding-right: 1.9rem;
+        }
+
+        .sj-check {
+            display: inline-flex;
+            align-items: center;
+            gap: .4rem;
+            font-size: .78rem;
+            font-weight: 700;
+            color: #475569;
+            white-space: nowrap;
+            cursor: pointer;
+        }
+
+        .sj-count {
+            margin-left: auto;
+            font-size: .78rem;
+            font-weight: 800;
+            color: #475569;
+            white-space: nowrap;
+        }
+
+        @media (max-width: 576px) {
+            .sj-toolbar .sj-search { flex: 1 1 100%; max-width: none; }
+            .sj-count { margin-left: 0; }
+            .gf-hide-mobile { display: none !important; }
+            /* kolom tersisa harus pas di layar — hilangkan min-width & padatkan */
+            .gf-table-scroll-sticky .gf-clean-table { min-width: 0 !important; font-size: .76rem; }
+            .gf-table-scroll-sticky .gf-clean-table th,
+            .gf-table-scroll-sticky .gf-clean-table td { padding-left: .4rem; padding-right: .4rem; }
+            .gf-table-scroll.gf-table-scroll-sticky { overflow-x: hidden; }
+        }
+
+        /* Scroll vertikal + thead sticky (override .gf-table-scroll yg flat) */
+        .gf-table-scroll.gf-table-scroll-sticky {
+            max-height: calc(100vh - 360px);
+            min-height: 220px;
+            overflow: auto;
+            -webkit-overflow-scrolling: touch;
+        }
+        .gf-table-scroll-sticky .gf-sticky-table thead th {
+            position: sticky;
+            top: 0;
+            z-index: 5;
+            background: #f8fafc;
+            box-shadow: inset 0 -1px 0 #e6eaf0;
+        }
+
+        /* Badges & chips dipakai partial produksi */
+        .gf-badge {
+            display: inline-block;
+            font-size: .68rem;
+            font-weight: 800;
+            padding: .14rem .5rem;
+            border-radius: 999px;
+            white-space: nowrap;
+        }
+        .gf-badge-red { background: rgba(239, 68, 68, .14); color: #b91c1c; }
+        .gf-badge-amber { background: rgba(245, 158, 11, .16); color: #b45309; }
+        .gf-badge-blue { background: rgba(37, 99, 235, .14); color: #1d4ed8; }
+        .gf-badge-green { background: rgba(34, 197, 94, .16); color: #166534; }
+        .gf-badge-muted { background: rgba(148, 163, 184, .16); color: #64748b; }
+
+        .gf-chip {
+            display: inline-flex;
+            align-items: baseline;
+            gap: .25rem;
+            font-size: .74rem;
+            padding: .12rem .45rem;
+            border-radius: 999px;
+            background: rgba(148, 163, 184, .12);
+            border: 1px solid rgba(148, 163, 184, .2);
+        }
+
+        .gf-bar-track {
+            height: 8px;
+            border-radius: 999px;
+            background: rgba(148, 163, 184, .2);
+            overflow: hidden;
+            min-width: 90px;
+        }
+        .gf-bar-fill {
+            height: 100%;
+            border-radius: 999px;
+            background: linear-gradient(90deg, #16a34a, #22c55e);
+        }
+
+        .gf-funnel {
+            display: grid;
+            grid-template-columns: repeat(auto-fit, minmax(150px, 1fr));
+            gap: .7rem;
+        }
+        .gf-funnel-step {
+            border: 1px solid var(--gf-border);
+            border-left: 3px solid #94a3b8;
+            border-radius: 12px;
+            padding: .7rem .8rem;
+            background: #fff;
+        }
+        .gf-funnel-step.accent-blue { border-left-color: #2563eb; }
+        .gf-funnel-step.accent-green { border-left-color: #16a34a; }
+        .gf-funnel-label {
+            font-size: .7rem; color: var(--gf-muted); font-weight: 800;
+            text-transform: uppercase; letter-spacing: .03em;
+        }
+        .gf-funnel-val { font-size: 1.3rem; font-weight: 900; margin: .1rem 0 .4rem; }
+
+        .gf-num { text-align: right; font-variant-numeric: tabular-nums; }
+        tr.gf-row-warn > td { background: rgba(245, 158, 11, .06); }
     </style>
 @endpush
 
 @section('content')
-    <div class="page-wrap mono">
+    <x-gf.page
+        eyebrow="Produksi"
+        title="Dashboard Produksi"
+        description="Pantau alur produksi harian: stok siap jahit, WIP penjahit, setoran &amp; QC, performa, dan prioritas.">
 
-        {{-- HEADER + FILTER --}}
-        <div class="card-main p-3 mb-3">
-            <div class="d-flex justify-content-between align-items-start gap-2 flex-wrap mb-2">
-                <div>
-                    <h1 class="h5 mb-1 fw-bold" style="font-family:inherit;">Dashboard Produksi</h1>
-                    <p class="text-muted small mb-0">
-                        Periode <span id="periodLabel">{{ $periodLabel }}</span>
-                    </p>
-                </div>
-            </div>
+        <x-slot:actions>
+            <div class="gf-dashboard-header-actions">
+                <form id="filterForm" method="GET" action="{{ route('production.dashboard') }}"
+                    class="gf-dashboard-header-filter" data-dashboard-filter>
+                    <input type="hidden" name="date_from" value="{{ $filters['date_from'] }}" data-date-from>
+                    <input type="hidden" name="date_to" value="{{ $filters['date_to'] }}" data-date-to>
 
-            <form id="filterForm" method="GET" action="{{ route('production.dashboard') }}"
-                class="d-flex flex-wrap gap-2 align-items-end">
-                <div>
-                    <label class="d-block small text-muted mb-1">Dari</label>
-                    <input type="date" name="date_from" value="{{ $filters['date_from'] }}" class="filter-input">
-                </div>
-                <div>
-                    <label class="d-block small text-muted mb-1">Sampai</label>
-                    <input type="date" name="date_to" value="{{ $filters['date_to'] }}" class="filter-input">
-                </div>
-                <div>
-                    <label class="d-block small text-muted mb-1">Operator</label>
-                    <select name="operator_id" class="filter-input">
-                        <option value="">Semua</option>
+                    <select class="form-select gf-header-period-select" data-period aria-label="Periode">
+                        <option value="custom">Custom</option>
+                        <option value="7">7 Hari</option>
+                        <option value="30">30 Hari</option>
+                        <option value="month">Bulan Ini</option>
+                    </select>
+
+                    <input type="text" class="form-control gf-header-date-input" autocomplete="off"
+                        data-date-range aria-label="Rentang tanggal"
+                        value="{{ $filters['date_from'] }} — {{ $filters['date_to'] }}">
+
+                    <select name="operator_id" class="form-select gf-header-select" data-filter aria-label="Penjahit">
+                        <option value="">Semua Penjahit</option>
                         @foreach ($operatorOptions as $op)
                             <option value="{{ $op->id }}" @selected($filters['operator_id'] == $op->id)>
                                 {{ $op->code }} — {{ $op->name }}</option>
                         @endforeach
                     </select>
-                </div>
-                <div>
-                    <label class="d-block small text-muted mb-1">Produk (Kategori)</label>
-                    <select name="category_id" class="filter-input">
-                        <option value="">Semua</option>
+
+                    <select name="category_id" class="form-select gf-header-select" data-filter aria-label="Kategori">
+                        <option value="">Semua Kategori</option>
                         @foreach ($categoryOptions as $cat)
                             <option value="{{ $cat->id }}" @selected($filters['category_id'] == $cat->id)>
                                 {{ $cat->name }}</option>
                         @endforeach
                     </select>
-                </div>
-                <div>
-                    <label class="d-block small text-muted mb-1">Varian (SKU)</label>
-                    <select name="item_id" class="filter-input">
-                        <option value="">Semua</option>
+
+                    <select name="item_id" class="form-select gf-header-select" data-filter aria-label="Varian (SKU)">
+                        <option value="">Semua SKU</option>
                         @foreach ($itemOptions as $it)
                             <option value="{{ $it->id }}" @selected($filters['item_id'] == $it->id)>
                                 {{ $it->code }} — {{ $it->name }}</option>
                         @endforeach
                     </select>
-                </div>
-                <div class="d-flex gap-1">
-                    <button type="submit" class="btn btn-primary btn-pill px-3">Terapkan</button>
-                    <button type="button" id="filterReset" class="btn btn-outline-secondary btn-pill px-3"
-                        data-from="{{ $defaults['date_from'] }}" data-to="{{ $defaults['date_to'] }}">Reset</button>
-                </div>
-            </form>
 
-            <div class="d-flex gap-1 mt-2 flex-wrap">
-                @php
-                    $presets = [
-                        '7 Hari' => [now()->subDays(6)->toDateString(), now()->toDateString()],
-                        '30 Hari' => [now()->subDays(29)->toDateString(), now()->toDateString()],
-                        'Bulan Ini' => [now()->startOfMonth()->toDateString(), now()->toDateString()],
-                    ];
-                @endphp
-                @foreach ($presets as $label => $range)
-                    <button type="button" class="btn btn-sm btn-outline-secondary btn-pill" data-preset
-                        data-from="{{ $range[0] }}" data-to="{{ $range[1] }}">{{ $label }}</button>
-                @endforeach
+                    <a href="{{ route('production.dashboard') }}" class="btn btn-light border gf-header-icon-btn"
+                        data-filter-reset data-from="{{ $defaults['date_from'] }}" data-to="{{ $defaults['date_to'] }}"
+                        title="Reset filter">Reset</a>
+                </form>
             </div>
-        </div>
+        </x-slot:actions>
 
-        {{-- OVERVIEW: KPI operasional + ringkasan SKU (selalu tampil, refresh saat filter) --}}
-        <div id="prodOverview">
-            @include('production.dashboard.partials._overview')
-        </div>
+        <div class="gf-marketplace-dashboard gf-marketplace-clean-ui" data-dashboard-root>
+            {{-- TABS --}}
+            <div class="gf-marketplace-sticky-head">
+                <div class="gf-marketplace-tabs" role="tablist" id="prodTabs">
+                    @foreach ($tabs as $key => $label)
+                        <button type="button" class="gf-marketplace-tab {{ $key === $initialTab ? 'is-active' : '' }}"
+                            data-tab-target="{{ $key }}">{{ $label }}</button>
+                    @endforeach
+                </div>
+            </div>
 
-        {{-- TABS --}}
-        <div class="tabs mb-3" id="prodTabs">
+            {{-- PANES (lazy) --}}
             @foreach ($tabs as $key => $label)
-                <button type="button" class="tab-btn {{ $key === $initialTab ? 'active' : '' }}"
-                    data-tab="{{ $key }}">{{ $label }}</button>
+                <section class="gf-marketplace-tab-panel" data-tab-panel="{{ $key }}"
+                    data-loaded="{{ $key === $initialTab ? '1' : '0' }}" @if($key !== $initialTab) hidden @endif>
+                    @if ($key === $initialTab)
+                        @include($initialPartial)
+                    @else
+                        <div class="prod-tab-loading"><span class="prod-tab-spinner"></span> Memuat…</div>
+                    @endif
+                </section>
             @endforeach
         </div>
-
-        {{-- PANES (lazy) --}}
-        @foreach ($tabs as $key => $label)
-            <div class="tab-pane {{ $key === $initialTab ? 'active' : '' }}" data-pane="{{ $key }}"
-                data-loaded="{{ $key === $initialTab ? '1' : '0' }}">
-                @if ($key === $initialTab)
-                    @include($initialPartial)
-                @else
-                    <div class="tab-loading"><span class="tab-spinner"></span> Memuat…</div>
-                @endif
-            </div>
-        @endforeach
-
-    </div>
+    </x-gf.page>
 @endsection
 
 @push('scripts')
@@ -438,22 +294,21 @@
         document.addEventListener('DOMContentLoaded', () => {
             const DATA_URL = @json(route('production.dashboard.data'));
             const SERVER_INITIAL = @json($initialTab);
-
-            const tabsEl = document.getElementById('prodTabs');
-            const tabBtns = Array.from(tabsEl.querySelectorAll('.tab-btn'));
-            const panes = Array.from(document.querySelectorAll('.tab-pane'));
-            const form = document.getElementById('filterForm');
-            const periodLabel = document.getElementById('periodLabel');
-            const overviewEl = document.getElementById('prodOverview');
             const KEY = 'prodDashTab';
 
-            const paneByName = (name) => panes.find(p => p.dataset.pane === name);
-            const activeName = () => (tabBtns.find(b => b.classList.contains('active'))?.dataset.tab) || 'ringkasan';
+            const tabBtns = Array.from(document.querySelectorAll('#prodTabs .gf-marketplace-tab'));
+            const panes = Array.from(document.querySelectorAll('[data-tab-panel]'));
+            const form = document.getElementById('filterForm');
+            const periodLabel = document.getElementById('periodLabel');
 
-            const loadingHTML = '<div class="tab-loading"><span class="tab-spinner"></span> Memuat…</div>';
+            const paneByName = (name) => panes.find(p => p.dataset.tabPanel === name);
+            const activeName = () =>
+                (tabBtns.find(b => b.classList.contains('is-active'))?.dataset.tabTarget) || SERVER_INITIAL;
+
+            const loadingHTML = '<div class="prod-tab-loading"><span class="prod-tab-spinner"></span> Memuat…</div>';
             const errorHTML = (name) =>
-                '<div class="empty">Gagal memuat data. ' +
-                '<button type="button" class="btn btn-sm btn-outline-secondary btn-pill" data-retry="' + name + '">Coba lagi</button></div>';
+                '<div class="prod-empty">Gagal memuat data. ' +
+                '<button type="button" class="btn btn-sm btn-light border rounded-pill" data-retry="' + name + '">Coba lagi</button></div>';
 
             function currentFilters() {
                 const fd = new FormData(form);
@@ -470,13 +325,11 @@
             }
 
             function activate(name) {
-                tabBtns.forEach(b => b.classList.toggle('active', b.dataset.tab === name));
-                panes.forEach(p => p.classList.toggle('active', p.dataset.pane === name));
+                tabBtns.forEach(b => b.classList.toggle('is-active', b.dataset.tabTarget === name));
+                panes.forEach(p => p.hidden = (p.dataset.tabPanel !== name));
             }
 
-            async function loadTab(name, {
-                force = false
-            } = {}) {
+            async function loadTab(name, { force = false } = {}) {
                 const pane = paneByName(name);
                 if (!pane) return;
                 if (pane.dataset.loaded === '1' && !force) return;
@@ -485,92 +338,256 @@
                 pane.innerHTML = loadingHTML;
                 try {
                     const res = await fetch(buildUrl(name), {
-                        headers: {
-                            'X-Requested-With': 'XMLHttpRequest',
-                            'Accept': 'application/json'
-                        }
+                        headers: { 'X-Requested-With': 'XMLHttpRequest', 'Accept': 'application/json' }
                     });
                     if (!res.ok) throw new Error('HTTP ' + res.status);
                     const json = await res.json();
                     pane.innerHTML = json.html;
                     pane.dataset.loaded = '1';
                     if (json.meta?.period_label && periodLabel) periodLabel.textContent = json.meta.period_label;
-                    if (json.overview_html && overviewEl) overviewEl.innerHTML = json.overview_html;
                 } catch (e) {
                     pane.innerHTML = errorHTML(name);
                 }
             }
 
-            // sync URL biar shareable / refresh-aman
             function syncUrl() {
                 const params = new URLSearchParams(currentFilters());
                 params.set('tab', activeName());
                 history.replaceState(null, '', location.pathname + '?' + params.toString());
             }
 
-            // apply filter → invalidate semua tab, reload tab aktif
             async function applyFilters() {
                 panes.forEach(p => {
-                    if (p.dataset.pane !== activeName()) {
+                    if (p.dataset.tabPanel !== activeName()) {
                         p.dataset.loaded = '0';
                         p.innerHTML = loadingHTML;
                     }
                 });
-                form.classList.add('filter-busy');
+                form.classList.add('prod-filter-busy');
                 syncUrl();
-                await loadTab(activeName(), {
-                    force: true
-                });
-                form.classList.remove('filter-busy');
+                await loadTab(activeName(), { force: true });
+                form.classList.remove('prod-filter-busy');
             }
 
-            // tab click
             tabBtns.forEach(b => b.addEventListener('click', () => {
-                const name = b.dataset.tab;
+                const name = b.dataset.tabTarget;
                 activate(name);
-                try {
-                    localStorage.setItem(KEY, name);
-                } catch (e) {}
+                try { localStorage.setItem(KEY, name); } catch (e) {}
                 syncUrl();
                 loadTab(name);
             }));
 
-            // retry (delegasi)
             document.addEventListener('click', (e) => {
                 const r = e.target.closest('[data-retry]');
-                if (r) loadTab(r.dataset.retry, {
-                    force: true
-                });
+                if (r) loadTab(r.dataset.retry, { force: true });
             });
 
-            // submit filter
+            // Submit (mis. Enter di input tanggal) → realtime apply tanpa reload
             form.addEventListener('submit', (e) => {
                 e.preventDefault();
                 applyFilters();
             });
 
-            // presets
-            document.querySelectorAll('[data-preset]').forEach(btn => {
-                btn.addEventListener('click', () => {
-                    form.querySelector('[name=date_from]').value = btn.dataset.from;
-                    form.querySelector('[name=date_to]').value = btn.dataset.to;
-                    applyFilters();
-                });
-            });
+            // ---- Filter realtime: flatpickr range + periode + select ----
+            const fromEl = form.querySelector('[data-date-from]');
+            const toEl = form.querySelector('[data-date-to]');
+            const rangeEl = form.querySelector('[data-date-range]');
+            const periodSel = form.querySelector('[data-period]');
 
-            // reset
-            const resetBtn = document.getElementById('filterReset');
-            if (resetBtn) resetBtn.addEventListener('click', () => {
-                form.querySelector('[name=date_from]').value = resetBtn.dataset.from;
-                form.querySelector('[name=date_to]').value = resetBtn.dataset.to;
-                form.querySelector('[name=operator_id]').value = '';
-                form.querySelector('[name=item_id]').value = '';
-                const catSel = form.querySelector('[name=category_id]');
-                if (catSel) catSel.value = '';
+            let fp = null;
+            const ymd = (d) => (fp && d instanceof Date) ? fp.formatDate(d, 'Y-m-d') : d;
+
+            if (rangeEl && window.GFID && window.GFID.initDateRange) {
+                fp = window.GFID.initDateRange(rangeEl, {
+                    defaultDate: [fromEl.value, toEl.value],
+                    onClose: (sel) => {
+                        if (sel.length === 2) {
+                            fromEl.value = ymd(sel[0]);
+                            toEl.value = ymd(sel[1]);
+                            if (periodSel) periodSel.value = 'custom';
+                            applyFilters();
+                        }
+                    }
+                });
+            }
+
+            function detectPeriod() {
+                if (!periodSel) return;
+                const today = new Date();
+                const minus = (n) => { const x = new Date(); x.setDate(x.getDate() - n); return x; };
+                const tStr = ymd(today);
+                let val = 'custom';
+                if (toEl.value === tStr && fromEl.value === ymd(minus(6))) val = '7';
+                else if (toEl.value === tStr && fromEl.value === ymd(minus(29))) val = '30';
+                else if (toEl.value === tStr && fromEl.value === ymd(new Date(today.getFullYear(), today.getMonth(), 1))) val = 'month';
+                periodSel.value = val;
+            }
+            detectPeriod();
+
+            if (periodSel) periodSel.addEventListener('change', () => {
+                const v = periodSel.value;
+                if (v === 'custom') return;
+                const today = new Date();
+                let from;
+                if (v === '7') { from = new Date(); from.setDate(from.getDate() - 6); }
+                else if (v === '30') { from = new Date(); from.setDate(from.getDate() - 29); }
+                else { from = new Date(today.getFullYear(), today.getMonth(), 1); }
+                fromEl.value = ymd(from);
+                toEl.value = ymd(today);
+                if (fp) fp.setDate([from, today], false);
                 applyFilters();
             });
 
-            // restore tab tersimpan (kalau beda dari yang dirender server)
+            form.querySelectorAll('select[data-filter]').forEach(sel =>
+                sel.addEventListener('change', applyFilters));
+
+            const resetLink = form.querySelector('[data-filter-reset]');
+            if (resetLink) resetLink.addEventListener('click', (e) => {
+                e.preventDefault();
+                fromEl.value = resetLink.dataset.from;
+                toEl.value = resetLink.dataset.to;
+                if (fp) fp.setDate([resetLink.dataset.from, resetLink.dataset.to], false);
+                form.querySelectorAll('select[data-filter]').forEach(s => s.value = '');
+                if (periodSel) periodSel.value = 'custom';
+                detectPeriod();
+                applyFilters();
+            });
+
+            // ---- Filter realtime tab "Siap Jahit" (client-side, instan) ----
+            const idFmt = (n) => (n || 0).toLocaleString('id-ID');
+
+            function applySjFilters(root) {
+                if (!root) return;
+                const table = root.querySelector('[data-sj-table]');
+                if (!table) return;
+                const tbody = table.querySelector('tbody');
+                const q = (root.querySelector('[data-sj-search]')?.value || '').trim().toLowerCase();
+                const grade = root.querySelector('[data-sj-grade]')?.value || '';
+                const sort = root.querySelector('[data-sj-sort]')?.value || 'remaining-desc';
+
+                const rows = Array.from(tbody.querySelectorAll('[data-sj-row]'));
+                let shown = 0, sumRemaining = 0;
+                rows.forEach(r => {
+                    let ok = true;
+                    if (q && !(r.dataset.search || '').includes(q)) ok = false;
+                    if (grade && r.dataset.grade !== grade) ok = false;
+                    r.hidden = !ok;
+                    if (ok) { shown++; sumRemaining += parseFloat(r.dataset.remaining) || 0; }
+                });
+
+                const cmp = {
+                    'remaining-desc': (a, b) => (+b.dataset.remaining) - (+a.dataset.remaining),
+                    'hpp-desc': (a, b) => (+b.dataset.hpp) - (+a.dataset.hpp),
+                    'stok-asc': (a, b) => (+a.dataset.stok) - (+b.dataset.stok),
+                    'bundles-desc': (a, b) => (+b.dataset.bundles) - (+a.dataset.bundles),
+                    'sku-asc': (a, b) => (a.dataset.sku || '').localeCompare(b.dataset.sku || ''),
+                }[sort];
+                if (cmp) rows.sort(cmp).forEach(r => tbody.appendChild(r));
+
+                const cnt = root.querySelector('[data-sj-count]');
+                if (cnt) cnt.textContent = idFmt(shown) + ' SKU · ' + idFmt(sumRemaining) + ' pcs';
+                const empty = root.querySelector('[data-sj-empty]');
+                if (empty) empty.hidden = (shown !== 0) || rows.length === 0;
+            }
+
+            const SJ_SEL = '[data-sj-search],[data-sj-grade],[data-sj-sort]';
+            document.addEventListener('input', (e) => {
+                if (!e.target.matches('[data-sj-search]')) return;
+                applySjFilters(e.target.closest('[data-tab-panel]'));
+            });
+            document.addEventListener('change', (e) => {
+                if (!e.target.matches(SJ_SEL)) return;
+                applySjFilters(e.target.closest('[data-tab-panel]'));
+            });
+
+            // ---- Filter realtime tab "Sedang Jahit" (client-side, instan) ----
+            function applySdFilters(root) {
+                if (!root) return;
+                const table = root.querySelector('[data-sd-table]');
+                if (!table) return;
+                const tbody = table.querySelector('tbody');
+                const q = (root.querySelector('[data-sd-search]')?.value || '').trim().toLowerCase();
+                const op = root.querySelector('[data-sd-operator]')?.value || '';
+                const sort = root.querySelector('[data-sd-sort]')?.value || 'out-desc';
+
+                const rows = Array.from(tbody.querySelectorAll('[data-sd-row]'));
+                let shown = 0, sumOut = 0;
+                rows.forEach(r => {
+                    let ok = true;
+                    if (q && !(r.dataset.search || '').includes(q)) ok = false;
+                    if (op && r.dataset.operator !== op) ok = false;
+                    r.hidden = !ok;
+                    if (ok) { shown++; sumOut += parseFloat(r.dataset.outstanding) || 0; }
+                });
+
+                const cmp = {
+                    'out-desc': (a, b) => (+b.dataset.outstanding) - (+a.dataset.outstanding),
+                    'hpp-desc': (a, b) => (+b.dataset.hpp) - (+a.dataset.hpp),
+                    'age-desc': (a, b) => (+b.dataset.age) - (+a.dataset.age),
+                    'picked-desc': (a, b) => (+b.dataset.picked) - (+a.dataset.picked),
+                }[sort];
+                if (cmp) rows.sort(cmp).forEach(r => tbody.appendChild(r));
+
+                const cnt = root.querySelector('[data-sd-count]');
+                if (cnt) cnt.textContent = idFmt(shown) + ' baris · ' + idFmt(sumOut) + ' pcs';
+                const empty = root.querySelector('[data-sd-empty]');
+                if (empty) empty.hidden = (shown !== 0) || rows.length === 0;
+            }
+
+            const SD_SEL = '[data-sd-search],[data-sd-operator],[data-sd-sort]';
+            document.addEventListener('input', (e) => {
+                if (!e.target.matches('[data-sd-search]')) return;
+                applySdFilters(e.target.closest('[data-tab-panel]'));
+            });
+            document.addEventListener('change', (e) => {
+                if (!e.target.matches(SD_SEL)) return;
+                applySdFilters(e.target.closest('[data-tab-panel]'));
+            });
+
+            // ---- Filter realtime tab "Setor & QC" (client-side, instan) ----
+            function applyQcFilters(root) {
+                if (!root) return;
+                const table = root.querySelector('[data-qc-table]');
+                if (!table) return;
+                const tbody = table.querySelector('tbody');
+                const q = (root.querySelector('[data-qc-search]')?.value || '').trim().toLowerCase();
+                const op = root.querySelector('[data-qc-operator]')?.value || '';
+                const sort = root.querySelector('[data-qc-sort]')?.value || 'date-desc';
+
+                const rows = Array.from(tbody.querySelectorAll('[data-qc-row]'));
+                let shown = 0, sumOk = 0;
+                rows.forEach(r => {
+                    let ok = true;
+                    if (q && !(r.dataset.search || '').includes(q)) ok = false;
+                    if (op && r.dataset.operator !== op) ok = false;
+                    r.hidden = !ok;
+                    if (ok) { shown++; sumOk += parseFloat(r.dataset.ok) || 0; }
+                });
+
+                const cmp = {
+                    'date-desc': (a, b) => (a.dataset.date < b.dataset.date ? 1 : -1),
+                    'ok-desc': (a, b) => (+b.dataset.ok) - (+a.dataset.ok),
+                    'hpp-desc': (a, b) => (+b.dataset.hpp) - (+a.dataset.hpp),
+                    'yield-asc': (a, b) => (+a.dataset.yield) - (+b.dataset.yield),
+                }[sort];
+                if (cmp) rows.sort(cmp).forEach(r => tbody.appendChild(r));
+
+                const cnt = root.querySelector('[data-qc-count]');
+                if (cnt) cnt.textContent = idFmt(shown) + ' setoran · ' + idFmt(sumOk) + ' pcs OK';
+                const empty = root.querySelector('[data-qc-empty]');
+                if (empty) empty.hidden = (shown !== 0) || rows.length === 0;
+            }
+
+            const QC_SEL = '[data-qc-search],[data-qc-operator],[data-qc-sort]';
+            document.addEventListener('input', (e) => {
+                if (!e.target.matches('[data-qc-search]')) return;
+                applyQcFilters(e.target.closest('[data-tab-panel]'));
+            });
+            document.addEventListener('change', (e) => {
+                if (!e.target.matches(QC_SEL)) return;
+                applyQcFilters(e.target.closest('[data-tab-panel]'));
+            });
+
             try {
                 const saved = localStorage.getItem(KEY);
                 if (saved && saved !== SERVER_INITIAL && paneByName(saved)) {
