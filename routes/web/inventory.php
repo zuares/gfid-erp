@@ -3,6 +3,7 @@
 use App\Http\Controllers\Api\StockApiController;
 use App\Http\Controllers\Inventory\ExternalTransferController;
 use App\Http\Controllers\Inventory\InventoryAdjustmentController;
+use App\Http\Controllers\Inventory\InventoryIntelligenceController;
 use App\Http\Controllers\Inventory\InventoryStockController;
 use App\Http\Controllers\Inventory\RtsDirectReceiveController;
 use App\Http\Controllers\Inventory\RtsStockRequestController;
@@ -33,6 +34,12 @@ use Illuminate\Support\Facades\Route;
 Route::middleware(['web', 'auth', 'role:owner,admin,operating'])->group(function () {
 
     Route::prefix('inventory')->name('inventory.')->group(function () {
+
+        // ================== INVENTORY INTELLIGENCE (dashboard forecast) ==================
+        Route::get('intelligence', [InventoryIntelligenceController::class, 'index'])
+            ->name('intelligence');
+        Route::get('intelligence/data', [InventoryIntelligenceController::class, 'data'])
+            ->name('intelligence.data');
 
         // ================== STOCK CARD ==================
         Route::get('stock-card', [StockCardController::class, 'index'])->name('stock_card.index');

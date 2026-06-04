@@ -27,12 +27,11 @@ class ProductionPriorityService
 
     public function priorityList(array $f, int $limit = 100): Collection
     {
-        $stock = $this->stockPivot($f);       // item_id => (ready, wip)
-        $sales = $this->salesWindows($f);     // item_id => (s7,s14,s30)
-        $deadlines = $this->nearestDeadline($f); // item_id => date
-        $aging = $this->maxWipAge($f);        // item_id => int days
+        $snapshot = $this->inventorySnapshot($f); // item_id => {ready_stock,wip_stock,s7,s14,s30,ads,cover_days,pipe_cover_days}
+        $deadlines = $this->nearestDeadline($f);  // item_id => date
+        $aging = $this->maxWipAge($f);            // item_id => int days
 
-        $ids = $stock->keys()->merge($sales->keys())->unique()->values();
+        $ids = $snapshot->keys();
         if ($ids->isEmpty()) {
             return collect();
         }
@@ -45,29 +44,22 @@ class ProductionPriorityService
 
         $today = Carbon::today();
 
-        // laju jual per item (prefer 30h, fallback 7h)
-        $adsOf = function ($s) {
-            if (!$s) {
-                return 0.0;
-            }
-            return $s->s30 > 0 ? $s->s30 / 30 : ($s->s7 > 0 ? $s->s7 / 7 : 0.0);
-        };
-        $maxAds = $items->keys()->reduce(fn($m, $id) => max($m, $adsOf($sales->get($id))), 0.0);
+        // laju jual tertinggi di antara finished_good (untuk skor demand relatif)
+        $maxAds = $items->keys()->reduce(fn($m, $id) => max($m, (float) ($snapshot->get($id)?->ads ?? 0.0)), 0.0);
 
-        $rows = $items->map(function ($item) use ($stock, $sales, $deadlines, $aging, $adsOf, $maxAds, $today) {
+        $rows = $items->map(function ($item) use ($snapshot, $deadlines, $aging, $maxAds, $today) {
             $id = $item->id;
-            $st = $stock->get($id);
-            $sa = $sales->get($id);
+            $snap = $snapshot->get($id);
 
-            $ready = (float) ($st->ready ?? 0);
-            $wip = (float) ($st->wip ?? 0);
-            $s7 = (float) ($sa->s7 ?? 0);
-            $s14 = (float) ($sa->s14 ?? 0);
-            $s30 = (float) ($sa->s30 ?? 0);
-            $ads = $adsOf($sa);
+            $ready = (float) ($snap->ready_stock ?? 0);
+            $wip = (float) ($snap->wip_stock ?? 0);
+            $s7 = (float) ($snap->s7 ?? 0);
+            $s14 = (float) ($snap->s14 ?? 0);
+            $s30 = (float) ($snap->s30 ?? 0);
+            $ads = (float) ($snap->ads ?? 0);
 
-            $cover = $ads > 0 ? round($ready / $ads, 1) : null;
-            $pipeCover = $ads > 0 ? round(($ready + $wip) / $ads, 1) : null;
+            $cover = $snap->cover_days ?? null;
+            $pipeCover = $snap->pipe_cover_days ?? null;
 
             $deadline = $deadlines->get($id);
             // signed: positif = masih ada waktu, <=0 = overdue
@@ -124,6 +116,47 @@ class ProductionPriorityService
             ->values();
 
         return $rows;
+    }
+
+    /**
+     * Snapshot stok + laju jual + cover per item (read-only, tanpa skor/deadline/aging).
+     * Sumber kebenaran bersama untuk priorityList() dan dashboard inventory.
+     * Filter: item_id, category_id. Window penjualan tetap 7/14/30 hari.
+     *
+     * @return Collection keyBy item_id => {item_id, ready_stock, wip_stock, s7, s14, s30, ads, cover_days, pipe_cover_days}
+     */
+    public function inventorySnapshot(array $filters): Collection
+    {
+        $stock = $this->stockPivot($filters);   // item_id => (ready, wip)
+        $sales = $this->salesWindows($filters); // item_id => (s7,s14,s30)
+
+        $ids = $stock->keys()->merge($sales->keys())->unique()->values();
+
+        return $ids->mapWithKeys(function ($id) use ($stock, $sales) {
+            $st = $stock->get($id);
+            $sa = $sales->get($id);
+
+            $ready = (float) ($st->ready ?? 0);
+            $wip = (float) ($st->wip ?? 0);
+            $s7 = (float) ($sa->s7 ?? 0);
+            $s14 = (float) ($sa->s14 ?? 0);
+            $s30 = (float) ($sa->s30 ?? 0);
+
+            // laju jual per item (prefer 30h, fallback 7h) — raw, tak dibulatkan
+            $ads = $s30 > 0 ? $s30 / 30 : ($s7 > 0 ? $s7 / 7 : 0.0);
+
+            return [$id => (object) [
+                'item_id' => $id,
+                'ready_stock' => $ready,
+                'wip_stock' => $wip,
+                's7' => $s7,
+                's14' => $s14,
+                's30' => $s30,
+                'ads' => $ads,
+                'cover_days' => $ads > 0 ? round($ready / $ads, 1) : null,
+                'pipe_cover_days' => $ads > 0 ? round(($ready + $wip) / $ads, 1) : null,
+            ]];
+        });
     }
 
     /** Alasan utama prioritas (faktor dominan, untuk ditampilkan). */
