@@ -144,6 +144,7 @@
     $hasOpeningBalancesBatchIndex = $router->has('accounting.opening-balances-batch.index');
 
     // Payroll (owner)
+    $hasPayrollDashboard = $router->has('payroll.dashboard');
     $hasPieceworkIndex = $router->has('payroll.piecework.index');
     $hasPieceRatesIndex = $router->has('payroll.piece_rates.index');
     $hasPayrollReportsOperators = $router->has('payroll.reports.operators');
@@ -211,6 +212,7 @@
         $open('accounting.accounts.*');
 
     $openPayroll =
+        $open('payroll.dashboard*') ||
         $open('payroll.piecework.*') ||
         $open('payroll.piece_rates.*') ||
         $open('payroll.reports.*');
@@ -1420,7 +1422,7 @@
             @endif
 
             {{-- PAYROLL --}}
-            @if ($canShow($hasPieceworkIndex, $hasPieceRatesIndex, $hasPayrollReportsOperators))
+            @if ($canShow($hasPayrollDashboard, $hasPieceworkIndex, $hasPieceRatesIndex, $hasPayrollReportsOperators))
                 <x-sidebar.label text="Payroll" />
                 <li class="mb-1">
                     <button class="sidebar-link sidebar-toggle {{ $openPayroll ? 'is-open' : '' }}" type="button"
@@ -1432,6 +1434,13 @@
                     </button>
 
                     <div class="collapse {{ $openPayroll ? 'show' : '' }}" id="navPayroll">
+                        @if ($hasPayrollDashboard)
+                            <x-sidebar.sub-link href="{{ route('payroll.dashboard') }}" icon="📈"
+                                :active="request()->routeIs('payroll.dashboard*')">
+                                Dashboard
+                            </x-sidebar.sub-link>
+                        @endif
+
                         @if ($hasPieceworkIndex)
                             <x-sidebar.sub-link href="{{ route('payroll.piecework.index', ['module' => 'cutting']) }}" icon="✂️"
                                 :active="$pieceworkCuttingActive">

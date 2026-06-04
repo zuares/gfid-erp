@@ -31,7 +31,7 @@ use Illuminate\View\View;
 class ProductionDashboardController extends Controller
 {
     /** Daftar tab valid + builder-nya. */
-    private const TABS = ['ringkasan', 'siap-jahit', 'sedang-jahit', 'setor-qc', 'reject', 'cutting', 'penjahit', 'prioritas'];
+    private const TABS = ['ringkasan', 'siap-jahit', 'sedang-jahit', 'setor-qc', 'reject', 'prioritas'];
 
     public function __construct(
         private ProductionFlowService $flow,
@@ -267,8 +267,6 @@ class ProductionDashboardController extends Controller
             'sedang-jahit' => $this->buildSedangJahit($f),
             'setor-qc' => $this->buildSetorQc($f),
             'reject' => $this->buildReject($f),
-            'cutting' => ['rows' => $this->buildCuttingActivity($f)],
-            'penjahit' => ['rows' => $this->buildPenjahitActivity($f)],
             'prioritas' => ['priority' => $this->priority->priorityList($f, 100)],
             default => [
                 'summary' => $this->buildSummary($f),
@@ -434,7 +432,9 @@ class ProductionDashboardController extends Controller
             ->leftJoin('sewing_pickup_lines as pl', 'pl.sewing_pickup_id', '=', 'p.id')
             ->leftJoin('items as it', 'it.id', '=', 'pl.finished_item_id')
             ->whereNull('p.voided_at')
-            ->whereIn('p.status', ['completed', 'partial'])
+            // Sertakan pickup 'draft' (baru ambil, belum disetor) — selaras tab Penjahit & KPI.
+            // Hanya kecualikan yang benar-benar void.
+            ->where('p.status', '!=', 'void')
             ->whereRaw('DATE(p.date) BETWEEN ? AND ?', [$from, $to]);
         if ($f['operator_id']) {
             $pick->where('p.operator_id', $f['operator_id']);

@@ -333,6 +333,7 @@
     $hasOpeningBalancesIndex = $router->has('accounting.opening-balances.index');
 
     // Payroll
+    $hasPayrollDashboard = $router->has('payroll.dashboard');
     $hasPieceworkIndex = $router->has('payroll.piecework.index');
     $hasPieceRatesIndex = $router->has('payroll.piece_rates.index');
     $hasPayrollReportsOperators = $router->has('payroll.reports.operators');
@@ -385,6 +386,7 @@
         request()->routeIs('accounting.accounts.*');
 
     $payrollOpen =
+        request()->routeIs('payroll.dashboard*') ||
         request()->routeIs('payroll.piecework.*') ||
         request()->routeIs('payroll.piece_rates.*') ||
         request()->routeIs('payroll.reports.*');
@@ -1225,6 +1227,13 @@
                         </button>
 
                         <div class="collapse {{ $payrollOpen ? 'show' : '' }}" id="navPayrollMobile">
+                            @if ($hasPayrollDashboard)
+                                <a href="{{ route('payroll.dashboard') }}"
+                                   class="mobile-sidebar-link mobile-sidebar-link-sub {{ request()->routeIs('payroll.dashboard*') ? 'active' : '' }}">
+                                    <span class="icon">📈</span><span>Dashboard</span>
+                                </a>
+                            @endif
+
                             @if ($hasPieceworkIndex)
                                 <a href="{{ route('payroll.piecework.index', ['module' => 'cutting']) }}"
                                    class="mobile-sidebar-link mobile-sidebar-link-sub {{ $pieceworkCuttingActive ? 'active' : '' }}">

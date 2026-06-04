@@ -118,7 +118,7 @@
                                 @if ($r->type === 'Setor')
                                     {{ $r->amount > 0 ? $rp($r->amount) : '–' }}
                                 @elseif ($r->rate > 0)
-                                    <span class="text-muted" title="Estimasi upah bila semua lolos QC (belum final)">~{{ $rp($r->rate * $r->qty) }}</span>
+                                    <span class="text-muted" title="Perkiraan upah bila semua lolos QC (belum final)">~{{ $rp($r->rate * $r->qty) }}</span>
                                 @else
                                     –
                                 @endif
@@ -128,7 +128,7 @@
                 </tbody>
                 <tfoot>
                     <tr class="gf-total-row" data-pj-foot>
-                        <td colspan="5" class="text-muted">Total Qty &amp; upah borongan (Setor real + estimasi Ambil)</td>
+                        <td colspan="5" class="text-muted">Total Qty &amp; upah borongan (Setor real + perkiraan Ambil)</td>
                         <td class="gf-num"><b data-pj-foot-qty>{{ $fmt($totalQty) }}</b></td>
                         <td class="gf-num gf-hide-mobile"></td>
                         <td class="gf-num gf-hide-mobile"></td>

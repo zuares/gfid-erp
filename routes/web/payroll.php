@@ -1,11 +1,28 @@
 <?php
 
+use App\Http\Controllers\Payroll\PayrollDashboardController;
 use App\Http\Controllers\Payroll\PayrollReportController;
 use App\Http\Controllers\Payroll\PieceRateController;
 use App\Http\Controllers\Payroll\PieceworkPayrollController;
 
 // Semua route payroll: hanya bisa diakses oleh owner
 Route::middleware(['web', 'auth', 'role:owner'])->group(function () {
+
+    /*
+    |--------------------------------------------------------------------------
+    | PAYROLL DASHBOARD (borongan jahit + cutting)
+    |--------------------------------------------------------------------------
+     */
+    Route::get('payroll/dashboard', [PayrollDashboardController::class, 'index'])
+        ->name('payroll.dashboard');
+
+    // API lazy-load per tab + filter AJAX
+    Route::get('payroll/dashboard/data', [PayrollDashboardController::class, 'data'])
+        ->name('payroll.dashboard.data');
+
+    // Slip upah borongan per operator (siap cetak)
+    Route::get('payroll/dashboard/slip', [PayrollDashboardController::class, 'slip'])
+        ->name('payroll.dashboard.slip');
 
     /*
     |--------------------------------------------------------------------------
