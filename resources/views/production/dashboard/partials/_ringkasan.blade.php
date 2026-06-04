@@ -14,7 +14,7 @@
 @endphp
 
 {{-- ============ Alur Produksi (ringkas) ============ --}}
-<x-gf.panel title="Alur Produksi" subtitle="Throughput periode terpilih (Cutting → Ambil → Setor → Finishing)">
+<x-gf.panel title="Alur Produksi" subtitle="Throughput periode terpilih (Cutting → Ambil → Setor → Finishing)" class="gf-hide-mobile">
     @php
         $steps = [
             ['Cutting OK', $summary['cutting_ok'], 'accent-blue'],

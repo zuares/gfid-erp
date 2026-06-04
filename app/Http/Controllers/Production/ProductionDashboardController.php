@@ -694,6 +694,7 @@ class ProductionDashboardController extends Controller
         $rows = $q->selectRaw("
                 it.id as item_id,
                 p.date as pickup_date, p.created_at as created_at,
+                p.operator_id as operator_id,
                 e.code as operator_code, e.name as operator_name,
                 it.code as sku, it.name as product_name,
                 COALESCE(cat.name,'-') as category,

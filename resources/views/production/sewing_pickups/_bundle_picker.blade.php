@@ -1022,6 +1022,19 @@
                 recalcSummaryAndUI();
             });
 
+            // PRE-FILTER dari query ?sku= (mis. klik baris di Dashboard Produksi → Siap Jahit)
+            (function applySkuFromQuery() {
+                if (!itemCodeSelect) return;
+                const sku = new URLSearchParams(window.location.search).get('sku');
+                if (!sku) return;
+                const match = Array.from(itemCodeSelect.options)
+                    .some(o => o.value === sku);
+                if (!match) return;
+                itemCodeSelect.value = sku;
+                state.activeItemCode = sku;
+                recalcSummaryAndUI();
+            })();
+
             // FOCAL POINT SELECT di mobile
             if (isMobile() && itemCodeSelectWrap) {
                 setTimeout(() => {

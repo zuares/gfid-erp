@@ -90,7 +90,10 @@
                             data-hpp="{{ $s->hpp_total }}"
                             data-bundles="{{ $s->bundle_count }}"
                             data-stok="{{ $s->stok_jadi }}"
-                            data-sku="{{ $s->sku }}">
+                            data-sku="{{ $s->sku }}"
+                            data-sj-href="{{ route('production.sewing.pickups.create') }}?sku={{ urlencode($s->sku) }}"
+                            style="cursor: pointer;"
+                            title="Klik untuk bagi bundle SKU {{ $s->sku }} ke penjahit">
                             <td><span class="gf-chip" title="{{ $s->product_name }}"><b>{{ $s->sku }}</b></span></td>
                             <td class="text-muted gf-hide-mobile">{{ $s->product_name }}</td>
                             <td class="gf-num"><b>{{ $fmt($s->qty_ready) }}</b></td>

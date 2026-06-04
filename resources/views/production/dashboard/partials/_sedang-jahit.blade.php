@@ -83,7 +83,12 @@
                             data-hpp="{{ $l->hpp_total }}"
                             data-age="{{ $l->age_days ?? -1 }}"
                             data-date="{{ $l->pickup_date }}"
-                            data-picked="{{ $l->qty_picked }}">
+                            data-picked="{{ $l->qty_picked }}"
+                            @if ($l->operator_id)
+                                data-sd-href="{{ route('production.sewing.returns.create') }}?operator_id={{ (int) $l->operator_id }}"
+                                style="cursor: pointer;"
+                                title="Klik untuk setor jahit penjahit {{ $l->operator_name }}"
+                            @endif>
                             <td><x-gf.datecell :date="$l->pickup_date" :time="$l->created_at" /></td>
                             <td>
                                 <span class="gf-chip" title="{{ $l->operator_name }}"><b>{{ $l->operator_code }}</b></span>

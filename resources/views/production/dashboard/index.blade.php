@@ -12,6 +12,16 @@
         'reject' => 'Reject',
         'prioritas' => 'Prioritas',
     ];
+
+    // Deskripsi singkat per tab (tampil di bawah judul header).
+    $tabDesc = [
+        'ringkasan' => 'Ringkasan & alur produksi periode ini.',
+        'siap-jahit' => 'Hasil potong yang siap dibagi ke penjahit.',
+        'sedang-jahit' => 'Barang yang sedang dikerjakan penjahit.',
+        'setor-qc' => 'Hasil jahit yang sudah disetor & lolos cek kualitas.',
+        'reject' => 'Barang gagal cek kualitas — cutting & jahit.',
+        'prioritas' => 'SKU yang perlu didahulukan produksinya.',
+    ];
 @endphp
 
 @push('head')
@@ -42,6 +52,9 @@
         }
 
         .prod-filter-busy { opacity: .55; pointer-events: none; }
+
+        /* Tombol toggle filter — hanya tampil di mobile (lihat media query) */
+        .gf-filter-toggle { display: none; }
 
         /* Select filter pill (penjahit / kategori / sku) — selaras header marketplace */
         .gf-header-select {
@@ -124,6 +137,72 @@
             /* Mobile: sembunyikan kartu KPI & teks petunjuk (subtitle) panel tabel */
             [data-dashboard-root] .gf-overview-kpi-grid { display: none !important; }
             [data-dashboard-root] .gf-panel-header .gf-subtext { display: none !important; }
+
+            /* Mobile: header lebih ringkas — sembunyikan eyebrow, sisakan judul + deskripsi */
+            .gf-master-eyebrow { display: none !important; }
+            .gf-master-desc {
+                font-size: 11.5px;
+                line-height: 1.35;
+                margin-top: 2px !important;
+            }
+
+            /* Mobile: judul + deskripsi di kiri, tombol filter sejajar presisi di kanan */
+            .gf-master-header { padding: 12px 14px; }
+            .gf-master-header-layout {
+                flex-wrap: nowrap !important;
+                align-items: center !important;
+                gap: 10px !important;
+            }
+            .gf-master-header-copy {
+                min-width: 0 !important;
+                flex: 1 1 auto;
+            }
+            .gf-master-title { margin-bottom: 0 !important; }
+            .gf-master-actions { flex: 0 0 auto !important; }
+
+            /* Mobile: filter dikompres jadi 1 tombol icon (dropdown saat ditekan) */
+            .gf-filter-toggle {
+                display: inline-flex;
+                align-items: center;
+                justify-content: center;
+                width: 40px;
+                height: 40px;
+                flex: 0 0 auto;
+                border-radius: 999px;
+                border: 1px solid rgba(15, 23, 42, .12);
+                background: #fff;
+                color: #0f172a;
+                cursor: pointer;
+            }
+            .gf-dashboard-header-actions {
+                position: relative;
+                justify-content: flex-end !important;
+            }
+            /* Saat terbuka, angkat wrapper di atas tab sticky (z-index tab = 1000) */
+            .gf-dashboard-header-actions.is-open { z-index: 2000; }
+            .gf-dashboard-header-filter {
+                display: none !important;
+                position: absolute;
+                top: calc(100% + .45rem);
+                right: 0;
+                z-index: 2001;
+                grid-template-columns: 1fr !important;
+                width: min(88vw, 320px);
+                padding: .8rem;
+                gap: .55rem;
+                background: #fff;
+                border: 1px solid rgba(15, 23, 42, .1);
+                border-radius: 16px;
+                box-shadow: 0 16px 36px rgba(15, 23, 42, .16);
+            }
+            .gf-dashboard-header-actions.is-open .gf-dashboard-header-filter { display: grid !important; }
+            .gf-dashboard-header-filter .gf-header-period-select,
+            .gf-dashboard-header-filter .gf-header-date-input,
+            .gf-dashboard-header-filter .gf-header-select,
+            .gf-dashboard-header-filter .gf-header-icon-btn {
+                width: 100% !important;
+                max-width: none !important;
+            }
             /* kolom tersisa harus pas di layar — hilangkan min-width & padatkan */
             .gf-table-scroll-sticky .gf-clean-table { min-width: 0 !important; font-size: .76rem; }
             .gf-table-scroll-sticky .gf-clean-table th,
@@ -299,10 +378,17 @@
     <x-gf.page
         eyebrow="Produksi"
         title="Dashboard Produksi"
-        description="Cutting · jahit · setoran &amp; QC · prioritas">
+        :description="$tabDesc[$initialTab] ?? ''">
 
         <x-slot:actions>
-            <div class="gf-dashboard-header-actions">
+            <div class="gf-dashboard-header-actions" data-filter-wrap>
+                <button type="button" class="gf-filter-toggle" data-filter-toggle
+                    aria-label="Filter" aria-expanded="false" title="Filter">
+                    <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor"
+                        stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
+                        <path d="M22 3H2l8 9.46V19l4 2v-8.54L22 3z" />
+                    </svg>
+                </button>
                 <form id="filterForm" method="GET" action="{{ route('production.dashboard') }}"
                     class="gf-dashboard-header-filter" data-dashboard-filter>
                     <input type="hidden" name="date_from" value="{{ $filters['date_from'] }}" data-date-from>
@@ -383,11 +469,32 @@
             const SLIP_URL = @json(route('production.dashboard.slip'));
             const SERVER_INITIAL = @json($initialTab);
             const KEY = 'prodDashTab';
+            const TAB_DESC = @json($tabDesc);
+            const descEl = document.querySelector('.gf-master-desc');
+            const setDesc = (name) => { if (descEl && TAB_DESC[name]) descEl.textContent = TAB_DESC[name]; };
 
             const tabBtns = Array.from(document.querySelectorAll('#prodTabs .gf-marketplace-tab'));
             const panes = Array.from(document.querySelectorAll('[data-tab-panel]'));
             const form = document.getElementById('filterForm');
             const periodLabel = document.getElementById('periodLabel');
+
+            // ---- Toggle filter (mobile): tampilkan/sembunyikan dropdown filter ----
+            const filterWrap = document.querySelector('[data-filter-wrap]');
+            const filterToggle = document.querySelector('[data-filter-toggle]');
+            if (filterToggle && filterWrap) {
+                filterToggle.addEventListener('click', (e) => {
+                    e.stopPropagation();
+                    const open = filterWrap.classList.toggle('is-open');
+                    filterToggle.setAttribute('aria-expanded', open ? 'true' : 'false');
+                });
+                // Klik di luar area filter → tutup
+                document.addEventListener('click', (e) => {
+                    if (filterWrap.classList.contains('is-open') && !filterWrap.contains(e.target)) {
+                        filterWrap.classList.remove('is-open');
+                        filterToggle.setAttribute('aria-expanded', 'false');
+                    }
+                });
+            }
 
             const paneByName = (name) => panes.find(p => p.dataset.tabPanel === name);
             const activeName = () =>
@@ -415,6 +522,7 @@
             function activate(name) {
                 tabBtns.forEach(b => b.classList.toggle('is-active', b.dataset.tabTarget === name));
                 panes.forEach(p => p.hidden = (p.dataset.tabPanel !== name));
+                setDesc(name);
             }
 
             async function loadTab(name, { force = false } = {}) {
@@ -588,6 +696,20 @@
             document.addEventListener('change', (e) => {
                 if (!e.target.matches(SJ_SEL)) return;
                 applySjFilters(e.target.closest('[data-tab-panel]'));
+            });
+
+            // ---- Klik baris "Siap Jahit" → buka form bagi bundle dengan filter SKU ----
+            document.addEventListener('click', (e) => {
+                const row = e.target.closest('[data-sj-row][data-sj-href]');
+                if (!row) return;
+                window.location.href = row.dataset.sjHref;
+            });
+
+            // ---- Klik baris "Sedang Jahit" → buka form setor jahit dgn filter penjahit ----
+            document.addEventListener('click', (e) => {
+                const row = e.target.closest('[data-sd-row][data-sd-href]');
+                if (!row) return;
+                window.location.href = row.dataset.sdHref;
             });
 
             // ---- Filter realtime tab "Sedang Jahit" (client-side, instan) ----
