@@ -132,6 +132,7 @@
     $hasProdMovementsIndex = $router->has('production.movements.index');
     $hasProdPriorityIndex = $router->has('production.priority.index');
     $hasProdReportsIndex = $router->has('production.reports.index');
+    $hasProdRejectIndex = $router->has('production.reject.index');
 
     $hasProdDashboard = $router->has('production.dashboard');
 
@@ -640,6 +641,13 @@
                         <x-sidebar.simple-link href="{{ route('production.qc.index') }}" icon="✅"
                             :active="request()->routeIs('production.qc.*')">
                             QC Produksi
+                        </x-sidebar.simple-link>
+                    @endif
+
+                    @if ($hasProdRejectIndex)
+                        <x-sidebar.simple-link href="{{ route('production.reject.index') }}" icon="⚠️"
+                            :active="request()->routeIs('production.reject.*')">
+                            Reject Produksi
                         </x-sidebar.simple-link>
                     @endif
 
@@ -1322,6 +1330,12 @@
                             <x-sidebar.sub-link href="{{ route('production.qc.index') }}" icon="✅"
                                 :active="request()->routeIs('production.qc.*')">
                                 QC Produksi
+                            </x-sidebar.sub-link>
+                        @endif
+                        @if ($hasProdRejectIndex)
+                            <x-sidebar.sub-link href="{{ route('production.reject.index') }}" icon="⚠️"
+                                :active="request()->routeIs('production.reject.*')">
+                                Reject Produksi
                             </x-sidebar.sub-link>
                         @endif
                         @if ($hasProdFinishingJobsIndex)

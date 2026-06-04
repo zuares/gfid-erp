@@ -1,80 +1,24 @@
 @php
     $fmt = fn($n, $d = 0) => number_format((float) $n, $d, ',', '.');
+
+    // Ringkasan jumlah event per jenis (untuk count chip)
+    $cCutting = $timeline->where('type', 'cutting')->count();
+    $cPickup = $timeline->where('type', 'pickup')->count();
+    $cReturn = $timeline->where('type', 'return')->count();
+
+    $typeMeta = [
+        'cutting' => ['label' => 'Beres Cutting', 'verb' => 'memotong', 'dot' => 'gf-tl-blue', 'badge' => 'gf-badge-blue'],
+        'pickup' => ['label' => 'Ambil Jahit', 'verb' => 'mengambil', 'dot' => 'gf-tl-amber', 'badge' => 'gf-badge-amber'],
+        'return' => ['label' => 'Setor Jahit', 'verb' => 'menyetor', 'dot' => 'gf-tl-green', 'badge' => 'gf-badge-green'],
+    ];
 @endphp
 
-{{-- ============ A. KPI Utama (snapshot kondisi produksi) ============ --}}
-<div class="gf-overview-kpi-grid">
-    <div class="gf-overview-kpi-card">
-        <div class="gf-overview-kpi-label">Stok Siap Jahit</div>
-        <div class="gf-overview-kpi-value">{{ $fmt($kpiA['siap_jahit']) }}</div>
-        <div class="gf-overview-kpi-note">WIP-CUT siap dibagi</div>
-    </div>
-    <div class="gf-overview-kpi-card">
-        <div class="gf-overview-kpi-label">Sedang Dijahit</div>
-        <div class="gf-overview-kpi-value">{{ $fmt($kpiA['sedang_jahit']) }}</div>
-        <div class="gf-overview-kpi-note">{{ $fmt($kpiA['penjahit_aktif']) }} penjahit aktif</div>
-    </div>
-    <div class="gf-overview-kpi-card gf-overview-kpi-card-strong">
-        <div class="gf-overview-kpi-label">Disetor Hari Ini</div>
-        <div class="gf-overview-kpi-value">{{ $fmt($kpiA['setor_today_ok']) }}</div>
-        <div class="gf-overview-kpi-note">Reject {{ $fmt($kpiA['setor_today_reject']) }}</div>
-    </div>
-    <div class="gf-overview-kpi-card">
-        <div class="gf-overview-kpi-label">Belum Disetor / Telat</div>
-        <div class="gf-overview-kpi-value">{{ $fmt($kpiA['overdue']) }}</div>
-        <div class="gf-overview-kpi-note">
-            @if ($kpiA['overdue'] > 0)
-                <span class="gf-badge gf-badge-red">menua</span>
-            @else
-                WIP jahit aman
-            @endif
-        </div>
-    </div>
-    <div class="gf-overview-kpi-card">
-        <div class="gf-overview-kpi-label">Prioritas Produksi</div>
-        <div class="gf-overview-kpi-value">{{ $fmt($kpiA['priority_count']) }}</div>
-        <div class="gf-overview-kpi-note">
-            @if ($kpiA['priority_count'] > 0)
-                <span class="gf-badge gf-badge-amber">cover tipis</span>
-            @else
-                cover aman
-            @endif
-        </div>
-    </div>
-    <div class="gf-overview-kpi-card">
-        <div class="gf-overview-kpi-label">Siap Masuk WH-PRD</div>
-        <div class="gf-overview-kpi-value">{{ $fmt($kpiA['wh_prd']) }}</div>
-        <div class="gf-overview-kpi-note">menunggu QC / siap jual</div>
-    </div>
-    <div class="gf-overview-kpi-card">
-        <div class="gf-overview-kpi-label">Penjahit Aktif</div>
-        <div class="gf-overview-kpi-value">{{ $fmt($kpiA['penjahit_aktif']) }}</div>
-        <div class="gf-overview-kpi-note">pegang WIP jahit</div>
-    </div>
-    <div class="gf-overview-kpi-card">
-        <div class="gf-overview-kpi-label">Rata-rata Performa</div>
-        <div class="gf-overview-kpi-value">{{ $kpiA['avg_score'] === null ? '–' : $fmt($kpiA['avg_score'], 1) }}</div>
-        <div class="gf-overview-kpi-note">
-            @php $avg = $kpiA['avg_score']; @endphp
-            @if ($avg === null)
-                skor penjahit periode
-            @elseif ($avg >= 70)
-                <span class="gf-badge gf-badge-green">baik</span>
-            @elseif ($avg >= 50)
-                <span class="gf-badge gf-badge-amber">cukup</span>
-            @else
-                <span class="gf-badge gf-badge-red">perlu perhatian</span>
-            @endif
-        </div>
-    </div>
-</div>
-
-{{-- ============ Funnel throughput periode (Cutting → Setor → Finishing) ============ --}}
-<x-gf.panel title="Alur Produksi" subtitle="Periode terpilih">
+{{-- ============ Alur Produksi (ringkas) ============ --}}
+<x-gf.panel title="Alur Produksi" subtitle="Throughput periode terpilih (Cutting → Ambil → Setor → Finishing)">
     @php
         $steps = [
             ['Cutting OK', $summary['cutting_ok'], 'accent-blue'],
-            ['Diambil Penjahit', $summary['pickup_total'], 'accent-blue'],
+            ['Diambil Penjahit', $summary['pickup_total'], 'accent-amber'],
             ['Setor Jahit OK', $summary['sewing_ok'], 'accent-green'],
             ['Finishing OK', $summary['finishing_ok'], 'accent-green'],
         ];
@@ -98,39 +42,69 @@
     </div>
 </x-gf.panel>
 
-{{-- ============ Tren harian ============ --}}
-<x-gf.panel title="Tren Harian" subtitle="Cutting & sewing per hari">
-    @if ($dailyTrend->isEmpty())
-        <div class="prod-empty">Tidak ada data pada periode ini.</div>
+{{-- ============ Timeline aktivitas (siapa ngerjain apa) ============ --}}
+<x-gf.panel title="Aktivitas Produksi" subtitle="Kronologis kejadian periode — beres cutting, ambil jahit, setor jahit">
+    <div class="sj-toolbar" data-ov-toolbar>
+        <input type="search" class="form-control sj-search" data-ov-search
+            placeholder="Cari operator / kode dokumen…" autocomplete="off">
+
+        <select class="form-select" data-ov-type aria-label="Jenis aktivitas">
+            <option value="">Semua Aktivitas</option>
+            <option value="cutting">Beres Cutting</option>
+            <option value="pickup">Ambil Jahit</option>
+            <option value="return">Setor Jahit</option>
+        </select>
+
+        <span class="sj-count" data-ov-count>{{ $fmt($timeline->count()) }} kejadian · {{ $fmt($cCutting) }} cutting · {{ $fmt($cPickup) }} ambil · {{ $fmt($cReturn) }} setor</span>
+    </div>
+
+    @if ($timeline->isEmpty())
+        <div class="prod-empty">Tidak ada aktivitas pada periode ini.</div>
     @else
-        @php $maxTrend = max(1, $dailyTrend->max(fn($r) => max($r->cutting_ok, $r->sewing_ok))); @endphp
-        <div class="gf-table-scroll">
-            <table class="table table-hover align-middle mb-0 gf-clean-table gf-sticky-table">
-                <thead>
-                    <tr>
-                        <th>Tanggal</th>
-                        <th class="gf-num">Cutting OK</th>
-                        <th class="gf-num">Sewing OK</th>
-                        <th style="width:35%;">Sewing OK (visual)</th>
-                        <th class="gf-num">Reject</th>
-                    </tr>
-                </thead>
-                <tbody>
-                    @foreach ($dailyTrend as $row)
-                        <tr>
-                            <td>{{ \Carbon\Carbon::parse($row->date)->format('d M (D)') }}</td>
-                            <td class="gf-num">{{ $fmt($row->cutting_ok) }}</td>
-                            <td class="gf-num">{{ $fmt($row->sewing_ok) }}</td>
-                            <td>
-                                <div class="gf-bar-track">
-                                    <div class="gf-bar-fill" style="width: {{ round($row->sewing_ok / $maxTrend * 100) }}%"></div>
-                                </div>
-                            </td>
-                            <td class="gf-num">{{ $row->reject > 0 ? $fmt($row->reject) : '-' }}</td>
-                        </tr>
-                    @endforeach
-                </tbody>
-            </table>
+        <div class="gf-tl" data-ov-list>
+            @php $lastDate = null; @endphp
+            @foreach ($timeline as $ev)
+                @php $meta = $typeMeta[$ev->type]; @endphp
+                @if ($ev->date !== $lastDate)
+                    @php $lastDate = $ev->date; @endphp
+                    <div class="gf-tl-day" data-ov-day data-date="{{ $ev->date }}">
+                        {{ \Carbon\Carbon::parse($ev->date)->translatedFormat('l, d M Y') }}
+                    </div>
+                @endif
+                <div class="gf-tl-item" data-ov-row
+                    data-type="{{ $ev->type }}"
+                    data-search="{{ strtolower(trim($ev->operator_code . ' ' . $ev->operator_name . ' ' . $ev->code . ' ' . $meta['label'])) }}">
+                    <div class="gf-tl-dot {{ $meta['dot'] }}"></div>
+                    <div class="gf-tl-body">
+                        <div class="gf-tl-main">
+                            <div class="gf-tl-who">
+                                <span class="gf-badge {{ $meta['badge'] }}">{{ $meta['label'] }}</span>
+                                <span class="gf-chip" title="{{ $ev->operator_name }}"><b>{{ $ev->operator_code }}</b></span>
+                                <span class="gf-tl-name">{{ $ev->operator_name }}</span>
+                            </div>
+                            <div class="gf-tl-qty">
+                                @if ($ev->type === 'pickup')
+                                    <span><b>{{ $fmt($ev->qty_total) }}</b> pcs</span>
+                                @else
+                                    <span><b>{{ $fmt($ev->qty_ok) }}</b> OK</span>
+                                    @if ($ev->qty_reject > 0)
+                                        <span class="text-danger">+{{ $fmt($ev->qty_reject) }} reject</span>
+                                    @endif
+                                @endif
+                            </div>
+                        </div>
+                        <div class="gf-tl-sub">
+                            @if ($ev->created_at)
+                                <span class="gf-tl-code">{{ \Carbon\Carbon::parse($ev->created_at)->format('H:i') }}</span>
+                                <span>·</span>
+                            @endif
+                            <span>{{ ucfirst($meta['verb']) }} {{ $fmt($ev->sku_count) }} SKU</span>
+                            <span class="gf-tl-code">· {{ $ev->code }}</span>
+                        </div>
+                    </div>
+                </div>
+            @endforeach
         </div>
+        <div class="prod-empty" data-ov-empty hidden>Tidak ada aktivitas yang cocok dengan filter.</div>
     @endif
 </x-gf.panel>

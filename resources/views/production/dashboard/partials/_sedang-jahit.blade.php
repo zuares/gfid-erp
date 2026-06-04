@@ -45,6 +45,7 @@
         </select>
 
         <select class="form-select" data-sd-sort aria-label="Urutkan">
+            <option value="date-desc">Terbaru</option>
             <option value="out-desc">Sisa terbanyak</option>
             <option value="hpp-desc">Nilai HPP terbesar</option>
             <option value="age-desc">Umur terlama</option>
@@ -81,8 +82,9 @@
                             data-outstanding="{{ $l->qty_outstanding }}"
                             data-hpp="{{ $l->hpp_total }}"
                             data-age="{{ $l->age_days ?? -1 }}"
+                            data-date="{{ $l->pickup_date }}"
                             data-picked="{{ $l->qty_picked }}">
-                            <td>{{ $l->pickup_date ? \Carbon\Carbon::parse($l->pickup_date)->format('d M') : '-' }}</td>
+                            <td><x-gf.datecell :date="$l->pickup_date" :time="$l->created_at" /></td>
                             <td>
                                 <span class="gf-chip" title="{{ $l->operator_name }}"><b>{{ $l->operator_code }}</b></span>
                                 <span class="text-muted small d-block gf-hide-mobile">{{ $l->operator_name }}</span>

@@ -7,6 +7,7 @@ use App\Http\Controllers\Production\PackingJobController;
 use App\Http\Controllers\Production\ProductionDashboardController;
 use App\Http\Controllers\Production\ProductionMovementController;
 use App\Http\Controllers\Production\ProductionPriorityController;
+use App\Http\Controllers\Production\ProductionRejectController;
 use App\Http\Controllers\Production\ProductionReportController;
 use App\Http\Controllers\Production\QcController;
 use App\Http\Controllers\Production\SewingPickupController;
@@ -166,6 +167,21 @@ Route::middleware(['web', 'auth', 'role:owner,operating'])
         // API lazy-load per tab + filter AJAX
         Route::get('dashboard/data', [ProductionDashboardController::class, 'data'])
             ->name('dashboard.data');
+
+        // Slip upah borongan per operator (siap cetak)
+        Route::get('dashboard/slip', [ProductionDashboardController::class, 'slip'])
+            ->name('dashboard.slip');
+
+        // Halaman Reject Produksi (cutting + jahit, per kejadian)
+        Route::get('reject', [ProductionRejectController::class, 'index'])
+            ->name('reject.index');
+        Route::get('reject/create', [ProductionRejectController::class, 'create'])
+            ->name('reject.create');
+        Route::post('reject', [ProductionRejectController::class, 'store'])
+            ->name('reject.store');
+        Route::post('reject/{line}/void-repair', [ProductionRejectController::class, 'voidRepair'])
+            ->whereNumber('line')
+            ->name('reject.void_repair');
 
         /*
     |--------------------------------------------------------------------------

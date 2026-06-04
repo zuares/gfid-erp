@@ -8,6 +8,7 @@ use App\Models\Employee;
 use App\Models\Item;
 use App\Models\ItemCategory;
 use App\Models\Warehouse;
+use App\Services\Payroll\PieceRateService;
 use App\Services\Production\ProductionFlowService;
 use App\Services\Production\ProductionPriorityService;
 use Carbon\Carbon;
@@ -30,11 +31,12 @@ use Illuminate\View\View;
 class ProductionDashboardController extends Controller
 {
     /** Daftar tab valid + builder-nya. */
-    private const TABS = ['ringkasan', 'siap-jahit', 'sedang-jahit', 'setor-qc', 'penjahit', 'prioritas'];
+    private const TABS = ['ringkasan', 'siap-jahit', 'sedang-jahit', 'setor-qc', 'reject', 'cutting', 'penjahit', 'prioritas'];
 
     public function __construct(
         private ProductionFlowService $flow,
         private ProductionPriorityService $priority,
+        private PieceRateService $pieceRate,
     ) {
     }
 
@@ -100,6 +102,81 @@ class ProductionDashboardController extends Controller
         ]);
     }
 
+    /**
+     * Slip upah borongan per operator (siap cetak).
+     * Sumber upah = nilai REAL yang dibayar:
+     *   - sewing  → setoran jahit lolos QC (qty_ok × rate)
+     *   - cutting → hasil potong lolos QC (qty_qc_ok × rate)
+     * Dirinci per kategori → per SKU, dengan subtotal & grand total.
+     */
+    public function slip(Request $request): View
+    {
+        $module = $request->query('module') === 'cutting' ? 'cutting' : 'sewing';
+        $code = trim((string) $request->query('operator', ''));
+
+        $employee = $code !== '' ? Employee::where('code', $code)->first() : null;
+        abort_if(!$employee, 404, 'Operator tidak ditemukan.');
+
+        $f = $this->resolveFilters($request);
+        $f['operator_id'] = $employee->id;
+
+        // Hanya baris yang benar-benar menghasilkan upah (real, bukan estimasi).
+        $rows = $module === 'cutting'
+            ? $this->buildCuttingActivity($f)
+            : $this->buildPenjahitActivity($f)->where('type', 'Setor')->values();
+
+        // Group kategori → SKU (tarif efektif = jumlah ÷ qty agar aman bila tarif beda tanggal).
+        $groups = $rows->groupBy('category')
+            ->map(function ($items, $cat) {
+                $lines = $items->groupBy('sku')
+                    ->map(function ($g) {
+                        $qty = (float) $g->sum('qty_ok');
+                        $amount = (float) $g->sum('amount');
+                        $first = $g->first();
+                        return (object) [
+                            'sku' => $first->sku,
+                            'product_name' => $first->product_name,
+                            'qty' => $qty,
+                            'rate' => $qty > 0 ? $amount / $qty : (float) $first->rate,
+                            'amount' => $amount,
+                        ];
+                    })
+                    ->sortBy('sku')
+                    ->values();
+
+                return (object) [
+                    'category' => $cat,
+                    'lines' => $lines,
+                    'qty' => (float) $items->sum('qty_ok'),
+                    'amount' => (float) $items->sum('amount'),
+                ];
+            })
+            ->sortBy('category')
+            ->values();
+
+        $role = $module === 'cutting' ? 'Pemotong' : 'Penjahit';
+
+        // Nama file unduhan: NAMAOPERATOR_ROLE_RANGETANGGAL
+        $clean = fn(string $s) => preg_replace('/[^A-Za-z0-9]+/', '', $s);
+        $range = Carbon::parse($f['date_from'])->format('Ymd') . '-' . Carbon::parse($f['date_to'])->format('Ymd');
+        $fileName = trim($clean($employee->name) . '_' . $role . '_' . $range, '_');
+
+        return view('production.dashboard.slip', [
+            'module' => $module,
+            'moduleLabel' => $module === 'cutting' ? 'Cutting (Potong)' : 'Jahit (Setor)',
+            'role' => $role,
+            'employee' => $employee,
+            'period' => $this->periodLabel($f),
+            'dateFrom' => $f['date_from'],
+            'dateTo' => $f['date_to'],
+            'groups' => $groups,
+            'grandQty' => (float) $rows->sum('qty_ok'),
+            'grandAmount' => (float) $rows->sum('amount'),
+            'printedAt' => Carbon::now(),
+            'fileName' => $fileName,
+        ]);
+    }
+
     /** Parse & normalisasi filter (default: 7 hari terakhir). */
     private function resolveFilters(Request $request): array
     {
@@ -149,12 +226,12 @@ class ProductionDashboardController extends Controller
             'sedang-jahit' => $this->buildSedangJahit($f),
             'setor-qc' => $this->buildSetorQc($f),
             'reject' => $this->buildReject($f),
-            'penjahit' => ['operators' => $this->buildOperatorPerformance($f)],
+            'cutting' => ['rows' => $this->buildCuttingActivity($f)],
+            'penjahit' => ['rows' => $this->buildPenjahitActivity($f)],
             'prioritas' => ['priority' => $this->priority->priorityList($f, 100)],
             default => [
-                'kpiA' => $this->buildRingkasanKpi($f),
                 'summary' => $this->buildSummary($f),
-                'dailyTrend' => $this->buildDailyTrend($f),
+                'timeline' => $this->buildActivityTimeline($f),
             ],
         };
     }
@@ -271,65 +348,117 @@ class ProductionDashboardController extends Controller
     }
 
     // ==========================================================
-    // 1a) KPI HARIAN (Ringkasan A) — snapshot kondisi produksi hari ini
+    // 1c) TIMELINE AKTIVITAS — kronologis "siapa ngerjain apa"
     // ==========================================================
     /**
-     * KPI utama untuk pengambilan keputusan harian (section A):
-     *  - Stok siap jahit / sedang jahit / siap WH-PRD  (snapshot, dari ProductionFlowService)
-     *  - Disetor hari ini (OK + reject)                (return lines tanggal hari ini)
-     *  - Overdue / belum disetor (WIP jahit menua)     (ProductionFlowService)
-     *  - Prioritas (SKU yang cover-nya tipis)          (ProductionFlowService)
-     *  - Penjahit aktif (punya WIP outstanding)        (sewing_pickup_lines in_progress)
-     *  - Rata-rata skor performa penjahit              (buildOperatorPerformance)
+     * Feed kronologis kejadian produksi pada periode terpilih (terbaru dulu):
+     *  - cutting : cutting job selesai QC (beres cutting) — per dokumen, pemotong.
+     *  - pickup  : penjahit MENGAMBIL bundle untuk dijahit (ambil jahit).
+     *  - return  : penjahit MENYETOR hasil jahit (setor jahit) — OK + reject.
+     *
+     * Tiap event: type, code, date, operator, qty ringkas, jumlah SKU.
      */
-    private function buildRingkasanKpi(array $f): array
+    private function buildActivityTimeline(array $f): \Illuminate\Support\Collection
     {
-        $kpi = $this->flow->dashboardKpis($f);
-        $today = Carbon::today()->toDateString();
+        $from = $f['date_from'];
+        $to = $f['date_to'];
 
-        // Disetor hari ini (return lines, tanggal setor = hari ini)
-        $setorQ = DB::table('sewing_return_lines as rl')
-            ->join('sewing_returns as r', 'r.id', '=', 'rl.sewing_return_id')
-            ->whereDate('r.date', $today);
-        $this->applyNotVoid($setorQ, 'sewing_returns', 'r');
-        if ($f['operator_id']) {
-            $setorQ->where('r.operator_id', $f['operator_id']);
-        }
+        // ---- Beres Cutting (cutting_jobs status qc_done) ----
+        $cut = DB::table('cutting_jobs as cj')
+            ->leftJoin('employees as e', 'e.id', '=', 'cj.operator_id')
+            ->leftJoin('cutting_job_bundles as cb', 'cb.cutting_job_id', '=', 'cj.id')
+            ->where('cj.status', 'qc_done')
+            ->whereRaw('DATE(cj.date) BETWEEN ? AND ?', [$from, $to]);
         if ($f['item_id']) {
-            $setorQ->join('sewing_pickup_lines as plx', 'plx.id', '=', 'rl.sewing_pickup_line_id')
-                ->where('plx.finished_item_id', $f['item_id']);
+            $cut->where('cb.finished_item_id', $f['item_id']);
         }
-        $setor = $setorQ->selectRaw('COALESCE(SUM(rl.qty_ok),0) ok, COALESCE(SUM(rl.qty_reject),0) rj')->first();
+        if ($f['category_id']) {
+            $cut->where('cb.item_category_id', $f['category_id']);
+        }
+        $cut = $cut->groupBy('cj.id', 'cj.code', 'cj.date', 'cj.created_at', 'e.code', 'e.name')
+            ->selectRaw("
+                'cutting' as type, cj.id as ref_id, cj.code as code,
+                DATE(cj.date) as date, cj.created_at as created_at,
+                COALESCE(e.code,'-') as operator_code, COALESCE(e.name,'-') as operator_name,
+                COALESCE(SUM(cb.qty_qc_ok),0) as qty_ok,
+                COALESCE(SUM(cb.qty_qc_reject),0) as qty_reject,
+                COALESCE(SUM(cb.qty_pcs),0) as qty_total,
+                COUNT(DISTINCT cb.finished_item_id) as sku_count
+            ")
+            ->get();
 
-        // Penjahit aktif = operator yang masih punya WIP jahit outstanding
-        $aktifQ = DB::table('sewing_pickup_lines as pl')
-            ->join('sewing_pickups as p', 'p.id', '=', 'pl.sewing_pickup_id')
+        // ---- Ambil Jahit (sewing_pickups) ----
+        $pick = DB::table('sewing_pickups as p')
+            ->leftJoin('employees as e', 'e.id', '=', 'p.operator_id')
+            ->leftJoin('sewing_pickup_lines as pl', 'pl.sewing_pickup_id', '=', 'p.id')
+            ->leftJoin('items as it', 'it.id', '=', 'pl.finished_item_id')
             ->whereNull('p.voided_at')
-            ->where('pl.status', 'in_progress')
-            ->whereRaw('pl.qty_bundle - COALESCE(pl.qty_returned_ok,0) - COALESCE(pl.qty_returned_reject,0) > 0');
+            ->whereIn('p.status', ['completed', 'partial'])
+            ->whereRaw('DATE(p.date) BETWEEN ? AND ?', [$from, $to]);
         if ($f['operator_id']) {
-            $aktifQ->where('p.operator_id', $f['operator_id']);
+            $pick->where('p.operator_id', $f['operator_id']);
         }
         if ($f['item_id']) {
-            $aktifQ->where('pl.finished_item_id', $f['item_id']);
+            $pick->where('pl.finished_item_id', $f['item_id']);
         }
-        $penjahitAktif = (int) $aktifQ->distinct()->count('p.operator_id');
+        if ($f['category_id']) {
+            $pick->where('it.item_category_id', $f['category_id']);
+        }
+        $pick = $pick->groupBy('p.id', 'p.code', 'p.date', 'p.created_at', 'e.code', 'e.name')
+            ->selectRaw("
+                'pickup' as type, p.id as ref_id, p.code as code,
+                DATE(p.date) as date, p.created_at as created_at,
+                COALESCE(e.code,'-') as operator_code, COALESCE(e.name,'-') as operator_name,
+                0 as qty_ok, 0 as qty_reject,
+                COALESCE(SUM(pl.qty_bundle),0) as qty_total,
+                COUNT(DISTINCT pl.finished_item_id) as sku_count
+            ")
+            ->get();
 
-        // Rata-rata skor performa penjahit (periode terpilih)
-        $ops = $this->buildOperatorPerformance($f);
-        $avgScore = $ops->count() ? round($ops->avg('score'), 1) : null;
+        // ---- Setor Jahit (sewing_returns) ----
+        $ret = DB::table('sewing_returns as r')
+            ->leftJoin('employees as e', 'e.id', '=', 'r.operator_id')
+            ->leftJoin('sewing_return_lines as rl', 'rl.sewing_return_id', '=', 'r.id')
+            ->leftJoin('sewing_pickup_lines as pl', 'pl.id', '=', 'rl.sewing_pickup_line_id')
+            ->leftJoin('items as it', 'it.id', '=', 'pl.finished_item_id')
+            ->whereNull('r.voided_at')
+            ->whereRaw('DATE(r.date) BETWEEN ? AND ?', [$from, $to]);
+        if ($f['operator_id']) {
+            $ret->where('r.operator_id', $f['operator_id']);
+        }
+        if ($f['item_id']) {
+            $ret->where('pl.finished_item_id', $f['item_id']);
+        }
+        if ($f['category_id']) {
+            $ret->where('it.item_category_id', $f['category_id']);
+        }
+        $ret = $ret->groupBy('r.id', 'r.code', 'r.date', 'r.created_at', 'e.code', 'e.name')
+            ->selectRaw("
+                'return' as type, r.id as ref_id, r.code as code,
+                DATE(r.date) as date, r.created_at as created_at,
+                COALESCE(e.code,'-') as operator_code, COALESCE(e.name,'-') as operator_name,
+                COALESCE(SUM(rl.qty_ok),0) as qty_ok,
+                COALESCE(SUM(rl.qty_reject),0) as qty_reject,
+                COALESCE(SUM(rl.qty_ok),0) + COALESCE(SUM(rl.qty_reject),0) as qty_total,
+                COUNT(DISTINCT pl.finished_item_id) as sku_count
+            ")
+            ->get();
 
-        return [
-            'siap_jahit' => (float) $kpi['siap_jahit'],
-            'sedang_jahit' => (float) $kpi['sedang_jahit'],
-            'wh_prd' => (float) $kpi['wh_prd'],
-            'setor_today_ok' => (float) $setor->ok,
-            'setor_today_reject' => (float) $setor->rj,
-            'overdue' => (float) $kpi['overdue'],
-            'priority_count' => (int) $kpi['high_priority'],
-            'penjahit_aktif' => $penjahitAktif,
-            'avg_score' => $avgScore,
-        ];
+        return $cut->concat($pick)->concat($ret)
+            ->map(fn($r) => (object) [
+                'type' => $r->type,
+                'code' => $r->code,
+                'date' => $r->date,
+                'created_at' => $r->created_at,
+                'operator_code' => $r->operator_code,
+                'operator_name' => $r->operator_name,
+                'qty_ok' => (float) $r->qty_ok,
+                'qty_reject' => (float) $r->qty_reject,
+                'qty_total' => (float) $r->qty_total,
+                'sku_count' => (int) $r->sku_count,
+            ])
+            ->sortBy([['date', 'desc'], ['created_at', 'desc']])
+            ->values();
     }
 
     // ==========================================================
@@ -523,7 +652,7 @@ class ProductionDashboardController extends Controller
 
         $rows = $q->selectRaw("
                 it.id as item_id,
-                p.date as pickup_date,
+                p.date as pickup_date, p.created_at as created_at,
                 e.code as operator_code, e.name as operator_name,
                 it.code as sku, it.name as product_name,
                 COALESCE(cat.name,'-') as category,
@@ -549,7 +678,7 @@ class ProductionDashboardController extends Controller
                 $r->hpp_total = (float) $r->qty_outstanding * $r->hpp_unit;
                 return $r;
             })
-            ->sortByDesc('qty_outstanding')
+            ->sortBy([['pickup_date', 'desc'], ['created_at', 'desc'], ['qty_outstanding', 'desc']])
             ->values();
 
         return [
@@ -599,7 +728,7 @@ class ProductionDashboardController extends Controller
 
         $raw = $q->selectRaw("
                 rl.id as line_id,
-                DATE(r.date) as date,
+                DATE(r.date) as date, r.created_at as created_at,
                 it.id as item_id, it.code as sku, it.name as product_name,
                 COALESCE(cat.name,'-') as category,
                 COALESCE(e.code,'-') as operator_code, COALESCE(e.name,'-') as operator_name,
@@ -607,6 +736,7 @@ class ProductionDashboardController extends Controller
                 COALESCE(rl.qty_reject,0) as qty_reject
             ")
             ->orderByDesc(DB::raw('DATE(r.date)'))
+            ->orderByDesc('r.created_at')
             ->orderByDesc('rl.qty_ok')
             ->get();
 
@@ -621,6 +751,7 @@ class ProductionDashboardController extends Controller
             $base = $ok + $rj;
             return (object) [
                 'date' => $r->date,
+                'created_at' => $r->created_at,
                 'operator_code' => $r->operator_code,
                 'operator_name' => $r->operator_name,
                 'sku' => $r->sku,
@@ -682,7 +813,8 @@ class ProductionDashboardController extends Controller
         }
         $cut = $cut->selectRaw("
                 'Cutting' as stage,
-                DATE(qc.qc_date) as date,
+                NULL as line_id,
+                DATE(qc.qc_date) as date, qc.created_at as created_at,
                 it.id as item_id, it.code as sku, it.name as product_name,
                 COALESCE(cat.name,'-') as category,
                 COALESCE(e.code,'-') as operator_code, COALESCE(e.name,'-') as operator_name,
@@ -712,7 +844,8 @@ class ProductionDashboardController extends Controller
         }
         $sew = $sew->selectRaw("
                 'Jahit' as stage,
-                DATE(r.date) as date,
+                rl.id as line_id,
+                DATE(r.date) as date, r.created_at as created_at,
                 it.id as item_id, it.code as sku, it.name as product_name,
                 COALESCE(cat.name,'-') as category,
                 COALESCE(e.code,'-') as operator_code, COALESCE(e.name,'-') as operator_name,
@@ -728,22 +861,33 @@ class ProductionDashboardController extends Controller
             ->get()
             ->mapWithKeys(fn($it) => [$it->id => (float) ($it->effective_unit_cost ?? 0)]);
 
-        $lines = $all->map(function ($r) use ($costByItem) {
+        // Qty yang sudah diperbaiki (→ WH-PRD) per baris reject jahit
+        $repairedByLine = $this->repairedQtyByLine(
+            $all->pluck('line_id')->filter()->map(fn($v) => (int) $v)->unique()->values()->all()
+        );
+
+        $lines = $all->map(function ($r) use ($costByItem, $repairedByLine) {
             $qty = (float) $r->qty;
+            $lineId = isset($r->line_id) ? (int) $r->line_id : 0;
+            $repaired = $lineId > 0 ? max((float) ($repairedByLine[$lineId] ?? 0), 0.0) : 0.0;
+            $repaired = min($repaired, $qty);
             return (object) [
                 'stage' => $r->stage,
                 'date' => $r->date,
+                'created_at' => $r->created_at ?? null,
                 'operator_code' => $r->operator_code,
                 'operator_name' => $r->operator_name,
                 'sku' => $r->sku,
                 'product_name' => $r->product_name,
                 'category' => $r->category,
                 'qty' => $qty,
+                'repaired' => $repaired,
+                'remaining' => max($qty - $repaired, 0.0),
                 'reason' => $r->reason,
                 'hpp_total' => $qty * (float) ($costByItem[$r->item_id] ?? 0),
             ];
         })
-            ->sortBy([['date', 'desc'], ['qty', 'desc']])
+            ->sortBy([['date', 'desc'], ['created_at', 'desc'], ['qty', 'desc']])
             ->values();
 
         return [
@@ -751,60 +895,226 @@ class ProductionDashboardController extends Controller
             'total_reject' => (float) $lines->sum('qty'),
             'reject_cutting' => (float) $lines->where('stage', 'Cutting')->sum('qty'),
             'reject_sewing' => (float) $lines->where('stage', 'Jahit')->sum('qty'),
+            'total_repaired' => (float) $lines->sum('repaired'),
+            'total_remaining' => (float) $lines->sum('remaining'),
             'total_hpp' => (float) $lines->sum('hpp_total'),
         ];
     }
 
+    /**
+     * Net qty yang sudah diperbaiki (masuk WH-PRD) per sewing_return_line.
+     * Perbaikan = IN (+), pembatalan = OUT (-) di ledger gudang WH-PRD.
+     *
+     * @param  array<int,int>  $lineIds
+     * @return array<int,float>
+     */
+    private function repairedQtyByLine(array $lineIds): array
+    {
+        if (empty($lineIds)) {
+            return [];
+        }
+
+        $whPrd = \App\Models\Warehouse::query()->where('code', 'WH-PRD')->first();
+        if (!$whPrd) {
+            return [];
+        }
+
+        return DB::table('inventory_mutations')
+            ->where('warehouse_id', $whPrd->id)
+            ->whereIn('source_type', ['reject_repair', 'reject_repair_void'])
+            ->whereIn('source_id', $lineIds)
+            ->groupBy('source_id')
+            ->selectRaw('source_id, SUM(qty_change) as net')
+            ->pluck('net', 'source_id')
+            ->map(fn($v) => (float) $v)
+            ->all();
+    }
+
     // ==========================================================
-    // 1b) TREND HARIAN
+    // 4a) AKTIVITAS PENJAHIT — per transaksi (tidak diringkas)
     // ==========================================================
-    private function buildDailyTrend(array $f): \Illuminate\Support\Collection
+    /**
+     * Daftar kejadian jahit per baris (tidak di-grouping per penjahit):
+     *  - Ambil : tiap sewing_pickup_line (penjahit mengambil bundle) → qty pcs.
+     *  - Setor : tiap sewing_return_line (penjahit menyetor hasil)    → OK + reject.
+     * Diurutkan terbaru dulu. Skor/grade/efisiensi tidak relevan di mode detail.
+     */
+    private function buildPenjahitActivity(array $f): \Illuminate\Support\Collection
     {
         $from = $f['date_from'];
         $to = $f['date_to'];
 
-        $cutQ = DB::table('qc_results as qc')
-            ->where('qc.stage', 'cutting')
-            ->whereRaw('DATE(qc.qc_date) BETWEEN ? AND ?', [$from, $to]);
-        if ($f['item_id']) {
-            $cutQ->join('cutting_job_bundles as b', 'b.id', '=', 'qc.cutting_job_bundle_id')
-                ->where('b.finished_item_id', $f['item_id']);
-        }
-        $cutting = $cutQ->selectRaw('DATE(qc.qc_date) as date, SUM(qc.qty_ok) ok, SUM(qc.qty_reject) rj')
-            ->groupBy(DB::raw('DATE(qc.qc_date)'))->get()->keyBy('date');
-
-        $sewQ = DB::table('sewing_return_lines as rl')
-            ->join('sewing_returns as r', 'r.id', '=', 'rl.sewing_return_id')
-            ->whereRaw('DATE(r.date) BETWEEN ? AND ?', [$from, $to]);
-        $this->applyNotVoid($sewQ, 'sewing_returns', 'r');
+        // ---- Ambil jahit (pickup lines) ----
+        $pick = DB::table('sewing_pickup_lines as pl')
+            ->join('sewing_pickups as p', 'p.id', '=', 'pl.sewing_pickup_id')
+            ->join('employees as e', 'e.id', '=', 'p.operator_id')
+            ->join('items as it', 'it.id', '=', 'pl.finished_item_id')
+            ->leftJoin('item_categories as cat', 'cat.id', '=', 'it.item_category_id')
+            ->whereNull('p.voided_at')
+            ->whereNull('pl.voided_at')
+            ->whereRaw('DATE(p.date) BETWEEN ? AND ?', [$from, $to]);
         if ($f['operator_id']) {
-            $sewQ->where('r.operator_id', $f['operator_id']);
+            $pick->where('p.operator_id', $f['operator_id']);
         }
         if ($f['item_id']) {
-            $sewQ->join('sewing_pickup_lines as pl2', 'pl2.id', '=', 'rl.sewing_pickup_line_id')
-                ->where('pl2.finished_item_id', $f['item_id']);
+            $pick->where('pl.finished_item_id', $f['item_id']);
         }
-        $sewing = $sewQ->selectRaw('DATE(r.date) as date, SUM(rl.qty_ok) ok, SUM(rl.qty_reject) rj')
-            ->groupBy(DB::raw('DATE(r.date)'))->get()->keyBy('date');
+        if ($f['category_id']) {
+            $pick->where('it.item_category_id', $f['category_id']);
+        }
+        $pick = $pick->selectRaw("
+                'Ambil' as type, p.code as code, DATE(p.date) as date, p.created_at as created_at,
+                e.id as operator_emp_id, e.code as operator_code, e.name as operator_name,
+                it.id as item_id, it.code as sku, it.name as product_name, COALESCE(cat.name,'-') as category,
+                COALESCE(pl.qty_bundle,0) as qty, 0 as qty_ok, 0 as qty_reject
+            ")
+            ->get();
 
-        // gabung semua tanggal di rentang
-        $rows = collect();
-        $cursor = Carbon::parse($from);
-        $end = Carbon::parse($to);
-        while ($cursor->lte($end)) {
-            $d = $cursor->toDateString();
-            $c = $cutting->get($d);
-            $s = $sewing->get($d);
-            $rows->push((object) [
-                'date' => $d,
-                'cutting_ok' => (float) ($c->ok ?? 0),
-                'sewing_ok' => (float) ($s->ok ?? 0),
-                'reject' => (float) ($c->rj ?? 0) + (float) ($s->rj ?? 0),
-            ]);
-            $cursor->addDay();
+        // ---- Setor jahit (return lines) ----
+        $ret = DB::table('sewing_return_lines as rl')
+            ->join('sewing_returns as r', 'r.id', '=', 'rl.sewing_return_id')
+            ->join('sewing_pickup_lines as pl', 'pl.id', '=', 'rl.sewing_pickup_line_id')
+            ->join('items as it', 'it.id', '=', 'pl.finished_item_id')
+            ->join('employees as e', 'e.id', '=', 'r.operator_id')
+            ->leftJoin('item_categories as cat', 'cat.id', '=', 'it.item_category_id')
+            ->whereNull('r.voided_at')
+            ->whereRaw('DATE(r.date) BETWEEN ? AND ?', [$from, $to]);
+        if ($f['operator_id']) {
+            $ret->where('r.operator_id', $f['operator_id']);
+        }
+        if ($f['item_id']) {
+            $ret->where('pl.finished_item_id', $f['item_id']);
+        }
+        if ($f['category_id']) {
+            $ret->where('it.item_category_id', $f['category_id']);
+        }
+        $ret = $ret->selectRaw("
+                'Setor' as type, r.code as code, DATE(r.date) as date, r.created_at as created_at,
+                e.id as operator_emp_id, e.code as operator_code, e.name as operator_name,
+                it.id as item_id, it.code as sku, it.name as product_name, COALESCE(cat.name,'-') as category,
+                COALESCE(rl.qty_ok,0) as qty, COALESCE(rl.qty_ok,0) as qty_ok, COALESCE(rl.qty_reject,0) as qty_reject
+            ")
+            ->get();
+
+        // Memo agar resolusi PieceRate tidak query berulang utk kombinasi sama.
+        $rateMemo = [];
+
+        return $pick->concat($ret)
+            ->map(function ($r) use (&$rateMemo) {
+                $qtyOk = (float) $r->qty_ok;
+                $rate = 0.0;
+                $amount = 0.0;
+                // Piece rate ditampilkan utk Ambil & Setor (acuan tarif borongan).
+                $key = $r->operator_emp_id . '|' . $r->item_id . '|' . $r->date;
+                $rate = $rateMemo[$key] ??= (float) $this->pieceRate->getRatePerPcs(
+                    'sewing',
+                    (int) $r->operator_emp_id,
+                    (int) $r->item_id,
+                    $r->date,
+                );
+                // Upah borongan jahit hanya dihitung dari hasil yang DISETOR & lolos QC.
+                if ($r->type === 'Setor' && $qtyOk > 0) {
+                    $amount = $rate * $qtyOk;
+                }
+                return (object) [
+                    'type' => $r->type,
+                    'code' => $r->code,
+                    'date' => $r->date,
+                    'created_at' => $r->created_at,
+                    'operator_code' => $r->operator_code,
+                    'operator_name' => $r->operator_name,
+                    'sku' => $r->sku,
+                    'product_name' => $r->product_name,
+                    'category' => $r->category,
+                    'qty' => (float) $r->qty,
+                    'qty_ok' => $qtyOk,
+                    'qty_reject' => (float) $r->qty_reject,
+                    'rate' => $rate,
+                    'amount' => $amount,
+                ];
+            })
+            ->sortBy([['date', 'desc'], ['created_at', 'desc']])
+            ->values();
+    }
+
+    /**
+     * Daftar kejadian cutting per baris (tidak di-grouping per pemotong):
+     *  - tiap cutting_job_bundle (status job = qc_done) → qty potong, OK, reject.
+     *  - upah borongan cutting = piece rate (module=cutting) × qty_qc_ok.
+     * Selaras dgn tab Penjahit: KPI + toolbar + tabel per transaksi + footer.
+     */
+    private function buildCuttingActivity(array $f): \Illuminate\Support\Collection
+    {
+        $from = $f['date_from'];
+        $to = $f['date_to'];
+
+        $q = DB::table('cutting_job_bundles as cb')
+            ->join('cutting_jobs as cj', 'cj.id', '=', 'cb.cutting_job_id')
+            ->join('items as it', 'it.id', '=', 'cb.finished_item_id')
+            ->leftJoin('item_categories as cat', 'cat.id', '=', 'it.item_category_id')
+            // operator pemotong: utamakan operator bundle, fallback ke operator job
+            ->leftJoin('employees as e', 'e.id', '=', DB::raw('COALESCE(cb.operator_id, cj.operator_id)'))
+            ->where('cj.status', 'qc_done')
+            ->whereRaw('DATE(cj.date) BETWEEN ? AND ?', [$from, $to]);
+
+        if ($f['operator_id']) {
+            $q->whereRaw('COALESCE(cb.operator_id, cj.operator_id) = ?', [$f['operator_id']]);
+        }
+        if ($f['item_id']) {
+            $q->where('cb.finished_item_id', $f['item_id']);
+        }
+        if ($f['category_id']) {
+            $q->where('it.item_category_id', $f['category_id']);
         }
 
-        return $rows;
+        $rows = $q->selectRaw("
+                cj.code as code, DATE(cj.date) as date, cj.created_at as created_at,
+                COALESCE(cb.operator_id, cj.operator_id) as operator_emp_id,
+                COALESCE(e.code, '-') as operator_code, COALESCE(e.name, 'Tanpa Operator') as operator_name,
+                it.id as item_id, it.code as sku, it.name as product_name, COALESCE(cat.name,'-') as category,
+                COALESCE(cb.qty_pcs,0) as qty, COALESCE(cb.qty_qc_ok,0) as qty_ok, COALESCE(cb.qty_qc_reject,0) as qty_reject
+            ")
+            ->get();
+
+        // Memo agar resolusi PieceRate tidak query berulang utk kombinasi sama.
+        $rateMemo = [];
+
+        return $rows
+            ->map(function ($r) use (&$rateMemo) {
+                $qtyOk = (float) $r->qty_ok;
+                $rate = 0.0;
+                $amount = 0.0;
+                if ($r->operator_emp_id) {
+                    $key = $r->operator_emp_id . '|' . $r->item_id . '|' . $r->date;
+                    $rate = $rateMemo[$key] ??= (float) $this->pieceRate->getRatePerPcs(
+                        'cutting',
+                        (int) $r->operator_emp_id,
+                        (int) $r->item_id,
+                        $r->date,
+                    );
+                    // Upah borongan cutting dihitung dari hasil yang LOLOS QC.
+                    if ($qtyOk > 0) {
+                        $amount = $rate * $qtyOk;
+                    }
+                }
+                return (object) [
+                    'code' => $r->code,
+                    'date' => $r->date,
+                    'created_at' => $r->created_at,
+                    'operator_code' => $r->operator_code,
+                    'operator_name' => $r->operator_name,
+                    'sku' => $r->sku,
+                    'product_name' => $r->product_name,
+                    'category' => $r->category,
+                    'qty' => (float) $r->qty,
+                    'qty_ok' => $qtyOk,
+                    'qty_reject' => (float) $r->qty_reject,
+                    'rate' => $rate,
+                    'amount' => $amount,
+                ];
+            })
+            ->sortBy([['date', 'desc'], ['created_at', 'desc']])
+            ->values();
     }
 
     // ==========================================================

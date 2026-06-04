@@ -45,7 +45,7 @@
             <option value="hpp-desc">Nilai HPP terbesar</option>
         </select>
 
-        <span class="sj-count" data-rj-count>{{ $fmt($lines->count()) }} kejadian · {{ $fmt($total_reject) }} pcs</span>
+        <span class="sj-count" data-rj-count>{{ $fmt($lines->count()) }} kejadian · {{ $fmt($total_reject) }} pcs@if (($total_repaired ?? 0) > 0) · {{ $fmt($total_repaired) }} diperbaiki@endif</span>
     </div>
 
     @if ($lines->isEmpty())
@@ -61,6 +61,7 @@
                         <th>SKU</th>
                         <th class="gf-hide-mobile">Produk</th>
                         <th class="gf-num">Reject</th>
+                        <th>Status</th>
                         <th class="gf-num gf-hide-mobile">Nilai HPP</th>
                         <th class="gf-hide-mobile">Alasan</th>
                     </tr>
@@ -72,8 +73,9 @@
                             data-stage="{{ $l->stage }}"
                             data-date="{{ $l->date }}"
                             data-qty="{{ $l->qty }}"
+                            data-repaired="{{ $l->repaired ?? 0 }}"
                             data-hpp="{{ $l->hpp_total }}">
-                            <td>{{ \Carbon\Carbon::parse($l->date)->format('d M') }}</td>
+                            <td><x-gf.datecell :date="$l->date" :time="$l->created_at" /></td>
                             <td><span class="gf-badge {{ $stageClass($l->stage) }}">{{ $l->stage }}</span></td>
                             <td class="gf-hide-mobile">
                                 @if ($l->operator_code !== '-')
@@ -85,6 +87,18 @@
                             <td><span class="gf-chip" title="{{ $l->product_name }}"><b>{{ $l->sku }}</b></span></td>
                             <td class="text-muted gf-hide-mobile">{{ $l->product_name }}</td>
                             <td class="gf-num"><b>{{ $fmt($l->qty) }}</b></td>
+                            <td>
+                                @if (($l->repaired ?? 0) > 0)
+                                    <span class="gf-badge gf-badge-green" title="Sudah diperbaiki & masuk WH-PRD">{{ $fmt($l->repaired) }} diperbaiki</span>
+                                    @if (($l->remaining ?? 0) > 0)
+                                        <span class="gf-badge gf-badge-red" title="Sisa reject belum diperbaiki">sisa {{ $fmt($l->remaining) }}</span>
+                                    @endif
+                                @elseif ($l->stage === 'Jahit')
+                                    <span class="gf-badge gf-badge-muted">belum</span>
+                                @else
+                                    <span class="text-muted">–</span>
+                                @endif
+                            </td>
                             <td class="gf-num gf-hide-mobile">{{ $rp($l->hpp_total) }}</td>
                             <td class="text-muted small gf-hide-mobile">{{ $l->reason }}</td>
                         </tr>

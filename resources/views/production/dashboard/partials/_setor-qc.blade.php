@@ -91,7 +91,7 @@
                             data-ok="{{ $l->qty_ok }}"
                             data-hpp="{{ $l->hpp_total }}"
                             data-yield="{{ $l->yield ?? 999 }}">
-                            <td>{{ \Carbon\Carbon::parse($l->date)->format('d M') }}</td>
+                            <td><x-gf.datecell :date="$l->date" :time="$l->created_at" /></td>
                             <td>
                                 <span class="gf-chip" title="{{ $l->operator_name }}"><b>{{ $l->operator_code }}</b></span>
                                 <span class="text-muted small d-block gf-hide-mobile">{{ $l->operator_name }}</span>

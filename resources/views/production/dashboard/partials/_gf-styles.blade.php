@@ -14,42 +14,43 @@
 
     .gf-master-header {
         border: 1px solid var(--gf-border);
-        border-radius: 24px;
+        border-radius: 16px;
         background: #fff;
-        padding: 22px;
-        box-shadow: 0 12px 30px rgba(15, 23, 42, .05);
+        padding: 14px 18px;
+        box-shadow: none;
     }
 
     .gf-master-header-layout {
         display: flex;
         justify-content: space-between;
-        align-items: flex-start;
-        gap: 18px;
+        align-items: center;
+        gap: 16px;
         flex-wrap: wrap;
     }
 
-    .gf-master-header-copy { min-width: 240px; }
+    .gf-master-header-copy { min-width: 200px; }
 
     .gf-master-eyebrow {
         color: var(--gf-muted);
-        font-size: 12px;
+        font-size: 10.5px;
         font-weight: 800;
-        letter-spacing: .08em;
+        letter-spacing: .12em;
         text-transform: uppercase;
-        margin-bottom: 8px;
+        margin-bottom: 2px;
     }
 
     .gf-master-title {
         color: var(--gf-dark);
-        font-size: 28px;
-        line-height: 1.2;
-        font-weight: 900;
-        margin-bottom: 6px;
+        font-size: 20px;
+        line-height: 1.25;
+        font-weight: 800;
+        margin-bottom: 1px;
+        letter-spacing: -.01em;
     }
 
     .gf-master-desc {
         color: var(--gf-muted);
-        font-size: 14px;
+        font-size: 12.5px;
         margin-bottom: 0;
         max-width: 860px;
     }
@@ -91,6 +92,22 @@
         z-index: 5;
         box-shadow: 0 1px 0 #edf0f5;
     }
+
+    .gf-sticky-table tfoot td {
+        position: sticky;
+        bottom: 0;
+        z-index: 5;
+    }
+
+    /* Baris total di tfoot (mis. total upah borongan) */
+    .gf-total-row td {
+        background: #f8fafc;
+        border-top: 2px solid #e4e7ec;
+        color: #344054;
+        font-weight: 700;
+        box-shadow: 0 -1px 0 #edf0f5;
+    }
+    .gf-total-row b { color: #0f172a; }
 
     .gf-clean-table thead th {
         background: #fbfcfe;
@@ -222,6 +239,15 @@
     .gf-marketplace-tab-panel[hidden],
     .gf-tab-kpi-panel[hidden] {
         display: none !important;
+    }
+
+    /* Beri jarak antar panel yang ditumpuk dalam satu tab (anti-mepet) */
+    .gf-marketplace-tab-panel > .gf-panel + .gf-panel,
+    .gf-marketplace-tab-panel > .gf-overview-kpi-grid + .gf-panel {
+        margin-top: 1.1rem;
+    }
+    .gf-marketplace-tab-panel > .gf-overview-metric-chips + .gf-panel {
+        margin-top: 1.1rem;
     }
 
     .gf-tab-kpi-stack {
@@ -662,35 +688,50 @@
     }
 
     .gf-header-period-select {
-        width: 118px;
-        min-height: 38px;
+        width: 112px;
+        min-height: 36px;
         border-radius: 999px !important;
         font-size: .78rem;
-        font-weight: 850;
+        font-weight: 600;
         padding-left: .85rem;
         padding-right: 2rem;
-        border-color: rgba(15, 23, 42, .10);
+        border-color: rgba(15, 23, 42, .12);
         box-shadow: none !important;
     }
 
     .gf-header-date-input {
-        width: 205px;
-        min-height: 38px;
+        width: 200px;
+        min-height: 36px;
         border-radius: 999px !important;
         font-size: .78rem;
-        font-weight: 800;
+        font-weight: 600;
         color: #0f172a;
-        border-color: rgba(15, 23, 42, .10);
+        border-color: rgba(15, 23, 42, .12);
         box-shadow: none !important;
+    }
+
+    /* Selaras-kan select filter (penjahit/kategori/SKU) dgn gaya pill yg sama */
+    .gf-header-select {
+        min-height: 36px;
+        max-width: 168px;
+        border-radius: 999px !important;
+        font-size: .78rem;
+        font-weight: 600;
+        padding-left: .85rem;
+        padding-right: 2rem;
+        border-color: rgba(15, 23, 42, .12);
+        box-shadow: none !important;
+        color: #0f172a;
     }
 
     .gf-header-icon-btn,
     .gf-header-action-btn {
-        min-height: 38px !important;
+        min-height: 36px !important;
         border-radius: 999px !important;
-        padding: .45rem .9rem !important;
+        padding: .42rem .85rem !important;
         font-size: .78rem !important;
-        font-weight: 850 !important;
+        font-weight: 600 !important;
+        color: var(--gf-muted) !important;
         white-space: nowrap;
     }
 
