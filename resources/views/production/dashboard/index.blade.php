@@ -121,6 +121,9 @@
             .sj-toolbar .sj-search { flex: 1 1 100%; max-width: none; }
             .sj-count { margin-left: 0; }
             .gf-hide-mobile { display: none !important; }
+            /* Mobile: sembunyikan kartu KPI & teks petunjuk (subtitle) panel tabel */
+            [data-dashboard-root] .gf-overview-kpi-grid { display: none !important; }
+            [data-dashboard-root] .gf-panel-header .gf-subtext { display: none !important; }
             /* kolom tersisa harus pas di layar — hilangkan min-width & padatkan */
             .gf-table-scroll-sticky .gf-clean-table { min-width: 0 !important; font-size: .76rem; }
             .gf-table-scroll-sticky .gf-clean-table th,
