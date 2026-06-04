@@ -120,41 +120,76 @@ class ProductionDashboardController extends Controller
         $f = $this->resolveFilters($request);
         $f['operator_id'] = $employee->id;
 
-        // Hanya baris yang benar-benar menghasilkan upah (real, bukan estimasi).
-        $rows = $module === 'cutting'
+        // Pisahkan upah RIIL (hasil disetor & lolos QC) dari ESTIMASI (masih diambil, belum disetor).
+        $activity = $module === 'cutting'
             ? $this->buildCuttingActivity($f)
-            : $this->buildPenjahitActivity($f)->where('type', 'Setor')->values();
+            : $this->buildPenjahitActivity($f);
 
-        // Group kategori → SKU (tarif efektif = jumlah ÷ qty agar aman bila tarif beda tanggal).
-        $groups = $rows->groupBy('category')
-            ->map(function ($items, $cat) {
-                $lines = $items->groupBy('sku')
-                    ->map(function ($g) {
-                        $qty = (float) $g->sum('qty_ok');
-                        $amount = (float) $g->sum('amount');
-                        $first = $g->first();
-                        return (object) [
-                            'sku' => $first->sku,
-                            'product_name' => $first->product_name,
-                            'qty' => $qty,
-                            'rate' => $qty > 0 ? $amount / $qty : (float) $first->rate,
-                            'amount' => $amount,
-                        ];
-                    })
-                    ->sortBy('sku')
-                    ->values();
+        $rows = $module === 'cutting'
+            ? $activity
+            : $activity->where('type', 'Setor')->values();
 
-                return (object) [
-                    'category' => $cat,
-                    'lines' => $lines,
-                    'qty' => (float) $items->sum('qty_ok'),
-                    'amount' => (float) $items->sum('amount'),
-                ];
-            })
-            ->sortBy('category')
+        // Item yang masih dipegang penjahit (belum disetor) → dasar estimasi. Hanya modul jahit.
+        $ambil = $module === 'cutting'
+            ? collect()
+            : $activity->where('type', 'Ambil')->filter(fn($r) => $r->qty_outstanding > 0)->values();
+
+        // Closure grouping kategori → SKU. $qtyKey & $amountFn menentukan basis riil vs estimasi.
+        $groupBy = function ($items, callable $qtyOf, callable $amountOf) {
+            return $items->groupBy('category')
+                ->map(function ($g, $cat) use ($qtyOf, $amountOf) {
+                    $lines = $g->groupBy('sku')
+                        ->map(function ($s) use ($qtyOf, $amountOf) {
+                            $qty = (float) $s->sum($qtyOf);
+                            $amount = (float) $s->sum($amountOf);
+                            $first = $s->first();
+                            return (object) [
+                                'sku' => $first->sku,
+                                'product_name' => $first->product_name,
+                                'qty' => $qty,
+                                'rate' => $qty > 0 ? $amount / $qty : (float) $first->rate,
+                                'amount' => $amount,
+                            ];
+                        })
+                        ->sortBy('sku')
+                        ->values();
+
+                    return (object) [
+                        'category' => $cat,
+                        'lines' => $lines,
+                        'qty' => (float) $g->sum($qtyOf),
+                        'amount' => (float) $g->sum($amountOf),
+                    ];
+                })
+                ->sortBy('category')
+                ->values();
+        };
+
+        // Riil: qty = qty_ok, upah = amount (sudah final).
+        $groups = $groupBy($rows, fn($r) => $r->qty_ok, fn($r) => $r->amount);
+
+        // Estimasi: qty = sisa belum disetor, upah = tarif × sisa (BELUM final).
+        $estGroups = $groupBy($ambil, fn($r) => $r->qty_outstanding, fn($r) => $r->rate * $r->qty_outstanding);
+        $estQty = (float) $ambil->sum('qty_outstanding');
+        $estAmount = (float) $ambil->sum(fn($r) => $r->rate * $r->qty_outstanding);
+
+        // Recap per kategori (gabungan riil + estimasi) — tampil ringkas di hero slip.
+        $recap = $groups->concat($estGroups)
+            ->groupBy('category')
+            ->map(fn($g, $cat) => (object) [
+                'category' => $cat,
+                'qty' => (float) $g->sum('qty'),
+                'amount' => (float) $g->sum('amount'),
+            ])
+            ->sortByDesc('amount')
             ->values();
 
         $role = $module === 'cutting' ? 'Pemotong' : 'Penjahit';
+
+        // Rentang tanggal ambil (dari pickup) — hanya relevan utk penjahit.
+        $pickupDates = $activity->pluck('pickup_date')->filter()->unique()->sort()->values();
+        $pickupFrom = $pickupDates->first();
+        $pickupTo = $pickupDates->last();
 
         // Nama file unduhan: NAMAOPERATOR_ROLE_RANGETANGGAL
         $clean = fn(string $s) => preg_replace('/[^A-Za-z0-9]+/', '', $s);
@@ -169,9 +204,15 @@ class ProductionDashboardController extends Controller
             'period' => $this->periodLabel($f),
             'dateFrom' => $f['date_from'],
             'dateTo' => $f['date_to'],
+            'pickupFrom' => $pickupFrom,
+            'pickupTo' => $pickupTo,
             'groups' => $groups,
             'grandQty' => (float) $rows->sum('qty_ok'),
             'grandAmount' => (float) $rows->sum('amount'),
+            'estGroups' => $estGroups,
+            'estQty' => $estQty,
+            'estAmount' => $estAmount,
+            'recap' => $recap,
             'printedAt' => Carbon::now(),
             'fileName' => $fileName,
         ]);
@@ -964,9 +1005,11 @@ class ProductionDashboardController extends Controller
         }
         $pick = $pick->selectRaw("
                 'Ambil' as type, p.code as code, DATE(p.date) as date, p.created_at as created_at,
+                DATE(p.date) as pickup_date,
                 e.id as operator_emp_id, e.code as operator_code, e.name as operator_name,
                 it.id as item_id, it.code as sku, it.name as product_name, COALESCE(cat.name,'-') as category,
-                COALESCE(pl.qty_bundle,0) as qty, 0 as qty_ok, 0 as qty_reject
+                COALESCE(pl.qty_bundle,0) as qty, 0 as qty_ok, 0 as qty_reject,
+                COALESCE(pl.qty_bundle,0) - COALESCE(pl.qty_returned_ok,0) - COALESCE(pl.qty_returned_reject,0) as qty_outstanding
             ")
             ->get();
 
@@ -974,6 +1017,7 @@ class ProductionDashboardController extends Controller
         $ret = DB::table('sewing_return_lines as rl')
             ->join('sewing_returns as r', 'r.id', '=', 'rl.sewing_return_id')
             ->join('sewing_pickup_lines as pl', 'pl.id', '=', 'rl.sewing_pickup_line_id')
+            ->join('sewing_pickups as pp', 'pp.id', '=', 'pl.sewing_pickup_id')
             ->join('items as it', 'it.id', '=', 'pl.finished_item_id')
             ->join('employees as e', 'e.id', '=', 'r.operator_id')
             ->leftJoin('item_categories as cat', 'cat.id', '=', 'it.item_category_id')
@@ -990,9 +1034,11 @@ class ProductionDashboardController extends Controller
         }
         $ret = $ret->selectRaw("
                 'Setor' as type, r.code as code, DATE(r.date) as date, r.created_at as created_at,
+                DATE(pp.date) as pickup_date,
                 e.id as operator_emp_id, e.code as operator_code, e.name as operator_name,
                 it.id as item_id, it.code as sku, it.name as product_name, COALESCE(cat.name,'-') as category,
-                COALESCE(rl.qty_ok,0) as qty, COALESCE(rl.qty_ok,0) as qty_ok, COALESCE(rl.qty_reject,0) as qty_reject
+                COALESCE(rl.qty_ok,0) as qty, COALESCE(rl.qty_ok,0) as qty_ok, COALESCE(rl.qty_reject,0) as qty_reject,
+                0 as qty_outstanding
             ")
             ->get();
 
@@ -1020,6 +1066,7 @@ class ProductionDashboardController extends Controller
                     'type' => $r->type,
                     'code' => $r->code,
                     'date' => $r->date,
+                    'pickup_date' => $r->pickup_date,
                     'created_at' => $r->created_at,
                     'operator_code' => $r->operator_code,
                     'operator_name' => $r->operator_name,
@@ -1029,6 +1076,7 @@ class ProductionDashboardController extends Controller
                     'qty' => (float) $r->qty,
                     'qty_ok' => $qtyOk,
                     'qty_reject' => (float) $r->qty_reject,
+                    'qty_outstanding' => (float) ($r->qty_outstanding ?? 0),
                     'rate' => $rate,
                     'amount' => $amount,
                 ];
@@ -1100,6 +1148,7 @@ class ProductionDashboardController extends Controller
                 return (object) [
                     'code' => $r->code,
                     'date' => $r->date,
+                    'pickup_date' => null,
                     'created_at' => $r->created_at,
                     'operator_code' => $r->operator_code,
                     'operator_name' => $r->operator_name,

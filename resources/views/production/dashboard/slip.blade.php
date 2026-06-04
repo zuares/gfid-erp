@@ -1,6 +1,7 @@
 @php
     $fmt = fn($n, $d = 0) => number_format((float) $n, $d, ',', '.');
     $rp = fn($n) => 'Rp ' . number_format((float) $n, 0, ',', '.');
+    $tgl = fn($d) => $d ? \Carbon\Carbon::parse($d)->format('d-m-Y') : $d;
 @endphp
 <!DOCTYPE html>
 <html lang="id">
@@ -51,10 +52,35 @@
         .num { text-align: right; font-variant-numeric: tabular-nums; white-space: nowrap; }
         .cat-row td { background: #f8fafc; font-weight: 700; border-top: 1px solid var(--line); padding-top: 9px; }
         .line-row td { border-bottom: 1px solid #f1f5f9; }
-        .line-row .sku { font-weight: 600; }
-        .line-row .prod { display: block; color: var(--muted); font-size: 12px; }
+        .line-row .prod-name { font-weight: 600; }
+        .line-row .sku-mini { display: block; color: var(--muted); font-size: 11px; margin-top: 1px; }
         .sub-row td { font-size: 12px; color: var(--muted); border-bottom: 1px solid var(--line); padding-bottom: 9px; }
         .sub-row .num { font-weight: 700; color: var(--ink); }
+
+        /* Hero — recap per kategori (kiri, panel) + Total Diterima (kanan, angka hijau).
+           Dua focal point: kiri panel rapi bertepi, kanan angka besar hijau. */
+        .hero { display: flex; flex-direction: column; gap: 16px;
+            padding: 2px 0 16px; margin-bottom: 18px; border-bottom: 2px solid var(--line); }
+        .hero-label { font-size: 11px; text-transform: uppercase; letter-spacing: .06em;
+            color: var(--muted); font-weight: 700; margin-bottom: 8px; }
+
+        .hero-recap { flex: 1 1 auto; min-width: 0; }
+        .recap-list { border: 1px solid var(--line); border-radius: 10px; overflow: hidden; background: #fff; }
+        .recap-row { display: flex; align-items: center; justify-content: space-between; gap: 12px;
+            padding: 9px 12px; border-bottom: 1px solid var(--line); }
+        .recap-row:last-child { border-bottom: 0; }
+        .recap-cat { font-weight: 700; color: var(--ink); font-size: 13px; }
+        .recap-qty { display: block; font-size: 11px; color: var(--muted); font-weight: 500; margin-top: 1px; }
+        .recap-amt { white-space: nowrap; font-variant-numeric: tabular-nums;
+            font-weight: 800; font-size: 14px; color: var(--ink); }
+
+        .hero-total { text-align: left; }
+        .hero-amount { font-size: 32px; font-weight: 800; letter-spacing: -.02em; margin-top: 2px; color: #16a34a; }
+        .hero-sub { font-size: 12px; color: var(--muted); margin-top: 5px; }
+        .hero-muted .hero-amount { color: var(--ink); }
+
+        .sec-title { font-size: 11px; text-transform: uppercase; letter-spacing: .05em; color: var(--muted);
+            font-weight: 700; margin: 4px 0 6px; }
 
         .grand { margin-top: 18px; display: flex; justify-content: stretch; }
         .grand-box { width: 100%; }
@@ -69,6 +95,19 @@
         .empty { padding: 40px; text-align: center; color: var(--muted); }
         .foot-note { margin-top: 24px; font-size: 11px; color: var(--muted); }
 
+        .note-empty { padding: 14px; margin-bottom: 4px; text-align: center; color: var(--muted);
+            background: #f8fafc; border: 1px dashed var(--line); border-radius: 8px; }
+
+        /* ---- Perkiraan (belum disetor) — gaya redup, jelas terpisah dari upah riil ---- */
+        .est { margin-top: 26px; padding-top: 18px; border-top: 1px dashed var(--line); }
+        .est-head { font-weight: 800; font-size: 13px; color: var(--muted); }
+        .est-head span { display: block; font-weight: 500; font-size: 11px; margin-top: 2px; }
+        .est-table { margin-top: 10px; }
+        .est-table .cat-row td { background: #fff7ed; }
+        .est-table .num { color: var(--muted); }
+        .est-total { border-top: 2px dashed var(--muted); margin-top: 4px; padding-top: 8px;
+            font-size: 15px; font-weight: 800; color: var(--muted); }
+
         /* ---------- Tablet & desktop enhancements ---------- */
         @media (min-width: 641px) {
             body { font-size: 13px; }
@@ -80,7 +119,9 @@
             .slip-title { text-align: right; }
             .slip-meta { grid-template-columns: 1fr 1fr; gap: 6px 24px; }
             th, td { padding: 7px 8px; }
-            .line-row .prod { display: inline; }
+            .hero { flex-direction: row; align-items: center; justify-content: space-between; gap: 28px; }
+            .hero-recap { max-width: 56%; }
+            .hero-total { text-align: right; flex: 0 0 auto; }
             .grand { justify-content: flex-end; }
             .grand-box { width: auto; min-width: 280px; }
             .sign { grid-template-columns: 1fr 1fr; gap: 24px; margin-top: 40px; }
@@ -121,54 +162,116 @@
             <div><dt>Nama</dt><dd>{{ $employee->name }}</dd></div>
             <div><dt>Kode</dt><dd>{{ $employee->code }}</dd></div>
             <div><dt>Peran</dt><dd>{{ $role }}</dd></div>
-            <div><dt>Periode</dt><dd>{{ $dateFrom }} – {{ $dateTo }}</dd></div>
-            <div><dt>Dicetak</dt><dd>{{ $printedAt->translatedFormat('d M Y H:i') }}</dd></div>
+            <div><dt>Periode</dt><dd>{{ $tgl($dateFrom) }} – {{ $tgl($dateTo) }}</dd></div>
+            @if ($pickupFrom)
+                <div><dt>Tgl Ambil</dt><dd>{{ $pickupFrom === $pickupTo ? $tgl($pickupFrom) : $tgl($pickupFrom) . ' – ' . $tgl($pickupTo) }}</dd></div>
+            @endif
+            <div><dt>Dicetak</dt><dd>{{ $printedAt->format('d-m-Y H:i') }}</dd></div>
         </dl>
 
-        @if ($groups->isEmpty())
+        @if ($groups->isEmpty() && $estGroups->isEmpty())
             <div class="empty">Tidak ada hasil borongan pada periode ini.</div>
         @else
-            <table>
-                <thead>
-                    <tr>
-                        <th>SKU / Produk</th>
-                        <th class="num">Qty OK</th>
-                        <th class="num">Tarif</th>
-                        <th class="num">Jumlah</th>
-                    </tr>
-                </thead>
-                <tbody>
-                    @foreach ($groups as $g)
-                        <tr class="cat-row">
-                            <td>{{ $g->category }}</td>
-                            <td class="num">{{ $fmt($g->qty) }}</td>
-                            <td></td>
-                            <td class="num">{{ $rp($g->amount) }}</td>
+            {{-- Kartu utama: Total Diterima = upah setor (riil) + perkiraan belum disetor --}}
+            @php
+                $grandTotal = $grandAmount + $estAmount;
+                if ($estAmount > 0) {
+                    $heroSub = 'Setor ' . $rp($grandAmount) . ' + perkiraan ~' . $rp($estAmount);
+                } else {
+                    $heroSub = $fmt($grandQty) . ' pcs lolos QC · ' . $tgl($dateFrom) . ' – ' . $tgl($dateTo);
+                }
+            @endphp
+            <div class="hero {{ $grandTotal > 0 ? '' : 'hero-muted' }}">
+                @if ($recap->isNotEmpty())
+                    <div class="hero-recap">
+                        <div class="hero-label">Per Kategori</div>
+                        <div class="recap-list">
+                            @foreach ($recap as $r)
+                                <div class="recap-row">
+                                    <span><span class="recap-cat">{{ $r->category }}</span><span class="recap-qty">{{ $fmt($r->qty) }} pcs</span></span>
+                                    <span class="recap-amt">{{ $rp($r->amount) }}</span>
+                                </div>
+                            @endforeach
+                        </div>
+                    </div>
+                @endif
+                <div class="hero-total">
+                    <div class="hero-label">Total Diterima</div>
+                    <div class="hero-amount">{{ $rp($grandTotal) }}</div>
+                    <div class="hero-sub">{{ $heroSub }}</div>
+                </div>
+            </div>
+
+            @if (!$groups->isEmpty())
+                @php $flatLines = $groups->flatMap(fn($g) => $g->lines)->sortBy('sku')->values(); @endphp
+                <div class="sec-title">Rincian hasil disetor</div>
+                <table>
+                    <thead>
+                        <tr>
+                            <th>Produk</th>
+                            <th class="num">OK</th>
+                            <th class="num">Tarif</th>
+                            <th class="num">Jumlah</th>
                         </tr>
-                        @foreach ($g->lines as $l)
+                    </thead>
+                    <tbody>
+                        @foreach ($flatLines as $l)
                             <tr class="line-row">
-                                <td><span class="sku">{{ $l->sku }}</span> <span class="prod">— {{ $l->product_name }}</span></td>
+                                <td><span class="prod-name">{{ $l->product_name }}</span><span class="sku-mini">{{ $l->sku }}</span></td>
                                 <td class="num">{{ $fmt($l->qty) }}</td>
                                 <td class="num">{{ $l->rate > 0 ? $rp($l->rate) : '–' }}</td>
                                 <td class="num">{{ $rp($l->amount) }}</td>
                             </tr>
                         @endforeach
+                    </tbody>
+                    <tfoot>
                         <tr class="sub-row">
-                            <td>Subtotal {{ $g->category }}</td>
-                            <td class="num">{{ $fmt($g->qty) }}</td>
+                            <td>Total</td>
+                            <td class="num">{{ $fmt($grandQty) }}</td>
                             <td></td>
-                            <td class="num">{{ $rp($g->amount) }}</td>
+                            <td class="num">{{ $rp($grandAmount) }}</td>
                         </tr>
-                    @endforeach
-                </tbody>
-            </table>
+                    </tfoot>
+                </table>
+            @else
+                <div class="note-empty">Belum ada hasil yang disetor &amp; lolos QC pada periode ini.</div>
+            @endif
 
-            <div class="grand">
-                <div class="grand-box">
-                    <div class="row"><span>Total Qty OK</span><b>{{ $fmt($grandQty) }} pcs</b></div>
-                    <div class="row total"><span>Total Diterima</span><span>{{ $rp($grandAmount) }}</span></div>
+            @if ($estGroups->isNotEmpty())
+                <div class="est">
+                    <div class="est-head">
+                        Belum Disetor
+                        <span>Pekerjaan yang masih dipegang (belum lolos QC). Nilai perkiraan, belum dibayar.</span>
+                    </div>
+                    @php $flatEst = $estGroups->flatMap(fn($g) => $g->lines)->sortBy('sku')->values(); @endphp
+                    <table class="est-table">
+                        <thead>
+                            <tr>
+                                <th>Produk</th>
+                                <th class="num">Sisa</th>
+                                <th class="num">Tarif</th>
+                                <th class="num">Perkiraan</th>
+                            </tr>
+                        </thead>
+                        <tbody>
+                            @foreach ($flatEst as $l)
+                                <tr class="line-row">
+                                    <td><span class="prod-name">{{ $l->product_name }}</span><span class="sku-mini">{{ $l->sku }}</span></td>
+                                    <td class="num">{{ $fmt($l->qty) }}</td>
+                                    <td class="num">{{ $l->rate > 0 ? $rp($l->rate) : '–' }}</td>
+                                    <td class="num">~{{ $rp($l->amount) }}</td>
+                                </tr>
+                            @endforeach
+                        </tbody>
+                    </table>
+                    <div class="grand">
+                        <div class="grand-box">
+                            <div class="row"><span>Sisa Qty</span><b>{{ $fmt($estQty) }} pcs</b></div>
+                            <div class="row est-total"><span>Perkiraan (belum final)</span><span>~{{ $rp($estAmount) }}</span></div>
+                        </div>
+                    </div>
                 </div>
-            </div>
+            @endif
 
             <div class="sign">
                 <div><div class="label">Diterima oleh</div><div class="name">{{ $employee->name }}</div></div>
@@ -176,10 +279,6 @@
             </div>
         @endif
 
-        <div class="foot-note">
-            Dihitung borongan dari hasil yang lolos QC{{ $module === 'cutting' ? ' (potong)' : ' (setoran jahit)' }}.
-            Estimasi dari pekerjaan yang masih diambil/diproses tidak termasuk.
-        </div>
     </div>
 
     <script src="https://cdnjs.cloudflare.com/ajax/libs/html2canvas/1.4.1/html2canvas.min.js"></script>
