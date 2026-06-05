@@ -80,7 +80,7 @@
             {{-- TYPE --}}
             <div class="col-md-4">
                 <label class="form-label fw-semibold small mb-1">Tipe Item</label>
-                <select name="type" class="form-select form-select-sm @error('type') is-invalid @enderror" required>
+                <select name="type" data-item-type class="form-select form-select-sm @error('type') is-invalid @enderror" required>
                     @php
                         $types = [
                             'material' => 'Material',
@@ -102,18 +102,40 @@
             </div>
 
             {{-- CATEGORY --}}
-            <div class="col-md-5">
+            <div class="col-md-3">
                 <label class="form-label fw-semibold small mb-1">Kategori</label>
                 <select name="item_category_id"
-                    class="form-select form-select-sm @error('item_category_id') is-invalid @enderror">
+                    data-item-category class="form-select form-select-sm @error('item_category_id') is-invalid @enderror">
                     <option value="">- Tidak Ada -</option>
                     @foreach ($categories as $cat)
-                        <option value="{{ $cat->id }}" @selected(old('item_category_id', $item->item_category_id ?? null) == $cat->id)>
-                            {{ $cat->name }}
+                        <option value="{{ $cat->id }}" data-kind="{{ $cat->kind }}" @selected(old('item_category_id', $item->item_category_id ?? null) == $cat->id)>
+                            {{ $cat->code }} — {{ $cat->name }} ({{ $cat->kind_label }})
                         </option>
                     @endforeach
                 </select>
+                <div class="form-text small" data-item-category-help>
+                    Pilih tipe item dulu agar pilihan kategori lebih relevan.
+                </div>
                 @error('item_category_id')
+                    <div class="invalid-feedback d-block">
+                        {{ $message }}
+                    </div>
+                @enderror
+            </div>
+
+            {{-- PRODUCTION SOURCE --}}
+            <div class="col-md-2" data-production-source-wrap>
+                <label class="form-label fw-semibold small mb-1">Sumber Produksi</label>
+                <select name="production_source" data-production-source
+                    class="form-select form-select-sm @error('production_source') is-invalid @enderror">
+                    @foreach (\App\Models\Item::productionSourceLabels() as $key => $label)
+                        <option value="{{ $key }}" @selected(old('production_source', $item->production_source ?? \App\Models\Item::PRODUCTION_BUY) === $key)>
+                            {{ $label }}
+                        </option>
+                    @endforeach
+                </select>
+                <div class="form-text small">Untuk FG/WIP.</div>
+                @error('production_source')
                     <div class="invalid-feedback d-block">
                         {{ $message }}
                     </div>
@@ -135,3 +157,49 @@
         Simpan
     </button>
 </div>
+
+@push('scripts')
+    <script>
+        (function () {
+            const typeSelect = document.querySelector('[data-item-type]');
+            const categorySelect = document.querySelector('[data-item-category]');
+            const productionSourceWrap = document.querySelector('[data-production-source-wrap]');
+            const productionSourceSelect = document.querySelector('[data-production-source]');
+            const help = document.querySelector('[data-item-category-help]');
+            if (!typeSelect || !categorySelect) return;
+
+            const labels = {
+                finished_good: 'Kategori produk jadi ditampilkan lebih dulu.',
+                wip: 'WIP biasanya mengikuti kategori produk jadi.',
+                material: 'Kategori bahan, pendukung, accessories, dan packaging ditampilkan lebih dulu.',
+            };
+
+            function allowedKinds(type) {
+                if (type === 'finished_good' || type === 'wip') return ['product'];
+                if (type === 'material') return ['material', 'support', 'accessory', 'packaging', 'other'];
+                return ['product', 'material', 'support', 'accessory', 'packaging', 'other'];
+            }
+
+            function refreshCategoryOptions() {
+                const allowed = allowedKinds(typeSelect.value);
+                const selected = categorySelect.selectedOptions[0];
+                Array.from(categorySelect.options).forEach(option => {
+                    if (!option.value) {
+                        option.hidden = false;
+                        return;
+                    }
+                    const keepSelected = selected && option.value === selected.value;
+                    option.hidden = !allowed.includes(option.dataset.kind || 'other') && !keepSelected;
+                });
+                if (help) help.textContent = labels[typeSelect.value] || 'Pilih kategori yang sesuai dengan tipe item.';
+
+                const usesProductionSource = typeSelect.value === 'finished_good' || typeSelect.value === 'wip';
+                if (productionSourceWrap) productionSourceWrap.hidden = !usesProductionSource;
+                if (productionSourceSelect) productionSourceSelect.disabled = !usesProductionSource;
+            }
+
+            typeSelect.addEventListener('change', refreshCategoryOptions);
+            refreshCategoryOptions();
+        })();
+    </script>
+@endpush

@@ -3,10 +3,6 @@
 @section('title', 'Shipment Analytics')
 
 @section('content')
-    @php
-        $fmt = fn($n) => number_format($n ?? 0, 0, ',', '.');
-    @endphp
-
     <div class="container py-3">
 
         <h4 class="mb-3">Shipment Analytics</h4>

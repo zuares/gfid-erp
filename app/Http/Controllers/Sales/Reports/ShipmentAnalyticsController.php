@@ -5,15 +5,18 @@ namespace App\Http\Controllers\Sales\Reports;
 use App\Http\Controllers\Controller;
 use App\Models\Shipment;
 use App\Models\Warehouse;
+use App\Support\ReportDateRange;
 use Illuminate\Http\Request;
 
 class ShipmentAnalyticsController extends Controller
 {
     public function index(Request $request)
     {
+        $range = ReportDateRange::fromRequest($request);
+
         $filters = [
-            'date_from' => $request->input('date_from'),
-            'date_to' => $request->input('date_to'),
+            'date_from' => $range->from,
+            'date_to' => $range->to,
             'warehouse_id' => $request->input('warehouse_id'),
             'shipping_method' => $request->input('shipping_method'),
         ];

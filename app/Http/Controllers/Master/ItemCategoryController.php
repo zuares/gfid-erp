@@ -3,6 +3,7 @@
 namespace App\Http\Controllers\Master;
 
 use App\Http\Controllers\Controller;
+use App\Models\Item;
 use App\Models\ItemCategory;
 use Illuminate\Http\Request;
 use Illuminate\Validation\Rule;
@@ -12,6 +13,21 @@ class ItemCategoryController extends Controller
     public function index(Request $request)
     {
         $query = ItemCategory::query()->withCount('items');
+        $kindLabels = ItemCategory::kindLabels();
+        $kindCounts = ItemCategory::query()
+            ->selectRaw('kind, COUNT(*) as total')
+            ->groupBy('kind')
+            ->pluck('total', 'kind');
+        $kindItemCounts = Item::query()
+            ->join('item_categories as c', 'c.id', '=', 'items.item_category_id')
+            ->selectRaw('c.kind, COUNT(items.id) as total')
+            ->groupBy('c.kind')
+            ->pluck('total', 'c.kind');
+        $totalCategories = ItemCategory::count();
+        $activeCount = ItemCategory::where('active', true)->count();
+        $usedCount = ItemCategory::has('items')->count();
+        $emptyCount = ItemCategory::doesntHave('items')->count();
+        $kindItems = null;
 
         if ($search = $request->input('q')) {
             $query->where(function ($q) use ($search) {
@@ -24,12 +40,55 @@ class ItemCategoryController extends Controller
             $query->where('active', $status === 'active');
         }
 
+        if (($kind = $request->input('kind')) !== null && $kind !== '') {
+            $query->where('kind', $kind);
+
+            $itemQuery = Item::query()
+                ->with('category')
+                ->withCount('barcodes')
+                ->whereHas('category', fn($q) => $q->where('kind', $kind));
+
+            if ($search) {
+                $itemQuery->where(function ($q) use ($search) {
+                    $q->where('code', 'like', '%' . $search . '%')
+                        ->orWhere('name', 'like', '%' . $search . '%');
+                });
+            }
+
+            if ($status !== null && $status !== '') {
+                $itemQuery->where('active', $status === 'active');
+            }
+
+            $kindItems = $itemQuery
+                ->orderBy('code')
+                ->paginate(100, ['*'], 'items_page')
+                ->withQueryString();
+        }
+
         $categories = $query
+            ->orderByRaw("CASE kind
+                WHEN 'product' THEN 1
+                WHEN 'material' THEN 2
+                WHEN 'support' THEN 3
+                WHEN 'accessory' THEN 4
+                WHEN 'packaging' THEN 5
+                ELSE 9
+            END")
             ->orderBy('name')
             ->paginate(25)
             ->withQueryString();
 
-        return view('master.item_categories.index', compact('categories'));
+        return view('master.item_categories.index', compact(
+            'categories',
+            'kindLabels',
+            'kindCounts',
+            'kindItemCounts',
+            'kindItems',
+            'totalCategories',
+            'activeCount',
+            'usedCount',
+            'emptyCount',
+        ));
     }
 
     public function store(Request $request)
@@ -39,6 +98,7 @@ class ItemCategoryController extends Controller
         ItemCategory::create([
             'code' => $data['code'],
             'name' => $data['name'],
+            'kind' => $data['kind'],
             'active' => isset($data['active']) ? (bool) $data['active'] : true,
         ]);
 
@@ -54,6 +114,7 @@ class ItemCategoryController extends Controller
         $item_category->update([
             'code' => $data['code'],
             'name' => $data['name'],
+            'kind' => $data['kind'],
             'active' => isset($data['active']) ? (bool) $data['active'] : true,
         ]);
 
@@ -92,6 +153,7 @@ class ItemCategoryController extends Controller
                 Rule::unique('item_categories', 'code')->ignore($idToIgnore),
             ],
             'name' => ['required', 'string', 'max:190'],
+            'kind' => ['required', 'string', Rule::in(array_keys(ItemCategory::kindLabels()))],
             'active' => ['nullable'],
         ]);
     }

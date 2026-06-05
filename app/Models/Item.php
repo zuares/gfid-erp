@@ -21,6 +21,7 @@ class Item extends Model
         'product_category_id', // kalau kamu sudah tambah kolom ini (opsional)
         'item_role', // legacy string (raw_material/production_supply/...)
         'item_role_id', // FK ke item_roles
+        'production_source', // in_house / outsource / buy
 
         'last_purchase_price',
         'hpp',
@@ -39,6 +40,10 @@ class Item extends Model
         'consumption_cutting_basis_qty',
     ];
 
+    public const PRODUCTION_IN_HOUSE = 'in_house';
+    public const PRODUCTION_OUTSOURCE = 'outsource';
+    public const PRODUCTION_BUY = 'buy';
+
     protected $casts = [
         'last_purchase_price' => 'decimal:2',
         'hpp' => 'decimal:2',
@@ -51,6 +56,25 @@ class Item extends Model
         'consumption_cutting' => 'decimal:4',
         'consumption_cutting_basis_qty' => 'decimal:4',
     ];
+
+    public static function productionSourceLabels(): array
+    {
+        return [
+            self::PRODUCTION_IN_HOUSE => 'Produksi sendiri',
+            self::PRODUCTION_OUTSOURCE => 'Makloon / Outsource',
+            self::PRODUCTION_BUY => 'Beli jadi',
+        ];
+    }
+
+    public function getProductionSourceLabelAttribute(): string
+    {
+        return self::productionSourceLabels()[$this->production_source] ?? 'Belum ditentukan';
+    }
+
+    public function getIsMadeInHouseAttribute(): bool
+    {
+        return $this->production_source === self::PRODUCTION_IN_HOUSE;
+    }
 
     /* ============================================================
      * RELATIONSHIPS

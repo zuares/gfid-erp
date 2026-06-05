@@ -12,6 +12,7 @@ class ItemCategory extends Model
     protected $fillable = [
         'code',
         'name',
+        'kind',
         'active',
     ];
 
@@ -40,6 +41,28 @@ class ItemCategory extends Model
     public function scopeActive($query)
     {
         return $query->where('active', true);
+    }
+
+    public function scopeKind($query, string $kind)
+    {
+        return $query->where('kind', $kind);
+    }
+
+    public static function kindLabels(): array
+    {
+        return [
+            'product' => 'Kategori Produk Jadi',
+            'material' => 'Bahan Baku',
+            'support' => 'Bahan Pendukung',
+            'accessory' => 'Accessories',
+            'packaging' => 'Packaging & Shipping',
+            'other' => 'Lainnya',
+        ];
+    }
+
+    public function getKindLabelAttribute(): string
+    {
+        return self::kindLabels()[$this->kind] ?? $this->kind ?? 'Lainnya';
     }
 
     public function isActive(): bool

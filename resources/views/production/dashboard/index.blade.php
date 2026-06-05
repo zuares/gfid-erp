@@ -132,6 +132,10 @@
 
         @media (max-width: 576px) {
             .sj-toolbar .sj-search { flex: 1 1 100%; max-width: none; }
+            .sj-toolbar .form-select {
+                flex: 1 1 calc(50% - .25rem);
+                min-width: 0;
+            }
             .sj-count { margin-left: 0; }
             .gf-hide-mobile { display: none !important; }
             /* Mobile: sembunyikan kartu KPI & teks petunjuk (subtitle) panel tabel */
@@ -351,6 +355,14 @@
         .gf-datecell-sub { font-size: .68rem; color: var(--gf-muted); font-variant-numeric: tabular-nums; white-space: nowrap; }
 
         /* Tab Prioritas — minimalis, sedikit warna */
+        .gf-pri-item { display: flex; align-items: center; gap: .7rem; min-width: 230px; }
+        .gf-pri-product { font-weight: 700; color: var(--gf-dark); line-height: 1.2; }
+        .gf-pri-meta { margin-top: .12rem; color: var(--gf-muted); font-size: .76rem; line-height: 1.2; }
+        .gf-pri-stack { display: flex; flex-direction: column; align-items: flex-end; gap: .08rem; line-height: 1.15; }
+        .gf-pri-stack b { color: var(--gf-dark); font-size: .96rem; font-variant-numeric: tabular-nums; }
+        .gf-pri-stack span,
+        .gf-pri-stack small { color: var(--gf-muted); font-size: .7rem; white-space: nowrap; }
+        .gf-pri-decision { display: flex; flex-direction: column; align-items: flex-start; gap: .32rem; min-width: 120px; }
         .gf-pri-score { display: flex; align-items: center; gap: .45rem; justify-content: flex-end; }
         .gf-pri-score b { font-variant-numeric: tabular-nums; }
         .gf-pri-bar { width: 44px; height: 4px; border-radius: 99px; background: #eef2f7; overflow: hidden; flex: none; }
@@ -360,6 +372,82 @@
         .gf-pri-kritis .gf-pri-dot { background: #dc2626; }
         .gf-pri-tinggi .gf-pri-dot { background: #f59e0b; }
         .gf-pri-kritis { color: #b91c1c; }
+        .gf-pri-reason { max-width: 280px; color: var(--gf-muted); font-size: .8rem; line-height: 1.35; }
+        @media (max-width: 576px) {
+            [data-pr-toolbar] {
+                position: sticky;
+                top: 0;
+                z-index: 8;
+                padding: .55rem 0 .65rem;
+                margin-bottom: .45rem;
+                background: #fff;
+            }
+            [data-pr-toolbar] .sj-count {
+                flex: 1 1 100%;
+                width: 100%;
+                padding: .2rem .1rem 0;
+                font-size: .72rem;
+                white-space: normal;
+            }
+            [data-pr-table],
+            [data-pr-table] tbody,
+            [data-pr-table] tr,
+            [data-pr-table] td {
+                display: block;
+                width: 100%;
+            }
+            [data-pr-table] thead { display: none; }
+            [data-pr-table] tbody {
+                display: grid;
+                gap: .65rem;
+            }
+            [data-pr-table] tr[data-pr-row] {
+                display: grid;
+                grid-template-columns: 1fr;
+                gap: .18rem;
+                padding: .72rem;
+                border: 1px solid rgba(15, 23, 42, .08);
+                border-radius: 10px;
+                background: #fff;
+                box-shadow: 0 6px 18px rgba(15, 23, 42, .04);
+            }
+            [data-pr-table] tr[data-pr-row] > td {
+                display: flex;
+                align-items: flex-start;
+                justify-content: space-between;
+                gap: .85rem;
+                border: 0 !important;
+                padding: .28rem 0 !important;
+                text-align: left;
+            }
+            [data-pr-table] tr[data-pr-row] > td::before {
+                content: attr(data-label);
+                flex: 0 0 auto;
+                color: var(--gf-muted);
+                font-size: .68rem;
+                font-weight: 800;
+                line-height: 1.2;
+                text-transform: uppercase;
+                letter-spacing: .03em;
+            }
+            [data-pr-table] tr[data-pr-row] > td:first-child {
+                border-bottom: 1px solid rgba(15, 23, 42, .06) !important;
+                margin-bottom: .2rem;
+                padding-bottom: .5rem !important;
+            }
+            [data-pr-table] tr[data-pr-row] > td:first-child::before { content: none; }
+            .gf-pri-item { min-width: 0; width: 100%; gap: .5rem; }
+            .gf-pri-product,
+            .gf-pri-meta { display: none; }
+            .gf-pri-stack { align-items: flex-end; }
+            .gf-pri-decision { min-width: 86px; }
+            .gf-pri-bar { width: 34px; }
+            .gf-table-scroll.gf-table-scroll-sticky {
+                max-height: none;
+                min-height: 0;
+                overflow: visible;
+            }
+        }
 
         /* Tombol Cetak Slip */
         .gf-slip-btn { display: inline-flex; align-items: center; gap: .35rem; padding: .4rem .85rem;
@@ -927,11 +1015,11 @@
                 if (cmp) rows.sort(cmp).forEach(r => tbody.appendChild(r));
 
                 const cnt = root.querySelector('[data-pr-count]');
-                if (cnt) cnt.textContent = idFmt(shown) + ' SKU · ' + idFmt(urgent) + ' perlu didahulukan';
+                if (cnt) cnt.textContent = idFmt(shown) + ' SKU produksi sendiri · ' + idFmt(urgent) + ' perlu didahulukan';
 
                 const setKpi = (sel, val) => { const el = root.querySelector(sel); if (el) el.textContent = val; };
-                setKpi('[data-pr-kpi-sku]', idFmt(shown));
                 setKpi('[data-pr-kpi-urgent]', idFmt(urgent));
+                setKpi('[data-pr-kpi-own]', idFmt(shown));
 
                 const empty = root.querySelector('[data-pr-empty]');
                 if (empty) empty.hidden = (shown !== 0) || rows.length === 0;

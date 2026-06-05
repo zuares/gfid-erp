@@ -62,24 +62,36 @@ class ItemBomSeeder extends Seeder
         $makeSup('OPP%', null);
 
         // =========================
-        // 2) Template BOM (RAW seperti DB kamu)
-        //    Target: 0.31, 0.06, 0.019, 0.009
+        // 2) Template BOM per keluarga produk.
+        //    SHT sengaja tidak dibuatkan BOM.
         // =========================
-        $templateK = [
-            ['code' => 'FLC280{COLOR}', 'qty' => '0.31', 'uom' => 'kg', 'scrap_pct' => '0', 'sort' => 10],
-            ['code' => 'RIB280{COLOR}', 'qty' => '0.06', 'uom' => 'kg', 'scrap_pct' => '0', 'sort' => 20],
-            ['code' => 'KRT4CM', 'qty' => '0.019', 'uom' => 'kg', 'scrap_pct' => '0', 'sort' => 30],
-            ['code' => 'TLKADDS', 'qty' => '0.009', 'uom' => 'kg', 'scrap_pct' => '0', 'sort' => 40],
+        $templates = [
+            // Jogger pendek: basic, bodyfit, cargo.
+            'SJR' => $this->templateShorts(),
+            'TJR' => $this->templateShorts(),
+            'CRG' => $this->templateShorts(),
+
+            // Jogger/celana panjang.
+            'LJR' => $this->templateLongPants(),
+            'LCG' => $this->templateLongPants(),
+            'LBP' => $this->templateLongPants(),
         ];
 
         // =========================
-        // 3) Generate BOM untuk semua FG kode awalan K%
+        // 3) Generate BOM untuk semua FG kecuali kategori SHT.
         // =========================
         $fgs = Item::query()
+            ->join('item_categories as c', 'c.id', '=', 'items.item_category_id')
             ->where('type', 'finished_good')
-            ->where('code', 'like', 'K%')
-            ->orderBy('code')
-            ->get(['id', 'code', 'name']);
+            ->where('c.code', '!=', 'SHT')
+            ->orderBy('items.code')
+            ->get([
+                'items.id',
+                'items.code',
+                'items.name',
+                'items.production_source',
+                'c.code as category_code',
+            ]);
 
         if ($fgs->isEmpty()) {
             return;
@@ -87,6 +99,10 @@ class ItemBomSeeder extends Seeder
 
         foreach ($fgs as $fg) {
             $color = $this->extractColor($fg->code); // BLK/NVY/MST/...
+            $template = $templates[$fg->category_code] ?? null;
+            if (!$template) {
+                continue;
+            }
 
             $bom = ItemBom::updateOrCreate(
                 ['item_id' => $fg->id],
@@ -96,16 +112,12 @@ class ItemBomSeeder extends Seeder
             // idempotent: bersihin lines
             ItemBomLine::where('item_bom_id', $bom->id)->delete();
 
-            foreach ($templateK as $t) {
-                $matCode = str_replace('{COLOR}', $color, $t['code']);
-
-                $mat = Item::query()
-                    ->where('code', $matCode)
-                    ->first(['id', 'code', 'unit']);
+            foreach ($template as $t) {
+                $mat = $this->resolveMaterial($t['codes'], $color);
 
                 if (!$mat) {
                     if ($this->strictMaterial) {
-                        throw new \RuntimeException("Material not found: {$matCode} for FG {$fg->code}");
+                        throw new \RuntimeException("Material not found for FG {$fg->code}");
                     }
                     continue;
                 }
@@ -122,7 +134,45 @@ class ItemBomSeeder extends Seeder
                     'sort_order' => (int) ($t['sort'] ?? 0),
                 ]);
             }
+
+            Item::whereKey($fg->id)->update(['production_source' => Item::PRODUCTION_IN_HOUSE]);
         }
+    }
+
+    private function templateShorts(): array
+    {
+        return [
+            ['codes' => ['FLC280{COLOR}', 'FLC240{COLOR}'], 'qty' => '0.31', 'uom' => 'kg', 'scrap_pct' => '0', 'sort' => 10],
+            ['codes' => ['RIB280{COLOR}', 'RIB280MST'], 'qty' => '0.06', 'uom' => 'kg', 'scrap_pct' => '0', 'sort' => 20],
+            ['codes' => ['KRT4CM'], 'qty' => '0.019', 'uom' => 'kg', 'scrap_pct' => '0', 'sort' => 30],
+            ['codes' => ['TLKADDS'], 'qty' => '0.009', 'uom' => 'kg', 'scrap_pct' => '0', 'sort' => 40],
+        ];
+    }
+
+    private function templateLongPants(): array
+    {
+        return [
+            ['codes' => ['FLC280{COLOR}', 'FLC240{COLOR}'], 'qty' => '0.45', 'uom' => 'kg', 'scrap_pct' => '0', 'sort' => 10],
+            ['codes' => ['RIB280{COLOR}', 'RIB280MST'], 'qty' => '0.07', 'uom' => 'kg', 'scrap_pct' => '0', 'sort' => 20],
+            ['codes' => ['KRT4CM'], 'qty' => '0.022', 'uom' => 'kg', 'scrap_pct' => '0', 'sort' => 30],
+            ['codes' => ['TLKADDS'], 'qty' => '0.010', 'uom' => 'kg', 'scrap_pct' => '0', 'sort' => 40],
+        ];
+    }
+
+    private function resolveMaterial(array $codes, string $color): ?Item
+    {
+        foreach ($codes as $code) {
+            $matCode = str_replace('{COLOR}', $color, $code);
+            $mat = Item::query()
+                ->where('code', $matCode)
+                ->first(['id', 'code', 'unit']);
+
+            if ($mat) {
+                return $mat;
+            }
+        }
+
+        return null;
     }
 
     /**

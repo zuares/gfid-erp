@@ -8,11 +8,13 @@
         'summary' => 'Ringkasan',
         'health' => 'Kesehatan Stok',
         'forecast' => 'Forecast & Saran',
+        'trend' => 'Tren Permintaan',
     ];
     $tabDesc = [
         'summary' => 'Ringkasan kesehatan stok seluruh SKU barang jadi.',
         'health' => 'Cover stok per SKU — mana yang menipis / kritis / stockout.',
         'forecast' => 'Laju jual, perkiraan 30 hari, dan saran jumlah produksi.',
+        'trend' => 'Pergerakan penjualan harian per SKU dan arah naik/turun.',
     ];
 @endphp
 
@@ -42,6 +44,8 @@
         .ii-toolbar .ii-search { flex: 1 1 220px; min-width: 180px; max-width: 330px; }
         .ii-toolbar .form-select { width: auto; padding-right: 1.9rem; }
         .ii-count { margin-left: auto; font-size: .78rem; font-weight: 800; color: #475569; white-space: nowrap; }
+        .ii-actions { display: inline-flex; gap: .4rem; }
+        .ii-actions .btn-sm { font-size: .75rem; font-weight: 700; padding: .35rem .8rem; }
 
         /* Status dot (kesehatan stok) */
         .ii-status { display: inline-flex; align-items: center; gap: .4rem; font-weight: 600; color: #475569; white-space: nowrap; }
@@ -52,6 +56,26 @@
         .ii-status-sehat .ii-status-dot { background: #16a34a; }
         .ii-status-no_demand .ii-status-dot { background: #94a3b8; }
         .ii-status-stockout, .ii-status-kritis { color: #b91c1c; }
+
+        /* Tren Permintaan */
+        .ii-trend-chart { margin-bottom: 1rem; }
+        .ii-trend-chart-head { display: flex; justify-content: space-between; align-items: center; gap: .5rem; margin-bottom: .4rem; flex-wrap: wrap; }
+        .ii-trend-title { font-weight: 800; font-size: .85rem; color: #0f172a; }
+        .ii-trend-legend { font-size: .75rem; font-weight: 700; color: #475569; white-space: nowrap; }
+        .ii-trend-canvas-wrap { position: relative; height: 200px; }
+        [data-ii-trend-id] { cursor: pointer; }
+        [data-ii-trend-id].is-active { background: rgba(37, 99, 235, .08); }
+        .ii-dir { display: inline-flex; align-items: center; gap: .25rem; font-weight: 700; font-size: .78rem; white-space: nowrap; }
+        .ii-dir-up { color: #16a34a; }
+        .ii-dir-down { color: #dc2626; }
+        .ii-dir-flat { color: #64748b; }
+        .ii-dir-new { color: #2563eb; }
+
+        /* Skor evaluasi (0–100): tinggi = paling butuh perhatian */
+        .ii-score { font-weight: 800; }
+        .ii-score-high { color: #dc2626; }
+        .ii-score-mid { color: #f59e0b; }
+        .ii-score-low { color: #16a34a; }
 
         @media (max-width: 576px) {
             .ii-toolbar .ii-search { flex: 1 1 100%; max-width: none; }
@@ -118,9 +142,12 @@
 @endsection
 
 @push('scripts')
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/Chart.js/4.4.1/chart.umd.min.js"></script>
     <script>
         document.addEventListener('DOMContentLoaded', () => {
             const DATA_URL = @json(route('inventory.intelligence.data'));
+            const SLIP_URL = @json(route('inventory.intelligence.slip'));
+            const EXPORT_URL = @json(route('inventory.intelligence.export'));
             const SERVER_INITIAL = @json($initialTab);
             const TAB_DESC = @json($tabDesc);
             const descEl = document.querySelector('.gf-master-desc');
@@ -177,6 +204,7 @@
                     pane.innerHTML = json.html;
                     pane.dataset.loaded = '1';
                     applyTableFilter(pane);
+                    if (name === 'trend') initTrend(pane);
                 } catch (e) {
                     pane.innerHTML = errorHTML(name);
                 }
@@ -220,6 +248,10 @@
                     'cover-asc': (a, b) => (+a.dataset.cover) - (+b.dataset.cover),
                     'ads-desc': (a, b) => (+b.dataset.ads) - (+a.dataset.ads),
                     'suggested-desc': (a, b) => (+b.dataset.suggested) - (+a.dataset.suggested),
+                    'trend-desc': (a, b) => (+b.dataset.delta) - (+a.dataset.delta),
+                    'trend-asc': (a, b) => (+a.dataset.delta) - (+b.dataset.delta),
+                    'score-desc': (a, b) => (+b.dataset.score) - (+a.dataset.score),
+                    'wads-desc': (a, b) => (+b.dataset.wads) - (+a.dataset.wads),
                 }[sort];
                 if (cmp) rows.sort(cmp).forEach(r => tbody.appendChild(r));
 
@@ -251,6 +283,73 @@
                 if (r) loadTab(r.dataset.iiRetry, { force: true });
             });
 
+            // ---- Tren Permintaan: grafik garis detail per SKU (Chart.js) ----
+            function initTrend(pane) {
+                if (!pane || typeof Chart === 'undefined') return;
+                const dataEl = pane.querySelector('[data-ii-trend-data]');
+                const canvas = pane.querySelector('[data-ii-trend-canvas]');
+                if (!dataEl || !canvas) return;
+
+                let payload;
+                try { payload = JSON.parse(dataEl.textContent); } catch (e) { return; }
+                if (pane._trendChart) { pane._trendChart.destroy(); pane._trendChart = null; }
+
+                const titleEl = pane.querySelector('[data-ii-trend-title]');
+                pane._trendDraw = function (id) {
+                    const it = payload.items[id];
+                    if (!it) return;
+                    if (titleEl) titleEl.textContent = it.sku + ' — ' + it.product;
+                    const ds = {
+                        labels: payload.labels,
+                        datasets: [{
+                            data: it.series, borderColor: '#2563eb',
+                            backgroundColor: 'rgba(37,99,235,.12)', fill: true,
+                            tension: .3, pointRadius: 0, borderWidth: 2,
+                        }],
+                    };
+                    if (pane._trendChart) {
+                        pane._trendChart.data = ds;
+                        pane._trendChart.update();
+                    } else {
+                        pane._trendChart = new Chart(canvas, {
+                            type: 'line', data: ds,
+                            options: {
+                                responsive: true, maintainAspectRatio: false,
+                                plugins: { legend: { display: false }, tooltip: { intersect: false, mode: 'index' } },
+                                scales: {
+                                    x: { ticks: { maxTicksLimit: 8, font: { size: 10 } }, grid: { display: false } },
+                                    y: { beginAtZero: true, ticks: { font: { size: 10 } }, grid: { color: 'rgba(148,163,184,.15)' } },
+                                },
+                            },
+                        });
+                    }
+                    pane.querySelectorAll('[data-ii-trend-id]').forEach(tr =>
+                        tr.classList.toggle('is-active', tr.dataset.iiTrendId === String(id)));
+                };
+
+                const first = pane.querySelector('[data-ii-trend-id]');
+                if (first) pane._trendDraw(first.dataset.iiTrendId);
+            }
+            document.addEventListener('click', (e) => {
+                const tr = e.target.closest('[data-ii-trend-id]');
+                if (!tr) return;
+                const pane = tr.closest('[data-tab-panel]');
+                if (pane && pane._trendDraw) pane._trendDraw(tr.dataset.iiTrendId);
+            });
+
+            // ---- Production Action: slip cetak + export CSV (ikut filter aktif) ----
+            function actionUrl(base) {
+                const params = new URLSearchParams(currentFilters());
+                return base + (params.toString() ? '?' + params.toString() : '');
+            }
+            document.addEventListener('click', (e) => {
+                if (e.target.closest('[data-ii-slip]')) {
+                    window.open(actionUrl(SLIP_URL), '_blank', 'noopener');
+                } else if (e.target.closest('[data-ii-export]')) {
+                    window.location.assign(actionUrl(EXPORT_URL));
+                }
+            });
+
             // ---- Server-side filter (kategori / SKU) ----
             form.addEventListener('submit', (e) => { e.preventDefault(); applyFilters(); });
             form.querySelectorAll('select[data-ii-filterctl]').forEach(sel =>
@@ -264,6 +363,7 @@
 
             // Tab awal sudah dirender server-side → terapkan filter client-side-nya.
             applyTableFilter(paneByName(SERVER_INITIAL));
+            if (SERVER_INITIAL === 'trend') initTrend(paneByName('trend'));
         });
     </script>
 @endpush

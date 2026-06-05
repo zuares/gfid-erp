@@ -40,6 +40,10 @@ Route::middleware(['web', 'auth', 'role:owner,admin,operating'])->group(function
             ->name('intelligence');
         Route::get('intelligence/data', [InventoryIntelligenceController::class, 'data'])
             ->name('intelligence.data');
+        Route::get('intelligence/slip', [InventoryIntelligenceController::class, 'slip'])
+            ->name('intelligence.slip');
+        Route::get('intelligence/export', [InventoryIntelligenceController::class, 'export'])
+            ->name('intelligence.export');
 
         // ================== STOCK CARD ==================
         Route::get('stock-card', [StockCardController::class, 'index'])->name('stock_card.index');

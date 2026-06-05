@@ -119,14 +119,3 @@ if (!function_exists('to_num')) {
         return (float) $v;
     }
 }
-
-if (!function_exists('angka')) {
-    /**
-     * Format number ke ID: 1.234.567 (atau dengan desimal).
-     */
-    function angka($value, $decimal = 0): string
-    {
-        $num = to_num($value);
-        return number_format($num, (int) $decimal, ',', '.');
-    }
-}

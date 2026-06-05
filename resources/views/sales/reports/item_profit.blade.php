@@ -114,22 +114,22 @@
                                         </div>
                                     </td>
                                     <td class="text-end">
-                                        {{ number_format($row->qty, 0) }}
+                                        {{ angka($row->qty, 0) }}
                                     </td>
                                     <td class="text-end">
-                                        {{ number_format($row->revenue, 0) }}
+                                        {{ angka($row->revenue, 0) }}
                                     </td>
                                     <td class="text-end">
-                                        {{ number_format($row->hpp_unit, 0) }}
+                                        {{ angka($row->hpp_unit, 0) }}
                                     </td>
                                     <td class="text-end">
-                                        {{ number_format($row->hpp_total, 0) }}
+                                        {{ angka($row->hpp_total, 0) }}
                                     </td>
                                     <td class="text-end">
-                                        {{ number_format($row->margin_unit, 0) }}
+                                        {{ angka($row->margin_unit, 0) }}
                                     </td>
                                     <td class="text-end {{ $row->margin_total < 0 ? 'text-danger' : 'text-success' }}">
-                                        {{ number_format($row->margin_total, 0) }}
+                                        {{ angka($row->margin_total, 0) }}
                                     </td>
                                 </tr>
                             @empty
@@ -147,22 +147,22 @@
                                 <tr>
                                     <th colspan="2" class="text-end">TOTAL</th>
                                     <th class="text-end">
-                                        {{ number_format($totals->qty, 0) }}
+                                        {{ angka($totals->qty, 0) }}
                                     </th>
                                     <th class="text-end">
-                                        {{ number_format($totals->revenue, 0) }}
+                                        {{ angka($totals->revenue, 0) }}
                                     </th>
                                     <th class="text-end">
                                         {{-- Kosong: HPP / unit total kurang relevan di sini --}}
                                     </th>
                                     <th class="text-end">
-                                        {{ number_format($totals->hpp_total, 0) }}
+                                        {{ angka($totals->hpp_total, 0) }}
                                     </th>
                                     <th class="text-end">
                                         {{-- Kosong: Margin / unit total kurang relevan --}}
                                     </th>
                                     <th class="text-end {{ $totals->margin_total < 0 ? 'text-danger' : 'text-success' }}">
-                                        {{ number_format($totals->margin_total, 0) }}
+                                        {{ angka($totals->margin_total, 0) }}
                                     </th>
                                 </tr>
                             </tfoot>

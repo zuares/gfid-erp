@@ -27,7 +27,7 @@ class ProductionPriorityService
 
     public function priorityList(array $f, int $limit = 100): Collection
     {
-        $snapshot = $this->inventorySnapshot($f); // item_id => {ready_stock,wip_stock,s7,s14,s30,ads,cover_days,pipe_cover_days}
+        $snapshot = $this->inventorySnapshot($f); // item_id => {ready_stock,siap_jahit,sedang_jahit,wip_stock,s7,s14,s30,ads,cover_days,pipe_cover_days}
         $deadlines = $this->nearestDeadline($f);  // item_id => date
         $aging = $this->maxWipAge($f);            // item_id => int days
 
@@ -39,6 +39,7 @@ class ProductionPriorityService
         $items = Item::with('category')
             ->whereIn('id', $ids)
             ->where('type', 'finished_good')
+            ->where('production_source', Item::PRODUCTION_IN_HOUSE)
             ->get()
             ->keyBy('id');
 
@@ -50,8 +51,12 @@ class ProductionPriorityService
         $rows = $items->map(function ($item) use ($snapshot, $deadlines, $aging, $maxAds, $today) {
             $id = $item->id;
             $snap = $snapshot->get($id);
+            $isMadeInHouse = $item->production_source === Item::PRODUCTION_IN_HOUSE;
 
             $ready = (float) ($snap->ready_stock ?? 0);
+            $siapJahit = (float) ($snap->siap_jahit ?? 0);
+            $sedangJahit = (float) ($snap->sedang_jahit ?? 0);
+            $whPrd = (float) ($snap->wh_prd ?? 0);
             $wip = (float) ($snap->wip_stock ?? 0);
             $s7 = (float) ($snap->s7 ?? 0);
             $s14 = (float) ($snap->s14 ?? 0);
@@ -94,7 +99,13 @@ class ProductionPriorityService
                 'sku' => $item->code,
                 'product' => $item->name,
                 'category' => $item->category?->name ?? '-',
+                'is_made_in_house' => $isMadeInHouse,
+                'production_source' => $item->production_source_label,
+                'production_source_key' => $isMadeInHouse ? 'own' : 'external',
                 'ready' => $ready,
+                'siap_jahit' => $siapJahit,
+                'sedang_jahit' => $sedangJahit,
+                'wh_prd' => $whPrd,
                 'wip' => $wip,
                 's7' => $s7,
                 's14' => $s14,
@@ -123,7 +134,7 @@ class ProductionPriorityService
      * Sumber kebenaran bersama untuk priorityList() dan dashboard inventory.
      * Filter: item_id, category_id. Window penjualan tetap 7/14/30 hari.
      *
-     * @return Collection keyBy item_id => {item_id, ready_stock, wip_stock, s7, s14, s30, ads, cover_days, pipe_cover_days}
+     * @return Collection keyBy item_id => {item_id, ready_stock, siap_jahit, sedang_jahit, wh_prd, wip_stock, s7, s14, s30, ads, cover_days, pipe_cover_days}
      */
     public function inventorySnapshot(array $filters): Collection
     {
@@ -137,6 +148,9 @@ class ProductionPriorityService
             $sa = $sales->get($id);
 
             $ready = (float) ($st->ready ?? 0);
+            $siapJahit = (float) ($st->siap_jahit ?? 0);
+            $sedangJahit = (float) ($st->sedang_jahit ?? 0);
+            $whPrd = (float) ($st->wh_prd ?? 0);
             $wip = (float) ($st->wip ?? 0);
             $s7 = (float) ($sa->s7 ?? 0);
             $s14 = (float) ($sa->s14 ?? 0);
@@ -148,6 +162,9 @@ class ProductionPriorityService
             return [$id => (object) [
                 'item_id' => $id,
                 'ready_stock' => $ready,
+                'siap_jahit' => $siapJahit,
+                'sedang_jahit' => $sedangJahit,
+                'wh_prd' => $whPrd,
                 'wip_stock' => $wip,
                 's7' => $s7,
                 's14' => $s14,
@@ -184,7 +201,7 @@ class ProductionPriorityService
     // AGREGASI (SQL)
     // ==========================================================
 
-    /** Ready (WH-RTS) + WIP (WIP-CUT+WIP-SEW+WH-PRD) per item. */
+    /** Ready (WH-RTS) + detail pipeline produksi per item. */
     private function stockPivot(array $f): Collection
     {
         $q = DB::table('inventory_stocks as s')
@@ -202,6 +219,9 @@ class ProductionPriorityService
             ->selectRaw("
                 s.item_id,
                 COALESCE(SUM(CASE WHEN w.code='WH-RTS' THEN s.qty END),0) as ready,
+                COALESCE(SUM(CASE WHEN w.code='WIP-CUT' THEN s.qty END),0) as siap_jahit,
+                COALESCE(SUM(CASE WHEN w.code='WIP-SEW' THEN s.qty END),0) as sedang_jahit,
+                COALESCE(SUM(CASE WHEN w.code='WH-PRD' THEN s.qty END),0) as wh_prd,
                 COALESCE(SUM(CASE WHEN w.code IN ('WIP-CUT','WIP-SEW','WH-PRD') THEN s.qty END),0) as wip
             ")
             ->get()

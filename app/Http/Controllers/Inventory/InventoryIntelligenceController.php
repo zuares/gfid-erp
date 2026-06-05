@@ -10,6 +10,7 @@ use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Cache;
 use Illuminate\View\View;
+use Symfony\Component\HttpFoundation\StreamedResponse;
 
 /**
  * Inventory Intelligence Dashboard (Phase 1).
@@ -24,7 +25,9 @@ use Illuminate\View\View;
  */
 class InventoryIntelligenceController extends Controller
 {
-    private const TABS = ['summary', 'health', 'forecast'];
+    private const TABS = ['summary', 'health', 'forecast', 'trend'];
+
+    private const TREND_RANGES = [30, 60, 90];
 
     public function __construct(private InventoryIntelligenceService $service)
     {
@@ -73,6 +76,63 @@ class InventoryIntelligenceController extends Controller
         ]);
     }
 
+    /**
+     * Slip cetak saran produksi (Production Action).
+     * Halaman berdiri sendiri (print-friendly), read-only, mengikuti filter aktif.
+     */
+    public function slip(Request $request): View
+    {
+        $filters = $this->resolveFilters($request);
+        $itemIds = $this->resolveItemIds($request);
+        $rows = $this->service->productionDraft($filters, $itemIds);
+
+        $category = $filters['category_id'] ? ItemCategory::find($filters['category_id']) : null;
+        $item = $filters['item_id'] ? Item::find($filters['item_id']) : null;
+
+        return view('inventory.intelligence.slip', [
+            'rows' => $rows,
+            'printedAt' => now(),
+            'fileName' => 'saran-produksi-' . now()->format('Ymd-Hi'),
+            'categoryLabel' => $category?->name,
+            'itemLabel' => $item ? $item->code . ' — ' . $item->name : null,
+            'skuCount' => $rows->count(),
+            'totalSuggested' => (float) $rows->sum('suggested_qty'),
+        ]);
+    }
+
+    /** Export CSV saran produksi (UTF-8 BOM agar rapi di Excel). Mengikuti filter aktif. */
+    public function export(Request $request): StreamedResponse
+    {
+        $filters = $this->resolveFilters($request);
+        $itemIds = $this->resolveItemIds($request);
+        $rows = $this->service->productionDraft($filters, $itemIds);
+
+        $fileName = 'saran-produksi-' . now()->format('Ymd-His') . '.csv';
+
+        return response()->streamDownload(function () use ($rows) {
+            $out = fopen('php://output', 'w');
+            fwrite($out, "\xEF\xBB\xBF"); // BOM
+            fputcsv($out, ['SKU', 'Produk', 'Kategori', 'Jual/hari', 'Ready', 'WIP', 'Cover (hari)', 'Forecast 30hr', 'Saran Produksi', 'Status']);
+            foreach ($rows as $r) {
+                fputcsv($out, [
+                    $r->sku,
+                    $r->product,
+                    $r->category,
+                    $r->ads,
+                    $r->ready,
+                    $r->wip,
+                    $r->cover_days,
+                    $r->forecast_30,
+                    $r->suggested_qty,
+                    $r->status,
+                ]);
+            }
+            fclose($out);
+        }, $fileName, [
+            'Content-Type' => 'text/csv; charset=UTF-8',
+        ]);
+    }
+
     /** Parse filter (item_id, category_id). Tidak ada rentang tanggal (window snapshot tetap). */
     private function resolveFilters(Request $request): array
     {
@@ -80,6 +140,22 @@ class InventoryIntelligenceController extends Controller
             'item_id' => $request->input('item_id') ?: null,
             'category_id' => $request->input('category_id') ?: null,
         ];
+    }
+
+    /** Parse daftar item_id terpilih (CSV "1,2,3") untuk slip/export. Kosong = semua suggested>0. */
+    private function resolveItemIds(Request $request): array
+    {
+        $raw = (string) $request->input('item_ids', '');
+        if ($raw === '') {
+            return [];
+        }
+
+        return collect(explode(',', $raw))
+            ->map(fn ($v) => (int) trim($v))
+            ->filter()
+            ->unique()
+            ->values()
+            ->all();
     }
 
     /** Nama blade partial untuk sebuah tab. */
@@ -94,6 +170,19 @@ class InventoryIntelligenceController extends Controller
      */
     private function tabData(string $tab, array $filters): array
     {
+        if ($tab === 'trend') {
+            $rows = Cache::remember(
+                'inv-intel:trend:' . md5(json_encode($filters)),
+                300,
+                fn () => $this->service->trendRows($filters),
+            );
+
+            return [
+                'rows' => $rows,
+                'trendSummary' => $this->service->trendSummary($rows),
+            ];
+        }
+
         $rows = Cache::remember(
             'inv-intel:rows:' . md5(json_encode($filters)),
             300,

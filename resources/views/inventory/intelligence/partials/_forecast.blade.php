@@ -28,12 +28,19 @@
 
         <select class="form-select" data-ii-sort aria-label="Urutkan">
             <option value="suggested-desc">Saran produksi terbanyak</option>
+            <option value="score-desc">Skor evaluasi tertinggi</option>
+            <option value="wads-desc">wADS tertinggi</option>
             <option value="ads-desc">Jual/hari tertinggi</option>
             <option value="cover-asc">Cover tertipis</option>
             <option value="sku-asc">SKU A–Z</option>
         </select>
 
         <span class="ii-count" data-ii-count>{{ $fmt($skuCount) }} SKU</span>
+
+        <span class="ii-actions">
+            <button type="button" class="btn btn-dark btn-sm rounded-pill" data-ii-slip>Cetak Slip</button>
+            <button type="button" class="btn btn-light border btn-sm rounded-pill" data-ii-export>Export CSV</button>
+        </span>
     </div>
 
     @if ($rows->isEmpty())
@@ -46,6 +53,8 @@
                         <th>SKU</th>
                         <th class="gf-hide-mobile">Kategori</th>
                         <th class="gf-num">Jual/hari</th>
+                        <th class="gf-num gf-hide-mobile">wADS</th>
+                        <th class="gf-num gf-hide-mobile">Skor</th>
                         <th class="gf-num gf-hide-mobile">Ready</th>
                         <th class="gf-num">Cover (hr)</th>
                         <th class="gf-num">Forecast 30hr</th>
@@ -61,10 +70,17 @@
                             data-sku="{{ $r->sku }}"
                             data-cover="{{ $r->cover_days ?? 99999 }}"
                             data-ads="{{ $r->ads }}"
+                            data-wads="{{ $r->wads }}"
+                            data-score="{{ $r->eval_score }}"
                             data-suggested="{{ $r->suggested_qty }}">
                             <td><span class="gf-chip" title="{{ $r->product }}"><b>{{ $r->sku }}</b></span></td>
                             <td class="text-muted gf-hide-mobile">{{ $r->category }}</td>
                             <td class="gf-num">{{ $fmt($r->ads, 1) }}</td>
+                            <td class="gf-num gf-hide-mobile">{{ $fmt($r->wads, 1) }}</td>
+                            <td class="gf-num gf-hide-mobile">
+                                @php $sc = $r->eval_score; $scb = $sc >= 70 ? 'ii-score-high' : ($sc >= 40 ? 'ii-score-mid' : 'ii-score-low'); @endphp
+                                <span class="ii-score {{ $scb }}">{{ $sc }}</span>
+                            </td>
                             <td class="gf-num gf-hide-mobile">{{ $fmt($r->ready) }}</td>
                             <td class="gf-num">{{ $r->cover_days === null ? '–' : $fmt($r->cover_days, 1) }}</td>
                             <td class="gf-num">{{ $fmt($r->forecast_30) }}</td>
@@ -79,7 +95,7 @@
                 </tbody>
                 <tfoot>
                     <tr class="fw-semibold">
-                        <td colspan="6" class="text-end gf-hide-mobile">Total saran produksi</td>
+                        <td colspan="8" class="text-end gf-hide-mobile">Total saran produksi</td>
                         <td colspan="1" class="text-end d-md-none">Total saran</td>
                         <td class="gf-num"><b>{{ $fmt($totalSuggested) }}</b></td>
                         <td class="gf-hide-mobile"></td>

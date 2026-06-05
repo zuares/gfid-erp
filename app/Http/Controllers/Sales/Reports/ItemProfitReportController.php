@@ -5,14 +5,16 @@ namespace App\Http\Controllers\Sales\Reports;
 use App\Http\Controllers\Controller;
 use App\Models\Customer;
 use App\Models\SalesInvoiceLine;
+use App\Support\ReportDateRange;
 use Illuminate\Http\Request;
 
 class ItemProfitReportController extends Controller
 {
     public function index(Request $request)
     {
-        $dateFrom = $request->query('date_from');
-        $dateTo = $request->query('date_to');
+        $range = ReportDateRange::fromRequest($request);
+        $dateFrom = $range->from;
+        $dateTo = $range->to;
         $customerId = $request->query('customer_id');
 
         $customers = Customer::orderBy('name')->get();

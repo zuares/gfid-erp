@@ -130,6 +130,21 @@
             min-width: 70px;
         }
 
+        .category-meta {
+            display: flex;
+            flex-direction: column;
+            gap: .12rem;
+        }
+
+        .category-meta .category-code {
+            font-weight: 600;
+        }
+
+        .category-meta .category-kind {
+            font-size: .7rem;
+            color: var(--muted);
+        }
+
         /* FOOTER / PAGINATION ROW */
         .table-footer {
             border-top: 1px solid rgba(148, 163, 184, 0.35);
@@ -195,13 +210,13 @@
         <div class="card card-main card-filters mb-3">
             <div class="card-body py-2">
                 <form method="GET" action="{{ route('master.items.index') }}" class="row g-2 align-items-end">
-                    <div class="col-md-4">
+                    <div class="col-md-3">
                         <label class="form-label mb-1">Cari</label>
                         <input type="text" name="q" class="form-control form-control-sm"
                             placeholder="Kode / nama item" value="{{ request('q') }}">
                     </div>
 
-                    <div class="col-md-3">
+                    <div class="col-md-2">
                         <label class="form-label mb-1">Tipe</label>
                         <select name="type" class="form-select form-select-sm">
                             <option value="">- Semua -</option>
@@ -220,24 +235,34 @@
                         </select>
                     </div>
 
+                    <div class="col-md-3">
+                        <label class="form-label mb-1">Kelompok</label>
+                        <select name="category_kind" class="form-select form-select-sm">
+                            <option value="">- Semua -</option>
+                            @foreach ($categoryKinds as $key => $label)
+                                <option value="{{ $key }}" @selected(request('category_kind') === $key)>{{ $label }}</option>
+                            @endforeach
+                        </select>
+                    </div>
+
                     {{-- Kategori --}}
                     <div class="col-md-3">
                         <label class="form-label mb-1">Kategori</label>
                         <select name="item_category_id" class="form-select form-select-sm">
                             <option value="">- Semua -</option>
                             @foreach ($categories as $cat)
-                                <option value="{{ $cat->id }}" @selected(request('item_category_id') == $cat->id)>
-                                    {{ $cat->name }}
+                                <option value="{{ $cat->id }}" data-kind="{{ $cat->kind }}" @selected(request('item_category_id') == $cat->id)>
+                                    {{ $cat->code }} — {{ $cat->name }}
                                 </option>
                             @endforeach
                         </select>
                     </div>
 
-                    <div class="col-md-2 d-flex gap-2">
+                    <div class="col-md-1 d-flex gap-2">
                         <button class="btn btn-outline-secondary btn-sm w-100">
                             Filter
                         </button>
-                        @if (request()->hasAny(['q', 'type', 'item_category_id']))
+                        @if (request()->hasAny(['q', 'type', 'category_kind', 'item_category_id']))
                             <a href="{{ route('master.items.index') }}"
                                 class="btn btn-outline-light border btn-sm d-none d-md-inline-flex">
                                 Reset
@@ -289,6 +314,8 @@
                                 <th>Nama</th>
                                 <th style="width: 8%">Satuan</th>
                                 <th style="width: 13%">Tipe</th>
+                                <th style="width: 15%">Kategori</th>
+                                <th style="width: 12%">Produksi</th>
                                 <th style="width: 10%" class="text-center">Barcode</th>
                                 <th style="width: 14%" class="text-end">HPP Aktif</th>
                                 <th style="width: 10%" class="text-center">Status</th>
@@ -337,6 +364,26 @@
                                         <span class="badge badge-soft">
                                             {{ $typeLabels[$item->type] ?? $item->type }}
                                         </span>
+                                    </td>
+                                    <td>
+                                        @if ($item->category)
+                                            <div class="category-meta">
+                                                <span class="category-code">{{ $item->category->code }}</span>
+                                                <span>{{ $item->category->name }}</span>
+                                                <span class="category-kind">{{ $item->category->kind_label }}</span>
+                                            </div>
+                                        @else
+                                            <span class="text-muted small">Tanpa kategori</span>
+                                        @endif
+                                    </td>
+                                    <td>
+                                        @if (in_array($item->type, ['finished_good', 'wip'], true))
+                                            <span class="badge badge-soft">
+                                                {{ $item->production_source_label }}
+                                            </span>
+                                        @else
+                                            <span class="text-muted small">-</span>
+                                        @endif
                                     </td>
                                     <td class="text-center">
                                         @if ($item->barcodes_count > 0)
@@ -401,7 +448,7 @@
                                 </tr>
                             @empty
                                 <tr>
-                                    <td colspan="10" class="text-center text-muted py-4">
+                                    <td colspan="12" class="text-center text-muted py-4">
                                         Belum ada item.
                                     </td>
                                 </tr>
@@ -448,7 +495,9 @@
                     <select name="item_category_id" class="form-select form-select-sm">
                         <option value="">— Kosongkan kategori —</option>
                         @foreach ($categories as $cat)
-                            <option value="{{ $cat->id }}">{{ $cat->name }}</option>
+                            <option value="{{ $cat->id }}" data-kind="{{ $cat->kind }}">
+                                {{ $cat->code }} — {{ $cat->name }} ({{ $cat->kind_label }})
+                            </option>
                         @endforeach
                     </select>
                     <div class="ids-container"></div>

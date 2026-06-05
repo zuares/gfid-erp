@@ -38,6 +38,8 @@
     $hasInvWipAdjIndex = $router->has('inventory.wip_adjustments.index');
     $hasInvWipCutReconcile = $router->has('inventory.wip_cut_reconcile.index');
 
+    $hasInvIntelligence = $router->has('inventory.intelligence');
+
     // RTS
     $hasRtsStockReqIndex = $router->has('rts.stock-requests.index');
     $hasRtsDirectReceiveIndex = $router->has('rts.direct-receives.index');
@@ -180,6 +182,8 @@
         $open('sales.shipments.report');
 
     $openInventory =
+        $open('inventory.intelligence') ||
+        $open('inventory.intelligence.*') ||
         $open('inventory.stocks.*') ||
         $open('inventory.stock_opnames.*') ||
         $open('inventory.stock_card.*') ||
@@ -455,6 +459,13 @@
 
             <x-sidebar.label text="Operations" />
             <li class="simple-group">
+                @if ($hasInvIntelligence)
+                    <x-sidebar.simple-link href="{{ route('inventory.intelligence') }}" icon="🧠"
+                        :active="request()->routeIs('inventory.intelligence') || request()->routeIs('inventory.intelligence.*')">
+                        Inventory Intelligence
+                    </x-sidebar.simple-link>
+                @endif
+
                 @if ($hasInvStocksItems)
                     <x-sidebar.simple-link href="{{ route('inventory.stocks.items') }}" icon="📦"
                         :active="request()->routeIs('inventory.stocks.items')">
@@ -1125,6 +1136,7 @@
 
             {{-- INVENTORY --}}
             @if ($canShow(
+                $hasInvIntelligence,
                 $hasInvStocksItems,
                 $hasInvStocksLots,
                 $hasInvStockCard,
@@ -1148,6 +1160,14 @@
                     </button>
 
                     <div class="collapse {{ $openInventory ? 'show' : '' }}" id="navInventory">
+                        @if ($hasInvIntelligence)
+                            @php $subhead('Intelligence'); @endphp
+                            <x-sidebar.sub-link href="{{ route('inventory.intelligence') }}" icon="🧠"
+                                :active="request()->routeIs('inventory.intelligence') || request()->routeIs('inventory.intelligence.*')">
+                                Inventory Intelligence
+                            </x-sidebar.sub-link>
+                        @endif
+
                         @php $subhead('Stock'); @endphp
                         @if ($hasInvStocksItems)
                             <x-sidebar.sub-link href="{{ route('inventory.stocks.items') }}" icon="📦"

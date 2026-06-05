@@ -5,15 +5,18 @@ namespace App\Http\Controllers\Sales\Reports;
 use App\Http\Controllers\Controller;
 use App\Models\SalesInvoiceLine;
 use App\Models\Store;
+use App\Support\ReportDateRange;
 use Illuminate\Http\Request;
 
 class ChannelProfitReportController extends Controller
 {
     public function index(Request $request)
     {
+        $range = ReportDateRange::fromRequest($request);
+
         $filters = [
-            'date_from' => $request->input('date_from'),
-            'date_to' => $request->input('date_to'),
+            'date_from' => $range->from,
+            'date_to' => $range->to,
             'store_id' => $request->input('store_id'),
             // 🔥 filter baru: hanya store dengan shipped% di bawah angka ini (misal 80)
             'shipped_below' => $request->input('shipped_below'),

@@ -11,6 +11,7 @@ use App\Models\Shipment;
 use App\Models\Store;
 use App\Models\Warehouse;
 use App\Services\Inventory\InventoryService;
+use App\Services\Sales\SalesInvoiceService;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\DB;
 
@@ -18,6 +19,7 @@ class SalesInvoiceController extends Controller
 {
     public function __construct(
         protected InventoryService $inventory, // siap kalau integrasi stok/shipment
+        protected SalesInvoiceService $salesInvoices,
     ) {}
 
     public function index()
@@ -132,12 +134,7 @@ class SalesInvoiceController extends Controller
         $warehouseId = (int) $data['warehouse_id'];
         $sourceShipmentId = $data['source_shipment_id'] ?? null;
 
-        $hasAnyPrice = collect($data['items'])->contains(function ($row) {
-            $v = $row['unit_price'] ?? null;
-            return $v !== null && $v !== '' && (float) $v > 0;
-        });
-
-        $initialStatus = $hasAnyPrice ? 'draft' : 'unpriced';
+        $initialStatus = $this->salesInvoices->statusFromPricing($data['items']);
 
         $code = 'INV-' . now()->format('Ymd') . '-' . str_pad(
             (string) (SalesInvoice::count() + 1),
@@ -147,10 +144,7 @@ class SalesInvoiceController extends Controller
         );
 
         // ✅ preload HPP master (items.hpp) biar 1 query saja
-        $itemIds = collect($data['items'])->pluck('item_id')->map(fn($x) => (int) $x)->unique()->values();
-        $hppMap = Item::query()
-            ->whereIn('id', $itemIds->all())
-            ->pluck('hpp', 'id'); // [id => hpp]
+        $hppMap = $this->salesInvoices->hppMap($data['items']);
 
         /** @var SalesInvoice $invoice */
         $invoice = DB::transaction(function () use (
@@ -176,55 +170,15 @@ class SalesInvoiceController extends Controller
                 'tax_percent' => $taxPercent,
             ]);
 
-            $subtotal = 0.0;
+            $built = $this->salesInvoices->buildLines($data['items'], $hppMap);
 
-            foreach ($data['items'] as $row) {
-                $itemId = (int) $row['item_id'];
-                $qty = (float) $row['qty'];
-
-                $unitPriceRaw = $row['unit_price'] ?? null;
-                $unitPrice = ($unitPriceRaw !== null && $unitPriceRaw !== '') ? (float) $unitPriceRaw : 0.0;
-
-                $lineDiscount = (float) ($row['line_discount'] ?? 0.0);
-
-                $lineTotal = max(0, ($qty * $unitPrice) - $lineDiscount);
-                $subtotal += $lineTotal;
-
-                // ✅ ambil HPP dari master items.hpp
-                $hppUnit = (float) ($hppMap[$itemId] ?? 0.0);
-                $hppTotal = $hppUnit * $qty;
-
-                $marginTotal = $lineTotal - $hppTotal;
-                $marginUnit = $qty > 0 ? ($marginTotal / $qty) : 0.0;
-
-                SalesInvoiceLine::create([
-                    'sales_invoice_id' => $invoice->id,
-                    'item_id' => $itemId,
-                    'qty' => $qty,
-                    'unit_price' => $unitPrice,
-                    'line_discount' => $lineDiscount,
-                    'line_total' => $lineTotal,
-
-                    'hpp_unit_snapshot' => $hppUnit,
-                    'hpp_total_snapshot' => $hppTotal,
-
-                    'margin_unit' => $marginUnit,
-                    'margin_total' => $marginTotal,
-                ]);
+            foreach ($built['lines'] as $lineAttr) {
+                $invoice->lines()->create($lineAttr);
             }
 
-            $discountTotal = min($headerDiscount, $subtotal);
-            $dpp = $subtotal - $discountTotal;
-
-            $taxAmount = $taxPercent > 0 ? round($dpp * $taxPercent / 100, 2) : 0.0;
-            $grandTotal = $dpp + $taxAmount;
-
-            $invoice->update([
-                'subtotal' => $subtotal,
-                'discount_total' => $discountTotal,
-                'tax_amount' => $taxAmount,
-                'grand_total' => $grandTotal,
-            ]);
+            $invoice->update(
+                $this->salesInvoices->computeTotals($built['subtotal'], $headerDiscount, $taxPercent)
+            );
 
             if ($sourceShipmentId) {
                 $shipment = Shipment::find($sourceShipmentId);
@@ -324,15 +278,10 @@ class SalesInvoiceController extends Controller
         $invoiceDate = $data['date'];
         $warehouseId = (int) $data['warehouse_id'];
 
-        $hasAnyPrice = collect($data['items'])->contains(function ($row) {
-            $v = $row['unit_price'] ?? null;
-            return $v !== null && $v !== '' && (float) $v > 0;
-        });
-        $newStatus = $hasAnyPrice ? 'draft' : 'unpriced';
+        $newStatus = $this->salesInvoices->statusFromPricing($data['items']);
 
         // ✅ preload HPP master lagi
-        $itemIds = collect($data['items'])->pluck('item_id')->map(fn($x) => (int) $x)->unique()->values();
-        $hppMap = Item::query()->whereIn('id', $itemIds->all())->pluck('hpp', 'id');
+        $hppMap = $this->salesInvoices->hppMap($data['items']);
 
         DB::transaction(function () use (
             $invoice,
@@ -356,54 +305,15 @@ class SalesInvoiceController extends Controller
 
             $invoice->lines()->delete();
 
-            $subtotal = 0.0;
+            $built = $this->salesInvoices->buildLines($data['items'], $hppMap);
 
-            foreach ($data['items'] as $row) {
-                $itemId = (int) $row['item_id'];
-                $qty = (float) $row['qty'];
-
-                $unitPriceRaw = $row['unit_price'] ?? null;
-                $unitPrice = ($unitPriceRaw !== null && $unitPriceRaw !== '') ? (float) $unitPriceRaw : 0.0;
-
-                $lineDiscount = (float) ($row['line_discount'] ?? 0.0);
-
-                $lineTotal = max(0, ($qty * $unitPrice) - $lineDiscount);
-                $subtotal += $lineTotal;
-
-                $hppUnit = (float) ($hppMap[$itemId] ?? 0.0);
-                $hppTotal = $hppUnit * $qty;
-
-                $marginTotal = $lineTotal - $hppTotal;
-                $marginUnit = $qty > 0 ? ($marginTotal / $qty) : 0.0;
-
-                SalesInvoiceLine::create([
-                    'sales_invoice_id' => $invoice->id,
-                    'item_id' => $itemId,
-                    'qty' => $qty,
-                    'unit_price' => $unitPrice,
-                    'line_discount' => $lineDiscount,
-                    'line_total' => $lineTotal,
-
-                    'hpp_unit_snapshot' => $hppUnit,
-                    'hpp_total_snapshot' => $hppTotal,
-
-                    'margin_unit' => $marginUnit,
-                    'margin_total' => $marginTotal,
-                ]);
+            foreach ($built['lines'] as $lineAttr) {
+                $invoice->lines()->create($lineAttr);
             }
 
-            $discountTotal = min($headerDiscount, $subtotal);
-            $dpp = $subtotal - $discountTotal;
-
-            $taxAmount = $taxPercent > 0 ? round($dpp * $taxPercent / 100, 2) : 0.0;
-            $grandTotal = $dpp + $taxAmount;
-
-            $invoice->update([
-                'subtotal' => $subtotal,
-                'discount_total' => $discountTotal,
-                'tax_amount' => $taxAmount,
-                'grand_total' => $grandTotal,
-            ]);
+            $invoice->update(
+                $this->salesInvoices->computeTotals($built['subtotal'], $headerDiscount, $taxPercent)
+            );
         });
 
         return redirect()

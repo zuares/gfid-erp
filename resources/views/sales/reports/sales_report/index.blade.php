@@ -5,8 +5,6 @@
 @php
   use Carbon\Carbon;
 
-  $fmtInt = fn($n) => number_format((float)$n, 0, ',', '.');
-  $fmtMoney = fn($n) => 'Rp ' . number_format((float)$n, 0, ',', '.');
   $rangeLabel = $fromDate.' s/d '.$toDate;
 
   // formatter tanggal indo + hari
@@ -404,17 +402,17 @@
     <div class="g-kpis">
       <div class="g-kpi">
         <div class="k">Total Qty</div>
-        <div class="v">{{ $fmtInt($kpi->total_qty ?? 0) }}</div>
+        <div class="v">{{ angka($kpi->total_qty ?? 0) }}</div>
         <div class="hint">Akumulasi qty terjual pada range</div>
       </div>
       <div class="g-kpi">
         <div class="k">Total Value</div>
-        <div class="v">{{ $fmtMoney($kpi->total_value ?? 0) }}</div>
+        <div class="v">{{ rupiah($kpi->total_value ?? 0) }}</div>
         <div class="hint">Akumulasi nilai penjualan</div>
       </div>
       <div class="g-kpi">
         <div class="k">Jumlah Hari</div>
-        <div class="v">{{ $fmtInt($daysCount ?? 1) }}</div>
+        <div class="v">{{ angka($daysCount ?? 1) }}</div>
         <div class="hint">Dipakai untuk ADS (avg/day)</div>
       </div>
       <div class="g-kpi">
@@ -422,7 +420,7 @@
         @php
           $avgValuePerDay = ($daysCount ?? 1) > 0 ? ((float)($kpi->total_value ?? 0) / (float)$daysCount) : 0;
         @endphp
-        <div class="v">{{ $fmtMoney($avgValuePerDay) }}</div>
+        <div class="v">{{ rupiah($avgValuePerDay) }}</div>
         <div class="hint">Total value ÷ jumlah hari</div>
       </div>
     </div>
@@ -461,8 +459,8 @@
                     <div class="code">{{ $fmtDateId($date) }}</div>
                     <div class="name">{{ $date }}</div>
                   </td>
-                  <td class="right">{{ $fmtInt($d->qty) }}</td>
-                  <td class="right">{{ $fmtMoney($d->value) }}</td>
+                  <td class="right">{{ angka($d->qty) }}</td>
+                  <td class="right">{{ rupiah($d->value) }}</td>
                   <td class="right">
                     @if($hasDetail)
                       <button class="g-mini-btn" type="button" data-toggle-detail="{{ $detailId }}">
@@ -484,9 +482,9 @@
                             <div class="name">Rincian kategori & item terjual</div>
                           </div>
                           <div class="g-meta">
-                            <span>{{ $fmtInt($pack['qty'] ?? 0) }} qty</span>
+                            <span>{{ angka($pack['qty'] ?? 0) }} qty</span>
                             <span class="g-dot">•</span>
-                            <span>{{ $fmtMoney($pack['value'] ?? 0) }}</span>
+                            <span>{{ rupiah($pack['value'] ?? 0) }}</span>
                           </div>
                         </summary>
 
@@ -505,9 +503,9 @@
                                   <div class="name">Klik untuk lihat item</div>
                                 </div>
                                 <div class="g-meta">
-                                  <span>{{ $fmtInt($catQty) }} qty</span>
+                                  <span>{{ angka($catQty) }} qty</span>
                                   <span class="g-dot">•</span>
-                                  <span>{{ $fmtMoney($catVal) }}</span>
+                                  <span>{{ rupiah($catVal) }}</span>
                                 </div>
                               </summary>
 
@@ -530,10 +528,10 @@
                                               <div class="name">{{ $it['name'] }}</div>
                                             </td>
                                             <td class="right">
-                                              <span class="code">{{ $fmtInt($it['qty']) }}</span>
+                                              <span class="code">{{ angka($it['qty']) }}</span>
                                               <span class="uom">{{ $it['unit'] ?? '' }}</span>
                                             </td>
-                                            <td class="right">{{ $fmtMoney($it['value']) }}</td>
+                                            <td class="right">{{ rupiah($it['value']) }}</td>
                                           </tr>
                                         @empty
                                           <tr><td colspan="3" style="padding:14px; color:var(--g-muted);">Tidak ada item.</td></tr>
@@ -611,8 +609,8 @@
                     <div class="code">{{ $r->category_code }}</div>
                     <div class="name">{{ $r->category_name }}</div>
                   </td>
-                  <td class="right"><span class="code">{{ $fmtInt($r->qty) }}</span></td>
-                  <td class="right">{{ $fmtMoney($r->value) }}</td>
+                  <td class="right"><span class="code">{{ angka($r->qty) }}</span></td>
+                  <td class="right">{{ rupiah($r->value) }}</td>
                 </tr>
               @empty
                 <tr><td colspan="3" style="padding:14px; color:var(--g-muted);">Tidak ada data.</td></tr>
@@ -641,10 +639,10 @@
                     <div class="name">{{ $r->name }}</div>
                   </td>
                   <td class="right">
-                    <span class="code">{{ $fmtInt($r->qty) }}</span>
+                    <span class="code">{{ angka($r->qty) }}</span>
                     <span class="uom">{{ $r->unit ?? '' }}</span>
                   </td>
-                  <td class="right">{{ $fmtMoney($r->value) }}</td>
+                  <td class="right">{{ rupiah($r->value) }}</td>
                 </tr>
               @empty
                 <tr><td colspan="3" style="padding:14px; color:var(--g-muted);">Tidak ada data.</td></tr>
@@ -673,10 +671,10 @@
                     <div class="name">{{ $r->name }}</div>
                   </td>
                   <td class="right">
-                    <span class="code">{{ $fmtInt($r->qty) }}</span>
+                    <span class="code">{{ angka($r->qty) }}</span>
                     <span class="uom">{{ $r->unit ?? '' }}</span>
                   </td>
-                  <td class="right">{{ $fmtMoney($r->value) }}</td>
+                  <td class="right">{{ rupiah($r->value) }}</td>
                 </tr>
               @empty
                 <tr><td colspan="3" style="padding:14px; color:var(--g-muted);">Tidak ada data.</td></tr>
@@ -705,11 +703,11 @@
                     <div class="name">{{ $r->name }}</div>
                   </td>
                   <td class="right">
-                    <span class="code">{{ $fmtInt($r->total_qty) }}</span>
+                    <span class="code">{{ angka($r->total_qty) }}</span>
                     <span class="uom">{{ $r->unit ?? '' }}</span>
                   </td>
                   <td class="right">
-                    <span class="code">{{ number_format((float)$r->ads, 2, ',', '.') }}</span>
+                    <span class="code">{{ angka($r->ads, 2) }}</span>
                     <span class="uom">/hari</span>
                   </td>
                 </tr>

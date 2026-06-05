@@ -13,10 +13,6 @@
 @endpush
 
 @section('content')
-    @php
-        $fmt = fn($n, $dec = 0) => number_format($n ?? 0, $dec, ',', '.');
-    @endphp
-
     <div class="container py-3">
         <div class="d-flex justify-content-between align-items-center mb-3">
             <div>
@@ -113,13 +109,13 @@
                         @foreach ($rows as $row)
                             <tr class="text-nowrap">
                                 <td>{{ $row->store_name }}</td>
-                                <td class="text-end">{{ number_format($row->total_sales, 0, ',', '.') }}</td>
-                                <td class="text-end">{{ number_format($row->total_hpp, 0, ',', '.') }}</td>
-                                <td class="text-end">{{ number_format($row->total_margin, 0, ',', '.') }}</td>
-                                <td class="text-end">{{ number_format($row->margin_percent, 2, ',', '.') }}%</td>
+                                <td class="text-end">{{ angka($row->total_sales) }}</td>
+                                <td class="text-end">{{ angka($row->total_hpp) }}</td>
+                                <td class="text-end">{{ angka($row->total_margin) }}</td>
+                                <td class="text-end">{{ angka($row->margin_percent, 2) }}%</td>
                                 <td class="text-end">{{ $row->invoice_count }}</td>
                                 <td class="text-end">{{ $row->invoice_shipped_count }}</td>
-                                <td class="text-end">{{ number_format($row->shipped_percent, 2, ',', '.') }}%</td>
+                                <td class="text-end">{{ angka($row->shipped_percent, 2) }}%</td>
                             </tr>
                         @endforeach
                     </tbody>
@@ -128,10 +124,10 @@
                         <tfoot>
                             <tr class="fw-semibold table-light text-nowrap">
                                 <td>GRAND TOTAL</td>
-                                <td class="text-end">{{ $fmt($totals['sales'], 0) }}</td>
-                                <td class="text-end">{{ $fmt($totals['hpp'], 0) }}</td>
-                                <td class="text-end">{{ $fmt($totals['margin'], 0) }}</td>
-                                <td class="text-end">{{ $fmt($totals['margin_percent'], 2) }}%</td>
+                                <td class="text-end">{{ angka($totals['sales']) }}</td>
+                                <td class="text-end">{{ angka($totals['hpp']) }}</td>
+                                <td class="text-end">{{ angka($totals['margin']) }}</td>
+                                <td class="text-end">{{ angka($totals['margin_percent'], 2) }}%</td>
                             </tr>
                         </tfoot>
                     @endif

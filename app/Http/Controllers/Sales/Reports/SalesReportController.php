@@ -3,7 +3,7 @@
 namespace App\Http\Controllers\Sales\Reports;
 
 use App\Http\Controllers\Controller;
-use Carbon\Carbon;
+use App\Support\ReportDateRange;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\DB;
 
@@ -12,23 +12,10 @@ class SalesReportController extends Controller
     public function index(Request $request)
     {
         // Default range: 30 hari terakhir
-        $tz = config('app.timezone', 'Asia/Jakarta');
+        $range = ReportDateRange::lastDays($request, 30);
 
-        $from = $request->query('from')
-        ? Carbon::parse($request->query('from'), $tz)->startOfDay()
-        : now($tz)->subDays(29)->startOfDay();
-
-        $to = $request->query('to')
-        ? Carbon::parse($request->query('to'), $tz)->endOfDay()
-        : now($tz)->endOfDay();
-
-        // Guard: kalau kebalik, swap
-        if ($from->gt($to)) {
-            [$from, $to] = [$to->copy()->startOfDay(), $from->copy()->endOfDay()];
-        }
-
-        $fromDate = $from->toDateString();
-        $toDate = $to->toDateString();
+        $fromDate = $range->from;
+        $toDate = $range->to;
 
         // KPI ringkas (total qty & total value)
         $kpi = DB::table('daily_item_sales as d')
@@ -93,7 +80,7 @@ class SalesReportController extends Controller
             ->get();
 
         // ADS (avg/day)
-        $daysCount = max(1, (int) $from->diffInDays($to) + 1);
+        $daysCount = $range->days();
 
         $ads = DB::table('daily_item_sales as d')
             ->join('items as i', 'i.id', '=', 'd.item_id')

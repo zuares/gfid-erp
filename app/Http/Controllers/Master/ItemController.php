@@ -6,17 +6,20 @@ use App\Http\Controllers\Controller;
 use App\Models\Item;
 use App\Models\ItemCategory;
 use App\Models\ItemCostSnapshot;
+use App\Models\ItemRole;
 use Illuminate\Http\Request;
 use Illuminate\Support\Carbon;
 use Illuminate\Support\Facades\Auth;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Validation\Rule;
+use Illuminate\Validation\ValidationException;
 
 class ItemController extends Controller
 {
     public function index(Request $request)
     {
         $query = Item::query()
+            ->with('category')
             ->withCount('barcodes')
             ->with(['costSnapshots' => function ($q) {
                 $q->active()
@@ -40,14 +43,19 @@ class ItemController extends Controller
             $query->where('item_category_id', $categoryId);
         }
 
+        if ($categoryKind = $request->input('category_kind')) {
+            $query->whereHas('category', fn($q) => $q->where('kind', $categoryKind));
+        }
+
         $items = $query
             ->orderBy('code')
             ->paginate(25)
             ->withQueryString();
 
-        $categories = ItemCategory::orderBy('name')->get();
+        $categories = $this->categoryOptions();
+        $categoryKinds = ItemCategory::kindLabels();
 
-        return view('master.items.index', compact('items', 'categories'));
+        return view('master.items.index', compact('items', 'categories', 'categoryKinds'));
     }
 
     public function create()
@@ -55,7 +63,7 @@ class ItemController extends Controller
         $item = null;
 
         // kalau kamu punya list kategori, lempar juga ke view:
-        $categories = ItemCategory::orderBy('name')->get();
+        $categories = $this->categoryOptions();
         return view('master.items.create', compact('item', 'categories'));
 
     }
@@ -141,12 +149,26 @@ class ItemController extends Controller
         $data = $this->validateRequest($request);
 
         DB::transaction(function () use ($data, &$item) {
+            $classification = $this->classificationFor(
+                $data['type'] ?? 'material',
+                $data['item_category_id'] ?? null,
+            );
+            $productionSource = $this->productionSourceFor(
+                $data['type'] ?? 'material',
+                $data['production_source'] ?? null,
+            );
+
             $item = Item::create([
                 'code' => $data['code'],
                 'name' => $data['name'],
                 'unit' => $data['unit'] ?? 'pcs',
                 'type' => $data['type'] ?? 'material',
                 'item_category_id' => $data['item_category_id'] ?? null,
+                'item_role_id' => $classification['item_role_id'],
+                'item_role' => $classification['item_role'],
+                'is_stocked' => $classification['is_stocked'],
+                'hpp_behavior' => $classification['hpp_behavior'],
+                'production_source' => $productionSource,
                 'active' => isset($data['active']) ? (bool) $data['active'] : true,
                 // last_purchase_price & hpp biarkan default (0) dari DB
             ]);
@@ -164,7 +186,7 @@ class ItemController extends Controller
         $item->load('barcodes');
 
         // kalau ada kategori:
-        $categories = ItemCategory::orderBy('name')->get();
+        $categories = $this->categoryOptions();
         return view('master.items.edit', compact('item', 'categories'));
 
         return view('master.items.edit', compact('item'));
@@ -175,12 +197,26 @@ class ItemController extends Controller
         $data = $this->validateRequest($request, $item);
 
         DB::transaction(function () use ($data, $item) {
+            $classification = $this->classificationFor(
+                $data['type'],
+                $data['item_category_id'] ?? null,
+            );
+            $productionSource = $this->productionSourceFor(
+                $data['type'],
+                $data['production_source'] ?? null,
+            );
+
             $item->update([
                 'code' => $data['code'],
                 'name' => $data['name'],
                 'unit' => $data['unit'] ?? 'pcs',
                 'type' => $data['type'] ?? 'material',
                 'item_category_id' => $data['item_category_id'] ?? null,
+                'item_role_id' => $classification['item_role_id'],
+                'item_role' => $classification['item_role'],
+                'is_stocked' => $classification['is_stocked'],
+                'hpp_behavior' => $classification['hpp_behavior'],
+                'production_source' => $productionSource,
                 'active' => isset($data['active']) ? (bool) $data['active'] : true,
                 // last_purchase_price & hpp tetap dikelola proses lain
             ]);
@@ -231,9 +267,22 @@ class ItemController extends Controller
         DB::transaction(function () use ($action, $ids, $data, &$count) {
 
             if ($action === 'set_category') {
-                // item_category_id boleh null (artinya kosongkan kategori)
-                $count = Item::whereIn('id', $ids)
-                    ->update(['item_category_id' => $data['item_category_id'] ?? null]);
+                $categoryId = $data['item_category_id'] ?? null;
+                foreach (Item::whereIn('id', $ids)->get(['id', 'type', 'production_source']) as $item) {
+                    $this->validateCategoryForType($item->type, $categoryId);
+                    $classification = $this->classificationFor($item->type, $categoryId);
+                    $productionSource = $this->productionSourceFor($item->type, $item->production_source ?? null);
+
+                    Item::whereKey($item->id)->update([
+                        'item_category_id' => $categoryId,
+                        'item_role_id' => $classification['item_role_id'],
+                        'item_role' => $classification['item_role'],
+                        'is_stocked' => $classification['is_stocked'],
+                        'hpp_behavior' => $classification['hpp_behavior'],
+                        'production_source' => $productionSource,
+                    ]);
+                    $count++;
+                }
                 return;
             }
 
@@ -241,8 +290,21 @@ class ItemController extends Controller
                 if (empty($data['type'])) {
                     abort(422, 'Tipe wajib dipilih untuk aksi ubah tipe.');
                 }
-                $count = Item::whereIn('id', $ids)
-                    ->update(['type' => $data['type']]);
+                foreach (Item::whereIn('id', $ids)->get(['id', 'item_category_id', 'production_source']) as $item) {
+                    $this->validateCategoryForType($data['type'], $item->item_category_id);
+                    $classification = $this->classificationFor($data['type'], $item->item_category_id);
+                    $productionSource = $this->productionSourceFor($data['type'], $item->production_source ?? null);
+
+                    Item::whereKey($item->id)->update([
+                        'type' => $data['type'],
+                        'item_role_id' => $classification['item_role_id'],
+                        'item_role' => $classification['item_role'],
+                        'is_stocked' => $classification['is_stocked'],
+                        'hpp_behavior' => $classification['hpp_behavior'],
+                        'production_source' => $productionSource,
+                    ]);
+                    $count++;
+                }
                 return;
             }
 
@@ -308,7 +370,7 @@ class ItemController extends Controller
     {
         $idToIgnore = $item?->id;
 
-        return $request->validate([
+        $data = $request->validate([
             'code' => [
                 'required',
                 'string',
@@ -328,6 +390,7 @@ class ItemController extends Controller
             ],
 
             'item_category_id' => ['nullable', 'integer', 'exists:item_categories,id'],
+            'production_source' => ['nullable', 'string', Rule::in(array_keys(Item::productionSourceLabels()))],
 
             'active' => ['nullable'],
 
@@ -339,6 +402,101 @@ class ItemController extends Controller
             'barcodes.*.notes' => ['nullable', 'string', 'max:190'],
             'barcodes.*.is_active' => ['nullable'],
         ]);
+
+        $this->validateCategoryForType($data['type'], $data['item_category_id'] ?? null);
+
+        return $data;
+    }
+
+    protected function validateCategoryForType(string $type, ?int $categoryId): void
+    {
+        if (!$categoryId) {
+            return;
+        }
+
+        $kind = ItemCategory::whereKey($categoryId)->value('kind');
+        $allowed = $this->allowedCategoryKindsForType($type);
+
+        if (!in_array($kind, $allowed, true)) {
+            throw ValidationException::withMessages([
+                'item_category_id' => 'Kategori tidak sesuai dengan tipe item. Finished Good wajib kategori produk; Material wajib kategori bahan/pendukung/accessories/packaging.',
+            ]);
+        }
+    }
+
+    protected function allowedCategoryKindsForType(string $type): array
+    {
+        return match ($type) {
+            'finished_good', 'wip' => ['product'],
+            'material' => ['material', 'support', 'accessory', 'packaging', 'other'],
+            default => ['product', 'material', 'support', 'accessory', 'packaging', 'other'],
+        };
+    }
+
+    protected function classificationFor(string $type, ?int $categoryId): array
+    {
+        $category = $categoryId ? ItemCategory::find($categoryId) : null;
+        $roleCode = match (true) {
+            $type === 'finished_good' || $type === 'wip' => ItemRole::FG,
+            $category?->kind === 'support' || $category?->kind === 'accessory' => ItemRole::SUP,
+            $category?->kind === 'packaging' => ItemRole::PKG,
+            default => ItemRole::RM,
+        };
+
+        return match ($roleCode) {
+            ItemRole::FG => [
+                'item_role_id' => ItemRole::idByCode(ItemRole::FG),
+                'item_role' => 'finished_good',
+                'is_stocked' => true,
+                'hpp_behavior' => 'hpp',
+            ],
+            ItemRole::SUP => [
+                'item_role_id' => ItemRole::idByCode(ItemRole::SUP),
+                'item_role' => 'production_supply',
+                'is_stocked' => true,
+                'hpp_behavior' => 'hpp',
+            ],
+            ItemRole::PKG => [
+                'item_role_id' => ItemRole::idByCode(ItemRole::PKG),
+                'item_role' => 'shipping_supply',
+                'is_stocked' => false,
+                'hpp_behavior' => 'non_hpp',
+            ],
+            default => [
+                'item_role_id' => ItemRole::idByCode(ItemRole::RM),
+                'item_role' => 'raw_material',
+                'is_stocked' => true,
+                'hpp_behavior' => 'hpp',
+            ],
+        };
+    }
+
+    protected function productionSourceFor(string $type, ?string $productionSource): ?string
+    {
+        if (!in_array($type, ['finished_good', 'wip'], true)) {
+            return null;
+        }
+
+        if ($productionSource && array_key_exists($productionSource, Item::productionSourceLabels())) {
+            return $productionSource;
+        }
+
+        return Item::PRODUCTION_BUY;
+    }
+
+    protected function categoryOptions()
+    {
+        return ItemCategory::query()
+            ->orderByRaw("CASE kind
+                WHEN 'product' THEN 1
+                WHEN 'material' THEN 2
+                WHEN 'support' THEN 3
+                WHEN 'accessory' THEN 4
+                WHEN 'packaging' THEN 5
+                ELSE 9
+            END")
+            ->orderBy('name')
+            ->get();
     }
 
     /**
