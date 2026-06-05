@@ -188,6 +188,12 @@ class ProductionPriorityService
     private function reason(?float $stokCukupDays, ?int $dd, ?int $age, float $stokJahit, float $ads): string
     {
         $parts = [];
+        if ($stokJahit > 0) {
+            $parts[] = 'Bisa langsung ambil jahit';
+        } elseif ($ads > 0) {
+            $parts[] = 'Potong dulu, belum ada stok jahit';
+        }
+
         if ($dd !== null && $dd <= 0) {
             $parts[] = 'Deadline sudah lewat';
         } elseif ($dd !== null && $dd < self::DEADLINE_WINDOW) {
@@ -195,9 +201,6 @@ class ProductionPriorityService
         }
         if ($ads > 0 && $stokCukupDays !== null && $stokCukupDays < 7) {
             $parts[] = 'Stok barang jadi cukup ' . $this->formatDays($stokCukupDays) . ' hari';
-        }
-        if ($stokJahit <= 0 && $ads > 0) {
-            $parts[] = 'Belum ada stok jahit untuk diambil';
         }
         if ($age !== null && $age >= self::AGE_MAX) {
             $parts[] = "Jahitan sudah {$age} hari, perlu dicek";

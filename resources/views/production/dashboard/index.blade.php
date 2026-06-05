@@ -1048,22 +1048,32 @@
                 const tbody = table.querySelector('tbody');
                 const q = (root.querySelector('[data-pr-search]')?.value || '').trim().toLowerCase();
                 const grade = root.querySelector('[data-pr-grade]')?.value || '';
-                const sort = root.querySelector('[data-pr-sort]')?.value || 'score-desc';
+                const pickup = root.querySelector('[data-pr-pickup]')?.value || '';
+                const sort = root.querySelector('[data-pr-sort]')?.value || 'actionable-desc';
 
                 const rows = Array.from(tbody.querySelectorAll('[data-pr-row]'));
-                let shown = 0, urgent = 0;
+                let shown = 0, urgent = 0, ready = 0;
                 rows.forEach(r => {
                     let ok = true;
                     if (q && !(r.dataset.search || '').includes(q)) ok = false;
                     if (grade && r.dataset.grade !== grade) ok = false;
+                    if (pickup && r.dataset.pickup !== pickup) ok = false;
                     r.hidden = !ok;
                     if (ok) {
                         shown++;
                         if (r.dataset.grade === 'Kritis' || r.dataset.grade === 'Tinggi') urgent++;
+                        if (r.dataset.pickup === 'ready') ready++;
                     }
                 });
 
                 const cmp = {
+                    'actionable-desc': (a, b) =>
+                        ((b.dataset.pickup === 'ready') - (a.dataset.pickup === 'ready')) ||
+                        ((+b.dataset.score) - (+a.dataset.score)) ||
+                        ((+b.dataset.sewingStock) - (+a.dataset.sewingStock)),
+                    'sewing-desc': (a, b) =>
+                        ((+b.dataset.sewingStock) - (+a.dataset.sewingStock)) ||
+                        ((+b.dataset.score) - (+a.dataset.score)),
                     'score-desc': (a, b) => (+b.dataset.score) - (+a.dataset.score),
                     'cover-asc': (a, b) => (+a.dataset.cover) - (+b.dataset.cover),
                     'ads-desc': (a, b) => (+b.dataset.ads) - (+a.dataset.ads),
@@ -1071,7 +1081,7 @@
                 if (cmp) rows.sort(cmp).forEach(r => tbody.appendChild(r));
 
                 const cnt = root.querySelector('[data-pr-count]');
-                if (cnt) cnt.textContent = idFmt(shown) + ' SKU produksi sendiri · ' + idFmt(urgent) + ' perlu didahulukan';
+                if (cnt) cnt.textContent = idFmt(shown) + ' SKU produksi sendiri · ' + idFmt(ready) + ' bisa diambil jahit · ' + idFmt(urgent) + ' perlu didahulukan';
 
                 const setKpi = (sel, val) => { const el = root.querySelector(sel); if (el) el.textContent = val; };
                 setKpi('[data-pr-kpi-urgent]', idFmt(urgent));
@@ -1081,7 +1091,7 @@
                 if (empty) empty.hidden = (shown !== 0) || rows.length === 0;
             }
 
-            const PR_SEL = '[data-pr-search],[data-pr-grade],[data-pr-sort]';
+            const PR_SEL = '[data-pr-search],[data-pr-grade],[data-pr-pickup],[data-pr-sort]';
             document.addEventListener('input', (e) => {
                 if (!e.target.matches('[data-pr-search]')) return;
                 applyPrFilters(e.target.closest('[data-tab-panel]'));

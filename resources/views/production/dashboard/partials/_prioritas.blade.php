@@ -47,8 +47,16 @@
             <option value="Rendah">Rendah</option>
         </select>
 
+        <select class="form-select" data-pr-pickup aria-label="Bisa diambil jahit">
+            <option value="">Semua</option>
+            <option value="ready">Ada Stok Jahit</option>
+            <option value="empty">Belum Ada Stok Jahit</option>
+        </select>
+
         <select class="form-select" data-pr-sort aria-label="Urutkan">
-            <option value="score-desc">Skor tertinggi</option>
+            <option value="actionable-desc">Dahulukan + ada stok jahit</option>
+            <option value="sewing-desc">Stok Jahit terbesar</option>
+            <option value="score-desc">Dahulukan tertinggi</option>
             <option value="cover-asc">Stok cukup tersingkat</option>
             <option value="ads-desc">Jual/hari tertinggi</option>
         </select>
@@ -85,7 +93,9 @@
                             data-grade="{{ $p->grade }}"
                             data-score="{{ $p->score }}"
                             data-cover="{{ $p->stok_cukup_days ?? 99999 }}"
-                            data-ads="{{ $p->ads }}">
+                            data-ads="{{ $p->ads }}"
+                            data-sewing-stock="{{ (float) $p->siap_jahit }}"
+                            data-pickup="{{ $canPickup ? 'ready' : 'empty' }}">
                             <td data-label="Item">
                                 <div class="gf-pri-item">
                                     @if ($pickupUrl)
