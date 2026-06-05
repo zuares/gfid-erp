@@ -1,5 +1,6 @@
 <?php
 
+use App\Console\Commands\SeedProductionBoms;
 use App\Http\Middleware\RoleMiddleware;
 use Illuminate\Console\Scheduling\Schedule;
 use Illuminate\Foundation\Application;
@@ -19,6 +20,9 @@ return Application::configure(basePath: dirname(__DIR__))
             \Laravel\Sanctum\Http\Middleware\EnsureFrontendRequestsAreStateful::class,
         ]);
     })
+    ->withCommands([
+        SeedProductionBoms::class,
+    ])
     ->withSchedule(function (Schedule $schedule) {
         // ✅ Ini yang bikin scheduler Laravel 12 aktif
         // Kamu bisa taruh TEST di sini dulu:
