@@ -1022,14 +1022,17 @@
                 recalcSummaryAndUI();
             });
 
-            // PRE-FILTER dari query ?sku= (mis. klik baris di Dashboard Produksi → Siap Jahit)
+            // PRE-FILTER dari query ?sku= (mis. klik baris di Dashboard Produksi → Prioritas)
             (function applySkuFromQuery() {
                 if (!itemCodeSelect) return;
-                const sku = new URLSearchParams(window.location.search).get('sku');
+                const params = new URLSearchParams(window.location.search);
+                const sku = normalizeText(params.get('sku') || params.get('item_code'));
                 if (!sku) return;
                 const match = Array.from(itemCodeSelect.options)
-                    .some(o => o.value === sku);
-                if (!match) return;
+                    .some(o => normalizeText(o.value) === sku);
+                if (!match) {
+                    itemCodeSelect.add(new Option(`${sku} — belum ada stok jahit`, sku));
+                }
                 itemCodeSelect.value = sku;
                 state.activeItemCode = sku;
                 recalcSummaryAndUI();

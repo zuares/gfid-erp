@@ -57,6 +57,7 @@ class ProductionPriorityService
             $siapJahit = (float) ($snap->siap_jahit ?? 0);
             $sedangJahit = (float) ($snap->sedang_jahit ?? 0);
             $whPrd = (float) ($snap->wh_prd ?? 0);
+            $barangJadi = $ready + $whPrd;
             $wip = (float) ($snap->wip_stock ?? 0);
             $s7 = (float) ($snap->s7 ?? 0);
             $s14 = (float) ($snap->s14 ?? 0);
@@ -64,6 +65,7 @@ class ProductionPriorityService
             $ads = (float) ($snap->ads ?? 0);
 
             $cover = $snap->cover_days ?? null;
+            $stokCukupDays = $ads > 0 ? round($barangJadi / $ads, 1) : null;
             $pipeCover = $snap->pipe_cover_days ?? null;
 
             $deadline = $deadlines->get($id);
@@ -93,6 +95,9 @@ class ProductionPriorityService
             $score = max(0, min(100, $score));
 
             $grade = $score >= 70 ? 'Kritis' : ($score >= 50 ? 'Tinggi' : ($score >= 30 ? 'Sedang' : 'Rendah'));
+            $dahulukanLabel = in_array($grade, ['Kritis', 'Tinggi'], true)
+                ? 'Ya'
+                : ($grade === 'Sedang' ? 'Siapkan' : 'Belum');
 
             return (object) [
                 'item_id' => $id,
@@ -103,6 +108,7 @@ class ProductionPriorityService
                 'production_source' => $item->production_source_label,
                 'production_source_key' => $isMadeInHouse ? 'own' : 'external',
                 'ready' => $ready,
+                'barang_jadi' => $barangJadi,
                 'siap_jahit' => $siapJahit,
                 'sedang_jahit' => $sedangJahit,
                 'wh_prd' => $whPrd,
@@ -112,13 +118,15 @@ class ProductionPriorityService
                 's30' => $s30,
                 'ads' => round($ads, 2),
                 'cover_days' => $cover,
+                'stok_cukup_days' => $stokCukupDays,
                 'pipe_cover_days' => $pipeCover,
                 'deadline' => $deadline,
                 'days_to_deadline' => $daysToDeadline,
                 'age_days' => $age,
                 'score' => $score,
                 'grade' => $grade,
-                'reason' => $this->reason($cover, $daysToDeadline, $age, $wip, $ads),
+                'dahulukan_label' => $dahulukanLabel,
+                'reason' => $this->reason($stokCukupDays, $daysToDeadline, $age, $siapJahit, $ads),
             ];
         })
             ->filter(fn($r) => $r->ready > 0 || $r->wip > 0 || $r->s7 > 0 || $r->s30 > 0)
@@ -177,24 +185,35 @@ class ProductionPriorityService
     }
 
     /** Alasan utama prioritas (faktor dominan, untuk ditampilkan). */
-    private function reason(?float $cover, ?int $dd, ?int $age, float $wip, float $ads): string
+    private function reason(?float $stokCukupDays, ?int $dd, ?int $age, float $stokJahit, float $ads): string
     {
         $parts = [];
         if ($dd !== null && $dd <= 0) {
-            $parts[] = 'deadline lewat';
+            $parts[] = 'Deadline sudah lewat';
         } elseif ($dd !== null && $dd < self::DEADLINE_WINDOW) {
-            $parts[] = "deadline {$dd} hr";
+            $parts[] = "Deadline tinggal {$dd} hari";
         }
-        if ($ads > 0 && $cover !== null && $cover < 7) {
-            $parts[] = "cover {$cover} hr";
+        if ($ads > 0 && $stokCukupDays !== null && $stokCukupDays < 7) {
+            $parts[] = 'Stok barang jadi cukup ' . $this->formatDays($stokCukupDays) . ' hari';
         }
-        if ($wip <= 0 && $ads > 0) {
-            $parts[] = 'belum ada WIP';
+        if ($stokJahit <= 0 && $ads > 0) {
+            $parts[] = 'Belum ada stok jahit untuk diambil';
         }
         if ($age !== null && $age >= self::AGE_MAX) {
-            $parts[] = "WIP menua {$age} hr";
+            $parts[] = "Jahitan sudah {$age} hari, perlu dicek";
         }
-        return $parts ? implode(' · ', $parts) : 'stok cukup';
+        return $parts ? implode(' · ', $parts) : 'Stok masih aman';
+    }
+
+    private function formatDays(float $days): string
+    {
+        $rounded = round($days, 1);
+
+        if (abs($rounded - round($rounded)) < 0.000001) {
+            return number_format($rounded, 0, ',', '.');
+        }
+
+        return number_format($rounded, 1, ',', '.');
     }
 
     // ==========================================================

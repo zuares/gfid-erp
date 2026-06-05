@@ -5,22 +5,22 @@
 
 @php
     $tabs = [
+        'prioritas' => 'Prioritas',
         'ringkasan' => 'Ringkasan',
         'siap-jahit' => 'Siap Jahit',
         'sedang-jahit' => 'Sedang Jahit',
         'setor-qc' => 'Setor & QC',
         'reject' => 'Reject',
-        'prioritas' => 'Prioritas',
     ];
 
     // Deskripsi singkat per tab (tampil di bawah judul header).
     $tabDesc = [
+        'prioritas' => 'SKU yang perlu didahulukan produksinya.',
         'ringkasan' => 'Ringkasan & alur produksi periode ini.',
         'siap-jahit' => 'Hasil potong yang siap dibagi ke penjahit.',
         'sedang-jahit' => 'Barang yang sedang dikerjakan penjahit.',
         'setor-qc' => 'Hasil jahit yang sudah disetor & lolos cek kualitas.',
         'reject' => 'Barang gagal cek kualitas — cutting & jahit.',
-        'prioritas' => 'SKU yang perlu didahulukan produksinya.',
     ];
 @endphp
 
@@ -355,7 +355,12 @@
         .gf-datecell-sub { font-size: .68rem; color: var(--gf-muted); font-variant-numeric: tabular-nums; white-space: nowrap; }
 
         /* Tab Prioritas — minimalis, sedikit warna */
+        [data-pr-row][data-href] { cursor: pointer; }
         .gf-pri-item { display: flex; align-items: center; gap: .7rem; min-width: 230px; }
+        .gf-pri-link { color: inherit; text-decoration: none; }
+        .gf-pri-link:hover .gf-chip { border-color: rgba(37, 99, 235, .45); background: rgba(37, 99, 235, .08); color: #1d4ed8; }
+        .gf-pri-link-copy { display: block; min-width: 0; }
+        .gf-pri-disabled { opacity: .62; cursor: default; }
         .gf-pri-product { font-weight: 700; color: var(--gf-dark); line-height: 1.2; }
         .gf-pri-meta { margin-top: .12rem; color: var(--gf-muted); font-size: .76rem; line-height: 1.2; }
         .gf-pri-stack { display: flex; flex-direction: column; align-items: flex-end; gap: .08rem; line-height: 1.15; }
@@ -411,6 +416,19 @@
                 background: #fff;
                 box-shadow: 0 6px 18px rgba(15, 23, 42, .04);
             }
+            [data-pr-table] tr.gf-pri-no-sewing-stock {
+                border-color: rgba(245, 158, 11, .28);
+                background: #fffbeb;
+                box-shadow: inset 4px 0 0 #f59e0b, 0 6px 18px rgba(146, 64, 14, .06);
+            }
+            [data-pr-table] tr.gf-pri-no-sewing-stock .gf-pri-sewing-stock {
+                background: rgba(245, 158, 11, .12) !important;
+                box-shadow: inset 3px 0 0 #f59e0b !important;
+            }
+            [data-pr-table] tr.gf-pri-no-sewing-stock .gf-pri-sewing-stock::before,
+            [data-pr-table] tr.gf-pri-no-sewing-stock .gf-pri-sewing-stock .gf-pri-stack b {
+                color: #b45309 !important;
+            }
             [data-pr-table] tr[data-pr-row] > td {
                 display: flex;
                 align-items: flex-start;
@@ -434,9 +452,47 @@
                 border-bottom: 1px solid rgba(15, 23, 42, .06) !important;
                 margin-bottom: .2rem;
                 padding-bottom: .5rem !important;
+                order: 1;
             }
             [data-pr-table] tr[data-pr-row] > td:first-child::before { content: none; }
+            [data-pr-table] tr[data-pr-row] > td.gf-pri-sewing-stock {
+                order: 2;
+                align-items: center;
+                padding: .58rem .65rem !important;
+                margin: .1rem 0 .22rem;
+                border-radius: 8px;
+                background: rgba(37, 99, 235, .07);
+                box-shadow: inset 3px 0 0 #2563eb;
+            }
+            [data-pr-table] tr[data-pr-row] > td.gf-pri-sewing-stock::before {
+                color: #1d4ed8;
+                font-size: .72rem;
+            }
+            [data-pr-table] tr[data-pr-row] > td.gf-pri-sewing-stock .gf-pri-stack b {
+                color: #1d4ed8;
+                font-size: 1.18rem;
+                font-weight: 900;
+            }
+            [data-pr-table] tr[data-pr-row] > td.gf-pri-fg { order: 3; }
+            [data-pr-table] tr[data-pr-row] > td.gf-pri-sewing-progress { order: 4; }
+            [data-pr-table] tr[data-pr-row] > td[data-label="Stok Cukup"] { order: 5; }
+            [data-pr-table] tr[data-pr-row] > td[data-label="Dahulukan?"] { order: 6; }
             .gf-pri-item { min-width: 0; width: 100%; gap: .5rem; }
+            .gf-pri-item .gf-chip {
+                padding: .22rem .62rem;
+                background: #0f172a;
+                border-color: #0f172a;
+                color: #fff;
+            }
+            .gf-pri-item .gf-chip b {
+                font-size: .92rem;
+                letter-spacing: .02em;
+            }
+            .gf-pri-disabled .gf-chip {
+                background: #f59e0b;
+                border-color: #f59e0b;
+                color: #fff;
+            }
             .gf-pri-product,
             .gf-pri-meta { display: none; }
             .gf-pri-stack { align-items: flex-end; }
@@ -1035,6 +1091,12 @@
                 applyPrFilters(e.target.closest('[data-tab-panel]'));
             });
 
+            document.addEventListener('click', (e) => {
+                const row = e.target.closest('[data-pr-row][data-href]');
+                if (!row || e.target.closest('a, button, input, select, textarea')) return;
+                window.location.href = row.dataset.href;
+            });
+
             // Terapkan filter default per-tab setelah HTML tab dimuat.
             function initTabFilters(name, pane) {
                 if (name === 'prioritas') applyPrFilters(pane);
@@ -1044,14 +1106,6 @@
             // jadi terapkan filter default-nya (mis. Penjahit = Ambil Jahit) di sini.
             initTabFilters(SERVER_INITIAL, paneByName(SERVER_INITIAL));
 
-            try {
-                const saved = localStorage.getItem(KEY);
-                if (saved && saved !== SERVER_INITIAL && paneByName(saved)) {
-                    activate(saved);
-                    syncUrl();
-                    loadTab(saved);
-                }
-            } catch (e) {}
         });
     </script>
 @endpush

@@ -31,7 +31,7 @@ use Illuminate\View\View;
 class ProductionDashboardController extends Controller
 {
     /** Daftar tab valid + builder-nya. */
-    private const TABS = ['ringkasan', 'siap-jahit', 'sedang-jahit', 'setor-qc', 'reject', 'prioritas'];
+    private const TABS = ['prioritas', 'ringkasan', 'siap-jahit', 'sedang-jahit', 'setor-qc', 'reject'];
 
     public function __construct(
         private ProductionFlowService $flow,
@@ -50,7 +50,7 @@ class ProductionDashboardController extends Controller
 
         $initialTab = $request->input('tab');
         if (!in_array($initialTab, self::TABS, true)) {
-            $initialTab = 'ringkasan';
+            $initialTab = 'prioritas';
         }
 
         // Default 7 hari (untuk tombol reset di front-end)
