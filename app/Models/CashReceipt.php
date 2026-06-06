@@ -4,16 +4,15 @@ namespace App\Models;
 
 use Illuminate\Database\Eloquent\Model;
 
-class CashExpense extends Model
+class CashReceipt extends Model
 {
     protected $fillable = [
         'date',
         'amount',
-        'expense_account_id',
         'cash_account_id',
+        'source_account_id',
         'description',
         'reference',
-        'proof_photo_path',
         'status',
         'journal_id',
         'created_by',
@@ -30,13 +29,13 @@ class CashExpense extends Model
         return $this->belongsTo(Journal::class);
     }
 
-    public function expenseAccount()
-    {
-        return $this->belongsTo(Account::class, 'expense_account_id');
-    }
-
     public function cashAccount()
     {
         return $this->belongsTo(Account::class, 'cash_account_id');
+    }
+
+    public function sourceAccount()
+    {
+        return $this->belongsTo(Account::class, 'source_account_id');
     }
 }

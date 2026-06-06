@@ -162,6 +162,7 @@
 
   {{-- ✅ Flatpickr GLOBAL --}}
   <script src="https://cdn.jsdelivr.net/npm/flatpickr"></script>
+  <script src="https://cdn.jsdelivr.net/npm/sweetalert2@11"></script>
 
   {{-- THEME TOGGLER SCRIPT --}}
   @include('layouts.partials.theme-script')
@@ -170,6 +171,7 @@
     ✅ GLOBAL HELPERS (bisa dipakai di semua halaman)
     - window.GFID.initDate(selector, options)
     - window.GFID.initDateRange(selector, options)
+    - window.GFID.initGreatfitUi(root)
   ========================= --}}
   <script>
     (function(){
@@ -192,6 +194,7 @@
       window.GFID.initDate = function(selectorOrEl, options = {}){
         const el = pickEl(selectorOrEl);
         if (!el || !window.flatpickr) return null;
+        if (el._flatpickr) return el._flatpickr;
 
         return window.flatpickr(el, Object.assign({}, baseOptions(), options));
       };
@@ -199,11 +202,118 @@
       window.GFID.initDateRange = function(selectorOrEl, options = {}){
         const el = pickEl(selectorOrEl);
         if (!el || !window.flatpickr) return null;
+        if (el._flatpickr) return el._flatpickr;
 
         return window.flatpickr(el, Object.assign({}, baseOptions(), {
           mode: 'range'
         }, options));
       };
+
+      window.GFID.toast = function(message, options = {}){
+        if (!message || !window.Swal) return null;
+        return Swal.fire(Object.assign({
+          toast: true,
+          position: 'top-end',
+          icon: 'success',
+          title: message,
+          showConfirmButton: false,
+          timer: 2600,
+          timerProgressBar: true
+        }, options));
+      };
+
+      function isDateLikeInput(el){
+        if (!el || el.tagName !== 'INPUT') return false;
+        if (el.dataset.gfDate === 'off') return false;
+        if (el.matches('[data-date-range],[data-gf-date-range]')) return false;
+
+        const type = (el.getAttribute('type') || 'text').toLowerCase();
+        const name = (el.getAttribute('name') || '').toLowerCase();
+        const id = (el.getAttribute('id') || '').toLowerCase();
+        const placeholder = (el.getAttribute('placeholder') || '').toLowerCase();
+        const marker = [name, id, placeholder].join(' ');
+
+        return el.matches('[data-gf-date],[data-ce-date]')
+          || type === 'date'
+          || ['date', 'from', 'to', 'date_from', 'date_to', 'period_start', 'period_end', 'ref_date'].includes(name)
+          || marker.includes('tanggal');
+      }
+
+      function upgradeDateInputs(root){
+        const scope = root || document;
+        scope.querySelectorAll('input').forEach((el) => {
+          if (!isDateLikeInput(el)) return;
+          if (el.type === 'date') {
+            try { el.type = 'text'; } catch (e) {}
+          }
+          window.GFID.initDate(el);
+        });
+      }
+
+      function initConfirmables(root){
+        const scope = root || document;
+
+        scope.querySelectorAll('form[data-gf-confirm], form[data-confirm]').forEach((form) => {
+          if (form.dataset.gfConfirmBound === '1') return;
+          form.dataset.gfConfirmBound = '1';
+
+          form.addEventListener('submit', (event) => {
+            if (form.dataset.confirmed === '1' || !window.Swal) return;
+            event.preventDefault();
+
+            Swal.fire({
+              title: form.dataset.gfConfirmTitle || form.dataset.confirmTitle || 'Lanjutkan?',
+              text: form.dataset.gfConfirmText || form.dataset.confirmText || 'Pastikan data sudah benar sebelum diproses.',
+              icon: form.dataset.gfConfirmIcon || form.dataset.confirmIcon || 'question',
+              showCancelButton: true,
+              confirmButtonText: form.dataset.gfConfirmOk || form.dataset.confirmOk || 'Ya, lanjutkan',
+              cancelButtonText: form.dataset.gfConfirmCancel || form.dataset.confirmCancel || 'Batal',
+              reverseButtons: true,
+            }).then((result) => {
+              if (!result.isConfirmed) return;
+              form.dataset.confirmed = '1';
+              form.submit();
+            });
+          });
+        });
+
+        scope.querySelectorAll('a[data-gf-confirm], button[data-gf-confirm]').forEach((el) => {
+          if (el.dataset.gfConfirmBound === '1') return;
+          el.dataset.gfConfirmBound = '1';
+
+          el.addEventListener('click', (event) => {
+            if (el.dataset.confirmed === '1' || !window.Swal) return;
+            event.preventDefault();
+
+            Swal.fire({
+              title: el.dataset.gfConfirmTitle || 'Lanjutkan?',
+              text: el.dataset.gfConfirmText || 'Aksi ini akan diproses.',
+              icon: el.dataset.gfConfirmIcon || 'question',
+              showCancelButton: true,
+              confirmButtonText: el.dataset.gfConfirmOk || 'Ya, lanjutkan',
+              cancelButtonText: el.dataset.gfConfirmCancel || 'Batal',
+              reverseButtons: true,
+            }).then((result) => {
+              if (!result.isConfirmed) return;
+              el.dataset.confirmed = '1';
+              if (el.tagName === 'A' && el.href) {
+                window.location.href = el.href;
+              } else {
+                el.click();
+              }
+            });
+          });
+        });
+      }
+
+      window.GFID.initGreatfitUi = function(root){
+        upgradeDateInputs(root || document);
+        initConfirmables(root || document);
+      };
+
+      document.addEventListener('DOMContentLoaded', function(){
+        window.GFID.initGreatfitUi(document);
+      });
     })();
   </script>
 
@@ -302,4 +412,3 @@
   GFID.initDateRange('#range1', { showMonths: 2 });
 </script>
 @endpush --}}
-

@@ -1,21 +1,83 @@
 @extends('layouts.app')
 
-@section('title', 'Edit Cash Expense')
+@section('title', 'Accounting • Edit Pengeluaran')
+
+@push('head')
+    @include('production.dashboard.partials._gf-styles')
+    <style>
+        .ce-edit-page { display: grid; gap: 1rem; }
+        .ce-actions { display: flex; justify-content: flex-end; gap: .5rem; flex-wrap: wrap; }
+        .ce-btn {
+            display: inline-flex; align-items: center; justify-content: center; gap: .45rem;
+            min-height: 40px; padding: .55rem .95rem; border-radius: 999px;
+            border: 1px solid rgba(15, 23, 42, .10); background: #fff;
+            color: #0f172a; text-decoration: none; font-size: .84rem; font-weight: 850;
+        }
+        .ce-btn:hover { color: #0f172a; background: #f8fafc; }
+        .ce-btn-primary { color: #fff; background: #0f172a; border-color: #0f172a; }
+        .ce-btn-primary:hover { color: #fff; background: #1e293b; }
+        .ce-form-grid { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: .8rem; }
+        .ce-field { display: grid; gap: .32rem; margin: 0; }
+        .ce-field-full { grid-column: 1 / -1; }
+        .ce-field > span {
+            color: #64748b; font-size: .75rem; font-weight: 900;
+            text-transform: uppercase; letter-spacing: .04em;
+        }
+        .ce-field small { color: #94a3b8; font-weight: 800; text-transform: none; letter-spacing: 0; }
+        .ce-form-control {
+            min-height: 42px; border-radius: 12px; border-color: rgba(15, 23, 42, .12);
+            box-shadow: none; font-size: .88rem;
+        }
+        .ce-form-error {
+            padding: .75rem .85rem; border-radius: 12px;
+            border: 1px solid rgba(239, 68, 68, .24);
+            background: rgba(239, 68, 68, .08); color: #991b1b; font-size: .86rem;
+        }
+        .ce-form-error ul { margin: .35rem 0 0; padding-left: 1.1rem; }
+        @media (max-width: 768px) {
+            .gf-master-header { padding: 12px 14px; border-radius: 14px; }
+            .gf-master-title { font-size: 18px; }
+            .gf-master-desc { font-size: 11.5px; }
+            .gf-master-actions { flex: 1 1 100%; }
+            .ce-actions { justify-content: stretch; }
+            .ce-actions .ce-btn { flex: 1 1 auto; }
+            .ce-form-grid { grid-template-columns: 1fr; }
+        }
+    </style>
+@endpush
 
 @section('content')
-    <div class="container" style="max-width:600px">
-        <h4 class="mb-3">Edit Cash Expense</h4>
-
-        <form method="POST" action="{{ route('accounting.cash-expenses.update', $cashExpense) }}">
-            @csrf
-            @method('PUT')
-
-            @include('accounting.cash_expenses.partials.form', ['cashExpense' => $cashExpense])
-
-            <div class="d-flex justify-content-end gap-2 mt-3">
-                <a href="{{ route('accounting.cash-expenses.show', $cashExpense) }}" class="btn btn-light">Cancel</a>
-                <button class="btn btn-primary">Update</button>
+    <x-gf.page
+        eyebrow="Accounting"
+        title="Edit Pengeluaran"
+        description="Hanya transaksi Draft yang bisa diedit sebelum diposting ke jurnal.">
+        <x-slot:actions>
+            <div class="ce-actions">
+                <a href="{{ route('accounting.cash-expenses.show', $cashExpense) }}" class="ce-btn">Detail</a>
+                <a href="{{ route('accounting.cash-expenses.index') }}" class="ce-btn">Daftar Pengeluaran</a>
             </div>
-        </form>
-    </div>
+        </x-slot:actions>
+
+        <div class="ce-edit-page">
+            <x-gf.panel title="Form Pengeluaran" subtitle="Update data draft, lalu posting dari halaman detail.">
+                <form method="POST"
+                    action="{{ route('accounting.cash-expenses.update', $cashExpense) }}"
+                    enctype="multipart/form-data"
+                    data-gf-confirm
+                    data-gf-confirm-title="Update draft?"
+                    data-gf-confirm-text="Perubahan pengeluaran draft akan disimpan."
+                    data-gf-confirm-ok="Ya, update">
+                    @csrf
+                    @method('PUT')
+
+                    @include('accounting.cash_expenses._form', ['cashExpense' => $cashExpense])
+
+                    <div class="d-flex justify-content-end gap-2 flex-wrap mt-3">
+                        <a href="{{ route('accounting.cash-expenses.show', $cashExpense) }}" class="ce-btn">Batal</a>
+                        <button class="ce-btn ce-btn-primary" type="submit">Update Draft</button>
+                    </div>
+                </form>
+            </x-gf.panel>
+        </div>
+    </x-gf.page>
 @endsection

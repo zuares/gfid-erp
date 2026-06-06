@@ -14,6 +14,8 @@ class JournalController extends Controller
         return match ($type) {
             'cash_expense' => 'Pengeluaran Kas/Bank',
             'cash_expense_void' => 'Pembatalan Pengeluaran',
+            'cash_receipt' => 'Penerimaan Kas/Bank',
+            'cash_receipt_void' => 'Pembatalan Penerimaan',
 
             'opening_balance' => 'Saldo Awal',
             'opening_balance_void' => 'Pembatalan Saldo Awal',
@@ -127,6 +129,11 @@ class JournalController extends Controller
         if (in_array($journal->source_type, ['cash_expense', 'cash_expense_void'], true) && $journal->source_id) {
             $sourceUrl = $this->safeRoute('accounting.cash-expenses.show', $journal->source_id);
             $sourceLabel = $sourceUrl ? 'Buka Pengeluaran' : null;
+        }
+
+        if (in_array($journal->source_type, ['cash_receipt', 'cash_receipt_void'], true) && $journal->source_id) {
+            $sourceUrl = $this->safeRoute('accounting.cash-receipts.show', $journal->source_id);
+            $sourceLabel = $sourceUrl ? 'Buka Penerimaan' : null;
         }
 
         if (in_array($journal->source_type, ['opening_balance', 'opening_balance_void'], true)) {

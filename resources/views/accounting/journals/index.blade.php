@@ -227,6 +227,8 @@
             return match ($t) {
                 'cash_expense' => 'Pengeluaran',
                 'cash_expense_void' => 'Void Pengeluaran',
+                'cash_receipt' => 'Penerimaan',
+                'cash_receipt_void' => 'Void Penerimaan',
                 'opening_balance' => 'Saldo Awal',
                 'opening_balance_void' => 'Void Saldo Awal',
                 // contoh masa depan:

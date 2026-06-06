@@ -106,6 +106,7 @@ class PayrollDashboardController extends Controller
     public function slip(Request $request): View
     {
         $module = $request->query('module') === 'cutting' ? 'cutting' : 'sewing';
+        $basis = $module === 'sewing' && $request->query('basis') === 'ambil' ? 'ambil' : 'setor';
         $code = trim((string) $request->query('operator', ''));
 
         $employee = $code !== '' ? Employee::where('code', $code)->first() : null;
@@ -120,11 +121,9 @@ class PayrollDashboardController extends Controller
 
         $rows = $module === 'cutting'
             ? $activity
-            : $activity->where('type', 'Setor')->values();
+            : $activity->where('type', $basis === 'ambil' ? 'Ambil' : 'Setor')->values();
 
-        $ambil = $module === 'cutting'
-            ? collect()
-            : $activity->where('type', 'Ambil')->filter(fn($r) => $r->qty_outstanding > 0)->values();
+        $ambil = collect();
 
         $groupBy = function ($items, callable $qtyOf, callable $amountOf) {
             return $items->groupBy('category')
@@ -134,9 +133,14 @@ class PayrollDashboardController extends Controller
                             $qty = (float) $s->sum($qtyOf);
                             $amount = (float) $s->sum($amountOf);
                             $first = $s->first();
+                            $pickupDates = $s->pluck('pickup_date')->filter()->unique()->sort()->values();
+                            $pickupFrom = $pickupDates->first();
+                            $pickupTo = $pickupDates->last();
                             return (object) [
                                 'sku' => $first->sku,
                                 'product_name' => $first->product_name,
+                                'pickup_from' => $pickupFrom,
+                                'pickup_to' => $pickupTo,
                                 'qty' => $qty,
                                 'rate' => $qty > 0 ? $amount / $qty : (float) $first->rate,
                                 'amount' => $amount,
@@ -156,12 +160,14 @@ class PayrollDashboardController extends Controller
                 ->values();
         };
 
-        $groups = $groupBy($rows, fn($r) => $r->qty_ok, fn($r) => $r->amount);
-        $estGroups = $groupBy($ambil, fn($r) => $r->qty_outstanding, fn($r) => $r->rate * $r->qty_outstanding);
-        $estQty = (float) $ambil->sum('qty_outstanding');
-        $estAmount = (float) $ambil->sum(fn($r) => $r->rate * $r->qty_outstanding);
+        $groups = $basis === 'ambil'
+            ? $groupBy($rows, fn($r) => $r->qty, fn($r) => $r->rate * $r->qty)
+            : $groupBy($rows, fn($r) => $r->qty_ok, fn($r) => $r->amount);
+        $estGroups = collect();
+        $estQty = 0.0;
+        $estAmount = 0.0;
 
-        $recap = $groups->concat($estGroups)
+        $recap = $groups
             ->groupBy('category')
             ->map(fn($g, $cat) => (object) [
                 'category' => $cat,
@@ -173,17 +179,19 @@ class PayrollDashboardController extends Controller
 
         $role = $module === 'cutting' ? 'Pemotong' : 'Penjahit';
 
-        $pickupDates = $activity->pluck('pickup_date')->filter()->unique()->sort()->values();
+        $pickupDates = ($basis === 'ambil' ? $rows : $activity)->pluck('pickup_date')->filter()->unique()->sort()->values();
         $pickupFrom = $pickupDates->first();
         $pickupTo = $pickupDates->last();
 
         $clean = fn(string $s) => preg_replace('/[^A-Za-z0-9]+/', '', $s);
         $range = Carbon::parse($f['date_from'])->format('Ymd') . '-' . Carbon::parse($f['date_to'])->format('Ymd');
-        $fileName = trim($clean($employee->name) . '_' . $role . '_' . $range, '_');
+        $basisLabel = $basis === 'ambil' ? 'Ambil' : 'Setor';
+        $fileName = trim($clean($employee->name) . '_' . $role . '_' . $basisLabel . '_' . $range, '_');
 
         return view('production.dashboard.slip', [
             'module' => $module,
-            'moduleLabel' => $module === 'cutting' ? 'Cutting (Potong)' : 'Jahit (Setor)',
+            'moduleLabel' => $module === 'cutting' ? 'Cutting (Potong)' : 'Jahit (' . $basisLabel . ')',
+            'slipBasis' => $basis,
             'role' => $role,
             'employee' => $employee,
             'period' => $this->periodLabel($f),
@@ -192,8 +200,8 @@ class PayrollDashboardController extends Controller
             'pickupFrom' => $pickupFrom,
             'pickupTo' => $pickupTo,
             'groups' => $groups,
-            'grandQty' => (float) $rows->sum('qty_ok'),
-            'grandAmount' => (float) $rows->sum('amount'),
+            'grandQty' => (float) ($basis === 'ambil' ? $rows->sum('qty') : $rows->sum('qty_ok')),
+            'grandAmount' => (float) ($basis === 'ambil' ? $rows->sum(fn($r) => $r->rate * $r->qty) : $rows->sum('amount')),
             'estGroups' => $estGroups,
             'estQty' => $estQty,
             'estAmount' => $estAmount,

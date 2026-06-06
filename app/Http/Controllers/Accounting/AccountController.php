@@ -10,9 +10,53 @@ use Illuminate\Support\Facades\DB;
 
 class AccountController extends Controller
 {
+    private const CASH_BASIS_CODES = [
+        '1101',
+        '1111',
+        '1112',
+        '2101',
+        '3101',
+        '3301',
+        '4101',
+        '5101',
+        '6101',
+        '6102',
+        '6103',
+        '6104',
+        '6110',
+        '6201',
+    ];
+
+    private const TECHNICAL_CODES = [
+        '1151',
+        '1201',
+        '1202',
+        '1203',
+        '1301',
+        '1302',
+        '1305',
+        '1401',
+        '4201',
+    ];
+
+    private const EXCLUDED_BALANCE_SOURCES = [
+        'opening_balance_void',
+        'opening_balance_batch_void',
+    ];
+
     public function index(Request $request)
     {
         $q = Account::query()->orderBy('code');
+        $mode = $request->string('mode')->toString() ?: 'cash_basis';
+
+        if ($mode === 'cash_basis') {
+            $q->whereIn('code', self::CASH_BASIS_CODES);
+            if (!$request->filled('active')) {
+                $q->where('is_active', true);
+            }
+        } elseif ($mode === 'technical') {
+            $q->whereIn('code', self::TECHNICAL_CODES);
+        }
 
         if ($request->filled('type')) {
             $q->where('type', $request->string('type')->toString());
@@ -23,11 +67,50 @@ class AccountController extends Controller
 
         $accounts = $q->withSum(['journalLines as balance' => function ($qq) {
             $qq->join('journals', 'journals.id', '=', 'journal_lines.journal_id')
-                ->whereNull('journals.voided_at');
+                ->whereNull('journals.voided_at')
+                ->whereNotIn('journals.source_type', self::EXCLUDED_BALANCE_SOURCES);
         }], DB::raw('journal_lines.debit - journal_lines.credit'))
             ->get();
 
-        return view('accounting.accounts.index', compact('accounts'));
+        $accountIds = $accounts->pluck('id')->all();
+        $journalSourceRows = empty($accountIds)
+            ? collect()
+            : DB::table('journal_lines as jl')
+                ->join('journals as j', 'j.id', '=', 'jl.journal_id')
+                ->whereIn('jl.account_id', $accountIds)
+                ->whereNull('j.voided_at')
+                ->whereNotIn('j.source_type', self::EXCLUDED_BALANCE_SOURCES)
+                ->groupBy('jl.account_id', 'j.source_type')
+                ->selectRaw('jl.account_id, j.source_type, COUNT(*) as line_count, COALESCE(SUM(jl.debit - jl.credit), 0) as balance')
+                ->orderByDesc('line_count')
+                ->get();
+
+        $journalSources = $journalSourceRows
+            ->groupBy('account_id')
+            ->map(fn($rows) => $rows->values());
+
+        $journalLineCounts = $journalSourceRows
+            ->groupBy('account_id')
+            ->map(fn($rows) => (int) $rows->sum('line_count'));
+
+        $allAccountsCount = Account::query()->count();
+        $cashBasisCount = Account::query()
+            ->whereIn('code', self::CASH_BASIS_CODES)
+            ->where('is_active', true)
+            ->count();
+        $technicalCount = Account::query()
+            ->whereIn('code', self::TECHNICAL_CODES)
+            ->count();
+
+        return view('accounting.accounts.index', compact(
+            'accounts',
+            'mode',
+            'allAccountsCount',
+            'cashBasisCount',
+            'technicalCount',
+            'journalSources',
+            'journalLineCounts',
+        ));
     }
 
     public function create()
@@ -101,6 +184,7 @@ class AccountController extends Controller
             ->join('journals', 'journals.id', '=', 'journal_lines.journal_id')
             ->where('journal_lines.account_id', $account->id)
             ->whereNull('journals.voided_at')
+            ->whereNotIn('journals.source_type', self::EXCLUDED_BALANCE_SOURCES)
             ->select([
                 'journal_lines.id',
                 'journals.date as date',
@@ -129,6 +213,7 @@ class AccountController extends Controller
                 ->join('journals', 'journals.id', '=', 'journal_lines.journal_id')
                 ->where('journal_lines.account_id', $account->id)
                 ->whereNull('journals.voided_at')
+                ->whereNotIn('journals.source_type', self::EXCLUDED_BALANCE_SOURCES)
                 ->whereDate('journals.date', '<', $request->date('from'))
                 ->selectRaw('COALESCE(SUM(journal_lines.debit - journal_lines.credit),0) as s')
                 ->value('s');
@@ -139,6 +224,7 @@ class AccountController extends Controller
             ->join('journals', 'journals.id', '=', 'journal_lines.journal_id')
             ->where('journal_lines.account_id', $account->id)
             ->whereNull('journals.voided_at')
+            ->whereNotIn('journals.source_type', self::EXCLUDED_BALANCE_SOURCES)
             ->selectRaw('COALESCE(SUM(journal_lines.debit - journal_lines.credit),0) as s')
             ->value('s');
 

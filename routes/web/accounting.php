@@ -1,13 +1,16 @@
 <?php
 
 use App\Http\Controllers\Accounting\AccountController;
+use App\Http\Controllers\Accounting\CashBasisReportController;
 use App\Http\Controllers\Accounting\CashExpenseController;
+use App\Http\Controllers\Accounting\CashReceiptController;
 use App\Http\Controllers\Accounting\JournalController;
 use App\Http\Controllers\Accounting\OpeningBalanceBatchController;
 use App\Http\Controllers\Accounting\OpeningBalanceController;
 use App\Http\Controllers\Api\AccountSuggestController;
 
 Route::middleware(['auth'])->prefix('accounting')->name('accounting.')->group(function () {
+    Route::get('cash-basis-report', [CashBasisReportController::class, 'index'])->name('cash-basis-report.index');
 
     // ✅ Ledger per Account (HARUS sebelum resource accounts)
     Route::get('accounts/{account}/ledger', [AccountController::class, 'ledger'])
@@ -20,6 +23,11 @@ Route::middleware(['auth'])->prefix('accounting')->name('accounting.')->group(fu
     Route::resource('cash-expenses', CashExpenseController::class);
     Route::post('cash-expenses/{cashExpense}/post', [CashExpenseController::class, 'post'])->name('cash-expenses.post');
     Route::post('cash-expenses/{cashExpense}/void', [CashExpenseController::class, 'void'])->name('cash-expenses.void');
+
+    // ✅ Cash Receipts
+    Route::resource('cash-receipts', CashReceiptController::class);
+    Route::post('cash-receipts/{cashReceipt}/post', [CashReceiptController::class, 'post'])->name('cash-receipts.post');
+    Route::post('cash-receipts/{cashReceipt}/void', [CashReceiptController::class, 'void'])->name('cash-receipts.void');
 
     // ✅ Journals (read-only)
     Route::get('journals', [JournalController::class, 'index'])->name('journals.index');

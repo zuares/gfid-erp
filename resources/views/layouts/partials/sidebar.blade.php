@@ -141,6 +141,8 @@
     // Accounting
     $hasAccountsIndex = $router->has('accounting.accounts.index');
     $hasCashExpensesIndex = $router->has('accounting.cash-expenses.index');
+    $hasCashBasisReportIndex = $router->has('accounting.cash-basis-report.index');
+    $hasCashReceiptsIndex = $router->has('accounting.cash-receipts.index');
     $hasJournalsIndex = $router->has('accounting.journals.index');
     $hasOpeningBalancesIndex = $router->has('accounting.opening-balances.index');
     $hasOpeningBalancesBatchIndex = $router->has('accounting.opening-balances-batch.index');
@@ -209,7 +211,9 @@
         $open('production.reports.*');
 
     $openAccounting =
+        $open('accounting.cash-basis-report.*') ||
         $open('accounting.cash-expenses.*') ||
+        $open('accounting.cash-receipts.*') ||
         $open('accounting.opening-balances.*') ||
         $open('accounting.opening-balances-batch.*') ||
         $open('accounting.journals.*') ||
@@ -711,6 +715,8 @@
             {{-- Finance --}}
             @if ($canShow(
                 $hasCashExpensesIndex,
+                $hasCashReceiptsIndex,
+                $hasCashBasisReportIndex,
                 $hasJournalsIndex,
                 $hasAccountsIndex,
                 $hasOpeningBalancesIndex,
@@ -718,10 +724,24 @@
             ))
                 <x-sidebar.label text="Finance" />
                 <li class="simple-group">
+                    @if ($hasCashBasisReportIndex)
+                        <x-sidebar.simple-link href="{{ route('accounting.cash-basis-report.index') }}" icon="📊"
+                            :active="request()->routeIs('accounting.cash-basis-report.*')">
+                            Cash Basis Report
+                        </x-sidebar.simple-link>
+                    @endif
+
                     @if ($hasCashExpensesIndex)
                         <x-sidebar.simple-link href="{{ route('accounting.cash-expenses.index') }}" icon="💸"
                             :active="request()->routeIs('accounting.cash-expenses.*')">
                             Cash Expenses
+                        </x-sidebar.simple-link>
+                    @endif
+
+                    @if ($hasCashReceiptsIndex)
+                        <x-sidebar.simple-link href="{{ route('accounting.cash-receipts.index') }}" icon="💰"
+                            :active="request()->routeIs('accounting.cash-receipts.*')">
+                            Cash Receipts
                         </x-sidebar.simple-link>
                     @endif
 
@@ -1391,7 +1411,7 @@
             @endif
 
             {{-- FINANCE --}}
-            @if ($canShow($hasOpeningBalancesIndex, $hasOpeningBalancesBatchIndex, $hasCashExpensesIndex, $hasJournalsIndex, $hasAccountsIndex))
+            @if ($canShow($hasOpeningBalancesIndex, $hasOpeningBalancesBatchIndex, $hasCashExpensesIndex, $hasCashReceiptsIndex, $hasCashBasisReportIndex, $hasJournalsIndex, $hasAccountsIndex))
                 <x-sidebar.label text="Finance" />
                 <li class="mb-1">
                     <button class="sidebar-link sidebar-toggle {{ $openAccounting ? 'is-open' : '' }}" type="button"
@@ -1403,6 +1423,13 @@
                     </button>
 
                     <div class="collapse {{ $openAccounting ? 'show' : '' }}" id="navAccounting">
+                        @if ($hasCashBasisReportIndex)
+                            <x-sidebar.sub-link href="{{ route('accounting.cash-basis-report.index') }}" icon="📊"
+                                :active="request()->routeIs('accounting.cash-basis-report.*')">
+                                Cash Basis Report
+                            </x-sidebar.sub-link>
+                        @endif
+
                         @if ($hasOpeningBalancesIndex)
                             <x-sidebar.sub-link href="{{ route('accounting.opening-balances.index') }}" icon="🟢"
                                 :active="request()->routeIs('accounting.opening-balances.*')">
@@ -1421,6 +1448,13 @@
                             <x-sidebar.sub-link href="{{ route('accounting.cash-expenses.index') }}" icon="💸"
                                 :active="request()->routeIs('accounting.cash-expenses.*')">
                                 Cash Expenses
+                            </x-sidebar.sub-link>
+                        @endif
+
+                        @if ($hasCashReceiptsIndex)
+                            <x-sidebar.sub-link href="{{ route('accounting.cash-receipts.index') }}" icon="💰"
+                                :active="request()->routeIs('accounting.cash-receipts.*')">
+                                Cash Receipts
                             </x-sidebar.sub-link>
                         @endif
 

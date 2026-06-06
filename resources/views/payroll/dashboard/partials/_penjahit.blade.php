@@ -140,7 +140,8 @@
         <div class="prod-empty" data-pj-empty hidden>Tidak ada transaksi yang cocok dengan filter.</div>
         <div class="gf-table-foot">
             <span class="gf-table-foot-hint" data-pj-slip-hint hidden>Pilih satu penjahit untuk mencetak slip upah.</span>
-            <a class="gf-slip-btn" data-pj-slip hidden target="_blank" rel="noopener">Cetak Slip</a>
+            <a class="gf-slip-btn" data-pj-slip-setor hidden target="_blank" rel="noopener">Slip Setor</a>
+            <a class="gf-slip-btn" data-pj-slip-ambil hidden target="_blank" rel="noopener">Slip Ambil</a>
         </div>
     @endif
 </x-gf.panel>

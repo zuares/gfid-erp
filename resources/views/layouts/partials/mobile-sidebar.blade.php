@@ -328,6 +328,8 @@
 
     // Finance (Accounting)
     $hasCashExpensesIndex = $router->has('accounting.cash-expenses.index');
+    $hasCashBasisReportIndex = $router->has('accounting.cash-basis-report.index');
+    $hasCashReceiptsIndex = $router->has('accounting.cash-receipts.index');
     $hasJournalsIndex = $router->has('accounting.journals.index');
     $hasAccountsIndex = $router->has('accounting.accounts.index');
     $hasOpeningBalancesIndex = $router->has('accounting.opening-balances.index');
@@ -380,7 +382,9 @@
         request()->routeIs('production.reports.*');
 
     $accountingOpen =
+        request()->routeIs('accounting.cash-basis-report.*') ||
         request()->routeIs('accounting.cash-expenses.*') ||
+        request()->routeIs('accounting.cash-receipts.*') ||
         request()->routeIs('accounting.opening-balances.*') ||
         request()->routeIs('accounting.journals.*') ||
         request()->routeIs('accounting.accounts.*');
@@ -1185,6 +1189,13 @@
                         </button>
 
                         <div class="collapse {{ $accountingOpen ? 'show' : '' }}" id="navAccountingMobile">
+                            @if ($hasCashBasisReportIndex)
+                                <a href="{{ route('accounting.cash-basis-report.index') }}"
+                                   class="mobile-sidebar-link mobile-sidebar-link-sub {{ request()->routeIs('accounting.cash-basis-report.*') ? 'active' : '' }}">
+                                    <span class="icon">📊</span><span>Cash Basis Report</span>
+                                </a>
+                            @endif
+
                             @if ($hasOpeningBalancesIndex)
                                 <a href="{{ route('accounting.opening-balances.index') }}"
                                    class="mobile-sidebar-link mobile-sidebar-link-sub {{ request()->routeIs('accounting.opening-balances.*') ? 'active' : '' }}">
@@ -1196,6 +1207,13 @@
                                 <a href="{{ route('accounting.cash-expenses.index') }}"
                                    class="mobile-sidebar-link mobile-sidebar-link-sub {{ request()->routeIs('accounting.cash-expenses.*') ? 'active' : '' }}">
                                     <span class="icon">💸</span><span>Cash Expenses</span>
+                                </a>
+                            @endif
+
+                            @if ($hasCashReceiptsIndex)
+                                <a href="{{ route('accounting.cash-receipts.index') }}"
+                                   class="mobile-sidebar-link mobile-sidebar-link-sub {{ request()->routeIs('accounting.cash-receipts.*') ? 'active' : '' }}">
+                                    <span class="icon">💰</span><span>Cash Receipts</span>
                                 </a>
                             @endif
 

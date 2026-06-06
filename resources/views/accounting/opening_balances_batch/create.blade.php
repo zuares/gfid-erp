@@ -1,277 +1,338 @@
 @extends('layouts.app')
 
-@section('title', 'Opening Balance (Batch)')
+@section('title', 'Accounting • Batch Input Saldo Awal')
+
+@php
+    $oldAcc = old('account_id', []);
+    $oldDebit = old('debit', []);
+    $oldCredit = old('credit', []);
+    $oldNote = old('line_note', []);
+    $useOld = is_array($oldAcc) && count($oldAcc);
+@endphp
+
+@push('head')
+    @include('production.dashboard.partials._gf-styles')
+    <style>
+        .obb-form-page { display: grid; gap: 1rem; }
+        .obb-actions { display: flex; justify-content: flex-end; gap: .5rem; flex-wrap: wrap; }
+        .obb-btn {
+            display: inline-flex; align-items: center; justify-content: center; gap: .45rem;
+            min-height: 40px; padding: .55rem .95rem; border-radius: 999px;
+            border: 1px solid rgba(15, 23, 42, .10); background: #fff;
+            color: #0f172a; text-decoration: none; font-size: .84rem; font-weight: 850;
+        }
+        .obb-btn:hover { color: #0f172a; background: #f8fafc; }
+        .obb-btn-primary { color: #fff; background: #0f172a; border-color: #0f172a; }
+        .obb-btn-primary:hover { color: #fff; background: #1e293b; }
+        .obb-btn-danger { color: #b91c1c; border-color: #fecaca; background: #fff5f5; }
+        .obb-btn-danger:hover { color: #991b1b; background: #fee2e2; }
+        .obb-top-grid { display: grid; grid-template-columns: 220px minmax(0, 1fr) 280px; gap: .75rem; align-items: end; }
+        .obb-field .form-control,
+        .obb-field .form-select,
+        .obb-lines-table .form-control {
+            min-height: 40px; border-radius: 12px; border-color: rgba(15, 23, 42, .12);
+            box-shadow: none; font-size: .88rem;
+        }
+        .obb-label {
+            display: block; margin-bottom: .32rem; color: #475569;
+            font-size: .76rem; font-weight: 900;
+        }
+        .obb-balance-card {
+            border: 1px solid #e2e8f0; border-radius: 12px; background: #f8fafc;
+            padding: .68rem .78rem;
+        }
+        .obb-balance-label {
+            color: #64748b; font-size: .66rem; font-weight: 900;
+            text-transform: uppercase; letter-spacing: .06em;
+        }
+        .obb-balance-value {
+            color: #0f172a; font-size: 1rem; font-weight: 950;
+            font-variant-numeric: tabular-nums; line-height: 1.15;
+        }
+        .obb-balance-state {
+            display: inline-flex; align-items: center; gap: .35rem; margin-top: .3rem;
+            border-radius: 999px; padding: .2rem .55rem; font-size: .72rem; font-weight: 880;
+            color: #b45309; background: #fef3c7; border: 1px solid #fde68a;
+        }
+        .obb-balance-state.is-ok { color: #166534; background: #dcfce7; border-color: #bbf7d0; }
+        .obb-error {
+            border: 1px solid #fecaca; background: #fef2f2; color: #991b1b;
+            border-radius: 12px; padding: .85rem .95rem; font-size: .86rem;
+        }
+        .obb-table-wrap { overflow: auto; -webkit-overflow-scrolling: touch; }
+        .obb-lines-table { min-width: 900px; }
+        .obb-lines-table th {
+            color: #64748b; font-size: .68rem; font-weight: 950;
+            text-transform: uppercase; letter-spacing: .06em;
+        }
+        .obb-lines-table td { vertical-align: middle; }
+        .obb-lines-table .js-debit,
+        .obb-lines-table .js-credit { font-weight: 850; font-variant-numeric: tabular-nums; }
+        .obb-add-row { display: flex; justify-content: flex-end; }
+        .obb-note {
+            color: #1e3a8a; background: #eff6ff; border: 1px solid rgba(37, 99, 235, .14);
+            border-radius: 12px; padding: .75rem .85rem; font-size: .84rem; font-weight: 720;
+        }
+        @media (max-width: 768px) {
+            .gf-master-header { padding: 12px 14px; border-radius: 14px; }
+            .gf-master-title { font-size: 18px; }
+            .gf-master-desc { font-size: 11.5px; }
+            .gf-master-actions { flex: 1 1 100%; }
+            .obb-actions { justify-content: stretch; }
+            .obb-actions .obb-btn { flex: 1 1 auto; }
+            .obb-top-grid { grid-template-columns: 1fr; }
+            .obb-add-row { justify-content: stretch; }
+            .obb-add-row .obb-btn { flex: 1 1 auto; }
+        }
+    </style>
+@endpush
 
 @section('content')
-<div class="container py-3" style="max-width:1100px">
-
-    {{-- HEADER --}}
-    <div class="d-flex justify-content-between align-items-start mb-3">
-        <div>
-            <h1 class="h4 mb-0">Opening Balance (Batch)</h1>
-            <div class="small text-muted">
-                Saldo awal multi-akun (Total Debit harus sama dengan Total Credit)
+    <x-gf.page
+        eyebrow="Accounting"
+        title="Batch Input Saldo Awal"
+        description="Isi banyak akun sekaligus. Total debit dan kredit harus sama sebelum bisa diposting.">
+        <x-slot:actions>
+            <div class="obb-actions">
+                <a href="{{ route('accounting.opening-balances-batch.index') }}" class="obb-btn">Daftar Batch</a>
+                <a href="{{ route('accounting.accounts.index') }}" class="obb-btn">Accounts</a>
             </div>
-        </div>
-        <a href="{{ route('accounting.opening-balances.index') }}"
-           class="btn btn-outline-secondary btn-sm">
-            &larr; Kembali
-        </a>
-    </div>
+        </x-slot:actions>
 
-    {{-- ERROR --}}
-    @if ($errors->any())
-        <div class="alert alert-danger">
-            <div class="fw-semibold mb-1">Terjadi kesalahan:</div>
-            <ul class="mb-0">
-                @foreach ($errors->all() as $err)
-                    <li>{{ $err }}</li>
-                @endforeach
-            </ul>
-        </div>
-    @endif
-
-    <form method="POST"
-          action="{{ route('accounting.opening-balances.store') }}"
-          id="ob-form">
-        @csrf
-
-        {{-- INFO --}}
-        <div class="card mb-3">
-            <div class="card-body">
-                <div class="row g-3">
-                    <div class="col-md-3">
-                        <label class="form-label">Tanggal</label>
-                        <input type="date"
-                               name="date"
-                               class="form-control"
-                               value="{{ old('date', now()->toDateString()) }}"
-                               required>
-                    </div>
-                    <div class="col-md-9">
-                        <label class="form-label">Deskripsi</label>
-                        <input type="text"
-                               name="description"
-                               class="form-control"
-                               value="{{ old('description') }}"
-                               placeholder="Opening balance awal sistem">
-                    </div>
+        <div class="obb-form-page">
+            @if ($errors->any())
+                <div class="obb-error">
+                    <div class="fw-semibold mb-1">Ada data yang perlu dicek:</div>
+                    <ul class="mb-0">
+                        @foreach ($errors->all() as $error)
+                            <li>{{ $error }}</li>
+                        @endforeach
+                    </ul>
                 </div>
-            </div>
-        </div>
+            @endif
 
-        {{-- LINES --}}
-        <div class="card mb-3">
-            <div class="card-header d-flex justify-content-between align-items-center">
-                <span class="fw-semibold">Detail Akun</span>
-                <button type="button"
-                        class="btn btn-sm btn-outline-primary"
-                        id="btn-add">
-                    + Tambah Baris
-                </button>
-            </div>
+            <form method="POST"
+                action="{{ route('accounting.opening-balances-batch.store') }}"
+                id="ob-form"
+                data-gf-confirm
+                data-gf-confirm-title="Posting saldo awal batch?"
+                data-gf-confirm-text="Sistem akan membuat jurnal posted untuk semua baris yang terisi."
+                data-gf-confirm-ok="Ya, posting">
+                @csrf
 
-            <div class="table-responsive">
-                <table class="table table-sm align-middle mb-0">
-                    <thead class="table-light">
-                        <tr>
-                            <th style="width:42%">Akun</th>
-                            <th style="width:18%" class="text-end">Debit</th>
-                            <th style="width:18%" class="text-end">Credit</th>
-                            <th style="width:18%">Catatan</th>
-                            <th style="width:4%"></th>
-                        </tr>
-                    </thead>
+                <x-gf.panel title="Informasi Batch" subtitle="Tanggal ini akan dipakai untuk seluruh baris saldo awal.">
+                    <div class="obb-top-grid">
+                        <div class="obb-field">
+                            <label class="obb-label" for="date">Tanggal</label>
+                            <input id="date" type="text" name="date" class="form-control"
+                                value="{{ old('date', now()->toDateString()) }}" required data-gf-date>
+                        </div>
+                        <div class="obb-field">
+                            <label class="obb-label" for="description">Deskripsi</label>
+                            <input id="description" type="text" name="description" class="form-control"
+                                value="{{ old('description', 'Opening Balance (Batch)') }}"
+                                placeholder="Opening balance awal sistem">
+                        </div>
+                        <div class="obb-balance-card">
+                            <div class="d-flex justify-content-between gap-2">
+                                <div>
+                                    <div class="obb-balance-label">Debit</div>
+                                    <div class="obb-balance-value" id="sum-debit">0</div>
+                                </div>
+                                <div class="text-end">
+                                    <div class="obb-balance-label">Kredit</div>
+                                    <div class="obb-balance-value" id="sum-credit">0</div>
+                                </div>
+                            </div>
+                            <div class="obb-balance-state" id="balance-indicator">Belum balance</div>
+                        </div>
+                    </div>
+                </x-gf.panel>
 
-                    <tbody id="lines-body">
-                        @php
-                            $oldAcc = old('account_id', []);
-                            $oldD   = old('debit', []);
-                            $oldC   = old('credit', []);
-                            $oldN   = old('line_note', []);
-                            $useOld = is_array($oldAcc) && count($oldAcc);
-                        @endphp
+                <x-gf.panel title="Detail Akun" subtitle="Isi debit atau kredit saja di tiap baris. Baris kosong akan dilewati.">
+                    <x-slot:actions>
+                        <div class="obb-add-row">
+                            <button type="button" class="obb-btn" id="btn-add">+ Tambah Baris</button>
+                        </div>
+                    </x-slot:actions>
 
-                        @if($useOld)
-                            @foreach($oldAcc as $i => $aid)
+                    <div class="obb-note mb-3">
+                        Contoh umum: kas/bank di debit, modal atau hutang pembuka di kredit. Untuk cash basis, cukup isi akun yang benar-benar punya saldo awal.
+                    </div>
+
+                    <div class="obb-table-wrap">
+                        <table class="table table-hover align-middle mb-0 gf-clean-table obb-lines-table">
+                            <thead>
                                 <tr>
-                                    <td>
-                                        <x-account-suggest
-                                            name="account_id[]"
-                                            :value="$aid"
-                                            :display="$accounts->firstWhere('id',(int)$aid)
-                                                ? $accounts->firstWhere('id',(int)$aid)->code.' — '.$accounts->firstWhere('id',(int)$aid)->name
-                                                : ''"
-                                            :required="true"
-                                        />
-                                    </td>
-                                    <td>
-                                        <input name="debit[]"
-                                               class="form-control form-control-sm text-end js-debit"
-                                               value="{{ $oldD[$i] ?? 0 }}">
-                                    </td>
-                                    <td>
-                                        <input name="credit[]"
-                                               class="form-control form-control-sm text-end js-credit"
-                                               value="{{ $oldC[$i] ?? 0 }}">
-                                    </td>
-                                    <td>
-                                        <input name="line_note[]"
-                                               class="form-control form-control-sm"
-                                               value="{{ $oldN[$i] ?? '' }}"
-                                               placeholder="-">
-                                    </td>
-                                    <td class="text-center">
-                                        <button type="button"
-                                                class="btn btn-sm btn-outline-danger js-del">
-                                            &times;
-                                        </button>
-                                    </td>
+                                    <th style="width: 42%">Akun</th>
+                                    <th class="text-end" style="width: 18%">Debit</th>
+                                    <th class="text-end" style="width: 18%">Kredit</th>
+                                    <th style="width: 17%">Catatan</th>
+                                    <th class="text-center" style="width: 5%"></th>
                                 </tr>
-                            @endforeach
-                        @else
-                            @for($i=0;$i<2;$i++)
-                                <tr>
-                                    <td>
-                                        <x-account-suggest
-                                            name="account_id[]"
-                                            :required="true"
-                                        />
-                                    </td>
-                                    <td>
-                                        <input name="debit[]"
-                                               class="form-control form-control-sm text-end js-debit"
-                                               value="0">
-                                    </td>
-                                    <td>
-                                        <input name="credit[]"
-                                               class="form-control form-control-sm text-end js-credit"
-                                               value="0">
-                                    </td>
-                                    <td>
-                                        <input name="line_note[]"
-                                               class="form-control form-control-sm"
-                                               placeholder="-">
-                                    </td>
-                                    <td class="text-center">
-                                        <button type="button"
-                                                class="btn btn-sm btn-outline-danger js-del">
-                                            &times;
-                                        </button>
-                                    </td>
-                                </tr>
-                            @endfor
-                        @endif
-                    </tbody>
+                            </thead>
+                            <tbody id="lines-body">
+                                @if ($useOld)
+                                    @foreach ($oldAcc as $i => $accountId)
+                                        @php
+                                            $selectedAccount = $accounts->firstWhere('id', (int) $accountId);
+                                        @endphp
+                                        <tr>
+                                            <td>
+                                                <x-account-suggest
+                                                    name="account_id[]"
+                                                    :value="$accountId"
+                                                    :display="$selectedAccount ? $selectedAccount->code . ' - ' . $selectedAccount->name : ''"
+                                                    :required="false" />
+                                            </td>
+                                            <td>
+                                                <input name="debit[]" class="form-control text-end js-debit" value="{{ $oldDebit[$i] ?? 0 }}" inputmode="decimal">
+                                            </td>
+                                            <td>
+                                                <input name="credit[]" class="form-control text-end js-credit" value="{{ $oldCredit[$i] ?? 0 }}" inputmode="decimal">
+                                            </td>
+                                            <td>
+                                                <input name="line_note[]" class="form-control" value="{{ $oldNote[$i] ?? '' }}" placeholder="-">
+                                            </td>
+                                            <td class="text-center">
+                                                <button type="button" class="obb-btn obb-btn-danger js-del" aria-label="Hapus baris">x</button>
+                                            </td>
+                                        </tr>
+                                    @endforeach
+                                @else
+                                    @for ($i = 0; $i < 4; $i++)
+                                        <tr>
+                                            <td>
+                                                <x-account-suggest name="account_id[]" :required="false" />
+                                            </td>
+                                            <td>
+                                                <input name="debit[]" class="form-control text-end js-debit" value="0" inputmode="decimal">
+                                            </td>
+                                            <td>
+                                                <input name="credit[]" class="form-control text-end js-credit" value="0" inputmode="decimal">
+                                            </td>
+                                            <td>
+                                                <input name="line_note[]" class="form-control" placeholder="-">
+                                            </td>
+                                            <td class="text-center">
+                                                <button type="button" class="obb-btn obb-btn-danger js-del" aria-label="Hapus baris">x</button>
+                                            </td>
+                                        </tr>
+                                    @endfor
+                                @endif
+                            </tbody>
+                        </table>
+                    </div>
+                </x-gf.panel>
 
-                    <tfoot class="table-light">
-                        <tr class="fw-semibold">
-                            <td class="text-end">Total</td>
-                            <td class="text-end" id="sum-debit">0</td>
-                            <td class="text-end" id="sum-credit">0</td>
-                            <td colspan="2" id="balance-indicator" class="text-muted">-</td>
-                        </tr>
-                    </tfoot>
-                </table>
-            </div>
+                <div class="d-flex justify-content-end gap-2 flex-wrap">
+                    <a href="{{ route('accounting.opening-balances-batch.index') }}" class="obb-btn">Batal</a>
+                    <button class="obb-btn obb-btn-primary" type="submit">Posting Batch</button>
+                </div>
+            </form>
         </div>
-
-        {{-- ACTION --}}
-        <div class="d-flex justify-content-end gap-2">
-            <a href="{{ route('accounting.opening-balances.index') }}"
-               class="btn btn-outline-secondary">
-                Batal
-            </a>
-            <button class="btn btn-primary">
-                Post Opening
-            </button>
-        </div>
-    </form>
-</div>
+    </x-gf.page>
 @endsection
 
 @push('scripts')
-<script>
-(function(){
-    const body = document.getElementById('lines-body');
-    const btnAdd = document.getElementById('btn-add');
-    const sumDebitEl = document.getElementById('sum-debit');
-    const sumCreditEl = document.getElementById('sum-credit');
-    const balEl = document.getElementById('balance-indicator');
-    const form = document.getElementById('ob-form');
+    <script>
+        (function() {
+            const body = document.getElementById('lines-body');
+            const btnAdd = document.getElementById('btn-add');
+            const sumDebitEl = document.getElementById('sum-debit');
+            const sumCreditEl = document.getElementById('sum-credit');
+            const balanceEl = document.getElementById('balance-indicator');
+            const form = document.getElementById('ob-form');
 
-    const toNum = v => {
-        v = (v ?? '').toString().replace(/,/g,'.').replace(/[^\d.\-]/g,'');
-        const n = parseFloat(v || '0');
-        return isNaN(n) ? 0 : n;
-    };
-    const fmt = n => new Intl.NumberFormat('id-ID').format(n);
+            if (!body || !btnAdd || !form) return;
 
-    function recalc(){
-        let d=0, c=0;
-        body.querySelectorAll('tr').forEach(tr=>{
-            d += toNum(tr.querySelector('.js-debit')?.value);
-            c += toNum(tr.querySelector('.js-credit')?.value);
-        });
-        sumDebitEl.textContent = fmt(d);
-        sumCreditEl.textContent = fmt(c);
+            const toNum = (value) => {
+                const clean = (value ?? '').toString().replace(/,/g, '.').replace(/[^\d.\-]/g, '');
+                const number = parseFloat(clean || '0');
+                return Number.isFinite(number) ? number : 0;
+            };
+            const fmt = (number) => new Intl.NumberFormat('id-ID').format(number);
 
-        const ok = d > 0 && Math.round(d*100) === Math.round(c*100);
-        balEl.textContent = ok ? 'Balance OK' : 'Tidak balance';
-        balEl.className = ok ? 'text-success' : 'text-danger';
-        return ok;
-    }
+            function recalc() {
+                let debit = 0;
+                let credit = 0;
 
-    function bindRow(tr){
-        tr.querySelectorAll('.js-debit,.js-credit').forEach(inp=>{
-            inp.addEventListener('input',()=>{
-                if (inp.classList.contains('js-debit') && toNum(inp.value)>0)
-                    tr.querySelector('.js-credit').value='0';
-                if (inp.classList.contains('js-credit') && toNum(inp.value)>0)
-                    tr.querySelector('.js-debit').value='0';
+                body.querySelectorAll('tr').forEach((row) => {
+                    debit += toNum(row.querySelector('.js-debit')?.value);
+                    credit += toNum(row.querySelector('.js-credit')?.value);
+                });
+
+                sumDebitEl.textContent = fmt(debit);
+                sumCreditEl.textContent = fmt(credit);
+
+                const ok = debit > 0 && Math.round(debit * 100) === Math.round(credit * 100);
+                balanceEl.textContent = ok ? 'Balance OK' : 'Belum balance';
+                balanceEl.classList.toggle('is-ok', ok);
+
+                return ok;
+            }
+
+            function bindRow(row) {
+                row.querySelectorAll('.js-debit,.js-credit').forEach((input) => {
+                    input.addEventListener('input', () => {
+                        if (input.classList.contains('js-debit') && toNum(input.value) > 0) {
+                            row.querySelector('.js-credit').value = '0';
+                        }
+                        if (input.classList.contains('js-credit') && toNum(input.value) > 0) {
+                            row.querySelector('.js-debit').value = '0';
+                        }
+                        recalc();
+                    });
+                });
+
+                row.querySelector('.js-del')?.addEventListener('click', () => {
+                    const rows = body.querySelectorAll('tr');
+                    if (rows.length > 2) {
+                        row.remove();
+                    } else {
+                        row.querySelectorAll('input').forEach((input) => {
+                            input.value = input.classList.contains('js-debit') || input.classList.contains('js-credit') ? '0' : '';
+                        });
+                    }
+                    recalc();
+                });
+            }
+
+            body.querySelectorAll('tr').forEach(bindRow);
+
+            btnAdd.addEventListener('click', () => {
+                const first = body.querySelector('tr');
+                if (!first) return;
+
+                const clone = first.cloneNode(true);
+                clone.querySelectorAll('input').forEach((input) => {
+                    input.value = input.classList.contains('js-debit') || input.classList.contains('js-credit') ? '0' : '';
+                });
+                clone.querySelectorAll('.acc-suggest-wrap').forEach((wrap) => wrap.removeAttribute('data-init'));
+
+                body.appendChild(clone);
+                bindRow(clone);
+                window.initAccountSuggest?.(clone);
                 recalc();
             });
-        });
 
-        tr.querySelector('.js-del')?.addEventListener('click',()=>{
-            const rows = body.querySelectorAll('tr');
-            if (rows.length>2) tr.remove();
-            else {
-                tr.querySelectorAll('input').forEach(i=>i.value='0');
-                tr.querySelectorAll('.js-acc-input,.js-acc-id').forEach(i=>i.value='');
-            }
+            form.addEventListener('submit', (event) => {
+                if (recalc()) return;
+
+                event.preventDefault();
+                if (window.Swal) {
+                    Swal.fire({
+                        icon: 'warning',
+                        title: 'Belum balance',
+                        text: 'Total debit harus sama dengan total kredit dan tidak boleh 0.',
+                        confirmButtonText: 'Cek lagi'
+                    });
+                } else {
+                    alert('Total debit harus sama dengan total kredit dan tidak boleh 0.');
+                }
+            }, true);
+
             recalc();
-        });
-    }
-
-    body.querySelectorAll('tr').forEach(bindRow);
-
-    btnAdd.addEventListener('click',()=>{
-        const first = body.querySelector('tr');
-        if(!first) return;
-
-        const clone = first.cloneNode(true);
-        clone.querySelectorAll('input').forEach(i=>{
-            if(i.classList.contains('js-debit') || i.classList.contains('js-credit')) i.value='0';
-            else i.value='';
-        });
-        clone.querySelectorAll('.acc-suggest-wrap').forEach(w=>w.removeAttribute('data-init'));
-
-        body.appendChild(clone);
-        bindRow(clone);
-        window.initAccountSuggest?.(clone);
-        recalc();
-    });
-
-    form.addEventListener('submit',e=>{
-        if(!recalc()){
-            e.preventDefault();
-            alert('Total Debit harus sama dengan Total Credit dan tidak boleh 0.');
-        }
-    });
-
-    recalc();
-})();
-</script>
+        })();
+    </script>
 @endpush
-

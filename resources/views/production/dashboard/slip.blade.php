@@ -2,6 +2,11 @@
     $fmt = fn($n, $d = 0) => number_format((float) $n, $d, ',', '.');
     $rp = fn($n) => 'Rp ' . number_format((float) $n, 0, ',', '.');
     $tgl = fn($d) => $d ? \Carbon\Carbon::parse($d)->format('d-m-Y') : $d;
+    $slipBasis = $slipBasis ?? 'setor';
+    $isAmbilSlip = ($module ?? null) === 'sewing' && $slipBasis === 'ambil';
+    $totalLabel = $isAmbilSlip ? 'Total Ambil' : 'Total Diterima';
+    $detailTitle = $isAmbilSlip ? 'Rincian ambil jahit' : 'Rincian hasil disetor';
+    $qtyHeader = $isAmbilSlip ? 'Ambil' : 'OK';
 @endphp
 <!DOCTYPE html>
 <html lang="id">
@@ -66,13 +71,14 @@
 
         .hero-recap { flex: 1 1 auto; min-width: 0; }
         .recap-list { border: 1px solid var(--line); border-radius: 10px; overflow: hidden; background: #fff; }
-        .recap-row { display: flex; align-items: center; justify-content: space-between; gap: 12px;
+        .recap-row { display: grid; grid-template-columns: minmax(0, 1fr) auto; align-items: center; gap: 14px;
             padding: 9px 12px; border-bottom: 1px solid var(--line); }
         .recap-row:last-child { border-bottom: 0; }
-        .recap-cat { font-weight: 700; color: var(--ink); font-size: 13px; }
-        .recap-qty { display: block; font-size: 11px; color: var(--muted); font-weight: 500; margin-top: 1px; }
-        .recap-amt { white-space: nowrap; font-variant-numeric: tabular-nums;
-            font-weight: 800; font-size: 14px; color: var(--ink); }
+        .recap-cat { min-width: 0; font-weight: 800; color: var(--ink); font-size: 13px; line-height: 1.25; }
+        .recap-metrics { display: grid; justify-items: end; text-align: right; }
+        .recap-qty { white-space: nowrap; font-variant-numeric: tabular-nums;
+            font-weight: 900; font-size: 20px; color: var(--ink); line-height: 1; }
+        .recap-qty small { font-size: 10px; color: var(--muted); font-weight: 800; text-transform: uppercase; letter-spacing: .04em; margin-left: 2px; }
 
         .hero-total { text-align: left; }
         .hero-amount { font-size: 32px; font-weight: 800; letter-spacing: -.02em; margin-top: 2px; color: #16a34a; }
@@ -172,11 +178,13 @@
         @if ($groups->isEmpty() && $estGroups->isEmpty())
             <div class="empty">Tidak ada hasil borongan pada periode ini.</div>
         @else
-            {{-- Kartu utama: Total Diterima = upah setor (riil) + perkiraan belum disetor --}}
+            {{-- Kartu utama mengikuti basis slip: ambil jahit atau setor jahit. --}}
             @php
-                $grandTotal = $grandAmount + $estAmount;
-                if ($estAmount > 0) {
-                    $heroSub = 'Setor ' . $rp($grandAmount) . ' + perkiraan ~' . $rp($estAmount);
+                $grandTotal = $grandAmount;
+                if ($isAmbilSlip) {
+                    $heroSub = $fmt($grandQty) . ' pcs diambil jahit · ' . $tgl($dateFrom) . ' – ' . $tgl($dateTo);
+                } elseif ($estAmount > 0) {
+                    $heroSub = $fmt($grandQty) . ' pcs lolos QC · belum disetor ~' . $rp($estAmount);
                 } else {
                     $heroSub = $fmt($grandQty) . ' pcs lolos QC · ' . $tgl($dateFrom) . ' – ' . $tgl($dateTo);
                 }
@@ -188,15 +196,17 @@
                         <div class="recap-list">
                             @foreach ($recap as $r)
                                 <div class="recap-row">
-                                    <span><span class="recap-cat">{{ $r->category }}</span><span class="recap-qty">{{ $fmt($r->qty) }} pcs</span></span>
-                                    <span class="recap-amt">{{ $rp($r->amount) }}</span>
+                                    <span class="recap-cat">{{ $r->category }}</span>
+                                    <span class="recap-metrics">
+                                        <span class="recap-qty">{{ $fmt($r->qty) }}<small>pcs</small></span>
+                                    </span>
                                 </div>
                             @endforeach
                         </div>
                     </div>
                 @endif
                 <div class="hero-total">
-                    <div class="hero-label">Total Diterima</div>
+                    <div class="hero-label">{{ $totalLabel }}</div>
                     <div class="hero-amount">{{ $rp($grandTotal) }}</div>
                     <div class="hero-sub">{{ $heroSub }}</div>
                 </div>
@@ -204,19 +214,26 @@
 
             @if (!$groups->isEmpty())
                 @php $flatLines = $groups->flatMap(fn($g) => $g->lines)->sortBy('sku')->values(); @endphp
-                <div class="sec-title">Rincian hasil disetor</div>
+                <div class="sec-title">{{ $detailTitle }}</div>
                 <table>
                     <thead>
                         <tr>
+                            <th>Tgl Ambil</th>
                             <th>Produk</th>
-                            <th class="num">OK</th>
+                            <th class="num">{{ $qtyHeader }}</th>
                             <th class="num">Tarif</th>
                             <th class="num">Jumlah</th>
                         </tr>
                     </thead>
                     <tbody>
                         @foreach ($flatLines as $l)
+                            @php
+                                $linePickup = $l->pickup_from
+                                    ? ($l->pickup_from === $l->pickup_to ? $tgl($l->pickup_from) : $tgl($l->pickup_from) . ' – ' . $tgl($l->pickup_to))
+                                    : '-';
+                            @endphp
                             <tr class="line-row">
+                                <td>{{ $linePickup }}</td>
                                 <td><span class="prod-name">{{ $l->product_name }}</span><span class="sku-mini">{{ $l->sku }}</span></td>
                                 <td class="num">{{ $fmt($l->qty) }}</td>
                                 <td class="num">{{ $l->rate > 0 ? $rp($l->rate) : '–' }}</td>
@@ -226,7 +243,7 @@
                     </tbody>
                     <tfoot>
                         <tr class="sub-row">
-                            <td>Total</td>
+                            <td colspan="2">Total</td>
                             <td class="num">{{ $fmt($grandQty) }}</td>
                             <td></td>
                             <td class="num">{{ $rp($grandAmount) }}</td>
@@ -234,7 +251,7 @@
                     </tfoot>
                 </table>
             @else
-                <div class="note-empty">Belum ada hasil yang disetor &amp; lolos QC pada periode ini.</div>
+                <div class="note-empty">{{ $isAmbilSlip ? 'Belum ada ambil jahit pada periode ini.' : 'Belum ada hasil yang disetor & lolos QC pada periode ini.' }}</div>
             @endif
 
             @if ($estGroups->isNotEmpty())
@@ -247,6 +264,7 @@
                     <table class="est-table">
                         <thead>
                             <tr>
+                                <th>Tgl Ambil</th>
                                 <th>Produk</th>
                                 <th class="num">Sisa</th>
                                 <th class="num">Tarif</th>
@@ -255,7 +273,13 @@
                         </thead>
                         <tbody>
                             @foreach ($flatEst as $l)
+                                @php
+                                    $linePickup = $l->pickup_from
+                                        ? ($l->pickup_from === $l->pickup_to ? $tgl($l->pickup_from) : $tgl($l->pickup_from) . ' – ' . $tgl($l->pickup_to))
+                                        : '-';
+                                @endphp
                                 <tr class="line-row">
+                                    <td>{{ $linePickup }}</td>
                                     <td><span class="prod-name">{{ $l->product_name }}</span><span class="sku-mini">{{ $l->sku }}</span></td>
                                     <td class="num">{{ $fmt($l->qty) }}</td>
                                     <td class="num">{{ $l->rate > 0 ? $rp($l->rate) : '–' }}</td>

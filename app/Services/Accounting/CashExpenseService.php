@@ -10,6 +10,11 @@ use Illuminate\Validation\ValidationException;
 
 class CashExpenseService
 {
+    private const EXCLUDED_BALANCE_SOURCES = [
+        'opening_balance_void',
+        'opening_balance_batch_void',
+    ];
+
     public function post(CashExpense $expense): CashExpense
     {
         return DB::transaction(function () use ($expense) {
@@ -123,6 +128,31 @@ class CashExpenseService
         if ($expense->expense_account_id === $expense->cash_account_id) {
             throw ValidationException::withMessages(['account' => 'Akun biaya dan akun kas/bank tidak boleh sama.']);
         }
+
+        $cashBalance = $this->cashBalance((int) $expense->cash_account_id);
+        $amount = (float) $expense->amount;
+
+        if ($cashBalance + 0.01 < $amount) {
+            $expense->loadMissing('cashAccount');
+            $accountName = $expense->cashAccount?->name ?? 'Kas/Bank';
+
+            throw ValidationException::withMessages([
+                'cash_account_id' => $accountName . ' tidak cukup. Saldo tersedia Rp ' .
+                    number_format($cashBalance, 0, ',', '.') . ', pengeluaran Rp ' .
+                    number_format($amount, 0, ',', '.') . '.',
+            ]);
+        }
+    }
+
+    private function cashBalance(int $accountId): float
+    {
+        return (float) JournalLine::query()
+            ->join('journals', 'journals.id', '=', 'journal_lines.journal_id')
+            ->where('journal_lines.account_id', $accountId)
+            ->whereNull('journals.voided_at')
+            ->whereNotIn('journals.source_type', self::EXCLUDED_BALANCE_SOURCES)
+            ->selectRaw('COALESCE(SUM(journal_lines.debit - journal_lines.credit), 0) as balance')
+            ->value('balance');
     }
 
     private function assertBalanced(int $journalId): void

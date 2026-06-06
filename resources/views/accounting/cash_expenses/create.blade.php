@@ -74,6 +74,36 @@
             justify-content: flex-end;
             flex-wrap: wrap
         }
+
+        .ce-form-grid { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: .8rem; }
+        .ce-field { display: grid; gap: .32rem; margin: 0; }
+        .ce-field-full { grid-column: 1 / -1; }
+        .ce-field > span {
+            color: rgba(100, 116, 139, 1);
+            font-size: .75rem;
+            font-weight: 800;
+            text-transform: uppercase;
+            letter-spacing: .04em;
+        }
+        .ce-field small { color: rgba(148, 163, 184, 1); text-transform: none; letter-spacing: 0; }
+        .ce-form-control {
+            min-height: 42px;
+            border-radius: 12px;
+            border-color: rgba(148, 163, 184, .28);
+            box-shadow: none;
+        }
+        .ce-form-error {
+            padding: .75rem .85rem;
+            border-radius: 12px;
+            border: 1px solid rgba(239, 68, 68, .24);
+            background: rgba(239, 68, 68, .08);
+            color: #991b1b;
+            font-size: .86rem;
+        }
+        .ce-form-error ul { margin: .35rem 0 0; padding-left: 1.1rem; }
+        @media (max-width: 768px) {
+            .ce-form-grid { grid-template-columns: 1fr; }
+        }
     </style>
 @endpush
 
@@ -89,7 +119,11 @@
             </div>
 
             <div class="ce-body">
-                <form method="POST" action="{{ route('accounting.cash-expenses.store') }}">
+                <form method="POST" action="{{ route('accounting.cash-expenses.store') }}" enctype="multipart/form-data"
+                    data-gf-confirm
+                    data-gf-confirm-title="Simpan sebagai Draft?"
+                    data-gf-confirm-text="Pengeluaran akan tersimpan sebagai draft dan bisa diposting setelah dicek."
+                    data-gf-confirm-ok="Ya, simpan">
                     @csrf
                     @include('accounting.cash_expenses._form')
 

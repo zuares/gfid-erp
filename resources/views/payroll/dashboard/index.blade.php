@@ -424,21 +424,29 @@
             const idRp = (n) => 'Rp ' + idFmt(Math.round(n || 0));
 
             // Tombol "Cetak Slip": tampil saat satu operator + modul terpilih.
-            function gfUpdateSlip(linkEl, operatorCode, module) {
+            function gfUpdateSlip(linkEl, operatorCode, module, basis = '') {
                 if (!linkEl) return;
-                const hint = linkEl.closest('.gf-table-foot')?.querySelector('.gf-table-foot-hint');
+                const foot = linkEl.closest('.gf-table-foot');
+                const hint = foot?.querySelector('.gf-table-foot-hint');
+                const syncHint = () => {
+                    if (!hint || !foot) return;
+                    hint.hidden = Array.from(foot.querySelectorAll('.gf-slip-btn')).some((a) => !a.hidden);
+                };
                 if (operatorCode && operatorCode !== '-' && module) {
                     const p = new URLSearchParams(currentFilters());
                     p.delete('operator_id');
                     p.set('module', module);
                     p.set('operator', operatorCode);
+                    if (basis) p.set('basis', basis);
+                    else p.delete('basis');
+                    linkEl.textContent = module === 'cutting' ? 'Slip Potong' : (basis === 'ambil' ? 'Slip Ambil' : 'Slip Setor');
                     linkEl.href = SLIP_URL + '?' + p.toString();
                     linkEl.hidden = false;
-                    if (hint) hint.hidden = true;
+                    syncHint();
                 } else {
                     linkEl.hidden = true;
                     linkEl.removeAttribute('href');
-                    if (hint) hint.hidden = false;
+                    syncHint();
                 }
             }
 
@@ -496,7 +504,8 @@
                 setKpi('[data-ks-kpi-tx]', idFmt(shown));
 
                 const module = role === 'Jahit' ? 'sewing' : (role === 'Cutting' ? 'cutting' : '');
-                gfUpdateSlip(root.querySelector('[data-ks-slip]'), operator, module);
+                gfUpdateSlip(root.querySelector('[data-ks-slip]'), operator, module, module === 'sewing' ? 'setor' : '');
+                gfUpdateSlip(root.querySelector('[data-ks-slip-ambil]'), operator, module === 'sewing' ? 'sewing' : '', 'ambil');
 
                 const empty = root.querySelector('[data-ks-empty]');
                 if (empty) empty.hidden = (shown !== 0) || rows.length === 0;
@@ -566,7 +575,8 @@
                 setKpi('[data-pj-kpi-upah]', idRp(sumAmount));
                 setKpi('[data-pj-kpi-reject]', idFmt(sumReject));
 
-                gfUpdateSlip(root.querySelector('[data-pj-slip]'), operator, 'sewing');
+                gfUpdateSlip(root.querySelector('[data-pj-slip-setor]'), operator, 'sewing', 'setor');
+                gfUpdateSlip(root.querySelector('[data-pj-slip-ambil]'), operator, 'sewing', 'ambil');
 
                 const empty = root.querySelector('[data-pj-empty]');
                 if (empty) empty.hidden = (shown !== 0) || rows.length === 0;

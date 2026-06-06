@@ -154,7 +154,8 @@
         <div class="prod-empty" data-ks-empty hidden>Tidak ada transaksi yang cocok dengan filter.</div>
         <div class="gf-table-foot">
             <span class="gf-table-foot-hint" data-ks-slip-hint hidden>Pilih peran (Jahit/Cutting) + satu operator untuk mencetak slip upah.</span>
-            <a class="gf-slip-btn" data-ks-slip hidden target="_blank" rel="noopener">Cetak Slip</a>
+            <a class="gf-slip-btn" data-ks-slip hidden target="_blank" rel="noopener">Slip Setor</a>
+            <a class="gf-slip-btn" data-ks-slip-ambil hidden target="_blank" rel="noopener">Slip Ambil</a>
         </div>
     @endif
 </x-gf.panel>

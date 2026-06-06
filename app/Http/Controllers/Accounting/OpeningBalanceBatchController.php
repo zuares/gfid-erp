@@ -61,8 +61,8 @@ class OpeningBalanceBatchController extends Controller
             'date' => ['required', 'date'],
             'description' => ['nullable', 'string', 'max:255'],
 
-            'account_id' => ['required', 'array', 'min:2'],
-            'account_id.*' => ['required', 'integer', 'exists:accounts,id'],
+            'account_id' => ['required', 'array'],
+            'account_id.*' => ['nullable', 'integer', 'exists:accounts,id'],
 
             'debit' => ['required', 'array'],
             'credit' => ['required', 'array'],
@@ -96,6 +96,12 @@ class OpeningBalanceBatchController extends Controller
 
             if ($d <= 0 && $c <= 0) {
                 continue;
+            }
+
+            if (empty($aid)) {
+                throw ValidationException::withMessages([
+                    "account_id.$i" => 'Akun wajib dipilih untuk baris yang punya debit atau kredit.',
+                ]);
             }
 
             $lines[] = [
@@ -157,7 +163,7 @@ class OpeningBalanceBatchController extends Controller
             }
 
             return redirect()
-                ->route('accounting.opening-balances.index') // atau route batch index kamu
+                ->route('accounting.opening-balances-batch.index')
                 ->with('status', 'ok')
                 ->with('message', 'Opening Balance (batch) berhasil diposting.');
         });
@@ -226,7 +232,7 @@ class OpeningBalanceBatchController extends Controller
             }
 
             return redirect()
-                ->route('accounting.opening-balances.index')
+                ->route('accounting.opening-balances-batch.index')
                 ->with('status', 'ok')
                 ->with('message', 'Opening Balance berhasil di-VOID (reversal batch dibuat).');
         });
