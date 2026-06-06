@@ -1082,3 +1082,52 @@ document.addEventListener('DOMContentLoaded', () => {
 });
 </script>
 @endpush
+
+
+
+{{-- SweetAlert existing error handler --}}
+<script id="gf-sweetalert-existing-error">
+document.addEventListener('DOMContentLoaded', function () {
+    const errorBox = document.querySelector('.alert-danger, .alert.alert-danger, [data-error-alert]');
+
+    if (!errorBox) return;
+
+    const rawText = (errorBox.innerText || errorBox.textContent || '').trim();
+
+    if (!rawText) return;
+
+    const cleanText = rawText
+        .replace('Terjadi error:', '')
+        .replace('Oops! Ada error input, cek form di bawah.', '')
+        .trim();
+
+    const showMessage = cleanText || rawText;
+
+    function showSweetAlert() {
+        if (typeof Swal === 'undefined') {
+            alert(showMessage);
+            return;
+        }
+
+        Swal.fire({
+            icon: 'error',
+            title: 'Data belum bisa disimpan',
+            html: showMessage + '<br><br><strong>Hubungi Owner</strong>',
+            confirmButtonText: 'Mengerti',
+            confirmButtonColor: '#dc2626'
+        });
+    }
+
+    if (typeof Swal === 'undefined') {
+        const cdn = document.createElement('script');
+        cdn.src = 'https://cdn.jsdelivr.net/npm/sweetalert2@11';
+        cdn.onload = showSweetAlert;
+        document.head.appendChild(cdn);
+    } else {
+        showSweetAlert();
+    }
+
+    errorBox.style.display = 'none';
+});
+</script>
+
