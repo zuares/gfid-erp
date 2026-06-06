@@ -99,6 +99,71 @@
   <link rel="stylesheet" href="{{ asset('css/dark-high-contrast.css') }}">
 
   @stack('head')
+
+<style>
+    /* OWNER WORK LOG GLOBAL NAV */
+    .gf-owner-worklog-nav {
+        position: fixed;
+        right: 18px;
+        bottom: 86px;
+        z-index: 1040;
+        display: inline-flex;
+        align-items: center;
+        justify-content: center;
+        gap: 8px;
+        min-height: 42px;
+        border-radius: 999px;
+        padding: 0 15px;
+        color: #0f172a;
+        background: rgba(255,255,255,.92);
+        border: 1px solid rgba(15,23,42,.10);
+        box-shadow: 0 14px 34px rgba(15,23,42,.14);
+        backdrop-filter: blur(10px);
+        -webkit-backdrop-filter: blur(10px);
+        font-size: 12px;
+        font-weight: 950;
+        text-decoration: none;
+        letter-spacing: -.01em;
+        transition: .16s ease;
+    }
+
+    .gf-owner-worklog-nav:hover {
+        color: #0f172a;
+        transform: translateY(-1px);
+        box-shadow: 0 18px 40px rgba(15,23,42,.18);
+    }
+
+    .gf-owner-worklog-nav.is-active {
+        color: #075985;
+        background: #e0f2fe;
+        border-color: #bae6fd;
+    }
+
+    .gf-owner-worklog-dot {
+        width: 8px;
+        height: 8px;
+        border-radius: 999px;
+        background: #38bdf8;
+        box-shadow: 0 0 0 4px rgba(56,189,248,.16);
+        flex: 0 0 auto;
+    }
+
+    .gf-owner-worklog-nav.is-active .gf-owner-worklog-dot {
+        background: #22c55e;
+        box-shadow: 0 0 0 4px rgba(34,197,94,.16);
+    }
+
+    @media (max-width: 768px) {
+        .gf-owner-worklog-nav {
+            left: 14px;
+            right: 14px;
+            bottom: calc(76px + env(safe-area-inset-bottom));
+            width: auto;
+            min-height: 44px;
+        }
+    }
+</style>
+
 </head>
 
 <body>
@@ -392,6 +457,28 @@
   </script>
 
   @stack('scripts')
+
+{{-- OWNER WORK LOG NAVBAR --}}
+@auth
+    @php
+        $gfOwnerUser = auth()->user();
+        $gfOwnerEmail = env('OWNER_EMAIL', 'ciciadeliamardani@gmail.com');
+
+        $gfIsOwner =
+            (bool) ($gfOwnerUser->is_owner ?? false) ||
+            (($gfOwnerUser->role ?? null) === 'owner') ||
+            (($gfOwnerUser->email ?? null) === $gfOwnerEmail);
+    @endphp
+
+    @if ($gfIsOwner)
+        <a href="{{ route('owner.work-logs.index') }}"
+            class="gf-owner-worklog-nav {{ request()->routeIs('owner.work-logs.*') ? 'is-active' : '' }}">
+            <span class="gf-owner-worklog-dot"></span>
+            <span>Owner Log</span>
+        </a>
+    @endif
+@endauth
+
 </body>
 </html>
 
