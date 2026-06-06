@@ -2,6 +2,8 @@
 
 namespace App\Services\Payroll;
 
+use Illuminate\Validation\ValidationException;
+
 use App\Models\Item;
 use App\Models\PieceRate;
 use Carbon\Carbon;
@@ -95,7 +97,9 @@ class PieceRateService
         $rate = $this->getRatePerPcs($module, $employeeId, $itemId, $date);
 
         if ($rate <= 0) {
-            throw new \RuntimeException("PieceRate {$module} belum diset untuk employee {$employeeId} item {$itemId} (date {$this->toDateString($date)}).");
+            throw ValidationException::withMessages([
+                'piece_rate' => "PieceRate {$module} belum diset untuk employee {$employeeId} item {$itemId} (date {$this->toDateString($date)}).",
+            ]);
         }
 
         return $rate;
