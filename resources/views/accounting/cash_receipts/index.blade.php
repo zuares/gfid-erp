@@ -423,3 +423,551 @@ document.addEventListener('DOMContentLoaded', function () {
 });
 </script>
 
+{{-- OWNER CASH RECEIPT INDEX MODAL UI --}}
+<style>
+/* Modal cash receipts dibuat simple dan mobile friendly */
+#cashReceiptCreateModal .modal-content,
+.cr-modal .modal-content {
+    border: 0;
+    border-radius: 20px;
+    overflow: hidden;
+    box-shadow: 0 24px 60px rgba(15, 23, 42, .18);
+}
+
+#cashReceiptCreateModal .modal-header,
+.cr-modal .modal-header {
+    padding: 1rem 1.1rem .75rem;
+    border-bottom: 1px solid #eef2f7;
+}
+
+#cashReceiptCreateModal .modal-title,
+.cr-modal .modal-title {
+    font-weight: 950;
+    color: #0f172a;
+}
+
+#cashReceiptCreateModal .modal-body,
+.cr-modal .modal-body {
+    padding: 1rem 1.1rem;
+}
+
+#cashReceiptCreateModal .modal-footer,
+.cr-modal .modal-footer {
+    position: sticky;
+    bottom: 0;
+    z-index: 3;
+    display: flex;
+    gap: .6rem;
+    padding: .85rem 1.1rem 1rem;
+    border-top: 1px solid #eef2f7;
+    background: #fff;
+}
+
+#cashReceiptCreateModal .modal-footer .cr-btn,
+.cr-modal .modal-footer .cr-btn {
+    min-height: 42px;
+}
+
+#cashReceiptCreateModal .cr-form-grid,
+.cr-modal .cr-form-grid {
+    gap: .8rem;
+}
+
+#cashReceiptCreateModal .cr-field > span,
+.cr-modal .cr-field > span {
+    font-size: .78rem;
+    font-weight: 900;
+    color: #475569;
+    margin-bottom: .35rem;
+}
+
+#cashReceiptCreateModal .cr-form-control,
+.cr-modal .cr-form-control {
+    border-radius: 12px;
+    min-height: 44px;
+}
+
+#cashReceiptCreateModal .cr-amount-input,
+.cr-modal .cr-amount-input {
+    font-size: 1.2rem;
+    font-weight: 900;
+}
+
+#cashReceiptCreateModal .cr-modal-sub,
+.cr-modal .cr-modal-sub,
+#cashReceiptCreateModal .text-muted:not([data-cr-keep-muted]),
+.cr-modal .text-muted:not([data-cr-keep-muted]) {
+    display: none;
+}
+
+@media (max-width: 768px) {
+    #cashReceiptCreateModal .modal-dialog,
+    .cr-modal .modal-dialog {
+        margin: .5rem;
+        max-width: none;
+    }
+
+    #cashReceiptCreateModal .modal-content,
+    .cr-modal .modal-content {
+        border-radius: 18px;
+        max-height: calc(100vh - 1rem);
+    }
+
+    #cashReceiptCreateModal .modal-body,
+    .cr-modal .modal-body {
+        overflow-y: auto;
+        -webkit-overflow-scrolling: touch;
+        max-height: calc(100vh - 170px);
+        padding: .85rem;
+    }
+
+    #cashReceiptCreateModal .modal-header,
+    #cashReceiptCreateModal .modal-footer,
+    .cr-modal .modal-header,
+    .cr-modal .modal-footer {
+        padding-left: .85rem;
+        padding-right: .85rem;
+    }
+
+    #cashReceiptCreateModal .modal-footer,
+    .cr-modal .modal-footer {
+        display: grid;
+        grid-template-columns: 1fr;
+    }
+
+    #cashReceiptCreateModal .modal-footer .cr-btn,
+    .cr-modal .modal-footer .cr-btn,
+    #cashReceiptCreateModal button[type="submit"],
+    .cr-modal button[type="submit"] {
+        width: 100%;
+    }
+}
+</style>
+
+<script src="https://cdn.jsdelivr.net/npm/sweetalert2@11"></script>
+<script>
+document.addEventListener('DOMContentLoaded', function () {
+    const modal =
+        document.getElementById('cashReceiptCreateModal') ||
+        document.querySelector('.cr-modal');
+
+    const amountSelectors = [
+        'input[name="amount"]',
+        'input[name="nominal"]',
+        'input[name="jumlah"]',
+        'input[name="total"]',
+        'input[data-cr-amount]',
+        '.cr-amount-input'
+    ];
+
+    function cleanAmount(input) {
+        if (!input) return;
+
+        let value = String(input.value || '').trim();
+        value = value.replace(/\.00$/, '');
+        value = value.replace(/[^\d]/g, '');
+
+        input.value = value;
+        input.setAttribute('inputmode', 'numeric');
+        input.setAttribute('pattern', '[0-9]*');
+        input.setAttribute('step', '1');
+        input.setAttribute('autocomplete', 'off');
+    }
+
+    function focusAmount(scope) {
+        const input = (scope || document).querySelector(amountSelectors.join(','));
+        if (!input) return;
+
+        cleanAmount(input);
+
+        setTimeout(function () {
+            input.focus({ preventScroll: false });
+            try {
+                input.select();
+                input.setSelectionRange(0, input.value.length);
+            } catch (e) {}
+        }, 180);
+    }
+
+    document.querySelectorAll(amountSelectors.join(',')).forEach(function (input) {
+        cleanAmount(input);
+
+        input.addEventListener('focus', function () {
+            setTimeout(function () {
+                try {
+                    input.select();
+                    input.setSelectionRange(0, input.value.length);
+                } catch (e) {}
+            }, 40);
+        });
+
+        input.addEventListener('input', function () {
+            cleanAmount(input);
+        });
+
+        input.addEventListener('blur', function () {
+            cleanAmount(input);
+        });
+    });
+
+    if (modal) {
+        modal.addEventListener('shown.bs.modal', function () {
+            focusAmount(modal);
+        });
+    }
+
+    function readySwal(callback) {
+        if (window.Swal) {
+            callback();
+            return;
+        }
+
+        const script = document.createElement('script');
+        script.src = 'https://cdn.jsdelivr.net/npm/sweetalert2@11';
+        script.onload = callback;
+        document.head.appendChild(script);
+    }
+
+    readySwal(function () {
+        @if (session('message'))
+            Swal.fire({
+                icon: @json(session('status') === 'error' ? 'error' : 'success'),
+                title: @json(session('status') === 'error' ? 'Gagal' : 'Berhasil'),
+                text: @json(session('message')),
+                confirmButtonText: 'OK'
+            });
+        @endif
+
+        document.querySelectorAll('form[data-gf-confirm]').forEach(function (form) {
+            if (form.dataset.crSwalBound === '1') return;
+            form.dataset.crSwalBound = '1';
+
+            form.addEventListener('submit', function (event) {
+                event.preventDefault();
+
+                const title = form.getAttribute('data-gf-confirm-title') || 'Lanjutkan?';
+                const text = form.getAttribute('data-gf-confirm-text') || 'Pastikan data sudah benar.';
+                const icon = form.getAttribute('data-gf-confirm-icon') || 'question';
+                const ok = form.getAttribute('data-gf-confirm-ok') || 'Ya, lanjutkan';
+
+                Swal.fire({
+                    title: title,
+                    text: text,
+                    icon: icon,
+                    showCancelButton: true,
+                    confirmButtonText: ok,
+                    cancelButtonText: 'Batal',
+                    reverseButtons: true
+                }).then(function (result) {
+                    if (result.isConfirmed) {
+                        form.removeAttribute('data-gf-confirm');
+                        form.submit();
+                    }
+                });
+            });
+        });
+    });
+});
+</script>
+
+{{-- OWNER CASH RECEIPT MODAL LIKE CASH EXPENSE --}}
+<style>
+/* Scoped: modal cash receipts dibuat seperti cash expenses */
+#cashReceiptCreateModal.cr-modal .modal-dialog,
+.cr-modal#cashReceiptCreateModal .modal-dialog {
+    max-width: 760px;
+}
+
+#cashReceiptCreateModal.cr-modal .modal-content,
+.cr-modal#cashReceiptCreateModal .modal-content {
+    border: 0;
+    border-radius: 20px;
+    overflow: hidden;
+    box-shadow: 0 24px 60px rgba(15, 23, 42, .18);
+    background: #fff;
+}
+
+#cashReceiptCreateModal.cr-modal .modal-header,
+#cashReceiptCreateModal.cr-modal .modal-footer {
+    border: 0;
+    background: #fff;
+}
+
+#cashReceiptCreateModal.cr-modal .modal-header {
+    padding: 1rem 1.1rem .75rem;
+    border-bottom: 1px solid #eef2f7;
+}
+
+#cashReceiptCreateModal.cr-modal .modal-title,
+#cashReceiptCreateModal.cr-modal .cr-modal-title {
+    color: #0f172a;
+    font-size: 1.05rem;
+    font-weight: 950;
+    line-height: 1.2;
+}
+
+#cashReceiptCreateModal.cr-modal .cr-modal-sub {
+    margin-top: .16rem;
+    color: #64748b;
+    font-size: .78rem;
+    font-weight: 700;
+}
+
+#cashReceiptCreateModal.cr-modal .modal-body {
+    padding: 1rem 1.1rem;
+}
+
+#cashReceiptCreateModal.cr-modal .modal-footer {
+    position: sticky;
+    bottom: 0;
+    z-index: 5;
+    gap: .55rem;
+    padding: .85rem 1.1rem 1rem;
+    border-top: 1px solid #eef2f7;
+}
+
+#cashReceiptCreateModal.cr-modal .modal-footer .cr-btn,
+#cashReceiptCreateModal.cr-modal .modal-footer .btn {
+    flex: 1 1 0;
+    min-height: 42px;
+    justify-content: center;
+}
+
+#cashReceiptCreateModal.cr-modal .cr-form-grid {
+    display: grid;
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+    gap: .8rem;
+}
+
+#cashReceiptCreateModal.cr-modal .cr-field {
+    display: grid;
+    gap: .35rem;
+}
+
+#cashReceiptCreateModal.cr-modal .cr-field-full {
+    grid-column: 1 / -1;
+}
+
+#cashReceiptCreateModal.cr-modal .cr-field > span {
+    color: #475569;
+    font-size: .78rem;
+    font-weight: 900;
+}
+
+#cashReceiptCreateModal.cr-modal .cr-field small {
+    color: #94a3b8;
+    font-weight: 750;
+}
+
+#cashReceiptCreateModal.cr-modal .cr-form-control,
+#cashReceiptCreateModal.cr-modal .form-control,
+#cashReceiptCreateModal.cr-modal .form-select {
+    min-height: 44px;
+    border-radius: 12px;
+    border-color: rgba(15, 23, 42, .12);
+    box-shadow: none;
+}
+
+#cashReceiptCreateModal.cr-modal .cr-form-control:focus,
+#cashReceiptCreateModal.cr-modal .form-control:focus,
+#cashReceiptCreateModal.cr-modal .form-select:focus {
+    border-color: #0f172a;
+    box-shadow: 0 0 0 3px rgba(15, 23, 42, .08);
+}
+
+#cashReceiptCreateModal.cr-modal .cr-amount-group .input-group-text {
+    border-radius: 12px 0 0 12px;
+    border-color: rgba(15, 23, 42, .12);
+    font-weight: 950;
+    color: #0f172a;
+}
+
+#cashReceiptCreateModal.cr-modal .cr-amount-input {
+    font-size: 1.12rem;
+    font-weight: 950;
+    font-variant-numeric: tabular-nums;
+}
+
+body.modal-open .mobile-bottom-nav {
+    display: none;
+}
+
+@media (max-width: 768px) {
+    #cashReceiptCreateModal.cr-modal .modal-dialog {
+        width: calc(100% - 1.5rem);
+        max-width: 480px;
+        margin: .75rem auto calc(.75rem + env(safe-area-inset-bottom));
+    }
+
+    #cashReceiptCreateModal.cr-modal .modal-content {
+        max-height: calc(var(--app-vh, 100vh) - 1.5rem - env(safe-area-inset-bottom));
+        border-radius: 16px;
+    }
+
+    #cashReceiptCreateModal.cr-modal .modal-body {
+        overflow-y: auto;
+        -webkit-overflow-scrolling: touch;
+        padding: .9rem;
+    }
+
+    #cashReceiptCreateModal.cr-modal .modal-header,
+    #cashReceiptCreateModal.cr-modal .modal-footer {
+        padding: .8rem .9rem;
+    }
+
+    #cashReceiptCreateModal.cr-modal .modal-footer {
+        background: #fff;
+        gap: .5rem;
+    }
+
+    #cashReceiptCreateModal.cr-modal .modal-footer .cr-btn,
+    #cashReceiptCreateModal.cr-modal .modal-footer .btn {
+        width: 100%;
+        flex: 1 1 0;
+    }
+
+    #cashReceiptCreateModal.cr-modal .cr-form-grid {
+        grid-template-columns: 1fr;
+    }
+}
+</style>
+
+<script src="https://cdn.jsdelivr.net/npm/sweetalert2@11"></script>
+<script>
+document.addEventListener('DOMContentLoaded', function () {
+    const modal = document.getElementById('cashReceiptCreateModal');
+
+    const amountSelectors = [
+        'input[name="amount"]',
+        'input[name="nominal"]',
+        'input[name="jumlah"]',
+        'input[name="total"]',
+        'input[data-cr-amount]',
+        '.cr-amount-input'
+    ];
+
+    function getAmount(scope) {
+        return (scope || document).querySelector(amountSelectors.join(','));
+    }
+
+    function cleanAmount(input) {
+        if (!input) return;
+
+        let value = String(input.value || '').trim();
+        value = value.replace(/\.00$/, '');
+        value = value.replace(/[^\d]/g, '');
+
+        input.value = value;
+        input.setAttribute('inputmode', 'numeric');
+        input.setAttribute('pattern', '[0-9]*');
+        input.setAttribute('step', '1');
+        input.setAttribute('autocomplete', 'off');
+    }
+
+    function focusAmount(scope) {
+        const input = getAmount(scope || document);
+        if (!input) return;
+
+        cleanAmount(input);
+        input.removeAttribute('readonly');
+        input.removeAttribute('disabled');
+
+        setTimeout(function () {
+            input.focus({ preventScroll: false });
+            input.click();
+
+            try {
+                input.select();
+                input.setSelectionRange(0, input.value.length);
+            } catch (e) {}
+        }, 250);
+    }
+
+    document.querySelectorAll(amountSelectors.join(',')).forEach(function (input) {
+        cleanAmount(input);
+
+        input.addEventListener('focus', function () {
+            setTimeout(function () {
+                try {
+                    input.select();
+                    input.setSelectionRange(0, input.value.length);
+                } catch (e) {}
+            }, 50);
+        });
+
+        input.addEventListener('click', function () {
+            setTimeout(function () {
+                try {
+                    input.select();
+                    input.setSelectionRange(0, input.value.length);
+                } catch (e) {}
+            }, 50);
+        });
+
+        input.addEventListener('input', function () {
+            cleanAmount(input);
+        });
+
+        input.addEventListener('blur', function () {
+            cleanAmount(input);
+        });
+    });
+
+    modal?.addEventListener('shown.bs.modal', function () {
+        focusAmount(modal);
+    });
+
+    function readySwal(callback) {
+        if (window.Swal) {
+            callback();
+            return;
+        }
+
+        const script = document.createElement('script');
+        script.src = 'https://cdn.jsdelivr.net/npm/sweetalert2@11';
+        script.onload = callback;
+        document.head.appendChild(script);
+    }
+
+    readySwal(function () {
+        @if (session('message'))
+            Swal.fire({
+                icon: @json(session('status') === 'error' ? 'error' : 'success'),
+                title: @json(session('status') === 'error' ? 'Gagal' : 'Berhasil'),
+                text: @json(session('message')),
+                confirmButtonText: 'OK'
+            });
+        @endif
+
+        document.querySelectorAll('form[data-gf-confirm]').forEach(function (form) {
+            if (form.dataset.crLikeExpenseConfirmBound === '1') return;
+            form.dataset.crLikeExpenseConfirmBound = '1';
+
+            form.addEventListener('submit', function (event) {
+                event.preventDefault();
+
+                const title = form.getAttribute('data-gf-confirm-title') || 'Simpan sebagai Draft?';
+                const text = form.getAttribute('data-gf-confirm-text') || 'Penerimaan akan tersimpan sebagai draft dan bisa diposting setelah dicek.';
+                const icon = form.getAttribute('data-gf-confirm-icon') || 'question';
+                const ok = form.getAttribute('data-gf-confirm-ok') || 'Ya, simpan';
+
+                Swal.fire({
+                    title: title,
+                    text: text,
+                    icon: icon,
+                    showCancelButton: true,
+                    confirmButtonText: ok,
+                    cancelButtonText: 'Batal',
+                    reverseButtons: true
+                }).then(function (result) {
+                    if (result.isConfirmed) {
+                        form.removeAttribute('data-gf-confirm');
+                        form.submit();
+                    }
+                });
+            });
+        });
+    });
+});
+</script>
+

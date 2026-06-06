@@ -44,7 +44,7 @@
         <span>Keterangan</span>
         <input class="form-control cr-form-control" type="text" name="description"
             value="{{ old('description', $cashReceipt->description ?? null) }}" maxlength="255"
-            placeholder="contoh: Penjualan tunai, modal tambahan, refund ongkir">
+            placeholder="contoh: Penjualan tunai">
     </label>
 
     <label class="cr-field cr-field-full">
@@ -180,6 +180,89 @@ document.addEventListener('DOMContentLoaded', function () {
     if (!document.querySelector('.modal.show')) {
         focusAmount(document);
     }
+});
+</script>
+
+{{-- OWNER CASH RECEIPT FORM MODAL BEHAVIOR --}}
+<style>
+/* Catatan disembunyikan agar form owner lebih simple */
+input[name="note"],
+input[name="notes"],
+input[name="catatan"],
+textarea[name="note"],
+textarea[name="notes"],
+textarea[name="catatan"] {
+    display: none !important;
+}
+</style>
+
+<script>
+document.addEventListener('DOMContentLoaded', function () {
+    const noteSelectors = [
+        'input[name="note"]',
+        'input[name="notes"]',
+        'input[name="catatan"]',
+        'textarea[name="note"]',
+        'textarea[name="notes"]',
+        'textarea[name="catatan"]'
+    ];
+
+    document.querySelectorAll(noteSelectors.join(',')).forEach(function (el) {
+        el.required = false;
+        el.disabled = true;
+
+        const wrap =
+            el.closest('.cr-field') ||
+            el.closest('.mb-3') ||
+            el.closest('.form-group') ||
+            el.closest('.col') ||
+            el.closest('label') ||
+            el.parentElement;
+
+        if (wrap) wrap.style.setProperty('display', 'none', 'important');
+    });
+});
+</script>
+
+{{-- OWNER CASH RECEIPT LIKE EXPENSE FORM --}}
+<style>
+input[name="note"],
+input[name="notes"],
+input[name="catatan"],
+textarea[name="note"],
+textarea[name="notes"],
+textarea[name="catatan"] {
+    display: none !important;
+}
+</style>
+
+<script>
+document.addEventListener('DOMContentLoaded', function () {
+    const selectors = [
+        'input[name="note"]',
+        'input[name="notes"]',
+        'input[name="catatan"]',
+        'textarea[name="note"]',
+        'textarea[name="notes"]',
+        'textarea[name="catatan"]'
+    ];
+
+    document.querySelectorAll(selectors.join(',')).forEach(function (el) {
+        el.required = false;
+        el.disabled = true;
+
+        const wrap =
+            el.closest('.cr-field') ||
+            el.closest('.mb-3') ||
+            el.closest('.form-group') ||
+            el.closest('.col') ||
+            el.closest('label') ||
+            el.parentElement;
+
+        if (wrap) {
+            wrap.style.setProperty('display', 'none', 'important');
+        }
+    });
 });
 </script>
 
