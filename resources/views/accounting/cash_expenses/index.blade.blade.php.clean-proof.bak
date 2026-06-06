@@ -395,133 +395,74 @@
     </script>
 @endpush
 
-{{-- AUTO COMPRESS CASH EXPENSE PROOF PHOTO --}}
-<script>
-document.addEventListener('DOMContentLoaded', function () {
-    const MAX_WIDTH = 1600;
-    const MAX_HEIGHT = 1600;
-    const QUALITY = 0.72;
-
-    function formatBytes(bytes) {
-        if (!bytes) return '0 KB';
-        const kb = bytes / 1024;
-        if (kb < 1024) return Math.round(kb) + ' KB';
-        return (kb / 1024).toFixed(2) + ' MB';
-    }
-
-    async function compressImageFile(file) {
-        if (!file || !file.type.startsWith('image/')) {
-            return file;
-        }
-
-        const imageBitmap = await createImageBitmap(file);
-        let width = imageBitmap.width;
-        let height = imageBitmap.height;
-
-        const ratio = Math.min(MAX_WIDTH / width, MAX_HEIGHT / height, 1);
-        width = Math.round(width * ratio);
-        height = Math.round(height * ratio);
-
-        const canvas = document.createElement('canvas');
-        canvas.width = width;
-        canvas.height = height;
-
-        const ctx = canvas.getContext('2d');
-        ctx.drawImage(imageBitmap, 0, 0, width, height);
-
-        const blob = await new Promise(resolve => {
-            canvas.toBlob(resolve, 'image/jpeg', QUALITY);
-        });
-
-        if (!blob) {
-            return file;
-        }
-
-        const originalName = file.name.replace(/\.[^.]+$/, '');
-        return new File([blob], originalName + '.jpg', {
-            type: 'image/jpeg',
-            lastModified: Date.now()
-        });
-    }
-
-    document.querySelectorAll('input[name="proof_photo"], [data-ce-proof-input]').forEach(function (input) {
-        input.addEventListener('change', async function () {
-            if (!input.files || !input.files.length) return;
-
-            const originalFile = input.files[0];
-            const compressedFile = await compressImageFile(originalFile);
-
-            const dt = new DataTransfer();
-            dt.items.add(compressedFile);
-            input.files = dt.files;
-
-            const label = input.closest('label, .ce-field, .form-group, .mb-3, div');
-            const nameEl = label ? label.querySelector('[data-ce-proof-name], [data-proof-file-name]') : null;
-
-            if (nameEl) {
-                nameEl.textContent =
-                    compressedFile.name +
-                    ' • ' +
-                    formatBytes(originalFile.size) +
-                    ' → ' +
-                    formatBytes(compressedFile.size);
-            }
-        });
-    });
-});
-</script>
-
-{{-- AUTO HIDE CASH EXPENSE EXTRA FIELDS --}}
+{{-- AUTO HIDE PROOF PHOTO AND NOTE FIELDS --}}
 <style>
-input[name="reference_no"],
-input[name="ref_no"],
-input[name="no_reference"],
-input[name="no_referensi"],
-input[name="description"],
-input[name="keterangan"],
+[data-ce-proof-input],
+input[name="proof_photo"] {
+    position: absolute;
+    left: -9999px;
+    width: 1px;
+    height: 1px;
+    opacity: 0;
+    pointer-events: none;
+}
+
+textarea[name="note"],
+textarea[name="notes"],
+textarea[name="description"],
 input[name="note"],
 input[name="notes"],
-textarea[name="reference_no"],
-textarea[name="ref_no"],
-textarea[name="no_reference"],
-textarea[name="no_referensi"],
-textarea[name="description"],
-textarea[name="keterangan"],
-textarea[name="note"],
-textarea[name="notes"] {
+input[name="description"] {
     display: none;
 }
 </style>
 
 <script>
-document.addEventListener('DOMContentLoaded', function () {
-    const selectors = [
-        'input[name="reference_no"]',
-        'input[name="ref_no"]',
-        'input[name="no_reference"]',
-        'input[name="no_referensi"]',
-        'input[name="description"]',
-        'input[name="keterangan"]',
-        'input[name="note"]',
-        'input[name="notes"]',
-        'textarea[name="reference_no"]',
-        'textarea[name="ref_no"]',
-        'textarea[name="no_reference"]',
-        'textarea[name="no_referensi"]',
-        'textarea[name="description"]',
-        'textarea[name="keterangan"]',
-        'textarea[name="note"]',
-        'textarea[name="notes"]'
-    ];
+document.addEventListener("DOMContentLoaded", function () {
+    document.querySelectorAll("[data-ce-proof-input], input[name=proof_photo]").forEach(function (el) {
+        el.required = false;
+        el.disabled = false;
 
-    document.querySelectorAll(selectors.join(',')).forEach(function (el) {
+        const wrap = el.closest(".mb-3, .form-group, .col, .row, label, div");
+
+        if (wrap) {
+            wrap.style.display = "block";
+
+            wrap.querySelectorAll("[data-open-camera-btn], [data-proof-file-name]").forEach(function (oldEl) {
+                oldEl.remove();
+            });
+
+            const btn = document.createElement("button");
+            btn.type = "button";
+            btn.className = "btn btn-primary mt-2";
+            btn.setAttribute("data-open-camera-btn", "1");
+            btn.textContent = "📷 Buka Kamera / Pilih Foto";
+
+            const info = document.createElement("div");
+            info.className = "small text-muted mt-2";
+            info.setAttribute("data-proof-file-name", "1");
+            info.textContent = "Belum ada foto dipilih";
+
+            btn.addEventListener("click", function () {
+                el.click();
+            });
+
+            el.addEventListener("change", function () {
+                info.textContent = el.files && el.files.length > 0
+                    ? el.files[0].name
+                    : "Belum ada foto dipilih";
+            });
+
+            wrap.appendChild(btn);
+            wrap.appendChild(info);
+        }
+    });
+
+    document.querySelectorAll("textarea[name=note], textarea[name=notes], textarea[name=description], input[name=note], input[name=notes], input[name=description]").forEach(function (el) {
         el.required = false;
         el.disabled = true;
-
-        const wrap = el.closest('.ce-field, .mb-3, .form-group, .col, .row, label, div');
-        if (wrap) {
-            wrap.style.display = 'none';
-        }
+        const wrap = el.closest(".mb-3, .form-group, .col, .row, label, div");
+        if (wrap) wrap.style.display = "none";
     });
 });
 </script>
