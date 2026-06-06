@@ -11,20 +11,24 @@ use Illuminate\Support\Facades\DB;
 class AccountController extends Controller
 {
     private const CASH_BASIS_CODES = [
-        '1101',
-        '1111',
-        '1112',
-        '2101',
-        '3101',
-        '3301',
-        '4101',
-        '5101',
-        '6101',
-        '6102',
-        '6103',
-        '6104',
-        '6110',
-        '6201',
+        '1101', // Kas Tunai
+        '1111', // Bank Jago
+        '1112', // Bank BCA
+        '1151', // Uang Muka Pembelian
+        '1201', // Persediaan Bahan Baku
+        '1305', // Piutang Supplier / Retur Pembelian
+        '2101', // Hutang Dagang
+        '3101', // Modal Pemilik
+        '3301', // Prive Pemilik
+        '4101', // Penjualan
+        '4201', // Retur Penjualan
+        '5101', // HPP
+        '6101', // Biaya Operasional Umum
+        '6102', // Biaya Transport / Ongkir
+        '6103', // Biaya Gaji Operasional
+        '6110', // Biaya Packing
+        '6201', // Biaya Marketplace
+        '6202', // Bonus Karyawan
     ];
 
     private const TECHNICAL_CODES = [

@@ -412,3 +412,327 @@
         </div>
     </x-gf.page>
 @endsection
+
+<style id="coa-clean-ui-patch">
+    .coa-card,
+    .coa-panel,
+    .card {
+        border: 1px solid rgba(15, 23, 42, .08) !important;
+        border-radius: 20px !important;
+        box-shadow: 0 14px 36px rgba(15, 23, 42, .06) !important;
+        overflow: hidden;
+    }
+
+    .coa-page h1,
+    .coa-wrap h1,
+    .coa-shell h1 {
+        font-size: 24px !important;
+        font-weight: 800 !important;
+        letter-spacing: -.03em;
+        margin-bottom: 6px !important;
+        color: #0f172a !important;
+    }
+
+    .coa-page h2,
+    .coa-wrap h2,
+    .coa-shell h2,
+    .coa-card h2,
+    .coa-panel h2 {
+        font-size: 17px !important;
+        font-weight: 800 !important;
+        margin-bottom: 12px !important;
+        color: #0f172a !important;
+    }
+
+    .coa-page p,
+    .coa-wrap p,
+    .coa-shell p,
+    .coa-card p,
+    .coa-panel p,
+    .text-muted,
+    small {
+        font-size: 12px !important;
+        line-height: 1.45 !important;
+        color: #64748b !important;
+    }
+
+    .coa-card .text-muted,
+    .coa-panel .text-muted,
+    .coa-card .form-text,
+    .coa-panel .form-text {
+        display: none !important;
+    }
+
+    .coa-filter {
+        display: grid !important;
+        grid-template-columns: minmax(220px, 1.4fr) minmax(150px, .7fr) minmax(150px, .7fr) auto auto;
+        gap: 10px !important;
+        align-items: end !important;
+        padding: 14px !important;
+        border: 1px solid rgba(15, 23, 42, .08) !important;
+        border-radius: 18px !important;
+        background: #f8fafc !important;
+        margin-bottom: 16px !important;
+    }
+
+    .coa-filter label {
+        font-size: 11px !important;
+        font-weight: 800 !important;
+        color: #475569 !important;
+        text-transform: uppercase;
+        letter-spacing: .04em;
+        margin-bottom: 6px !important;
+    }
+
+    .coa-filter input,
+    .coa-filter select,
+    .form-control,
+    .form-select {
+        min-height: 42px !important;
+        border-radius: 14px !important;
+        border: 1px solid rgba(148, 163, 184, .32) !important;
+        font-size: 13px !important;
+        box-shadow: none !important;
+    }
+
+    .coa-btn,
+    .btn {
+        min-height: 40px !important;
+        border-radius: 14px !important;
+        font-size: 13px !important;
+        font-weight: 800 !important;
+        display: inline-flex !important;
+        align-items: center !important;
+        justify-content: center !important;
+        gap: 6px !important;
+        padding: 9px 14px !important;
+        line-height: 1 !important;
+        white-space: nowrap !important;
+    }
+
+    .btn-primary,
+    .coa-btn-primary {
+        background: #2563eb !important;
+        border-color: #2563eb !important;
+        color: white !important;
+    }
+
+    .coa-tabs,
+    .nav-tabs {
+        display: flex !important;
+        gap: 8px !important;
+        border: 0 !important;
+        margin-bottom: 16px !important;
+        flex-wrap: wrap;
+    }
+
+    .coa-tabs a,
+    .nav-tabs .nav-link {
+        border: 1px solid rgba(15, 23, 42, .08) !important;
+        border-radius: 999px !important;
+        background: white !important;
+        color: #475569 !important;
+        font-size: 13px !important;
+        font-weight: 800 !important;
+        padding: 9px 14px !important;
+    }
+
+    .coa-tabs a.active,
+    .coa-tabs a.is-active,
+    .nav-tabs .nav-link.active {
+        background: #dbeafe !important;
+        color: #1d4ed8 !important;
+        border-color: rgba(37, 99, 235, .22) !important;
+    }
+
+    .table thead th {
+        background: #f8fafc !important;
+        color: #475569 !important;
+        font-size: 11px !important;
+        font-weight: 900 !important;
+        text-transform: uppercase;
+        letter-spacing: .04em;
+        border-bottom: 1px solid rgba(15, 23, 42, .08) !important;
+        white-space: nowrap;
+    }
+
+    .table tbody td {
+        font-size: 13px !important;
+        color: #0f172a !important;
+        vertical-align: middle !important;
+        border-color: rgba(15, 23, 42, .06) !important;
+    }
+
+    .table tbody tr:hover {
+        background: #f8fafc !important;
+    }
+
+    .badge,
+    .coa-badge {
+        border-radius: 999px !important;
+        padding: 6px 10px !important;
+        font-size: 11px !important;
+        font-weight: 800 !important;
+    }
+
+    .table td:last-child,
+    .table th:last-child {
+        text-align: right !important;
+        white-space: nowrap !important;
+    }
+
+    .table td:last-child .btn,
+    .table td:last-child .coa-btn,
+    .table td:last-child a,
+    .table td:last-child form {
+        display: inline-flex !important;
+        margin-left: 4px !important;
+        vertical-align: middle !important;
+    }
+
+    @media (max-width: 992px) {
+        .coa-filter {
+            grid-template-columns: 1fr 1fr !important;
+        }
+    }
+
+    @media (max-width: 576px) {
+        .coa-filter {
+            grid-template-columns: 1fr !important;
+        }
+
+        .coa-page h1,
+        .coa-wrap h1,
+        .coa-shell h1 {
+            font-size: 21px !important;
+        }
+    }
+</style>
+
+<style id="coa-hide-source-column">
+    /* Sembunyikan kolom asal data agar halaman Accounts lebih clean */
+    .table th:nth-child(6),
+    .table td:nth-child(6) {
+        display: none !important;
+    }
+
+    .coa-source,
+    .coa-source-list,
+    .coa-source-wrap,
+    .coa-mobile-source,
+    .coa-mobile-sources {
+        display: none !important;
+    }
+</style>
+
+<style id="coa-expense-group-style">
+    .coa-expense-group-row td {
+        background: #f8fafc !important;
+        border-top: 1px solid rgba(15, 23, 42, .08) !important;
+        border-bottom: 1px solid rgba(15, 23, 42, .08) !important;
+    }
+
+    .coa-expense-group {
+        display: flex;
+        align-items: center;
+        justify-content: space-between;
+        gap: 14px;
+        padding: 14px 4px;
+    }
+
+    .coa-expense-group-title {
+        font-size: 14px;
+        font-weight: 900;
+        color: #0f172a;
+        margin-bottom: 5px;
+    }
+
+    .coa-expense-group-desc {
+        display: flex;
+        flex-wrap: wrap;
+        gap: 6px;
+    }
+
+    .coa-expense-chip {
+        display: inline-flex;
+        align-items: center;
+        border-radius: 999px;
+        padding: 5px 9px;
+        background: #e0f2fe;
+        color: #075985;
+        font-size: 11px;
+        font-weight: 800;
+    }
+
+    .coa-expense-group-balance {
+        font-size: 14px;
+        font-weight: 900;
+        color: #b91c1c;
+        white-space: nowrap;
+    }
+
+    @media (max-width: 768px) {
+        .coa-expense-group {
+            align-items: flex-start;
+            flex-direction: column;
+        }
+    }
+</style>
+
+<script id="coa-expense-group-script">
+document.addEventListener('DOMContentLoaded', function () {
+    const expenseCodes = ['6102', '6103', '6110', '6201', '6202'];
+    const importantLabels = ['Transport / Ongkir', 'Gaji Operasional', 'Packing', 'Marketplace'];
+    const rows = Array.from(document.querySelectorAll('table tbody tr'));
+
+    let targetRows = [];
+    let total = 0;
+
+    rows.forEach(function (row) {
+        const firstCell = row.querySelector('td');
+        if (!firstCell) return;
+
+        const code = firstCell.innerText.trim().match(/\d{4}/)?.[0];
+        if (!expenseCodes.includes(code)) return;
+
+        targetRows.push(row);
+
+        const balanceCell = row.querySelector('td:nth-last-child(2), td:last-child');
+        if (balanceCell) {
+            const raw = balanceCell.innerText.replace(/[^\d,-]/g, '').replace(/\./g, '').replace(',', '.');
+            const value = parseFloat(raw);
+            if (!Number.isNaN(value)) total += value;
+        }
+    });
+
+    if (!targetRows.length) return;
+
+    const firstRow = targetRows[0];
+    const colCount = firstRow.children.length || 6;
+
+    const groupRow = document.createElement('tr');
+    groupRow.className = 'coa-expense-group-row';
+    groupRow.innerHTML = `
+        <td colspan="${colCount}">
+            <div class="coa-expense-group">
+                <div>
+                    <div class="coa-expense-group-title">Biaya Operasional</div>
+                    <div class="coa-expense-group-desc">
+                        ${importantLabels.map(label => `<span class="coa-expense-chip">${label}</span>`).join('')}
+                        <span class="coa-expense-chip">+1 lainnya</span>
+                    </div>
+                </div>
+                <div class="coa-expense-group-balance">
+                    ${total ? 'Rp ' + new Intl.NumberFormat('id-ID').format(total) : 'Lihat detail'}
+                </div>
+            </div>
+        </td>
+    `;
+
+    firstRow.parentNode.insertBefore(groupRow, firstRow);
+
+    targetRows.forEach(function (row) {
+        row.style.display = 'none';
+    });
+});
+</script>
