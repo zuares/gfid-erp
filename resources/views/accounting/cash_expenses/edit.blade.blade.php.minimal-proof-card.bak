@@ -43,26 +43,7 @@
             .ce-actions .ce-btn { flex: 1 1 auto; }
             .ce-form-grid { grid-template-columns: 1fr; }
         }
-    
-/* AUTO MOBILE FULL PROOF BUTTON */
-.ce-owner-proof-head:empty {
-    display: none;
-}
-
-@media (max-width: 768px) {
-    .ce-owner-proof-actions {
-        width: 100%;
-    }
-
-    .ce-owner-proof-btn {
-        width: 100%;
-        display: flex;
-        justify-content: center;
-        text-align: center;
-    }
-}
-
-</style>
+    </style>
 @endpush
 
 @section('content')
@@ -314,24 +295,25 @@ document.addEventListener('DOMContentLoaded', function () {
 {{-- AUTO OWNER FRIENDLY PROOF CARD --}}
 <style>
 .ce-owner-proof-card {
-    border: 1px solid rgba(15, 23, 42, .10);
-    border-radius: 14px;
-    padding: 12px;
-    margin-bottom: 12px;
-    background: #fff;
+    border: 1px solid rgba(15, 23, 42, .12);
+    border-radius: 16px;
+    padding: 14px;
+    margin-bottom: 14px;
+    background: linear-gradient(180deg, #ffffff 0%, #f8fafc 100%);
+    box-shadow: 0 8px 24px rgba(15, 23, 42, .08);
 }
 
 .ce-owner-proof-head {
     display: flex;
-    align-items: center;
+    align-items: flex-start;
     justify-content: space-between;
-    gap: 10px;
-    margin-bottom: 0;
+    gap: 12px;
+    margin-bottom: 10px;
 }
 
 .ce-owner-proof-title {
-    font-weight: 850;
-    font-size: 14px;
+    font-weight: 800;
+    font-size: 15px;
     color: #0f172a;
     margin: 0;
 }
@@ -354,6 +336,7 @@ document.addEventListener('DOMContentLoaded', function () {
 
 .ce-owner-proof-actions {
     display: flex;
+    flex-wrap: wrap;
     gap: 8px;
     align-items: center;
 }
@@ -362,8 +345,9 @@ document.addEventListener('DOMContentLoaded', function () {
     display: inline-flex;
     align-items: center;
     justify-content: center;
-    border-radius: 10px;
-    padding: 8px 12px;
+    gap: 6px;
+    border-radius: 12px;
+    padding: 10px 14px;
     font-weight: 800;
     text-decoration: none;
     border: 1px solid rgba(15, 23, 42, .14);
@@ -442,30 +426,32 @@ document.addEventListener('DOMContentLoaded', function () {
             card.innerHTML = `
                 <div class="ce-owner-proof-head">
                     <div>
-                        
-                        
+                        <p class="ce-owner-proof-title">📌 Bukti Foto</p>
+                        <div class="ce-owner-proof-subtitle">Bukti foto hanya untuk dicek. Tidak perlu upload ulang jika tidak diganti.</div>
                     </div>
-                    
+                    <div class="ce-owner-proof-badge">Sudah ada bukti</div>
                 </div>
 
                 <div class="ce-owner-proof-actions">
                     <a class="ce-owner-proof-btn" href="${proofUrl}" target="_blank" rel="noopener">
-                        Lihat Bukti
+                        🔍 Lihat Bukti
                     </a>
-                    
+                    <small class="text-muted">Klik untuk membuka foto struk/bukti pembayaran.</small>
                 </div>
             `;
         } else {
             card.innerHTML = `
                 <div class="ce-owner-proof-head">
                     <div>
-                        
-                        
+                        <p class="ce-owner-proof-title">📌 Bukti Foto</p>
+                        <div class="ce-owner-proof-subtitle">Belum ada bukti foto pada pengeluaran ini.</div>
                     </div>
                     <div class="ce-owner-proof-badge" style="background:#fffbeb;color:#b45309;">Belum ada</div>
                 </div>
 
-                <div class="ce-owner-proof-empty">Belum ada bukti foto.</div>
+                <div class="ce-owner-proof-empty">
+                    Belum ada bukti foto untuk dicek.
+                </div>
             `;
         }
 
