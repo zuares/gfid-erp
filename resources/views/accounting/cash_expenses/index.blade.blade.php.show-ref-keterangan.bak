@@ -471,6 +471,61 @@ document.addEventListener('DOMContentLoaded', function () {
 });
 </script>
 
+{{-- AUTO HIDE CASH EXPENSE EXTRA FIELDS --}}
+<style>
+input[name="reference_no"],
+input[name="ref_no"],
+input[name="no_reference"],
+input[name="no_referensi"],
+input[name="description"],
+input[name="keterangan"],
+input[name="note"],
+input[name="notes"],
+textarea[name="reference_no"],
+textarea[name="ref_no"],
+textarea[name="no_reference"],
+textarea[name="no_referensi"],
+textarea[name="description"],
+textarea[name="keterangan"],
+textarea[name="note"],
+textarea[name="notes"] {
+    display: none;
+}
+</style>
+
+<script>
+document.addEventListener('DOMContentLoaded', function () {
+    const selectors = [
+        'input[name="reference_no"]',
+        'input[name="ref_no"]',
+        'input[name="no_reference"]',
+        'input[name="no_referensi"]',
+        'input[name="description"]',
+        'input[name="keterangan"]',
+        'input[name="note"]',
+        'input[name="notes"]',
+        'textarea[name="reference_no"]',
+        'textarea[name="ref_no"]',
+        'textarea[name="no_reference"]',
+        'textarea[name="no_referensi"]',
+        'textarea[name="description"]',
+        'textarea[name="keterangan"]',
+        'textarea[name="note"]',
+        'textarea[name="notes"]'
+    ];
+
+    document.querySelectorAll(selectors.join(',')).forEach(function (el) {
+        el.required = false;
+        el.disabled = true;
+
+        const wrap = el.closest('.ce-field, .mb-3, .form-group, .col, .row, label, div');
+        if (wrap) {
+            wrap.style.display = 'none';
+        }
+    });
+});
+</script>
+
 {{-- AUTO SELECT ALL CASH EXPENSE NOMINAL --}}
 <script>
 document.addEventListener('DOMContentLoaded', function () {
@@ -588,50 +643,6 @@ document.addEventListener('DOMContentLoaded', function () {
             focusAndSelectNominal(document);
         }
     }, 400);
-});
-</script>
-
-{{-- AUTO HIDE CASH EXPENSE CATATAN ONLY --}}
-<style>
-input[name="note"],
-input[name="notes"],
-input[name="catatan"],
-textarea[name="note"],
-textarea[name="notes"],
-textarea[name="catatan"] {
-    display: none !important;
-}
-</style>
-
-<script>
-document.addEventListener('DOMContentLoaded', function () {
-    const selectors = [
-        'input[name="note"]',
-        'input[name="notes"]',
-        'input[name="catatan"]',
-        'textarea[name="note"]',
-        'textarea[name="notes"]',
-        'textarea[name="catatan"]'
-    ];
-
-    document.querySelectorAll(selectors.join(',')).forEach(function (el) {
-        el.required = false;
-        el.disabled = true;
-
-        const wrap =
-            el.closest('.ce-field') ||
-            el.closest('.mb-3') ||
-            el.closest('.form-group') ||
-            el.closest('.col') ||
-            el.closest('label') ||
-            el.parentElement;
-
-        if (wrap) {
-            wrap.style.setProperty('display', 'none', 'important');
-        } else {
-            el.style.setProperty('display', 'none', 'important');
-        }
-    });
 });
 </script>
 

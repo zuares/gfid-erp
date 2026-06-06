@@ -84,113 +84,6 @@
             .ce-inline-form { display: flex; width: 100%; }
             .ce-reason { width: 100%; min-width: 0; }
         }
-    
-        /* AUTO OWNER MINIMAL CASH EXPENSE SHOW */
-        .ce-owner-layout {
-            display: grid;
-            grid-template-columns: minmax(0, 1.15fr) minmax(280px, .85fr);
-            gap: 1rem;
-            align-items: start;
-        }
-        .ce-proof-focus {
-            border: 1px solid rgba(15, 23, 42, .1);
-            border-radius: 18px;
-            background: #fff;
-            overflow: hidden;
-            box-shadow: 0 14px 34px rgba(15, 23, 42, .10);
-        }
-        .ce-proof-focus-head {
-            display: flex;
-            justify-content: space-between;
-            align-items: flex-start;
-            gap: .75rem;
-            padding: .9rem 1rem;
-            border-bottom: 1px solid #eef2f7;
-        }
-        .ce-proof-focus-title {
-            margin: 0;
-            font-size: 1rem;
-            font-weight: 950;
-            color: #0f172a;
-        }
-        .ce-proof-focus-sub {
-            margin-top: .15rem;
-            font-size: .78rem;
-            color: #64748b;
-            font-weight: 700;
-        }
-        .ce-proof-focus-badge {
-            border-radius: 999px;
-            padding: .35rem .65rem;
-            background: #ecfdf5;
-            color: #047857;
-            font-size: .72rem;
-            font-weight: 900;
-            white-space: nowrap;
-        }
-        .ce-proof-focus-img {
-            display: block;
-            width: 100%;
-            max-height: 68vh;
-            object-fit: contain;
-            background: #f8fafc;
-        }
-        .ce-proof-focus-empty {
-            padding: 2rem 1rem;
-            text-align: center;
-            color: #92400e;
-            background: #fffbeb;
-            font-weight: 850;
-        }
-        .ce-proof-focus-actions {
-            display: flex;
-            gap: .5rem;
-            flex-wrap: wrap;
-            padding: .85rem 1rem 1rem;
-        }
-        .ce-owner-mini-card {
-            border: 1px solid #e2e8f0;
-            border-radius: 16px;
-            background: #fff;
-            padding: 1rem;
-        }
-        .ce-owner-mini-title {
-            font-size: .82rem;
-            color: #64748b;
-            font-weight: 950;
-            text-transform: uppercase;
-            letter-spacing: .05em;
-            margin-bottom: .65rem;
-        }
-        .ce-owner-row {
-            display: flex;
-            justify-content: space-between;
-            gap: .75rem;
-            padding: .65rem 0;
-            border-bottom: 1px dashed #e2e8f0;
-        }
-        .ce-owner-row:last-child {
-            border-bottom: 0;
-            padding-bottom: 0;
-        }
-        .ce-owner-row span:first-child {
-            color: #64748b;
-            font-weight: 800;
-        }
-        .ce-owner-row span:last-child {
-            color: #0f172a;
-            font-weight: 950;
-            text-align: right;
-        }
-        @media (max-width: 768px) {
-            .ce-owner-layout {
-                grid-template-columns: 1fr;
-            }
-            .ce-proof-focus-img {
-                max-height: 62vh;
-            }
-        }
-
     </style>
 @endpush
 
@@ -251,86 +144,48 @@
                 </div>
             </div>
 
-            
-            @php
-                $proofUrl = $cashExpense->proof_photo_path
-                    ? Storage::disk('public')->url($cashExpense->proof_photo_path)
-                    : null;
-            @endphp
-
-            <div class="ce-owner-layout">
-                <div class="ce-proof-focus">
-                    <div class="ce-proof-focus-head">
-                        <div>
-                            <p class="ce-proof-focus-title">📌 Preview Bukti Foto</p>
-                            <div class="ce-proof-focus-sub">Focal point untuk cek struk / bukti pembayaran.</div>
+            <x-gf.panel title="Rincian Transaksi" subtitle="Saat diposting, biaya akan didebit dan kas/bank akan dikredit.">
+                <div class="ce-info-grid">
+                    <div class="ce-info">
+                        <div class="ce-info-label">Kategori Pengeluaran</div>
+                        <div class="ce-info-value">{{ $cashExpense->expenseAccount?->name ?? '-' }}</div>
+                        <div class="ce-meta">{{ $cashExpense->expenseAccount?->code ?? '' }}</div>
+                    </div>
+                    <div class="ce-info">
+                        <div class="ce-info-label">Bayar Dari</div>
+                        <div class="ce-info-value">{{ $cashExpense->cashAccount?->name ?? '-' }}</div>
+                        <div class="ce-meta">{{ $cashExpense->cashAccount?->code ?? '' }}</div>
+                    </div>
+                    <div class="ce-info">
+                        <div class="ce-info-label">No. Referensi</div>
+                        <div class="ce-info-value">{{ $cashExpense->reference ?: '-' }}</div>
+                    </div>
+                    <div class="ce-info">
+                        <div class="ce-info-label">Catatan</div>
+                        <div class="ce-info-value">{{ $cashExpense->notes ?: '-' }}</div>
+                    </div>
+                    <div class="ce-info">
+                        <div class="ce-info-label">Bukti Foto</div>
+                        <div class="ce-info-value">
+                            @if ($cashExpense->proof_photo_path)
+                                <a href="{{ Storage::disk('public')->url($cashExpense->proof_photo_path) }}" target="_blank" rel="noopener">
+                                    Lihat bukti foto
+                                </a>
+                            @else
+                                -
+                            @endif
                         </div>
-
-                        @if ($proofUrl)
-                            <div class="ce-proof-focus-badge">Ada bukti</div>
-                        @else
-                            <div class="ce-proof-focus-badge" style="background:#fffbeb;color:#b45309;">Belum ada</div>
-                        @endif
-                    </div>
-
-                    @if ($proofUrl)
-                        <a href="{{ $proofUrl }}" target="_blank" rel="noopener">
-                            <img class="ce-proof-focus-img"
-                                src="{{ $proofUrl }}"
-                                alt="Bukti foto pengeluaran">
-                        </a>
-
-                        <div class="ce-proof-focus-actions">
-                            <a class="ce-btn ce-btn-primary" href="{{ $proofUrl }}" target="_blank" rel="noopener">
-                                🔍 Buka Foto Penuh
-                            </a>
-                        </div>
-                    @else
-                        <div class="ce-proof-focus-empty">
-                            Belum ada bukti foto untuk transaksi ini.
-                        </div>
-                    @endif
-                </div>
-
-                <div class="ce-owner-mini-card">
-                    <div class="ce-owner-mini-title">Rincian Transaksi</div>
-
-                    <div class="ce-owner-row">
-                        <span>Nominal</span>
-                        <span>Rp {{ $fmt($cashExpense->amount) }}</span>
-                    </div>
-
-                    <div class="ce-owner-row">
-                        <span>Tanggal</span>
-                        <span>{{ $cashExpense->date?->format('d/m/Y') ?? '-' }}</span>
-                    </div>
-
-                    <div class="ce-owner-row">
-                        <span>Kategori</span>
-                        <span>{{ $cashExpense->expenseAccount?->name ?? '-' }}</span>
-                    </div>
-
-                    <div class="ce-owner-row">
-                        <span>Bayar dari</span>
-                        <span>{{ $cashExpense->cashAccount?->name ?? '-' }}</span>
-                    </div>
-
-                    <div class="ce-owner-row">
-                        <span>Keterangan</span>
-                        <span>{{ $cashExpense->description ?: '-' }}</span>
-                    </div>
-
-                    <div class="ce-owner-row">
-                        <span>No. Referensi</span>
-                        <span>{{ $cashExpense->reference ?: '-' }}</span>
-                    </div>
-
-                    <div class="ce-owner-row">
-                        <span>Status</span>
-                        <span>{{ $statusLabel }}</span>
                     </div>
                 </div>
-            </div>
+            </x-gf.panel>
+
+            @if ($cashExpense->proof_photo_path)
+                <x-gf.panel title="Preview Bukti Foto" subtitle="Foto struk atau bukti pembayaran.">
+                    <img src="{{ Storage::disk('public')->url($cashExpense->proof_photo_path) }}"
+                        alt="Bukti foto pengeluaran"
+                        style="display:block;max-width:420px;width:100%;border-radius:12px;border:1px solid #e2e8f0">
+                </x-gf.panel>
+            @endif
 
             @if ($cashExpense->journal)
                 <x-gf.panel title="Bukti Jurnal" subtitle="Jurnal dibuat otomatis saat transaksi diposting.">
@@ -387,59 +242,3 @@
         </div>
     </x-gf.page>
 @endsection
-
-{{-- AUTO SWEETALERT CASH EXPENSE SHOW --}}
-<script src="https://cdn.jsdelivr.net/npm/sweetalert2@11"></script>
-<script>
-document.addEventListener('DOMContentLoaded', function () {
-    function runSwal(callback) {
-        if (window.Swal) {
-            callback();
-            return;
-        }
-
-        const script = document.createElement('script');
-        script.src = 'https://cdn.jsdelivr.net/npm/sweetalert2@11';
-        script.onload = callback;
-        document.head.appendChild(script);
-    }
-
-    runSwal(function () {
-        @if (session('message'))
-            Swal.fire({
-                icon: @json(session('status') === 'error' ? 'error' : 'success'),
-                title: @json(session('status') === 'error' ? 'Gagal' : 'Berhasil'),
-                text: @json(session('message')),
-                confirmButtonText: 'OK'
-            });
-        @endif
-
-        document.querySelectorAll('form[data-gf-confirm]').forEach(function (form) {
-            form.addEventListener('submit', function (event) {
-                event.preventDefault();
-
-                const title = form.getAttribute('data-gf-confirm-title') || 'Lanjutkan?';
-                const text = form.getAttribute('data-gf-confirm-text') || 'Pastikan data sudah benar.';
-                const icon = form.getAttribute('data-gf-confirm-icon') || 'question';
-                const ok = form.getAttribute('data-gf-confirm-ok') || 'Ya, lanjutkan';
-
-                Swal.fire({
-                    title: title,
-                    text: text,
-                    icon: icon,
-                    showCancelButton: true,
-                    confirmButtonText: ok,
-                    cancelButtonText: 'Batal',
-                    reverseButtons: true
-                }).then(function (result) {
-                    if (result.isConfirmed) {
-                        form.removeAttribute('data-gf-confirm');
-                        form.submit();
-                    }
-                });
-            });
-        });
-    });
-});
-</script>
-
