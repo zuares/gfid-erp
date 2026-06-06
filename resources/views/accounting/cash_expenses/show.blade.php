@@ -220,13 +220,7 @@
         </x-slot:actions>
 
         <div class="ce-detail-page">
-            @if (session('message'))
-                <div class="alert alert-{{ session('status') === 'error' ? 'danger' : 'success' }} mb-0">
-                    {{ session('message') }}
-                </div>
-            @endif
-
-            <div class="ce-kpi-grid">
+<div class="ce-kpi-grid">
                 <div class="ce-kpi">
                     <div class="ce-kpi-label">Status</div>
                     <div class="ce-kpi-value">

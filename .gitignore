@@ -43,3 +43,6 @@ storage/backups/before_rollback_*.sqlite
 
 # ignore dev snapshot database
 storage/backups/snapshot_dev.sqlite
+
+# Backup files
+*.bak
