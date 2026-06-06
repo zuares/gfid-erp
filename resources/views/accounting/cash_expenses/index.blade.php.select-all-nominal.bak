@@ -526,10 +526,10 @@ document.addEventListener('DOMContentLoaded', function () {
 });
 </script>
 
-{{-- AUTO SELECT ALL CASH EXPENSE NOMINAL --}}
+{{-- AUTO FORMAT AND FOCUS CASH EXPENSE NOMINAL --}}
 <script>
 document.addEventListener('DOMContentLoaded', function () {
-    const selectors = [
+    const amountSelectors = [
         'input[name="amount"]',
         'input[name="nominal"]',
         'input[name="jumlah"]',
@@ -538,34 +538,52 @@ document.addEventListener('DOMContentLoaded', function () {
         'input[data-amount]'
     ];
 
-    function getNominalInput(scope) {
+    function getAmountInput(scope) {
         scope = scope || document;
-        return scope.querySelector(selectors.join(','));
+        return scope.querySelector(amountSelectors.join(','));
     }
 
-    function cleanNominal(input) {
+    function cleanNominalValue(input) {
         if (!input) return;
 
         let value = String(input.value || '').trim();
 
-        // Hilangkan .00 dari nominal
+        // Ubah 28000.00 menjadi 28000
         value = value.replace(/\.00$/, '');
 
-        // Jangan izinkan desimal/koma
-        value = value.replace(/[^\d]/g, '');
+        // Ubah 28,000.00 menjadi 28000 jika ada format campuran
+        value = value.replace(/,/g, '').replace(/\.00$/, '');
 
         input.value = value;
-        input.setAttribute('inputmode', 'numeric');
-        input.setAttribute('pattern', '[0-9]*');
-        input.setAttribute('step', '1');
-        input.setAttribute('autocomplete', 'off');
     }
 
-    function focusAndSelectNominal(scope) {
-        const input = getNominalInput(scope || document);
+    function prepareNominalInput(input) {
         if (!input) return;
 
-        cleanNominal(input);
+        cleanNominalValue(input);
+
+        input.setAttribute('inputmode', 'numeric');
+        input.setAttribute('autocomplete', 'off');
+        input.setAttribute('pattern', '[0-9]*');
+        input.setAttribute('step', '1');
+
+        input.addEventListener('input', function () {
+            // Hapus angka belakang koma saat user mengetik/paste
+            input.value = String(input.value || '')
+                .replace(/\.00$/, '')
+                .replace(/[^\d]/g, '');
+        });
+
+        input.addEventListener('blur', function () {
+            cleanNominalValue(input);
+        });
+    }
+
+    function focusNominal(modal) {
+        const input = getAmountInput(modal || document);
+        if (!input) return;
+
+        prepareNominalInput(input);
 
         input.removeAttribute('readonly');
         input.removeAttribute('disabled');
@@ -574,50 +592,24 @@ document.addEventListener('DOMContentLoaded', function () {
             input.focus({ preventScroll: false });
             input.click();
 
-            // Select all nominal supaya langsung bisa ditimpa
             try {
-                input.select();
-                input.setSelectionRange(0, input.value.length);
+                const len = input.value.length;
+                input.setSelectionRange(len, len);
             } catch (e) {}
-        }, 300);
+        }, 250);
     }
 
-    document.querySelectorAll(selectors.join(',')).forEach(function (input) {
-        cleanNominal(input);
-
-        input.addEventListener('focus', function () {
-            setTimeout(function () {
-                try {
-                    input.select();
-                    input.setSelectionRange(0, input.value.length);
-                } catch (e) {}
-            }, 50);
-        });
-
-        input.addEventListener('click', function () {
-            setTimeout(function () {
-                try {
-                    input.select();
-                    input.setSelectionRange(0, input.value.length);
-                } catch (e) {}
-            }, 50);
-        });
-
-        input.addEventListener('input', function () {
-            cleanNominal(input);
-        });
-
-        input.addEventListener('blur', function () {
-            cleanNominal(input);
-        });
+    // Bersihkan semua nominal yang sudah tampil saat halaman load
+    document.querySelectorAll(amountSelectors.join(',')).forEach(function (input) {
+        prepareNominalInput(input);
     });
 
     // Bootstrap modal
     document.addEventListener('shown.bs.modal', function (event) {
-        focusAndSelectNominal(event.target);
+        focusNominal(event.target);
     });
 
-    // Modal custom / tombol buka modal
+    // Untuk modal custom / tombol buka modal
     document.querySelectorAll(
         '[data-bs-toggle="modal"], [data-toggle="modal"], [data-ce-open-modal], button, a'
     ).forEach(function (trigger) {
@@ -628,21 +620,65 @@ document.addEventListener('DOMContentLoaded', function () {
                     document.querySelector('[role="dialog"][aria-modal="true"]') ||
                     document.querySelector('.ce-modal');
 
-                focusAndSelectNominal(openedModal || document);
+                focusNominal(openedModal || document);
             }, 350);
         });
     });
+});
+</script>
 
-    // Halaman edit/create biasa, bukan modal
-    setTimeout(function () {
-        const modalOpen =
-            document.querySelector('.modal.show') ||
-            document.querySelector('[role="dialog"][aria-modal="true"]');
+{{-- AUTO CLEAN DECIMAL AND FOCUS EDIT AMOUNT --}}
+<script>
+document.addEventListener('DOMContentLoaded', function () {
+    const selectors = [
+        'input[name="amount"]',
+        'input[name="nominal"]',
+        'input[name="jumlah"]',
+        'input[name="total"]'
+    ];
 
-        if (!modalOpen) {
-            focusAndSelectNominal(document);
+    function clean(input) {
+        if (!input) return;
+
+        let value = String(input.value || '').trim();
+
+        if (/^\d+\.00$/.test(value)) {
+            value = value.replace(/\.00$/, '');
         }
-    }, 400);
+
+        value = value.replace(/[^\d]/g, '');
+
+        input.value = value;
+        input.setAttribute('inputmode', 'numeric');
+        input.setAttribute('pattern', '[0-9]*');
+        input.setAttribute('step', '1');
+        input.setAttribute('autocomplete', 'off');
+    }
+
+    document.querySelectorAll(selectors.join(',')).forEach(function (input) {
+        clean(input);
+
+        input.addEventListener('input', function () {
+            clean(input);
+        });
+
+        input.addEventListener('blur', function () {
+            clean(input);
+        });
+    });
+
+    const amountInput = document.querySelector(selectors.join(','));
+    if (amountInput) {
+        setTimeout(function () {
+            amountInput.focus({ preventScroll: false });
+            amountInput.click();
+
+            try {
+                const len = amountInput.value.length;
+                amountInput.setSelectionRange(len, len);
+            } catch (e) {}
+        }, 300);
+    }
 });
 </script>
 
