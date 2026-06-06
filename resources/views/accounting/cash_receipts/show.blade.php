@@ -67,6 +67,62 @@
             .cr-inline-form { display: flex; width: 100%; }
             .cr-reason { width: 100%; min-width: 0; }
         }
+    
+        /* AUTO CASH RECEIPT OWNER MINIMAL SHOW */
+        .cr-owner-layout {
+            display: grid;
+            grid-template-columns: minmax(0, 1fr);
+            gap: 1rem;
+            align-items: start;
+        }
+        .cr-owner-mini-card {
+            border: 1px solid #e2e8f0;
+            border-radius: 16px;
+            background: #fff;
+            padding: 1rem;
+        }
+        .cr-owner-mini-title {
+            font-size: .82rem;
+            color: #64748b;
+            font-weight: 950;
+            text-transform: uppercase;
+            letter-spacing: .05em;
+            margin-bottom: .65rem;
+        }
+        .cr-owner-row {
+            display: flex;
+            justify-content: space-between;
+            gap: .75rem;
+            padding: .65rem 0;
+            border-bottom: 1px dashed #e2e8f0;
+        }
+        .cr-owner-row:last-child {
+            border-bottom: 0;
+            padding-bottom: 0;
+        }
+        .cr-owner-row span:first-child {
+            color: #64748b;
+            font-weight: 800;
+        }
+        .cr-owner-row span:last-child {
+            color: #0f172a;
+            font-weight: 950;
+            text-align: right;
+        }
+        @media (max-width: 768px) {
+            .cr-owner-row {
+                align-items: flex-start;
+            }
+            .cr-owner-row span:last-child {
+                max-width: 58%;
+            }
+            .cr-actions .cr-btn,
+            .cr-actions form,
+            .cr-actions form .cr-btn {
+                width: 100%;
+            }
+        }
+
     </style>
 @endpush
 
@@ -96,13 +152,7 @@
         </x-slot:actions>
 
         <div class="cr-detail-page">
-            @if (session('message'))
-                <div class="alert alert-{{ session('status') === 'error' ? 'danger' : 'success' }} mb-0">
-                    {{ session('message') }}
-                </div>
-            @endif
-
-            <div class="cr-kpi-grid">
+<div class="cr-kpi-grid">
                 <div class="cr-kpi">
                     <div class="cr-kpi-label">Status</div>
                     <div class="cr-kpi-value">
@@ -127,28 +177,47 @@
                 </div>
             </div>
 
-            <x-gf.panel title="Rincian Transaksi" subtitle="Saat diposting, kas/bank akan didebit dan sumber penerimaan akan dikredit.">
-                <div class="cr-info-grid">
-                    <div class="cr-info">
-                        <div class="cr-info-label">Terima Ke</div>
-                        <div class="cr-info-value">{{ $cashReceipt->cashAccount?->name ?? '-' }}</div>
-                        <div class="cr-meta">{{ $cashReceipt->cashAccount?->code ?? '' }}</div>
+            
+            <div class="cr-owner-layout">
+                <div class="cr-owner-mini-card">
+                    <div class="cr-owner-mini-title">Rincian Transaksi</div>
+
+                    <div class="cr-owner-row">
+                        <span>Nominal</span>
+                        <span>Rp {{ $fmt($cashReceipt->amount) }}</span>
                     </div>
-                    <div class="cr-info">
-                        <div class="cr-info-label">Sumber Penerimaan</div>
-                        <div class="cr-info-value">{{ $cashReceipt->sourceAccount?->name ?? '-' }}</div>
-                        <div class="cr-meta">{{ $cashReceipt->sourceAccount?->code ?? '' }}</div>
+
+                    <div class="cr-owner-row">
+                        <span>Tanggal</span>
+                        <span>{{ \Illuminate\Support\Carbon::parse($cashReceipt->date)->format('d/m/Y') }}</span>
                     </div>
-                    <div class="cr-info">
-                        <div class="cr-info-label">No. Referensi</div>
-                        <div class="cr-info-value">{{ $cashReceipt->reference ?: '-' }}</div>
+
+                    <div class="cr-owner-row">
+                        <span>Terima Ke</span>
+                        <span>{{ $cashReceipt->cashAccount?->name ?? '-' }}</span>
                     </div>
-                    <div class="cr-info">
-                        <div class="cr-info-label">Catatan</div>
-                        <div class="cr-info-value">{{ $cashReceipt->notes ?: '-' }}</div>
+
+                    <div class="cr-owner-row">
+                        <span>Sumber</span>
+                        <span>{{ $cashReceipt->sourceAccount?->name ?? '-' }}</span>
+                    </div>
+
+                    <div class="cr-owner-row">
+                        <span>Keterangan</span>
+                        <span>{{ $cashReceipt->description ?: '-' }}</span>
+                    </div>
+
+                    <div class="cr-owner-row">
+                        <span>No. Referensi</span>
+                        <span>{{ $cashReceipt->reference ?: '-' }}</span>
+                    </div>
+
+                    <div class="cr-owner-row">
+                        <span>Status</span>
+                        <span>{{ $statusLabel }}</span>
                     </div>
                 </div>
-            </x-gf.panel>
+            </div>
 
             @if ($cashReceipt->journal)
                 <x-gf.panel title="Bukti Jurnal" subtitle="Jurnal dibuat otomatis saat transaksi diposting.">
@@ -205,3 +274,59 @@
         </div>
     </x-gf.page>
 @endsection
+
+{{-- AUTO SWEETALERT CASH RECEIPT SHOW --}}
+<script src="https://cdn.jsdelivr.net/npm/sweetalert2@11"></script>
+<script>
+document.addEventListener('DOMContentLoaded', function () {
+    function ready(callback) {
+        if (window.Swal) {
+            callback();
+            return;
+        }
+
+        const script = document.createElement('script');
+        script.src = 'https://cdn.jsdelivr.net/npm/sweetalert2@11';
+        script.onload = callback;
+        document.head.appendChild(script);
+    }
+
+    ready(function () {
+        @if (session('message'))
+            Swal.fire({
+                icon: @json(session('status') === 'error' ? 'error' : 'success'),
+                title: @json(session('status') === 'error' ? 'Gagal' : 'Berhasil'),
+                text: @json(session('message')),
+                confirmButtonText: 'OK'
+            });
+        @endif
+
+        document.querySelectorAll('form[data-gf-confirm]').forEach(function (form) {
+            form.addEventListener('submit', function (event) {
+                event.preventDefault();
+
+                const title = form.getAttribute('data-gf-confirm-title') || 'Lanjutkan?';
+                const text = form.getAttribute('data-gf-confirm-text') || 'Pastikan data sudah benar.';
+                const icon = form.getAttribute('data-gf-confirm-icon') || 'question';
+                const ok = form.getAttribute('data-gf-confirm-ok') || 'Ya, lanjutkan';
+
+                Swal.fire({
+                    title: title,
+                    text: text,
+                    icon: icon,
+                    showCancelButton: true,
+                    confirmButtonText: ok,
+                    cancelButtonText: 'Batal',
+                    reverseButtons: true
+                }).then(function (result) {
+                    if (result.isConfirmed) {
+                        form.removeAttribute('data-gf-confirm');
+                        form.submit();
+                    }
+                });
+            });
+        });
+    });
+});
+</script>
+

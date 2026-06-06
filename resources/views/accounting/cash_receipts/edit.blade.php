@@ -70,3 +70,79 @@
         </div>
     </x-gf.page>
 @endsection
+
+{{-- AUTO SWEETALERT CASH RECEIPT PAGE --}}
+<style>
+@media (max-width: 768px) {
+    .cr-actions .cr-btn,
+    .cr-actions form,
+    .cr-actions form .cr-btn,
+    .cr-btn {
+        width: 100%;
+    }
+
+    .d-flex.justify-content-end.gap-2.flex-wrap.mt-3 {
+        display: grid !important;
+        width: 100%;
+    }
+
+    .d-flex.justify-content-end.gap-2.flex-wrap.mt-3 .cr-btn {
+        width: 100%;
+    }
+}
+</style>
+
+<script src="https://cdn.jsdelivr.net/npm/sweetalert2@11"></script>
+<script>
+document.addEventListener('DOMContentLoaded', function () {
+    function ready(callback) {
+        if (window.Swal) {
+            callback();
+            return;
+        }
+
+        const script = document.createElement('script');
+        script.src = 'https://cdn.jsdelivr.net/npm/sweetalert2@11';
+        script.onload = callback;
+        document.head.appendChild(script);
+    }
+
+    ready(function () {
+        @if (session('message'))
+            Swal.fire({
+                icon: @json(session('status') === 'error' ? 'error' : 'success'),
+                title: @json(session('status') === 'error' ? 'Gagal' : 'Berhasil'),
+                text: @json(session('message')),
+                confirmButtonText: 'OK'
+            });
+        @endif
+
+        document.querySelectorAll('form[data-gf-confirm]').forEach(function (form) {
+            form.addEventListener('submit', function (event) {
+                event.preventDefault();
+
+                const title = form.getAttribute('data-gf-confirm-title') || 'Lanjutkan?';
+                const text = form.getAttribute('data-gf-confirm-text') || 'Pastikan data sudah benar.';
+                const icon = form.getAttribute('data-gf-confirm-icon') || 'question';
+                const ok = form.getAttribute('data-gf-confirm-ok') || 'Ya, lanjutkan';
+
+                Swal.fire({
+                    title: title,
+                    text: text,
+                    icon: icon,
+                    showCancelButton: true,
+                    confirmButtonText: ok,
+                    cancelButtonText: 'Batal',
+                    reverseButtons: true
+                }).then(function (result) {
+                    if (result.isConfirmed) {
+                        form.removeAttribute('data-gf-confirm');
+                        form.submit();
+                    }
+                });
+            });
+        });
+    });
+});
+</script>
+
