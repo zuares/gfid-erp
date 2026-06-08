@@ -2,36 +2,19 @@
 
 namespace App\Models;
 
-use Illuminate\Database\Eloquent\Factories\HasFactory;
 use Illuminate\Database\Eloquent\Model;
+use Illuminate\Database\Eloquent\Relations\HasMany;
 
 class Channel extends Model
 {
-    use HasFactory;
-
-    protected $fillable = [
-        'code',
-        'name',
-        'is_active',
-    ];
+    protected $fillable = ['code', 'name', 'status', 'meta'];
 
     protected $casts = [
-        'is_active' => 'boolean',
+        'meta' => 'array',
     ];
 
-    /**
-     * 1 channel punya banyak store.
-     */
-    public function stores()
+    public function stores(): HasMany
     {
         return $this->hasMany(Store::class);
-    }
-
-    /**
-     * Scope: hanya channel yang aktif.
-     */
-    public function scopeActive($query)
-    {
-        return $query->where('is_active', true);
     }
 }

@@ -36,23 +36,3 @@ Route::middleware(['auth'])
         ]);
     });
 
-use App\Http\Controllers\OmnichannelController;
-use App\Http\Controllers\ShopeeStoreAuthController;
-
-Route::get('/owner/omnichannel', [OmnichannelController::class, 'index'])->name('owner.omnichannel');
-Route::get('/owner/omnichannel/shopee/connect', [ShopeeStoreAuthController::class, 'redirect'])->name('owner.omnichannel.shopee.connect');
-Route::get('/owner/omnichannel/shopee/callback', [ShopeeStoreAuthController::class, 'callback'])->name('owner.omnichannel.shopee.callback');
-
-Route::prefix('api/omnichannel')->group(function () {
-    Route::post('/bootstrap', [OmnichannelController::class, 'bootstrap'])
-        ->withoutMiddleware([\Illuminate\Foundation\Http\Middleware\VerifyCsrfToken::class]);
-
-    Route::get('/channels', [OmnichannelController::class, 'channels']);
-    Route::get('/stores', [OmnichannelController::class, 'stores']);
-    Route::get('/stores/{store}/shop-info', [OmnichannelController::class, 'shopInfo']);
-
-    Route::post('/stores/{store}/sync-orders', [OmnichannelController::class, 'syncOrders'])
-        ->withoutMiddleware([\Illuminate\Foundation\Http\Middleware\VerifyCsrfToken::class]);
-
-    Route::get('/local-orders', [OmnichannelController::class, 'localOrders']);
-});

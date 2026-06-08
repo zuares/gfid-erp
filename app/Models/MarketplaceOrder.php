@@ -3,64 +3,67 @@
 namespace App\Models;
 
 use Illuminate\Database\Eloquent\Model;
+use Illuminate\Database\Eloquent\Relations\BelongsTo;
+use Illuminate\Database\Eloquent\Relations\HasMany;
 
 class MarketplaceOrder extends Model
 {
     protected $fillable = [
-        'store_id',
-        'external_order_id',
-        'external_invoice_no',
-        'order_date',
-        'status',
-        'buyer_name',
-        'buyer_phone',
-        'shipping_address',
-        'shipping_city',
-        'shipping_province',
-        'shipping_postal_code',
-        'shipping_courier_code',
-        'shipping_awb_no',
-        'subtotal_items',
-        'shipping_fee_customer',
-        'shipping_discount_platform',
-        'voucher_discount',
-        'other_discount',
-        'total_paid_customer',
-        'platform_fee_total',
-        'net_payout_estimated',
-        'payment_status',
-        'payment_date',
-        'completed_at',
-        'cancelled_at',
-        'customer_id',
-        'remarks',
         'raw_payload_json',
+        'remarks',
+        'customer_id',
+        'cancelled_at',
+        'completed_at',
+        'payment_date',
+        'payment_status',
+        'net_payout_estimated',
+        'platform_fee_total',
+        'total_paid_customer',
+        'other_discount',
+        'voucher_discount',
+        'shipping_discount_platform',
+        'shipping_fee_customer',
+        'subtotal_items',
+        'shipping_awb_no',
+        'shipping_courier_code',
+        'shipping_postal_code',
+        'shipping_province',
+        'shipping_city',
+        'shipping_address',
+        'buyer_phone',
+        'buyer_name',
+        'status',
+        'order_date',
+        'external_invoice_no',
+        'store_id',
+        'channel_order_id',
+        'external_order_id',
+        'booking_sn',
+        'order_status',
+        'buyer_username',
+        'payment_method',
+        'shipping_carrier',
+        'total_amount',
+        'currency',
+        'ordered_at',
+        'synced_at',
+        'raw_json',
     ];
 
     protected $casts = [
-        'order_date' => 'datetime',
-        'payment_date' => 'datetime',
-        'completed_at' => 'datetime',
-        'cancelled_at' => 'datetime',
+        'total_amount' => 'decimal:2',
+        'ordered_at' => 'datetime',
+        'synced_at' => 'datetime',
+        'raw_json' => 'array',
     ];
 
-    public function store()
+    public function store(): BelongsTo
     {
-        return $this->belongsTo(MarketplaceStore::class, 'store_id');
+        return $this->belongsTo(Store::class);
     }
 
-    public function customer()
+    public function items(): HasMany
     {
-        return $this->belongsTo(Customer::class, 'customer_id');
-    }
-
-    public function items()
-    {
-        return $this->hasMany(MarketplaceOrderItem::class, 'order_id');
-    }
-
-    public function getDisplayStatusAttribute(): string
-    {
-        return ucfirst($this->status);
+        return $this->hasMany(MarketplaceOrderItem::class);
     }
 }

@@ -2,50 +2,46 @@
 
 namespace App\Models;
 
-use Illuminate\Database\Eloquent\Factories\HasFactory;
 use Illuminate\Database\Eloquent\Model;
-use Illuminate\Support\Str;
+use Illuminate\Database\Eloquent\Relations\BelongsTo;
+use Illuminate\Database\Eloquent\Relations\HasMany;
 
 class Store extends Model
 {
-    use HasFactory;
-
     protected $fillable = [
-        'name',
+        'code',
         'channel_id',
-        'is_active',
-        // 'code' boleh tidak diisi manual, karena kita auto generate
+        'name',
+        'external_shop_id',
+        'region',
+        'status',
+        'credentials',
+        'token_expires_at',
+        'last_synced_at',
+        'meta',
     ];
 
     protected $casts = [
-        'is_active' => 'boolean',
+        'credentials' => 'encrypted:array',
+        'meta' => 'array',
+        'token_expires_at' => 'datetime',
+        'last_synced_at' => 'datetime',
     ];
 
-    protected static function boot()
-    {
-        parent::boot();
+    protected $hidden = ['credentials'];
 
-        static::creating(function (Store $store) {
-            // Pastikan channel_id sudah diisi sebelum create
-            $channel = Channel::find($store->channel_id);
-
-            $channelCode = $channel?->code ?? 'GEN';
-
-            // Slug dari nama, contoh: "Offline Store Utama" → "OFFLINE-STORE-UTAMA"
-            $nameSlug = Str::slug($store->name, '-');
-
-            // Code final → SHP-OFFLINE-STORE-UTAMA
-            $store->code = strtoupper($channelCode . '-' . $nameSlug);
-        });
-    }
-
-    public function channel()
+    public function channel(): BelongsTo
     {
         return $this->belongsTo(Channel::class);
     }
 
-    public function scopeActive($query)
+    public function orders(): HasMany
     {
-        return $query->where('is_active', true);
+        return $this->hasMany(MarketplaceOrder::class);
+    }
+
+    public function credential(string $key, mixed $default = null): mixed
+    {
+        return data_get($this->credentials ?? [], $key, $default);
     }
 }

@@ -1,0 +1,280 @@
+@extends('layouts.greatfit-omnichannel')
+
+@section('title', 'Toko Marketplace - GreatFit')
+@section('page_title', 'Toko Marketplace')
+@section('page_subtitle', 'Kelola toko marketplace, login channel, sync order, dan pantau data penjualan.')
+
+@section('content')
+<div class="row g-3 mb-4">
+    <div class="col-6 col-lg-3"><div class="gf-stat"><div class="d-flex align-items-center justify-content-between"><div class="gf-stat-icon"><i class="bi bi-diagram-3"></i></div><span class="gf-badge gf-badge-gray">Channel</span></div><div class="gf-stat-value" id="statChannels">0</div><div class="gf-stat-label">Marketplace Aktif</div></div></div>
+    <div class="col-6 col-lg-3"><div class="gf-stat"><div class="d-flex align-items-center justify-content-between"><div class="gf-stat-icon"><i class="bi bi-shop"></i></div><span class="gf-badge gf-badge-green">Store</span></div><div class="gf-stat-value" id="statStores">0</div><div class="gf-stat-label">Toko Terhubung</div></div></div>
+    <div class="col-6 col-lg-3"><div class="gf-stat"><div class="d-flex align-items-center justify-content-between"><div class="gf-stat-icon"><i class="bi bi-bag-check"></i></div><span class="gf-badge gf-badge-yellow">Order</span></div><div class="gf-stat-value" id="statOrders">0</div><div class="gf-stat-label">Order Tersimpan</div></div></div>
+    <div class="col-6 col-lg-3"><div class="gf-stat"><div class="d-flex align-items-center justify-content-between"><div class="gf-stat-icon"><i class="bi bi-clock-history"></i></div><span class="gf-badge gf-badge-gray">Sync</span></div><div class="gf-stat-value" id="statSync">-</div><div class="gf-stat-label">Sinkronisasi Terakhir</div></div></div>
+</div>
+
+<div class="gf-card mb-4">
+    <div class="gf-card-header">
+        <div>
+            <h5 class="mb-1 fw-bold">Koneksi Marketplace</h5>
+            <div class="text-muted small">Login marketplace untuk menambahkan toko otomatis. Credential tidak ditampilkan di frontend.</div>
+        </div>
+        <div class="d-flex gap-2 flex-wrap">
+            <a href="/owner/omnichannel/shopee/connect" class="btn btn-gf-dark"><i class="bi bi-box-arrow-in-right me-1"></i>Login Shopee</a>
+            <button class="btn btn-gf-soft" type="button" onclick="bootstrapChannels()"><i class="bi bi-plus-circle me-1"></i>Buat Channel Default</button>
+            <button class="btn btn-gf-soft" type="button" onclick="loadAll()"><i class="bi bi-arrow-repeat me-1"></i>Refresh</button>
+        </div>
+    </div>
+    <div class="gf-card-body">
+        <div id="alertBox" class="alert d-none mb-3"></div>
+        <div class="row g-3">
+            <div class="col-lg-3 col-md-6"><label class="form-label fw-semibold">Filter Channel</label><select id="filterChannel" class="form-select gf-input" onchange="renderStores()"><option value="">Semua Channel</option></select></div>
+            <div class="col-lg-3 col-md-6"><label class="form-label fw-semibold">Filter Status</label><select id="filterStatus" class="form-select gf-input" onchange="renderStores()"><option value="">Semua Status</option><option value="active">Active</option><option value="inactive">Inactive</option></select></div>
+            <div class="col-lg-6"><label class="form-label fw-semibold">Cari Toko</label><div class="input-group"><span class="input-group-text gf-input bg-white"><i class="bi bi-search"></i></span><input id="searchStore" class="form-control gf-input" placeholder="Cari nama toko / shop id..." oninput="renderStores()"></div></div>
+        </div>
+    </div>
+</div>
+
+<div class="gf-card mb-4">
+    <div class="gf-card-header"><div><h5 class="mb-1 fw-bold">Daftar Toko</h5><div class="text-muted small">Pilih toko lalu cek info atau sync order hari ini.</div></div></div>
+    <div class="gf-card-body">
+        <div id="storeEmpty" class="gf-empty d-none"><i class="bi bi-shop-window fs-1 d-block mb-2"></i>Belum ada toko yang terhubung.<div class="mt-3"><a href="/owner/omnichannel/shopee/connect" class="btn btn-gf-dark">Login Shopee</a></div></div>
+        <div class="table-responsive" id="storeTableWrap">
+            <table class="table align-middle"><thead><tr><th>Toko</th><th>Channel</th><th>Shop ID</th><th>Status</th><th>Token</th><th>Last Sync</th><th class="text-end">Aksi</th></tr></thead><tbody id="storeTable"></tbody></table>
+        </div>
+    </div>
+</div>
+
+<div class="gf-card">
+    <div class="gf-card-header"><div><h5 class="mb-1 fw-bold">Order Tersimpan Lokal</h5><div class="text-muted small">Order yang sudah disync ke database GreatFit.</div></div><button class="btn btn-gf-soft btn-sm" type="button" onclick="loadAll()"><i class="bi bi-arrow-repeat me-1"></i>Refresh Order</button></div>
+    <div class="gf-card-body">
+        <div id="orderEmpty" class="gf-empty d-none"><i class="bi bi-bag-x fs-1 d-block mb-2"></i>Belum ada order tersimpan.</div>
+        <div class="table-responsive" id="orderTableWrap">
+            <table class="table align-middle"><thead><tr><th>Order</th><th>Toko</th><th>Status</th><th>Item</th><th class="text-end">Total</th></tr></thead><tbody id="orderTable"></tbody></table>
+        </div>
+    </div>
+</div>
+
+<div class="modal fade" id="jsonModal" tabindex="-1"><div class="modal-dialog modal-xl modal-dialog-scrollable"><div class="modal-content" style="border-radius:20px;border:0;"><div class="modal-header"><div><h5 class="modal-title fw-bold" id="jsonTitle">Response</h5><div class="text-muted small" id="jsonSubtitle">API response</div></div><button class="btn-close" data-bs-dismiss="modal"></button></div><div class="modal-body"><pre class="bg-light rounded-4 p-3 small mb-0" id="jsonOutput" style="max-height:70vh;overflow:auto;"></pre></div></div></div></div>
+@endsection
+
+@push('scripts')
+<script>
+let channels = [];
+let stores = [];
+let orders = [];
+
+function showAlert(message, type = 'success') {
+    const box = document.getElementById('alertBox');
+    box.className = `alert alert-${type}`;
+    box.textContent = message;
+    box.classList.remove('d-none');
+    setTimeout(() => box.classList.add('d-none'), 6000);
+}
+
+async function api(url, options = {}) {
+    const response = await fetch(url, {
+        headers: {'Accept': 'application/json','Content-Type': 'application/json', ...(options.headers || {})},
+        ...options
+    });
+
+    let payload = null;
+    try { payload = await response.json(); } catch (error) { payload = { message: 'Response bukan JSON valid.' }; }
+
+    if (!response.ok) throw new Error(payload.message || payload.error || 'API error');
+    return payload;
+}
+
+async function bootstrapChannels() {
+    const data = await api('/api/omnichannel/bootstrap', { method: 'POST' });
+    showAlert(data.message || 'Channel default berhasil dibuat.');
+    await loadAll();
+}
+
+async function loadAll() {
+    const [channelsResult, storesResult, ordersResult] = await Promise.allSettled([
+        api('/api/omnichannel/channels'),
+        api('/api/omnichannel/stores'),
+        api('/api/omnichannel/local-orders')
+    ]);
+
+    channels = channelsResult.status === 'fulfilled' ? channelsResult.value : [];
+    stores = storesResult.status === 'fulfilled' ? storesResult.value : [];
+    orders = ordersResult.status === 'fulfilled' ? ordersResult.value : [];
+
+    renderChannelFilter();
+    renderStores();
+    renderOrders();
+    renderStats();
+}
+
+function renderStats() {
+    document.getElementById('statChannels').textContent = channels.length;
+    document.getElementById('statStores').textContent = stores.length;
+    document.getElementById('statOrders').textContent = orders.length;
+
+    const last = stores.filter(store => store.last_synced_at).sort((a, b) => new Date(b.last_synced_at) - new Date(a.last_synced_at))[0];
+    document.getElementById('statSync').textContent = last?.last_synced_at ? formatShortDate(last.last_synced_at) : '-';
+}
+
+function renderChannelFilter() {
+    const select = document.getElementById('filterChannel');
+    const current = select.value;
+    select.innerHTML = `<option value="">Semua Channel</option>` + channels.map(channel => `<option value="${channel.id}">${escapeHtml(channel.name)}</option>`).join('');
+    select.value = current;
+}
+
+function getFilteredStores() {
+    const channelId = document.getElementById('filterChannel').value;
+    const status = document.getElementById('filterStatus').value;
+    const keyword = document.getElementById('searchStore').value.toLowerCase().trim();
+
+    return stores.filter(store => {
+        const matchChannel = !channelId || String(store.channel_id) === String(channelId);
+        const matchStatus = !status || store.status === status;
+        const haystack = `${store.name || ''} ${store.external_shop_id || ''} ${store.channel?.name || ''}`.toLowerCase();
+        const matchKeyword = !keyword || haystack.includes(keyword);
+        return matchChannel && matchStatus && matchKeyword;
+    });
+}
+
+function renderStores() {
+    const tbody = document.getElementById('storeTable');
+    const empty = document.getElementById('storeEmpty');
+    const wrap = document.getElementById('storeTableWrap');
+    const filtered = getFilteredStores();
+
+    if (!filtered.length) {
+        tbody.innerHTML = '';
+        empty.classList.remove('d-none');
+        wrap.classList.add('d-none');
+        return;
+    }
+
+    empty.classList.add('d-none');
+    wrap.classList.remove('d-none');
+
+    tbody.innerHTML = filtered.map(store => `
+        <tr>
+            <td><div class="fw-bold">${escapeHtml(store.name || '-')}</div><div class="text-muted small">${escapeHtml(store.region || 'ID')}</div></td>
+            <td><span class="gf-badge gf-badge-gray">${escapeHtml(store.channel?.name || '-')}</span></td>
+            <td><div class="fw-semibold">${escapeHtml(store.external_shop_id || '-')}</div></td>
+            <td>${statusBadge(store.status)}</td>
+            <td><div class="small">${store.token_expires_at ? formatDateTime(store.token_expires_at) : '-'}</div></td>
+            <td><div class="small">${store.last_synced_at ? formatDateTime(store.last_synced_at) : '-'}</div></td>
+            <td class="text-end"><div class="d-flex gap-2 justify-content-end flex-wrap">
+                <button class="btn btn-gf-soft btn-sm" type="button" onclick="checkStore(${store.id})"><i class="bi bi-eye me-1"></i>Cek</button>
+                <button class="btn btn-gf-dark btn-sm" type="button" onclick="syncToday(${store.id})"><i class="bi bi-cloud-arrow-down me-1"></i>Sync Hari Ini</button>
+            </div></td>
+        </tr>
+    `).join('');
+}
+
+function renderOrders() {
+    const tbody = document.getElementById('orderTable');
+    const empty = document.getElementById('orderEmpty');
+    const wrap = document.getElementById('orderTableWrap');
+
+    if (!orders.length) {
+        tbody.innerHTML = '';
+        empty.classList.remove('d-none');
+        wrap.classList.add('d-none');
+        return;
+    }
+
+    empty.classList.add('d-none');
+    wrap.classList.remove('d-none');
+
+    tbody.innerHTML = orders.map(order => {
+        const items = order.items || [];
+        return `
+            <tr>
+                <td><div class="fw-bold">${escapeHtml(order.channel_order_id || '-')}</div><div class="text-muted small">${order.ordered_at ? formatDateTime(order.ordered_at) : '-'}</div></td>
+                <td><div class="fw-semibold">${escapeHtml(order.store?.name || '-')}</div><div class="text-muted small">${escapeHtml(order.store?.channel?.name || '-')}</div></td>
+                <td><span class="gf-badge gf-badge-yellow">${escapeHtml(order.order_status || '-')}</span></td>
+                <td>${items.length ? items.map(item => `<div class="small mb-1"><strong>${escapeHtml(item.model_sku || item.item_sku || '-')}</strong> · ${escapeHtml(item.variant_name || '-')} · ${Number(item.qty || 0)} pcs</div>`).join('') : '<span class="text-muted small">Tidak ada item</span>'}</td>
+                <td class="text-end fw-bold">${formatRupiah(order.total_amount || 0)}</td>
+            </tr>
+        `;
+    }).join('');
+}
+
+async function checkStore(storeId) {
+    try {
+        showAlert('Mengecek toko...', 'warning');
+        const data = await api(`/api/omnichannel/stores/${storeId}/shop-info`);
+        showJson('Info Toko', `Store ID: ${storeId}`, data);
+    } catch (error) {
+        showAlert(error.message, 'danger');
+    }
+}
+
+async function syncToday(storeId) {
+    const now = new Date();
+    const start = new Date(now.getFullYear(), now.getMonth(), now.getDate(), 0, 0, 0);
+    const end = new Date(now.getFullYear(), now.getMonth(), now.getDate(), 23, 59, 59);
+
+    try {
+        showAlert('Sync order hari ini sedang diproses...', 'warning');
+        const data = await api(`/api/omnichannel/stores/${storeId}/sync-orders`, {
+            method: 'POST',
+            body: JSON.stringify({
+                time_from: Math.floor(start.getTime() / 1000),
+                time_to: Math.floor(end.getTime() / 1000),
+                page_size: 50,
+            })
+        });
+
+        showAlert(data.message || 'Sync selesai.');
+        await loadAll();
+    } catch (error) {
+        showAlert(error.message, 'danger');
+    }
+}
+
+function showJson(title, subtitle, data) {
+    document.getElementById('jsonTitle').textContent = title;
+    document.getElementById('jsonSubtitle').textContent = subtitle;
+    document.getElementById('jsonOutput').textContent = JSON.stringify(data, null, 2);
+    new bootstrap.Modal(document.getElementById('jsonModal')).show();
+}
+
+function statusBadge(status) {
+    if (status === 'active') return `<span class="gf-badge gf-badge-green">Active</span>`;
+    if (status === 'inactive') return `<span class="gf-badge gf-badge-gray">Inactive</span>`;
+    return `<span class="gf-badge gf-badge-yellow">${escapeHtml(status || '-')}</span>`;
+}
+
+function formatRupiah(value) {
+    return new Intl.NumberFormat('id-ID', {style: 'currency', currency: 'IDR', maximumFractionDigits: 0}).format(value || 0);
+}
+
+function formatDateTime(value) {
+    return new Date(value).toLocaleString('id-ID', {day: '2-digit', month: 'short', year: 'numeric', hour: '2-digit', minute: '2-digit'});
+}
+
+function formatShortDate(value) {
+    return new Date(value).toLocaleDateString('id-ID', {day: '2-digit', month: 'short'});
+}
+
+function escapeHtml(value) {
+    const div = document.createElement('div');
+    div.innerText = value ?? '';
+    return div.innerHTML;
+}
+
+const urlParams = new URLSearchParams(window.location.search);
+
+if (urlParams.get('connected')) {
+    setTimeout(() => {
+        showAlert('Login Shopee berhasil. Toko otomatis tersimpan.');
+        window.history.replaceState({}, document.title, '/owner/omnichannel');
+    }, 500);
+}
+
+loadAll().catch(async (error) => {
+    console.error(error);
+    showAlert('Gagal load data awal. Mencoba buat channel default...', 'warning');
+    try { await bootstrapChannels(); } catch (bootstrapError) { showAlert(bootstrapError.message, 'danger'); }
+});
+</script>
+@endpush
