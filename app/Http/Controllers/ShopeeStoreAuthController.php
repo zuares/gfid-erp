@@ -19,7 +19,7 @@ class ShopeeStoreAuthController extends Controller
             return response('SHOPEE_PARTNER_ID dan SHOPEE_PARTNER_KEY belum diisi di .env', 422);
         }
 
-        $redirectUrl = rtrim(env('APP_URL', request()->getSchemeAndHttpHost()), '/') . '/owner/omnichannel/shopee/callback';
+        $redirectUrl = rtrim(env('APP_URL', request()->getSchemeAndHttpHost()), '/') . '/marketplace/shopee/callback';
 
         $path = '/api/v2/shop/auth_partner';
         $timestamp = time();
@@ -110,6 +110,6 @@ class ShopeeStoreAuthController extends Controller
             ]
         );
 
-        return redirect('/owner/omnichannel?connected=1');
+        return redirect('/marketplace/toko?connected=1');
     }
 }

@@ -1,124 +1,706 @@
+
+@push('head')
+<style>
+    .gf-master-page {
+        max-width: 1180px;
+        margin: 0 auto;
+        padding: 16px 12px 28px;
+        color: #0f172a;
+        font-family: Inter, ui-sans-serif, system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
+    }
+
+    .gf-master-head {
+        display: flex;
+        justify-content: space-between;
+        align-items: stretch;
+        gap: 14px;
+        margin-bottom: 14px;
+        padding: 18px;
+        border: 1px solid #e2e8f0;
+        border-radius: 24px;
+        background: linear-gradient(135deg, #ffffff 0%, #f8fafc 58%, #f1f5f9 100%);
+        box-shadow: 0 16px 42px rgba(15, 23, 42, .07);
+    }
+
+    .gf-master-head-left {
+        display: flex;
+        align-items: center;
+        gap: 13px;
+        min-width: 0;
+    }
+
+    .gf-master-icon {
+        width: 48px;
+        height: 48px;
+        flex: 0 0 48px;
+        border-radius: 17px;
+        display: inline-flex;
+        align-items: center;
+        justify-content: center;
+        color: #ffffff;
+        background: linear-gradient(135deg, #0f172a, #334155);
+        box-shadow: 0 14px 28px rgba(15, 23, 42, .18);
+        font-size: 1.22rem;
+    }
+
+    .gf-master-eyebrow {
+        display: inline-flex;
+        align-items: center;
+        gap: 7px;
+        padding: 5px 10px;
+        border-radius: 999px;
+        background: #f1f5f9;
+        border: 1px solid #e2e8f0;
+        color: #334155;
+        font-size: .72rem;
+        font-weight: 900;
+        margin-bottom: 7px;
+    }
+
+    .gf-master-title {
+        color: #0f172a;
+        font-size: 1.34rem;
+        font-weight: 950;
+        letter-spacing: -.05em;
+        line-height: 1.1;
+        margin: 0;
+    }
+
+    .gf-master-subtitle {
+        color: #64748b;
+        font-size: .86rem;
+        font-weight: 600;
+        margin-top: 4px;
+    }
+
+    .gf-master-actions {
+        display: flex;
+        flex-wrap: wrap;
+        gap: 8px;
+        align-items: center;
+        justify-content: flex-end;
+    }
+
+    .gf-master-card {
+        border: 1px solid #e2e8f0;
+        border-radius: 24px;
+        background: #ffffff;
+        box-shadow: 0 16px 42px rgba(15, 23, 42, .07);
+        overflow: hidden;
+    }
+
+    .gf-master-card-body {
+        padding: 14px;
+    }
+
+    .gf-kpi-grid {
+        display: grid;
+        grid-template-columns: repeat(4, minmax(0, 1fr));
+        gap: 10px;
+        margin-bottom: 12px;
+    }
+
+    .gf-kpi-card {
+        border: 1px solid #e2e8f0;
+        border-radius: 20px;
+        padding: 14px;
+        background: linear-gradient(180deg, #ffffff 0%, #f8fafc 100%);
+        box-shadow: 0 14px 34px rgba(15, 23, 42, .06);
+    }
+
+    .gf-kpi-label {
+        font-size: .7rem;
+        font-weight: 900;
+        color: #64748b;
+        text-transform: uppercase;
+        letter-spacing: .045em;
+    }
+
+    .gf-kpi-value {
+        font-size: 1.28rem;
+        font-weight: 900;
+        color: #0f172a;
+        letter-spacing: -.04em;
+        margin-top: 5px;
+    }
+
+    .gf-kpi-note {
+        font-size: .74rem;
+        color: #94a3b8;
+        margin-top: 2px;
+    }
+
+    .gf-filter {
+        display: grid;
+        grid-template-columns: minmax(220px, 1fr) minmax(170px, .55fr) auto;
+        gap: 10px;
+        align-items: end;
+        margin-bottom: 12px;
+    }
+
+    .gf-label,
+    .gf-form .form-label {
+        font-size: .72rem;
+        font-weight: 900;
+        color: #334155;
+        margin-bottom: 5px;
+        text-transform: uppercase;
+        letter-spacing: .045em;
+    }
+
+    .gf-filter .form-control,
+    .gf-filter .form-select,
+    .gf-form .form-control,
+    .gf-form .form-select {
+        border-radius: 14px;
+        border: 1px solid #e2e8f0;
+        min-height: 38px;
+        color: #0f172a;
+        font-size: .84rem;
+        font-weight: 650;
+        background: #ffffff;
+        box-shadow: none;
+    }
+
+    .gf-filter .form-control:focus,
+    .gf-filter .form-select:focus,
+    .gf-form .form-control:focus,
+    .gf-form .form-select:focus {
+        border-color: #94a3b8;
+        box-shadow: 0 0 0 .22rem rgba(15, 23, 42, .08);
+    }
+
+    .gf-master-actions .btn,
+    .gf-filter .btn,
+    .gf-form .btn {
+        border-radius: 999px;
+        font-weight: 850;
+        letter-spacing: -.01em;
+        min-height: 34px;
+        display: inline-flex;
+        align-items: center;
+        justify-content: center;
+        gap: 6px;
+        text-decoration: none;
+    }
+
+    .gf-btn-primary,
+    .gf-master-actions .btn-primary {
+        color: #ffffff !important;
+        background: linear-gradient(135deg, #0f172a, #334155) !important;
+        border-color: transparent !important;
+        box-shadow: 0 12px 24px rgba(15, 23, 42, .12);
+    }
+
+    .gf-table-scroll {
+        max-height: 68vh;
+        overflow: auto;
+        border: 1px solid #e2e8f0;
+        border-radius: 18px;
+    }
+
+    .gf-clean-table {
+        font-size: .82rem;
+        color: #0f172a;
+        margin: 0;
+    }
+
+    .gf-clean-table thead th {
+        position: sticky;
+        top: 0;
+        z-index: 8;
+        background: #f8fafc;
+        color: #64748b;
+        font-size: .7rem;
+        text-transform: uppercase;
+        letter-spacing: .045em;
+        font-weight: 900;
+        border-bottom: 1px solid #e2e8f0;
+        padding: 12px 10px;
+        white-space: nowrap;
+    }
+
+    .gf-clean-table tbody td {
+        border-color: #eef2f7;
+        padding: 12px 10px;
+        vertical-align: middle;
+    }
+
+    .gf-clean-table tbody tr:hover {
+        background: #f8fbff;
+    }
+
+    .gf-code {
+        display: inline-flex;
+        align-items: center;
+        border-radius: 999px;
+        padding: 5px 9px;
+        background: #f1f5f9;
+        color: #334155;
+        border: 1px solid #e2e8f0;
+        font-size: .73rem;
+        font-weight: 900;
+        font-family: ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, monospace;
+    }
+
+    .gf-name {
+        font-weight: 850;
+        color: #0f172a;
+        letter-spacing: -.02em;
+    }
+
+    .gf-sub {
+        color: #64748b;
+        font-size: .74rem;
+        margin-top: 2px;
+    }
+
+    .gf-badge {
+        display: inline-flex;
+        align-items: center;
+        justify-content: center;
+        border-radius: 999px;
+        padding: 5px 10px;
+        font-size: .72rem;
+        font-weight: 850;
+        border: 1px solid transparent;
+    }
+
+    .gf-badge-green {
+        background: #dcfce7;
+        color: #166534;
+        border-color: #bbf7d0;
+    }
+
+    .gf-badge-red {
+        background: #fee2e2;
+        color: #991b1b;
+        border-color: #fecaca;
+    }
+
+    .gf-badge-soft {
+        background: #f1f5f9;
+        color: #334155;
+        border-color: #e2e8f0;
+    }
+
+    .gf-row-actions {
+        display: inline-flex;
+        gap: 6px;
+        justify-content: flex-end;
+        flex-wrap: wrap;
+    }
+
+    .gf-empty {
+        text-align: center;
+        color: #64748b;
+        padding: 40px 16px;
+        border: 1px dashed #cbd5e1;
+        border-radius: 18px;
+        background: #f8fafc;
+    }
+
+    .gf-foot {
+        display: flex;
+        justify-content: space-between;
+        align-items: center;
+        gap: 12px;
+        padding-top: 12px;
+        color: #64748b;
+        font-size: .78rem;
+        font-weight: 700;
+    }
+
+    .pagination {
+        margin: 0;
+        gap: 4px;
+    }
+
+    .pagination .page-link {
+        border-radius: 11px;
+        border-color: #e2e8f0;
+        color: #475569;
+        font-size: .78rem;
+        font-weight: 700;
+    }
+
+    .pagination .active .page-link,
+    .pagination .page-item.active .page-link {
+        color: #ffffff;
+        background: #0f172a;
+        border-color: #0f172a;
+    }
+
+    .gf-form-grid {
+        display: grid;
+        grid-template-columns: repeat(2, minmax(0, 1fr));
+        gap: 12px;
+    }
+
+    .gf-live-wrap {
+        position: relative;
+    }
+
+    .gf-live-indicator {
+        position: absolute;
+        right: 12px;
+        top: 50%;
+        transform: translateY(-50%);
+        display: none;
+        color: #334155;
+        background: rgba(255,255,255,.88);
+        padding-left: 8px;
+        font-size: .72rem;
+        font-weight: 850;
+    }
+
+    .gf-live-indicator.is-show {
+        display: inline-flex;
+    }
+
+    @media (max-width: 992px) {
+        .gf-master-head {
+            flex-direction: column;
+        }
+
+        .gf-master-actions {
+            justify-content: flex-start;
+        }
+
+        .gf-kpi-grid {
+            grid-template-columns: repeat(2, minmax(0, 1fr));
+        }
+
+        .gf-filter {
+            grid-template-columns: 1fr 1fr;
+        }
+    }
+
+    @media (max-width: 768px) {
+        .gf-master-page {
+            padding: 12px 10px 24px;
+        }
+
+        .gf-master-head {
+            padding: 15px;
+            border-radius: 20px;
+        }
+
+        .gf-master-head-left {
+            align-items: flex-start;
+        }
+
+        .gf-master-icon {
+            width: 42px;
+            height: 42px;
+            flex-basis: 42px;
+            border-radius: 15px;
+            font-size: 1.08rem;
+        }
+
+        .gf-kpi-grid,
+        .gf-filter,
+        .gf-form-grid {
+            grid-template-columns: 1fr;
+        }
+
+        .gf-master-actions,
+        .gf-master-actions .btn,
+        .gf-filter .btn {
+            width: 100%;
+        }
+
+        .gf-foot {
+            flex-direction: column;
+            align-items: flex-start;
+        }
+    }
+</style>
+@endpush
+
 @extends('layouts.app')
 
 @section('title', 'Karyawan')
 
+@php
+    $fmt = fn($n) => number_format((float) $n, 0, ',', '.');
+    $totalEmployees = method_exists($employees, 'total') ? $employees->total() : $employees->count();
+    $collection = method_exists($employees, 'getCollection') ? $employees->getCollection() : collect($employees);
+    $activeCount = $collection->where('active', 1)->count();
+    $fixedCount = $collection->where('payment_type', 'fixed')->count();
+    $variableCount = $collection->where('payment_type', 'variable')->count();
+    $search = request('q');
+    $activeRole = request('role');
+    $hasFilter = filled($search) || filled($activeRole);
+@endphp
+
 @section('content')
-    <div class="page-wrap">
-        <div class="d-flex justify-content-between align-items-center mb-3">
-            <div>
-                <h1 class="h4 mb-1">Karyawan</h1>
-                <p class="text-muted mb-0">
-                    Master data karyawan untuk produksi & payroll.
-                </p>
+<div class="gf-master-page">
+    <div class="gf-master-head">
+        <div class="gf-master-head-left">
+            <div class="gf-master-icon">
+                <i class="bi bi-person-badge"></i>
             </div>
-            <a href="{{ route('master.employees.create') }}" class="btn btn-primary btn-sm">
-                + Karyawan Baru
+
+            <div>
+                <div class="gf-master-eyebrow">
+                    <i class="bi bi-stars"></i>
+                    Master Data
+                </div>
+
+                <h1 class="gf-master-title">Karyawan</h1>
+
+                <div class="gf-master-subtitle">
+                    Master data karyawan untuk produksi, payroll, operator, dan akses internal.
+                </div>
+            </div>
+        </div>
+
+        <div class="gf-master-actions">
+            <a href="{{ route('master.employees.create') }}" class="btn btn-primary gf-btn-primary btn-sm">
+                <i class="bi bi-plus-lg"></i>
+                Tambah Karyawan
             </a>
         </div>
+    </div>
 
-        @if (session('status'))
-            <div class="alert alert-success py-2 px-3 small">
-                {{ session('status') }}
-            </div>
-        @endif
+    @if (session('status'))
+        <div class="alert alert-success py-2 px-3 mb-3" style="font-size:.82rem;">{{ session('status') }}</div>
+    @endif
 
-        <div class="card shadow-sm border-0 mb-3">
-            <div class="card-body py-2">
-                <form method="GET" action="{{ route('master.employees.index') }}" class="row g-2 align-items-center">
-                    <div class="col-auto">
-                        <label class="col-form-label col-form-label-sm">Cari</label>
-                    </div>
-                    <div class="col-auto">
-                        <input type="text" name="q" class="form-control form-control-sm"
-                            placeholder="Nama / kode / HP" value="{{ request('q') }}">
-                    </div>
-                    <div class="col-auto">
-                        <select name="role" class="form-select form-select-sm">
-                            <option value="">Semua Role</option>
-                            @foreach ($roles as $r)
-                                <option value="{{ $r }}" @selected(request('role') === $r)>{{ ucfirst($r) }}</option>
-                            @endforeach
-                        </select>
-                    </div>
-                    <div class="col-auto">
-                        <button class="btn btn-sm btn-outline-secondary" type="submit">Filter</button>
-                    </div>
-                    @if (request('q') || request('role'))
-                        <div class="col-auto">
-                            <a href="{{ route('master.employees.index') }}"
-                                class="btn btn-sm btn-link text-decoration-none">
-                                Reset
-                            </a>
-                        </div>
-                    @endif
-                </form>
-            </div>
+    @if (session('success'))
+        <div class="alert alert-success py-2 px-3 mb-3" style="font-size:.82rem;">{{ session('success') }}</div>
+    @endif
+
+    @if ($errors->any())
+        <div class="alert alert-danger py-2 px-3 mb-3" style="font-size:.82rem;">{{ $errors->first() }}</div>
+    @endif
+
+    <div class="gf-kpi-grid">
+        <div class="gf-kpi-card">
+            <div class="gf-kpi-label">Total Karyawan</div>
+            <div class="gf-kpi-value">{{ $fmt($totalEmployees) }}</div>
+            <div class="gf-kpi-note">berdasarkan filter aktif</div>
         </div>
 
-        <div class="card shadow-sm border-0">
-            <div class="card-body p-0">
-                <div class="table-responsive">
-                    <table class="table table-sm mb-0 align-middle">
-                        <thead class="table-light">
+        <div class="gf-kpi-card">
+            <div class="gf-kpi-label">Aktif</div>
+            <div class="gf-kpi-value">{{ $fmt($activeCount) }}</div>
+            <div class="gf-kpi-note">di halaman saat ini</div>
+        </div>
+
+        <div class="gf-kpi-card">
+            <div class="gf-kpi-label">Fixed</div>
+            <div class="gf-kpi-value">{{ $fmt($fixedCount) }}</div>
+            <div class="gf-kpi-note">gaji tetap</div>
+        </div>
+
+        <div class="gf-kpi-card">
+            <div class="gf-kpi-label">Variable</div>
+            <div class="gf-kpi-value">{{ $fmt($variableCount) }}</div>
+            <div class="gf-kpi-note">borongan / fleksibel</div>
+        </div>
+    </div>
+
+    <div class="gf-master-card">
+        <div class="gf-master-card-body">
+            <form method="GET" action="{{ route('master.employees.index') }}" class="gf-filter">
+                <div>
+                    <label class="gf-label">Cari Karyawan</label>
+                    <input type="search" name="q" value="{{ $search }}" class="form-control"
+                        placeholder="Cari nama, kode, role, atau nomor HP..." autofocus>
+                </div>
+
+                <div>
+                    <label class="gf-label">Role</label>
+                    <select name="role" class="form-select">
+                        <option value="">Semua Role</option>
+                        @foreach ($roles as $r)
+                            <option value="{{ $r }}" @selected($activeRole === $r)>{{ ucfirst($r) }}</option>
+                        @endforeach
+                    </select>
+                </div>
+
+                <div class="d-flex gap-2">
+                    <button class="btn btn-outline-secondary btn-sm" type="submit">
+                        <i class="bi bi-funnel"></i>
+                        Filter
+                    </button>
+
+                    @if ($hasFilter)
+                        <a href="{{ route('master.employees.index') }}" class="btn btn-outline-light border btn-sm">
+                            Reset
+                        </a>
+                    @endif
+                </div>
+            </form>
+
+            @if ($employees->count())
+                <div class="gf-table-scroll">
+                    <table class="table table-hover align-middle gf-clean-table">
+                        <thead>
                             <tr>
-                                <th style="width: 60px;">#</th>
-                                <th>Kode</th>
-                                <th>Nama</th>
-                                <th>Role</th>
-                                <th>Jenis Gaji</th>
-                                <th>HP</th>
-                                <th>Status</th>
-                                <th style="width: 160px;">Aksi</th>
+                                <th style="width:70px;" class="text-center">No.</th>
+                                <th style="width:130px;">Kode</th>
+                                <th>Karyawan</th>
+                                <th style="width:130px;">Role</th>
+                                <th style="width:130px;">Payment</th>
+                                <th style="width:145px;">Phone</th>
+                                <th style="width:110px;" class="text-center">Status</th>
+                                <th style="width:145px;" class="text-end">Aksi</th>
                             </tr>
                         </thead>
+
                         <tbody>
-                            @forelse ($employees as $employee)
+                            @foreach ($employees as $employee)
                                 <tr>
-                                    <td>{{ $loop->iteration + ($employees->currentPage() - 1) * $employees->perPage() }}
+                                    <td class="text-center text-muted">
+                                        {{ method_exists($employees, 'firstItem') ? $employees->firstItem() + $loop->index : $loop->iteration }}
                                     </td>
-                                    <td>{{ $employee->code }}</td>
-                                    <td>{{ $employee->name }}</td>
-                                    <td>{{ ucfirst($employee->role) }}</td>
-                                    <td>{{ $employee->payment_type === 'fixed' ? 'Fixed' : 'Variable' }}</td>
-                                    <td>{{ $employee->phone ?? '-' }}</td>
+
                                     <td>
+                                        <span class="gf-code">{{ $employee->code }}</span>
+                                    </td>
+
+                                    <td>
+                                        <div class="gf-name">{{ $employee->name }}</div>
+                                        <div class="gf-sub">
+                                            {{ $employee->address ?: 'Alamat belum diisi' }}
+                                        </div>
+                                    </td>
+
+                                    <td>
+                                        <span class="gf-badge gf-badge-soft">{{ ucfirst($employee->role) }}</span>
+                                    </td>
+
+                                    <td>
+                                        <span class="gf-badge gf-badge-soft">
+                                            {{ $employee->payment_type === 'fixed' ? 'Fixed' : 'Variable' }}
+                                        </span>
+                                    </td>
+
+                                    <td>
+                                        <div class="gf-name">{{ $employee->phone ?: '-' }}</div>
+                                        <div class="gf-sub">Nomor kontak</div>
+                                    </td>
+
+                                    <td class="text-center">
                                         @if ($employee->active)
-                                            <span class="badge bg-success-subtle text-success">Aktif</span>
+                                            <span class="gf-badge gf-badge-green">Aktif</span>
                                         @else
-                                            <span class="badge bg-secondary-subtle text-secondary">Nonaktif</span>
+                                            <span class="gf-badge gf-badge-red">Nonaktif</span>
                                         @endif
                                     </td>
-                                    <td>
-                                        <div class="d-flex gap-1">
+
+                                    <td class="text-end">
+                                        <div class="gf-row-actions">
                                             <a href="{{ route('master.employees.edit', $employee) }}"
-                                                class="btn btn-sm btn-outline-primary">
+                                                class="btn btn-outline-primary btn-sm rounded-pill">
                                                 Edit
                                             </a>
+
                                             <form action="{{ route('master.employees.destroy', $employee) }}"
                                                 method="POST" onsubmit="return confirm('Hapus karyawan ini?');">
                                                 @csrf
                                                 @method('DELETE')
-                                                <button class="btn btn-sm btn-outline-danger" type="submit">
+
+                                                <button type="submit" class="btn btn-outline-danger btn-sm rounded-pill">
                                                     Hapus
                                                 </button>
                                             </form>
                                         </div>
                                     </td>
                                 </tr>
-                            @empty
-                                <tr>
-                                    <td colspan="8" class="text-center text-muted py-3">
-                                        Belum ada data karyawan.
-                                    </td>
-                                </tr>
-                            @endforelse
+                            @endforeach
                         </tbody>
                     </table>
                 </div>
-                <div class="p-2">
+            @else
+                <div class="gf-empty">
+                    <div class="fw-bold text-dark mb-1">Belum ada data karyawan.</div>
+                    <div>Tambah karyawan baru untuk dipakai di produksi dan payroll.</div>
+
+                    <a href="{{ route('master.employees.create') }}" class="btn btn-primary gf-btn-primary btn-sm mt-3">
+                        Tambah Karyawan
+                    </a>
+                </div>
+            @endif
+
+            <div class="gf-foot">
+                <div>
+                    @if (method_exists($employees, 'firstItem') && $employees->total())
+                        Menampilkan {{ $employees->firstItem() }}–{{ $employees->lastItem() }} dari {{ $fmt($employees->total()) }} karyawan
+                    @else
+                        Total {{ $fmt($employees->count()) }} karyawan
+                    @endif
+                </div>
+
+                <div class="ms-auto">
                     {{ $employees->links() }}
                 </div>
             </div>
         </div>
     </div>
+</div>
 @endsection
+
+@push('scripts')
+<script>
+document.addEventListener('DOMContentLoaded', function () {
+    const form = document.querySelector('form.gf-filter');
+    if (!form || form.dataset.gfRealtime === '1') return;
+
+    form.dataset.gfRealtime = '1';
+
+    const input = form.querySelector('input[name="q"]');
+    const selects = Array.from(form.querySelectorAll('select'));
+    const submitBtn = form.querySelector('button[type="submit"]');
+    let timer = null;
+    let submitting = false;
+
+    function submitLive(delay = 450) {
+        clearTimeout(timer);
+
+        timer = setTimeout(function () {
+            if (submitting) return;
+            submitting = true;
+
+            if (submitBtn) {
+                submitBtn.disabled = true;
+                submitBtn.innerHTML = '<span class="spinner-border spinner-border-sm me-1"></span>Filter';
+            }
+
+            Array.from(form.elements).forEach(function (el) {
+                if (!el.name || el.type === 'hidden') return;
+                if ((el.tagName === 'INPUT' || el.tagName === 'SELECT') && String(el.value || '').trim() === '') {
+                    el.disabled = true;
+                }
+            });
+
+            form.requestSubmit ? form.requestSubmit() : form.submit();
+        }, delay);
+    }
+
+    if (input) {
+        input.setAttribute('autocomplete', 'off');
+
+        input.addEventListener('input', function () {
+            submitLive(450);
+        });
+
+        input.addEventListener('keydown', function (e) {
+            if (e.key === 'Enter') {
+                e.preventDefault();
+                submitLive(0);
+            }
+        });
+    }
+
+    selects.forEach(function (select) {
+        select.addEventListener('change', function () {
+            submitLive(80);
+        });
+    });
+});
+</script>
+@endpush

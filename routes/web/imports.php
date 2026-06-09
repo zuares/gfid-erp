@@ -3,7 +3,6 @@
 use App\Http\Controllers\Api\MarketplaceShipmentController;
 use App\Http\Controllers\Imports\MarketplaceImportController;
 use App\Http\Controllers\Imports\MarketplaceIncomeImportController;
-use App\Http\Controllers\Marketplace\MpAdsImportController;
 use Illuminate\Support\Facades\Route;
 
 Route::middleware(['web', 'auth'])
@@ -77,37 +76,7 @@ Route::middleware(['web', 'auth'])
                 ->name('apply');
         });
 
-        /*
-    |--------------------------------------------------------------------------
-    | Marketplace Ads (Shopee Ads Import)
-    |--------------------------------------------------------------------------
-    | URL: /imports/marketplace-ads/...
-    | Name: imports.marketplace_ads.*
-    |
-    | Note: Controller ada di namespace Marketplace karena ini domain Ads.
-     */
-        /*
-    |--------------------------------------------------------------------------
-    | Marketplace Ads (Shopee Ads Import)
-    |--------------------------------------------------------------------------
-    | URL: /imports/marketplace-ads/...
-    | Name: imports.marketplace_ads.*
-     */
-        Route::prefix('marketplace-ads')->name('marketplace_ads.')->group(function () {
-            // pages
-            Route::get('/', [MpAdsImportController::class, 'index'])->name('index');
-            Route::get('create', [MpAdsImportController::class, 'create'])->name('create');
-
-            // guard GET preview/commit
-            Route::get('preview', fn() => redirect()->route('imports.marketplace_ads.create'))->name('preview.get');
-            Route::get('commit', fn() => redirect()->route('imports.marketplace_ads.create'))->name('commit.get');
-
-            // actions
-            Route::post('preview', [MpAdsImportController::class, 'preview'])->name('preview');
-            Route::post('commit', [MpAdsImportController::class, 'commit'])->name('commit');
-
-            // report API (optional)
-            Route::get('data', [MpAdsImportController::class, 'data'])->name('data');
-        });
+        // Marketplace Ads CSV import dihapus — data sekarang dari Shopee Ads API.
+        // Lihat: /api/marketplace/stores/{store}/sync-ad-campaigns
 
     });

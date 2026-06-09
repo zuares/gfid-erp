@@ -46,22 +46,38 @@ class ShopeeChannel implements MarketplaceChannel
 
     protected function get(Store $store, string $path, array $params = []): array
     {
+        $result = $this->doGet($store, $path, $params);
+
+        // Token kedaluwarsa → auto-refresh sekali lalu retry
+        if (isset($result['error']) && str_contains((string) ($result['error'] ?? ''), 'access_token')) {
+            $refreshed = $this->refreshToken($store);
+            if (empty($refreshed['error'])) {
+                $store->refresh(); // reload credentials dari DB
+                $result = $this->doGet($store, $path, $params);
+            }
+        }
+
+        return $result;
+    }
+
+    protected function doGet(Store $store, string $path, array $params = []): array
+    {
         $timestamp = time();
 
         $query = array_merge([
-            'partner_id' => (int) $this->partnerId($store),
-            'timestamp' => $timestamp,
+            'partner_id'   => (int) $this->partnerId($store),
+            'timestamp'    => $timestamp,
             'access_token' => $this->accessToken($store),
-            'shop_id' => (int) $this->shopId($store),
-            'sign' => $this->sign($store, $path, $timestamp),
+            'shop_id'      => (int) $this->shopId($store),
+            'sign'         => $this->sign($store, $path, $timestamp),
         ], $params);
 
         $response = Http::timeout(30)->get($this->baseUrl($store) . $path, $query);
 
         return $response->json() ?? [
-            'error' => 'invalid_response',
+            'error'   => 'invalid_response',
             'message' => $response->body(),
-            'status' => $response->status(),
+            'status'  => $response->status(),
         ];
     }
 
@@ -97,6 +113,65 @@ class ShopeeChannel implements MarketplaceChannel
                 'total_amount',
                 'checkout_shipping_carrier',
             ]),
+        ]);
+    }
+
+    public function getEscrowDetail(Store $store, string $orderSn): array
+    {
+        return $this->get($store, '/api/v2/payment/get_escrow_detail', [
+            'order_sn' => $orderSn,
+        ]);
+    }
+
+    // ─── Ads API ──────────────────────────────────────────────────────────────
+
+    /**
+     * Cek apakah iklan aktif di toko ini.
+     * Endpoint: GET /api/v2/ads/get_shop_toggle_info
+     */
+    public function getShopToggleInfo(Store $store): array
+    {
+        return $this->get($store, '/api/v2/ads/get_shop_toggle_info', []);
+    }
+
+    /**
+     * Ambil daftar ID campaign.
+     * Endpoint: GET /api/v2/ads/get_product_level_campaign_id_list
+     */
+    public function getCampaignIdList(Store $store, int $pageNo = 1, int $pageSize = 100): array
+    {
+        return $this->get($store, '/api/v2/ads/get_product_level_campaign_id_list', [
+            'page_no'   => $pageNo,
+            'page_size' => $pageSize,
+        ]);
+    }
+
+    /**
+     * Ambil info pengaturan campaign (nama, tipe, status, budget).
+     * Endpoint: GET /api/v2/ads/get_product_level_campaign_setting_info
+     */
+    public function getCampaignSettingInfo(Store $store, array $campaignIds): array
+    {
+        return $this->get($store, '/api/v2/ads/get_product_level_campaign_setting_info', [
+            'campaign_id_list' => implode(',', $campaignIds),
+        ]);
+    }
+
+    /**
+     * Ambil performa harian per campaign untuk rentang tanggal.
+     * Endpoint: GET /api/v2/ads/get_product_campaign_daily_performance
+     * Date format: DD-MM-YYYY
+     */
+    public function getCampaignDailyPerformance(
+        Store  $store,
+        array  $campaignIds,
+        string $startDate,
+        string $endDate
+    ): array {
+        return $this->get($store, '/api/v2/ads/get_product_campaign_daily_performance', [
+            'campaign_id_list' => implode(',', $campaignIds),
+            'start_date'       => $startDate,
+            'end_date'         => $endDate,
         ]);
     }
 

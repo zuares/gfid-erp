@@ -11,6 +11,7 @@ class Store extends Model
     protected $fillable = [
         'code',
         'channel_id',
+        'default_warehouse_id',
         'name',
         'external_shop_id',
         'region',
@@ -33,6 +34,11 @@ class Store extends Model
     public function channel(): BelongsTo
     {
         return $this->belongsTo(Channel::class);
+    }
+
+    public function defaultWarehouse(): BelongsTo
+    {
+        return $this->belongsTo(Warehouse::class, 'default_warehouse_id');
     }
 
     public function orders(): HasMany

@@ -74,6 +74,17 @@
     $hasGrnCreate = $router->has('purchasing.purchase_receipts.create');
 
     // =========================================================
+    // Marketplace
+    $hasMarketplaceToko        = $router->has('marketplace.toko');
+    $hasMarketplaceOrders      = $router->has('marketplace.orders');
+    $hasMarketplaceFulfillment = $router->has('marketplace.fulfillment');
+    $hasMarketplaceSkuMapping  = $router->has('marketplace.sku-mapping');
+    $hasMarketplaceSync        = $router->has('marketplace.sync');
+    $hasMarketplaceSettlement  = $router->has('marketplace.settlement');
+    $hasMarketplaceProfit      = $router->has('marketplace.profit');
+    $hasMarketplaceAds         = $router->has('marketplace.ads');
+    $hasMarketplaceIssues      = $router->has('marketplace.issues');
+
     // Marketplace (UPDATED sesuai routes terbaru yang kamu kasih)
     // =========================================================
     // Marketplace Orders
@@ -880,184 +891,63 @@
                 </li>
             @endif
 
-            {{-- SALES & MARKETPLACE --}}
-            <x-sidebar.label text="Sales" />
-
-            {{-- Marketplace Orders --}}
-            @if ($canShow($hasMarketplaceIndex, $hasMarketplaceCreate))
-                <li class="mb-1">
-                    <button class="sidebar-link sidebar-toggle {{ $openMarketplaceOrders ? 'is-open' : '' }}" type="button"
-                        data-bs-toggle="collapse" data-bs-target="#navMarketplaceOrders"
-                        aria-expanded="{{ $openMarketplaceOrders ? 'true' : 'false' }}" aria-controls="navMarketplaceOrders">
-                        <span class="icon">🛒</span>
-                        <span>Marketplace Orders</span>
-                        <span class="chevron">▸</span>
-                    </button>
-
-                    <div class="collapse {{ $openMarketplaceOrders ? 'show' : '' }}" id="navMarketplaceOrders">
-                        @if ($hasMarketplaceIndex)
-                            <x-sidebar.sub-link href="{{ route('marketplace.orders.index') }}" icon="≡"
-                                :active="request()->routeIs('marketplace.orders.index')">
-                                Daftar Order
-                            </x-sidebar.sub-link>
-                        @endif
-                        @if ($hasMarketplaceCreate)
-                            <x-sidebar.sub-link href="{{ route('marketplace.orders.create') }}" icon="＋"
-                                :active="request()->routeIs('marketplace.orders.create')">
-                                Order Manual
-                            </x-sidebar.sub-link>
-                        @endif
-                        @if ($hasMarketplaceSalesReport)
-                            <x-sidebar.sub-link href="{{ route('marketplace.reports.sales') }}" icon="📈"
-                                :active="request()->routeIs('marketplace.reports.sales')">
-                                Sales Summary
-                            </x-sidebar.sub-link>
-                        @endif
-                    </div>
-                </li>
-            @endif
-
-            {{-- Marketplace Tools (Reports + Reconcile) --}}
-            @if ($canShow(
-                $hasMarketplaceSalesReport,
-                $hasMarketplaceReconcileQueue,
-                $hasMarketplaceReconcileItemsIndex
-            ))
-                <li class="mb-1">
-                    <button class="sidebar-link sidebar-toggle {{ $openMarketplaceTools ? 'is-open' : '' }}" type="button"
-                        data-bs-toggle="collapse" data-bs-target="#navMarketplaceTools"
-                        aria-expanded="{{ $openMarketplaceTools ? 'true' : 'false' }}" aria-controls="navMarketplaceTools">
-                        <span class="icon">🧰</span>
-                        <span>Marketplace Tools</span>
-                        <span class="chevron">▸</span>
-                    </button>
-
-                    <div class="collapse {{ $openMarketplaceTools ? 'show' : '' }}" id="navMarketplaceTools">
-
-                        @if ($hasMarketplaceSalesReport)
-                            @php $subhead('Reports'); @endphp
-                            <x-sidebar.sub-link href="{{ route('marketplace.reports.sales') }}" icon="📈"
-                                :active="request()->routeIs('marketplace.reports.sales')">
-                                Sales Summary
-                            </x-sidebar.sub-link>
-                        @endif
-
-                        @if ($canShow($hasMarketplaceReconcileQueue, $hasMarketplaceReconcileItemsIndex))
-                            @php $subhead('Reconcile'); @endphp
-
-                            @if ($hasMarketplaceReconcileQueue)
-                                <x-sidebar.sub-link href="{{ route('marketplace.reconcile.queue') }}" icon="🧩"
-                                    :active="request()->routeIs('marketplace.reconcile.*') || request()->routeIs('marketplace.reconciliations.*')">
-                                    Reconcile Queue
-                                </x-sidebar.sub-link>
-                            @endif
-
-                            @if ($hasMarketplaceReconcileItemsIndex)
-                                <x-sidebar.sub-link href="{{ route('marketplace.reconcile.items') }}" icon="🧾"
-                                    :active="request()->routeIs('marketplace.reconcile.items*')">
-                                    Reconcile Items
-                                </x-sidebar.sub-link>
-                            @endif
-
-                            @if ($hasMarketplaceReconcileItemsPackets)
-                                <x-sidebar.sub-link href="{{ route('marketplace.reconcile.items.packets') }}" icon="📦"
-                                    :active="request()->routeIs('marketplace.reconcile.items.packets')">
-                                    Packets (Debug)
-                                </x-sidebar.sub-link>
-                            @endif
-                        @endif
-
-                        @if ($hasMarketplaceSalesExport)
-                            @php $subhead('Export'); @endphp
-                            <x-sidebar.sub-link href="{{ route('marketplace.reports.sales') }}" icon="⤓" :active="false">
-                                Export CSV (di halaman Sales)
-                            </x-sidebar.sub-link>
-                        @endif
-                    </div>
-                </li>
-            @endif
-
-            {{-- IMPORTS --}}
-            @if ($canShow(
-                $hasImportsMarketplaceIndex,
-                $hasImportsMarketplaceCreate,
-                $hasImportsMarketplaceDraft,
-                $hasImportsMarketplaceExport,
-                $hasImportsMarketplaceIncomeIndex,
-                $hasImportsMarketplaceIncomeCreate,
-                $hasImportsMarketplaceIncomeDraft
-            ))
-                <x-sidebar.label text="Data Ingest" />
-                <li class="mb-1">
-                    <button class="sidebar-link sidebar-toggle {{ $openImports ? 'is-open' : '' }}" type="button"
-                        data-bs-toggle="collapse" data-bs-target="#navImports"
-                        aria-expanded="{{ $openImports ? 'true' : 'false' }}" aria-controls="navImports">
-                        <span class="icon">⬆️</span>
-                        <span>Imports</span>
-                        <span class="chevron">▸</span>
-                    </button>
-
-                    <div class="collapse {{ $openImports ? 'show' : '' }}" id="navImports">
-                        @php $subhead('Marketplace Shipments'); @endphp
-
-                        @if ($hasImportsMarketplaceIndex)
-                            <x-sidebar.sub-link href="{{ route('imports.marketplace.index') }}" icon="≡"
-                                :active="request()->routeIs('imports.marketplace.index') || request()->routeIs('imports.marketplace.show')">
-                                Daftar Import
-                            </x-sidebar.sub-link>
-                        @endif
-
-                        @if ($hasImportsMarketplaceCreate)
-                            <x-sidebar.sub-link href="{{ route('imports.marketplace.create') }}" icon="＋"
-                                :active="request()->routeIs('imports.marketplace.create')">
-                                Import Baru
-                            </x-sidebar.sub-link>
-                        @endif
-
-                        @if ($hasImportsMarketplaceDraft)
-                            <x-sidebar.sub-link href="{{ route('imports.marketplace.draft') }}" icon="🕘"
-                                :active="request()->routeIs('imports.marketplace.draft')">
-                                Draft Terakhir
-                            </x-sidebar.sub-link>
-                        @endif
-
-                        @if ($hasImportsMarketplaceExport)
-                            <x-sidebar.sub-link href="{{ route('imports.marketplace.export') }}" icon="⤓"
-                                :active="request()->routeIs('imports.marketplace.export')">
-                                Export
-                            </x-sidebar.sub-link>
-                        @endif
-
-                        @php $subhead('Marketplace Income'); @endphp
-
-                        @if ($hasImportsMarketplaceIncomeIndex)
-                            <x-sidebar.sub-link href="{{ route('imports.marketplace_income.index') }}" icon="≡"
-                                :active="request()->routeIs('imports.marketplace_income.index')">
-                                Daftar Batch Income
-                            </x-sidebar.sub-link>
-                        @endif
-
-                        @if ($hasImportsMarketplaceIncomeCreate)
-                            <x-sidebar.sub-link href="{{ route('imports.marketplace_income.create') }}" icon="＋"
-                                :active="request()->routeIs('imports.marketplace_income.create')">
-                                Import Income Baru
-                            </x-sidebar.sub-link>
-                        @endif
-
-                        @if ($hasImportsMarketplaceIncomeDraft)
-                            <x-sidebar.sub-link href="{{ route('imports.marketplace_income.draft') }}" icon="🕘"
-                                :active="request()->routeIs('imports.marketplace_income.draft')">
-                                Draft Income (Terakhir)
-                            </x-sidebar.sub-link>
-                        @endif
-
-                        @if ($hasImportsMarketplaceIncomeShow || $hasImportsMarketplaceIncomeOrderShow)
-                            <x-sidebar.sub-link href="{{ route('imports.marketplace_income.index') }}" icon="↩️" :active="false">
-                                Kembali ke List Income
-                            </x-sidebar.sub-link>
-                        @endif
-                    </div>
-                </li>
+            {{-- MARKETPLACE --}}
+            @if ($hasMarketplaceToko || $hasMarketplaceOrders || $hasMarketplaceFulfillment || $hasMarketplaceSkuMapping || $hasMarketplaceSync)
+                <x-sidebar.label text="Marketplace" />
+                @if ($hasMarketplaceToko)
+                    <x-sidebar.simple-link href="{{ route('marketplace.toko') }}" icon="🏪"
+                        :active="request()->routeIs('marketplace.toko')">
+                        Toko & Channel
+                    </x-sidebar.simple-link>
+                @endif
+                @if ($hasMarketplaceOrders)
+                    <x-sidebar.simple-link href="{{ route('marketplace.orders') }}" icon="📋"
+                        :active="request()->routeIs('marketplace.orders')">
+                        Order Lokal
+                    </x-sidebar.simple-link>
+                @endif
+                @if ($hasMarketplaceFulfillment)
+                    <x-sidebar.simple-link href="{{ route('marketplace.fulfillment') }}" icon="📦"
+                        :active="request()->routeIs('marketplace.fulfillment')">
+                        Fulfillment
+                    </x-sidebar.simple-link>
+                @endif
+                @if ($hasMarketplaceSkuMapping)
+                    <x-sidebar.simple-link href="{{ route('marketplace.sku-mapping') }}" icon="🔗"
+                        :active="request()->routeIs('marketplace.sku-mapping')">
+                        SKU Mapping
+                    </x-sidebar.simple-link>
+                @endif
+                @if ($hasMarketplaceSync)
+                    <x-sidebar.simple-link href="{{ route('marketplace.sync') }}" icon="↓"
+                        :active="request()->routeIs('marketplace.sync')">
+                        Sync Order
+                    </x-sidebar.simple-link>
+                @endif
+                @if ($hasMarketplaceSettlement)
+                    <x-sidebar.simple-link href="{{ route('marketplace.settlement') }}" icon="💰"
+                        :active="request()->routeIs('marketplace.settlement')">
+                        Settlement
+                    </x-sidebar.simple-link>
+                @endif
+                @if ($hasMarketplaceProfit)
+                    <x-sidebar.simple-link href="{{ route('marketplace.profit') }}" icon="📈"
+                        :active="request()->routeIs('marketplace.profit')">
+                        Profit Order
+                    </x-sidebar.simple-link>
+                @endif
+                @if ($hasMarketplaceAds)
+                    <x-sidebar.simple-link href="{{ route('marketplace.ads') }}" icon="🎯"
+                        :active="request()->routeIs('marketplace.ads')">
+                        Analisa Iklan
+                    </x-sidebar.simple-link>
+                @endif
+                @if ($hasMarketplaceIssues)
+                    <x-sidebar.simple-link href="{{ route('marketplace.issues') }}" icon="⚠️"
+                        :active="request()->routeIs('marketplace.issues')">
+                        Data Perlu Diperbaiki
+                    </x-sidebar.simple-link>
+                @endif
             @endif
 
             {{-- SALES --}}

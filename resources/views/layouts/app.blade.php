@@ -500,9 +500,3 @@
 </script>
 @endpush --}}
 
-{{-- Omnichannel menu: tambahkan manual ke sidebar --}}
-
-        <a href="{{ route('owner.omnichannel') }}" class="gf-owner-worklog-nav {{ request()->routeIs(">
-            <i class="bi bi-shop-window"></i>
-            <span>Toko Marketplace</span>
-        </a>
