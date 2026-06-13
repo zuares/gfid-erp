@@ -2,6 +2,10 @@
 
 use Illuminate\Support\Facades\Route;
 
+Route::get('/', function () {
+    return view('storefront.home');
+})->name('storefront.home');
+
 Route::middleware(['auth'])->group(function () {
 
     Route::get('/dashboard', function () {
@@ -11,17 +15,13 @@ Route::middleware(['auth'])->group(function () {
             return redirect()->route('login');
         }
 
-        // production → Dashboard Produksi (konsolidasi semua report)
-        if ($user->role === 'operating') {
-            return redirect()->route('production.dashboard');
+        $landingRoute = $user->preferredLandingRouteName();
+        if ($landingRoute && $landingRoute !== 'dashboard') {
+            return redirect()->to(route($landingRoute, [], false));
         }
 
-        // admin → langsung ke laporan shipment
-        if ($user->role === 'admin') {
-            return redirect()->route('sales.shipments.report');
-        }
+        abort_unless($user->canAccessModule('dashboard'), 403, 'Akses dashboard belum diizinkan.');
 
-        // owner / role lain → dashboard biasa
         return view('dashboard.index');
     })->name('dashboard');
 
@@ -34,8 +34,6 @@ Route::middleware(['auth'])->group(function () {
             return view('welcome');
         })->name('admin.home');
 
-        Route::get('/', function () {
-            return view('welcome');
-        })->name('home');
+        Route::redirect('/home', '/dashboard')->name('home');
     });
 });

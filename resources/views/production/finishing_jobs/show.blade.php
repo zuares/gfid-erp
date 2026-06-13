@@ -4,601 +4,460 @@
 @section('title', 'Produksi • Finishing ' . $job->code)
 
 @push('head')
-    <style>
-        :root {
-            --fin-card-radius: 16px;
-            --fin-border: rgba(148, 163, 184, 0.28);
-            --fin-muted: #6b7280;
-            --fin-bg-light-1: #f5f6fa;
-            --fin-bg-light-2: #f9fafb;
-            --fin-bg-light-3: #ffffff;
-        }
+<style>
+  .page-wrap{ max-width:1000px; margin-inline:auto; padding:.8rem .8rem 3.5rem; }
+  body[data-theme="light"] .page-wrap{
+    background: radial-gradient(circle at top left,
+      rgba(56,189,248,.20) 0,
+      rgba(125,211,252,.12) 22%,
+      #f9fafb 58%);
+  }
+  .card{
+    background: var(--card);
+    border-radius: 16px;
+    border: 1px solid rgba(148,163,184,.22);
+    box-shadow: 0 10px 26px rgba(15,23,42,.08), 0 0 0 1px rgba(15,23,42,.03);
+  }
+  .card-section{ padding:.9rem 1rem; }
+  @media(min-width:768px){
+    .page-wrap{ padding:1.1rem 1rem 3.5rem; }
+    .card-section{ padding:1rem 1.25rem; }
+  }
+  .mono{ font-variant-numeric: tabular-nums; font-family: ui-monospace, SFMono-Regular, Menlo, Consolas, "Liberation Mono"; }
 
-        .finishing-show-page {
-            min-height: 100vh;
-        }
+  .badge-status{
+    font-size:.7rem; text-transform:uppercase; letter-spacing:.12em;
+    border-radius:999px; padding:.16rem .7rem; font-weight:800;
+  }
+  .badge-posted{ background: rgba(14,165,233,.14); color:#0369a1; border:1px solid rgba(14,165,233,.45); }
+  .badge-draft{ background: rgba(148,163,184,.18); color:#4b5563; border:1px solid rgba(148,163,184,.6); }
+  .badge-reject{ background: rgba(248,113,113,.16); color:#b91c1c; border:1px solid rgba(248,113,113,.6); }
 
-        .finishing-show-page .page-wrap {
-            max-width: 1100px;
-            margin-inline: auto;
-            padding: 1rem 1rem 3.5rem;
-        }
+  .pill{ border-radius:999px; padding:.12rem .6rem; font-size:.72rem; font-weight:800; }
+  .pill-ok{ background: rgba(14,165,233,.12); color:#0369a1; border:1px solid rgba(14,165,233,.4); }
+  .pill-rj{ background: rgba(248,113,113,.14); color:#b91c1c; border:1px solid rgba(248,113,113,.5); }
+  .pill-total{ background: rgba(59,130,246,.08); color:#1d4ed8; border:1px solid rgba(59,130,246,.4); }
+  .pill-warn{ background: rgba(245,158,11,.12); color:#92400e; border:1px solid rgba(245,158,11,.45); }
 
-        body[data-theme="light"] .finishing-show-page .page-wrap {
-            background: linear-gradient(to bottom,
-                    var(--fin-bg-light-1) 0,
-                    var(--fin-bg-light-2) 40%,
-                    var(--fin-bg-light-3) 100%);
-        }
+  .section-title{ font-size:.9rem; font-weight:900; margin-bottom:.15rem; }
+  .section-sub{ font-size:.75rem; color: var(--muted); }
 
-        body[data-theme="dark"] .finishing-show-page .page-wrap {
-            background:
-                radial-gradient(circle at top left,
-                    rgba(37, 99, 235, 0.26) 0,
-                    rgba(15, 23, 42, 0.9) 55%,
-                    #020617 100%);
-        }
+  .summary-grid{
+    display:grid;
+    grid-template-columns: repeat(2, minmax(0,1fr));
+    gap:.45rem .9rem;
+    font-size:.8rem;
+  }
+  @media(min-width:768px){
+    .summary-grid{ grid-template-columns: repeat(5, minmax(0,1fr)); }
+  }
+  .summary-label{ font-size:.7rem; text-transform:uppercase; letter-spacing:.08em; color: var(--muted); }
+  .summary-value{ font-weight:900; }
+  .summary-ok{ color:#0369a1; }
+  .summary-rj{ color:#b91c1c; }
+  .summary-warn{ color:#b45309; }
 
-        .fin-card {
-            background: var(--card);
-            border-radius: var(--fin-card-radius);
-            border: 1px solid var(--fin-border);
-            padding: 1rem 1.2rem;
-            margin-bottom: 1rem;
-            box-shadow:
-                0 18px 45px rgba(15, 23, 42, 0.12),
-                0 0 0 1px rgba(15, 23, 42, 0.04);
-        }
+  .table thead th{
+    font-size:.74rem; text-transform:uppercase; letter-spacing:.08em;
+    color: var(--muted); border-top:none; white-space:nowrap;
+  }
+  .table tbody td{ font-size:.8rem; vertical-align:middle; }
+  .row-ok{ background: rgba(240,249,255,.96); }
+  .row-rj{ background: rgba(254,242,242,.96); }
 
-        body[data-theme="dark"] .fin-card {
-            border-color: rgba(51, 65, 85, 0.9);
-            box-shadow:
-                0 18px 50px rgba(0, 0, 0, 0.85),
-                0 0 0 1px rgba(15, 23, 42, 0.9);
-        }
-
-        .mono {
-            font-variant-numeric: tabular-nums;
-            font-family: ui-monospace, SFMono-Regular, Menlo, Consolas, "Liberation Mono";
-        }
-
-        .fin-alert {
-            margin-top: .8rem;
-            border-radius: 14px;
-            padding: .8rem .9rem;
-            border: 1px solid rgba(251, 146, 60, 0.8);
-            background: linear-gradient(to right,
-                    rgba(251, 146, 60, 0.09),
-                    rgba(251, 191, 36, 0.03));
-        }
-
-        .fin-alert.danger {
-            border-color: rgba(239, 68, 68, 0.85);
-            background: radial-gradient(circle at top left,
-                    rgba(248, 113, 113, 0.16),
-                    rgba(15, 23, 42, 0));
-        }
-
-        .fin-alert-title {
-            font-weight: 700;
-            font-size: .9rem;
-            margin-bottom: .2rem;
-        }
-
-        .fin-alert p {
-            margin: 0;
-            font-size: .82rem;
-        }
-
-        .fin-alert ul {
-            margin: .35rem 0 0;
-            padding-left: 1.2rem;
-            font-size: .8rem;
-        }
-
-        .fin-section-title {
-            font-size: .9rem;
-            font-weight: 700;
-            margin-bottom: .35rem;
-        }
-
-        .fin-chip {
-            display: inline-flex;
-            align-items: center;
-            border-radius: 999px;
-            padding: .12rem .55rem;
-            font-size: .72rem;
-            border: 1px solid rgba(148, 163, 184, 0.6);
-        }
-
-        .fin-chip-light {
-            background: rgba(248, 250, 252, 0.9);
-        }
-
-        .help {
-            color: var(--fin-muted);
-            font-size: .75rem;
-        }
-
-        /* ===== TABLE UX ===== */
-        .fin-table-wrap {
-            overflow-x: auto;
-            -webkit-overflow-scrolling: touch;
-            scrollbar-gutter: stable;
-            border-radius: 14px;
-            border: 1px solid rgba(148, 163, 184, 0.22);
-        }
-
-        body[data-theme="dark"] .fin-table-wrap {
-            border-color: rgba(51, 65, 85, 0.75);
-        }
-
-        .fin-table {
-            width: 100%;
-            border-collapse: separate;
-            border-spacing: 0;
-            font-size: .8rem;
-            table-layout: fixed;
-            min-width: 820px;
-        }
-
-        .fin-table thead th {
-            position: sticky;
-            top: 0;
-            z-index: 2;
-            background: rgba(248, 250, 252, 0.98);
-            color: var(--fin-muted);
-            font-size: .72rem;
-            text-transform: uppercase;
-            letter-spacing: .04em;
-            padding: .55rem .6rem;
-            border-bottom: 1px solid rgba(148, 163, 184, 0.22);
-            white-space: nowrap;
-        }
-
-        body[data-theme="dark"] .fin-table thead th {
-            background: rgba(2, 6, 23, 0.92);
-            border-bottom-color: rgba(51, 65, 85, 0.8);
-        }
-
-        .fin-table tbody td {
-            padding: .55rem .6rem;
-            vertical-align: top;
-            border-bottom: 1px solid rgba(148, 163, 184, 0.14);
-            background: rgba(255, 255, 255, 0.55);
-        }
-
-        body[data-theme="dark"] .fin-table tbody td {
-            background: rgba(15, 23, 42, 0.55);
-        }
-
-        .fin-table tbody tr:hover td {
-            background: rgba(59, 130, 246, 0.06);
-        }
-
-        body[data-theme="dark"] .fin-table tbody tr:hover td {
-            background: rgba(59, 130, 246, 0.10);
-        }
-
-        .cell-2line {
-            line-height: 1.15;
-        }
-
-        .cell-sub {
-            margin-top: .15rem;
-            font-size: .72rem;
-            color: var(--fin-muted);
-        }
-
-        .num {
-            text-align: right;
-        }
-
-        .rej {
-            color: #991b1b;
-            font-weight: 700;
-        }
-
-        /* cols */
-        .col-no {
-            width: 64px;
-        }
-
-        .col-item {
-            width: 220px;
-        }
-
-        .col-num {
-            width: 96px;
-        }
-
-        .col-ops {
-            width: 160px;
-        }
-
-        .col-reason {
-            width: 210px;
-        }
-
-        .col-snapdate {
-            width: 170px;
-        }
-
-        /* badges mini bawah item (OWNER only) */
-        .mini-badges {
-            margin-top: .22rem;
-            display: flex;
-            flex-wrap: wrap;
-            gap: .25rem;
-        }
-
-        .mini-badge {
-            display: inline-flex;
-            align-items: center;
-            gap: .25rem;
-            border-radius: 999px;
-            padding: .10rem .45rem;
-            font-size: .68rem;
-            font-weight: 700;
-            border: 1px solid rgba(148, 163, 184, 0.45);
-            background: rgba(248, 250, 252, 0.75);
-            white-space: nowrap;
-        }
-
-        body[data-theme="dark"] .mini-badge {
-            background: rgba(2, 6, 23, 0.35);
-            border-color: rgba(51, 65, 85, 0.85);
-        }
-
-        .mini-badge .k {
-            font-size: .62rem;
-            opacity: .7;
-            letter-spacing: .04em;
-            text-transform: uppercase;
-        }
-
-        /* MOBILE */
-        @media (max-width: 768px) {
-            .fin-card {
-                padding-inline: .95rem;
-            }
-
-            .fin-table {
-                font-size: .82rem;
-                min-width: 720px;
-            }
-
-            .fin-table thead th {
-                padding: .5rem .55rem;
-            }
-
-            .hide-sm {
-                display: none;
-            }
-
-            .col-item {
-                width: 190px;
-            }
-
-            .col-ops {
-                width: 140px;
-            }
-        }
-    </style>
+  .header-actions{
+    display:flex; gap:.45rem; flex-wrap:wrap; justify-content:flex-end;
+  }
+  .btn-pill{
+    border-radius:999px; padding:.25rem .75rem; font-size:.78rem;
+    display:inline-flex; align-items:center; gap:.35rem;
+  }
+  .table-scroll{ overflow-x:auto; -webkit-overflow-scrolling:touch; }
+  .table-scroll table{ min-width:760px; }
+</style>
 @endpush
 
 @section('content')
-    @php
-        $isOwner = auth()->check() && auth()->user()?->role === 'owner';
+@php
+  use Illuminate\Support\Carbon;
 
-        /** @var \Illuminate\Support\Collection|\App\Models\FinishingJobLine[] $rejectLines */
-        $rejectLines = $job->lines->filter(fn($line) => (float) $line->qty_reject > 0.0001);
+  $user = auth()->user();
+  $isOwner = strtolower((string)($user?->role ?? '')) === 'owner';
+  $status = $job->status ?? 'draft';
+  $isPosted = $status === 'posted';
 
-        $totalIn = $job->lines->sum('qty_in');
-        $totalOk = $job->lines->sum('qty_ok');
-        $totalReject = $job->lines->sum('qty_reject');
-    @endphp
+  $lines = $job->lines ?? collect();
+  $rejectLines = $lines->filter(fn($line) => (float) $line->qty_reject > 0.0001);
+  $totalIn = (float) $lines->sum('qty_in');
+  $totalOk = (float) $lines->sum('qty_ok');
+  $totalReject = (float) $lines->sum('qty_reject');
+  $totalProcessed = $totalOk + $totalReject;
+  $rejectPercent = $totalProcessed > 0 ? ($totalReject / $totalProcessed) * 100 : 0;
+  $bundleCount = $lines->pluck('cutting_job_bundle_id')->filter()->unique()->count();
+  $hasReject = $totalReject > 0.000001;
 
-    <div class="finishing-show-page">
-        <div class="page-wrap">
+  try {
+    $dateLabel = $job->date
+      ? (function_exists('id_day') ? id_day($job->date) : Carbon::parse($job->date)->format('d/m/Y'))
+      : '-';
+  } catch (\Throwable $e) {
+    $dateLabel = optional($job->date)->format('d/m/Y') ?? '-';
+  }
 
-            {{-- HEADER (tanpa badge row untuk non-owner) --}}
-            <div class="fin-card">
-                <div class="flex items-start justify-between gap-3 flex-wrap">
-                    <div class="space-y-1">
-                        <h1 class="text-base md:text-lg font-semibold">
-                            Finishing {{ $job->code }}
-                        </h1>
-                        <div class="text-xs md:text-sm text-slate-500 dark:text-slate-400">
-                            <span class="opacity-80">Tanggal:</span>
-                            <span class="mono">{{ $job->date }}</span>
-                        </div>
-                        <div class="text-xs text-slate-500 dark:text-slate-400">
-                            Dibuat oleh: <span class="font-medium">{{ $job->createdBy?->name ?? '-' }}</span>
-                        </div>
-                        @if ($job->notes)
-                            <div class="mt-1 text-xs text-slate-500 dark:text-slate-400">
-                                Catatan: {{ $job->notes }}
-                            </div>
-                        @endif
-                    </div>
+  $fmt = fn($n, $d = 2) => number_format((float) $n, $d, ',', '.');
+  $fmt0 = fn($n) => number_format((float) $n, 0, ',', '.');
 
-                    {{-- hanya OWNER boleh lihat status chips (opsional kecil), non-owner: kosong --}}
-                    @if ($isOwner)
-                        <div class="flex flex-wrap gap-2 justify-end">
-                            @if ($job->status === 'posted')
-                                <span class="mini-badge"><span class="k">status</span><span
-                                        class="mono">POSTED</span></span>
-                            @else
-                                <span class="mini-badge"><span class="k">status</span><span
-                                        class="mono">DRAFT</span></span>
-                            @endif
+  $operatorName = function ($line) {
+    return $line->sewingOperator?->name
+      ?? $line->sewingPickupLine?->sewingPickup?->operator?->name
+      ?? '-';
+  };
 
-                            @if ($isAutoPost)
-                                <span class="mini-badge"><span class="k">auto</span><span class="mono">0
-                                        RJ</span></span>
-                            @endif
+  $itemMeta = function ($line) {
+    return [
+      'code' => $line->item?->code ?? ($line->bundle?->finishedItem?->code ?? '-'),
+      'name' => $line->item?->name ?? ($line->bundle?->finishedItem?->name ?? ''),
+      'lot' => $line->bundle?->lot?->code ?? '-',
+      'lot_name' => $line->bundle?->lot?->item?->name ?? '',
+      'bundle' => $line->bundle?->bundle_code ?? '-',
+      'job' => $line->bundle?->cuttingJob?->code ?? '-',
+    ];
+  };
 
-                            @if ($hasReject)
-                                <span class="mini-badge"><span class="k">flag</span><span class="mono">HAS
-                                        RJ</span></span>
-                            @endif
-                        </div>
-                    @endif
-                </div>
+  $perItem = $lines
+    ->groupBy(fn($line) => (int) ($line->item_id ?? $line->bundle?->finished_item_id ?? 0))
+    ->map(function ($group) use ($itemMeta) {
+      $first = $group->first();
+      $meta = $itemMeta($first);
+      return [
+        'code' => $meta['code'],
+        'name' => $meta['name'],
+        'in' => (float) $group->sum('qty_in'),
+        'ok' => (float) $group->sum('qty_ok'),
+        'reject' => (float) $group->sum('qty_reject'),
+      ];
+    })
+    ->sortBy('code')
+    ->values();
+@endphp
 
-                {{-- ALERTS --}}
-                @if ($hasReject && $job->status !== 'posted')
-                    <div class="fin-alert mt-3">
-                        <div class="fin-alert-title">
-                            Finishing ini punya REJECT &amp; <span class="underline">BELUM diposting</span>.
-                        </div>
-                        <p>
-                            Stok masih berada di gudang <strong>WIP-FIN</strong> dan
-                            <strong>belum dipindahkan</strong> ke <strong>WH-PRD</strong> / <strong>REJECT</strong>.
-                        </p>
-                        <ul>
-                            <li>Review kuantitas OK vs Reject dan alasan reject.</li>
-                            <li>Jika reject masih bisa diperbaiki, edit finishing hingga qty reject = 0.</li>
-                            <li>Jika reject final, klik tombol <strong>"Post Finishing"</strong> di bawah.</li>
-                        </ul>
-                    </div>
-                @endif
+<div class="page-wrap">
 
-                @if ($hasReject && $job->status === 'posted' && !$isAutoPost)
-                    <div class="fin-alert danger mt-3">
-                        <div class="fin-alert-title">Finishing ini sudah POSTED dengan REJECT.</div>
-                        <p>
-                            Stok OK telah dipindahkan ke <strong>WH-PRD</strong> dan stok reject ke gudang
-                            <strong>REJECT</strong>. Data di bawah dipakai untuk evaluasi kualitas &amp; penanggung jawab.
-                        </p>
-                    </div>
-                @endif
-
-                {{-- ACTIONS --}}
-                <div class="mt-3 flex flex-wrap gap-2">
-                    <a href="{{ route('production.finishing_jobs.index') }}" class="btn btn-sm btn-ghost">
-                        &larr; Kembali
-                    </a>
-
-                    @if ($job->status !== 'posted')
-                        <a href="{{ route('production.finishing_jobs.edit', $job->id) }}" class="btn btn-sm btn-outline">
-                            Edit Finishing
-                        </a>
-
-                        <form method="POST" action="{{ route('production.finishing_jobs.post', $job->id) }}"
-                            onsubmit="return confirm('Post finishing ini? Stok OK akan pindah ke WH-PRD dan Reject ke gudang REJECT. Lanjutkan?');">
-                            @csrf
-                            <button type="submit" class="btn btn-sm btn-primary">
-                                Post Finishing ({{ $hasReject ? 'dengan Reject' : '0 Reject' }})
-                            </button>
-                        </form>
-                    @endif
-                </div>
-            </div>
-
-            {{-- RINGKASAN REJECT --}}
-            @if ($rejectLines->count())
-                <div class="fin-card">
-                    <div class="flex items-center justify-between mb-2 gap-2">
-                        <h2 class="fin-section-title">Ringkasan Reject</h2>
-                        <span class="fin-chip fin-chip-light">Total baris reject: {{ $rejectLines->count() }}</span>
-                    </div>
-
-                    <div class="fin-table-wrap">
-                        <table class="fin-table">
-                            <thead>
-                                <tr>
-                                    <th class="col-no text-left">No</th>
-                                    <th class="col-item text-left">Item</th>
-                                    <th class="col-num num">In</th>
-                                    <th class="col-num num">Reject</th>
-                                    <th class="col-reason text-left">Alasan</th>
-                                    <th class="col-ops text-left">Finishing</th>
-                                    <th class="col-ops text-left">Jahit</th>
-                                </tr>
-                            </thead>
-                            <tbody>
-                                @foreach ($rejectLines->values() as $i => $line)
-                                    @php
-                                        $itemCode = $line->item?->code ?? ($line->bundle?->finishedItem?->code ?? '-');
-                                        $itemName = $line->item?->name ?? ($line->bundle?->finishedItem?->name ?? '');
-                                        $bundleCode = $line->bundle?->bundle_code ?? '-';
-                                        $jobCode = $line->bundle?->cuttingJob?->code ?? '-';
-                                    @endphp
-                                    <tr>
-                                        <td class="mono col-no">{{ $i + 1 }}</td>
-
-                                        <td class="col-item">
-                                            <div class="cell-2line">
-                                                {{-- MOBILE: kode saja --}}
-                                                <div class="mono font-semibold">{{ $itemCode }}</div>
-                                                {{-- DESKTOP: nama item --}}
-                                                <div class="cell-sub hide-sm">{{ $itemName }}</div>
-
-                                                {{-- OWNER: mini badges bundle+job di bawah item --}}
-                                                @if ($isOwner)
-                                                    <div class="mini-badges">
-                                                        <span class="mini-badge"><span class="k">b</span><span
-                                                                class="mono">{{ $bundleCode }}</span></span>
-                                                        <span class="mini-badge"><span class="k">job</span><span
-                                                                class="mono">{{ $jobCode }}</span></span>
-                                                    </div>
-                                                @endif
-                                            </div>
-                                        </td>
-
-                                        <td class="mono num col-num">{{ number_format($line->qty_in, 0) }}</td>
-                                        <td class="mono num col-num rej">{{ number_format($line->qty_reject, 0) }}</td>
-                                        <td class="col-reason">{{ $line->reject_reason ?: '-' }}</td>
-                                        <td class="col-ops">{{ $line->operator?->name ?? '-' }}</td>
-                                        <td class="col-ops">
-                                            {{ $line->sewingOperator?->name ?? ($line->sewingPickupLine?->sewingPickup?->operator?->name ?? '-') }}
-                                        </td>
-                                    </tr>
-                                @endforeach
-                            </tbody>
-                        </table>
-                    </div>
-
-                    <p class="help mt-2">
-                        Operator jahit diambil dari Sewing Return / Sewing Pickup terbaru untuk bundle terkait.
-                    </p>
-                </div>
-            @endif
-
-            {{-- DETAIL BARIS FINISHING --}}
-            <div class="fin-card">
-                <div class="flex items-center justify-between mb-2 gap-2">
-                    <h2 class="fin-section-title">Detail Finishing</h2>
-                    <span class="fin-chip fin-chip-light">Total baris: {{ $job->lines->count() }}</span>
-                </div>
-
-                <div class="fin-table-wrap">
-                    <table class="fin-table">
-                        <thead>
-                            <tr>
-                                <th class="col-no text-left">No</th>
-                                <th class="col-item text-left">Item</th>
-                                <th class="col-num num">In</th>
-                                <th class="col-num num">OK</th>
-                                <th class="col-num num">Reject</th>
-                                <th class="col-ops text-left">Finishing</th>
-                                <th class="col-ops text-left">Jahit</th>
-                            </tr>
-                        </thead>
-                        <tbody>
-                            @foreach ($job->lines->values() as $i => $line)
-                                @php
-                                    $itemCode = $line->item?->code ?? ($line->bundle?->finishedItem?->code ?? '-');
-                                    $itemName = $line->item?->name ?? ($line->bundle?->finishedItem?->name ?? '');
-                                    $lotCode = $line->bundle?->lot?->code ?? '-';
-                                    $lotName = $line->bundle?->lot?->item?->name ?? '';
-                                    $bundleCode = $line->bundle?->bundle_code ?? '-';
-                                    $jobCode = $line->bundle?->cuttingJob?->code ?? '-';
-                                @endphp
-                                <tr>
-                                    <td class="mono col-no">{{ $i + 1 }}</td>
-
-                                    <td class="col-item">
-                                        <div class="cell-2line">
-                                            <div class="mono font-semibold">{{ $itemCode }}</div>
-                                            <div class="cell-sub hide-sm">{{ $itemName }}</div>
-                                            <div class="cell-sub hide-sm">LOT: {{ $lotCode }} &middot;
-                                                {{ $lotName }}</div>
-
-                                            {{-- OWNER: mini badges bundle+job di bawah item --}}
-                                            @if ($isOwner)
-                                                <div class="mini-badges">
-                                                    <span class="mini-badge"><span class="k">b</span><span
-                                                            class="mono">{{ $bundleCode }}</span></span>
-                                                    <span class="mini-badge"><span class="k">job</span><span
-                                                            class="mono">{{ $jobCode }}</span></span>
-                                                </div>
-                                            @endif
-                                        </div>
-                                    </td>
-
-                                    <td class="mono num col-num">{{ number_format($line->qty_in, 0) }}</td>
-                                    <td class="mono num col-num">{{ number_format($line->qty_ok, 0) }}</td>
-                                    <td class="mono num col-num {{ (float) $line->qty_reject > 0 ? 'rej' : '' }}">
-                                        {{ number_format($line->qty_reject, 0) }}
-                                    </td>
-
-                                    <td class="col-ops">{{ $line->operator?->name ?? '-' }}</td>
-                                    <td class="col-ops">
-                                        {{ $line->sewingOperator?->name ?? ($line->sewingPickupLine?->sewingPickup?->operator?->name ?? '-') }}
-                                    </td>
-                                </tr>
-                            @endforeach
-                        </tbody>
-                    </table>
-                </div>
-
-                <div class="mt-3 flex flex-wrap gap-3 justify-end text-xs">
-                    <div class="fin-chip">
-                        Total IN: <span class="mono ml-1">{{ number_format($totalIn, 0) }}</span>
-                    </div>
-                    <div class="fin-chip">
-                        Total OK: <span class="mono ml-1">{{ number_format($totalOk, 0) }}</span>
-                    </div>
-                    <div class="fin-chip">
-                        Total Reject:
-                        <span class="mono ml-1 {{ $totalReject > 0 ? 'text-red-600' : '' }}">
-                            {{ number_format($totalReject, 0) }}
-                        </span>
-                    </div>
-                </div>
-            </div>
-
-            {{-- SNAPSHOT HPP RM-ONLY (HANYA OWNER) --}}
-            @if ($isOwner && $rmSnapshots->count())
-                <div class="fin-card">
-                    <div class="flex items-center justify-between mb-2 gap-2">
-                        <h2 class="fin-section-title">Snapshot HPP RM-only (Finishing)</h2>
-                        <span class="fin-chip fin-chip-light">Total snapshot: {{ $rmSnapshots->count() }}</span>
-                    </div>
-
-                    <div class="fin-table-wrap">
-                        <table class="fin-table" style="min-width: 780px;">
-                            <thead>
-                                <tr>
-                                    <th class="col-snapdate text-left">Snapshot Date</th>
-                                    <th class="col-item text-left">Item</th>
-                                    <th class="col-num num">Qty</th>
-                                    <th class="col-num num">HPP/pcs</th>
-                                    <th class="col-num num">Total</th>
-                                </tr>
-                            </thead>
-                            <tbody>
-                                @foreach ($rmSnapshots as $snap)
-                                    @php
-                                        $snapItemCode = $snap->item?->code ?? '-';
-                                        $snapItemName = $snap->item?->name ?? '';
-                                    @endphp
-                                    <tr>
-                                        <td class="mono col-snapdate">{{ $snap->snapshot_date ?? $snap->created_at }}</td>
-                                        <td class="col-item">
-                                            <div class="cell-2line">
-                                                <div class="mono font-semibold">{{ $snapItemCode }}</div>
-                                                <div class="cell-sub hide-sm">{{ $snapItemName }}</div>
-                                            </div>
-                                        </td>
-                                        <td class="mono num col-num">{{ number_format($snap->qty ?? 0, 0) }}</td>
-                                        <td class="mono num col-num">{{ number_format($snap->unit_cost ?? 0, 0) }}</td>
-                                        <td class="mono num col-num">{{ number_format($snap->total_cost ?? 0, 0) }}</td>
-                                    </tr>
-                                @endforeach
-                            </tbody>
-                        </table>
-                    </div>
-
-                    <p class="help mt-2">
-                        Snapshot ini hanya tampil untuk <strong>owner</strong>.
-                    </p>
-                </div>
-            @endif
-
-        </div>
+  @if(session('status'))
+    <div class="alert alert-success py-2">{{ session('status') }}</div>
+  @endif
+  @if(session('error'))
+    <div class="alert alert-danger py-2">{{ session('error') }}</div>
+  @endif
+  @if ($errors->any())
+    <div class="alert alert-danger">
+      <div class="fw-bold mb-1">Terjadi error:</div>
+      <ul class="mb-0">
+        @foreach($errors->all() as $err)
+          <li>{{ $err }}</li>
+        @endforeach
+      </ul>
     </div>
+  @endif
+
+  {{-- HEADER --}}
+  <div class="card mb-2">
+    <div class="card-section d-flex justify-content-between flex-wrap gap-2">
+      <div>
+        <div class="fw-bold mb-1">
+          Finishing <span class="mono">{{ $job->code }}</span>
+        </div>
+
+        <div class="small text-muted">
+          <span class="mono">{{ $dateLabel }}</span>
+          @if($bundleCount > 0)
+            • Bundle: <span class="mono">{{ $bundleCount }}</span>
+          @endif
+        </div>
+
+        <div class="small text-muted mt-1">
+          Dibuat oleh: {{ $job->createdBy?->name ?? '-' }}
+        </div>
+
+        @if($job->notes)
+          <div class="small text-muted mt-1">
+            Catatan: {{ $job->notes }}
+          </div>
+        @endif
+      </div>
+
+      <div class="d-flex flex-column align-items-end gap-2">
+        <div class="d-flex gap-1 flex-wrap justify-content-end">
+          <span class="badge-status {{ $isPosted ? 'badge-posted' : 'badge-draft' }}">
+            {{ strtoupper($status) }}
+          </span>
+
+          @if($hasReject)
+            <span class="badge-status badge-reject">ADA REJECT</span>
+          @else
+            <span class="pill pill-ok">SEMUA AMAN</span>
+          @endif
+        </div>
+
+        <div class="header-actions">
+          <a href="{{ route('production.finishing_jobs.index') }}" class="btn btn-outline-secondary btn-sm btn-pill">
+            <i class="bi bi-arrow-left"></i><span>Kembali</span>
+          </a>
+
+          @if(!$isPosted)
+            <a href="{{ route('production.finishing_jobs.edit', $job->id) }}" class="btn btn-outline-primary btn-sm btn-pill">
+              <i class="bi bi-pencil"></i><span>Edit</span>
+            </a>
+
+            <form method="POST" action="{{ route('production.finishing_jobs.post', $job->id) }}"
+              onsubmit="return confirm('Post finishing ini? OK akan pindah ke WH-PRD. Reject Finishing ke REJ-FIN, Reject Jahit ke REJ-SEW. Lanjutkan?');">
+              @csrf
+              <button type="submit" class="btn btn-success btn-sm btn-pill">
+                <i class="bi bi-check2-circle"></i><span>Post</span>
+              </button>
+            </form>
+          @endif
+        </div>
+      </div>
+    </div>
+  </div>
+
+  {{-- SUMMARY --}}
+  <div class="card mb-2">
+    <div class="card-section">
+      <div class="section-title mb-2">Ringkasan</div>
+
+      <div class="summary-grid">
+        <div>
+          <div class="summary-label">Masuk FIN</div>
+          <div class="summary-value mono">{{ $fmt($totalIn) }}</div>
+        </div>
+        <div>
+          <div class="summary-label">Diproses (OK + Reject)</div>
+          <div class="summary-value mono">{{ $fmt($totalProcessed) }}</div>
+        </div>
+        <div>
+          <div class="summary-label">OK</div>
+          <div class="summary-value summary-ok mono">{{ $fmt($totalOk) }}</div>
+        </div>
+        <div>
+          <div class="summary-label">Reject</div>
+          <div class="summary-value summary-rj mono">{{ $fmt($totalReject) }}</div>
+          <div class="section-sub">{{ number_format($rejectPercent, 1, ',', '.') }}%</div>
+        </div>
+        <div>
+          <div class="summary-label">Bundle</div>
+          <div class="summary-value summary-warn mono">{{ $bundleCount }}</div>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  @if($hasReject && !$isPosted)
+    <div class="alert alert-warning py-2 mb-2">
+      <div class="fw-bold">Finishing ini punya reject dan belum diposting.</div>
+      <div class="small">
+        Stok masih di WIP-FIN. Setelah post, OK masuk WH-PRD, reject finishing masuk REJ-FIN, reject jahit masuk REJ-SEW.
+      </div>
+    </div>
+  @endif
+
+  {{-- PER ITEM --}}
+  <div class="card mb-2">
+    <div class="card-section">
+      <div class="section-title mb-2">Ringkasan per Item</div>
+
+      <div class="table-scroll">
+        <table class="table table-sm align-middle mb-0">
+          <thead>
+            <tr>
+              <th style="width:44px;">#</th>
+              <th style="width:140px;">Item</th>
+              <th>Nama</th>
+              <th class="text-end" style="width:120px;">Masuk</th>
+              <th class="text-end" style="width:120px;">OK</th>
+              <th class="text-end" style="width:120px;">Reject</th>
+            </tr>
+          </thead>
+          <tbody>
+            @forelse($perItem as $idx => $row)
+              <tr class="{{ $row['reject'] > 0 && $row['ok'] == 0 ? 'row-rj' : ($row['ok'] > 0 && $row['reject'] == 0 ? 'row-ok' : '') }}">
+                <td class="text-muted mono">{{ $idx + 1 }}</td>
+                <td class="mono fw-bold">{{ $row['code'] }}</td>
+                <td>{{ $row['name'] }}</td>
+                <td class="text-end mono">{{ $fmt($row['in']) }}</td>
+                <td class="text-end">
+                  <span class="pill pill-ok mono">{{ $fmt($row['ok']) }}</span>
+                </td>
+                <td class="text-end">
+                  @if($row['reject'] > 0)
+                    <span class="pill pill-rj mono">{{ $fmt($row['reject']) }}</span>
+                  @else
+                    <span class="text-muted mono">0,00</span>
+                  @endif
+                </td>
+              </tr>
+            @empty
+              <tr>
+                <td colspan="6" class="text-center text-muted small py-3">Tidak ada data item.</td>
+              </tr>
+            @endforelse
+          </tbody>
+        </table>
+      </div>
+    </div>
+  </div>
+
+  @if($rejectLines->count())
+    <div class="card mb-2">
+      <div class="card-section">
+        <div class="section-title mb-2">Ringkasan Reject</div>
+
+        <div class="table-scroll">
+          <table class="table table-sm align-middle mb-0">
+            <thead>
+              <tr>
+                <th style="width:44px;">#</th>
+                <th style="width:140px;">Item</th>
+                <th>Bundle / LOT</th>
+                <th class="text-end" style="width:110px;">Reject</th>
+                <th style="width:120px;">Jenis</th>
+                <th style="width:180px;">Alasan</th>
+                <th style="width:160px;">Finishing</th>
+                <th style="width:160px;">Jahit</th>
+              </tr>
+            </thead>
+            <tbody>
+              @foreach($rejectLines->values() as $i => $line)
+                @php
+                  $meta = $itemMeta($line);
+                @endphp
+                <tr class="row-rj">
+                  <td class="text-muted mono">{{ $i + 1 }}</td>
+                  <td>
+                    <div class="fw-bold mono">{{ $meta['code'] }}</div>
+                    <div class="small text-muted">{{ $meta['name'] }}</div>
+                  </td>
+                  <td>
+                    <div class="small">{{ $meta['bundle'] }}</div>
+                    <div class="small text-muted">LOT: <span class="mono">{{ $meta['lot'] }}</span></div>
+                    @if($isOwner)
+                      <div class="small text-muted">Job: <span class="mono">{{ $meta['job'] }}</span></div>
+                    @endif
+                  </td>
+                  <td class="text-end">
+                    <span class="pill pill-rj mono">{{ $fmt($line->qty_reject) }}</span>
+                  </td>
+                  <td>{{ ($line->reject_cause ?? 'finishing') === 'sewing' ? 'Jahit' : 'Finishing' }}</td>
+                  <td>{{ $line->reject_reason ?: '—' }}</td>
+                  <td>{{ $line->operator?->name ?? '-' }}</td>
+                  <td>{{ $operatorName($line) }}</td>
+                </tr>
+              @endforeach
+            </tbody>
+          </table>
+        </div>
+      </div>
+    </div>
+  @endif
+
+  {{-- DETAIL --}}
+  <div class="card mb-2">
+    <div class="card-section">
+      <div class="section-title mb-2">Detail Bundle</div>
+
+      <div class="table-scroll">
+        <table class="table table-sm align-middle mono mb-0">
+          <thead>
+            <tr>
+              <th style="width:40px;">#</th>
+              <th style="width:150px;">Item</th>
+              <th>Bundle / LOT</th>
+              <th class="text-end" style="width:110px;">Masuk</th>
+              <th class="text-end" style="width:110px;">OK</th>
+              <th class="text-end" style="width:110px;">Reject</th>
+              <th style="width:160px;">Finishing</th>
+              <th style="width:160px;">Jahit</th>
+            </tr>
+          </thead>
+          <tbody>
+            @forelse($lines->values() as $i => $line)
+              @php
+                $meta = $itemMeta($line);
+              @endphp
+              @php
+                $ok = (float) $line->qty_ok;
+                $rj = (float) $line->qty_reject;
+              @endphp
+              <tr class="{{ $rj > 0 && $ok == 0 ? 'row-rj' : ($ok > 0 && $rj == 0 ? 'row-ok' : '') }}">
+                <td class="text-muted">{{ $i + 1 }}</td>
+                <td>
+                  <div class="fw-bold">{{ $meta['code'] }}</div>
+                  <div class="small text-muted">{{ $meta['name'] }}</div>
+                </td>
+                <td>
+                  <div class="small">{{ $meta['bundle'] }}</div>
+                  <div class="small text-muted">
+                    LOT <span class="mono">{{ $meta['lot'] }}</span>
+                    @if($meta['lot_name'])
+                      • {{ $meta['lot_name'] }}
+                    @endif
+                  </div>
+                  @if($isOwner)
+                    <div class="small text-muted">Job: <span class="mono">{{ $meta['job'] }}</span></div>
+                  @endif
+                </td>
+                <td class="text-end">{{ $fmt($line->qty_in) }}</td>
+                <td class="text-end">{{ $fmt($ok) }}</td>
+                <td class="text-end">{{ $fmt($rj) }}</td>
+                <td>{{ $line->operator?->name ?? '-' }}</td>
+                <td>{{ $operatorName($line) }}</td>
+              </tr>
+            @empty
+              <tr>
+                <td colspan="8" class="text-center text-muted small py-3">Tidak ada detail.</td>
+              </tr>
+            @endforelse
+          </tbody>
+        </table>
+      </div>
+    </div>
+  </div>
+
+  @if ($isOwner && $rmSnapshots->count())
+    <div class="card mb-2">
+      <div class="card-section">
+        <div class="section-title mb-2">Snapshot HPP RM-only</div>
+
+        <div class="table-scroll">
+          <table class="table table-sm align-middle mono mb-0">
+            <thead>
+              <tr>
+                <th style="width:170px;">Snapshot</th>
+                <th>Item</th>
+                <th class="text-end" style="width:110px;">Qty</th>
+                <th class="text-end" style="width:130px;">HPP/pcs</th>
+                <th class="text-end" style="width:140px;">Total</th>
+              </tr>
+            </thead>
+            <tbody>
+              @foreach($rmSnapshots as $snap)
+                <tr>
+                  <td>{{ $snap->snapshot_date ?? $snap->created_at }}</td>
+                  <td>
+                    <div class="fw-bold">{{ $snap->item?->code ?? '-' }}</div>
+                    <div class="small text-muted">{{ $snap->item?->name ?? '' }}</div>
+                  </td>
+                  <td class="text-end">{{ $fmt0($snap->qty ?? 0) }}</td>
+                  <td class="text-end">{{ $fmt0($snap->unit_cost ?? 0) }}</td>
+                  <td class="text-end">{{ $fmt0($snap->total_cost ?? 0) }}</td>
+                </tr>
+              @endforeach
+            </tbody>
+          </table>
+        </div>
+      </div>
+    </div>
+  @endif
+</div>
 @endsection

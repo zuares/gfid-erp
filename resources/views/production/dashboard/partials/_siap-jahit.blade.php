@@ -29,10 +29,10 @@
         <div class="gf-overview-kpi-value">{{ $fmt($total_stok_jadi) }}</div>
         <div class="gf-overview-kpi-note">pcs siap jual (WH-PRD + WH-RTS)</div>
     </div>
-    <div class="gf-overview-kpi-card">
-        <div class="gf-overview-kpi-label">Jumlah SKU</div>
-        <div class="gf-overview-kpi-value">{{ $fmt($skuCount) }}</div>
-        <div class="gf-overview-kpi-note">{{ $fmt($totalBundles) }} bundle</div>
+        <div class="gf-overview-kpi-card">
+            <div class="gf-overview-kpi-label">Total Bundle</div>
+            <div class="gf-overview-kpi-value">{{ $fmt($totalBundles) }}</div>
+        <div class="gf-overview-kpi-note">{{ $fmt($skuCount) }} SKU siap jahit saat ini</div>
     </div>
 </div>
 

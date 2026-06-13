@@ -55,6 +55,24 @@
 .toast-msg.ok  { background:#166534; }
 .toast-msg.err { background:#b91c1c; }
 @keyframes slideUp { from { opacity:0; transform:translateY(12px); } to { opacity:1; transform:translateY(0); } }
+
+/* ── Checkbox col ──────────────────────────────────────────────────── */
+.chk-col { width:36px; padding-right:0 !important; }
+.chk-col input[type=checkbox] { cursor:pointer; accent-color:#0f172a; width:15px; height:15px; }
+
+/* ── Bulk bar ───────────────────────────────────────────────────────── */
+#bulkBar {
+    display:none; align-items:center; gap:.65rem; flex-wrap:wrap;
+    background:#1e293b; color:#fff; padding:.6rem 1rem;
+    border-radius:14px; margin-bottom:.65rem;
+    animation: slideUp .15s ease;
+}
+#bulkBar .bulk-count { font-weight:800; font-size:.82rem; }
+
+/* ── Rec chip ───────────────────────────────────────────────────────── */
+.rec-chip { font-size:.65rem; font-weight:900; color:#b45309; background:rgba(245,158,11,.12);
+            padding:.1rem .42rem; border-radius:6px; display:inline-block; margin-bottom:.1rem; }
+.btn-pakai { font-size:.65rem; border-radius:999px; padding:.1rem .55rem; margin-top:.2rem; }
 </style>
 @endpush
 
@@ -113,6 +131,15 @@
                 onclick="clearFilters()">✕ Reset</button>
         </div>
 
+        {{-- Bulk action bar --}}
+        <div id="bulkBar">
+            <span class="bulk-count" id="bulkCount">0 item dipilih</span>
+            <button class="btn btn-warning btn-sm fw-bold" style="border-radius:999px;font-size:.75rem"
+                onclick="openBulkMap()">🔗 Mapping Bulk</button>
+            <button class="btn btn-outline-light btn-sm" style="border-radius:999px;font-size:.75rem"
+                onclick="clearSelection()">✕ Batal Pilih</button>
+        </div>
+
         {{-- Table --}}
         <div id="tableBody"><div class="prod-tab-loading"><span class="prod-tab-spinner"></span> Memuat…</div></div>
 
@@ -125,6 +152,53 @@
 </x-gf.page>
 
 <div id="toastContainer"></div>
+
+{{-- ════════════════════════════════════════════════════════════
+     Modal: Mapping Bulk
+════════════════════════════════════════════════════════════ --}}
+<div class="modal fade" id="modalBulkMap" tabindex="-1">
+    <div class="modal-dialog modal-dialog-centered">
+        <div class="modal-content" style="border-radius:20px">
+            <div class="modal-header border-0">
+                <div>
+                    <h5 class="modal-title fw-black">Mapping Bulk</h5>
+                    <div class="text-muted" style="font-size:.8rem" id="bulkMapSub">—</div>
+                </div>
+                <button class="btn-close" data-bs-dismiss="modal"></button>
+            </div>
+            <div class="modal-body">
+                <input type="hidden" id="bulkSelectedInternalId">
+
+                <div class="mb-3">
+                    <label class="form-label fw-bold" style="font-size:.75rem;color:#64748b">ITEM INTERNAL</label>
+                    <input type="text" class="form-control mb-1" id="bulkItemSearch"
+                        placeholder="Cari kode atau nama item…"
+                        style="border-radius:12px" autocomplete="off">
+                    <div id="bulkItemResults" class="border"
+                        style="border-radius:12px;overflow:hidden;display:none;max-height:200px;overflow-y:auto"></div>
+                    <div id="bulkItemSelected" class="mt-1 fw-bold" style="font-size:.8rem;color:#166534"></div>
+                </div>
+
+                <div class="mb-3">
+                    <div class="form-check">
+                        <input type="checkbox" class="form-check-input" id="bulkApplyAll" checked>
+                        <label class="form-check-label" for="bulkApplyAll" style="font-size:.8rem">
+                            Terapkan juga ke semua order lain dengan SKU marketplace yang sama
+                        </label>
+                    </div>
+                </div>
+
+                <div id="bulkMapAlert" class="alert d-none mb-3" style="border-radius:12px;font-size:.85rem"></div>
+
+                <div class="d-flex justify-content-end gap-2">
+                    <button class="btn btn-light border" style="border-radius:999px" data-bs-dismiss="modal">Batal</button>
+                    <button class="btn btn-dark fw-bold" style="border-radius:999px" id="bulkSaveBtn"
+                        onclick="submitBulkMap()">Hubungkan Semua</button>
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
 
 {{-- ════════════════════════════════════════════════════════════
      Modal 1: Isi SKU
@@ -173,54 +247,60 @@
      Modal 2: Mapping Sekarang
 ════════════════════════════════════════════════════════════ --}}
 <div class="modal fade" id="modalMapping" tabindex="-1">
-    <div class="modal-dialog modal-dialog-centered" style="max-width:480px">
+    <div class="modal-dialog modal-dialog-centered">
         <div class="modal-content" style="border-radius:20px">
-            <div class="modal-header border-0 pb-0">
-                <div>
-                    <h5 class="modal-title fw-black">🔗 Hubungkan SKU ke Produk Internal</h5>
-                    <div class="text-muted" style="font-size:.8rem" id="mapSub">—</div>
-                </div>
+            <div class="modal-header border-0">
+                <h5 class="modal-title fw-black">Hubungkan SKU ke Item Internal</h5>
                 <button class="btn-close" data-bs-dismiss="modal"></button>
             </div>
             <div class="modal-body">
-                <input type="hidden" id="mapItemId">
-                <input type="hidden" id="mapSelectedItemId">
+                <input type="hidden" id="mapOrderItemId">
+                <input type="hidden" id="mapSelectedInternalId">
+
                 <div class="mb-3">
-                    <label class="form-label fw-bold" style="font-size:.75rem;color:#64748b">SKU MARKETPLACE</label>
-                    <code id="mapSku" style="font-size:.9rem;background:#f8fafc;padding:.25rem .6rem;border-radius:8px;display:inline-block">—</code>
+                    <label class="form-label fw-bold" style="font-size:.75rem;color:#64748b">MARKETPLACE SKU</label>
+                    <input type="text" class="form-control" id="mapSkuInput"
+                        placeholder="Marketplace SKU" style="border-radius:12px" autocomplete="off">
                 </div>
+
+                <div id="mapRecommendations" style="display:none;margin-bottom:1rem">
+                    <div class="fw-bold mb-1"
+                        style="font-size:.72rem;color:#64748b;text-transform:uppercase;letter-spacing:.04em">
+                        REKOMENDASI ITEM INTERNAL
+                    </div>
+                    <div id="mapRecoList" class="d-flex flex-wrap gap-2"></div>
+                </div>
+
                 <div class="mb-3">
-                    <label class="form-label fw-bold" style="font-size:.75rem;color:#64748b">PRODUK MARKETPLACE</label>
-                    <div id="mapItemName" style="font-size:.88rem;font-weight:600">—</div>
-                    <div id="mapVariant" style="font-size:.78rem;color:#64748b">—</div>
+                    <label class="form-label fw-bold" style="font-size:.75rem;color:#64748b">ITEM INTERNAL</label>
+                    <input type="text" class="form-control mb-1" id="mapItemSearch"
+                        placeholder="Cari kode atau nama item…" style="border-radius:12px" autocomplete="off">
+                    <div id="mapItemResults" class="border"
+                        style="border-radius:12px;overflow:hidden;display:none;max-height:200px;overflow-y:auto"></div>
+                    <div id="mapItemSelected" class="mt-1 fw-bold" style="font-size:.8rem;color:#166534"></div>
                 </div>
-                <div class="mb-2">
-                    <label class="form-label fw-bold" style="font-size:.75rem;color:#64748b">CARI PRODUK INTERNAL <span class="text-danger">*</span></label>
-                    <input type="text" class="form-control" id="mapSearch" placeholder="Ketik nama atau kode produk…"
-                        style="border-radius:12px;font-size:.88rem" oninput="searchItems()">
+
+                <div class="mb-3">
+                    <div class="form-check">
+                        <input type="checkbox" class="form-check-input" id="mapApplyAll" checked>
+                        <label class="form-check-label" for="mapApplyAll" style="font-size:.8rem">
+                            Hubungkan semua order dengan SKU marketplace yang sama
+                        </label>
+                    </div>
                 </div>
-                <div id="mapResults" style="max-height:200px;overflow-y:auto;border:1.5px solid #e2e8f0;border-radius:12px;background:#fff">
-                    <div style="padding:.75rem;font-size:.8rem;color:#94a3b8;text-align:center">Ketik untuk mencari produk internal…</div>
+
+                <div class="mb-3">
+                    <label class="form-label fw-bold" style="font-size:.75rem;color:#64748b">CATATAN</label>
+                    <input type="text" class="form-control" id="mapNotes" style="border-radius:12px">
                 </div>
-                <div id="mapSelected" class="d-none mt-2" style="background:#f0fdf4;border:1.5px solid #bbf7d0;border-radius:12px;padding:.6rem .9rem">
-                    <div style="font-size:.72rem;font-weight:800;color:#166534;margin-bottom:.2rem">DIPILIH</div>
-                    <div id="mapSelectedName" style="font-size:.85rem;font-weight:700;color:#0f172a"></div>
-                    <div id="mapSelectedCode" style="font-size:.72rem;color:#64748b"></div>
-                    <div id="mapSelectedHpp" style="font-size:.72rem;color:#64748b"></div>
+
+                <div id="mapAlert" class="alert d-none mb-3" style="border-radius:12px;font-size:.85rem"></div>
+
+                <div class="d-flex justify-content-end gap-2">
+                    <button class="btn btn-light border" style="border-radius:999px" data-bs-dismiss="modal">Batal</button>
+                    <button class="btn btn-dark fw-bold" style="border-radius:999px" id="mapSaveBtn"
+                        onclick="submitMapping()">Simpan</button>
                 </div>
-                <div class="form-check mt-3">
-                    <input type="checkbox" class="form-check-input" id="mapApplyAll" checked>
-                    <label class="form-check-label" for="mapApplyAll" style="font-size:.8rem">
-                        Hubungkan semua order dengan SKU marketplace yang sama
-                    </label>
-                </div>
-                <div id="mapAlert" class="d-none alert mt-2" style="border-radius:12px;font-size:.82rem"></div>
-            </div>
-            <div class="modal-footer border-0 pt-0 gap-2">
-                <button class="btn btn-light border" style="border-radius:999px" data-bs-dismiss="modal">Batal</button>
-                <button class="btn btn-dark fw-bold" style="border-radius:999px" id="mapBtn" onclick="submitMapping()">
-                    🔗 Hubungkan SKU
-                </button>
             </div>
         </div>
     </div>
@@ -368,6 +448,10 @@
     }
 
     function renderTable(items) {
+        // clear stale selections on new page load
+        selectedItems.clear();
+        updateBulkBar();
+
         if (!items.length) {
             $('tableBody').innerHTML = `<div class="oc-empty">
                 <div style="font-size:2rem;margin-bottom:.5rem">✓</div>
@@ -383,11 +467,18 @@
         <div class="gf-table-scroll">
         <table class="gf-clean-table w-100">
             <thead><tr>
+                <th class="chk-col"><input type="checkbox" id="chkAll" title="Pilih semua"
+                    onchange="toggleAll(this.checked)"></th>
                 <th>Order</th><th>Toko</th><th>Produk Marketplace</th><th>Variant</th>
-                <th>SKU Marketplace</th><th>Masalah</th><th class="text-end">Aksi Cepat</th>
+                <th>SKU Marketplace</th>
+                <th>Masalah</th><th class="text-end">Aksi Cepat</th>
             </tr></thead>
             <tbody>
             ${items.map(item => `<tr>
+                <td class="chk-col">
+                    <input type="checkbox" class="row-chk" value="${item.id}"
+                        onchange="toggleItem(${item.id},this.checked)">
+                </td>
                 <td style="white-space:nowrap">
                     <a href="/marketplace/orders" class="fw-bold text-decoration-none" style="font-size:.8rem">
                         ${esc(item.order_number || '—')}
@@ -401,9 +492,6 @@
                     <div class="fw-bold" style="overflow:hidden;text-overflow:ellipsis;white-space:nowrap" title="${esc(item.item_name||'')}">
                         ${esc(item.item_name || '—')}
                     </div>
-                    ${item.internal_item_name
-                        ? `<div style="font-size:.68rem;color:#3b82f6;margin-top:.1rem">→ ${esc(item.internal_item_name)}</div>`
-                        : ''}
                 </td>
                 <td style="font-size:.78rem;color:#475569">${esc(item.variant_name || '—')}</td>
                 <td>
@@ -416,6 +504,37 @@
             </tr>`).join('')}
             </tbody>
         </table></div>`;
+    }
+
+    function renderInternalItem(item) {
+        // Already linked
+        if (item.internal_item_name) {
+            return `<div style="font-size:.78rem">
+                <div style="font-weight:700;color:#166534;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;max-width:140px"
+                    title="${esc(item.internal_item_name)}">${esc(item.internal_item_name)}</div>
+                ${item.internal_item_code
+                    ? `<div style="font-size:.66rem;color:#64748b">${esc(item.internal_item_code)}</div>` : ''}
+            </div>`;
+        }
+        // Recommendation available
+        if (item.recommended_item) {
+            const r = item.recommended_item;
+            const rSku  = esc(item.marketplace_sku||'');
+            const rName = esc(item.item_name||'');
+            const rVar  = esc(item.variant_name||'');
+            const riId  = r.id, riName = esc(r.name), riCode = esc(r.code||''), riHpp = r.hpp||0;
+            return `<div style="font-size:.76rem">
+                <div class="rec-chip">Rekomendasi</div>
+                <div style="font-weight:700;color:#0f172a;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;max-width:140px"
+                    title="${esc(r.name)}">${esc(r.name)}</div>
+                ${r.code ? `<div style="font-size:.66rem;color:#64748b">${esc(r.code)}</div>` : ''}
+                <button class="btn btn-outline-warning btn-pakai"
+                    onclick="openMapping(${item.id},'${rSku}','${rName}','${rVar}',${riId},'${riName}','${riCode}',${riHpp})">
+                    Pakai ›
+                </button>
+            </div>`;
+        }
+        return '<span style="font-size:.72rem;color:#94a3b8">—</span>';
     }
 
     function renderIssueBadges(item) {
@@ -548,74 +667,127 @@
 
     // ── Modal: Mapping Sekarang ───────────────────────────────────────────
     let mapSearchTimer = null;
+    let mapSkuTimer    = null;
 
-    window.openMapping = function (itemId, sku, itemName, variant) {
-        $('mapItemId').value = itemId;
-        $('mapSelectedItemId').value = '';
-        $('mapSub').textContent = 'SKU: ' + (sku || '—');
-        $('mapSku').textContent  = sku      || '—';
-        $('mapItemName').textContent = itemName || '—';
-        $('mapVariant').textContent  = variant  || '—';
-        $('mapSearch').value = itemName || '';
-        $('mapResults').innerHTML = `<div style="padding:.75rem;font-size:.8rem;color:#94a3b8;text-align:center">Ketik untuk mencari produk internal…</div>`;
-        $('mapSelected').classList.add('d-none');
-        $('mapAlert').className = 'd-none alert';
-        $('mapBtn').disabled = false; $('mapBtn').textContent = '🔗 Hubungkan SKU';
+    async function fetchMapReco(sku) {
+        if (!sku || sku.length < 2) {
+            $('mapRecommendations').style.display = 'none';
+            return;
+        }
+        // Build a small query set from the SKU
+        const queries = new Set([sku, sku.split('-')[0], sku.replace(/[-_]\d+$/, '')]);
+        let results = [];
+        for (const q of queries) {
+            if (!q || q.length < 2) continue;
+            const items = await api('/api/sku-mappings/search-items?q=' + encodeURIComponent(q)).catch(() => []);
+            items.forEach(i => { if (!results.find(r => r.id === i.id)) results.push(i); });
+            if (results.length >= 6) break;
+        }
+        if (!results.length) { $('mapRecommendations').style.display = 'none'; return; }
+        $('mapRecommendations').style.display = 'block';
+        $('mapRecoList').innerHTML = results.slice(0, 6).map(i =>
+            `<button type="button" class="oc-reco-chip"
+                onclick="selectMapItem(${i.id},'${esc(i.code||'')}','${esc(i.name)}',0)">
+                <span class="oc-reco-chip-code">${esc(i.code||i.name)}</span>
+                <span class="oc-reco-chip-name">${esc(i.name)}</span>
+            </button>`
+        ).join('');
+    }
+
+    window.selectMapItem = function (id, code, name, hpp) {
+        $('mapSelectedInternalId').value = id;
+        $('mapItemSearch').value = code || name;
+        $('mapItemSelected').textContent = '✓ ' + (code ? code + ' — ' : '') + name;
+        $('mapItemResults').style.display = 'none';
+        // mark chip
+        document.querySelectorAll('#mapRecoList .oc-reco-chip').forEach(c => {
+            c.classList.toggle('is-selected', c.querySelector('.oc-reco-chip-code')?.textContent === (code || name));
+        });
+    }
+
+    window.openMapping = function (itemId, sku, itemName, variant, recId, recName, recCode, recHpp) {
+        $('mapOrderItemId').value       = itemId;
+        $('mapSelectedInternalId').value = '';
+        $('mapSkuInput').value           = sku || '';
+        $('mapItemSearch').value         = '';
+        $('mapItemSelected').textContent = '';
+        $('mapItemResults').style.display = 'none';
+        $('mapRecommendations').style.display = 'none';
+        $('mapRecoList').innerHTML       = '';
+        $('mapNotes').value              = '';
+        $('mapAlert').className          = 'alert d-none';
+        $('mapSaveBtn').disabled         = false;
+        $('mapSaveBtn').textContent      = 'Simpan';
         new bootstrap.Modal($('modalMapping')).show();
-        // Auto-search with item name
-        if (itemName) setTimeout(() => searchItems(), 100);
+        if (recId) {
+            // Pre-select the recommended item passed from table
+            setTimeout(() => selectMapItem(recId, recCode, recName, recHpp), 150);
+        }
+        if (sku) setTimeout(() => fetchMapReco(sku), 200);
     };
 
-    window.searchItems = function () {
-        clearTimeout(mapSearchTimer);
-        mapSearchTimer = setTimeout(async () => {
-            const q = $('mapSearch').value.trim();
-            if (!q) {
-                $('mapResults').innerHTML = `<div style="padding:.75rem;font-size:.8rem;color:#94a3b8;text-align:center">Ketik untuk mencari…</div>`;
-                return;
-            }
-            $('mapResults').innerHTML = `<div style="padding:.75rem;font-size:.8rem;color:#94a3b8;text-align:center">Mencari…</div>`;
-            try {
-                const items = await api('/api/marketplace/items/search?q=' + encodeURIComponent(q));
-                if (!items.length) {
-                    $('mapResults').innerHTML = `<div style="padding:.75rem;font-size:.8rem;color:#94a3b8;text-align:center">Produk tidak ditemukan.</div>`;
-                    return;
-                }
-                $('mapResults').innerHTML = items.map(i =>
-                    `<div class="map-result-item" style="padding:.6rem .9rem;cursor:pointer;border-bottom:1px solid #f1f5f9;font-size:.82rem"
-                        onmouseover="this.style.background='#f8fafc'" onmouseout="this.style.background=''"
-                        onclick="selectInternalItem(${i.id},'${esc(i.name)}','${esc(i.code||'')}',${i.hpp||0})">
-                        <div style="font-weight:700;color:#0f172a">${esc(i.name)}</div>
-                        <div style="color:#64748b">${esc(i.code||'')} ${i.hpp > 0 ? '· HPP: ' + fmtRp(i.hpp) : '· <span style=color:#b91c1c>HPP belum diisi</span>'}</div>
-                    </div>`
-                ).join('');
-            } catch (e) {
-                $('mapResults').innerHTML = `<div style="padding:.75rem;font-size:.8rem;color:#b91c1c">Gagal mencari: ${e.message}</div>`;
-            }
-        }, 350);
-    };
-
-    window.selectInternalItem = function (id, name, code, hpp) {
-        $('mapSelectedItemId').value = id;
-        $('mapSelectedName').textContent = name;
-        $('mapSelectedCode').textContent = code ? 'Kode: ' + code : '';
-        $('mapSelectedHpp').innerHTML  = hpp > 0
-            ? 'HPP: ' + fmtRp(hpp)
-            : '<span style="color:#b91c1c">HPP belum diisi — perlu diisi setelah mapping</span>';
-        $('mapSelected').classList.remove('d-none');
-        $('mapResults').innerHTML = `<div style="padding:.75rem;font-size:.8rem;color:#94a3b8;text-align:center">Klik produk lain untuk mengganti pilihan.</div>`;
-    };
+    // SKU input change → re-fetch reco
+    document.addEventListener('DOMContentLoaded', () => {
+        const skuInp = $('mapSkuInput');
+        if (skuInp) {
+            skuInp.addEventListener('input', () => {
+                clearTimeout(mapSkuTimer);
+                mapSkuTimer = setTimeout(() => fetchMapReco(skuInp.value.trim()), 400);
+            });
+        }
+        const srchInp = $('mapItemSearch');
+        if (srchInp) {
+            srchInp.addEventListener('input', function () {
+                clearTimeout(mapSearchTimer);
+                const q = this.value.trim();
+                if (q.length < 2) { $('mapItemResults').style.display = 'none'; return; }
+                mapSearchTimer = setTimeout(async () => {
+                    const items = await api('/api/sku-mappings/search-items?q=' + encodeURIComponent(q)).catch(() => []);
+                    const box = $('mapItemResults');
+                    if (!items.length) { box.style.display = 'none'; return; }
+                    box.style.display = 'block';
+                    box.innerHTML = items.map(i =>
+                        `<div class="p-2 border-bottom" style="cursor:pointer;font-size:.82rem"
+                            onmousedown="selectMapItem(${i.id},'${esc(i.code||'')}','${esc(i.name)}',0)">
+                            <strong>${esc(i.code||'')}</strong>${i.code ? ' — ' : ''}${esc(i.name)}
+                        </div>`
+                    ).join('');
+                }, 250);
+            });
+        }
+        // Bulk search
+        const bulkInp = $('bulkItemSearch');
+        if (bulkInp) {
+            bulkInp.addEventListener('input', function () {
+                clearTimeout(bulkSearchTimer);
+                const q = this.value.trim();
+                if (q.length < 2) { $('bulkItemResults').style.display = 'none'; return; }
+                bulkSearchTimer = setTimeout(async () => {
+                    const items = await api('/api/sku-mappings/search-items?q=' + encodeURIComponent(q)).catch(() => []);
+                    const box = $('bulkItemResults');
+                    if (!items.length) { box.style.display = 'none'; return; }
+                    box.style.display = 'block';
+                    box.innerHTML = items.map(i =>
+                        `<div class="p-2 border-bottom" style="cursor:pointer;font-size:.82rem"
+                            onmousedown="selectBulkItem(${i.id},'${esc(i.code||'')}','${esc(i.name)}',0)">
+                            <strong>${esc(i.code||'')}</strong>${i.code ? ' — ' : ''}${esc(i.name)}
+                        </div>`
+                    ).join('');
+                }, 250);
+            });
+        }
+    });
 
     window.submitMapping = async function () {
-        const itemId         = $('mapItemId').value;
-        const internalItemId = $('mapSelectedItemId').value;
-        if (!internalItemId) { showModalAlert('mapAlert', 'Pilih produk internal terlebih dahulu.', 'danger'); return; }
+        const orderItemId    = $('mapOrderItemId').value;
+        const internalItemId = $('mapSelectedInternalId').value;
+        if (!internalItemId) { showModalAlert('mapAlert', 'Pilih item internal terlebih dahulu.', 'danger'); return; }
 
-        const btn = $('mapBtn');
+        const btn = $('mapSaveBtn');
         btn.disabled = true; btn.textContent = 'Menyimpan…';
 
         try {
-            const res = await api('/api/marketplace/order-items/' + itemId + '/map-sku', {
+            const res = await api('/api/marketplace/order-items/' + orderItemId + '/map-sku', {
                 method: 'PATCH',
                 body: JSON.stringify({ internal_item_id: parseInt(internalItemId), apply_to_all: $('mapApplyAll').checked }),
             });
@@ -624,7 +796,7 @@
             loadItems(currentPage); loadSummary();
         } catch (e) {
             showModalAlert('mapAlert', e.message, 'danger');
-            btn.disabled = false; btn.textContent = '🔗 Hubungkan SKU';
+            btn.disabled = false; btn.textContent = 'Simpan';
         }
     };
 
@@ -687,6 +859,100 @@
             toast(e.message, 'err');
         } finally {
             btn.disabled = false; btn.textContent = '⟳ Re-map Semua';
+        }
+    };
+
+    // ── Bulk selection ───────────────────────────────────────────────────────
+    let selectedItems = new Set();
+
+    window.toggleItem = function (id, checked) {
+        if (checked) selectedItems.add(id);
+        else selectedItems.delete(id);
+        updateBulkBar();
+        const allChks = document.querySelectorAll('.row-chk');
+        const chkAll  = $('chkAll');
+        if (chkAll) {
+            chkAll.indeterminate = selectedItems.size > 0 && selectedItems.size < allChks.length;
+            chkAll.checked = allChks.length > 0 && selectedItems.size === allChks.length;
+        }
+    };
+
+    window.toggleAll = function (checked) {
+        document.querySelectorAll('.row-chk').forEach(chk => {
+            const id = parseInt(chk.value);
+            chk.checked = checked;
+            if (checked) selectedItems.add(id);
+            else selectedItems.delete(id);
+        });
+        updateBulkBar();
+    };
+
+    function updateBulkBar() {
+        const bar = $('bulkBar');
+        if (!bar) return;
+        if (selectedItems.size > 0) {
+            bar.style.display = 'flex';
+            $('bulkCount').textContent = selectedItems.size + ' item dipilih';
+        } else {
+            bar.style.display = 'none';
+        }
+    }
+
+    window.clearSelection = function () {
+        selectedItems.clear();
+        document.querySelectorAll('.row-chk').forEach(c => c.checked = false);
+        const chkAll = $('chkAll');
+        if (chkAll) { chkAll.checked = false; chkAll.indeterminate = false; }
+        updateBulkBar();
+    };
+
+    // ── Modal: Bulk Mapping ───────────────────────────────────────────────────
+    let bulkSearchTimer = null;
+
+    window.selectBulkItem = function (id, code, name, hpp) {
+        $('bulkSelectedInternalId').value = id;
+        $('bulkItemSearch').value = code || name;
+        $('bulkItemSelected').textContent = '✓ ' + (code ? code + ' — ' : '') + name;
+        $('bulkItemResults').style.display = 'none';
+    }
+
+    window.openBulkMap = function () {
+        if (!selectedItems.size) { toast('Pilih minimal 1 item dulu.', 'err'); return; }
+        $('bulkMapSub').textContent       = selectedItems.size + ' item akan di-mapping sekaligus';
+        $('bulkItemSearch').value         = '';
+        $('bulkSelectedInternalId').value = '';
+        $('bulkItemSelected').textContent = '';
+        $('bulkItemResults').style.display = 'none';
+        $('bulkMapAlert').className       = 'alert d-none';
+        $('bulkSaveBtn').disabled         = false;
+        $('bulkSaveBtn').textContent      = 'Hubungkan Semua';
+        new bootstrap.Modal($('modalBulkMap')).show();
+    };
+
+    window.submitBulkMap = async function () {
+        const internalItemId = $('bulkSelectedInternalId').value;
+        if (!internalItemId) { showModalAlert('bulkMapAlert', 'Pilih item internal terlebih dahulu.', 'danger'); return; }
+        if (!selectedItems.size) { showModalAlert('bulkMapAlert', 'Tidak ada item yang dipilih.', 'danger'); return; }
+
+        const btn = $('bulkSaveBtn');
+        btn.disabled = true; btn.textContent = 'Menyimpan…';
+
+        try {
+            const res = await api('/api/marketplace/order-items/bulk-map', {
+                method: 'POST',
+                body: JSON.stringify({
+                    item_ids:         Array.from(selectedItems),
+                    internal_item_id: parseInt(internalItemId),
+                    apply_to_all:     $('bulkApplyAll').checked,
+                }),
+            });
+            bootstrap.Modal.getInstance($('modalBulkMap')).hide();
+            clearSelection();
+            toast(res.message, 'ok');
+            loadItems(currentPage); loadSummary();
+        } catch (e) {
+            showModalAlert('bulkMapAlert', e.message, 'danger');
+            btn.disabled = false; btn.textContent = 'Hubungkan Semua';
         }
     };
 

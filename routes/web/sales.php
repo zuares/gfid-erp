@@ -7,7 +7,7 @@ use App\Http\Controllers\Sales\Reports\ShipmentAnalyticsController;
 use App\Http\Controllers\Sales\SalesInvoiceController;
 use Illuminate\Support\Facades\Route;
 
-Route::middleware(['web', 'auth', 'role:owner,admin'])
+Route::middleware(['web', 'auth', 'access:sales'])
     ->prefix('sales')
     ->as('sales.')
     ->group(function () {

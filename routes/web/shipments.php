@@ -4,7 +4,7 @@ use App\Http\Controllers\Sales\ShipmentController;
 use App\Http\Controllers\Sales\ShipmentReturnController;
 use Illuminate\Support\Facades\Route;
 
-Route::middleware(['web', 'auth', 'role:owner,admin'])
+Route::middleware(['web', 'auth', 'access:sales'])
     ->prefix('sales')
     ->as('sales.')
     ->group(function () {

@@ -81,6 +81,39 @@
             padding: 1.6rem;
         }
 
+        .prod-tab-count {
+            display: inline-flex;
+            align-items: center;
+            justify-content: center;
+            min-width: 1.55rem;
+            height: 1.35rem;
+            margin-left: .35rem;
+            padding: 0 .45rem;
+            border-radius: 999px;
+            background: rgba(15, 23, 42, .07);
+            color: #475569;
+            font-size: .68rem;
+            font-weight: 900;
+            font-variant-numeric: tabular-nums;
+            line-height: 1;
+        }
+
+        #prodTabs .gf-marketplace-tab {
+            display: inline-flex;
+            align-items: center;
+            gap: .25rem;
+        }
+
+        #prodTabs .gf-marketplace-tab.is-active,
+        #prodTabs .gf-marketplace-tab.is-active > span:first-child {
+            color: #fff !important;
+        }
+
+        .gf-marketplace-tab.is-active .prod-tab-count {
+            background: #fff;
+            color: #0f172a;
+        }
+
         /* Toolbar filter realtime (tab Siap Jahit) */
         .sj-toolbar {
             display: flex;
@@ -586,7 +619,11 @@
                 <div class="gf-marketplace-tabs" role="tablist" id="prodTabs">
                     @foreach ($tabs as $key => $label)
                         <button type="button" class="gf-marketplace-tab {{ $key === $initialTab ? 'is-active' : '' }}"
-                            data-tab-target="{{ $key }}">{{ $label }}</button>
+                            data-tab-target="{{ $key }}">
+                            <span>{{ $label }}</span>
+                            <span class="prod-tab-count" data-tab-count="{{ $key }}"
+                                title="Total bundle">{{ number_format((int) ($tabCounts[$key] ?? 0), 0, ',', '.') }}</span>
+                        </button>
                     @endforeach
                 </div>
             </div>
@@ -616,6 +653,7 @@
             const TAB_DESC = @json($tabDesc);
             const descEl = document.querySelector('.gf-master-desc');
             const setDesc = (name) => { if (descEl && TAB_DESC[name]) descEl.textContent = TAB_DESC[name]; };
+            const idFmt = (n) => (n || 0).toLocaleString('id-ID');
 
             const tabBtns = Array.from(document.querySelectorAll('#prodTabs .gf-marketplace-tab'));
             const panes = Array.from(document.querySelectorAll('[data-tab-panel]'));
@@ -663,6 +701,14 @@
                 return DATA_URL + '?' + params.toString();
             }
 
+            function updateTabCounts(counts) {
+                if (!counts) return;
+                Object.entries(counts).forEach(([name, count]) => {
+                    const el = document.querySelector('[data-tab-count="' + name + '"]');
+                    if (el) el.textContent = idFmt(Number(count) || 0);
+                });
+            }
+
             function activate(name) {
                 tabBtns.forEach(b => b.classList.toggle('is-active', b.dataset.tabTarget === name));
                 panes.forEach(p => p.hidden = (p.dataset.tabPanel !== name));
@@ -685,6 +731,7 @@
                     pane.innerHTML = json.html;
                     pane.dataset.loaded = '1';
                     if (json.meta?.period_label && periodLabel) periodLabel.textContent = json.meta.period_label;
+                    updateTabCounts(json.meta?.tab_counts);
                     // Terapkan filter default per-tab (mis. Penjahit default = Ambil Jahit).
                     if (typeof initTabFilters === 'function') initTabFilters(name, pane);
                 } catch (e) {
@@ -796,8 +843,6 @@
             });
 
             // ---- Filter realtime tab "Siap Jahit" (client-side, instan) ----
-            const idFmt = (n) => (n || 0).toLocaleString('id-ID');
-
             function applySjFilters(root) {
                 if (!root) return;
                 const table = root.querySelector('[data-sj-table]');

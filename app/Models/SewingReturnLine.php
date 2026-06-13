@@ -15,6 +15,9 @@ class SewingReturnLine extends Model
         'qty_ok',
         'qty_reject',
         'notes',
+        'source_type',
+        'source_reject_return_line_id',
+        'source_finishing_job_line_id',
     ];
 
     protected $casts = [
@@ -63,5 +66,15 @@ class SewingReturnLine extends Model
     {
         // ⬅️ RELASI YANG DIBUTUHKAN BLADE
         return $this->belongsTo(SewingPickupLine::class, 'sewing_pickup_line_id');
+    }
+
+    public function sourceRejectReturnLine()
+    {
+        return $this->belongsTo(self::class, 'source_reject_return_line_id');
+    }
+
+    public function sourceFinishingJobLine()
+    {
+        return $this->belongsTo(FinishingJobLine::class, 'source_finishing_job_line_id');
     }
 }

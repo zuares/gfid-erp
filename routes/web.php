@@ -1,5 +1,6 @@
 <?php
 
+use App\Http\Controllers\Owner\AccessControlController;
 use App\Http\Controllers\Owner\WorkLogController;
 
 // Grouping per domain
@@ -28,6 +29,11 @@ Route::middleware(['auth'])
     ->name('owner.')
     ->group(function () {
 
+        Route::middleware('role:owner')->group(function () {
+            Route::get('access-control', [AccessControlController::class, 'index'])->name('access-control.index');
+            Route::put('access-control', [AccessControlController::class, 'update'])->name('access-control.update');
+        });
+
         Route::post('work-logs/{workLog}/done', [WorkLogController::class, 'markDone'])->name('work-logs.mark-done');
         Route::post('work-logs/{workLog}/reopen', [WorkLogController::class, 'reopen'])->name('work-logs.reopen');
 
@@ -40,24 +46,36 @@ use App\Http\Controllers\MarketplaceController;
 use App\Http\Controllers\Owner\FulfillmentController;
 use App\Http\Controllers\Owner\SkuMappingController;
 use App\Http\Controllers\ShopeeStoreAuthController;
+use App\Http\Controllers\TikTokShopAuthController;
 
 // Marketplace — halaman
-Route::get('/marketplace/toko',        [MarketplaceController::class, 'toko'])->name('marketplace.toko');
-Route::get('/marketplace/orders',      [MarketplaceController::class, 'orders'])->name('marketplace.orders');
-Route::get('/marketplace/fulfillment', [MarketplaceController::class, 'fulfillment'])->name('marketplace.fulfillment');
-Route::get('/marketplace/sku-mapping', [MarketplaceController::class, 'skuMapping'])->name('marketplace.sku-mapping');
-Route::get('/marketplace/sync',        [MarketplaceController::class, 'sync'])->name('marketplace.sync');
-Route::get('/marketplace/settlement',  [MarketplaceController::class, 'settlement'])->name('marketplace.settlement');
-Route::get('/marketplace/profit',      [MarketplaceController::class, 'profit'])->name('marketplace.profit');
-Route::get('/marketplace/ads',         [MarketplaceController::class, 'ads'])->name('marketplace.ads');
-Route::get('/marketplace/issues',      [MarketplaceController::class, 'issueCenter'])->name('marketplace.issues');
+Route::middleware(['auth', 'access:marketplace'])->group(function () {
+    Route::get('/marketplace/toko',        [MarketplaceController::class, 'toko'])->name('marketplace.toko');
+    Route::get('/marketplace/orders',      [MarketplaceController::class, 'orders'])->name('marketplace.orders');
+    Route::get('/marketplace/fulfillment',                          [MarketplaceController::class, 'fulfillment'])->name('marketplace.fulfillment');
+    Route::get('/marketplace/fulfillment/{fulfillment}/history',    [FulfillmentController::class, 'history'])->name('marketplace.fulfillment.history');
+    Route::get('/marketplace/picking',     [MarketplaceController::class, 'picking'])->name('marketplace.picking');
+    Route::get('/marketplace/sku-mapping', [MarketplaceController::class, 'skuMapping'])->name('marketplace.sku-mapping');
+    Route::get('/marketplace/sync',        [MarketplaceController::class, 'sync'])->name('marketplace.sync');
+    Route::get('/marketplace/settlement',  [MarketplaceController::class, 'settlement'])->name('marketplace.settlement');
+    Route::get('/marketplace/profit',      [MarketplaceController::class, 'profit'])->name('marketplace.profit');
+    Route::get('/marketplace/ads',         [MarketplaceController::class, 'ads'])->name('marketplace.ads');
+    Route::get('/marketplace/analytics',  [MarketplaceController::class, 'analytics'])->name('marketplace.analytics');
+    Route::get('/marketplace/issues',      [MarketplaceController::class, 'issueCenter'])->name('marketplace.issues');
+});
 
-// Shopee OAuth
-Route::get('/marketplace/shopee/connect',  [ShopeeStoreAuthController::class, 'redirect'])->name('marketplace.shopee.connect');
-Route::get('/marketplace/shopee/callback', [ShopeeStoreAuthController::class, 'callback'])->name('marketplace.shopee.callback');
+Route::middleware(['auth', 'access:marketplace'])->group(function () {
+    // Shopee OAuth
+    Route::get('/marketplace/shopee/connect',  [ShopeeStoreAuthController::class, 'redirect'])->name('marketplace.shopee.connect');
+    Route::get('/marketplace/shopee/callback', [ShopeeStoreAuthController::class, 'callback'])->name('marketplace.shopee.callback');
+
+    // TikTok Shop OAuth
+    Route::get('/marketplace/tiktok/connect',  [TikTokShopAuthController::class, 'redirect'])->name('marketplace.tiktok.connect');
+    Route::get('/marketplace/tiktok/callback', [TikTokShopAuthController::class, 'callback'])->name('marketplace.tiktok.callback');
+});
 
 // Marketplace API
-Route::prefix('api/marketplace')->group(function () {
+Route::middleware(['auth', 'access:marketplace'])->prefix('api/marketplace')->group(function () {
     Route::post('/bootstrap', [MarketplaceController::class, 'bootstrap'])
         ->withoutMiddleware([\Illuminate\Foundation\Http\Middleware\VerifyCsrfToken::class]);
 
@@ -82,6 +100,7 @@ Route::prefix('api/marketplace')->group(function () {
         ->withoutMiddleware([\Illuminate\Foundation\Http\Middleware\VerifyCsrfToken::class]);
     Route::get('/stores-summary',  [MarketplaceController::class, 'storesSummary']);
     Route::get('/items/search',    [MarketplaceController::class, 'searchInternalItems']);
+    Route::get('/items/by-code',   [MarketplaceController::class, 'itemByCode']);
     Route::patch('/order-items/{item}/fill-sku',  [MarketplaceController::class, 'fillItemSku'])
         ->withoutMiddleware([\Illuminate\Foundation\Http\Middleware\VerifyCsrfToken::class]);
     Route::patch('/order-items/{item}/map-sku',   [MarketplaceController::class, 'mapItemSku'])
@@ -89,6 +108,8 @@ Route::prefix('api/marketplace')->group(function () {
     Route::patch('/order-items/{item}/fill-hpp',  [MarketplaceController::class, 'fillItemHpp'])
         ->withoutMiddleware([\Illuminate\Foundation\Http\Middleware\VerifyCsrfToken::class]);
     Route::post('/order-items/{item}/recalc-profit', [MarketplaceController::class, 'recalcItemProfit'])
+        ->withoutMiddleware([\Illuminate\Foundation\Http\Middleware\VerifyCsrfToken::class]);
+    Route::post('/order-items/bulk-map',              [MarketplaceController::class, 'bulkMapSku'])
         ->withoutMiddleware([\Illuminate\Foundation\Http\Middleware\VerifyCsrfToken::class]);
     Route::patch('/ad-campaigns/{campaign}/break-even', [MarketplaceController::class, 'updateCampaignBreakEven'])
         ->withoutMiddleware([\Illuminate\Foundation\Http\Middleware\VerifyCsrfToken::class]);
@@ -100,23 +121,67 @@ Route::prefix('api/marketplace')->group(function () {
 });
 
 // Fulfillment API
-Route::prefix('api/fulfillments')->group(function () {
+Route::middleware(['auth', 'access:marketplace'])->prefix('api/fulfillments')->group(function () {
     Route::get('/',                                    [FulfillmentController::class, 'index']);
+    Route::get('/batch-stats',                         [FulfillmentController::class, 'batchStats']);
     Route::post('/create-draft',                       [FulfillmentController::class, 'createDraft'])
+        ->withoutMiddleware([\Illuminate\Foundation\Http\Middleware\VerifyCsrfToken::class]);
+    Route::post('/scan',                               [FulfillmentController::class, 'scanOrder'])
         ->withoutMiddleware([\Illuminate\Foundation\Http\Middleware\VerifyCsrfToken::class]);
     Route::post('/remap-all',                          [FulfillmentController::class, 'remapAll'])
         ->withoutMiddleware([\Illuminate\Foundation\Http\Middleware\VerifyCsrfToken::class]);
-    Route::get('/{fulfillment}',                       [FulfillmentController::class, 'show']);
-    Route::patch('/{fulfillment}/lines/{line}',        [FulfillmentController::class, 'updateLine'])
+    // Picking workflow
+    Route::get('/picking-queue',                              [FulfillmentController::class, 'pickingQueue']);
+    Route::post('/start-picking',                             [FulfillmentController::class, 'startPicking'])
         ->withoutMiddleware([\Illuminate\Foundation\Http\Middleware\VerifyCsrfToken::class]);
-    Route::post('/{fulfillment}/confirm',              [FulfillmentController::class, 'confirm'])
+    Route::get('/{fulfillment}',                              [FulfillmentController::class, 'show']);
+    Route::patch('/{fulfillment}/lines/{line}',               [FulfillmentController::class, 'updateLine'])
         ->withoutMiddleware([\Illuminate\Foundation\Http\Middleware\VerifyCsrfToken::class]);
-    Route::post('/{fulfillment}/refresh-stock',        [FulfillmentController::class, 'refreshStock'])
+    Route::post('/{fulfillment}/confirm',                     [FulfillmentController::class, 'confirm'])
         ->withoutMiddleware([\Illuminate\Foundation\Http\Middleware\VerifyCsrfToken::class]);
+    Route::post('/{fulfillment}/refresh-stock',               [FulfillmentController::class, 'refreshStock'])
+        ->withoutMiddleware([\Illuminate\Foundation\Http\Middleware\VerifyCsrfToken::class]);
+    Route::post('/{fulfillment}/mark-packed',                 [FulfillmentController::class, 'markPacked'])
+        ->withoutMiddleware([\Illuminate\Foundation\Http\Middleware\VerifyCsrfToken::class]);
+    Route::post('/{fulfillment}/unpack',                      [FulfillmentController::class, 'unpack'])
+        ->withoutMiddleware([\Illuminate\Foundation\Http\Middleware\VerifyCsrfToken::class]);
+    Route::post('/{fulfillment}/lines/{line}/toggle-picked',  [FulfillmentController::class, 'toggleLinePicked'])
+        ->withoutMiddleware([\Illuminate\Foundation\Http\Middleware\VerifyCsrfToken::class]);
+    Route::post('/{fulfillment}/lines/{line}/flag-problem',   [FulfillmentController::class, 'flagLineProblem'])
+        ->withoutMiddleware([\Illuminate\Foundation\Http\Middleware\VerifyCsrfToken::class]);
+    Route::post('/{fulfillment}/lines/{line}/resolve-problem',[FulfillmentController::class, 'resolveLineProblem'])
+        ->withoutMiddleware([\Illuminate\Foundation\Http\Middleware\VerifyCsrfToken::class]);
+    Route::post('/{fulfillment}/complete-picking',            [FulfillmentController::class, 'completePicking'])
+        ->withoutMiddleware([\Illuminate\Foundation\Http\Middleware\VerifyCsrfToken::class]);
+    Route::post('/{fulfillment}/lines/{line}/substitute',     [FulfillmentController::class, 'substituteItem'])
+        ->withoutMiddleware([\Illuminate\Foundation\Http\Middleware\VerifyCsrfToken::class]);
+    Route::post('/{fulfillment}/lines/{line}/split',          [FulfillmentController::class, 'splitLine'])
+        ->withoutMiddleware([\Illuminate\Foundation\Http\Middleware\VerifyCsrfToken::class]);
+    Route::post('/{fulfillment}/lines/{line}/restore-split',  [FulfillmentController::class, 'restoreSplitLine'])
+        ->withoutMiddleware([\Illuminate\Foundation\Http\Middleware\VerifyCsrfToken::class]);
+    Route::post('/{fulfillment}/batch-confirm',               [FulfillmentController::class, 'batchConfirm'])
+        ->withoutMiddleware([\Illuminate\Foundation\Http\Middleware\VerifyCsrfToken::class]);
+    Route::post('/{fulfillment}/pack',                        [FulfillmentController::class, 'packOrder'])
+        ->withoutMiddleware([\Illuminate\Foundation\Http\Middleware\VerifyCsrfToken::class]);
+    Route::post('/{fulfillment}/confirm-packed',              [FulfillmentController::class, 'confirmPacked'])
+        ->withoutMiddleware([\Illuminate\Foundation\Http\Middleware\VerifyCsrfToken::class]);
+    Route::get('/{fulfillment}/audit-logs',                   [FulfillmentController::class, 'auditLogs']);
 });
 
+// Dev-only API (non-production)
+if (! app()->isProduction()) {
+    $noCsrf = [\Illuminate\Foundation\Http\Middleware\VerifyCsrfToken::class];
+    Route::middleware(['auth', 'access:marketplace'])->group(function () use ($noCsrf) {
+        Route::post('/api/dev/fresh-orders',       [MarketplaceController::class, 'devFreshOrders'])->withoutMiddleware($noCsrf);
+        Route::post('/api/dev/seed-orders',        [MarketplaceController::class, 'devSeedOrders'])->withoutMiddleware($noCsrf);
+        Route::post('/api/dev/reset-fulfillments', [MarketplaceController::class, 'devResetFulfillments'])->withoutMiddleware($noCsrf);
+        Route::get('/api/dev/next-order',          [MarketplaceController::class, 'devNextOrder']);
+        Route::get('/api/dev/stats',               [MarketplaceController::class, 'devStats']);
+    });
+}
+
 // SKU Mapping API
-Route::prefix('api/sku-mappings')->group(function () {
+Route::middleware(['auth', 'access:marketplace'])->prefix('api/sku-mappings')->group(function () {
     Route::get('/',                  [SkuMappingController::class, 'index']);
     Route::post('/',                 [SkuMappingController::class, 'store'])
         ->withoutMiddleware([\Illuminate\Foundation\Http\Middleware\VerifyCsrfToken::class]);

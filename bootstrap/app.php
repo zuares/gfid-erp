@@ -1,6 +1,7 @@
 <?php
 
 use App\Console\Commands\SeedProductionBoms;
+use App\Http\Middleware\EnsureModuleAccess;
 use App\Http\Middleware\RoleMiddleware;
 use Illuminate\Console\Scheduling\Schedule;
 use Illuminate\Foundation\Application;
@@ -16,6 +17,7 @@ return Application::configure(basePath: dirname(__DIR__))
     )
     ->withMiddleware(function (Middleware $middleware): void {
         $middleware->alias([
+            'access' => EnsureModuleAccess::class,
             'role' => RoleMiddleware::class,
             \Laravel\Sanctum\Http\Middleware\EnsureFrontendRequestsAreStateful::class,
         ]);

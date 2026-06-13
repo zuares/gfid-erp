@@ -83,7 +83,7 @@
         @if ($isEdit && ($cashExpense->proof_photo_path ?? null))
             <small>
                 Foto saat ini:
-                <a href="{{ Storage::disk('public')->url($cashExpense->proof_photo_path) }}" target="_blank" rel="noopener">
+                <a href="{{ route('accounting.cash-expenses.proof', $cashExpense) }}" target="_blank" rel="noopener">
                     lihat bukti
                 </a>
             </small>
@@ -307,4 +307,3 @@ document.addEventListener('DOMContentLoaded', function () {
     });
 });
 </script>
-

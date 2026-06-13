@@ -25,9 +25,9 @@
         <div class="gf-overview-kpi-note">pegang WIP jahit</div>
     </div>
     <div class="gf-overview-kpi-card">
-        <div class="gf-overview-kpi-label">Baris WIP</div>
-        <div class="gf-overview-kpi-value">{{ $fmt($lines->count()) }}</div>
-        <div class="gf-overview-kpi-note">bundle dalam proses</div>
+        <div class="gf-overview-kpi-label">Total Bundle</div>
+        <div class="gf-overview-kpi-value">{{ $fmt($total_bundle_count ?? $lines->count()) }}</div>
+        <div class="gf-overview-kpi-note">sedang dijahit saat ini</div>
     </div>
 </div>
 

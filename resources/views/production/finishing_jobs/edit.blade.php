@@ -111,6 +111,7 @@
                   <th class="text-end" style="width:11%;">Qty OK</th>
                   <th class="text-end" style="width:11%;">Qty Reject</th>
                   <th class="text-end" style="width:11%;">Sisa</th>
+                  <th style="width:13%;">Jenis Reject</th>
                   <th style="width:17%;">Alasan Reject</th>
                 </tr>
               </thead>
@@ -130,6 +131,7 @@
                     $qtyOk = (int) old("lines.$idx.qty_ok", $isOld ? ($line['qty_ok'] ?? 0) : ($line->qty_ok ?? 0));
                     $qtyRj = (int) old("lines.$idx.qty_reject", $isOld ? ($line['qty_reject'] ?? 0) : ($line->qty_reject ?? 0));
                     $reason = old("lines.$idx.reject_reason", $isOld ? ($line['reject_reason'] ?? '') : ($line->reject_reason ?? ''));
+                    $rejectCause = old("lines.$idx.reject_cause", $isOld ? ($line['reject_cause'] ?? 'finishing') : ($line->reject_cause ?? 'finishing'));
 
                     // (opsional) kalau mau super cepat tanpa N+1, preload item+bundle di controller.
                     $bundleModel = $isOld ? \App\Models\CuttingJobBundle::find($bundleId) : ($line->bundle ?? null);
@@ -191,6 +193,18 @@
                     </td>
 
                     <td>
+                      <select name="lines[{{ $idx }}][reject_cause]"
+                              class="form-select form-select-sm @error("lines.$idx.reject_cause") is-invalid @enderror"
+                              @disabled($isPosted)>
+                        <option value="finishing" @selected($rejectCause === 'finishing')>Finishing</option>
+                        <option value="sewing" @selected($rejectCause === 'sewing')>Jahit</option>
+                      </select>
+                      @error("lines.$idx.reject_cause")
+                        <div class="invalid-feedback">{{ $message }}</div>
+                      @enderror
+                    </td>
+
+                    <td>
                       <input type="text"
                              name="lines[{{ $idx }}][reject_reason]"
                              class="form-control form-control-sm js-reason @error("lines.$idx.reject_reason") is-invalid @enderror"
@@ -206,7 +220,7 @@
                   </tr>
                 @empty
                   <tr>
-                    <td colspan="7" class="text-center py-4 text-muted">
+                    <td colspan="8" class="text-center py-4 text-muted">
                       Tidak ada detail untuk diedit.
                     </td>
                   </tr>

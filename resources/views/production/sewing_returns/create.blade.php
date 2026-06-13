@@ -126,13 +126,17 @@
     use Carbon\Carbon;
 
     $dateValue = old('date', now()->toDateString());
-
     $selectedOperatorId = (string) (request('operator_id', old('operator_id', $operatorId ?? '')) ?? '');
     $selectedPickupDate = (string) (request('pickup_date', '') ?? '');
 
     $isAllMode = $selectedOperatorId === '' || $selectedOperatorId === '0';
 
+    $isRejectReworkMode = (bool) ($isRejectReworkMode ?? false);
     $lines = $lines ?? collect();
+    $hasRejectRows = $lines->contains(fn($line) => (int) ($line->source_reject_return_line_id ?? 0) > 0 || (int) ($line->source_finishing_job_line_id ?? 0) > 0);
+    $pageTitle = $isRejectReworkMode ? 'Setor Ulang Reject Jahit' : 'Sewing Return';
+    $sourceStockLabel = $isRejectReworkMode ? 'REJ-SEW' : ($hasRejectRows ? 'STOK' : 'WIP');
+    $remainingLabel = $isRejectReworkMode ? 'SISA REJECT' : ($hasRejectRows ? 'SISA' : 'BELUM');
 
     $itemOptions = $lines
         ->map(fn($l) => strtoupper(optional($l->finishedItem)->code ?? ''))
@@ -157,7 +161,7 @@
     // controller mengirim:
     // - $destinationWarehouses (collection)
     // - $defaultDestWarehouseId (int)
-    // - $canChooseDestination (bool) => true hanya owner
+    // - $canChooseDestination (bool)
     $destinationWarehouses = $destinationWarehouses ?? collect();
     $defaultDestWarehouseId = (int) ($defaultDestWarehouseId ?? 0);
 
@@ -248,13 +252,16 @@
         <div class="panel-h">
             <div class="d-flex align-items-start justify-content-between gap-2 flex-wrap">
                 <div>
-                    <div class="h-title">Sewing Return</div>
+                    <div class="h-title">{{ $pageTitle }}</div>
+                    @if ($isRejectReworkMode)
+                        <div class="text-muted small mt-1">Sumber stok dari REJ-SEW, lalu disetor ulang ke gudang tujuan.</div>
+                    @endif
                 </div>
 
-                <a href="{{ route('production.sewing.pickups.create') }}"
+                <a href="{{ $isRejectReworkMode ? route('production.sewing.reject_returns.index') : route('production.sewing.pickups.create') }}"
                    class="btn btn-sm btn-outline-success"
                    style="border-radius:999px;">
-                    Sewing Pickup
+                    {{ $isRejectReworkMode ? 'List Reject Jahit' : 'Sewing Pickup' }}
                 </a>
             </div>
         </div>
@@ -295,31 +302,19 @@
                             @enderror
                         </div>
 
-                        {{-- ✅ Tujuan Barang Jadi: OWNER boleh pilih; non-owner disembunyikan (hidden input) --}}
-                        <div class="col-6 col-md-3" id="dest-wrap" style="{{ $canChooseDestination ? '' : 'display:none;' }}">
-                            <label class="form-label form-label-sm">Tujuan Barang Jadi</label>
-
-                            <select id="destination" name="destination_warehouse_id"
-                                class="form-select form-select-sm @error('destination_warehouse_id') is-invalid @enderror">
-                                @foreach($destinationWarehouses as $wh)
-                                    <option value="{{ $wh->id }}"
-                                        @selected((int) old('destination_warehouse_id', $defaultDestWarehouseId) === (int) $wh->id)>
-                                        {{ $wh->code }} — {{ $wh->name }}
-                                        @if($wh->code === 'WH-RTS')
-                                            (Owner Only)
-                                        @endif
-                                    </option>
-                                @endforeach
-                            </select>
-
+                        <div class="col-6 col-md-3" id="dest-wrap">
+                            <label class="form-label form-label-sm">Masuk Ke</label>
+                            <input type="hidden" id="destination" name="destination_warehouse_id" value="{{ (int) $defaultDestWarehouseId }}"
+                                   data-label="{{ optional($destinationWarehouses->firstWhere('id', $defaultDestWarehouseId))->code ?? 'WIP-FIN' }} — {{ optional($destinationWarehouses->firstWhere('id', $defaultDestWarehouseId))->name ?? 'Sedang Finishing' }}">
+                            <div class="form-control form-control-sm mono" style="border-radius:12px; font-weight:900;">
+                                {{ optional($destinationWarehouses->firstWhere('id', $defaultDestWarehouseId))->code ?? 'WIP-FIN' }}
+                                —
+                                {{ optional($destinationWarehouses->firstWhere('id', $defaultDestWarehouseId))->name ?? 'Sedang Finishing' }}
+                            </div>
                             @error('destination_warehouse_id')
-                                <div class="invalid-feedback">{{ $message }}</div>
+                                <div class="text-danger small mt-1">{{ $message }}</div>
                             @enderror
                         </div>
-
-                        @if(!$canChooseDestination)
-                            <input type="hidden" name="destination_warehouse_id" value="{{ (int) $defaultDestWarehouseId }}">
-                        @endif
 
                         <div class="col-6 col-md-2">
                             <label class="form-label form-label-sm">Filter item</label>
@@ -354,7 +349,7 @@
                         <div class="d-flex gap-2 flex-wrap align-items-center">
                             <span class="pill">Total Iket: <span class="mono" id="stat-total-rows">0</span></span>
                             <span class="pill">Di Setor: <span class="mono" id="stat-picked-rows">0</span></span>
-                            <span class="pill">Total OK: <span class="mono" id="stat-total-ok">0,00</span></span>
+                            <span class="pill">{{ $isRejectReworkMode ? 'Total Setor' : 'Total OK' }}: <span class="mono" id="stat-total-ok">0,00</span></span>
                         </div>
 
                         <div class="d-flex gap-2 align-items-center">
@@ -375,14 +370,14 @@
                     @else
                         <div class="sum-box mb-2">
                             <div class="sum-top">
-                                <div><div class="ttl">Summary (Belum Setor)</div></div>
+                                <div><div class="ttl">{{ $isRejectReworkMode ? 'Summary (Reject Siap Setor)' : 'Summary (Belum Setor)' }}</div></div>
                                 <div class="text-end">
                                     <div class="sub">Update: <span class="mono">{{ now()->format('H:i') }}</span></div>
                                 </div>
                             </div>
                             <div class="sum-pillrow">
                                 <div class="sum-pill"><span class="lbl">Item</span><span class="val mono">{{ number_format($summaryItems, 0, ',', '.') }}</span></div>
-                                <div class="sum-pill"><span class="lbl">Total Belum</span><span class="val mono">{{ number_format($summaryRemaining, 2, ',', '.') }}</span></div>
+                                <div class="sum-pill"><span class="lbl">{{ $isRejectReworkMode ? 'Total Reject' : 'Total Belum' }}</span><span class="val mono">{{ number_format($summaryRemaining, 2, ',', '.') }}</span></div>
                                 <div class="sum-pill"><span class="lbl">Operator</span><span class="val mono">{{ number_format($summaryOps, 0, ',', '.') }}</span></div>
                             </div>
                         </div>
@@ -414,8 +409,8 @@
                                                 </div>
                                                 <div class="d-flex align-items-center gap-2">
                                                     <span class="acc-pill">OP <span class="mono">{{ number_format($opCount, 0, ',', '.') }}</span></span>
-                                                    <span class="acc-pill">BELUM <span class="mono">{{ number_format($remainingSum, 2, ',', '.') }}</span></span>
-                                                    <span class="acc-pill">WIP <span class="mono">{{ number_format($wip, 2, ',', '.') }}</span></span>
+                                                    <span class="acc-pill">{{ $remainingLabel }} <span class="mono">{{ number_format($remainingSum, 2, ',', '.') }}</span></span>
+                                                    <span class="acc-pill">{{ $sourceStockLabel }} <span class="mono">{{ number_format($wip, 2, ',', '.') }}</span></span>
                                                 </div>
                                             </div>
                                         </button>
@@ -433,7 +428,7 @@
                                                             <tr>
                                                                 <th style="width:56px;">No</th>
                                                                 <th>Operator</th>
-                                                                <th class="text-end" style="width:170px;">Belum</th>
+                                                                <th class="text-end" style="width:170px;">{{ $isRejectReworkMode ? 'Sisa Reject' : 'Belum' }}</th>
                                                                 <th class="text-end" style="width:110px;">Iket</th>
                                                             </tr>
                                                         </thead>
@@ -518,37 +513,55 @@
                                     </div>
 
                                     <div class="right-metrics">
-                                        BELUM {{ number_format($remaining, 2, ',', '.') }}<br>
-                                        WIP {{ number_format($wip, 2, ',', '.') }}
+                                        {{ $remainingLabel }} {{ number_format($remaining, 2, ',', '.') }}<br>
+                                        {{ $sourceStockLabel }} {{ number_format($wip, 2, ',', '.') }}
                                     </div>
                                 </div>
 
                                 <div class="cardx-b">
                                     <div class="grid2">
                                         <div class="field">
-                                            <label>Di setor</label>
+                                            <label>{{ $isRejectReworkMode ? 'Setor Ulang' : 'Di setor' }}</label>
                                             <input type="number" step="0.01" min="0" inputmode="decimal"
                                                    class="form-control form-control-sm qty ok num-input select-all-on-focus"
                                                    name="results[{{ $idx }}][qty_ok]"
                                                    value="{{ $okVal }}" placeholder="0">
                                         </div>
 
-                                        <div class="field">
-                                            <label>Reject</label>
-                                            <input type="number" step="0.01" min="0" inputmode="decimal"
-                                                   class="form-control form-control-sm qty rj num-input select-all-on-focus"
-                                                   name="results[{{ $idx }}][qty_reject]"
-                                                   value="{{ $rjVal }}" placeholder="0">
-                                        </div>
+                                        @if ($isRejectReworkMode)
+                                            <input type="hidden" name="results[{{ $idx }}][qty_reject]" value="0">
+                                            <div class="field">
+                                                <label>Sumber</label>
+                                                <div class="form-control form-control-sm mono" style="border-radius:999px; font-weight:900; text-align:center;">
+                                                    {{ $line->reject_code ?? 'REJ-SEW' }}
+                                                </div>
+                                            </div>
+                                        @else
+                                            <div class="field">
+                                                <label>Reject</label>
+                                                <input type="number" step="0.01" min="0" inputmode="decimal"
+                                                       class="form-control form-control-sm qty rj num-input select-all-on-focus"
+                                                       name="results[{{ $idx }}][qty_reject]"
+                                                       value="{{ $rjVal }}" placeholder="0">
+                                            </div>
+                                        @endif
                                     </div>
 
-                                    <div class="notes {{ $showNotes ? 'is-show' : '' }}">
+                                    <div class="notes {{ (!$isRejectReworkMode && $showNotes) ? 'is-show' : '' }}">
                                         <input type="text" class="form-control form-control-sm"
                                                name="results[{{ $idx }}][notes]"
                                                placeholder="Catatan reject (opsional)" value="{{ $notes }}">
                                     </div>
 
                                     <input type="hidden" name="results[{{ $idx }}][sewing_pickup_line_id]" value="{{ $line->id }}">
+                                    @if ($isRejectReworkMode)
+                                        @if ((int) ($line->source_reject_return_line_id ?? 0) > 0)
+                                            <input type="hidden" name="results[{{ $idx }}][source_reject_return_line_id]" value="{{ (int) $line->source_reject_return_line_id }}">
+                                        @endif
+                                        @if ((int) ($line->source_finishing_job_line_id ?? 0) > 0)
+                                            <input type="hidden" name="results[{{ $idx }}][source_finishing_job_line_id]" value="{{ (int) $line->source_finishing_job_line_id }}">
+                                        @endif
+                                    @endif
                                 </div>
                             </div>
                         @endforeach
@@ -1051,7 +1064,7 @@ document.addEventListener('DOMContentLoaded', () => {
         if (mOp) mOp.textContent = (operator?.value ? (opt ? opt.text : '-') : 'SEMUA');
 
         const destOpt = destination?.options?.[destination.selectedIndex];
-        if (mDest) mDest.textContent = destOpt ? destOpt.text : '-';
+        if (mDest) mDest.textContent = destination?.dataset?.label || (destOpt ? destOpt.text : '-');
 
         rebuildModalItems();
 
@@ -1130,4 +1143,3 @@ document.addEventListener('DOMContentLoaded', function () {
     errorBox.style.display = 'none';
 });
 </script>
-

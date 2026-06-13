@@ -5,7 +5,7 @@ use App\Http\Controllers\Api\AccountSuggestController;
 use App\Http\Controllers\Api\CustomerController as ApiCustomerController;
 use App\Http\Controllers\Api\ItemController;
 
-Route::prefix('v1')->group(function () {
+Route::middleware('auth:sanctum')->prefix('v1')->group(function () {
     Route::get('/items', [ItemController::class, 'index']);
     Route::get('/items/suggest', [ItemController::class, 'suggest']);
     Route::get('/items/{item}', [ItemController::class, 'show']);
@@ -17,7 +17,7 @@ Route::prefix('v1')->group(function () {
 
 Route::prefix('api')
     ->name('api.')
-    ->middleware(['auth'])
+    ->middleware(['auth:sanctum'])
     ->group(function () {
         Route::get('/customers/suggest', [ApiCustomerController::class, 'suggest'])
             ->name('customers.suggest');

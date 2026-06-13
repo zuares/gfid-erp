@@ -70,6 +70,7 @@ class ProductionDashboardController extends Controller
                 'operatorOptions' => Employee::where('role', 'sewing')->orderBy('code')->get(),
                 'itemOptions' => Item::where('type', 'finished_good')->orderBy('code')->get(),
                 'categoryOptions' => ItemCategory::where('active', 1)->orderBy('name')->get(),
+                'tabCounts' => $this->tabCounts($filters),
             ],
             $this->tabData($initialTab, $filters),
         ));
@@ -98,6 +99,7 @@ class ProductionDashboardController extends Controller
                 'item_id' => $filters['item_id'],
                 'category_id' => $filters['category_id'],
                 'period_label' => $this->periodLabel($filters),
+                'tab_counts' => $this->tabCounts($filters),
             ],
         ]);
     }
@@ -277,6 +279,236 @@ class ProductionDashboardController extends Controller
                 'timeline' => $this->buildActivityTimeline($f),
             ],
         };
+    }
+
+    /**
+     * Count badge per tab. Dibuat ringan dan berbasis filter aktif.
+     * Angkanya dipakai di tombol tab, bukan sebagai pengganti KPI di isi tab.
+     */
+    private function tabCounts(array $f): array
+    {
+        $summary = $this->productionActivityCount($f);
+
+        return [
+            'prioritas' => $this->priorityBundleCount($f),
+            'ringkasan' => $summary,
+            'siap-jahit' => $this->readySewingBundleCount($f),
+            'sedang-jahit' => $this->sewingOutstandingBundleCount($f),
+            'setor-qc' => $this->sewingReturnBundleCount($f),
+            'reject' => $this->rejectBundleCount($f),
+        ];
+    }
+
+    private function readySewingBundleCount(array $f): int
+    {
+        $wipCutId = Warehouse::where('code', 'WIP-CUT')->value('id');
+
+        $q = CuttingJobBundle::query()
+            ->readyForSewing($wipCutId);
+
+        if ($f['item_id']) {
+            $q->where('finished_item_id', $f['item_id']);
+        }
+        if ($f['category_id']) {
+            $q->whereHas('finishedItem', fn($qq) => $qq->where('item_category_id', $f['category_id']));
+        }
+        return (int) $q->count();
+    }
+
+    private function sewingOutstandingBaseQuery(array $f)
+    {
+        $wipSewId = Warehouse::whereIn('code', ['WIP-SEW', 'WH-SEWING'])->value('id');
+
+        $remainingExpr = 'pl.qty_bundle'
+            . ' - COALESCE(pl.qty_returned_ok,0)'
+            . ' - COALESCE(pl.qty_returned_reject,0)'
+            . ' - COALESCE(pl.qty_direct_picked,0)'
+            . ' - COALESCE(pl.qty_progress_adjusted,0)';
+
+        $q = DB::table('sewing_pickup_lines as pl')
+            ->join('sewing_pickups as p', 'p.id', '=', 'pl.sewing_pickup_id')
+            ->join('items as it', 'it.id', '=', 'pl.finished_item_id')
+            ->whereNull('p.voided_at')
+            ->whereNull('pl.voided_at')
+            ->whereRaw("$remainingExpr > 0.0001");
+
+        if ($wipSewId) {
+            $q->whereExists(function ($sub) use ($wipSewId) {
+                $sub->from('inventory_stocks as ws')
+                    ->whereColumn('ws.item_id', 'pl.finished_item_id')
+                    ->where('ws.warehouse_id', $wipSewId)
+                    ->where('ws.qty', '>', 0.0001);
+            });
+        }
+
+        if ($f['operator_id']) {
+            $q->where('p.operator_id', $f['operator_id']);
+        }
+        if ($f['item_id']) {
+            $q->where('pl.finished_item_id', $f['item_id']);
+        }
+        if ($f['category_id']) {
+            $q->where('it.item_category_id', $f['category_id']);
+        }
+
+        return $q;
+    }
+
+    private function sewingOutstandingBundleCount(array $f): int
+    {
+        return (int) $this->sewingOutstandingBaseQuery($f)->distinct('pl.cutting_job_bundle_id')->count('pl.cutting_job_bundle_id');
+    }
+
+    private function sewingReturnBundleCount(array $f): int
+    {
+        $from = $f['date_from'];
+        $to = $f['date_to'];
+        $whPrdId = Warehouse::where('code', 'WH-PRD')->value('id');
+
+        $q = DB::table('sewing_return_lines as rl')
+            ->join('sewing_returns as r', 'r.id', '=', 'rl.sewing_return_id')
+            ->join('sewing_pickup_lines as pl', 'pl.id', '=', 'rl.sewing_pickup_line_id')
+            ->join('items as it', 'it.id', '=', 'pl.finished_item_id')
+            ->whereRaw('DATE(r.date) BETWEEN ? AND ?', [$from, $to])
+            ->whereNull('r.voided_at');
+
+        if ($whPrdId) {
+            $q->where('r.destination_warehouse_id', $whPrdId);
+        }
+        if ($f['operator_id']) {
+            $q->where('r.operator_id', $f['operator_id']);
+        }
+        if ($f['item_id']) {
+            $q->where('pl.finished_item_id', $f['item_id']);
+        }
+        if ($f['category_id']) {
+            $q->where('it.item_category_id', $f['category_id']);
+        }
+
+        return (int) $q->distinct('pl.cutting_job_bundle_id')->count('pl.cutting_job_bundle_id');
+    }
+
+    private function rejectBundleCount(array $f): int
+    {
+        $from = $f['date_from'];
+        $to = $f['date_to'];
+
+        $cut = DB::table('qc_results as qc')
+            ->join('cutting_job_bundles as cb', 'cb.id', '=', 'qc.cutting_job_bundle_id')
+            ->join('items as it', 'it.id', '=', 'cb.finished_item_id')
+            ->where('qc.stage', 'cutting')
+            ->where('qc.qty_reject', '>', 0)
+            ->whereRaw('DATE(qc.qc_date) BETWEEN ? AND ?', [$from, $to]);
+        if ($f['operator_id']) {
+            $cut->where('qc.operator_id', $f['operator_id']);
+        }
+        if ($f['item_id']) {
+            $cut->where('cb.finished_item_id', $f['item_id']);
+        }
+        if ($f['category_id']) {
+            $cut->where('it.item_category_id', $f['category_id']);
+        }
+
+        $sew = DB::table('sewing_return_lines as rl')
+            ->join('sewing_returns as r', 'r.id', '=', 'rl.sewing_return_id')
+            ->join('sewing_pickup_lines as pl', 'pl.id', '=', 'rl.sewing_pickup_line_id')
+            ->join('items as it', 'it.id', '=', 'pl.finished_item_id')
+            ->where('rl.qty_reject', '>', 0)
+            ->whereNull('r.voided_at')
+            ->whereRaw('DATE(r.date) BETWEEN ? AND ?', [$from, $to]);
+        if ($f['operator_id']) {
+            $sew->where('r.operator_id', $f['operator_id']);
+        }
+        if ($f['item_id']) {
+            $sew->where('pl.finished_item_id', $f['item_id']);
+        }
+        if ($f['category_id']) {
+            $sew->where('it.item_category_id', $f['category_id']);
+        }
+
+        return (int) $cut->count('qc.id') + (int) $sew->count('rl.id');
+    }
+
+    private function productionActivityCount(array $f): int
+    {
+        $from = $f['date_from'];
+        $to = $f['date_to'];
+
+        $cut = DB::table('cutting_jobs as cj')
+            ->leftJoin('cutting_job_bundles as cb', 'cb.cutting_job_id', '=', 'cj.id')
+            ->where('cj.status', 'qc_done')
+            ->whereRaw('DATE(cj.date) BETWEEN ? AND ?', [$from, $to]);
+        if ($f['item_id']) {
+            $cut->where('cb.finished_item_id', $f['item_id']);
+        }
+        if ($f['category_id']) {
+            $cut->where('cb.item_category_id', $f['category_id']);
+        }
+
+        $pick = DB::table('sewing_pickup_lines as pl')
+            ->join('sewing_pickups as p', 'p.id', '=', 'pl.sewing_pickup_id')
+            ->join('items as it', 'it.id', '=', 'pl.finished_item_id')
+            ->whereNull('p.voided_at')
+            ->where('p.status', '!=', 'void')
+            ->whereRaw('DATE(p.date) BETWEEN ? AND ?', [$from, $to]);
+        if ($f['operator_id']) {
+            $pick->where('p.operator_id', $f['operator_id']);
+        }
+        if ($f['item_id']) {
+            $pick->where('pl.finished_item_id', $f['item_id']);
+        }
+        if ($f['category_id']) {
+            $pick->where('it.item_category_id', $f['category_id']);
+        }
+
+        $ret = DB::table('sewing_return_lines as rl')
+            ->join('sewing_returns as r', 'r.id', '=', 'rl.sewing_return_id')
+            ->join('sewing_pickup_lines as pl', 'pl.id', '=', 'rl.sewing_pickup_line_id')
+            ->join('items as it', 'it.id', '=', 'pl.finished_item_id')
+            ->whereNull('r.voided_at')
+            ->whereRaw('DATE(r.date) BETWEEN ? AND ?', [$from, $to]);
+        if ($f['operator_id']) {
+            $ret->where('r.operator_id', $f['operator_id']);
+        }
+        if ($f['item_id']) {
+            $ret->where('pl.finished_item_id', $f['item_id']);
+        }
+        if ($f['category_id']) {
+            $ret->where('it.item_category_id', $f['category_id']);
+        }
+
+        return (int) $cut->distinct('cj.id')->count('cj.id')
+            + (int) $pick->count('pl.id')
+            + (int) $ret->count('rl.id');
+    }
+
+    private function priorityBundleCount(array $f): int
+    {
+        $priorityItemIds = $this->priority->priorityList($f, 100)
+            ->pluck('item_id')
+            ->filter()
+            ->unique()
+            ->values()
+            ->all();
+
+        if (empty($priorityItemIds)) {
+            return 0;
+        }
+
+        $readyForPriority = CuttingJobBundle::query()
+            ->readyForSewing(Warehouse::where('code', 'WIP-CUT')->value('id'))
+            ->whereIn('finished_item_id', $priorityItemIds);
+
+        if ($f['category_id']) {
+            $readyForPriority->whereHas('finishedItem', fn($qq) => $qq->where('item_category_id', $f['category_id']));
+        }
+
+        $outstanding = $this->sewingOutstandingBaseQuery(array_merge($f, ['item_id' => null]))
+            ->whereIn('pl.finished_item_id', $priorityItemIds)
+            ->distinct('pl.cutting_job_bundle_id')
+            ->count('pl.cutting_job_bundle_id');
+
+        return (int) $readyForPriority->count() + (int) $outstanding;
     }
 
     /**
@@ -538,7 +770,6 @@ class ProductionDashboardController extends Controller
         if ($f['category_id']) {
             $q->whereHas('finishedItem', fn($qq) => $qq->where('item_category_id', $f['category_id']));
         }
-
         $today = Carbon::today();
         $costCache = []; // item_id => HPP satuan (cache agar tidak query berulang)
 
@@ -697,6 +928,7 @@ class ProductionDashboardController extends Controller
 
         $rows = $q->selectRaw("
                 it.id as item_id,
+                pl.cutting_job_bundle_id as bundle_id,
                 p.date as pickup_date, p.created_at as created_at,
                 p.operator_id as operator_id,
                 e.code as operator_code, e.name as operator_name,
@@ -732,6 +964,7 @@ class ProductionDashboardController extends Controller
             'total_outstanding' => (float) $lines->sum('qty_outstanding'),
             'total_hpp' => (float) $lines->sum('hpp_total'),
             'operator_count' => $lines->pluck('operator_code')->unique()->count(),
+            'total_bundle_count' => $lines->pluck('bundle_id')->filter()->unique()->count(),
         ];
     }
 
@@ -775,6 +1008,7 @@ class ProductionDashboardController extends Controller
         $raw = $q->selectRaw("
                 rl.id as line_id,
                 DATE(r.date) as date, r.created_at as created_at,
+                pl.cutting_job_bundle_id as bundle_id,
                 it.id as item_id, it.code as sku, it.name as product_name,
                 COALESCE(cat.name,'-') as category,
                 COALESCE(e.code,'-') as operator_code, COALESCE(e.name,'-') as operator_name,
@@ -798,6 +1032,7 @@ class ProductionDashboardController extends Controller
             return (object) [
                 'date' => $r->date,
                 'created_at' => $r->created_at,
+                'bundle_id' => $r->bundle_id,
                 'operator_code' => $r->operator_code,
                 'operator_name' => $r->operator_name,
                 'sku' => $r->sku,
@@ -822,6 +1057,7 @@ class ProductionDashboardController extends Controller
             'total_hpp' => (float) $lines->sum('hpp_total'),
             'yield' => $base > 0 ? round($totalOk / $base * 100, 1) : null,
             'operator_count' => $lines->pluck('operator_code')->unique()->reject(fn($c) => $c === '-')->count(),
+            'total_bundle_count' => $lines->pluck('bundle_id')->filter()->unique()->count(),
         ];
     }
 

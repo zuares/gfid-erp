@@ -5,7 +5,7 @@ use App\Http\Controllers\Marketplace\MpReconciliationController;
 use App\Http\Controllers\Marketplace\MpReconciliationItemsController;
 use App\Http\Controllers\Marketplace\MpReconciliationQueueController;
 
-Route::middleware(['web', 'auth'])
+Route::middleware(['web', 'auth', 'access:marketplace'])
     ->prefix('marketplace')
     ->name('marketplace.')
     ->group(function () {

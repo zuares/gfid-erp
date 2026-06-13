@@ -5,7 +5,7 @@ use App\Http\Controllers\Imports\MarketplaceImportController;
 use App\Http\Controllers\Imports\MarketplaceIncomeImportController;
 use Illuminate\Support\Facades\Route;
 
-Route::middleware(['web', 'auth'])
+Route::middleware(['web', 'auth', 'access:imports'])
     ->prefix('imports')
     ->name('imports.')
     ->group(function () {

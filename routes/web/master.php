@@ -8,7 +8,7 @@ use App\Http\Controllers\Master\ItemController;
 use App\Http\Controllers\Master\SupplierController;
 use Illuminate\Support\Facades\Route;
 
-Route::middleware(['web', 'auth'])->group(function () {
+Route::middleware(['web', 'auth', 'access:master'])->group(function () {
 
     Route::prefix('master')->name('master.')->group(function () {
 

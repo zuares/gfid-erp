@@ -9,7 +9,7 @@ use App\Http\Controllers\Accounting\OpeningBalanceBatchController;
 use App\Http\Controllers\Accounting\OpeningBalanceController;
 use App\Http\Controllers\Api\AccountSuggestController;
 
-Route::middleware(['auth'])->prefix('accounting')->name('accounting.')->group(function () {
+Route::middleware(['auth', 'access:accounting'])->prefix('accounting')->name('accounting.')->group(function () {
     Route::get('cash-basis-report', [CashBasisReportController::class, 'index'])->name('cash-basis-report.index');
 
     // ✅ Ledger per Account (HARUS sebelum resource accounts)
@@ -20,6 +20,8 @@ Route::middleware(['auth'])->prefix('accounting')->name('accounting.')->group(fu
     Route::resource('accounts', AccountController::class);
 
     // ✅ Cash Expenses
+    Route::get('cash-expenses/{cashExpense}/proof', [CashExpenseController::class, 'proof'])
+        ->name('cash-expenses.proof');
     Route::resource('cash-expenses', CashExpenseController::class);
     Route::post('cash-expenses/{cashExpense}/post', [CashExpenseController::class, 'post'])->name('cash-expenses.post');
     Route::post('cash-expenses/{cashExpense}/void', [CashExpenseController::class, 'void'])->name('cash-expenses.void');
@@ -41,11 +43,11 @@ Route::middleware(['auth'])->prefix('accounting')->name('accounting.')->group(fu
 });
 
 // routes/web.php
-Route::prefix('accounting/opening-balances-batch')->name('accounting.opening-balances-batch.')->group(function () {
+Route::middleware(['auth', 'access:accounting'])->prefix('accounting/opening-balances-batch')->name('accounting.opening-balances-batch.')->group(function () {
     Route::get('/', [OpeningBalanceBatchController::class, 'index'])->name('index');
     Route::get('/create', [OpeningBalanceBatchController::class, 'create'])->name('create');
     Route::post('/', [OpeningBalanceBatchController::class, 'store'])->name('store');
     Route::post('/{journal}/void', [OpeningBalanceBatchController::class, 'void'])->name('void');
 });
 
-Route::get('v1/accounts/suggest', AccountSuggestController::class);
+Route::middleware(['auth', 'access:accounting'])->get('v1/accounts/suggest', AccountSuggestController::class);

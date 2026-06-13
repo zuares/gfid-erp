@@ -450,6 +450,11 @@
                                     </div>
 
                                     <div class="notes">
+                                        <select class="form-select form-select-sm mb-2"
+                                            name="lines_byop[{{ $idx }}][reject_cause]">
+                                            <option value="finishing">Reject Finishing</option>
+                                            <option value="sewing">Reject Jahit</option>
+                                        </select>
                                         <input type="text" class="form-control form-control-sm"
                                             name="lines_byop[{{ $idx }}][reject_notes]" placeholder="Catatan reject (opsional)">
                                     </div>
@@ -465,7 +470,7 @@
 
                 <div class="fab-wrap">
                     <a href="{{ route('production.finishing_jobs.index') }}" class="btn btn-sm btn-outline-secondary fab-back">←</a>
-                    <button type="button" class="btn btn-sm btn-primary fab-save" id="btn-open-modal" disabled>Summary</button>
+                    <button type="button" class="btn btn-sm btn-primary fab-save" id="btn-open-modal" disabled>Simpan & Post</button>
                 </div>
 
                 {{-- MODAL --}}
@@ -473,7 +478,7 @@
                     <div class="modal-dialog modal-dialog-centered modal-lg">
                         <div class="modal-content">
                             <div class="modal-header">
-                                <h5 class="modal-title">Summary</h5>
+                                <h5 class="modal-title">Konfirmasi Finishing</h5>
                                 <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
                             </div>
 
@@ -481,7 +486,7 @@
                                 <div class="sum-box">
                                     <div class="sum-top">
                                         <div>
-                                            <div class="ttl">Ringkasan</div>
+                                            <div class="ttl">Ringkasan Posting</div>
                                             <div class="sub">Mode: <span class="mono" id="m-mode">ALL</span></div>
                                         </div>
                                         <div class="text-end">
@@ -538,7 +543,7 @@
 
                             <div class="modal-footer">
                                 <button type="button" class="btn btn-sm btn-outline-secondary" data-bs-dismiss="modal">Tutup</button>
-                                <button type="button" class="btn btn-sm btn-primary" id="modal-submit" style="display:none;">Simpan</button>
+                                <button type="button" class="btn btn-sm btn-primary" id="modal-submit" style="display:none;">Simpan & Post</button>
                             </div>
                         </div>
                     </div>
@@ -751,7 +756,7 @@ document.addEventListener('DOMContentLoaded', () => {
             total += (ok + rj);
         });
 
-        btnOpenModal.textContent = 'Simpan';
+        btnOpenModal.textContent = 'Simpan & Post';
         btnOpenModal.disabled = !(anyChecked || total > 0);
     }
 

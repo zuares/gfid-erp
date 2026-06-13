@@ -22,7 +22,7 @@ use App\Http\Controllers\Production\ProductionReceiptController;
 | agar konsisten dengan pola routing per-domain. Perilaku identik.
 |--------------------------------------------------------------------------
  */
-Route::prefix('production')->group(function () {
+Route::middleware(['web', 'auth', 'access:production'])->prefix('production')->group(function () {
     Route::get('orders', [ProductionOrderController::class, 'index'])
         ->name('production.orders.index');
 

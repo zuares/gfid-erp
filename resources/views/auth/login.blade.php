@@ -6,7 +6,7 @@
     <div class="container py-5" style="max-width: 420px;">
         <h1 class="h4 mb-4 text-center">Login GFID</h1>
 
-        <form method="POST" action="{{ route('login.post') }}">
+        <form method="POST" action="{{ route('login.post', [], false) }}">
             @csrf
 
             <div class="mb-3">

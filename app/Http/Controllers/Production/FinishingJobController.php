@@ -358,6 +358,7 @@ class FinishingJobController extends Controller
             $linesKey . '.*.qty_in' => ['nullable', 'integer', 'min:0'],
             $linesKey . '.*.qty_reject' => ['nullable', 'integer', 'min:0'],
             $linesKey . '.*.reject_reason' => ['nullable', 'string', 'max:100'],
+            $linesKey . '.*.reject_cause' => ['nullable', 'in:finishing,sewing'],
             $linesKey . '.*.reject_notes' => ['nullable', 'string'],
 
             $linesKey . '.*.operator_id' => [
@@ -471,6 +472,7 @@ class FinishingJobController extends Controller
                 'qty_in' => $qtyIn,
                 'qty_reject' => $qtyRj,
                 'reject_reason' => $line['reject_reason'] ?? null,
+                'reject_cause' => $line['reject_cause'] ?? 'finishing',
                 'reject_notes' => $line['reject_notes'] ?? null,
             ];
         }
@@ -659,6 +661,7 @@ class FinishingJobController extends Controller
                         'qty_ok' => $takeOk,
                         'qty_reject' => $takeReject,
                         'reject_reason' => $wl['reject_reason'],
+                        'reject_cause' => $takeReject > 0 ? ($wl['reject_cause'] ?? 'finishing') : 'finishing',
                         'reject_notes' => $wl['reject_notes'],
                         'processed_at' => $validated['date'],
                     ]);
@@ -677,9 +680,17 @@ class FinishingJobController extends Controller
             return $job;
         });
 
+        try {
+            $this->postCreatedJob($job);
+        } catch (\Throwable $e) {
+            return redirect()
+                ->route('production.finishing_jobs.show', ['finishing_job' => $job->id])
+                ->with('error', 'Finishing berhasil dibuat, tapi gagal auto-post: ' . $e->getMessage());
+        }
+
         return redirect()
-            ->route('production.finishing_jobs.show', ['finishing_job' => $job->id])
-            ->with('status', 'Finishing Job berhasil dibuat sebagai draft.');
+            ->route('production.finishing_jobs.index')
+            ->with('status', "Finishing {$job->code} berhasil diposting. OK ke WH-PRD, reject jahit ke REJ-SEW, reject finishing ke REJ-FIN.");
     }
 
     /* ============================================================
@@ -756,6 +767,7 @@ class FinishingJobController extends Controller
             'lines.*.qty_ok' => ['required', 'integer', 'min:0'],
             'lines.*.qty_reject' => ['required', 'integer', 'min:0'],
             'lines.*.reject_reason' => ['nullable', 'string', 'max:100'],
+            'lines.*.reject_cause' => ['nullable', 'in:finishing,sewing'],
             'lines.*.reject_notes' => ['nullable', 'string'],
         ]);
 
@@ -875,6 +887,7 @@ class FinishingJobController extends Controller
                 $line->qty_ok = $qtyOk;
                 $line->qty_reject = $qtyRj;
                 $line->reject_reason = $payload['reject_reason'] ?? null;
+                $line->reject_cause = $qtyRj > 0 ? ($payload['reject_cause'] ?? 'finishing') : 'finishing';
                 $line->reject_notes = $payload['reject_notes'] ?? null;
                 $line->save();
             }
@@ -905,30 +918,44 @@ class FinishingJobController extends Controller
                 ->with('status', 'Finishing Job ini sudah diposting sebelumnya.');
         }
 
-        // ✅ tambah RM karena kita akan stockOut SUP dari RM saat post
-        $requiredCodes = ['WIP-FIN', 'WH-PRD', 'REJECT', 'RM'];
+        try {
+            $this->postCreatedJob($job);
+        } catch (\RuntimeException $e) {
+            return back()->withErrors(['warehouse' => $e->getMessage()]);
+        }
+
+        return redirect()
+            ->route('production.finishing_jobs.show', $job->id)
+            ->with('status', 'Finishing Job berhasil diposting. OK ke WH-PRD, reject finishing ke REJ-FIN, reject jahit ke REJ-SEW.');
+    }
+
+    protected function postCreatedJob(FinishingJob $job): void
+    {
+        $job->loadMissing(['lines', 'lines.bundle.cuttingJob', 'lines.item']);
+
+        if (($job->status ?? null) === 'posted') {
+            return;
+        }
+
+        $requiredCodes = ['WIP-FIN', 'WH-PRD', 'REJ-FIN', 'REJ-SEW', 'RM'];
         $warehouses = $this->getRequiredWarehouses($requiredCodes);
 
         $missing = array_diff($requiredCodes, $warehouses->keys()->all());
         if (!empty($missing)) {
-            return back()->withErrors([
-                'warehouse' => 'Warehouse berikut belum dikonfigurasi: ' . implode(', ', $missing) . '. Silakan setting dulu di Master Gudang.',
-            ]);
+            throw new \RuntimeException('Warehouse berikut belum dikonfigurasi: ' . implode(', ', $missing) . '. Silakan setting dulu di Master Gudang.');
         }
 
         $movementDate = $this->resolveMovementDate($job);
 
         DB::transaction(function () use ($job, $warehouses, $movementDate) {
-
-            // ✅ 0) Apply BOM SUP-only (skip FLC) per line, idempotent by bom_applied_at
             $this->finBom->applySupOnlyForPostedJob($job, $movementDate);
 
-            // ✅ 1) Move stok WIP-FIN -> WH-PRD / REJECT (existing logic)
             $this->applyPostingMovements(
                 job: $job,
                 wipFinWarehouseId: $warehouses['WIP-FIN']->id,
                 prodWarehouseId: $warehouses['WH-PRD']->id,
-                rejectWarehouseId: $warehouses['REJECT']->id,
+                rejectFinWarehouseId: $warehouses['REJ-FIN']->id,
+                rejectSewWarehouseId: $warehouses['REJ-SEW']->id,
                 movementDate: $movementDate,
                 notesPrefix: 'Finishing ' . $job->code,
             );
@@ -944,10 +971,6 @@ class FinishingJobController extends Controller
 
             $job->update($update);
         });
-
-        return redirect()
-            ->route('production.finishing_jobs.show', $job->id)
-            ->with('status', 'Finishing Job berhasil diposting. BOM SUP ter-apply + stok dipindahkan dari WIP-FIN ke WH-PRD/REJECT.');
     }
 
     /* ============================================================
@@ -985,7 +1008,7 @@ class FinishingJobController extends Controller
      * Posting movements Finishing:
      * - OUT  : WIP-FIN (qty_ok + qty_reject)
      * - IN   : WH-PRD (qty_ok)
-     * - IN   : REJECT (qty_reject)
+     * - IN   : REJ-FIN / REJ-SEW (qty_reject, sesuai reject_cause)
      *
      * Notes:
      * - source of truth = qty_ok + qty_reject
@@ -995,7 +1018,8 @@ class FinishingJobController extends Controller
         FinishingJob $job,
         int $wipFinWarehouseId,
         int $prodWarehouseId,
-        int $rejectWarehouseId,
+        int $rejectFinWarehouseId,
+        int $rejectSewWarehouseId,
         \DateTimeInterface $movementDate,
         string $notesPrefix = 'Finishing',
         bool $enforceQtyInMatch = false// ✅ sementara optional
@@ -1015,7 +1039,8 @@ class FinishingJobController extends Controller
             $job,
             $wipFinWarehouseId,
             $prodWarehouseId,
-            $rejectWarehouseId,
+            $rejectFinWarehouseId,
+            $rejectSewWarehouseId,
             $movementDate,
             $notesPrefix,
             $enforceQtyInMatch,
@@ -1150,9 +1175,15 @@ class FinishingJobController extends Controller
                 }
 
                 // =========================
-                // 5) IN REJECT
+                // 5) IN REJECT sesuai sumber masalah
                 // =========================
                 if ($qtyReject > 0) {
+                    $rejectCause = (string) ($line->reject_cause ?? 'finishing');
+                    $rejectWarehouseId = $rejectCause === 'sewing'
+                        ? $rejectSewWarehouseId
+                        : $rejectFinWarehouseId;
+                    $rejectCode = $rejectCause === 'sewing' ? 'REJ-SEW' : 'REJ-FIN';
+
                     $this->inventory->stockIn(
                         $rejectWarehouseId,
                         (int) $line->item_id,
@@ -1160,7 +1191,7 @@ class FinishingJobController extends Controller
                         $movementDate,
                         FinishingJob::class,
                         $job->id,
-                        $notesPrefix . " REJECT (WIP-FIN→REJECT)",
+                        $notesPrefix . " REJECT {$rejectCode} (WIP-FIN→{$rejectCode})",
                         null,
                         $movementUnitCost,
                         false,

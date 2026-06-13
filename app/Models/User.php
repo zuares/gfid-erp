@@ -4,10 +4,16 @@ namespace App\Models;
 
 use Illuminate\Foundation\Auth\User as Authenticatable;
 use Illuminate\Notifications\Notifiable;
+use Illuminate\Database\Eloquent\Relations\HasMany;
+use Illuminate\Support\Facades\Route;
+use Illuminate\Support\Facades\Schema;
+use Throwable;
 
 class User extends Authenticatable
 {
     use Notifiable;
+
+    protected static ?bool $moduleAccessTableExists = null;
 
     protected $fillable = [
         'employee_code',
@@ -28,6 +34,11 @@ class User extends Authenticatable
         return $this->belongsTo(Employee::class);
     }
 
+    public function moduleAccesses(): HasMany
+    {
+        return $this->hasMany(UserModuleAccess::class);
+    }
+
     public function isOwner(): bool
     {
         return $this->role === 'owner';
@@ -41,5 +52,86 @@ class User extends Authenticatable
         }
 
         return in_array($this->role, $roles, true);
+    }
+
+    public function canAccessModule(string $module): bool
+    {
+        if ($this->isOwner()) {
+            return true;
+        }
+
+        $module = strtolower(trim($module));
+
+        if (!self::moduleAccessTableExists()) {
+            return in_array($module, self::defaultModulesForRole((string) $this->role), true);
+        }
+
+        $access = $this->relationLoaded('moduleAccesses')
+            ? $this->moduleAccesses->firstWhere('module', $module)
+            : $this->moduleAccesses()->where('module', $module)->first();
+
+        if ($access) {
+            return (bool) $access->can_access;
+        }
+
+        return in_array($module, self::defaultModulesForRole((string) $this->role), true);
+    }
+
+    public static function defaultModulesForRole(string $role): array
+    {
+        return match (strtolower($role)) {
+            'owner' => array_keys(UserModuleAccess::MODULES),
+            'admin' => ['dashboard', 'inventory', 'sales', 'purchasing', 'marketplace', 'imports', 'accounting'],
+            'operating' => ['dashboard', 'inventory', 'production'],
+            default => ['dashboard'],
+        };
+    }
+
+    public static function moduleAccessTableExists(): bool
+    {
+        if (self::$moduleAccessTableExists !== null) {
+            return self::$moduleAccessTableExists;
+        }
+
+        try {
+            return self::$moduleAccessTableExists = Schema::hasTable('user_module_accesses');
+        } catch (Throwable) {
+            return self::$moduleAccessTableExists = false;
+        }
+    }
+
+    public function preferredLandingRouteName(): ?string
+    {
+        $moduleRoutes = [
+            'dashboard' => 'dashboard',
+            'production' => 'production.dashboard',
+            'sales' => 'sales.shipments.report',
+            'accounting' => 'accounting.cash-basis-report.index',
+            'inventory' => 'inventory.stocks.items',
+            'purchasing' => 'purchasing.purchase_orders.index',
+            'marketplace' => 'marketplace.orders.index',
+            'imports' => 'imports.marketplace.index',
+            'master' => 'master.items.index',
+            'payroll' => 'payroll.dashboard',
+            'costing' => 'costing.hpp.index',
+        ];
+
+        $preferredModules = match (strtolower((string) $this->role)) {
+            'operating' => ['production', 'inventory', 'dashboard'],
+            'admin' => ['sales', 'inventory', 'purchasing', 'marketplace', 'imports', 'accounting', 'dashboard'],
+            'owner' => ['dashboard'],
+            default => ['dashboard'],
+        };
+
+        $orderedModules = array_values(array_unique(array_merge($preferredModules, array_keys($moduleRoutes))));
+
+        foreach ($orderedModules as $module) {
+            $route = $moduleRoutes[$module] ?? null;
+            if ($route && $this->canAccessModule($module) && Route::has($route)) {
+                return $route;
+            }
+        }
+
+        return null;
     }
 }

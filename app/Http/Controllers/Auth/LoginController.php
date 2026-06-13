@@ -16,19 +16,23 @@ class LoginController extends Controller
     public function login(Request $request)
     {
         $credentials = $request->validate([
-            'employee_code' => ['required', 'string'],
+            'employee_code' => ['required', 'string', 'max:50'],
             'password' => ['required', 'string'],
         ]);
 
+        $employeeCode = strtoupper(trim((string) $credentials['employee_code']));
+
         // Login pakai employee_code + password
         if (Auth::attempt([
-            'employee_code' => $credentials['employee_code'],
+            'employee_code' => $employeeCode,
             'password' => $credentials['password'],
         ], $request->boolean('remember'))) {
 
             $request->session()->regenerate();
 
-            return redirect()->intended(route('dashboard'));
+            $landingRoute = $request->user()?->preferredLandingRouteName() ?? 'dashboard';
+
+            return redirect()->intended(route($landingRoute, [], false));
 
         }
 
@@ -44,6 +48,6 @@ class LoginController extends Controller
         $request->session()->invalidate();
         $request->session()->regenerateToken();
 
-        return redirect()->route('login');
+        return redirect()->to(route('login', [], false));
     }
 }

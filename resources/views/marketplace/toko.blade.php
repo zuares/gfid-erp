@@ -15,6 +15,11 @@
 .store-card:hover { box-shadow: 0 4px 20px rgba(0,0,0,.07); }
 .store-card-head { display: flex; align-items: center; gap: .6rem; margin-bottom: .5rem; }
 .store-card-name { font-weight: 800; font-size: .97rem; color: #0f172a; }
+.rename-btn { background:none;border:none;padding:0 .2rem;cursor:pointer;color:#94a3b8;font-size:.85rem;line-height:1; }
+.rename-btn:hover { color:#0f172a; }
+.rename-inline { display:none;align-items:center;gap:.4rem; }
+.rename-inline input { font-size:.85rem;font-weight:700;border:1.5px solid #cbd5e1;border-radius:8px;padding:.2rem .5rem;width:160px; }
+.rename-inline .btn-save-name { font-size:.7rem;font-weight:700;border-radius:7px;padding:.2rem .6rem; }
 .store-card-meta { font-size: .72rem; color: #64748b; margin-bottom: .75rem; }
 .store-stats { display: flex; gap: .4rem; flex-wrap: wrap; margin-bottom: .85rem; }
 .store-stat {
@@ -27,6 +32,7 @@
 .store-stat.ok   { background: rgba(22,163,74,.07);  border-color: rgba(22,163,74,.25);  color: #166534; }
 .store-actions { display: flex; gap: .5rem; flex-wrap: wrap; }
 .store-actions .btn { font-size: .72rem; font-weight: 700; border-radius: 999px; padding: .3rem .85rem; }
+
 
 /* Sync result modal */
 .sync-row { display: flex; justify-content: space-between; align-items: center;
@@ -48,6 +54,10 @@
         <a href="{{ route('marketplace.shopee.connect') }}" class="btn btn-dark btn-sm"
             style="border-radius:999px;font-size:.78rem;font-weight:700;min-height:36px">
             + Login Shopee
+        </a>
+        <a href="{{ route('marketplace.tiktok.connect') }}" class="btn btn-sm"
+            style="border-radius:999px;font-size:.78rem;font-weight:700;min-height:36px;background:#fe2c55;color:#fff;border:none">
+            + Login TikTok Shop
         </a>
     </x-slot:actions>
 
@@ -214,7 +224,13 @@
             return `<div class="store-card">
                 <div class="store-card-head">
                     ${channelPill(s.channel)}
-                    <span class="store-card-name">${esc(s.name || '—')}</span>
+                    <span class="store-card-name" id="store-name-${s.id}">${esc(s.name || '—')}</span>
+                    <button class="rename-btn" title="Ganti nama toko" onclick="startRename(${s.id})">✎</button>
+                    <span class="rename-inline" id="rename-inline-${s.id}">
+                        <input type="text" id="rename-input-${s.id}" value="${esc(s.name || '')}">
+                        <button class="btn btn-dark btn-save-name" onclick="saveRename(${s.id})">Simpan</button>
+                        <button class="btn btn-light border btn-save-name" onclick="cancelRename(${s.id})">✕</button>
+                    </span>
                     <span class="ms-auto">${statusBadge(tokenOk ? 'active' : 'inactive')}</span>
                 </div>
                 <div class="store-card-meta">
@@ -402,6 +418,34 @@
             const d = await api('/api/marketplace/stores/' + id + '/shop-info');
             $('infoOutput').textContent = JSON.stringify(d, null, 2);
         } catch (e) { $('infoOutput').textContent = 'Error: ' + e.message; }
+    };
+
+    window.startRename = function (storeId) {
+        document.getElementById('store-name-' + storeId).style.display = 'none';
+        const row = document.getElementById('rename-inline-' + storeId);
+        row.style.display = 'flex';
+        document.getElementById('rename-input-' + storeId).focus();
+    };
+
+    window.cancelRename = function (storeId) {
+        document.getElementById('rename-inline-' + storeId).style.display = 'none';
+        document.getElementById('store-name-' + storeId).style.display = '';
+    };
+
+    window.saveRename = async function (storeId) {
+        const input = document.getElementById('rename-input-' + storeId);
+        const name = input.value.trim();
+        if (!name) return;
+        try {
+            await api('/api/marketplace/stores/' + storeId, {
+                method: 'PATCH',
+                body: JSON.stringify({ name }),
+            });
+            document.getElementById('store-name-' + storeId).textContent = name;
+            cancelRename(storeId);
+        } catch (e) {
+            alert('Gagal menyimpan nama: ' + e.message);
+        }
     };
 
     window.loadAll = loadAll;

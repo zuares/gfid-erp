@@ -248,7 +248,7 @@
             
             @php
                 $proofUrl = $cashExpense->proof_photo_path
-                    ? Storage::disk('public')->url($cashExpense->proof_photo_path)
+                    ? route('accounting.cash-expenses.proof', $cashExpense)
                     : null;
             @endphp
 
@@ -436,4 +436,3 @@ document.addEventListener('DOMContentLoaded', function () {
     });
 });
 </script>
-

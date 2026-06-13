@@ -110,6 +110,24 @@ class ShopeeStoreAuthController extends Controller
             ]
         );
 
+        // Try to fetch real shop name from Shopee API
+        try {
+            $storeModel = Store::where('code', 'shopee_' . $shopId)->first();
+            if ($storeModel) {
+                /** @var \App\Services\Channels\Shopee\ShopeeChannel $shopee */
+                $shopee   = app(\App\Services\Channels\Shopee\ShopeeChannel::class);
+                $info     = $shopee->getShopInfo($storeModel);
+                $realName = $info['response']['shop_name']
+                    ?? $info['shop_name']
+                    ?? null;
+                if ($realName) {
+                    $storeModel->update(['name' => $realName]);
+                }
+            }
+        } catch (\Throwable $e) {
+            // silent — name stays as fallback
+        }
+
         return redirect('/marketplace/toko?connected=1');
     }
 }

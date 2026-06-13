@@ -10,6 +10,8 @@ class OrderFulfillment extends Model
 {
     public const STATUS_DRAFT          = 'draft';
     public const STATUS_PENDING_REVIEW = 'pending_review';
+    public const STATUS_PICKING        = 'picking';   // sedang dipick oleh picker di gudang
+    public const STATUS_PACKED         = 'packed';    // semua item sudah dipick, siap dikonfirmasi
     public const STATUS_CONFIRMED      = 'confirmed';
     public const STATUS_CANCELLED      = 'cancelled';
 
@@ -18,6 +20,7 @@ class OrderFulfillment extends Model
         'warehouse_id',
         'status',
         'notes',
+        'scan_log',
         'confirmed_by',
         'confirmed_at',
     ];
@@ -52,9 +55,14 @@ class OrderFulfillment extends Model
 
     public function isDraft(): bool          { return $this->status === self::STATUS_DRAFT; }
     public function isPendingReview(): bool   { return $this->status === self::STATUS_PENDING_REVIEW; }
+    public function isPicking(): bool         { return $this->status === self::STATUS_PICKING; }
+    public function isPacked(): bool          { return $this->status === self::STATUS_PACKED; }
     public function isConfirmed(): bool       { return $this->status === self::STATUS_CONFIRMED; }
     public function isCancelled(): bool       { return $this->status === self::STATUS_CANCELLED; }
-    public function canConfirm(): bool        { return in_array($this->status, [self::STATUS_DRAFT, self::STATUS_PENDING_REVIEW]); }
+    public function canConfirm(): bool        { return in_array($this->status, [self::STATUS_DRAFT, self::STATUS_PENDING_REVIEW, self::STATUS_PICKING, self::STATUS_PACKED]); }
+    public function canStartPicking(): bool   { return in_array($this->status, [self::STATUS_PENDING_REVIEW]); }
+    public function canPack(): bool           { return $this->status === self::STATUS_PICKING; }
+    public function canUnpack(): bool         { return $this->status === self::STATUS_PACKED; }
 
     /** Apakah semua line sudah punya item_id (tidak ada yang unresolved). */
     public function allLinesResolved(): bool

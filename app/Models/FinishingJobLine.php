@@ -18,6 +18,7 @@ class FinishingJobLine extends Model
         'qty_ok',
         'qty_reject',
         'reject_reason',
+        'reject_cause',
         'reject_notes',
         'processed_at',
         'sewing_operator_id', // new

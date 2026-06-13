@@ -6,13 +6,13 @@ use App\Http\Controllers\Purchasing\PurchaseReceiptController;
 use App\Http\Controllers\Purchasing\PurchaseReturnController;
 use Illuminate\Support\Facades\Route;
 
-Route::middleware(['web', 'auth'])
+Route::middleware(['web', 'auth', 'access:purchasing'])
     ->prefix('purchasing')
     ->name('purchasing.')
     ->group(function () {
 
         // OWNER + ADMIN
-        Route::middleware('role:owner,admin')->group(function () {
+        Route::middleware('access:purchasing')->group(function () {
 
             // PURCHASE ORDERS
             Route::resource('purchase-orders', PurchaseOrderController::class)

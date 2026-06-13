@@ -5,21 +5,19 @@ use App\Http\Controllers\Production\CuttingJobController;
 use App\Http\Controllers\Production\FinishingJobController;
 use App\Http\Controllers\Production\PackingJobController;
 use App\Http\Controllers\Production\ProductionDashboardController;
-use App\Http\Controllers\Production\ProductionMovementController;
 use App\Http\Controllers\Production\ProductionPriorityController;
-use App\Http\Controllers\Production\ProductionRejectController;
 use App\Http\Controllers\Production\ProductionReportController;
 use App\Http\Controllers\Production\QcController;
 use App\Http\Controllers\Production\SewingPickupController;
+use App\Http\Controllers\Production\SewingRejectReturnController;
 use App\Http\Controllers\Production\SewingReturnController;
-use App\Http\Controllers\Production\WipFinAdjustmentController;
 
 /*
 |--------------------------------------------------------------------------
 | PRODUCTION (Owner + Operating)
 |--------------------------------------------------------------------------
  */
-Route::middleware(['web', 'auth', 'role:owner,operating'])
+Route::middleware(['web', 'auth', 'access:production'])
     ->prefix('production')
     ->name('production.')
     ->group(function () {
@@ -113,6 +111,9 @@ Route::middleware(['web', 'auth', 'role:owner,operating'])
                     ->whereNumber('return')
                     ->name('destroy');
             });
+
+            Route::get('/reject-returns', [SewingRejectReturnController::class, 'index'])
+                ->name('reject_returns.index');
         });
 
         /*
@@ -172,27 +173,6 @@ Route::middleware(['web', 'auth', 'role:owner,operating'])
         Route::get('dashboard/slip', [ProductionDashboardController::class, 'slip'])
             ->name('dashboard.slip');
 
-        // Halaman Reject Produksi (cutting + jahit, per kejadian)
-        Route::get('reject', [ProductionRejectController::class, 'index'])
-            ->name('reject.index');
-        Route::get('reject/create', [ProductionRejectController::class, 'create'])
-            ->name('reject.create');
-        Route::post('reject', [ProductionRejectController::class, 'store'])
-            ->name('reject.store');
-        Route::post('reject/{line}/void-repair', [ProductionRejectController::class, 'voidRepair'])
-            ->whereNumber('line')
-            ->name('reject.void_repair');
-
-        /*
-    |--------------------------------------------------------------------------
-    | MUTASI PRODUKSI (tombol aksi pindah status)
-    |--------------------------------------------------------------------------
-     */
-        Route::get('movements', [ProductionMovementController::class, 'index'])
-            ->name('movements.index');
-        Route::post('movements', [ProductionMovementController::class, 'store'])
-            ->name('movements.store');
-
         /*
     |--------------------------------------------------------------------------
     | PRIORITAS PRODUKSI (skor prioritas per SKU)
@@ -220,7 +200,7 @@ Route::middleware(['web', 'auth', 'role:owner,operating'])
 |   GET  /production/sewing/returns/create
 |   POST /production/sewing/returns
  */
-Route::middleware(['web', 'auth', 'role:owner,admin,operating'])
+Route::middleware(['web', 'auth', 'access:production'])
     ->prefix('production')
     ->name('production.')
     ->group(function () {
@@ -232,19 +212,6 @@ Route::middleware(['web', 'auth', 'role:owner,admin,operating'])
             });
         });
 
-        /*
-    |--------------------------------------------------------------------------
-    | WIP-FIN ADJUSTMENTS
-    |--------------------------------------------------------------------------
-     */
-        Route::resource('wip-fin-adjustments', WipFinAdjustmentController::class)
-            ->except(['destroy']);
-
-        Route::post('wip-fin-adjustments/{adjustment}/post', [WipFinAdjustmentController::class, 'post'])
-            ->name('wip-fin-adjustments.post');
-
-        Route::post('wip-fin-adjustments/{adjustment}/void', [WipFinAdjustmentController::class, 'void'])
-            ->name('wip-fin-adjustments.void');
     });
 
 /*
@@ -252,7 +219,7 @@ Route::middleware(['web', 'auth', 'role:owner,admin,operating'])
 | PRODUCTION (Owner) — CUTTING OVERPRODUCTION (Inventory Adjustments)
 |--------------------------------------------------------------------------
  */
-Route::middleware(['web', 'auth', 'role:owner'])
+Route::middleware(['web', 'auth', 'access:production', 'role:owner'])
     ->prefix('production/cutting-overproduction')
     ->name('production.cutting_overproduction.')
     ->group(function () {

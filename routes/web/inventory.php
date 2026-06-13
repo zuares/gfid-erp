@@ -31,7 +31,7 @@ use Illuminate\Support\Facades\Route;
 // ======================================================================
 // INVENTORY MAIN (owner + admin + operating)
 // ======================================================================
-Route::middleware(['web', 'auth', 'role:owner,admin,operating'])->group(function () {
+Route::middleware(['web', 'auth', 'access:inventory'])->group(function () {
 
     Route::prefix('inventory')->name('inventory.')->group(function () {
 
@@ -144,7 +144,7 @@ Route::middleware(['web', 'auth', 'role:owner,admin,operating'])->group(function
 // ======================================================================
 
 // ✅ WRITE ONLY (define dulu agar /create tidak ketabrak)
-Route::middleware(['web', 'auth', 'role:owner,admin'])->group(function () {
+Route::middleware(['web', 'auth', 'access:inventory', 'role:owner,admin'])->group(function () {
     Route::prefix('rts/stock-requests')->name('rts.stock-requests.')->group(function () {
 
         Route::get('/create', [RtsStockRequestController::class, 'create'])->name('create');
@@ -161,7 +161,7 @@ Route::middleware(['web', 'auth', 'role:owner,admin'])->group(function () {
 });
 
 // ✅ READ ONLY
-Route::middleware(['web', 'auth', 'role:owner,admin,operating'])->group(function () {
+Route::middleware(['web', 'auth', 'access:inventory'])->group(function () {
     Route::prefix('rts/stock-requests')->name('rts.stock-requests.')->group(function () {
 
         Route::get('/', [RtsStockRequestController::class, 'index'])->name('index');
@@ -176,7 +176,7 @@ Route::middleware(['web', 'auth', 'role:owner,admin,operating'])->group(function
 // RTS DIRECT RECEIVES (DADAKAN) - owner + admin
 // - includes AJAX operator-wip for auto_sr
 // ======================================================================
-Route::middleware(['web', 'auth', 'role:owner,admin'])->group(function () {
+Route::middleware(['web', 'auth', 'access:inventory', 'role:owner,admin'])->group(function () {
     Route::prefix('rts/direct-receives')->name('rts.direct-receives.')->group(function () {
 
         Route::get('/', [RtsDirectReceiveController::class, 'index'])->name('index');
@@ -198,7 +198,7 @@ Route::middleware(['web', 'auth', 'role:owner,admin'])->group(function () {
 // ======================================================================
 // STOCK API (owner + admin + operating)
 // ======================================================================
-Route::middleware(['web', 'auth', 'role:owner,admin,operating'])->group(function () {
+Route::middleware(['web', 'auth', 'access:inventory'])->group(function () {
     Route::prefix('api')->name('api.')->group(function () {
         Route::get('/stock/available', [StockApiController::class, 'available'])->name('stock.available');
         Route::get('/stock/summary', [StockApiController::class, 'summary'])->name('stock.summary');

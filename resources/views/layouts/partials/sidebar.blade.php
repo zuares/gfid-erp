@@ -4,6 +4,9 @@
     use Illuminate\Support\Facades\DB;
 
     $user = auth()->user();
+    if ($user && $user::moduleAccessTableExists()) {
+        $user->loadMissing('moduleAccesses');
+    }
     $role = strtolower((string) ($user->role ?? ''));
 
     $isOwner = $role === 'owner';
@@ -20,6 +23,7 @@
     // ROUTE GUARDS (biar tidak error kalau route belum ada)
     // =========================================================
     $hasDashboardRoute = $router->has('dashboard');
+    $hasOwnerAccessControl = $router->has('owner.access-control.index');
 
     // Inventory
     $hasInvStocksItems = $router->has('inventory.stocks.items');
@@ -78,17 +82,19 @@
     $hasMarketplaceToko        = $router->has('marketplace.toko');
     $hasMarketplaceOrders      = $router->has('marketplace.orders');
     $hasMarketplaceFulfillment = $router->has('marketplace.fulfillment');
+    $hasMarketplacePicking     = $router->has('marketplace.picking');
     $hasMarketplaceSkuMapping  = $router->has('marketplace.sku-mapping');
     $hasMarketplaceSync        = $router->has('marketplace.sync');
     $hasMarketplaceSettlement  = $router->has('marketplace.settlement');
     $hasMarketplaceProfit      = $router->has('marketplace.profit');
     $hasMarketplaceAds         = $router->has('marketplace.ads');
+    $hasMarketplaceAnalytics   = $router->has('marketplace.analytics');
     $hasMarketplaceIssues      = $router->has('marketplace.issues');
 
     // Marketplace (UPDATED sesuai routes terbaru yang kamu kasih)
     // =========================================================
     // Marketplace Orders
-    $hasMarketplaceIndex = $router->has('marketplace.orders.index');
+    $hasMarketplaceIndex = $router->has('marketplace.orders');
     $hasMarketplaceCreate = $router->has('marketplace.orders.create');
     $hasMarketplaceShow = $router->has('marketplace.orders.show');
 
@@ -138,14 +144,12 @@
     $hasProdCuttingJobsIndex = $router->has('production.cutting_jobs.index');
     $hasProdSewPickupsIndex = $router->has('production.sewing.pickups.index');
     $hasProdSewReturnsIndex = $router->has('production.sewing.returns.index');
+    $hasProdSewRejectReturnsIndex = $router->has('production.sewing.reject_returns.index');
     $hasProdFinishingJobsIndex = $router->has('production.finishing_jobs.index');
-    $hasProdWipFinAdjIndex = $router->has('production.wip-fin-adjustments.index');
     $hasProdQcIndex = $router->has('production.qc.index');
     $hasProdPackingIndex = $router->has('production.packing_jobs.index');
-    $hasProdMovementsIndex = $router->has('production.movements.index');
     $hasProdPriorityIndex = $router->has('production.priority.index');
     $hasProdReportsIndex = $router->has('production.reports.index');
-    $hasProdRejectIndex = $router->has('production.reject.index');
 
     $hasProdDashboard = $router->has('production.dashboard');
 
@@ -168,6 +172,82 @@
     $hasHppIndex = $router->has('costing.hpp.index');
     $hasProdCostPeriodsIndex = $router->has('costing.production_cost_periods.index');
 
+    $canModule = fn (string $module) => $user ? $user->canAccessModule($module) : false;
+    $hasDashboardRoute = $hasDashboardRoute && $canModule('dashboard');
+
+    if (!$canModule('inventory')) {
+        $hasInvStocksItems = $hasInvStocksLots = $hasInvStockCard = false;
+        $hasInvTransfersIndex = $hasInvTransfersCreate = $hasInvAdjustmentsIndex = false;
+        $hasInvOpnamesIndex = $hasInvOpnamesCreate = false;
+        $hasInvExternalIndex = $hasInvExternalCreate = false;
+        $hasInvWipAdjIndex = $hasInvWipCutReconcile = $hasInvIntelligence = false;
+        $hasRtsStockReqIndex = $hasRtsDirectReceiveIndex = false;
+    }
+
+    if (!$canModule('sales')) {
+        $hasSalesShipmentsIndex = $hasSalesShipmentsCreate = $hasSalesShipmentReturnsIndex = false;
+        $hasSalesInvoicesIndex = $hasSalesInvoicesCreate = $hasSalesShipmentsReport = false;
+        $hasSalesReportPerformance = $hasSalesReportItemProfit = false;
+        $hasSalesReportChannelProfit = $hasSalesReportShipmentAnalytics = false;
+    }
+
+    if (!$canModule('master')) {
+        $hasMasterItemsIndex = $hasMasterItemCategoriesIndex = $hasMasterCustomersIndex = false;
+        $hasMasterSuppliersIndex = $hasMasterItemBomsIndex = $hasMasterEmployeesIndex = false;
+    }
+
+    if (!$canModule('purchasing')) {
+        $hasPoIndex = $hasPoCreate = $hasGrnIndex = $hasGrnCreate = false;
+    }
+
+    if (!$canModule('marketplace')) {
+        $hasMarketplaceToko = $hasMarketplaceOrders = $hasMarketplaceFulfillment = false;
+        $hasMarketplacePicking = $hasMarketplaceSkuMapping = $hasMarketplaceSync = false;
+        $hasMarketplaceSettlement = $hasMarketplaceProfit = $hasMarketplaceAds = false;
+        $hasMarketplaceAnalytics = $hasMarketplaceIssues = false;
+        $hasMarketplaceIndex = $hasMarketplaceCreate = $hasMarketplaceShow = false;
+        $hasMarketplaceSalesReport = $hasMarketplaceSalesExport = false;
+        $hasMarketplaceReconcileQueue = $hasMarketplaceReconcileQueueBulk = false;
+        $hasMarketplaceReconcilePreview = $hasMarketplaceReconcileCommit = false;
+        $hasMarketplaceReconciliationsResolve = $hasMarketplaceReconciliationsDiff = false;
+        $hasMarketplaceReconcileItemsIndex = $hasMarketplaceReconcileItemsApply = false;
+        $hasMarketplaceReconcileItemsPackets = false;
+    }
+
+    if (!$canModule('imports')) {
+        $hasImportsMarketplaceIndex = $hasImportsMarketplaceCreate = $hasImportsMarketplaceExport = false;
+        $hasImportsMarketplaceDraft = $hasImportsMarketplacePreview = $hasImportsMarketplaceCommit = false;
+        $hasImportsMarketplaceCancel = $hasImportsMarketplaceShow = false;
+        $hasImportsMarketplaceIncomeIndex = $hasImportsMarketplaceIncomeCreate = false;
+        $hasImportsMarketplaceIncomeDraft = $hasImportsMarketplaceIncomePreview = false;
+        $hasImportsMarketplaceIncomeCommit = $hasImportsMarketplaceIncomeCancel = false;
+        $hasImportsMarketplaceIncomeShow = $hasImportsMarketplaceIncomeOrderShow = false;
+        $hasImportsMarketplaceIncomeApply = false;
+    }
+
+    if (!$canModule('production')) {
+        $hasProdCuttingJobsIndex = $hasProdSewPickupsIndex = $hasProdSewReturnsIndex = false;
+        $hasProdSewRejectReturnsIndex = false;
+        $hasProdFinishingJobsIndex = $hasProdQcIndex = false;
+        $hasProdPackingIndex = $hasProdPriorityIndex = false;
+        $hasProdReportsIndex = $hasProdDashboard = false;
+    }
+
+    if (!$canModule('accounting')) {
+        $hasAccountsIndex = $hasCashExpensesIndex = $hasCashBasisReportIndex = false;
+        $hasCashReceiptsIndex = $hasJournalsIndex = $hasOpeningBalancesIndex = false;
+        $hasOpeningBalancesBatchIndex = false;
+    }
+
+    if (!$canModule('payroll')) {
+        $hasPayrollDashboard = $hasPieceworkIndex = $hasPieceRatesIndex = false;
+        $hasPayrollReportsOperators = false;
+    }
+
+    if (!$canModule('costing')) {
+        $hasHppIndex = $hasProdCostPeriodsIndex = false;
+    }
+
     // =========================================================
     // OPEN STATES (untuk collapse)
     // =========================================================
@@ -178,6 +258,19 @@
     $openMarketplaceOrders = $open('marketplace.orders.*');
 
     $openMarketplaceTools =
+        $open('marketplace.toko') ||
+        $open('marketplace.orders') ||
+        $open('marketplace.orders.*') ||
+        $open('marketplace.fulfillment') ||
+        $open('marketplace.fulfillment.*') ||
+        $open('marketplace.picking') ||
+        $open('marketplace.sku-mapping') ||
+        $open('marketplace.sync') ||
+        $open('marketplace.settlement') ||
+        $open('marketplace.profit') ||
+        $open('marketplace.ads') ||
+        $open('marketplace.analytics') ||
+        $open('marketplace.issues') ||
         $open('marketplace.reports.*') ||
         $open('marketplace.reconcile.*') ||
         $open('marketplace.reconciliations.*');
@@ -213,11 +306,9 @@
         $open('production.cutting_jobs.*') ||
         $open('production.sewing.*') ||
         $open('production.finishing_jobs.*') ||
-        $open('production.wip-fin-adjustments.*') ||
         $open('production.qc.*') ||
         $open('production.dashboard') ||
         $open('production.packing_jobs.*') ||
-        $open('production.movements.*') ||
         $open('production.priority.*') ||
         $open('production.reports.*');
 
@@ -460,6 +551,13 @@
                     Dashboard
                 </x-sidebar.simple-link>
             </li>
+            @if ($isOwner && $hasOwnerAccessControl)
+                <li>
+                    <x-sidebar.simple-link href="{{ route('owner.access-control.index') }}" icon="🔐" :active="request()->routeIs('owner.access-control.*')">
+                        Akses Login
+                    </x-sidebar.simple-link>
+                </li>
+            @endif
             <div class="sidebar-divider"></div>
         @endif
 
@@ -531,8 +629,8 @@
                 <x-sidebar.label text="Marketplace" />
                 <li class="simple-group">
                     @if ($hasMarketplaceIndex)
-                        <x-sidebar.simple-link href="{{ route('marketplace.orders.index') }}" icon="🛒"
-                            :active="request()->routeIs('marketplace.orders.*')">
+                        <x-sidebar.simple-link href="{{ route('marketplace.orders') }}" icon="🛒"
+                            :active="request()->routeIs('marketplace.orders') || request()->routeIs('marketplace.orders.*')">
                             Orders
                         </x-sidebar.simple-link>
                     @endif
@@ -629,9 +727,7 @@
                 $hasProdSewReturnsIndex,
                 $hasProdFinishingJobsIndex,
                 $hasProdPackingIndex,
-                $hasProdWipFinAdjIndex,
                 $hasProdQcIndex,
-                $hasProdMovementsIndex,
                 $hasProdPriorityIndex,
                 $hasProdReportsIndex
             ))
@@ -665,17 +761,17 @@
                         </x-sidebar.simple-link>
                     @endif
 
+                    @if ($hasProdSewRejectReturnsIndex)
+                        <x-sidebar.simple-link href="{{ route('production.sewing.reject_returns.index') }}" icon="♻️"
+                            :active="request()->routeIs('production.sewing.reject_returns.*')">
+                            Setor Reject Jahit
+                        </x-sidebar.simple-link>
+                    @endif
+
                     @if ($hasProdQcIndex)
                         <x-sidebar.simple-link href="{{ route('production.qc.index') }}" icon="✅"
                             :active="request()->routeIs('production.qc.*')">
                             QC Produksi
-                        </x-sidebar.simple-link>
-                    @endif
-
-                    @if ($hasProdRejectIndex)
-                        <x-sidebar.simple-link href="{{ route('production.reject.index') }}" icon="⚠️"
-                            :active="request()->routeIs('production.reject.*')">
-                            Reject Produksi
                         </x-sidebar.simple-link>
                     @endif
 
@@ -693,13 +789,6 @@
                         </x-sidebar.simple-link>
                     @endif
 
-                    @if ($hasProdMovementsIndex)
-                        <x-sidebar.simple-link href="{{ route('production.movements.index') }}" icon="🔄"
-                            :active="request()->routeIs('production.movements.*')">
-                            Mutasi Produksi
-                        </x-sidebar.simple-link>
-                    @endif
-
                     @if ($hasProdPriorityIndex)
                         <x-sidebar.simple-link href="{{ route('production.priority.index') }}" icon="🎯"
                             :active="request()->routeIs('production.priority.*')">
@@ -714,12 +803,6 @@
                         </x-sidebar.simple-link>
                     @endif
 
-                    @if ($hasProdWipFinAdjIndex)
-                        <x-sidebar.simple-link href="{{ route('production.wip-fin-adjustments.index') }}" icon="🧾"
-                            :active="request()->routeIs('production.wip-fin-adjustments.*')">
-                            Koreksi WIP-FIN
-                        </x-sidebar.simple-link>
-                    @endif
                 </li>
             @endif
 
@@ -892,62 +975,103 @@
             @endif
 
             {{-- MARKETPLACE --}}
-            @if ($hasMarketplaceToko || $hasMarketplaceOrders || $hasMarketplaceFulfillment || $hasMarketplaceSkuMapping || $hasMarketplaceSync)
+            @if ($canShow(
+                $hasMarketplaceToko,
+                $hasMarketplaceOrders,
+                $hasMarketplaceFulfillment,
+                $hasMarketplacePicking,
+                $hasMarketplaceSkuMapping,
+                $hasMarketplaceSync,
+                $hasMarketplaceSettlement,
+                $hasMarketplaceProfit,
+                $hasMarketplaceAds,
+                $hasMarketplaceAnalytics,
+                $hasMarketplaceIssues
+            ))
                 <x-sidebar.label text="Marketplace" />
-                @if ($hasMarketplaceToko)
-                    <x-sidebar.simple-link href="{{ route('marketplace.toko') }}" icon="🏪"
-                        :active="request()->routeIs('marketplace.toko')">
-                        Toko & Channel
-                    </x-sidebar.simple-link>
-                @endif
-                @if ($hasMarketplaceOrders)
-                    <x-sidebar.simple-link href="{{ route('marketplace.orders') }}" icon="📋"
-                        :active="request()->routeIs('marketplace.orders')">
-                        Order Lokal
-                    </x-sidebar.simple-link>
-                @endif
-                @if ($hasMarketplaceFulfillment)
-                    <x-sidebar.simple-link href="{{ route('marketplace.fulfillment') }}" icon="📦"
-                        :active="request()->routeIs('marketplace.fulfillment')">
-                        Fulfillment
-                    </x-sidebar.simple-link>
-                @endif
-                @if ($hasMarketplaceSkuMapping)
-                    <x-sidebar.simple-link href="{{ route('marketplace.sku-mapping') }}" icon="🔗"
-                        :active="request()->routeIs('marketplace.sku-mapping')">
-                        SKU Mapping
-                    </x-sidebar.simple-link>
-                @endif
-                @if ($hasMarketplaceSync)
-                    <x-sidebar.simple-link href="{{ route('marketplace.sync') }}" icon="↓"
-                        :active="request()->routeIs('marketplace.sync')">
-                        Sync Order
-                    </x-sidebar.simple-link>
-                @endif
-                @if ($hasMarketplaceSettlement)
-                    <x-sidebar.simple-link href="{{ route('marketplace.settlement') }}" icon="💰"
-                        :active="request()->routeIs('marketplace.settlement')">
-                        Settlement
-                    </x-sidebar.simple-link>
-                @endif
-                @if ($hasMarketplaceProfit)
-                    <x-sidebar.simple-link href="{{ route('marketplace.profit') }}" icon="📈"
-                        :active="request()->routeIs('marketplace.profit')">
-                        Profit Order
-                    </x-sidebar.simple-link>
-                @endif
-                @if ($hasMarketplaceAds)
-                    <x-sidebar.simple-link href="{{ route('marketplace.ads') }}" icon="🎯"
-                        :active="request()->routeIs('marketplace.ads')">
-                        Analisa Iklan
-                    </x-sidebar.simple-link>
-                @endif
-                @if ($hasMarketplaceIssues)
-                    <x-sidebar.simple-link href="{{ route('marketplace.issues') }}" icon="⚠️"
-                        :active="request()->routeIs('marketplace.issues')">
-                        Data Perlu Diperbaiki
-                    </x-sidebar.simple-link>
-                @endif
+                <li class="mb-1">
+                    <button class="sidebar-link sidebar-toggle {{ $openMarketplaceTools ? 'is-open' : '' }}" type="button"
+                        data-bs-toggle="collapse" data-bs-target="#navMarketplaceOwner"
+                        aria-expanded="{{ $openMarketplaceTools ? 'true' : 'false' }}" aria-controls="navMarketplaceOwner">
+                        <span class="icon">🛒</span>
+                        <span>Marketplace</span>
+                        <span class="chevron">▸</span>
+                    </button>
+
+                    <div class="collapse {{ $openMarketplaceTools ? 'show' : '' }}" id="navMarketplaceOwner">
+                        @php $subhead('Operasional'); @endphp
+                        @if ($hasMarketplaceToko)
+                            <x-sidebar.sub-link href="{{ route('marketplace.toko') }}" icon="🏪"
+                                :active="request()->routeIs('marketplace.toko')">
+                                Toko & Channel
+                            </x-sidebar.sub-link>
+                        @endif
+                        @if ($hasMarketplaceOrders)
+                            <x-sidebar.sub-link href="{{ route('marketplace.orders') }}" icon="📋"
+                                :active="request()->routeIs('marketplace.orders') || request()->routeIs('marketplace.orders.*')">
+                                Order Lokal
+                            </x-sidebar.sub-link>
+                        @endif
+                        @if ($hasMarketplaceFulfillment)
+                            <x-sidebar.sub-link href="{{ route('marketplace.fulfillment') }}" icon="🚚"
+                                :active="request()->routeIs('marketplace.fulfillment') || request()->routeIs('marketplace.fulfillment.*')">
+                                Fulfillment
+                            </x-sidebar.sub-link>
+                        @endif
+                        @if ($hasMarketplacePicking)
+                            <x-sidebar.sub-link href="{{ route('marketplace.picking') }}" icon="🧺"
+                                :active="request()->routeIs('marketplace.picking')">
+                                Picking
+                            </x-sidebar.sub-link>
+                        @endif
+
+                        @php $subhead('Data & Sinkron'); @endphp
+                        @if ($hasMarketplaceSkuMapping)
+                            <x-sidebar.sub-link href="{{ route('marketplace.sku-mapping') }}" icon="🔗"
+                                :active="request()->routeIs('marketplace.sku-mapping')">
+                                SKU Mapping
+                            </x-sidebar.sub-link>
+                        @endif
+                        @if ($hasMarketplaceSync)
+                            <x-sidebar.sub-link href="{{ route('marketplace.sync') }}" icon="↓"
+                                :active="request()->routeIs('marketplace.sync')">
+                                Sync Order
+                            </x-sidebar.sub-link>
+                        @endif
+                        @if ($hasMarketplaceIssues)
+                            <x-sidebar.sub-link href="{{ route('marketplace.issues') }}" icon="⚠️"
+                                :active="request()->routeIs('marketplace.issues')">
+                                Data Perlu Diperbaiki
+                            </x-sidebar.sub-link>
+                        @endif
+
+                        @php $subhead('Analisa'); @endphp
+                        @if ($hasMarketplaceSettlement)
+                            <x-sidebar.sub-link href="{{ route('marketplace.settlement') }}" icon="💰"
+                                :active="request()->routeIs('marketplace.settlement')">
+                                Settlement
+                            </x-sidebar.sub-link>
+                        @endif
+                        @if ($hasMarketplaceProfit)
+                            <x-sidebar.sub-link href="{{ route('marketplace.profit') }}" icon="📈"
+                                :active="request()->routeIs('marketplace.profit')">
+                                Profit Order
+                            </x-sidebar.sub-link>
+                        @endif
+                        @if ($hasMarketplaceAds)
+                            <x-sidebar.sub-link href="{{ route('marketplace.ads') }}" icon="🎯"
+                                :active="request()->routeIs('marketplace.ads')">
+                                Analisa Iklan
+                            </x-sidebar.sub-link>
+                        @endif
+                        @if ($hasMarketplaceAnalytics)
+                            <x-sidebar.sub-link href="{{ route('marketplace.analytics') }}" icon="📊"
+                                :active="request()->routeIs('marketplace.analytics')">
+                                Sales Analytics
+                            </x-sidebar.sub-link>
+                        @endif
+                    </div>
+                </li>
             @endif
 
             {{-- SALES --}}
@@ -1201,10 +1325,8 @@
                 $hasProdSewReturnsIndex,
                 $hasProdFinishingJobsIndex,
                 $hasProdPackingIndex,
-                $hasProdWipFinAdjIndex,
                 $hasProdQcIndex,
                 $hasProdDashboard,
-                $hasProdMovementsIndex,
                 $hasProdPriorityIndex,
                 $hasProdReportsIndex
             ))
@@ -1258,16 +1380,16 @@
                                 Sewing Returns
                             </x-sidebar.sub-link>
                         @endif
+                        @if ($hasProdSewRejectReturnsIndex)
+                            <x-sidebar.sub-link href="{{ route('production.sewing.reject_returns.index') }}" icon="♻️"
+                                :active="request()->routeIs('production.sewing.reject_returns.*')">
+                                Setor Reject Jahit
+                            </x-sidebar.sub-link>
+                        @endif
                         @if ($hasProdQcIndex)
                             <x-sidebar.sub-link href="{{ route('production.qc.index') }}" icon="✅"
                                 :active="request()->routeIs('production.qc.*')">
                                 QC Produksi
-                            </x-sidebar.sub-link>
-                        @endif
-                        @if ($hasProdRejectIndex)
-                            <x-sidebar.sub-link href="{{ route('production.reject.index') }}" icon="⚠️"
-                                :active="request()->routeIs('production.reject.*')">
-                                Reject Produksi
                             </x-sidebar.sub-link>
                         @endif
                         @if ($hasProdFinishingJobsIndex)
@@ -1280,20 +1402,6 @@
                             <x-sidebar.sub-link href="{{ route('production.packing_jobs.index') }}" icon="📦"
                                 :active="request()->routeIs('production.packing_jobs.*')">
                                 Packing
-                            </x-sidebar.sub-link>
-                        @endif
-
-                        @php $subhead('Stok & Koreksi'); @endphp
-                        @if ($hasProdMovementsIndex)
-                            <x-sidebar.sub-link href="{{ route('production.movements.index') }}" icon="🔄"
-                                :active="request()->routeIs('production.movements.*')">
-                                Mutasi Produksi
-                            </x-sidebar.sub-link>
-                        @endif
-                        @if ($hasProdWipFinAdjIndex)
-                            <x-sidebar.sub-link href="{{ route('production.wip-fin-adjustments.index') }}" icon="🧾"
-                                :active="request()->routeIs('production.wip-fin-adjustments.*')">
-                                Koreksi WIP-FIN
                             </x-sidebar.sub-link>
                         @endif
                     </div>

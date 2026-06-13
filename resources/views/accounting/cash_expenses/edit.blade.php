@@ -287,7 +287,7 @@ document.addEventListener('DOMContentLoaded', function () {
         input.style.display = 'none';
 
         if (!wrap.querySelector('[data-proof-view-only]')) {
-            const proofUrl = @json($cashExpense->proof_photo_path ? asset('storage/' . $cashExpense->proof_photo_path) : null);
+            const proofUrl = @json($cashExpense->proof_photo_path ? route('accounting.cash-expenses.proof', $cashExpense) : null);
 
             const box = document.createElement('div');
             box.setAttribute('data-proof-view-only', '1');
@@ -399,7 +399,7 @@ input[name="proof_photo"],
 
 <script>
 document.addEventListener('DOMContentLoaded', function () {
-    const proofUrl = @json($cashExpense->proof_photo_path ? asset('storage/' . $cashExpense->proof_photo_path) : null);
+    const proofUrl = @json($cashExpense->proof_photo_path ? route('accounting.cash-expenses.proof', $cashExpense) : null);
 
     function findDateField() {
         return document.querySelector(
@@ -570,4 +570,3 @@ document.addEventListener('DOMContentLoaded', function () {
     }
 });
 </script>
-

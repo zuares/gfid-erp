@@ -5,8 +5,7 @@ use App\Http\Controllers\Payroll\PayrollReportController;
 use App\Http\Controllers\Payroll\PieceRateController;
 use App\Http\Controllers\Payroll\PieceworkPayrollController;
 
-// Semua route payroll: hanya bisa diakses oleh owner
-Route::middleware(['web', 'auth', 'role:owner'])->group(function () {
+Route::middleware(['web', 'auth', 'access:payroll'])->group(function () {
 
     /*
     |--------------------------------------------------------------------------

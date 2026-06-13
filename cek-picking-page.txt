@@ -1,0 +1,320 @@
+=== ROUTE PICKING / FULFILLMENT ===
+  GET|HEAD        api/fulfillments ....................................................... Owner\FulfillmentController@index
+  POST            api/fulfillments/create-draft .................................... Owner\FulfillmentController@createDraft
+  GET|HEAD        api/fulfillments/picking-queue .................................. Owner\FulfillmentController@pickingQueue
+  POST            api/fulfillments/remap-all .......................................... Owner\FulfillmentController@remapAll
+  POST            api/fulfillments/scan .............................................. Owner\FulfillmentController@scanOrder
+  POST            api/fulfillments/start-picking .................................. Owner\FulfillmentController@startPicking
+  GET|HEAD        api/fulfillments/{fulfillment} .......................................... Owner\FulfillmentController@show
+  POST            api/fulfillments/{fulfillment}/confirm ............................... Owner\FulfillmentController@confirm
+  PATCH           api/fulfillments/{fulfillment}/lines/{line} ....................... Owner\FulfillmentController@updateLine
+  POST            api/fulfillments/{fulfillment}/lines/{line}/flag-problem ..... Owner\FulfillmentController@flagLineProblem
+  POST            api/fulfillments/{fulfillment}/lines/{line}/resolve-problem Owner\FulfillmentController@resolveLineProblem
+  POST            api/fulfillments/{fulfillment}/lines/{line}/toggle-picked ... Owner\FulfillmentController@toggleLinePicked
+  POST            api/fulfillments/{fulfillment}/mark-packed ........................ Owner\FulfillmentController@markPacked
+  POST            api/fulfillments/{fulfillment}/refresh-stock .................... Owner\FulfillmentController@refreshStock
+  POST            api/fulfillments/{fulfillment}/unpack ................................. Owner\FulfillmentController@unpack
+  GET|HEAD        marketplace/fulfillment ...................... marketplace.fulfillment › MarketplaceController@fulfillment
+  GET|HEAD        marketplace/picking .................................. marketplace.picking › MarketplaceController@picking
+
+=== CARI ROUTE DI FILE ===
+routes/web.php:47:Route::get('/marketplace/fulfillment', [MarketplaceController::class, 'fulfillment'])->name('marketplace.fulfillment');
+routes/web.php:48:Route::get('/marketplace/picking',     [MarketplaceController::class, 'picking'])->name('marketplace.picking');
+routes/web.php:107:Route::prefix('api/fulfillments')->group(function () {
+routes/web.php:116:    Route::get('/picking-queue',                              [FulfillmentController::class, 'pickingQueue']);
+routes/web.php:117:    Route::post('/start-picking',                             [FulfillmentController::class, 'startPicking'])
+routes/web.php:119:    Route::get('/{fulfillment}',                              [FulfillmentController::class, 'show']);
+routes/web.php:120:    Route::patch('/{fulfillment}/lines/{line}',               [FulfillmentController::class, 'updateLine'])
+routes/web.php:122:    Route::post('/{fulfillment}/confirm',                     [FulfillmentController::class, 'confirm'])
+routes/web.php:124:    Route::post('/{fulfillment}/refresh-stock',               [FulfillmentController::class, 'refreshStock'])
+routes/web.php:126:    Route::post('/{fulfillment}/mark-packed',                 [FulfillmentController::class, 'markPacked'])
+routes/web.php:128:    Route::post('/{fulfillment}/unpack',                      [FulfillmentController::class, 'unpack'])
+routes/web.php:130:    Route::post('/{fulfillment}/lines/{line}/toggle-picked',  [FulfillmentController::class, 'toggleLinePicked'])
+routes/web.php:132:    Route::post('/{fulfillment}/lines/{line}/flag-problem',   [FulfillmentController::class, 'flagLineProblem'])
+routes/web.php:134:    Route::post('/{fulfillment}/lines/{line}/resolve-problem',[FulfillmentController::class, 'resolveLineProblem'])
+app/Models/MarketplaceOrder.php:73:    public function fulfillment(): HasOne
+app/Models/OrderFulfillment.php:13:    public const STATUS_PICKING        = 'picking';   // sedang dipick oleh picker di gudang
+app/Models/OrderFulfillment.php:50:        return $this->hasMany(OrderFulfillmentLine::class, 'fulfillment_id');
+app/Models/OrderFulfillmentLine.php:11:        'fulfillment_id',
+app/Models/OrderFulfillmentLine.php:36:    public function fulfillment(): BelongsTo
+app/Http/Controllers/Owner/FulfillmentController.php:17:    /** Daftar fulfillment pending (draft / pending_review). */
+app/Http/Controllers/Owner/FulfillmentController.php:20:        $fulfillments = OrderFulfillment::with([
+app/Http/Controllers/Owner/FulfillmentController.php:33:        return response()->json($fulfillments);
+app/Http/Controllers/Owner/FulfillmentController.php:36:    /** Detail satu fulfillment. */
+app/Http/Controllers/Owner/FulfillmentController.php:37:    public function show(OrderFulfillment $fulfillment): JsonResponse
+app/Http/Controllers/Owner/FulfillmentController.php:39:        $fulfillment->load(['order.store.channel', 'lines.item', 'lines.lot', 'warehouse', 'confirmedBy']);
+app/Http/Controllers/Owner/FulfillmentController.php:40:        return response()->json($this->formatFulfillment($fulfillment, detail: true));
+app/Http/Controllers/Owner/FulfillmentController.php:43:    /** Buat draft manual untuk order yang belum punya fulfillment. */
+app/Http/Controllers/Owner/FulfillmentController.php:49:        $fulfillment = $this->service->createDraft($order);
+app/Http/Controllers/Owner/FulfillmentController.php:51:        return response()->json($this->formatFulfillment($fulfillment->fresh(['order.store.channel', 'lines.item', 'warehouse']), detail: true));
+app/Http/Controllers/Owner/FulfillmentController.php:55:     * Scan nomor order → cari atau buat fulfillment draft, lalu kembalikan detail-nya.
+app/Http/Controllers/Owner/FulfillmentController.php:56:     * Dipakai oleh scan box di halaman fulfillment.
+app/Http/Controllers/Owner/FulfillmentController.php:69:        // Cek apakah sudah ada fulfillment (status apapun — termasuk confirmed)
+app/Http/Controllers/Owner/FulfillmentController.php:79:                'fulfillment'       => $this->formatFulfillment($existing, detail: true),
+app/Http/Controllers/Owner/FulfillmentController.php:84:        $fulfillment = $this->service->createDraft($order);
+app/Http/Controllers/Owner/FulfillmentController.php:85:        $fulfillment->load(['order.store.channel', 'lines.item', 'lines.lot', 'warehouse']);
+app/Http/Controllers/Owner/FulfillmentController.php:89:            'fulfillment'       => $this->formatFulfillment($fulfillment, detail: true),
+app/Http/Controllers/Owner/FulfillmentController.php:94:    public function updateLine(Request $request, OrderFulfillment $fulfillment, OrderFulfillmentLine $line): JsonResponse
+app/Http/Controllers/Owner/FulfillmentController.php:108:    /** Konfirmasi fulfillment → potong stok. */
+app/Http/Controllers/Owner/FulfillmentController.php:109:    public function confirm(OrderFulfillment $fulfillment): JsonResponse
+app/Http/Controllers/Owner/FulfillmentController.php:112:            $result = $this->service->confirm($fulfillment, auth()->user());
+app/Http/Controllers/Owner/FulfillmentController.php:119:            'fulfillment' => $this->formatFulfillment($result->load(['lines.item', 'confirmedBy'])),
+app/Http/Controllers/Owner/FulfillmentController.php:127:    /** Daftar fulfillment untuk halaman picking, dikelompokkan per stage. */
+app/Http/Controllers/Owner/FulfillmentController.php:128:    public function pickingQueue(): JsonResponse
+app/Http/Controllers/Owner/FulfillmentController.php:130:        $fulfillments = OrderFulfillment::with([
+app/Http/Controllers/Owner/FulfillmentController.php:144:            'ready_to_pick' => $fulfillments
+app/Http/Controllers/Owner/FulfillmentController.php:149:            'picking' => $fulfillments
+app/Http/Controllers/Owner/FulfillmentController.php:153:            'problem' => $fulfillments
+app/Http/Controllers/Owner/FulfillmentController.php:158:            'packed' => $fulfillments
+app/Http/Controllers/Owner/FulfillmentController.php:165:    /** Mulai picking untuk batch fulfillment (array of IDs). */
+app/Http/Controllers/Owner/FulfillmentController.php:170:        $fulfillments = OrderFulfillment::whereIn('id', $request->ids)->get()->all();
+app/Http/Controllers/Owner/FulfillmentController.php:171:        $this->service->startPicking($fulfillments);
+app/Http/Controllers/Owner/FulfillmentController.php:173:        return response()->json(['message' => count($fulfillments) . ' fulfillment dimulai picking.']);
+app/Http/Controllers/Owner/FulfillmentController.php:176:    /** Tandai fulfillment siap dikemas (picking → packed). */
+app/Http/Controllers/Owner/FulfillmentController.php:177:    public function markPacked(OrderFulfillment $fulfillment): JsonResponse
+app/Http/Controllers/Owner/FulfillmentController.php:180:            $result = $this->service->markPacked($fulfillment);
+app/Http/Controllers/Owner/FulfillmentController.php:184:        return response()->json(['message' => 'Siap dikemas.', 'fulfillment' => $this->formatFulfillment($result->load('lines.item'))]);
+app/Http/Controllers/Owner/FulfillmentController.php:187:    /** Undo packed → picking. */
+app/Http/Controllers/Owner/FulfillmentController.php:188:    public function unpack(OrderFulfillment $fulfillment): JsonResponse
+app/Http/Controllers/Owner/FulfillmentController.php:191:            $result = $this->service->unpack($fulfillment);
+app/Http/Controllers/Owner/FulfillmentController.php:195:        return response()->json(['message' => 'Dikembalikan ke picking.', 'fulfillment' => $this->formatFulfillment($result->load('lines.item'))]);
+app/Http/Controllers/Owner/FulfillmentController.php:199:    public function toggleLinePicked(OrderFulfillment $fulfillment, OrderFulfillmentLine $line): JsonResponse
+app/Http/Controllers/Owner/FulfillmentController.php:207:    public function flagLineProblem(Request $request, OrderFulfillment $fulfillment, OrderFulfillmentLine $line): JsonResponse
+app/Http/Controllers/Owner/FulfillmentController.php:216:    public function resolveLineProblem(Request $request, OrderFulfillment $fulfillment, OrderFulfillmentLine $line): JsonResponse
+app/Http/Controllers/Owner/FulfillmentController.php:227:    /** Re-resolve semua lines unmapped di seluruh fulfillment pending. */
+app/Http/Controllers/Owner/FulfillmentController.php:235:    public function refreshStock(OrderFulfillment $fulfillment): JsonResponse
+app/Http/Controllers/Owner/FulfillmentController.php:237:        $this->service->refreshStock($fulfillment);
+app/Http/Controllers/Owner/FulfillmentController.php:238:        $fulfillment->load(['lines.item', 'lines.lot']);
+app/Http/Controllers/Owner/FulfillmentController.php:240:        return response()->json($this->formatFulfillment($fulfillment, detail: true));
+app/Http/Controllers/MarketplaceController.php:30:        protected OrderFulfillmentService $fulfillment,
+app/Http/Controllers/MarketplaceController.php:52:    public function fulfillment(): \Illuminate\View\View
+app/Http/Controllers/MarketplaceController.php:54:        return view('marketplace.fulfillment');
+app/Http/Controllers/MarketplaceController.php:57:    public function picking(): \Illuminate\View\View
+app/Http/Controllers/MarketplaceController.php:59:        return view('marketplace.picking');
+app/Http/Controllers/MarketplaceController.php:179:                'fulfillment:id,marketplace_order_id,status',
+app/Http/Controllers/MarketplaceController.php:180:                'fulfillment.lines:id,fulfillment_id,item_id',
+app/Http/Controllers/MarketplaceController.php:188:            $arr['fulfillment_id']         = $o->fulfillment?->id;
+app/Http/Controllers/MarketplaceController.php:189:            $arr['fulfillment_status']     = $o->fulfillment?->status; // null|draft|pending_review|confirmed|cancelled
+app/Http/Controllers/MarketplaceController.php:190:            $arr['has_unresolved_lines']   = $o->fulfillment
+app/Http/Controllers/MarketplaceController.php:191:                ? $o->fulfillment->lines->whereNull('item_id')->isNotEmpty()
+app/Http/Controllers/MarketplaceController.php:569:            $fulfillments = OrderFulfillment::whereHas('order', fn ($q) => $q->where('store_id', $store->id))
+app/Http/Controllers/MarketplaceController.php:574:            foreach ($fulfillments as $f) {
+app/Http/Controllers/MarketplaceController.php:576:                $this->fulfillment->refreshStock($f->load('lines'));
+app/Http/Controllers/MarketplaceController.php:584:            'fulfillments_updated' => isset($fulfillments) ? $fulfillments->count() : 0,
+app/Http/Controllers/MarketplaceController.php:607:        // Order READY_TO_SHIP belum punya fulfillment draft
+app/Http/Controllers/MarketplaceController.php:610:            ->whereDoesntHave('fulfillment')
+app/Http/Controllers/OmnichannelController.php:22:        protected OrderFulfillmentService $fulfillment,
+app/Http/Controllers/OmnichannelController.php:27:        $validTabs   = ['toko', 'orders', 'fulfillment', 'sku-mapping'];
+app/Http/Controllers/OmnichannelController.php:57:    public function fulfillmentPage(): \Illuminate\View\View
+app/Http/Controllers/OmnichannelController.php:59:        return view('owner.marketplace.fulfillment');
+app/Http/Controllers/OmnichannelController.php:160:        // Update warehouse_id di semua fulfillment pending milik store ini yang warehouse-nya masih null
+app/Http/Controllers/OmnichannelController.php:163:            $fulfillments = OrderFulfillment::whereHas('order', fn ($q) => $q->where('store_id', $store->id))
+app/Http/Controllers/OmnichannelController.php:168:            foreach ($fulfillments as $f) {
+app/Http/Controllers/OmnichannelController.php:170:                $this->fulfillment->refreshStock($f->load('lines'));
+app/Http/Controllers/OmnichannelController.php:178:            'fulfillments_updated'=> isset($fulfillments) ? $fulfillments->count() : 0,
+app/Services/OrderFulfillmentService.php:17:     * Buat draft fulfillment untuk sebuah MarketplaceOrder.
+app/Services/OrderFulfillmentService.php:34:            $fulfillment = OrderFulfillment::create([
+app/Services/OrderFulfillmentService.php:60:                    'fulfillment_id'           => $fulfillment->id,
+app/Services/OrderFulfillmentService.php:73:            $fulfillment->update(['status' => OrderFulfillment::STATUS_PENDING_REVIEW]);
+app/Services/OrderFulfillmentService.php:75:            return $fulfillment->fresh('lines');
+app/Services/OrderFulfillmentService.php:85:        $warehouseId = $line->fulfillment->warehouse_id;
+app/Services/OrderFulfillmentService.php:113:     * Mulai picking: pending_review → picking.
+app/Services/OrderFulfillmentService.php:114:     * Bisa batch (array of fulfillments).
+app/Services/OrderFulfillmentService.php:116:     * @param  OrderFulfillment[]  $fulfillments
+app/Services/OrderFulfillmentService.php:118:    public function startPicking(array $fulfillments): void
+app/Services/OrderFulfillmentService.php:120:        foreach ($fulfillments as $f) {
+app/Services/OrderFulfillmentService.php:127:     * Tandai fulfillment siap dikemas: picking → packed.
+app/Services/OrderFulfillmentService.php:130:    public function markPacked(OrderFulfillment $fulfillment): OrderFulfillment
+app/Services/OrderFulfillmentService.php:132:        if (! $fulfillment->canPack()) {
+app/Services/OrderFulfillmentService.php:133:            throw new \RuntimeException("Fulfillment tidak dalam status picking.");
+app/Services/OrderFulfillmentService.php:135:        $fulfillment->update(['status' => OrderFulfillment::STATUS_PACKED]);
+app/Services/OrderFulfillmentService.php:136:        return $fulfillment->fresh();
+app/Services/OrderFulfillmentService.php:140:     * Undo packed → picking (misalnya ada item yang perlu dicek ulang).
+app/Services/OrderFulfillmentService.php:142:    public function unpack(OrderFulfillment $fulfillment): OrderFulfillment
+app/Services/OrderFulfillmentService.php:144:        if (! $fulfillment->canUnpack()) {
+app/Services/OrderFulfillmentService.php:147:        $fulfillment->update(['status' => OrderFulfillment::STATUS_PICKING]);
+app/Services/OrderFulfillmentService.php:148:        return $fulfillment->fresh();
+app/Services/OrderFulfillmentService.php:161:            // Kalau fulfillment sudah packed, kembalikan ke picking
+app/Services/OrderFulfillmentService.php:162:            $fulfillment = $line->fulfillment;
+app/Services/OrderFulfillmentService.php:163:            if ($fulfillment->isPacked()) {
+app/Services/OrderFulfillmentService.php:164:                $fulfillment->update(['status' => OrderFulfillment::STATUS_PICKING]);
+app/Services/OrderFulfillmentService.php:173:        $fulfillment = $line->fulfillment()->with('lines')->first();
+app/Services/OrderFulfillmentService.php:174:        $allPicked = $fulfillment->lines->every(fn ($l) => $l->isPicked());
+app/Services/OrderFulfillmentService.php:175:        if ($allPicked && $fulfillment->isPicking()) {
+app/Services/OrderFulfillmentService.php:176:            $fulfillment->update(['status' => OrderFulfillment::STATUS_PACKED]);
+app/Services/OrderFulfillmentService.php:191:        // Pastikan fulfillment kembali ke picking kalau sempat packed
+app/Services/OrderFulfillmentService.php:192:        $fulfillment = $line->fulfillment;
+app/Services/OrderFulfillmentService.php:193:        if ($fulfillment->isPacked()) {
+app/Services/OrderFulfillmentService.php:194:            $fulfillment->update(['status' => OrderFulfillment::STATUS_PICKING]);
+app/Services/OrderFulfillmentService.php:210:     * Konfirmasi fulfillment: potong stok + ubah status.
+app/Services/OrderFulfillmentService.php:214:    public function confirm(OrderFulfillment $fulfillment, User $confirmedBy): OrderFulfillment
+app/Services/OrderFulfillmentService.php:216:        if (! $fulfillment->canConfirm()) {
+app/Services/OrderFulfillmentService.php:217:            throw new \RuntimeException("Fulfillment sudah {$fulfillment->status}, tidak bisa dikonfirmasi.");
+app/Services/OrderFulfillmentService.php:220:        $fulfillment->loadMissing(['lines', 'order']);
+app/Services/OrderFulfillmentService.php:223:        $unresolved = $fulfillment->lines->whereNull('item_id');
+app/Services/OrderFulfillmentService.php:230:        $orderId = $fulfillment->marketplace_order_id;
+app/Services/OrderFulfillmentService.php:232:        DB::transaction(function () use ($fulfillment, $confirmedBy) {
+app/Services/OrderFulfillmentService.php:233:            foreach ($fulfillment->lines as $line) {
+app/Services/OrderFulfillmentService.php:241:                    'warehouse_id' => $fulfillment->warehouse_id,
+app/Services/OrderFulfillmentService.php:246:                    'source_type'  => 'order_fulfillment',
+app/Services/OrderFulfillmentService.php:247:                    'source_id'    => $fulfillment->id,
+app/Services/OrderFulfillmentService.php:248:                    'notes'        => "Fulfillment order #{$fulfillment->order->channel_order_id}",
+app/Services/OrderFulfillmentService.php:254:                if ($fulfillment->warehouse_id) {
+app/Services/OrderFulfillmentService.php:255:                    InventoryStock::where('warehouse_id', $fulfillment->warehouse_id)
+app/Services/OrderFulfillmentService.php:261:            // Update status fulfillment
+app/Services/OrderFulfillmentService.php:262:            $fulfillment->update([
+app/Services/OrderFulfillmentService.php:274:        return $fulfillment->fresh();
+app/Services/OrderFulfillmentService.php:284:        $fulfillments = OrderFulfillment::with(['order.store.channel', 'lines'])
+app/Services/OrderFulfillmentService.php:292:        foreach ($fulfillments as $fulfillment) {
+app/Services/OrderFulfillmentService.php:293:            $total += $this->remapLines($fulfillment);
+app/Services/OrderFulfillmentService.php:299:     * Re-resolve lines yang masih unmapped pada satu fulfillment.
+app/Services/OrderFulfillmentService.php:301:    public function remapLines(OrderFulfillment $fulfillment): int
+app/Services/OrderFulfillmentService.php:303:        $channelCode = $fulfillment->order?->store?->channel?->code;
+app/Services/OrderFulfillmentService.php:304:        $warehouseId = $fulfillment->warehouse_id;
+app/Services/OrderFulfillmentService.php:307:        foreach ($fulfillment->lines as $line) {
+app/Services/OrderFulfillmentService.php:338:    public function refreshStock(OrderFulfillment $fulfillment): void
+app/Services/OrderFulfillmentService.php:340:        $warehouseId = $fulfillment->warehouse_id;
+app/Services/OrderFulfillmentService.php:343:        foreach ($fulfillment->lines as $line) {
+app/Services/MarketplaceSyncService.php:23:        protected OrderFulfillmentService $fulfillment,
+app/Services/MarketplaceSyncService.php:87:        // 4. Auto-buat fulfillment draft untuk READY_TO_SHIP yang belum punya fulfillment
+app/Services/MarketplaceSyncService.php:595:        // Hanya buat fulfillment draft untuk order yang SEMUA item-nya data_status = valid
+app/Services/MarketplaceSyncService.php:598:            ->whereDoesntHave('fulfillment')
+app/Services/MarketplaceSyncService.php:604:                $this->fulfillment->createDraft($order);
+app/Services/MarketplaceSyncService.php:606:                Log::warning("Gagal buat fulfillment draft order #{$order->id}: " . $e->getMessage());
+app/Services/OmnichannelSyncService.php:18:        protected OrderFulfillmentService $fulfillment,
+app/Services/OmnichannelSyncService.php:81:        // 4. Auto-buat fulfillment draft untuk READY_TO_SHIP yang belum punya fulfillment
+app/Services/OmnichannelSyncService.php:170:            ->whereDoesntHave('fulfillment')
+app/Services/OmnichannelSyncService.php:175:                $this->fulfillment->createDraft($order);
+app/Services/OmnichannelSyncService.php:177:                Log::warning("Gagal buat fulfillment draft order #{$order->id}: " . $e->getMessage());
+
+=== CARI BLADE PICKING ===
+resources/views/marketplace/fulfillment.blade.php
+resources/views/marketplace/picking.blade.php
+resources/views/owner/marketplace/fulfillment.blade.php
+
+=== CARI VIEW YANG DIPANGGIL CONTROLLER ===
+app/Http/Controllers/MarketplaceController.php:54:        return view('marketplace.fulfillment');
+app/Http/Controllers/MarketplaceController.php:59:        return view('marketplace.picking');
+app/Http/Controllers/OmnichannelController.php:59:        return view('owner.marketplace.fulfillment');
+routes/web.php:47:Route::get('/marketplace/fulfillment', [MarketplaceController::class, 'fulfillment'])->name('marketplace.fulfillment');
+routes/web.php:48:Route::get('/marketplace/picking',     [MarketplaceController::class, 'picking'])->name('marketplace.picking');
+resources/views/marketplace/orders.blade.php:460:    // currentFulfillment tidak lagi dipakai — proses pindah ke /marketplace/fulfillment
+resources/views/marketplace/orders.blade.php:1042:                    : `<button class="btn-fulfillment" style="margin-top:.35rem" onclick="window.location='/marketplace/fulfillment?scan=${encodeURIComponent(o.channel_order_id)}'">📦 Proses</button>`)
+resources/views/marketplace/toko.blade.php:252:                    <a href="/marketplace/fulfillment" class="btn btn-light border">📦 Fulfillment</a>
+resources/views/marketplace/toko.blade.php:376:                    ? `<a href="/marketplace/fulfillment" class="btn btn-success fw-bold" style="border-radius:999px;font-size:.8rem" data-bs-dismiss="modal">
+resources/views/layouts/partials/sidebar.blade.php:80:    $hasMarketplaceFulfillment = $router->has('marketplace.fulfillment');
+resources/views/layouts/partials/sidebar.blade.php:911:                    <x-sidebar.simple-link href="{{ route('marketplace.fulfillment') }}" icon="📦"
+resources/views/layouts/partials/sidebar.blade.php:912:                        :active="request()->routeIs('marketplace.fulfillment')">
+
+=== CEK ISI BLADE TERKAIT ===
+resources/views/marketplace/_mapping-modal.blade.php:2:<div class="modal fade" id="mappingModal" tabindex="-1">
+resources/views/marketplace/_mapping-modal.blade.php:94:        delete document.getElementById('mappingModal').dataset.editLineId;
+resources/views/marketplace/_mapping-modal.blade.php:95:        new bootstrap.Modal(document.getElementById('mappingModal')).show();
+resources/views/marketplace/_mapping-modal.blade.php:101:        document.getElementById('mappingModal').dataset.editLineId   = lineId;
+resources/views/marketplace/_mapping-modal.blade.php:102:        document.getElementById('mappingModal').dataset.editFulfillId = fulfillId;
+resources/views/marketplace/_mapping-modal.blade.php:113:            const items = await api('/api/sku-mappings/search-items?q=' + encodeURIComponent(q)).catch(() => []);
+resources/views/marketplace/_mapping-modal.blade.php:155:            const item = await api('/api/sku-mappings/quick-create-item', { method: 'POST', body: JSON.stringify({ code, name, unit }) });
+resources/views/marketplace/_mapping-modal.blade.php:167:            await api('/api/sku-mappings', {
+resources/views/marketplace/_mapping-modal.blade.php:178:            const modal = document.getElementById('mappingModal');
+resources/views/marketplace/_mapping-modal.blade.php:180:                await api(`/api/fulfillments/${modal.dataset.editFulfillId}/lines/${modal.dataset.editLineId}`, {
+resources/views/marketplace/_mapping-modal.blade.php:185:            // Auto remap pending fulfillments di background
+resources/views/marketplace/_mapping-modal.blade.php:186:            api('/api/fulfillments/remap-all', { method: 'POST' }).catch(() => {});
+resources/views/marketplace/_mapping-modal.blade.php:211:                    const items = await api('/api/sku-mappings/search-items?q=' + encodeURIComponent(q)).catch(() => []);
+resources/views/marketplace/picking.blade.php:132:.pk-confirm-row {
+resources/views/marketplace/picking.blade.php:136:.pk-confirmed-badge {
+resources/views/marketplace/picking.blade.php:764:                <button class="pk-btn success" onclick="confirmFulfillment(${f.id})">✓ Konfirmasi</button>
+resources/views/marketplace/picking.blade.php:779:function confirmFulfillment(fulfId) {
+resources/views/marketplace/picking.blade.php:780:    // TODO: POST /api/fulfillments/{id}/confirm
+resources/views/marketplace/orders.blade.php:455:    let fulfilledOrderIds    = new Set();   // order ID yang sudah punya fulfillment confirmed
+resources/views/marketplace/orders.blade.php:480:        fulfilled:  o => o.fulfillment_status === 'confirmed' || fulfilledOrderIds.has(o.id),
+resources/views/marketplace/orders.blade.php:486:        unresolved: { icon: '✅', text: 'Tidak ada order yang perlu diperbaiki. Semua item sudah ter-mapping.' },
+resources/views/marketplace/orders.blade.php:597:        if (f.status === 'confirmed')      return '<span class="fstatus fstatus-done">✓ Selesai</span>';
+resources/views/marketplace/orders.blade.php:613:                if (o.fulfillment_status === 'confirmed') fulfilledOrderIds.add(o.id);
+resources/views/marketplace/orders.blade.php:701:                : `<span style="color:#aaa;font-family:monospace">${it.mSku || '—'} <em>(belum mapping)</em></span>`;
+resources/views/marketplace/orders.blade.php:717:                    : `<span style="color:#999;font-family:monospace">${mSku} <em>(belum mapping)</em></span>`;
+resources/views/marketplace/orders.blade.php:870:        $('bulkSummaryText').innerHTML = summaryParts.join(' — ') + '. Item yang sudah mapping akan dikonfirmasi dan stok dipotong.';
+resources/views/marketplace/orders.blade.php:875:            warnEl.innerHTML = `⚠ <strong>${unmapped.length} order</strong> punya item belum mapping — item tersebut akan dilewati, item lainnya tetap diproses.`;
+resources/views/marketplace/orders.blade.php:909:                const draft = await api('/api/fulfillments/create-draft', {
+resources/views/marketplace/orders.blade.php:913:                await api(`/api/fulfillments/${draft.id}/confirm`, { method: 'POST' });
+resources/views/marketplace/orders.blade.php:916:                fulfillmentStatusMap.set(o.id, { id: draft.id, status: 'confirmed' });
+resources/views/marketplace/orders.blade.php:964:                // Hanya READY_TO_SHIP belum confirmed
+resources/views/marketplace/orders.blade.php:990:                + `<span class="ord-item-nomap">Belum mapping</span>`;
+resources/views/marketplace/orders.blade.php:992:            bodyHtml = `<span class="ord-item-nomap">Belum mapping</span>`;
+resources/views/marketplace/orders.blade.php:1137:                    totalIssues += (d.sku_empty||0) + (d.mapping_not_found||0) + (d.missing_hpp||0);
+resources/views/marketplace/toko.blade.php:290:                        <td class="text-end" style="font-size:.8rem;color:${(p.mapping_not_found||0)>0?'#b45309':'inherit'}">${p.mapping_not_found ?? '—'}</td>
+resources/views/marketplace/toko.blade.php:352:            { label: '❓ SKU belum dimapping',    val: d.mapping_not_found ?? 0, style: (d.mapping_not_found||0)>0 ? 'warn' : '' },
+resources/views/marketplace/toko.blade.php:365:        const hasIssues = (d.sku_empty||0) + (d.mapping_not_found||0) + (d.missing_hpp||0) > 0;
+resources/views/marketplace/profit.blade.php:32:            ⚠️ Beberapa order tidak memiliki mapping SKU → Item, sehingga HPP-nya <strong>0</strong>. Lengkapi <a href="{{ route('marketplace.sku-mapping') }}">SKU Mapping</a> dan pastikan sudah ada <em>HPP Snapshot</em> aktif.
+resources/views/marketplace/profit.blade.php:120:                    : `<span style="color:#b91c1c" title="SKU belum ter-mapping">${fmtRp(r.hpp_total)} ⚠</span>`;
+resources/views/marketplace/_shared.blade.php:101:        const map = { active: 'oc-badge-green', inactive: 'oc-badge-muted', expired: 'oc-badge-red', COMPLETED: 'oc-badge-green', CANCELLED: 'oc-badge-red', READY_TO_SHIP: 'oc-badge-amber', PROCESSED: 'oc-badge-amber', fulfilled: 'oc-badge-green', draft: 'oc-badge-muted', pending_review: 'oc-badge-amber', confirmed: 'oc-badge-green' };
+resources/views/marketplace/import-orders.blade.php:189:                <option value="create" {{ $om==='create'?'selected':'' }}>Create item (saat confirm)</option>
+resources/views/marketplace/import-orders.blade.php:311:      <form method="POST" action="{{ route('marketplace.import_orders.confirm', ['platform'=>$platform]) }}">
+resources/views/marketplace/issues.blade.php:83:        <button id="remapBtn" class="btn btn-outline-secondary btn-sm fw-bold" style="border-radius:999px;font-size:.78rem"
+resources/views/marketplace/issues.blade.php:116:            <button class="dpd-tab" data-tab="mapping_not_found" onclick="setTab('mapping_not_found',this)">Belum Mapping <span class="cnt" id="tcMap">—</span></button>
+resources/views/marketplace/issues.blade.php:378:        const map = { sku_empty:'sku_empty', mapping_not_found:'mapping_not_found', missing_hpp:'missing_hpp' };
+resources/views/marketplace/issues.blade.php:413:            $('kpiNotFound').textContent         = (s.mapping_not_found || 0).toLocaleString('id');
+resources/views/marketplace/issues.blade.php:419:            $('tcMap').textContent    = (s.mapping_not_found || 0).toLocaleString('id');
+resources/views/marketplace/issues.blade.php:543:            mapping_not_found:     ['ib-not-found',   'SKU belum terhubung'],
+resources/views/marketplace/issues.blade.php:573:        } else if (issue === 'mapping_not_found') {
+resources/views/marketplace/issues.blade.php:583:        } else if (item.data_status !== 'valid' && item.mapping_status === 'mapped' && item.cost_status === 'complete') {
+resources/views/marketplace/issues.blade.php:682:            const items = await api('/api/sku-mappings/search-items?q=' + encodeURIComponent(q)).catch(() => []);
+resources/views/marketplace/issues.blade.php:745:                    const items = await api('/api/sku-mappings/search-items?q=' + encodeURIComponent(q)).catch(() => []);
+resources/views/marketplace/issues.blade.php:766:                    const items = await api('/api/sku-mappings/search-items?q=' + encodeURIComponent(q)).catch(() => []);
+resources/views/marketplace/issues.blade.php:852:        const btn = $('remapBtn');
+resources/views/marketplace/issues.blade.php:853:        btn.disabled = true; btn.textContent = '⏳ Re-mapping…';
+resources/views/marketplace/issues.blade.php:855:            const res = await api('/api/marketplace/remap-items', { method: 'POST' });
+resources/views/marketplace/issues.blade.php:921:        $('bulkMapSub').textContent       = selectedItems.size + ' item akan di-mapping sekaligus';
+resources/views/marketplace/sku-mapping.blade.php:19:        <div class="oc-kpi-card"><div class="oc-kpi-label">Belum Dipetakan</div><div class="oc-kpi-value" id="kpiUnmapped">—</div><div class="oc-kpi-note">perlu mapping</div></div>
+resources/views/marketplace/sku-mapping.blade.php:20:        <div class="oc-kpi-card"><div class="oc-kpi-label">Sudah Dipetakan</div><div class="oc-kpi-value" id="kpiMapped">—</div><div class="oc-kpi-note">mapping aktif</div></div>
+resources/views/marketplace/sku-mapping.blade.php:31:    <x-gf.panel title="Mapping Terdaftar" subtitle="Seluruh mapping SKU marketplace → item internal.">
+resources/views/marketplace/sku-mapping.blade.php:33:            <input type="text" id="mappingSearch" placeholder="Cari SKU atau item…"
+resources/views/marketplace/sku-mapping.blade.php:37:        <div id="mappingsBody"><div class="prod-tab-loading"><span class="prod-tab-spinner"></span> Memuat…</div></div>
+resources/views/marketplace/sku-mapping.blade.php:41:@include('marketplace._mapping-modal')
+resources/views/marketplace/sku-mapping.blade.php:48:    let unmappedList = [], mappingsList = [];
+resources/views/marketplace/sku-mapping.blade.php:54:        $('mappingsBody').innerHTML = '<div class="prod-tab-loading"><span class="prod-tab-spinner"></span> Memuat…</div>';
+resources/views/marketplace/sku-mapping.blade.php:57:            api('/api/sku-mappings/unmapped-skus'),
+resources/views/marketplace/sku-mapping.blade.php:58:            api('/api/sku-mappings'),
+resources/views/marketplace/sku-mapping.blade.php:61:        mappingsList  = mp.value || [];
+resources/views/marketplace/sku-mapping.blade.php:70:        const mapped   = mappingsList.length;
+resources/views/marketplace/sku-mapping.blade.php:108:        const body = $('mappingsBody');
+resources/views/marketplace/sku-mapping.blade.php:110:            ? mappingsList.filter(m =>
+resources/views/marketplace/sku-mapping.blade.php:114:            : mappingsList;
+resources/views/marketplace/sku-mapping.blade.php:118:                ? '<div class="oc-empty">Tidak ada mapping yang cocok.</div>'
+resources/views/marketplace/sku-mapping.blade.php:119:                : '<div class="oc-empty">Belum ada mapping terdaftar.</div>';
+resources/views/marketplace/sku-mapping.blade.php:148:        <div class="gf-table-foot"><span class="gf-table-foot-hint">${rows.length} mapping ditampilkan</span></div>`;
+resources/views/marketplace/sku-mapping.blade.php:152:        if (!confirm('Hapus mapping ini?')) return;
+resources/views/marketplace/sku-mapping.blade.php:154:            await api('/api/sku-mappings/' + id, { method: 'DELETE' });
+resources/views/marketplace/fulfillment.blade.php:12:        <div class="oc-kpi-card"><div class="oc-kpi-label">Unresolved SKU</div><div class="oc-kpi-value" id="kpiUnresolved">—</div><div class="oc-kpi-note">butuh mapping</div></div>
+resources/views/marketplace/fulfillment.blade.php:39:                    <span style="font-size:.78rem;color:#b45309"> Tambahkan mapping dulu agar item ter-resolve otomatis.</span>
+resources/views/marketplace/fulfillment.blade.php:42:            <a href="{{ route('marketplace.sku-mapping') }}" class="btn btn-warning btn-sm fw-bold"
+resources/views/marketplace/fulfillment.blade.php:57:            <input id="scanInput" type="text"
+resources/views/marketplace/fulfillment.blade.php:78:            <button type="button" class="btn btn-warning btn-sm fw-bold" id="remapAllBtn"
+resources/views/marketplace/fulfillment.blade.php:80:                onclick="remapAll()">⚡ Apply Mapping</button>
+resources/views/marketplace/fulfillment.blade.php:114:@include('marketplace._mapping-modal')
+resources/views/marketplace/fulfillment.blade.php:121:    let fulfillments = [], currentFulfillId = null;
+resources/views/marketplace/fulfillment.blade.php:138:        fulfillments = await api('/api/fulfillments').catch(() => []);
+resources/views/marketplace/fulfillment.blade.php:144:        const pending    = fulfillments.length;
+resources/views/marketplace/fulfillment.blade.php:145:        const unresolved = fulfillments.filter(f => !f.all_resolved).length;
+resources/views/marketplace/fulfillment.blade.php:146:        const shortage   = fulfillments.filter(f => f.has_shortage).length;
+resources/views/marketplace/fulfillment.blade.php:147:        const ready      = fulfillments.filter(f => f.all_resolved && !f.has_shortage).length;
+resources/views/marketplace/fulfillment.blade.php:153:        const unmappedLines = fulfillments.reduce((n, f) => n + (f.lines_count - f.lines_resolved), 0);
+resources/views/marketplace/fulfillment.blade.php:161:        if (!fulfillments.length) { body.innerHTML = '<div class="oc-empty">Tidak ada order yang perlu dikonfirmasi.</div>'; return; }
+resources/views/marketplace/fulfillment.blade.php:167:            ${fulfillments.map(f => {
+resources/views/marketplace/fulfillment.blade.php:190:        <div class="gf-table-foot"><span class="gf-table-foot-hint">${fulfillments.length} order pending</span></div>`;
+resources/views/marketplace/fulfillment.blade.php:202:        const f = await api('/api/fulfillments/' + id).catch(() => null);
+resources/views/marketplace/fulfillment.blade.php:253:        await api(`/api/fulfillments/${currentFulfillId}/lines/${lineId}`, {
+resources/views/marketplace/fulfillment.blade.php:262:    window.remapAll = async function () {
+resources/views/marketplace/fulfillment.blade.php:263:        const btn = $('remapAllBtn');
+resources/views/marketplace/fulfillment.blade.php:266:            const d = await api('/api/fulfillments/remap-all', { method: 'POST' });
+resources/views/marketplace/fulfillment.blade.php:278:            const d = await api(`/api/fulfillments/${currentFulfillId}/confirm`, { method: 'POST' });
+resources/views/marketplace/fulfillment.blade.php:289:    const scanInput  = $('scanInput');
+resources/views/marketplace/fulfillment.blade.php:297:        scanInput.value = _scanParam;
+resources/views/marketplace/fulfillment.blade.php:302:        setTimeout(() => scanInput.focus(), 300);
+resources/views/marketplace/fulfillment.blade.php:317:        const orderNo = scanInput.value.trim();
+resources/views/marketplace/fulfillment.blade.php:318:        if (! orderNo) { scanInput.focus(); return; }
+resources/views/marketplace/fulfillment.blade.php:325:            const res = await api('/api/fulfillments/scan', {
+resources/views/marketplace/fulfillment.blade.php:331:            if (res.already_confirmed) {
+resources/views/marketplace/fulfillment.blade.php:332:                setScanResult(`✓ Order ${orderNo} sudah dikonfirmasi sebelumnya (${f.confirmed_at ? new Date(f.confirmed_at).toLocaleString('id-ID') : '—'}).`, 'warn');
+resources/views/marketplace/fulfillment.blade.php:335:                scanInput.value = '';
+resources/views/marketplace/fulfillment.blade.php:346:            scanInput.focus();
+resources/views/marketplace/fulfillment.blade.php:347:            scanInput.select();

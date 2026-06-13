@@ -5,6 +5,7 @@ namespace App\Services\Channels;
 use App\Models\Store;
 use App\Services\Channels\Contracts\MarketplaceChannel;
 use App\Services\Channels\Shopee\ShopeeChannel;
+use App\Services\Channels\TikTokShop\TikTokShopChannel;
 use RuntimeException;
 
 class ChannelManager
@@ -15,7 +16,8 @@ class ChannelManager
 
         return match ($code) {
             'shopee' => app(ShopeeChannel::class),
-            default => throw new RuntimeException("Channel {$code} belum punya adapter."),
+            'tiktok' => app(TikTokShopChannel::class),
+            default  => throw new RuntimeException("Channel {$code} belum punya adapter."),
         };
     }
 }

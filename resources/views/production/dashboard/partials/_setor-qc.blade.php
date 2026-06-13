@@ -26,18 +26,10 @@
         <div class="gf-overview-kpi-note">pcs gagal QC periode</div>
     </div>
     <div class="gf-overview-kpi-card">
-        <div class="gf-overview-kpi-label">Yield</div>
-        <div class="gf-overview-kpi-value">{{ $yield === null ? '–' : $fmt($yield, 1) . '%' }}</div>
+        <div class="gf-overview-kpi-label">Total Bundle</div>
+        <div class="gf-overview-kpi-value">{{ $fmt($total_bundle_count ?? $lines->count()) }}</div>
         <div class="gf-overview-kpi-note">
-            @if ($yield === null)
-                belum ada setoran
-            @elseif ($yield >= 95)
-                <span class="gf-badge gf-badge-green">baik</span>
-            @elseif ($yield >= 85)
-                <span class="gf-badge gf-badge-amber">cukup</span>
-            @else
-                <span class="gf-badge gf-badge-red">perlu perhatian</span>
-            @endif
+            {{ $yield === null ? 'belum ada setoran' : 'yield ' . $fmt($yield, 1) . '%' }}
         </div>
     </div>
 </div>

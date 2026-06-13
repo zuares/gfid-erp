@@ -76,7 +76,7 @@ class CashExpenseController extends Controller
             'cash_account_id' => ['required', 'integer', 'exists:accounts,id'],
             'description' => ['nullable', 'string', 'max:255'],
             'reference' => ['nullable', 'string', 'max:100'],
-            'proof_photo' => ['nullable', 'image', 'mimes:jpg,jpeg,png,webp', 'max:4096'],
+            'proof_photo' => ['required', 'image', 'mimes:jpg,jpeg,png,webp', 'max:4096'],
             'notes' => ['nullable', 'string'],
         ]);
 
@@ -98,7 +98,7 @@ class CashExpenseController extends Controller
         }
 
         $data['expense_account_id'] = $expenseAccountId;
-        $data['proof_photo_path'] = $request->file('proof_photo')->store('cash-expenses/proofs', 'public');
+        $data['proof_photo_path'] = $request->file('proof_photo')->store('cash-expenses/proofs', 'local');
         unset($data['category_new']);
         unset($data['proof_photo']);
         $data['status'] = 'draft';
@@ -117,6 +117,21 @@ class CashExpenseController extends Controller
         $cashExpense->load(['expenseAccount', 'cashAccount', 'journal.lines.account']);
 
         return view('accounting.cash_expenses.show', compact('cashExpense'));
+    }
+
+    public function proof(CashExpense $cashExpense)
+    {
+        abort_unless($cashExpense->proof_photo_path, 404);
+
+        if (Storage::disk('local')->exists($cashExpense->proof_photo_path)) {
+            return Storage::disk('local')->response($cashExpense->proof_photo_path);
+        }
+
+        if (Storage::disk('public')->exists($cashExpense->proof_photo_path)) {
+            return Storage::disk('public')->response($cashExpense->proof_photo_path);
+        }
+
+        abort(404);
     }
 
     public function edit(CashExpense $cashExpense)
@@ -174,9 +189,10 @@ class CashExpenseController extends Controller
         $data['expense_account_id'] = $expenseAccountId;
         if ($request->hasFile('proof_photo')) {
             if ($cashExpense->proof_photo_path) {
+                Storage::disk('local')->delete($cashExpense->proof_photo_path);
                 Storage::disk('public')->delete($cashExpense->proof_photo_path);
             }
-            $data['proof_photo_path'] = $request->file('proof_photo')->store('cash-expenses/proofs', 'public');
+            $data['proof_photo_path'] = $request->file('proof_photo')->store('cash-expenses/proofs', 'local');
         }
         unset($data['category_new']);
         unset($data['proof_photo']);

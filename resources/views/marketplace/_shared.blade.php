@@ -74,7 +74,12 @@ window.mpHelpers = (function () {
             ...opts,
         }).then(async r => {
             const p = await r.json().catch(() => ({ message: 'Response tidak valid.' }));
-            if (!r.ok) throw new Error(p.message || p.error || 'API error');
+            if (!r.ok) {
+                const err = new Error(p.message || p.error || 'API error');
+                err.status = r.status;
+                err.data   = p;
+                throw err;
+            }
             return p;
         });
     }
