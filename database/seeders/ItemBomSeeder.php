@@ -56,9 +56,11 @@ class ItemBomSeeder extends Seeder
         // =========================
         // 1) Update master item jadi SUP (ramah produksi)
         // =========================
+        $this->ensureLabelSizeItem($supRoleId);
         $makeSup('RIB%', 'kg');
         $makeSup('KRT%', 'kg');
         $makeSup('TLK%', 'kg');
+        $makeSup('LBL%', 'pcs');
         $makeSup('OPP%', null);
 
         // =========================
@@ -146,6 +148,7 @@ class ItemBomSeeder extends Seeder
             ['codes' => ['FLC280{COLOR}', 'FLC240{COLOR}'], 'qty' => '0.31', 'uom' => 'kg', 'scrap_pct' => '0', 'sort' => 10, 'stage' => ItemBomLine::STAGE_MAIN_MATERIAL],
             ['codes' => ['RIB280{COLOR}', 'RIB280MST'], 'qty' => '0.06', 'uom' => 'kg', 'scrap_pct' => '0', 'sort' => 20, 'stage' => ItemBomLine::STAGE_SEWING_SUPPLY],
             ['codes' => ['KRT4CM'], 'qty' => '0.019', 'uom' => 'kg', 'scrap_pct' => '0', 'sort' => 30, 'stage' => ItemBomLine::STAGE_SEWING_SUPPLY],
+            ['codes' => ['LBLSIZE'], 'qty' => '1', 'uom' => 'pcs', 'scrap_pct' => '0', 'sort' => 35, 'stage' => ItemBomLine::STAGE_SEWING_SUPPLY],
             ['codes' => ['TLKADDS'], 'qty' => '0.009', 'uom' => 'kg', 'scrap_pct' => '0', 'sort' => 40, 'stage' => ItemBomLine::STAGE_PACKING_SUPPLY],
         ];
     }
@@ -156,8 +159,50 @@ class ItemBomSeeder extends Seeder
             ['codes' => ['FLC280{COLOR}', 'FLC240{COLOR}'], 'qty' => '0.45', 'uom' => 'kg', 'scrap_pct' => '0', 'sort' => 10, 'stage' => ItemBomLine::STAGE_MAIN_MATERIAL],
             ['codes' => ['RIB280{COLOR}', 'RIB280MST'], 'qty' => '0.07', 'uom' => 'kg', 'scrap_pct' => '0', 'sort' => 20, 'stage' => ItemBomLine::STAGE_SEWING_SUPPLY],
             ['codes' => ['KRT4CM'], 'qty' => '0.022', 'uom' => 'kg', 'scrap_pct' => '0', 'sort' => 30, 'stage' => ItemBomLine::STAGE_SEWING_SUPPLY],
+            ['codes' => ['LBLSIZE'], 'qty' => '1', 'uom' => 'pcs', 'scrap_pct' => '0', 'sort' => 35, 'stage' => ItemBomLine::STAGE_SEWING_SUPPLY],
             ['codes' => ['TLKADDS'], 'qty' => '0.010', 'uom' => 'kg', 'scrap_pct' => '0', 'sort' => 40, 'stage' => ItemBomLine::STAGE_PACKING_SUPPLY],
         ];
+    }
+
+    private function ensureLabelSizeItem(?int $supRoleId): void
+    {
+        $bpuCategoryId = \DB::table('item_categories')->where('code', 'BPU')->value('id');
+
+        $item = Item::firstOrCreate(
+            ['code' => 'LBLSIZE'],
+            [
+                'name' => 'Label Size',
+                'unit' => 'pcs',
+                'type' => 'material',
+                'item_category_id' => $bpuCategoryId,
+                'item_role' => 'production_supply',
+                'item_role_id' => $supRoleId,
+                'active' => 1,
+                'is_stocked' => 1,
+                'affects_hpp' => 1,
+                'default_allocation' => 'hpp',
+                'hpp_behavior' => 'hpp',
+            ]
+        );
+
+        $item->fill([
+            'name' => $item->name ?: 'Label Size',
+            'unit' => 'pcs',
+            'type' => 'material',
+            'item_category_id' => $item->item_category_id ?: $bpuCategoryId,
+            'item_role' => 'production_supply',
+            'active' => 1,
+            'is_stocked' => 1,
+            'affects_hpp' => 1,
+            'default_allocation' => 'hpp',
+            'hpp_behavior' => 'hpp',
+        ]);
+
+        if ($supRoleId && Schema::hasColumn('items', 'item_role_id')) {
+            $item->item_role_id = (int) $supRoleId;
+        }
+
+        $item->save();
     }
 
     private function resolveMaterial(array $codes, string $color): ?Item

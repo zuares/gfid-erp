@@ -67,6 +67,32 @@ class SewingPickupLine extends Model
         return $this->hasMany(\App\Models\SewingReturnLine::class, 'sewing_pickup_line_id');
     }
 
+    public function supplyLines()
+    {
+        return $this->hasMany(SewingPickupLineSupplyLine::class, 'sewing_pickup_line_id');
+    }
+
+    public function getSupplyStatusAttribute(): string
+    {
+        $lines = $this->relationLoaded('supplyLines') ? $this->supplyLines : $this->supplyLines()->get();
+
+        if ($lines->isEmpty()) {
+            return 'unmigrated';
+        }
+
+        $epsilon = 0.000001;
+        $hasIssued = $lines->contains(fn($line) => (float) ($line->issued_qty ?? 0) > $epsilon);
+        $isComplete = $lines->every(
+            fn($line) => (float) ($line->issued_qty ?? 0) + $epsilon >= (float) ($line->required_qty ?? 0)
+        );
+
+        if ($isComplete) {
+            return 'complete';
+        }
+
+        return $hasIssued ? 'partial' : 'incomplete';
+    }
+
     public function progressAdjustments()
     {
         return $this->hasMany(SewingProgressAdjustmentLine::class);

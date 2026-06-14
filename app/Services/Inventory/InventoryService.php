@@ -124,8 +124,16 @@ class InventoryService
 
         $current = $this->num($stock?->qty ?? 0);
 
-// toleransi float biar kasus 24.24 vs 24.24 tidak false-negative
+        // toleransi float biar kasus 24.24 vs 24.24 tidak false-negative
         $eps = 0.0000001;
+
+        // Kalau caller tidak eksplisit allow, cek flag allow_negative di master item
+        // (bahan baku & bahan pendukung produksi boleh minus)
+        if (!$allowNegative) {
+            $allowNegative = (bool) \DB::table('items')
+                ->where('id', $itemId)
+                ->value('allow_negative');
+        }
 
         if (!$allowNegative && ($current + $eps) < $qty) {
             throw new \RuntimeException(

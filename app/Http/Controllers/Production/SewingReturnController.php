@@ -9,6 +9,7 @@ use App\Models\InventoryStock;
 use App\Models\Item;
 use App\Models\SewingPickup;
 use App\Models\SewingPickupLine;
+use App\Models\SewingPickupLineSupplyLine;
 use App\Models\SewingPickupSupplyLine;
 use App\Models\SewingReturn;
 use App\Models\SewingReturnLine;
@@ -92,6 +93,8 @@ class SewingReturnController extends Controller
             'operator',
             'pickup.operator',
             'lines.sewingPickupLine.sewingPickup',
+            'lines.sewingPickupLine.supplyLines.materialItem:id,code,name,unit',
+            'lines.sewingPickupLine.finishedItem:id,code,name',
             'lines.sewingPickupLine.bundle.finishedItem',
             'lines.sewingPickupLine.bundle.cuttingJob.lot.item',
         ]);
@@ -283,6 +286,9 @@ class SewingReturnController extends Controller
                 'sewingPickup:id,code,date,operator_id',
                 'sewingPickup.operator:id,code,name',
                 'sewingPickup.supplyLines.material:id,code,name',
+                'sewingPickup.lines:id,sewing_pickup_id,finished_item_id,qty_bundle,voided_at',
+                'sewingPickup.lines.finishedItem:id,code',
+                'supplyLines.materialItem:id,code,name,unit',
                 'finishedItem:id,code,name',
                 'bundle.cuttingJob.lot',
             ])
@@ -320,20 +326,67 @@ class SewingReturnController extends Controller
                 ->toArray();
         }
 
-        $lines = $lines->map(function ($l) use ($wipStockByItemId) {
+        // Pre-compute per-bundle greedy supply allocation (cached per pickup_id)
+        // Greedy: alokasikan issued_pcs dari bundle terbesar (qty_bundle desc) → sama dengan urutan modal JS
+        $pickupAllocCache = []; // pickup_id → [bundle_line_id → [sl_id => [issued, required]]]
+
+        $lines = $lines->map(function ($l) use ($wipStockByItemId, &$pickupAllocCache) {
             $itemId = (int) ($l->finished_item_id ?? 0);
             $l->wip_stock  = (float) ($wipStockByItemId[$itemId] ?? 0);
             $remaining     = (float) ($l->remaining_qty ?? 0);
 
-            $supplyLines = $l->sewingPickup?->supplyLines ?? collect();
+            $pu = $l->sewingPickup;
+            $puId = $pu?->id;
+            $lineSupplyLines = $l->supplyLines ?? collect();
 
-            // Supply lines yang kekurangan
-            $shortSupplies = $supplyLines->filter(
-                fn($s) => (float) $s->issued_qty + 0.000001 < (float) $s->required_qty
-            );
+            if ($lineSupplyLines->isNotEmpty()) {
+                $this->applyLineSupplyStateToPickupLine($l, $lineSupplyLines, $remaining);
+                return $l;
+            }
 
-            if ($shortSupplies->isEmpty()) {
-                // Semua supply terpenuhi
+            // Jika pickup tidak punya supply lines sama sekali → bebas setor
+            $allSupplyLines = $pu?->supplyLines ?? collect();
+            if (!$puId || $allSupplyLines->isEmpty()) {
+                $l->supply_incomplete  = false;
+                $l->supply_partial     = false;
+                $l->supply_max_setor   = null;
+                $l->supply_shortage_label = '';
+                $l->supply_unmigrated = true;
+                return $l;
+            }
+
+            // Build greedy allocation cache untuk pickup ini (hanya sekali per pickup)
+            if (!array_key_exists($puId, $pickupAllocCache)) {
+                // Sort bundle lines desc by qty_bundle — sama dengan urutan breakdown modal
+                $allBundleLines = ($pu->lines ?? collect())
+                    ->whereNull('voided_at')
+                    ->sortByDesc('qty_bundle')
+                    ->values();
+                $totalQty = (float) $allBundleLines->sum('qty_bundle');
+
+                $cache = []; // [bundle_line_id][sl_id] → [issued, required]
+                foreach ($allSupplyLines as $sl) {
+                    $reqTotal   = (float) ($sl->required_pcs ?? 0);
+                    $remainIss  = (float) ($sl->issued_pcs ?? 0);
+
+                    foreach ($allBundleLines as $bl) {
+                        $share     = $totalQty > 0.0001
+                            ? round((float) ($bl->qty_bundle ?? 0) / $totalQty * $reqTotal)
+                            : 0.0;
+                        $allocated = min($remainIss, $share);
+                        $remainIss -= $allocated;
+                        $cache[$bl->id][$sl->id] = ['issued' => $allocated, 'required' => $share];
+                    }
+                }
+                $pickupAllocCache[$puId] = $cache;
+            }
+
+            $myAlloc    = $pickupAllocCache[$puId][$l->id] ?? null;
+            $slById     = $allSupplyLines->keyBy('id');
+            $bundleQty  = (float) ($l->qty_bundle ?? 0);
+
+            // Jika $l->id tidak ada di cache (edge case), fallback → no block
+            if ($myAlloc === null) {
                 $l->supply_incomplete  = false;
                 $l->supply_partial     = false;
                 $l->supply_max_setor   = null;
@@ -341,33 +394,40 @@ class SewingReturnController extends Controller
                 return $l;
             }
 
-            // Hitung max setor dari pcs yang supply-nya tersedia
-            // Gunakan issued_pcs / required_pcs (integer piece count) untuk hindari float error
-            $supplyMaxSetor = $shortSupplies->reduce(function ($carry, $s) use ($remaining) {
-                $reqPcs = (float) ($s->required_pcs ?? 0);
-                $issPcs = (float) ($s->issued_pcs ?? 0);
-                if ($reqPcs <= 0) return $carry;
-                // Berapa pcs bundle yang bisa dilayani dengan supply yang ada
-                $canServe = (int) floor($issPcs / $reqPcs * $remaining + 0.00001);
+            // Supply lines yang kurang untuk bundle ini (berdasarkan alokasi greedy)
+            $shortForLine = collect($myAlloc)->filter(
+                fn($a) => (float) $a['issued'] + 0.000001 < (float) $a['required']
+            );
+
+            if ($shortForLine->isEmpty()) {
+                // Bundle ini sudah fully covered → bebas setor
+                $l->supply_incomplete  = false;
+                $l->supply_partial     = false;
+                $l->supply_max_setor   = null;
+                $l->supply_shortage_label = '';
+                return $l;
+            }
+
+            // Hitung max setor berdasarkan alokasi per bundle ini
+            $supplyMaxSetor = $shortForLine->reduce(function ($carry, $a) use ($bundleQty) {
+                if ((float) $a['required'] <= 0) return $carry;
+                $canServe = (int) floor((float) $a['issued'] / (float) $a['required'] * $bundleQty + 0.00001);
                 return $carry === null ? $canServe : min($carry, $canServe);
             }, null);
             $supplyMaxSetor = (int) min($supplyMaxSetor ?? 0, $remaining);
 
-            // Hard block hanya jika 0 pcs pun tidak bisa disetor
             $l->supply_incomplete = $supplyMaxSetor < 1;
             $l->supply_partial    = !$l->supply_incomplete;
             $l->supply_max_setor  = $l->supply_partial ? $supplyMaxSetor : 0;
 
-            $l->supply_shortage_label = $shortSupplies->map(function ($s) {
-                $needPcs   = (float) ($s->required_pcs ?? 0);
-                $issuedPcs = (float) ($s->issued_pcs ?? 0);
-                $short     = max((float) $s->required_qty - (float) $s->issued_qty, 0);
-                $uom       = $s->uom ?: '';
-                if ($needPcs > 0) {
-                    return ($s->material?->code ?: 'Bahan') . ' kurang ' . number_format(max($needPcs - $issuedPcs, 0), 0, ',', '.') . ' pcs';
+            $l->supply_shortage_label = $shortForLine->map(function ($a, $slId) use ($slById) {
+                $sl    = $slById->get((int) $slId);
+                $short = (int) ceil((float) $a['required'] - (float) $a['issued']);
+                if ($short > 0) {
+                    return ($sl?->material?->code ?: 'Bahan') . ' kurang ' . number_format($short, 0, ',', '.') . ' pcs';
                 }
-                return ($s->material?->code ?: 'Bahan') . ' kurang ' . number_format($short, 4, ',', '.') . ($uom ? ' ' . $uom : '');
-            })->implode('; ');
+                return null;
+            })->filter()->implode('; ');
 
             return $l;
         })->filter(fn($l) => (float) $l->wip_stock > 0.000001)->values();
@@ -390,6 +450,47 @@ class SewingReturnController extends Controller
         ));
     }
 
+    private function applyLineSupplyStateToPickupLine(SewingPickupLine $line, $supplyLines, float $remaining): void
+    {
+        $epsilon = 0.000001;
+        $shortLines = collect($supplyLines)->filter(
+            fn($s) => (float) ($s->issued_qty ?? 0) + $epsilon < (float) ($s->required_qty ?? 0)
+        );
+
+        $line->supply_unmigrated = false;
+
+        if ($shortLines->isEmpty()) {
+            $line->supply_incomplete = false;
+            $line->supply_partial = false;
+            $line->supply_max_setor = null;
+            $line->supply_shortage_label = '';
+            return;
+        }
+
+        $bundleQty = max((float) ($line->qty_bundle ?? 0), 0.0);
+        $supplyMaxSetor = $shortLines->reduce(function ($carry, $s) use ($bundleQty) {
+            $requiredQty = (float) ($s->required_qty ?? 0);
+            $issuedQty = (float) ($s->issued_qty ?? 0);
+            if ($requiredQty <= 0.000001 || $bundleQty <= 0.000001) {
+                return $carry;
+            }
+
+            $canServe = (int) floor(($issuedQty / $requiredQty) * $bundleQty + 0.00001);
+            return $carry === null ? $canServe : min($carry, $canServe);
+        }, null);
+
+        $supplyMaxSetor = (int) min($supplyMaxSetor ?? 0, $remaining);
+
+        $line->supply_incomplete = $supplyMaxSetor < 1;
+        $line->supply_partial = !$line->supply_incomplete;
+        $line->supply_max_setor = $line->supply_partial ? $supplyMaxSetor : 0;
+        $line->supply_shortage_label = $shortLines->map(function ($s) {
+            $shortQty = max((float) ($s->required_qty ?? 0) - (float) ($s->issued_qty ?? 0), 0);
+            $uom = trim((string) ($s->uom ?: $s->materialItem?->unit ?: ''));
+            return ($s->materialItem?->code ?: 'Bahan') . ' kurang ' . number_format($shortQty, 4, ',', '.') . ($uom ? ' ' . $uom : '');
+        })->filter()->implode('; ');
+    }
+
     private function assertPickupSuppliesCompleteForReturn($normalRows, $pickupLines): void
     {
         if ($normalRows->isEmpty()) {
@@ -403,8 +504,75 @@ class SewingReturnController extends Controller
         }
 
         $lineIds = $normalRows->pluck('sewing_pickup_line_id')->unique()->values()->all();
+        $lineSupplyLines = SewingPickupLineSupplyLine::query()
+            ->whereIn('sewing_pickup_line_id', $lineIds)
+            ->with('materialItem:id,code,name')
+            ->get()
+            ->groupBy('sewing_pickup_line_id');
+
+        $lineSupplyErrors = [];
+        foreach ($normalRows as $row) {
+            $lineId = (int) ($row['sewing_pickup_line_id'] ?? 0);
+            $qtyTotal = (float) ($row['qty_ok'] ?? 0) + (float) ($row['qty_reject'] ?? 0);
+            if ($lineId <= 0 || $qtyTotal <= 0.000001 || !$lineSupplyLines->has($lineId)) {
+                continue;
+            }
+
+            $pickupLine = $pickupLines->get($lineId) ?? $pickupLines[$lineId] ?? null;
+            if (!$pickupLine) {
+                continue;
+            }
+
+            $supplies = $lineSupplyLines->get($lineId, collect());
+            $minRatio = $supplies->reduce(function ($carry, $supply) {
+                $requiredQty = (float) ($supply->required_qty ?? 0);
+                if ($requiredQty <= 0.000001) {
+                    return $carry;
+                }
+
+                $ratio = (float) ($supply->issued_qty ?? 0) / $requiredQty;
+                return $carry === null ? $ratio : min($carry, $ratio);
+            }, null);
+
+            if ($minRatio === null || $minRatio >= 1) {
+                continue;
+            }
+
+            $qtyBundle = (float) ($pickupLine->qty_bundle ?? 0);
+            $returnedOk = (float) ($pickupLine->qty_returned_ok ?? 0);
+            $returnedRj = (float) ($pickupLine->qty_returned_reject ?? 0);
+            $directPick = (float) ($pickupLine->qty_direct_picked ?? 0);
+            $progressAdj = (float) ($pickupLine->qty_progress_adjusted ?? 0);
+            $alreadyProcessed = $returnedOk + $returnedRj + $directPick + $progressAdj;
+
+            $coveredPcs = (int) floor(max($minRatio, 0) * $qtyBundle + 0.00001);
+            $maxAllowed = max($coveredPcs - $alreadyProcessed, 0);
+            $sku = $pickupLine?->finishedItem?->code ?: ('Line #' . $lineId);
+
+            if ($maxAllowed < 1) {
+                $lineSupplyErrors[] = "Bundle {$sku} belum bisa disetor karena kelengkapan jahit belum cukup.";
+            } elseif ($qtyTotal > $maxAllowed + 0.001) {
+                $lineSupplyErrors[] = "Bundle {$sku} maksimal setor {$maxAllowed} pcs sesuai kelengkapan jahit yang sudah dibawa.";
+            }
+        }
+
+        if (!empty($lineSupplyErrors)) {
+            throw ValidationException::withMessages([
+                'results' => implode(' | ', array_unique($lineSupplyErrors)),
+            ]);
+        }
+
+        $legacyRows = $normalRows
+            ->filter(fn($row) => !$lineSupplyLines->has((int) ($row['sewing_pickup_line_id'] ?? 0)))
+            ->values();
+
+        if ($legacyRows->isEmpty()) {
+            return;
+        }
+
+        $legacyLineIds = $legacyRows->pluck('sewing_pickup_line_id')->unique()->values()->all();
         $pickupIds = $pickupLines
-            ->only($lineIds)
+            ->only($legacyLineIds)
             ->pluck('sewing_pickup_id')
             ->filter()
             ->unique()
@@ -449,7 +617,7 @@ class SewingReturnController extends Controller
 
         // Validasi setiap row yang di-submit
         $errors = [];
-        foreach ($normalRows as $r) {
+        foreach ($legacyRows as $r) {
             $lineId   = (int) ($r['sewing_pickup_line_id'] ?? 0);
             $qtyOk    = (float) ($r['qty_ok'] ?? 0);
             $qtyRj    = (float) ($r['qty_reject'] ?? 0);
@@ -804,6 +972,7 @@ class SewingReturnController extends Controller
             $pickupLines = SewingPickupLine::query()
                 ->whereIn('id', $lineIds)
                 ->whereNull('voided_at')
+                ->with('finishedItem:id,code,name')
                 ->lockForUpdate()
                 ->get()
                 ->keyBy('id');

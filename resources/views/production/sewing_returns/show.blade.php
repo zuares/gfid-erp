@@ -3,6 +3,10 @@
 
 @section('title', 'Produksi • Sewing Return ' . $return->code)
 
+@php
+    $errors = $errors ?? new \Illuminate\Support\ViewErrorBag;
+@endphp
+
 @push('head')
 <style>
   .page-wrap{ max-width:1000px; margin-inline:auto; padding:.8rem .8rem 3.5rem; }
@@ -391,6 +395,7 @@
             <th class="text-end" style="width:110px;">Reject</th>
             <th class="text-end" style="width:110px;">Dadakan</th>
             <th class="text-end" style="width:110px;">Belum Setor</th>
+            <th style="width:220px;">Kelengkapan</th>
             <th style="width:220px;">Catatan</th>
           </tr>
         </thead>
@@ -399,8 +404,16 @@
             @php
               $pickupLine = $line->sewingPickupLine;
               $bundle = optional($pickupLine)->bundle;
-              $item = optional($bundle)->finishedItem;
+              $item = optional($bundle)->finishedItem ?: optional($pickupLine)->finishedItem;
               $lot = optional(optional($bundle)->cuttingJob)->lot;
+              $supplyLines = $pickupLine?->supplyLines ?? collect();
+              $supplyStatus = $pickupLine?->supply_status ?? 'unmigrated';
+              $supplyStatusLabel = [
+                'complete' => 'Lengkap',
+                'partial' => 'Kurang',
+                'incomplete' => 'Belum lengkap',
+                'unmigrated' => 'Belum dimigrasikan',
+              ][$supplyStatus] ?? 'Belum dimigrasikan';
 
               $setor = (float) $line->qty_ok;
               $rj = (float) $line->qty_reject;
@@ -436,12 +449,26 @@
               <td class="text-end">{{ number_format($rj, 2, ',', '.') }}</td>
               <td class="text-end">{{ number_format($directPickAll, 2, ',', '.') }}</td>
               <td class="text-end">{{ number_format($remainingRow, 2, ',', '.') }}</td>
+              <td>
+                <div class="fw-bold small">{{ $supplyStatusLabel }}</div>
+                @if($supplyLines->isNotEmpty())
+                  @foreach($supplyLines as $supply)
+                    <div class="small text-muted">
+                      {{ $supply->materialItem?->code ?? 'Bahan' }}
+                      {{ number_format((float) $supply->issued_qty, 4, ',', '.') }}/{{ number_format((float) $supply->required_qty, 4, ',', '.') }}
+                      {{ $supply->uom ?: $supply->materialItem?->unit }}
+                    </div>
+                  @endforeach
+                @else
+                  <div class="small text-muted">Data lama belum punya detail per bundle.</div>
+                @endif
+              </td>
 
               <td>{{ $line->notes ?: '—' }}</td>
             </tr>
           @empty
             <tr>
-              <td colspan="8" class="text-center text-muted small py-3">Tidak ada detail.</td>
+              <td colspan="9" class="text-center text-muted small py-3">Tidak ada detail.</td>
             </tr>
           @endforelse
         </tbody>

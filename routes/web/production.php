@@ -91,6 +91,9 @@ Route::middleware(['web', 'auth', 'access:production'])
 
                 Route::get('/{pickup}/supplies', [SewingPickupController::class, 'editSupplies'])->name('supplies.edit');
                 Route::put('/{pickup}/supplies', [SewingPickupController::class, 'updateSupplies'])->name('supplies.update');
+                Route::match(['post', 'patch'], '/lines/{line}/supplies', [SewingPickupController::class, 'updateLineSupplies'])
+                    ->whereNumber('line')
+                    ->name('lines.supplies.update');
 
                 Route::get('/{pickup}', [SewingPickupController::class, 'show'])->name('show');
                 Route::get('/{pickup}/edit', [SewingPickupController::class, 'edit'])->name('edit');

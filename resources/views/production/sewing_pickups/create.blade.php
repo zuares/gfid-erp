@@ -3,6 +3,10 @@
 
 @section('title', 'Produksi • Sewing Pickup')
 
+@php
+    $errors = $errors ?? new \Illuminate\Support\ViewErrorBag;
+@endphp
+
 @push('head')
     <style>
         .sewing-pickup-page {

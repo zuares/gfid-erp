@@ -3,6 +3,10 @@
 
 @section('title', 'Produksi • Sewing Return')
 
+@php
+    $errors = $errors ?? new \Illuminate\Support\ViewErrorBag;
+@endphp
+
 @push('head')
     <style>
         :root {
@@ -22,7 +26,7 @@
 
         .page-wrap { max-width: 980px; margin: 0 auto; padding: 14px 12px 96px; }
 
-        @media(max-width:767.98px) {
+        @media(max-width:991.98px) {
             .page-wrap { padding-bottom: calc(var(--bottom-nav-h) + 130px + var(--vv-kbd)); }
             body.keyboard-open .page-wrap { padding-bottom: calc(14rem + var(--vv-kbd)); }
             .modal-dialog { margin: .75rem; }
@@ -42,6 +46,62 @@
         .form-label-sm { font-size: .75rem; font-weight: 800; color: var(--muted); }
         .form-control-sm, .form-select-sm { font-size: .88rem; padding: .42rem .55rem; border-radius: 12px; }
 
+        .return-filter-row { --bs-gutter-x: .5rem; --bs-gutter-y: .45rem; }
+        .return-filter-row .form-label-sm {
+            display: block;
+            margin-bottom: .2rem;
+            line-height: 1.05;
+            white-space: nowrap;
+        }
+        .return-dest-pill {
+            display: flex;
+            align-items: center;
+            gap: .3rem;
+            overflow: hidden;
+            font-weight: 900;
+            border-radius: 12px;
+        }
+        .return-dest-code { flex: 0 0 auto; }
+        .return-dest-name {
+            min-width: 0;
+            overflow: hidden;
+            text-overflow: ellipsis;
+            white-space: nowrap;
+            color: var(--muted);
+            font-family: var(--bs-body-font-family);
+            font-size: .78rem;
+        }
+
+        @media(max-width:991.98px) {
+            .meta { padding: 8px; border-radius: 12px; }
+            .return-filter-row { --bs-gutter-x: .35rem; --bs-gutter-y: .35rem; }
+            .return-filter-row .form-label-sm {
+                font-size: .62rem;
+                letter-spacing: .02em;
+                margin-bottom: .14rem;
+            }
+            .return-filter-row .form-control-sm,
+            .return-filter-row .form-select-sm {
+                min-height: 36px;
+                padding: .34rem .45rem;
+                border-radius: 10px;
+                font-size: .8rem;
+            }
+            .return-filter-row select.form-select-sm {
+                padding-right: 1.7rem;
+                background-position: right .45rem center;
+                background-size: 12px 9px;
+            }
+            .return-dest-name { display: none; }
+            .return-dest-pill { justify-content: center; padding-left: .35rem; padding-right: .35rem; }
+            #q { font-size: .86rem; }
+        }
+
+        @media(min-width:768px) and (max-width:991.98px) {
+            .return-filter-row .form-control-sm,
+            .return-filter-row .form-select-sm { min-height: 38px; }
+        }
+
         .mono { font-variant-numeric: tabular-nums; font-family: ui-monospace, SFMono-Regular, Menlo, Consolas; }
 
         .list { display: grid; gap: .6rem; margin-top: 12px; }
@@ -60,9 +120,38 @@
         .meta-inline .dot { opacity: .6; }
         .meta-inline .truncate { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; max-width: 260px; display: inline-block; vertical-align: bottom; }
 
-        @media(max-width:767.98px) { .meta-inline .truncate { max-width: 170px; } }
+        @media(max-width:991.98px) { .meta-inline .truncate { max-width: 170px; } }
 
         .right-metrics { font-size: .78rem; color: var(--muted); font-weight: 900; white-space: nowrap; text-align: right; flex: 0 0 auto; }
+        .card-metrics { display: grid; gap: .18rem; min-width: 92px; }
+        .metric-main {
+            border: 1px solid rgba(37, 99, 235, .20);
+            background: rgba(37, 99, 235, .06);
+            border-radius: 12px;
+            padding: .34rem .5rem;
+            color: #2563eb;
+        }
+        .metric-main .lbl,
+        .metric-sub .lbl { display: block; font-size: .58rem; line-height: 1; color: var(--muted); letter-spacing: .06em; text-transform: uppercase; }
+        .metric-main .val { display: block; margin-top: .08rem; font-size: 1rem; line-height: 1; font-weight: 950; color: #2563eb; }
+        .metric-sub { font-size: .7rem; line-height: 1.15; color: var(--muted); }
+        .metric-sub.is-returned { color: #16a34a; }
+        .supply-mini-btn {
+            display: inline-flex;
+            align-items: center;
+            gap: .35rem;
+            margin-top: .3rem;
+            max-width: 230px;
+            border: 0;
+            background: transparent;
+            border-radius: 999px;
+            padding: .08rem 0;
+            text-align: left;
+            color: var(--muted);
+        }
+        .supply-mini-status { font-size: .66rem; font-weight: 900; flex-shrink: 0; }
+        .supply-mini-hint { font-size: .66rem; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; min-width: 0; }
+        .supply-mini-action { font-size: .66rem; font-weight: 900; color: #2563eb; flex-shrink: 0; }
 
         .cardx-b { padding: 10px 12px; display: grid; gap: .55rem; }
         .grid2 { display: grid; grid-template-columns: 1fr 1fr; gap: .55rem; }
@@ -73,6 +162,64 @@
         .qty.ok { border: 1px solid rgba(22, 163, 74, .22); background: rgba(22, 163, 74, .05); }
         .qty.rj { border: 1px solid rgba(185, 28, 28, .22); background: rgba(185, 28, 28, .05); }
         .qty:focus { box-shadow: none; }
+
+        .sc-step-hdr { display:flex; justify-content:space-between; align-items:center; gap:.75rem; margin-bottom:.75rem; }
+        .sc-step-main { font-size:1.05rem; font-weight:900; letter-spacing:-.01em; font-family:ui-monospace,SFMono-Regular,Menlo,Consolas,monospace; min-width:0; overflow:hidden; text-overflow:ellipsis; white-space:nowrap; }
+        .sc-step-meta { display:flex; gap:.35rem; flex-wrap:wrap; margin-bottom:.65rem; }
+        .sc-chip { border:1px solid rgba(148,163,184,.18); border-radius:999px; padding:.16rem .5rem; background:rgba(148,163,184,.06); font-size:.68rem; font-weight:900; color:var(--muted); }
+        .sc-row { display:grid; grid-template-columns:24px 1fr auto; align-items:center; gap:.5rem; padding:.45rem .6rem; border:1px solid rgba(148,163,184,.18); border-radius:10px; margin-bottom:.35rem; transition:background .15s; }
+        .sc-row.is-ok { background:rgba(22,163,74,.06); border-color:rgba(22,163,74,.25); }
+        .sc-row.is-short { background:rgba(239,68,68,.05); border-color:rgba(239,68,68,.25); }
+        .sc-chk { width:1.1rem; height:1.1rem; cursor:pointer; accent-color:#2563eb; flex-shrink:0; }
+        .sc-label { font-size:.78rem; font-weight:800; line-height:1.15; }
+        .sc-sub { font-size:.69rem; color:var(--muted); }
+        .sc-input { width:68px; text-align:right; font-weight:900; font-size:.86rem; border-radius:8px; padding:.22rem .35rem; border:1px solid rgba(148,163,184,.4); background:var(--card); color:var(--text); }
+        .sc-input:focus { outline:none; border-color:#2563eb; box-shadow:0 0 0 2px rgba(37,99,235,.15); }
+        .sc-input:disabled { background:rgba(148,163,184,.10); color:var(--muted); opacity:.7; }
+
+        /* ── Mobile + Tablet optimized card ── */
+        @media(max-width:991.98px) {
+            .cardx { border-radius: 14px; }
+
+            .code { font-size: 1.1rem; letter-spacing: .06em; }
+
+            /* Header: kode kiri, sisa kanan */
+            .cardx-h { padding: 10px 12px 8px; align-items: center; }
+            .right-metrics { font-size: .82rem; }
+            .card-metrics { min-width: 84px; }
+            .metric-main { padding: .32rem .45rem; border-radius: 11px; }
+            .metric-main .val { font-size: 1.08rem; }
+            .metric-sub { font-size: .66rem; }
+            .supply-mini-btn { max-width: 190px; }
+            .supply-mini-hint { display: none; }
+            /* Sembunyikan baris WIP */
+            .right-metrics .wip-line { display: none; }
+
+            /* Meta: sembunyikan operator, cukup tanggal */
+            .meta-inline .op-label { display: none; }
+            .meta-inline .op-dot   { display: none; }
+
+            /* Input lebih besar */
+            .qty { padding: .7rem .55rem !important; font-size: 1rem !important; }
+            .field label { font-size: .68rem; }
+            .cardx-b { padding: 8px 12px 10px; gap: .45rem; }
+
+            /* Shortage pill: tampilkan detail kurang di baris baru */
+            .shortage-pill {
+                flex-wrap: wrap !important;
+                border-radius: 10px !important;
+                gap: .2rem .35rem !important;
+            }
+            .shortage-label {
+                display: block !important;
+                white-space: normal !important;
+                overflow: visible !important;
+                text-overflow: unset !important;
+                width: 100%;
+                line-height: 1.5;
+                padding-top: .05rem;
+            }
+        }
 
         .notes { display: none; }
         .notes.is-show { display: block; }
@@ -86,7 +233,7 @@
         .fab-back { width: 46px; padding-left: 0; padding-right: 0; }
         .fab-save { width: auto; padding: .62rem 1.05rem; white-space: nowrap; }
 
-        @media(max-width:767.98px) {
+        @media(max-width:991.98px) {
             .fab-wrap { transition: transform .15s ease, opacity .15s ease; transform: translateY(0); opacity: 1; }
             body.keyboard-open .fab-wrap { bottom: calc(var(--fab-bottom) + var(--vv-kbd)); }
             .fab-wrap.is-hidden { opacity: 0; transform: translateY(10px); pointer-events: none; }
@@ -99,6 +246,53 @@
         .top-actions { display: flex; gap: .5rem; flex-wrap: wrap; align-items: center; justify-content: space-between; }
         .pill { border: 1px solid rgba(148, 163, 184, .22); background: rgba(148, 163, 184, .06); border-radius: 999px; padding: .35rem .6rem; font-weight: 900; font-size: .78rem; color: var(--muted); }
         .btn-mini { border-radius: 999px; font-weight: 900; padding: .35rem .6rem; }
+        .mini-kpi-row {
+            display: grid;
+            grid-template-columns: repeat(4, minmax(0, 1fr));
+            gap: .45rem;
+            margin-top: .55rem;
+        }
+        .mini-kpi {
+            border: 1px solid rgba(148, 163, 184, .18);
+            background: rgba(255, 255, 255, .45);
+            border-radius: 12px;
+            padding: .45rem .55rem;
+            min-width: 0;
+        }
+        body[data-theme="dark"] .mini-kpi { background: rgba(15, 23, 42, .20); }
+        .mini-kpi .lbl {
+            display: block;
+            color: var(--muted);
+            font-size: .62rem;
+            font-weight: 900;
+            line-height: 1;
+            white-space: nowrap;
+            overflow: hidden;
+            text-overflow: ellipsis;
+        }
+        .mini-kpi .val {
+            display: block;
+            margin-top: .16rem;
+            font-size: .96rem;
+            line-height: 1;
+            font-weight: 950;
+            color: var(--text);
+            white-space: nowrap;
+            overflow: hidden;
+            text-overflow: ellipsis;
+        }
+        .mini-kpi.is-main {
+            border-color: rgba(37, 99, 235, .20);
+            background: rgba(37, 99, 235, .06);
+        }
+        .mini-kpi.is-main .val { color: #2563eb; }
+
+        @media(max-width:991.98px) {
+            .mini-kpi-row { gap: .35rem; margin-top: .45rem; }
+            .mini-kpi { padding: .4rem .42rem; border-radius: 10px; }
+            .mini-kpi .lbl { font-size: .58rem; }
+            .mini-kpi .val { font-size: .82rem; }
+        }
 
         .sum-box { border: 1px solid rgba(148, 163, 184, .18); border-radius: 14px; padding: 10px 12px; background: rgba(148, 163, 184, .06); }
         body[data-theme="dark"] .sum-box { background: rgba(15, 23, 42, .25); }
@@ -115,9 +309,72 @@
         .sum-pill .val { display: block; margin-top: .12rem; }
 
         .acc-op-btn { font-weight: 900; padding: .7rem .85rem; }
+        .acc-op-btn.accordion-button::after {
+            width: .65rem;
+            height: .65rem;
+            background-size: .65rem;
+            opacity: .42;
+            margin-left: .55rem;
+        }
+        .acc-op-btn.accordion-button:not(.collapsed)::after { opacity: .62; }
+        .acc-op-btn.accordion-button:focus { box-shadow: none; }
         .acc-pill { display: inline-flex; align-items: center; gap: .35rem; padding: .18rem .55rem; border-radius: 999px; border: 1px solid rgba(148, 163, 184, .18); background: rgba(148, 163, 184, .06); font-weight: 900; font-size: .78rem; white-space: nowrap; }
         body[data-theme="dark"] .acc-pill { background: rgba(15, 23, 42, .22); }
         .acc-sub { font-size: .78rem; font-weight: 900; color: var(--muted); }
+        .all-card {
+            border-radius: 16px;
+            overflow: hidden;
+            border: 1px solid rgba(148,163,184,.18);
+            background: var(--card);
+            margin-bottom: .55rem;
+        }
+        .all-btn-main { display: flex; width: 100%; justify-content: space-between; align-items: center; gap: .75rem; }
+        .all-code { font-weight: 950; font-size: 1rem; letter-spacing: .04em; max-width: 48vw; }
+        .all-metrics { display: flex; align-items: center; gap: .4rem; flex-wrap: wrap; justify-content: flex-end; }
+        .all-pill-main {
+            display: inline-flex;
+            flex-direction: column;
+            align-items: flex-end;
+            gap: .05rem;
+            border: 1px solid rgba(37, 99, 235, .20);
+            background: rgba(37, 99, 235, .06);
+            color: #2563eb;
+            border-radius: 12px;
+            padding: .28rem .52rem;
+            font-weight: 950;
+            line-height: 1;
+        }
+        .all-pill-main .lbl { font-size: .58rem; color: var(--muted); letter-spacing: .05em; text-transform: uppercase; }
+        .all-pill-main .val { font-size: .95rem; color: #2563eb; }
+        .all-op-count { color: var(--muted); font-size: .72rem; font-weight: 900; white-space: nowrap; }
+        .all-subline { display: flex; align-items: center; gap: .45rem; flex-wrap: wrap; margin-top: .18rem; }
+        .all-detail-row {
+            display: grid;
+            grid-template-columns: 1fr auto auto;
+            gap: .6rem;
+            align-items: center;
+            padding: .58rem 0;
+            border-bottom: 1px solid rgba(148,163,184,.12);
+            cursor: pointer;
+            border-radius: 10px;
+            transition: background .15s ease;
+        }
+        .all-detail-row:hover { background: rgba(37, 99, 235, .05); }
+        .all-detail-row:last-child { border-bottom: 0; }
+        .all-op-name { font-weight: 900; min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+        .all-detail-val { font-weight: 950; text-align: right; }
+        .all-detail-sub { color: var(--muted); font-size: .68rem; font-weight: 900; text-align: right; }
+
+        @media(max-width:991.98px) {
+            .sum-box { display: none; }
+            .acc-op-btn { padding: .62rem .72rem; }
+            .all-card { border-radius: 14px; margin-bottom: .45rem; }
+            .all-code { font-size: 1.05rem; max-width: 44vw; }
+            .all-pill-main { padding: .3rem .48rem; min-width: 78px; }
+            .all-pill-main .val { font-size: .96rem; }
+            .all-detail-row { grid-template-columns: 1fr auto; gap: .5rem; padding: .6rem 0; }
+            .all-detail-sub { display: block; font-size: .66rem; }
+        }
     </style>
 @endpush
 
@@ -128,6 +385,7 @@
     $dateValue = old('date', now()->toDateString());
     $selectedOperatorId = (string) (request('operator_id', old('operator_id', $operatorId ?? '')) ?? '');
     $selectedPickupDate = (string) (request('pickup_date', '') ?? '');
+    $selectedItemCode = strtoupper((string) (request('item', '') ?? ''));
 
     $isAllMode = $selectedOperatorId === '' || $selectedOperatorId === '0';
 
@@ -230,6 +488,21 @@
     $summaryItems = $groupsAll->count();
     $summaryRemaining = (float) $groupsAll->sum('remaining_sum');
     $summaryOps = $groupsAll->flatMap(fn($g) => collect($g['ops'])->pluck('operator_id'))->filter(fn($id) => (int) $id > 0)->unique()->count();
+    $summaryBundles = (int) $groupsAll->sum(fn($g) => collect($g['ops'] ?? [])->sum('lines_count'));
+
+    $lineBundleCount = (int) $lines->count();
+    $lineRemainingTotal = (float) $lines->sum(fn($l) => (float) ($l->remaining_qty ?? 0));
+    $lineReturnedTotal = (float) $lines->sum(fn($l) => (float) ($l->qty_returned_ok ?? 0) + (float) ($l->qty_returned_reject ?? 0));
+    $lineMaxSetorTotal = (float) $lines->sum(function ($l) {
+        $remaining = (float) ($l->remaining_qty ?? 0);
+        $wip = (float) ($l->wip_stock ?? 0);
+        $max = max(0, min($remaining, $wip));
+        if ((bool) ($l->supply_partial ?? false)) {
+            $max = max(0, min($max, (float) ($l->supply_max_setor ?? 0)));
+        }
+
+        return $max;
+    });
 @endphp
 
 <div class="page-wrap">
@@ -338,7 +611,7 @@
         </div>
     @endif
 
-    @if ($errors->any())
+    @if (isset($errors) && $errors->any())
         <div class="alert alert-danger alert-dismissible fade show mb-3" role="alert">
             @foreach ($errors->all() as $err)
                 <div>⚠ {{ $err }}</div>
@@ -373,10 +646,10 @@
             <div class="panel-b">
 
                 <div class="meta">
-                    <div class="row g-2 align-items-end">
+                    <div class="row align-items-end return-filter-row">
 
-                        <div class="col-6 col-md-3">
-                            <label class="form-label form-label-sm">Tanggal Return</label>
+                        <div class="col-5 col-lg-2">
+                            <label class="form-label form-label-sm">Return</label>
                             <input type="date" name="date"
                                    class="form-control form-control-sm @error('date') is-invalid @enderror"
                                    value="{{ $dateValue }}">
@@ -385,7 +658,7 @@
                             @enderror
                         </div>
 
-                        <div class="col-6 col-md-4">
+                        <div class="col-7 col-lg-3">
                             <label class="form-label form-label-sm">Operator</label>
                             <select id="operator" name="operator_id"
                                     class="form-select form-select-sm @error('operator_id') is-invalid @enderror">
@@ -401,32 +674,31 @@
                             @enderror
                         </div>
 
-                        <div class="col-6 col-md-3" id="dest-wrap">
-                            <label class="form-label form-label-sm">Masuk Ke</label>
+                        <div class="col-lg-2 d-none d-lg-block" id="dest-wrap">
+                            <label class="form-label form-label-sm">Tujuan</label>
                             <input type="hidden" id="destination" name="destination_warehouse_id" value="{{ (int) $defaultDestWarehouseId }}"
                                    data-label="{{ optional($destinationWarehouses->firstWhere('id', $defaultDestWarehouseId))->code ?? 'WIP-FIN' }} — {{ optional($destinationWarehouses->firstWhere('id', $defaultDestWarehouseId))->name ?? 'Sedang Finishing' }}">
-                            <div class="form-control form-control-sm mono" style="border-radius:12px; font-weight:900;">
-                                {{ optional($destinationWarehouses->firstWhere('id', $defaultDestWarehouseId))->code ?? 'WIP-FIN' }}
-                                —
-                                {{ optional($destinationWarehouses->firstWhere('id', $defaultDestWarehouseId))->name ?? 'Sedang Finishing' }}
+                            <div class="form-control form-control-sm mono return-dest-pill">
+                                <span class="return-dest-code">{{ optional($destinationWarehouses->firstWhere('id', $defaultDestWarehouseId))->code ?? 'WIP-FIN' }}</span>
+                                <span class="return-dest-name">— {{ optional($destinationWarehouses->firstWhere('id', $defaultDestWarehouseId))->name ?? 'Sedang Finishing' }}</span>
                             </div>
                             @error('destination_warehouse_id')
                                 <div class="text-danger small mt-1">{{ $message }}</div>
                             @enderror
                         </div>
 
-                        <div class="col-6 col-md-2">
-                            <label class="form-label form-label-sm">Filter item</label>
+                        <div class="col-5 col-lg-2">
+                            <label class="form-label form-label-sm">Item</label>
                             <select id="item-filter" class="form-select form-select-sm">
                                 <option value="">Semua</option>
                                 @foreach ($itemOptions as $code)
-                                    <option value="{{ $code }}">{{ $code }}</option>
+                                    <option value="{{ $code }}" @selected($selectedItemCode === strtoupper($code))>{{ $code }}</option>
                                 @endforeach
                             </select>
                         </div>
 
-                        <div class="col-6 col-md-3">
-                            <label class="form-label form-label-sm">Tanggal Pickup (opsional)</label>
+                        <div class="col-lg-2 d-none d-lg-block">
+                            <label class="form-label form-label-sm">Pickup</label>
                             <select id="pickup-date" class="form-select form-select-sm">
                                 <option value="">Semua tanggal</option>
                                 @foreach ($pickupDateOptions as $d)
@@ -437,16 +709,51 @@
                             </select>
                         </div>
 
-                        <div class="col-12 col-md-2">
+                        <div class="col-7 col-lg-1">
                             <label class="form-label form-label-sm">Cari</label>
                             <input type="text" id="q" class="form-control form-control-sm mono"
-                                   placeholder="Kode..." autocomplete="off">
+                                   placeholder="Kode" autocomplete="off">
                         </div>
                     </div>
 
-                    <div class="top-actions mt-2" id="top-actions-input" style="{{ $isAllMode ? 'display:none;' : '' }}">
+                    <div class="mini-kpi-row">
+                        @if ($isAllMode)
+                            <div class="mini-kpi">
+                                <span class="lbl">Item</span>
+                                <span class="val mono">{{ number_format($summaryItems, 0, ',', '.') }}</span>
+                            </div>
+                            <div class="mini-kpi">
+                                <span class="lbl">Iket</span>
+                                <span class="val mono">{{ number_format($summaryBundles, 0, ',', '.') }}</span>
+                            </div>
+                            <div class="mini-kpi is-main">
+                                <span class="lbl">{{ $isRejectReworkMode ? 'Reject' : 'Belum Setor' }}</span>
+                                <span class="val mono">{{ number_format($summaryRemaining, 0, ',', '.') }} pcs</span>
+                            </div>
+                            <div class="mini-kpi">
+                                <span class="lbl">Penjahit</span>
+                                <span class="val mono">{{ number_format($summaryOps, 0, ',', '.') }}</span>
+                            </div>
+                        @else
+                            <div class="mini-kpi">
+                                <span class="lbl">Bundle</span>
+                                <span class="val mono">{{ number_format($lineBundleCount, 0, ',', '.') }}</span>
+                            </div>
+                            <div class="mini-kpi is-main">
+                                <span class="lbl">Maks Setor</span>
+                                <span class="val mono">{{ number_format($lineMaxSetorTotal, 0, ',', '.') }} pcs</span>
+                            </div>
+                            <div class="mini-kpi">
+                                <span class="lbl">Sudah Setor</span>
+                                <span class="val mono">{{ number_format($lineReturnedTotal, 0, ',', '.') }} pcs</span>
+                            </div>
+                        @endif
+                    </div>
+
+                    <div class="top-actions mt-2 d-none d-lg-flex" id="top-actions-input" style="{{ $isAllMode ? 'display:none;' : '' }}">
                         <div class="d-flex gap-2 flex-wrap align-items-center">
                             <span class="pill">Total Iket: <span class="mono" id="stat-total-rows">0</span></span>
+                            <span class="pill">Sudah Setor: <span class="mono" id="stat-returned">0,00</span></span>
                             <span class="pill">Di Setor: <span class="mono" id="stat-picked-rows">0</span></span>
                             <span class="pill">{{ $isRejectReworkMode ? 'Total Setor' : 'Total OK' }}: <span class="mono" id="stat-total-ok">0,00</span></span>
                         </div>
@@ -469,15 +776,16 @@
                     @else
                         <div class="sum-box mb-2">
                             <div class="sum-top">
-                                <div><div class="ttl">{{ $isRejectReworkMode ? 'Summary (Reject Siap Setor)' : 'Summary (Belum Setor)' }}</div></div>
+                                <div><div class="ttl">{{ $isRejectReworkMode ? 'Reject Siap Disetor' : 'Belum Disetor' }}</div></div>
                                 <div class="text-end">
                                     <div class="sub">Update: <span class="mono">{{ now()->format('H:i') }}</span></div>
                                 </div>
                             </div>
-                            <div class="sum-pillrow">
+                            <div class="sum-pillrow" style="grid-template-columns: repeat(4, minmax(0, 1fr));">
                                 <div class="sum-pill"><span class="lbl">Item</span><span class="val mono">{{ number_format($summaryItems, 0, ',', '.') }}</span></div>
-                                <div class="sum-pill"><span class="lbl">{{ $isRejectReworkMode ? 'Total Reject' : 'Total Belum' }}</span><span class="val mono">{{ number_format($summaryRemaining, 2, ',', '.') }}</span></div>
-                                <div class="sum-pill"><span class="lbl">Operator</span><span class="val mono">{{ number_format($summaryOps, 0, ',', '.') }}</span></div>
+                                <div class="sum-pill"><span class="lbl">Iket</span><span class="val mono">{{ number_format($summaryBundles, 0, ',', '.') }}</span></div>
+                                <div class="sum-pill"><span class="lbl">{{ $isRejectReworkMode ? 'Reject' : 'Belum Setor' }}</span><span class="val mono">{{ number_format($summaryRemaining, 0, ',', '.') }}</span></div>
+                                <div class="sum-pill"><span class="lbl">Penjahit</span><span class="val mono">{{ number_format($summaryOps, 0, ',', '.') }}</span></div>
                             </div>
                         </div>
 
@@ -491,25 +799,30 @@
                                     $remainingSum = (float) ($g['remaining_sum'] ?? 0);
                                     $wip = (float) ($g['wip'] ?? 0);
                                     $ops = collect($g['ops'] ?? []);
+                                    $bundleCount = (int) $ops->sum('lines_count');
                                     $collapseId = 'allItemCollapse-' . $gidx;
                                     $headingId = 'allItemHeading-' . $gidx;
                                 @endphp
 
-                                <div class="accordion-item acc-item" data-code="{{ $itemCode }}" data-item="{{ $itemCode }}"
-                                     style="border-radius:16px; overflow:hidden; border:1px solid rgba(148,163,184,.18); background:var(--card); margin-bottom:.55rem;">
+                                <div class="accordion-item acc-item all-card" data-code="{{ $itemCode }}" data-item="{{ $itemCode }}">
                                     <h2 class="accordion-header" id="{{ $headingId }}">
                                         <button class="accordion-button collapsed acc-op-btn" type="button"
                                                 data-bs-toggle="collapse" data-bs-target="#{{ $collapseId }}"
                                                 aria-expanded="false" aria-controls="{{ $collapseId }}">
-                                            <div class="d-flex w-100 justify-content-between align-items-center gap-2 flex-wrap">
-                                                <div class="d-flex align-items-center gap-2 min-w-0">
-                                                    <span class="acc-pill"><span class="mono">{{ $no }}</span></span>
-                                                    <div class="mono text-truncate" style="font-weight:900; max-width: 62vw;">{{ $itemCode }}</div>
+                                            <div class="all-btn-main">
+                                                <div class="min-w-0">
+                                                    <div class="mono text-truncate all-code">{{ $itemCode }}</div>
+                                                    <div class="all-subline">
+                                                        <span class="all-op-count">{{ number_format($bundleCount, 0, ',', '.') }} iket</span>
+                                                        <span class="all-op-count">{{ number_format($opCount, 0, ',', '.') }} penjahit</span>
+                                                    </div>
                                                 </div>
-                                                <div class="d-flex align-items-center gap-2">
-                                                    <span class="acc-pill">OP <span class="mono">{{ number_format($opCount, 0, ',', '.') }}</span></span>
-                                                    <span class="acc-pill">{{ $remainingLabel }} <span class="mono">{{ number_format($remainingSum, 2, ',', '.') }}</span></span>
-                                                    <span class="acc-pill">{{ $sourceStockLabel }} <span class="mono">{{ number_format($wip, 2, ',', '.') }}</span></span>
+                                                <div class="all-metrics">
+                                                    <span class="all-pill-main">
+                                                        <span class="lbl">{{ $isRejectReworkMode ? 'Reject' : 'Belum' }}</span>
+                                                        <span class="val mono">{{ number_format($remainingSum, 0, ',', '.') }} pcs</span>
+                                                    </span>
+                                                    <span class="acc-pill d-none d-lg-inline-flex">{{ $sourceStockLabel }} <span class="mono">{{ number_format($wip, 0, ',', '.') }}</span></span>
                                                 </div>
                                             </div>
                                         </button>
@@ -521,36 +834,25 @@
                                             @if ($ops->isEmpty())
                                                 <div class="text-muted text-center py-2">Tidak ada detail operator.</div>
                                             @else
-                                                <div class="table-responsive">
-                                                    <table class="table table-sm align-middle mb-0">
-                                                        <thead>
-                                                            <tr>
-                                                                <th style="width:56px;">No</th>
-                                                                <th>Operator</th>
-                                                                <th class="text-end" style="width:170px;">{{ $isRejectReworkMode ? 'Sisa Reject' : 'Belum' }}</th>
-                                                                <th class="text-end" style="width:110px;">Iket</th>
-                                                            </tr>
-                                                        </thead>
-                                                        <tbody>
-                                                            @foreach ($ops as $i => $op)
-                                                                <tr>
-                                                                    <td class="mono">{{ $i + 1 }}</td>
-                                                                    <td class="mono" style="font-weight:900;">
-                                                                        {{ $op['label'] ?: 'OP-' . $op['operator_id'] }}
-                                                                    </td>
-                                                                    <td class="text-end mono" style="font-weight:900;">
-                                                                        {{ number_format((float) $op['remaining_sum'], 2, ',', '.') }}
-                                                                    </td>
-                                                                    <td class="text-end mono" style="font-weight:900;">
-                                                                        {{ number_format((int) $op['lines_count'], 0, ',', '.') }}
-                                                                    </td>
-                                                                </tr>
-                                                            @endforeach
-                                                        </tbody>
-                                                    </table>
-                                                </div>
-                                                <div class="mt-2 acc-sub">
-                                                    Total item: <span class="mono">{{ number_format($remainingSum, 2, ',', '.') }}</span>
+                                                <div>
+                                                    @foreach ($ops as $op)
+                                                        <div class="all-detail-row js-open-operator-item"
+                                                             role="button"
+                                                             tabindex="0"
+                                                             title="Buka {{ $op['label'] ?: 'Penjahit ' . $op['operator_id'] }} - {{ $itemCode }}"
+                                                             data-operator-id="{{ (int) ($op['operator_id'] ?? 0) }}"
+                                                             data-item-code="{{ $itemCode }}">
+                                                            <div class="mono all-op-name">
+                                                                {{ $op['label'] ?: 'Penjahit ' . $op['operator_id'] }}
+                                                            </div>
+                                                            <div class="mono all-detail-val">
+                                                                {{ number_format((float) $op['remaining_sum'], 0, ',', '.') }} pcs
+                                                            </div>
+                                                            <div class="all-detail-sub">
+                                                                {{ number_format((int) $op['lines_count'], 0, ',', '.') }} iket
+                                                            </div>
+                                                        </div>
+                                                    @endforeach
                                                 </div>
                                             @endif
                                         </div>
@@ -566,7 +868,22 @@
                     @if ($lines->isEmpty())
                         <div class="text-center py-4 text-muted">Tidak ada baris yang bisa disetor.</div>
                     @else
-                        @foreach ($lines as $idx => $line)
+                        @php
+                            $linesByCode = $lines->groupBy(
+                                fn($l) => strtoupper($l->finishedItem?->code ?? 'ITEM-' . $l->finished_item_id)
+                            )->sortKeys();
+                        @endphp
+                        @foreach ($linesByCode as $groupCode => $groupLines)
+                            {{-- Group header --}}
+                            <div class="byop-group-header"
+                                 data-group-code="{{ $groupCode }}"
+                                 style="font-size:.7rem; font-weight:800; letter-spacing:.06em; text-transform:uppercase;
+                                        color:var(--muted); padding:.55rem .1rem .25rem; border-bottom:1px solid rgba(148,163,184,.18);
+                                        margin-bottom:.5rem; font-family:ui-monospace,SFMono-Regular,Menlo,Consolas,monospace;">
+                                {{ $groupCode }}
+                            </div>
+                        @foreach ($groupLines as $line)
+                            @php $idx = $lines->search(fn($l) => $l->id === $line->id); @endphp
                             @php
                                 $item = $line->finishedItem;
                                 $pickup = $line->sewingPickup;
@@ -590,18 +907,41 @@
                                 $rjVal = $oldRow['qty_reject'] ?? '';
                                 $notes = $oldRow['notes'] ?? '';
                                 $showNotes = (float) ($rjVal ?: 0) > 0 || trim((string) $notes) !== '';
+                                $alreadyReturned = (float) ($line->qty_returned_ok ?? 0) + (float) ($line->qty_returned_reject ?? 0);
                                 $supplyIncomplete    = (bool) ($line->supply_incomplete ?? false);
                                 $supplyPartial       = (bool) ($line->supply_partial ?? false);
                                 $supplyMaxSetor      = (int) ($line->supply_max_setor ?? 0);
+                                $maxSetor = max(0, min($remaining, $wip));
+                                if (!$isRejectLine && $supplyPartial) {
+                                    $maxSetor = max(0, min($maxSetor, $supplyMaxSetor));
+                                }
                                 $supplyShortageLabel = (string) ($line->supply_shortage_label ?? '');
+                                $supplyShortCount    = $supplyShortageLabel !== '' ? count(array_filter(array_map('trim', explode(';', $supplyShortageLabel)))) : 0;
+                                $supplyHintText      = $supplyShortCount > 0
+                                    ? $supplyShortCount . ' bahan perlu dilengkapi'
+                                    : '';
+                                $supplyActionText    = $supplyIncomplete ? 'Lengkapi' : ($supplyPartial ? 'Cek' : 'Detail');
+                                $supplyUnmigrated    = (bool) ($line->supply_unmigrated ?? false);
                                 $isBlocked = $supplyIncomplete; // partial = bisa input, tapi dibatasi
+                                $supplyStatusText = $supplyUnmigrated
+                                    ? 'Belum dimigrasikan'
+                                    : ($supplyIncomplete ? 'Belum lengkap' : ($supplyPartial ? 'Kurang' : 'Lengkap'));
+                                $supplyStatusColor = $supplyUnmigrated
+                                    ? '#64748b'
+                                    : ($supplyIncomplete ? '#dc2626' : ($supplyPartial ? '#b45309' : '#16a34a'));
 
                                 // Prepare back URL untuk link "Isi Kelengkapan"
                                 $qs = request()->getQueryString();
                                 $backUrl = request()->getPathInfo() . ($qs ? '?' . $qs : '');
                                 $suppliesUrl = $line->sewingPickup?->id
-                                    ? route('production.sewing.pickups.supplies.edit', $line->sewingPickup->id) . '?redirect_to=' . urlencode($backUrl)
+                                    ? route('production.sewing.pickups.supplies.edit', $line->sewingPickup->id)
+                                        . '?redirect_to=' . urlencode($backUrl)
+                                        . '&line_id=' . $line->id
                                     : null;
+                                $suppliesUpdateUrl = $line->sewingPickup?->id
+                                    ? route('production.sewing.pickups.supplies.update', $line->sewingPickup->id)
+                                    : null;
+                                $lineSuppliesUpdateUrl = route('production.sewing.pickups.lines.supplies.update', $line->id);
                             @endphp
 
                             <div class="cardx mono fin-item"
@@ -610,7 +950,10 @@
                                  data-pickupdate="{{ $pickupDateRaw }}"
                                  data-remaining="{{ $remaining }}"
                                  data-wip="{{ $wip }}"
-                                 data-supply-blocked="{{ $supplyIncomplete ? 1 : 0 }}">
+                                 data-returned="{{ $alreadyReturned }}"
+                                 data-supply-blocked="{{ $supplyIncomplete ? 1 : 0 }}"
+                                 data-supply-partial="{{ $supplyPartial ? 1 : 0 }}"
+                                 data-supply-max-setor="{{ $supplyPartial ? $supplyMaxSetor : '' }}">
                                 <div class="cardx-h">
                                     <div class="cardx-left">
                                         <input type="checkbox" class="chk row-check" aria-label="Pilih baris" {{ $isBlocked ? 'disabled' : '' }}>
@@ -620,54 +963,58 @@
                                                 <span class="dot">•</span>
                                                 <span>{{ $pickupDateText }}</span>
                                                 @if ($opLabel !== '')
-                                                    <span class="dot">•</span>
-                                                    <span class="truncate" title="{{ $opLabel }}">OP: {{ $opLabel }}</span>
+                                                    <span class="dot op-dot">•</span>
+                                                    <span class="truncate op-label" title="{{ $opLabel }}">OP: {{ $opLabel }}</span>
                                                 @endif
                                             </div>
-
-                                            {{-- Hard block: supply 0, tidak bisa setor sama sekali --}}
-                                            @if ($supplyIncomplete)
-                                                <div class="text-danger small mt-1" style="white-space:normal; line-height:1.4;">
-                                                    ✕ Bahan tidak tersedia: {{ $supplyShortageLabel }}
-                                                </div>
-                                                @if ($suppliesUrl)
-                                                    <a href="{{ $suppliesUrl }}" class="btn btn-xs btn-outline-danger mt-1"
-                                                       style="font-size:.72rem; padding:.2rem .55rem; border-radius:999px; font-weight:900; display:inline-flex; align-items:center; gap:.3rem;">
-                                                        <i class="bi bi-pencil-square"></i> Isi Kelengkapan
-                                                    </a>
-                                                @endif
-
-                                            {{-- Partial: supply ada tapi kurang → bisa setor sebagian --}}
-                                            @elseif ($supplyPartial)
-                                                <div class="small mt-1" style="white-space:normal; line-height:1.4; color:#b45309;">
-                                                    ⚠ {{ $supplyShortageLabel }}
-                                                    — maks setor <strong>{{ $supplyMaxSetor }}</strong> pcs
-                                                </div>
-                                                @if ($suppliesUrl)
-                                                    <a href="{{ $suppliesUrl }}" class="btn btn-xs mt-1"
-                                                       style="font-size:.72rem; padding:.2rem .55rem; border-radius:999px; font-weight:900; display:inline-flex; align-items:center; gap:.3rem; color:#b45309; border:1px solid #b45309;">
-                                                        <i class="bi bi-pencil-square"></i> Lengkapi Bahan
-                                                    </a>
-                                                @endif
+                                            @if (!$isRejectLine)
+                                                <button type="button"
+                                                        class="js-supply-modal-btn supply-mini-btn"
+                                                        data-line-id="{{ $line->id }}"
+                                                        data-update-url="{{ $lineSuppliesUpdateUrl }}">
+                                                    <span class="supply-mini-status" style="color:{{ $supplyStatusColor }};">
+                                                        {{ $supplyStatusText }}
+                                                    </span>
+                                                    @if ($supplyHintText)
+                                                        <span class="supply-mini-hint">
+                                                            {{ $supplyHintText }}
+                                                        </span>
+                                                    @endif
+                                                    <span class="supply-mini-action">
+                                                        {{ $supplyActionText }}
+                                                    </span>
+                                                </button>
                                             @endif
                                         </div>
                                     </div>
 
-                                    <div class="right-metrics">
-                                        {{ $rowRemainingLabel }} {{ number_format($remaining, 2, ',', '.') }}<br>
-                                        {{ $rowSourceStockLabel }} {{ number_format($wip, 2, ',', '.') }}
+                                    <div class="right-metrics card-metrics">
+                                        <div class="metric-main">
+                                            <span class="lbl">Maks Setor</span>
+                                            <span class="val">{{ number_format($maxSetor, 0, ',', '.') }}</span>
+                                        </div>
+                                        <div class="metric-sub">
+                                            {{ $rowRemainingLabel }} {{ number_format($remaining, 0, ',', '.') }}
+                                        </div>
+                                        @if ($alreadyReturned > 0)
+                                            <div class="metric-sub is-returned">
+                                                Sudah {{ number_format($alreadyReturned, 0, ',', '.') }}
+                                            </div>
+                                        @endif
+                                        <div class="metric-sub wip-line">
+                                            {{ $rowSourceStockLabel }} {{ number_format($wip, 0, ',', '.') }}
+                                        </div>
                                     </div>
                                 </div>
 
                                 <div class="cardx-b">
                                     <div class="grid2">
                                         <div class="field">
-                                            <label>{{ $isRejectLine ? 'Setor Ulang' : 'Di setor' }}</label>
                                             <input type="number" step="1" min="0"
                                                    inputmode="numeric"
                                                    class="form-control form-control-sm qty ok num-input select-all-on-focus {{ $supplyPartial ? 'border-warning' : '' }}"
                                                    name="results[{{ $idx }}][qty_ok]"
-                                                   value="{{ $okVal }}" placeholder="0" {{ $isBlocked ? 'disabled' : '' }}>
+                                                   value="{{ $okVal }}" placeholder="{{ $isRejectLine ? 'Setor ulang' : 'Disetor' }}" {{ $isBlocked ? 'disabled' : '' }}>
                                         </div>
 
                                         @if ($isRejectLine)
@@ -680,11 +1027,10 @@
                                             </div>
                                         @else
                                             <div class="field">
-                                                <label>Reject</label>
                                                 <input type="number" step="0.01" min="0" inputmode="decimal"
                                                        class="form-control form-control-sm qty rj num-input select-all-on-focus"
                                                        name="results[{{ $idx }}][qty_reject]"
-                                                       value="{{ $rjVal }}" placeholder="0" {{ $isBlocked ? 'disabled' : '' }}>
+                                                       value="{{ $rjVal }}" placeholder="Reject" {{ $isBlocked ? 'disabled' : '' }}>
                                             </div>
                                         @endif
                                     </div>
@@ -705,6 +1051,7 @@
                                 </div>
                             </div>
                         @endforeach
+                        @endforeach {{-- end groupCode --}}
                     @endif
                 </div>
 
@@ -719,6 +1066,88 @@
 
             </div>
         </form>
+    </div>
+</div>
+
+{{-- ══ DATA SUPPLY PER LINE / BUNDLE (untuk modal per card) ══ --}}
+@php
+$supplyDataByLineId = [];
+
+foreach ($lines as $l) {
+    $pu = $l->sewingPickup;
+    if (!$pu) continue;
+
+    $lineSupplyLines = $l->supplyLines ?? collect();
+    $bundleQty = max((float) ($l->qty_bundle ?? 0), 0);
+    $remainingQty = max((float) ($l->remaining_qty ?? 0), 0);
+    $pickupDateText = $pu?->date ? \Illuminate\Support\Carbon::parse($pu->date)->format('d/m/Y') : '-';
+    $itemCode = strtoupper($l->finishedItem?->code ?? 'ITEM-' . $l->finished_item_id);
+    $modalLines = $lineSupplyLines->map(function ($sl) use ($bundleQty) {
+        $requiredQty = (float) ($sl->required_qty ?? 0);
+        $issuedQty = (float) ($sl->issued_qty ?? 0);
+        $qtyPerPcs = $bundleQty > 0.000001 ? ($requiredQty / $bundleQty) : 0;
+
+        return [
+            'material_item_id' => (int) $sl->material_item_id,
+            'code' => $sl->materialItem?->code ?? 'Bahan',
+            'name' => $sl->materialItem?->name ?? '-',
+            'required_qty' => $requiredQty,
+            'issued_qty' => $issuedQty,
+            'required_pcs' => $bundleQty,
+            'issued_pcs' => $qtyPerPcs > 0.000001 ? floor(($issuedQty / $qtyPerPcs) + 0.00001) : 0,
+            'qty_per_pcs' => $qtyPerPcs,
+            'uom' => (string) ($sl->uom ?: $sl->materialItem?->unit ?: ''),
+            'notes' => (string) ($sl->notes ?? ''),
+        ];
+    })->values();
+
+    if ($modalLines->isEmpty()) {
+        $pickupBundleLines = ($pu->lines ?? collect())->whereNull('voided_at')->values();
+        $totalPickupQty = (float) $pickupBundleLines->sum('qty_bundle');
+        $lineFraction = $totalPickupQty > 0.000001 ? ((float) ($l->qty_bundle ?? 0) / $totalPickupQty) : 1.0;
+
+        $modalLines = ($pu->supplyLines ?? collect())->map(fn($sl) => [
+            'material_item_id' => (int) $sl->material_item_id,
+            'code' => $sl->material?->code ?? 'Bahan',
+            'name' => $sl->material?->name ?? '-',
+            'required_qty' => round((float) ($sl->required_qty ?? 0) * $lineFraction, 4),
+            'issued_qty' => round((float) ($sl->issued_qty ?? 0) * $lineFraction, 4),
+            'required_pcs' => $bundleQty,
+            'issued_pcs' => round((float) ($sl->issued_pcs ?? 0) * $lineFraction, 4),
+            'qty_per_pcs' => $bundleQty > 0.000001
+                ? round(((float) ($sl->required_qty ?? 0) * $lineFraction) / $bundleQty, 8)
+                : 0,
+            'uom' => (string) ($sl->uom ?: $sl->material?->unit ?: ''),
+            'notes' => '',
+        ])->values();
+    }
+
+    $supplyDataByLineId[$l->id] = [
+        'code' => $pu->code . ' · ' . $itemCode,
+        'pickup_date' => $pickupDateText,
+        'item_code' => $itemCode,
+        'remaining_qty' => $remainingQty,
+        'lines' => $modalLines->all(),
+    ];
+}
+@endphp
+
+{{-- ══ MODAL KELENGKAPAN JAHIT (inline) ══ --}}
+<div class="modal fade" id="supplyModal" tabindex="-1" aria-hidden="true">
+    <div class="modal-dialog modal-dialog-centered modal-dialog-scrollable modal-sm">
+        <div class="modal-content">
+            <div class="modal-header py-2">
+                <h5 class="modal-title mb-0" id="supplyModalTitle">Kelengkapan Jahit</h5>
+                <button type="button" class="btn-close ms-2" data-bs-dismiss="modal"></button>
+            </div>
+            <div class="modal-body" id="supplyModalBody">
+                <div class="text-center text-muted py-3" id="supplyModalLoading">Memuat…</div>
+            </div>
+            <div class="modal-footer py-2 gap-1">
+                <button type="button" class="btn btn-sm btn-outline-secondary" data-bs-dismiss="modal">Batal</button>
+                <button type="button" class="btn btn-sm btn-primary" id="supplyModalSave">Simpan</button>
+            </div>
+        </div>
     </div>
 </div>
 
@@ -825,8 +1254,21 @@ document.addEventListener('DOMContentLoaded', () => {
     const statTotalRows = document.getElementById('stat-total-rows');
     const statPickedRows = document.getElementById('stat-picked-rows');
     const statTotalOk = document.getElementById('stat-total-ok');
+    const statReturned = document.getElementById('stat-returned');
 
     const fallbackNote = document.getElementById('modal-fallback-note');
+
+    q?.addEventListener('focus', () => {
+        setTimeout(() => {
+            try { q.select(); } catch (_) {}
+        }, 0);
+    });
+
+    q?.addEventListener('click', () => {
+        setTimeout(() => {
+            try { q.select(); } catch (_) {}
+        }, 0);
+    });
 
     const body = document.body;
     const $$ = (sel, root = document) => Array.from(root.querySelectorAll(sel));
@@ -848,6 +1290,7 @@ document.addEventListener('DOMContentLoaded', () => {
         const url = new URL(window.location.href);
         const op = (operator?.value || '').toString();
         const pd = (pickupDate?.value || '').toString();
+        const item = (itemFilter?.value || '').toString();
 
         if (op) url.searchParams.set('operator_id', op);
         else url.searchParams.delete('operator_id');
@@ -855,11 +1298,45 @@ document.addEventListener('DOMContentLoaded', () => {
         if (pd) url.searchParams.set('pickup_date', pd);
         else url.searchParams.delete('pickup_date');
 
+        if (item) url.searchParams.set('item', item);
+        else url.searchParams.delete('item');
+
         window.location.href = url.toString();
     }
 
     operator?.addEventListener('change', reloadWithFilters);
     pickupDate?.addEventListener('change', reloadWithFilters);
+
+    function openOperatorItem(row) {
+        const opId = (row?.dataset?.operatorId || '').toString();
+        const itemCode = (row?.dataset?.itemCode || '').toString();
+        if (!opId || opId === '0') return;
+
+        const url = new URL(window.location.href);
+        url.searchParams.set('operator_id', opId);
+        if (itemCode) url.searchParams.set('item', itemCode);
+        else url.searchParams.delete('item');
+
+        const pd = (pickupDate?.value || '').toString();
+        if (pd) url.searchParams.set('pickup_date', pd);
+        else url.searchParams.delete('pickup_date');
+
+        window.location.href = url.toString();
+    }
+
+    listAll?.addEventListener('click', (e) => {
+        const row = e.target.closest('.js-open-operator-item');
+        if (!row) return;
+        openOperatorItem(row);
+    });
+
+    listAll?.addEventListener('keydown', (e) => {
+        if (e.key !== 'Enter' && e.key !== ' ') return;
+        const row = e.target.closest('.js-open-operator-item');
+        if (!row) return;
+        e.preventDefault();
+        openOperatorItem(row);
+    });
 
     function sanitizeNum(v) {
         v = (v ?? '').toString().trim();
@@ -882,24 +1359,30 @@ document.addEventListener('DOMContentLoaded', () => {
         return (card?.dataset?.supplyBlocked || '0') === '1';
     }
 
-    function clampCard(card, changed) {
+    function maxSetorForCard(card) {
         const rem = parseFloat(card.dataset.remaining || '0') || 0;
         const wip = parseFloat(card.dataset.wip || '0') || 0;
+        const base = Math.max(0, Math.min(rem, wip));
+        const supplyMax = parseFloat(card.dataset.supplyMaxSetor || '');
+
+        if ((card.dataset.supplyPartial || '0') === '1' && Number.isFinite(supplyMax)) {
+            return Math.max(0, Math.min(base, supplyMax));
+        }
+
+        return base;
+    }
+
+    function clampCard(card, changed) {
+        const maxSetor = maxSetorForCard(card);
         const { ok, rj } = getEls(card);
 
         let a = parseFloat(ok?.value || '0'); if (!Number.isFinite(a) || a < 0) a = 0;
         let b = parseFloat(rj?.value || '0'); if (!Number.isFinite(b) || b < 0) b = 0;
 
-        if (a + b > rem) {
-            const diff = (a + b) - rem;
+        if (a + b > maxSetor) {
+            const diff = (a + b) - maxSetor;
             if (changed === 'rj') b = Math.max(0, b - diff);
             else a = Math.max(0, a - diff);
-        }
-
-        if (a + b > wip) {
-            const diff2 = (a + b) - wip;
-            if (changed === 'rj') b = Math.max(0, b - diff2);
-            else a = Math.max(0, a - diff2);
         }
 
         if (ok) ok.value = (a <= 0) ? '' : String(a);
@@ -923,9 +1406,7 @@ document.addEventListener('DOMContentLoaded', () => {
 
     function autoFillCard(card) {
         if (isSupplyBlocked(card)) return;
-        const rem = parseFloat(card.dataset.remaining || '0') || 0;
-        const wip = parseFloat(card.dataset.wip || '0') || 0;
-        const fill = Math.max(0, Math.min(rem, wip));
+        const fill = maxSetorForCard(card);
 
         const { ok, rj } = getEls(card);
         if (ok) ok.value = (fill > 0) ? String(fill) : '';
@@ -941,7 +1422,7 @@ document.addEventListener('DOMContentLoaded', () => {
         if (listAll) listAll.style.display = all ? '' : 'none';
         if (listByOp) listByOp.style.display = all ? 'none' : '';
 
-        if (topActionsInput) topActionsInput.style.display = all ? 'none' : '';
+        if (topActionsInput) topActionsInput.style.display = all ? 'none' : (window.innerWidth >= 992 ? 'flex' : 'none');
         if (fabWrap) fabWrap.style.display = all ? 'none' : '';
 
         // tujuan hanya relevan untuk mode input
@@ -978,6 +1459,7 @@ document.addEventListener('DOMContentLoaded', () => {
         let totalRows = 0;
         let pickedRows = 0;
         let totalOk = 0;
+        let totalReturned = 0;
 
         $$('.fin-item', listByOp).forEach(card => {
             if (card.style.display === 'none') return;
@@ -990,11 +1472,14 @@ document.addEventListener('DOMContentLoaded', () => {
                 pickedRows++;
                 totalOk += ok;
             }
+
+            totalReturned += parseFloat(card.dataset.returned || '0') || 0;
         });
 
         if (statTotalRows) statTotalRows.textContent = totalRows.toLocaleString('id-ID');
         if (statPickedRows) statPickedRows.textContent = pickedRows.toLocaleString('id-ID');
         if (statTotalOk) statTotalOk.textContent = totalOk.toLocaleString('id-ID', { minimumFractionDigits: 2, maximumFractionDigits: 2 });
+        if (statReturned) statReturned.textContent = totalReturned.toLocaleString('id-ID', { minimumFractionDigits: 2, maximumFractionDigits: 2 });
     }
 
     function applyFilter() {
@@ -1025,6 +1510,16 @@ document.addEventListener('DOMContentLoaded', () => {
             const matchDate = !selPd || pd === selPd;
 
             card.style.display = (matchSearch && matchItem && matchDate) ? '' : 'none';
+        });
+
+        $$('.byop-group-header', listByOp).forEach(header => {
+            const code = (header.dataset.groupCode || '').toString().toUpperCase();
+            const hasVisibleCard = $$('.fin-item', listByOp).some(card => {
+                return card.style.display !== 'none'
+                    && (card.dataset.item || '').toString().toUpperCase() === code;
+            });
+
+            header.style.display = (!selItem && hasVisibleCard) ? '' : 'none';
         });
 
         computeSubmitEnabled();
@@ -1303,6 +1798,168 @@ document.addEventListener('DOMContentLoaded', () => {
         applyDryRun(); // apply state awal (default: checked)
     }
     // ─────────────────────────────────────────────────────────────────
+
+    // ══ MODAL KELENGKAPAN JAHIT ══
+    const supplyLineData = @json($supplyDataByLineId ?? []);
+    const supplyModalEl   = document.getElementById('supplyModal');
+    const supplyModalBody = document.getElementById('supplyModalBody');
+    const supplyModalTitle = document.getElementById('supplyModalTitle');
+    const supplyModalSave = document.getElementById('supplyModalSave');
+    let supplyBsModal = null;
+    let supplyUpdateUrl = '';
+
+    if (supplyModalEl && typeof bootstrap !== 'undefined') {
+        supplyBsModal = bootstrap.Modal.getOrCreateInstance(supplyModalEl);
+    }
+
+    function renderSupplyModal(lineId, updateUrl) {
+        const data = supplyLineData[lineId];
+        if (!data) { supplyModalBody.innerHTML = '<div class="text-muted text-center py-3">Data tidak tersedia.</div>'; return; }
+
+        supplyUpdateUrl = updateUrl;
+        supplyModalTitle.textContent = 'Kelengkapan Jahit';
+
+        const remainingQty = parseFloat(data.remaining_qty || '0') || 0;
+        const summary = `
+            <div style="display:grid; grid-template-columns:repeat(3,minmax(0,1fr)); gap:.45rem; margin-bottom:.75rem;">
+                <div style="border:1px solid rgba(148,163,184,.18); border-radius:12px; padding:.45rem .5rem; background:rgba(148,163,184,.06); min-width:0;">
+                    <div style="font-size:.58rem; color:var(--muted); font-weight:900; text-transform:uppercase; letter-spacing:.04em;">Tanggal</div>
+                    <div style="font-size:.78rem; font-weight:950; margin-top:.04rem; white-space:nowrap;">${escHtml(data.pickup_date || '-')}</div>
+                </div>
+                <div style="border:1px solid rgba(148,163,184,.18); border-radius:12px; padding:.45rem .5rem; background:rgba(148,163,184,.06); min-width:0;">
+                    <div style="font-size:.58rem; color:var(--muted); font-weight:900; text-transform:uppercase; letter-spacing:.04em;">Kode Item</div>
+                    <div style="font-size:.78rem; font-weight:950; margin-top:.04rem; white-space:nowrap; overflow:hidden; text-overflow:ellipsis;">${escHtml(data.item_code || '-')}</div>
+                </div>
+                <div style="border:1px solid rgba(148,163,184,.18); border-radius:12px; padding:.45rem .5rem; background:rgba(148,163,184,.06); min-width:0;">
+                    <div style="font-size:.58rem; color:var(--muted); font-weight:900; text-transform:uppercase; letter-spacing:.04em;">Qty</div>
+                    <div style="font-size:.78rem; font-weight:950; margin-top:.04rem; white-space:nowrap;">${remainingQty.toLocaleString('id-ID', { maximumFractionDigits: 2 })} pcs</div>
+                </div>
+            </div>`;
+
+        const rows = (data.lines || []).map(sl => {
+            const required = parseFloat(sl.required_qty || '0') || 0;
+            const issued = parseFloat(sl.issued_qty || '0') || 0;
+            const requiredPcs = parseFloat(sl.required_pcs || '0') || 0;
+            const issuedPcs = parseFloat(sl.issued_pcs || '0') || 0;
+            const qtyPerPcs = parseFloat(sl.qty_per_pcs || '0') || 0;
+            const complete = required > 0 && issued >= required;
+            const shortPcs = Math.max(requiredPcs - issuedPcs, 0);
+            const shortQty = shortPcs * qtyPerPcs;
+            const uom = sl.uom ? ` ${escHtml(sl.uom)}` : '';
+            const helperText = complete
+                ? `${issuedPcs.toLocaleString('id-ID', { maximumFractionDigits: 2 })}/${requiredPcs.toLocaleString('id-ID', { maximumFractionDigits: 2 })} pcs`
+                : `Total kurang ${shortQty.toLocaleString('id-ID', { maximumFractionDigits: 4 })}${uom}`;
+
+            return `
+            <div class="sc-row ${complete ? 'is-ok' : (issuedPcs > 0 ? 'is-short' : '')}" data-required-pcs="${requiredPcs}">
+                <input type="checkbox" class="sc-chk" ${complete ? 'checked disabled' : 'disabled'}>
+                <div>
+                    <div class="sc-label">${escHtml(sl.name)}</div>
+                    <div class="sc-sub">${requiredPcs.toLocaleString('id-ID', { maximumFractionDigits: 2 })} pcs · ${helperText}</div>
+                </div>
+                <div>
+                    <input type="number" step="1" min="0" max="${requiredPcs}" inputmode="numeric"
+                           data-material-id="${sl.material_item_id}"
+                           data-required="${required}"
+                           data-qty-per-pcs="${qtyPerPcs}"
+                           data-required-pcs="${requiredPcs}"
+                           class="sc-input js-sm-inp"
+                           value="${issuedPcs}"
+                           ${complete ? 'disabled' : ''}
+                           placeholder="${requiredPcs.toLocaleString('id-ID', { maximumFractionDigits: 0 })}">
+                </div>
+            </div>`;
+        }).join('');
+
+        supplyModalBody.innerHTML = summary + (rows || '<div class="text-muted small py-2">Tidak ada kelengkapan dari BOM untuk bundle ini.</div>');
+    }
+
+    supplyModalBody?.addEventListener('focusin', function (e) {
+        const input = e.target.closest('.js-sm-inp');
+        if (!input || input.disabled) return;
+        setTimeout(() => {
+            try { input.select(); } catch (_) {}
+        }, 0);
+    });
+
+    supplyModalBody?.addEventListener('click', function (e) {
+        if (e.target.closest('.js-sm-inp')) return;
+
+        const row = e.target.closest('.sc-row');
+        if (!row) return;
+
+        const input = row.querySelector('.js-sm-inp');
+        const checkbox = row.querySelector('.sc-chk');
+        if (!input || input.disabled) return;
+
+        const requiredPcs = parseFloat(input.dataset.requiredPcs || row.dataset.requiredPcs || '0') || 0;
+        input.value = requiredPcs > 0 ? String(requiredPcs) : '';
+
+        row.classList.add('is-ok');
+        row.classList.remove('is-short');
+        if (checkbox) checkbox.checked = true;
+
+        input.focus();
+        setTimeout(() => {
+            try { input.select(); } catch (_) {}
+        }, 0);
+    });
+
+    function escHtml(s) {
+        return String(s ?? '').replace(/[&<>"']/g, m =>
+            ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#039;'}[m]));
+    }
+
+    document.addEventListener('click', function (e) {
+        const btn = e.target.closest('.js-supply-modal-btn');
+        if (!btn) return;
+        const lineId  = btn.dataset.lineId;
+        const updateUrl = btn.dataset.updateUrl;
+        if (!lineId || !supplyBsModal) return;
+        renderSupplyModal(lineId, updateUrl);
+        supplyBsModal.show();
+    });
+
+    supplyModalSave?.addEventListener('click', async function () {
+        if (!supplyUpdateUrl) return;
+        const inputs = supplyModalBody.querySelectorAll('.js-sm-inp:not([disabled])');
+        const body = new FormData();
+        body.append('_token', document.querySelector('meta[name="csrf-token"]')?.content || '');
+        body.append('_method', 'PATCH');
+        inputs.forEach(inp => {
+            const materialId = inp.dataset.materialId;
+            if (!materialId) return;
+            const issuedPcs = parseFloat(inp.value || '0') || 0;
+            const qtyPerPcs = parseFloat(inp.dataset.qtyPerPcs || '0') || 0;
+            body.append(`supplies[${materialId}][issued_pcs]`, issuedPcs);
+            body.append(`supplies[${materialId}][qty_per_pcs]`, qtyPerPcs);
+            body.append(`supplies[${materialId}][issued_qty]`, issuedPcs * qtyPerPcs);
+            body.append(`supplies[${materialId}][required_qty]`, inp.dataset.required || '0');
+        });
+
+        supplyModalSave.disabled = true;
+        supplyModalSave.textContent = 'Menyimpan…';
+
+        try {
+            const res = await fetch(supplyUpdateUrl, {
+                method: 'POST',
+                headers: { 'X-Requested-With': 'XMLHttpRequest', 'Accept': 'application/json' },
+                body,
+            });
+            const json = await res.json();
+            if (json.ok) {
+                supplyBsModal?.hide();
+                window.location.reload();
+            } else {
+                alert('Gagal menyimpan.');
+            }
+        } catch (err) {
+            alert('Terjadi error: ' + err.message);
+        } finally {
+            supplyModalSave.disabled = false;
+            supplyModalSave.textContent = 'Simpan';
+        }
+    });
 });
 </script>
 @endpush

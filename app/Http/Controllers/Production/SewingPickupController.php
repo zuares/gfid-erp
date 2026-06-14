@@ -6,11 +6,13 @@ use App\Helpers\CodeGenerator;
 use App\Http\Controllers\Controller;
 use App\Models\CuttingJobBundle;
 use App\Models\Employee;
+use App\Models\Item;
 use App\Models\ItemBom;
 use App\Models\ItemBomLine;
 use App\Models\ItemRole;
 use App\Models\SewingPickup;
 use App\Models\SewingPickupLine;
+use App\Models\SewingPickupLineSupplyLine;
 use App\Models\SewingPickupSupplyLine;
 use App\Models\Warehouse;
 use App\Services\Inventory\InventoryService;
@@ -219,6 +221,7 @@ class SewingPickupController extends Controller
             $createdLines = 0;
             $epsilon = 0.000001;
             $qtyByFinishedItem = [];
+            $createdPickupLines = collect();
 
             foreach ($validated['lines'] as $row) {
 
@@ -290,7 +293,7 @@ class SewingPickupController extends Controller
                 }
 
                 // 🔹 Simpan detail sewing pickup (simpan unit_cost)
-                SewingPickupLine::create([
+                $pickupLine = SewingPickupLine::create([
                     'sewing_pickup_id' => $pickup->id,
                     'cutting_job_bundle_id' => $bundle->id,
                     'finished_item_id' => $bundle->finished_item_id,
@@ -298,6 +301,8 @@ class SewingPickupController extends Controller
                     'unit_cost' => $unitCostPerPiece, // ✅ simpan cost
                     'status' => 'in_progress',
                 ]);
+
+                $createdPickupLines->push($pickupLine);
 
                 $finishedItemId = (int) $bundle->finished_item_id;
                 $qtyByFinishedItem[$finishedItemId] = ($qtyByFinishedItem[$finishedItemId] ?? 0) + $qty;
@@ -364,6 +369,12 @@ class SewingPickupController extends Controller
             $this->storeSewingPickupSupplies(
                 pickup: $pickup,
                 qtyByFinishedItem: $qtyByFinishedItem,
+                submittedPayload: $validated['supplies_checklist'] ?? null,
+            );
+
+            $this->storeSewingPickupLineSupplies(
+                pickup: $pickup,
+                pickupLines: $createdPickupLines,
                 submittedPayload: $validated['supplies_checklist'] ?? null,
             );
 
@@ -438,8 +449,82 @@ class SewingPickupController extends Controller
             'supplyLines.material:id,code,name,unit',
         ]);
 
+        // Auto-seed supply lines dari BOM jika pickup ini belum punya sama sekali
+        if ($pickup->supplyLines->isEmpty() && $pickup->lines->isNotEmpty()) {
+            $qtyByItem = $pickup->lines
+                ->whereNull('voided_at')
+                ->groupBy('finished_item_id')
+                ->map(fn($g) => $g->sum('qty_bundle'))
+                ->toArray();
+
+            if (!empty($qtyByItem)) {
+                $this->storeSewingPickupSupplies($pickup, $qtyByItem, null);
+                $pickup->load('supplyLines.material:id,code,name,unit');
+            }
+        }
+
+        // Hitung kebutuhan material per pickup line (per bundle) dari BOM
+        $activeLines = $pickup->lines->whereNull('voided_at')->values();
+        $finishedItemIds = $activeLines->pluck('finished_item_id')->unique()->values()->all();
+
+        $bomsByItem = \App\Models\ItemBom::query()
+            ->whereIn('item_id', $finishedItemIds)
+            ->where('active', true)
+            ->with(['lines.material'])
+            ->get()
+            ->keyBy('item_id');
+
+        // supplyLines index by material_item_id → id (untuk hidden input)
+        $supplyLineIdByMaterial = $pickup->supplyLines
+            ->keyBy('material_item_id')
+            ->map(fn($sl) => $sl->id);
+
+        // issued_pcs saat ini per supply_line_id
+        $issuedPcsBySupplyLine = $pickup->supplyLines
+            ->keyBy('id')
+            ->map(fn($sl) => (float) ($sl->issued_pcs ?? 0));
+
+        // Per pickup line: daftar material yang dibutuhkan
+        $bundleRequirements = $activeLines->map(function ($line) use ($bomsByItem) {
+            $bom = $bomsByItem[(int) $line->finished_item_id] ?? null;
+            $materials = [];
+            if ($bom) {
+                foreach ($bom->lines as $bomLine) {
+                    if (!$this->isSewingSupplyBomLine($bomLine)) continue;
+                    $materials[] = [
+                        'material_item_id' => (int) $bomLine->material_id,
+                        'code'             => (string) ($bomLine->material?->code ?? '-'),
+                        'name'             => (string) ($bomLine->material?->name ?? ''),
+                        'qty_per_pcs'      => (float) $bomLine->qty,
+                        'required_qty'     => (float) $bomLine->qty * (float) $line->qty_bundle,
+                        'uom'              => (string) ($bomLine->uom ?: $bomLine->material?->unit ?: ''),
+                        'required_pcs'     => (int) $line->qty_bundle,
+                    ];
+                }
+            }
+            return [
+                'id'              => $line->id,
+                'code'            => strtoupper($line->finishedItem?->code ?? 'ITEM-' . $line->finished_item_id),
+                'qty'             => (int) $line->qty_bundle,
+                'finished_item_id'=> (int) $line->finished_item_id,
+                'materials'       => $materials,
+            ];
+        })->filter(fn($b) => count($b['materials']) > 0)->values();
+
+        // Filter per pickup line jika ada ?line_id= di URL (tampilkan satu bundle saja)
+        $filterLineId = (int) request('line_id', 0);
+        if ($filterLineId > 0) {
+            $bundleRequirements = $bundleRequirements
+                ->filter(fn($b) => (int) $b['id'] === $filterLineId)
+                ->values();
+        }
+
         return view('production.sewing_pickups.supplies', [
-            'pickup' => $pickup,
+            'pickup'                 => $pickup,
+            'bundleRequirements'     => $bundleRequirements,
+            'supplyLineIdByMaterial' => $supplyLineIdByMaterial,
+            'issuedPcsBySupplyLine'  => $issuedPcsBySupplyLine,
+            'filterLineId'           => $filterLineId,
         ]);
     }
 
@@ -448,12 +533,20 @@ class SewingPickupController extends Controller
         $validated = $request->validate([
             'supplies' => ['nullable', 'array'],
             'supplies.*.issued_pcs' => ['nullable', 'numeric', 'min:0'],
+            'line_supplies' => ['nullable', 'array'],
+            'line_supplies.*.*.issued_pcs' => ['nullable', 'numeric', 'min:0'],
+            'line_supplies.*.*.issued_qty' => ['nullable', 'numeric', 'min:0'],
+            'line_supplies.*.*.required_qty' => ['nullable', 'numeric', 'min:0'],
+            'line_supplies.*.*.qty_per_pcs' => ['nullable', 'numeric', 'min:0'],
         ]);
 
         DB::transaction(function () use ($pickup, $validated) {
             $pickup->load('supplyLines');
 
             foreach ($pickup->supplyLines as $line) {
+                // Hanya update baris yang explicitly di-submit (skip jika tidak ada di request)
+                if (!isset($validated['supplies'][$line->id])) continue;
+
                 $input = $validated['supplies'][$line->id]['issued_pcs'] ?? 0;
                 $issuedPcs = max((float) $input, 0);
                 $requiredPcs = (float) ($line->required_pcs ?? 0);
@@ -464,7 +557,46 @@ class SewingPickupController extends Controller
                 $line->issued_qty = $qtyPerPiece > 0 ? ($issuedPcs * $qtyPerPiece) : $issuedPcs;
                 $line->save();
             }
+
+            foreach (($validated['line_supplies'] ?? []) as $pickupLineId => $materials) {
+                $pickupLine = SewingPickupLine::query()
+                    ->where('sewing_pickup_id', $pickup->id)
+                    ->whereKey((int) $pickupLineId)
+                    ->first();
+
+                if (!$pickupLine) {
+                    continue;
+                }
+
+                foreach ((array) $materials as $materialId => $row) {
+                    $materialId = (int) $materialId;
+                    if ($materialId <= 0) {
+                        continue;
+                    }
+
+                    $issuedQty = array_key_exists('issued_pcs', $row)
+                        ? max((float) ($row['issued_pcs'] ?? 0), 0) * max((float) ($row['qty_per_pcs'] ?? 0), 0)
+                        : max((float) ($row['issued_qty'] ?? 0), 0);
+
+                    SewingPickupLineSupplyLine::updateOrCreate(
+                        [
+                            'sewing_pickup_line_id' => (int) $pickupLine->id,
+                            'material_item_id' => $materialId,
+                        ],
+                        [
+                            'sewing_pickup_id' => (int) $pickup->id,
+                            'required_qty' => max((float) ($row['required_qty'] ?? 0), 0),
+                            'issued_qty' => $issuedQty,
+                        ]
+                    );
+                }
+            }
         });
+
+        // AJAX request → return JSON
+        if ($request->expectsJson() || $request->header('X-Requested-With') === 'XMLHttpRequest') {
+            return response()->json(['ok' => true, 'message' => 'Kelengkapan jahit tersimpan.']);
+        }
 
         // Kalau ada redirect_to (misal dari halaman Sewing Return), kembali ke sana
         $redirectTo = $request->input('redirect_to');
@@ -475,6 +607,78 @@ class SewingPickupController extends Controller
         return redirect()
             ->route('production.sewing.pickups.show', $pickup)
             ->with('success', 'Kelengkapan jahit tersimpan.');
+    }
+
+    public function updateLineSupplies(Request $request, SewingPickupLine $line)
+    {
+        $validated = $request->validate([
+            'supplies' => ['nullable', 'array'],
+            'supplies.*.issued_pcs' => ['nullable', 'numeric', 'min:0'],
+            'supplies.*.issued_qty' => ['nullable', 'numeric', 'min:0'],
+            'supplies.*.required_qty' => ['nullable', 'numeric', 'min:0'],
+            'supplies.*.qty_per_pcs' => ['nullable', 'numeric', 'min:0'],
+            'supplies.*.notes' => ['nullable', 'string', 'max:500'],
+        ]);
+
+        $isOwner = strtolower((string) (auth()->user()->role ?? '')) === 'owner';
+        $supplies = $validated['supplies'] ?? [];
+
+        DB::transaction(function () use ($line, $supplies, $isOwner) {
+            $line = SewingPickupLine::query()
+                ->whereKey($line->id)
+                ->lockForUpdate()
+                ->firstOrFail();
+
+            foreach ($supplies as $materialId => $row) {
+                $materialId = (int) $materialId;
+                if ($materialId <= 0 || !Item::query()->whereKey($materialId)->exists()) {
+                    throw ValidationException::withMessages([
+                        'supplies' => 'Material kelengkapan jahit tidak valid.',
+                    ]);
+                }
+
+                $requiredQty = max((float) ($row['required_qty'] ?? 0), 0);
+                $issuedQty = array_key_exists('issued_pcs', $row)
+                    ? max((float) ($row['issued_pcs'] ?? 0), 0) * max((float) ($row['qty_per_pcs'] ?? 0), 0)
+                    : max((float) ($row['issued_qty'] ?? 0), 0);
+
+                $existing = SewingPickupLineSupplyLine::query()
+                    ->where('sewing_pickup_line_id', $line->id)
+                    ->where('material_item_id', $materialId)
+                    ->lockForUpdate()
+                    ->first();
+
+                if ($existing && $requiredQty <= 0) {
+                    $requiredQty = (float) ($existing->required_qty ?? 0);
+                }
+
+                if (!$isOwner && $issuedQty > $requiredQty + 0.000001) {
+                    throw ValidationException::withMessages([
+                        'supplies' => 'Qty dibawa tidak boleh lebih dari kebutuhan bundle.',
+                    ]);
+                }
+
+                SewingPickupLineSupplyLine::updateOrCreate(
+                    [
+                        'sewing_pickup_line_id' => $line->id,
+                        'material_item_id' => $materialId,
+                    ],
+                    [
+                        'sewing_pickup_id' => (int) $line->sewing_pickup_id,
+                        'required_qty' => $requiredQty,
+                        'issued_qty' => $issuedQty,
+                        'uom' => $existing?->uom,
+                        'notes' => trim((string) ($row['notes'] ?? '')) ?: null,
+                    ]
+                );
+            }
+        });
+
+        if ($request->expectsJson() || $request->header('X-Requested-With') === 'XMLHttpRequest') {
+            return response()->json(['ok' => true, 'message' => 'Kelengkapan bundle tersimpan.']);
+        }
+
+        return back()->with('success', 'Kelengkapan bundle tersimpan.');
     }
 
     private function storeSewingPickupSupplies(SewingPickup $pickup, array $qtyByFinishedItem, ?string $submittedPayload): void
@@ -520,6 +724,146 @@ class SewingPickupController extends Controller
                 ]
             );
         }
+    }
+
+    private function storeSewingPickupLineSupplies(SewingPickup $pickup, $pickupLines, ?string $submittedPayload): void
+    {
+        $pickupLines = collect($pickupLines)->filter();
+        if ($pickupLines->isEmpty()) {
+            return;
+        }
+
+        $submittedItems = $this->parseSubmittedSewingSupplies($submittedPayload);
+        $submittedBundles = $this->parseSubmittedSewingSupplyBundles($submittedPayload);
+        $remainingIssuedByMaterial = collect($submittedItems)
+            ->map(fn($row) => (float) ($row['issued_qty'] ?? 0))
+            ->toArray();
+
+        $finishedItemIds = $pickupLines->pluck('finished_item_id')->filter()->unique()->values()->all();
+        if (empty($finishedItemIds)) {
+            return;
+        }
+
+        $bomsByItem = ItemBom::query()
+            ->whereIn('item_id', $finishedItemIds)
+            ->where('active', true)
+            ->with(['lines.material'])
+            ->get()
+            ->keyBy('item_id');
+
+        foreach ($pickupLines as $line) {
+            $bom = $bomsByItem->get((int) $line->finished_item_id);
+            if (!$bom) {
+                continue;
+            }
+
+            foreach ($bom->lines as $bomLine) {
+                if (!$this->isSewingSupplyBomLine($bomLine)) {
+                    continue;
+                }
+
+                $materialId = (int) ($bomLine->material_id ?? 0);
+                if ($materialId <= 0) {
+                    continue;
+                }
+
+                $requiredQty = (float) ($line->qty_bundle ?? 0) * (float) ($bomLine->qty ?? 0);
+                $submittedBundleSupply = $submittedBundles[(int) ($line->cutting_job_bundle_id ?? 0)][$materialId] ?? null;
+
+                if ($submittedBundleSupply) {
+                    $issuedQty = min((float) ($submittedBundleSupply['issued_qty'] ?? 0), $requiredQty);
+                } else {
+                    $issuedQty = min((float) ($remainingIssuedByMaterial[$materialId] ?? 0), $requiredQty);
+                    $remainingIssuedByMaterial[$materialId] = max((float) ($remainingIssuedByMaterial[$materialId] ?? 0) - $issuedQty, 0);
+                }
+
+                SewingPickupLineSupplyLine::updateOrCreate(
+                    [
+                        'sewing_pickup_line_id' => (int) $line->id,
+                        'material_item_id' => $materialId,
+                    ],
+                    [
+                        'sewing_pickup_id' => (int) $pickup->id,
+                        'required_qty' => $requiredQty,
+                        'issued_qty' => $issuedQty,
+                        'uom' => $bomLine->uom ?: ($bomLine->material?->unit ?: null),
+                    ]
+                );
+            }
+        }
+    }
+
+    private function parseSubmittedSewingSupplies(?string $payload): array
+    {
+        $submittedItems = [];
+        $decoded = $payload ? json_decode($payload, true) : null;
+        if (!is_array($decoded)) {
+            return $submittedItems;
+        }
+
+        foreach (($decoded['items'] ?? []) as $item) {
+            if (!is_array($item)) {
+                continue;
+            }
+
+            $materialId = (int) ($item['id'] ?? 0);
+            if ($materialId <= 0) {
+                continue;
+            }
+
+            $submittedItems[$materialId] = [
+                'issued_qty' => max((float) ($item['issued_qty'] ?? $item['issuedQty'] ?? 0), 0),
+                'issued_pcs' => max((float) ($item['issued_pcs'] ?? $item['issuedPieces'] ?? 0), 0),
+            ];
+        }
+
+        return $submittedItems;
+    }
+
+    private function parseSubmittedSewingSupplyBundles(?string $payload): array
+    {
+        $result = [];
+        $decoded = $payload ? json_decode($payload, true) : null;
+        if (!is_array($decoded)) {
+            return $result;
+        }
+
+        foreach (($decoded['bundles'] ?? []) as $bundle) {
+            if (!is_array($bundle)) {
+                continue;
+            }
+
+            $bundleId = (int) ($bundle['bundle_id'] ?? 0);
+            if ($bundleId <= 0) {
+                continue;
+            }
+
+            foreach (($bundle['supplies'] ?? []) as $supply) {
+                if (!is_array($supply)) {
+                    continue;
+                }
+
+                $materialId = (int) ($supply['id'] ?? 0);
+                if ($materialId <= 0) {
+                    continue;
+                }
+
+                $qtyPerPiece = max((float) ($supply['qty_per_piece'] ?? $supply['qtyPerPiece'] ?? 0), 0);
+                $issuedPcs = max((float) ($supply['issued_pcs'] ?? $supply['issuedPieces'] ?? 0), 0);
+                $requiredPcs = max((float) ($supply['required_pcs'] ?? $supply['requiredPieces'] ?? 0), 0);
+
+                $result[$bundleId][$materialId] = [
+                    'issued_qty' => array_key_exists('issued_qty', $supply)
+                        ? max((float) $supply['issued_qty'], 0)
+                        : ($issuedPcs * $qtyPerPiece),
+                    'required_qty' => array_key_exists('required_qty', $supply)
+                        ? max((float) $supply['required_qty'], 0)
+                        : ($requiredPcs * $qtyPerPiece),
+                ];
+            }
+        }
+
+        return $result;
     }
 
     private function buildSewingSupplyRequirements(array $qtyByFinishedItem): array

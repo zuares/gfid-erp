@@ -4,8 +4,8 @@
 <head>
   <meta charset="utf-8">
 
-  {{-- viewport: standar --}}
-  <meta name="viewport" content="width=device-width, initial-scale=1">
+  {{-- viewport: lock zoom/pinch for mobile app workflow --}}
+  <meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=1, minimum-scale=1, user-scalable=no, viewport-fit=cover">
 
   <meta name="csrf-token" content="{{ csrf_token() }}">
 
@@ -31,6 +31,7 @@
       box-sizing:border-box;
       -webkit-text-size-adjust:100%;
       height:100%;
+      touch-action: pan-x pan-y;
     }
     *,*::before,*::after{ box-sizing:inherit; }
 
@@ -41,6 +42,7 @@
       line-height:1.4;
       margin:0;
       height:100%;
+      touch-action: pan-x pan-y;
     }
 
     /* cegah auto-zoom iOS saat focus input */
@@ -453,6 +455,24 @@
 
     document.addEventListener('focusin', function(){ setTimeout(updateVhAndKeyboard, 0); });
     document.addEventListener('focusout', function(){ setTimeout(updateVhAndKeyboard, 120); });
+  })();
+  </script>
+
+  <script>
+  // Lock pinch / double-tap zoom on mobile production screens.
+  (function(){
+    document.addEventListener('gesturestart', function(e){ e.preventDefault(); }, { passive:false });
+    document.addEventListener('gesturechange', function(e){ e.preventDefault(); }, { passive:false });
+    document.addEventListener('gestureend', function(e){ e.preventDefault(); }, { passive:false });
+
+    let lastTouchEnd = 0;
+    document.addEventListener('touchend', function(e){
+      const now = Date.now();
+      if (now - lastTouchEnd <= 300) {
+        e.preventDefault();
+      }
+      lastTouchEnd = now;
+    }, { passive:false });
   })();
   </script>
 

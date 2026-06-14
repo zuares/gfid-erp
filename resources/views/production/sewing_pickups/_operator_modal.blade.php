@@ -2,447 +2,422 @@
 
 @push('head')
     <style>
-        .sewing-modal-summary .mono {
-            font-variant-numeric: tabular-nums;
-        }
+        /* ── Confirm phase: bundle list ── */
+        .sc-tbl { width:100%; border-collapse:collapse; font-size:.8rem; }
+        .sc-tbl thead th { font-size:.68rem; font-weight:600; color:var(--muted);
+                           text-transform:uppercase; letter-spacing:.04em;
+                           padding:.3rem .45rem; border-bottom:1px solid rgba(148,163,184,.25); }
+        .sc-tbl tbody tr:nth-child(odd) { background:rgba(148,163,184,.05); }
+        .sc-tbl td { padding:.42rem .45rem; vertical-align:middle; }
+        .sc-td-no   { width:28px; color:var(--muted); font-size:.7rem; text-align:center; }
+        .sc-td-date { white-space:nowrap; color:var(--muted); font-size:.73rem; }
+        .sc-td-code { font-size:.92rem; font-weight:900;
+                      font-family:ui-monospace,SFMono-Regular,Menlo,Consolas,monospace; }
+        .sc-td-qty  { text-align:right; white-space:nowrap; font-size:.9rem; font-weight:800; }
 
-        .sewing-supply-checklist {
-            border: 1px solid rgba(148, 163, 184, .35);
-            border-radius: 12px;
-            padding: .75rem;
-            background: rgba(59, 130, 246, .035);
-        }
-
-        .sewing-supply-checklist-title {
-            display: flex;
-            justify-content: space-between;
-            gap: .5rem;
-            align-items: center;
-            font-size: .82rem;
-            font-weight: 700;
-            margin-bottom: .45rem;
-        }
-
-        .sewing-supply-check-item {
-            display: flex;
-            align-items: flex-start;
-            gap: .55rem;
-            padding: .48rem .52rem;
-            border-radius: 10px;
-            background: var(--card);
-            border: 1px solid rgba(148, 163, 184, .22);
-        }
-
-        .sewing-supply-check-item.is-short {
-            background: rgba(239, 68, 68, .06);
-            border-color: rgba(239, 68, 68, .38);
-        }
-
-        .sewing-supply-check-item + .sewing-supply-check-item {
-            margin-top: .4rem;
-        }
-
-        .sewing-supply-check-item .form-check-input {
-            width: 1.15rem;
-            height: 1.15rem;
-            margin-top: .12rem;
-            flex-shrink: 0;
-        }
-
-        .sewing-supply-issue-input {
-            max-width: 120px;
-            font-size: .78rem;
-            font-weight: 800;
-            text-align: right;
-            border-radius: 10px;
-        }
-
-        .sewing-supply-code {
-            font-size: .82rem;
-            font-weight: 800;
-            line-height: 1.15;
-        }
-
-        .sewing-supply-name {
-            font-size: .74rem;
-            color: var(--muted);
-            line-height: 1.25;
-        }
-
-        .sewing-supply-qty {
-            font-size: .72rem;
-            color: var(--muted);
-        }
-
-        .sewing-supply-shortage {
-            font-size: .72rem;
-            font-weight: 700;
-            color: #dc2626;
-        }
-
-        @media (max-width: 767.98px) {
-            .sewing-supply-checklist {
-                padding: .65rem;
-            }
-
-            .sewing-supply-check-item {
-                min-height: 48px;
-            }
-        }
+        /* ── Supply phase: checklist rows ── */
+        .sc-row { display:grid; grid-template-columns:24px 1fr auto; align-items:center; gap:.5rem;
+                  padding:.45rem .6rem; border:1px solid rgba(148,163,184,.18); border-radius:10px;
+                  margin-bottom:.35rem; transition:background .15s; }
+        .sc-row.is-ok    { background:rgba(22,163,74,.06);  border-color:rgba(22,163,74,.25); }
+        .sc-row.is-short { background:rgba(239,68,68,.05);  border-color:rgba(239,68,68,.25); }
+        .sc-chk   { width:1.1rem; height:1.1rem; cursor:pointer; accent-color:#2563eb; flex-shrink:0; }
+        .sc-label { font-size:.78rem; font-weight:700; line-height:1.15; }
+        .sc-sub   { font-size:.69rem; color:var(--muted); }
+        .sc-input { width:68px; text-align:right; font-weight:800; font-size:.8rem;
+                    border-radius:8px; padding:.2rem .35rem; border:1px solid rgba(148,163,184,.4);
+                    background:var(--card); color:var(--text); }
+        .sc-input:focus { outline:none; border-color:#2563eb; box-shadow:0 0 0 2px rgba(37,99,235,.15); }
+        .sc-step-hdr { display:flex; justify-content:space-between; align-items:center;
+                       margin-bottom:.75rem; }
+        .sc-step-main { font-size:1.15rem; font-weight:900; letter-spacing:-.01em;
+                        font-family:ui-monospace,SFMono-Regular,Menlo,Consolas,monospace; }
     </style>
 @endpush
 
 {{-- Modal --}}
-<div class="modal fade" id="confirmSubmitModal" tabindex="-1" aria-labelledby="confirmSubmitLabel" aria-hidden="true">
+<div class="modal fade" id="confirmSubmitModal" tabindex="-1" aria-hidden="true">
     <div class="modal-dialog modal-dialog-centered modal-dialog-scrollable modal-md">
         <div class="modal-content">
+
             <div class="modal-header py-2">
-                <h5 class="modal-title mb-0">Konfirmasi Sewing Pickup</h5>
+                <h5 class="modal-title mb-0" id="modal-phase-title">Konfirmasi Sewing Pickup</h5>
                 <button type="button" class="btn-close ms-2" data-bs-dismiss="modal"></button>
             </div>
 
             <div class="modal-body">
 
-                {{-- OPERATOR FOCAL POINT (pakai komponen) --}}
-                <x-modal-confirm-operator title="Operator Jahit" label="Pilih Operator" :required="true"
-                    :name="null" {{-- tidak kirim langsung ke backend, pakai hidden --}} selectId="operator_select_modal" :operators="$operators"
-                    :selected="null"
-                    description="Pilih <strong>Operator Jahit</strong> untuk semua bundle yang diambil." />
+                {{-- ══ PHASE 1: Konfirmasi ══ --}}
+                <div id="phase-confirm">
 
-                {{-- DETAIL PICKUP --}}
-                <div class="mb-3">
-                    <div class="small fw-semibold mb-1">Detail Pickup Jahit</div>
+                    {{-- Operator --}}
+                    <x-modal-confirm-operator title="Operator Jahit" label="Pilih Operator" :required="true"
+                        :name="null" selectId="operator_select_modal" :operators="$operators"
+                        :selected="null"
+                        description="Pilih <strong>Operator Jahit</strong> untuk semua bundle yang diambil." />
 
-                    <div class="table-responsive mb-2">
-                        <table class="table table-sm mb-0">
-                            <thead>
-                                <tr>
-                                    <th style="width: 40px;">#</th>
-                                    <th>Item (kode)</th>
-                                    <th class="text-end">Qty (pcs)</th>
-                                </tr>
-                            </thead>
-                            <tbody id="sewing-summary-rows">
-                                <tr>
-                                    <td colspan="3" class="text-muted small">Belum ada bundle yang diambil.</td>
-                                </tr>
-                            </tbody>
-                        </table>
+                    {{-- Bundle list (diisi JS) --}}
+                    <div class="mt-3">
+                        <div class="small fw-bold text-muted mb-1">Yang Diambil</div>
+                        <div id="confirm-bundle-list"></div>
                     </div>
+
                 </div>
 
-                {{-- SUMMARY --}}
-                <div class="mb-0 p-2 rounded border bg-light small sewing-modal-summary">
-                    <div class="d-flex justify-content-between">
-                        <span>Tanggal Ambil</span>
-                        <span class="fw-semibold" id="sewing-summary-date">-</span>
+                {{-- ══ PHASE 2: Kelengkapan Jahit step-by-step ══ --}}
+                <div id="phase-supply" style="display:none">
+                    <div class="sc-step-hdr">
+                        <span class="sc-step-main" id="sc-step-title">—</span>
+                        <span class="badge rounded-pill text-bg-secondary" id="sc-step-prog">0 / 0</span>
                     </div>
-                    <div class="d-flex justify-content-between">
-                        <span>Total qty pickup (pcs)</span>
-                        <span class="fw-semibold mono" id="sewing-summary-total">0.00</span>
-                    </div>
-                </div>
-
-                {{-- KELENGKAPAN JAHIT: disembunyikan dulu, dibuka setelah klik Selanjutnya --}}
-                <div class="mt-3 sewing-supply-checklist d-none" id="sewing-supply-step">
-                    <div class="sewing-supply-checklist-title">
-                        <span>Kelengkapan Jahit</span>
-                        <span class="badge rounded-pill text-bg-light border" id="sewing-supply-check-count">0/0</span>
-                    </div>
-                    <div id="sewing-supply-checklist">
-                        <div class="text-muted small">Belum ada kelengkapan jahit dari BOM.</div>
-                    </div>
+                    <div id="sewing-supply-checklist"></div>
                 </div>
 
             </div>
 
-            <div class="modal-footer py-2">
+            <div class="modal-footer py-2 gap-1">
                 <button class="btn btn-sm btn-outline-secondary" data-bs-dismiss="modal">Batal</button>
-                <button class="btn btn-sm btn-primary" id="btn-confirm-submit" disabled>
-                    Selanjutnya
-                </button>
+                <button class="btn btn-sm btn-outline-secondary" id="btn-step-back" style="display:none">← Kembali</button>
+                <button class="btn btn-sm btn-primary" id="btn-confirm-submit" disabled>Lanjut →</button>
             </div>
+
         </div>
     </div>
 </div>
 
 @push('scripts')
-    <script>
-        document.addEventListener("DOMContentLoaded", function() {
-            const bomSuppliesByItem = @json($bomSuppliesByItem ?? []);
+<script>
+document.addEventListener('DOMContentLoaded', function () {
+    const bomSuppliesByItem  = @json($bomSuppliesByItem ?? []);
 
-            const operatorHidden = document.getElementById("operator_id_hidden"); // hidden input di form utama
-            const operatorSelect = document.getElementById("operator_select_modal");
-            const checklistPayload = document.getElementById("supplies_checklist_payload");
+    const operatorHidden     = document.getElementById('operator_id_hidden');
+    const operatorSelect     = document.getElementById('operator_select_modal');
+    const checklistPayload   = document.getElementById('supplies_checklist_payload');
+    const modalEl            = document.getElementById('confirmSubmitModal');
+    const confirmBtn         = document.getElementById('btn-confirm-submit');
+    const backBtn            = document.getElementById('btn-step-back');
+    const rows               = document.querySelectorAll('.bundle-row');
+    const form               = document.getElementById('sewing-pickup-form');
 
-            const modalEl = document.getElementById("confirmSubmitModal");
-            const confirmBtn = document.getElementById("btn-confirm-submit");
+    const phaseConfirm       = document.getElementById('phase-confirm');
+    const phaseSupply        = document.getElementById('phase-supply');
+    const modalTitle         = document.getElementById('modal-phase-title');
+    const bundleListEl       = document.getElementById('confirm-bundle-list');
+    const supplyChecklist    = document.getElementById('sewing-supply-checklist');
+    const stepTitle          = document.getElementById('sc-step-title');
+    const stepProg           = document.getElementById('sc-step-prog');
 
-            const rows = document.querySelectorAll(".bundle-row");
-            const form = document.getElementById("sewing-pickup-form");
+    const modal = new bootstrap.Modal(modalEl);
 
-            const tblBody = document.getElementById("sewing-summary-rows");
-            const summaryDate = document.getElementById("sewing-summary-date");
-            const summaryTotal = document.getElementById("sewing-summary-total");
-            const supplyStep = document.getElementById("sewing-supply-step");
-            const supplyChecklist = document.getElementById("sewing-supply-checklist");
-            const supplyCheckCount = document.getElementById("sewing-supply-check-count");
+    /* ── state ── */
+    let phase            = 'confirm';   // 'confirm' | 'supply'
+        let selectedLines    = [];          // [{bundleId, code, qty, finishedItemId}]
+        let activeSupplyItems = [];         // [{bundleId, code, qty, finishedItemId, supplies:[...]}]
+    let currentStep      = 0;
 
-            let modal = new bootstrap.Modal(modalEl);
-            let modalStep = 'summary';
-            let activeSupplyItems = [];
+    /* ── helpers ── */
+    function esc(s) {
+        return (s ?? '').replace(/[&<>"']/g, m =>
+            ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#039;'}[m]));
+    }
+    function fmt(n) {
+        const v = Number(n || 0);
+        return Number.isFinite(v) ? v.toLocaleString('id-ID', {maximumFractionDigits:4}) : '0';
+    }
 
-            function syncConfirmState() {
-                const val = operatorSelect.value;
-                operatorHidden.value = val;
-                confirmBtn.disabled = val === "";
-                if (supplyCheckCount) {
-                    const complete = activeSupplyItems.filter(item => Number(item.issuedPieces || 0) + 0.000001 >= Number(item.totalPieces || 0)).length;
-                    supplyCheckCount.textContent = `${complete}/${activeSupplyItems.length}`;
-                    supplyCheckCount.classList.toggle("text-bg-success", activeSupplyItems.length > 0 && complete === activeSupplyItems.length);
-                    supplyCheckCount.classList.toggle("text-bg-warning", activeSupplyItems.length > 0 && complete < activeSupplyItems.length);
-                    supplyCheckCount.classList.toggle("text-bg-light", activeSupplyItems.length === 0);
-                }
-            }
+    /* ── operator sync ── */
+    operatorSelect.addEventListener('change', () => {
+        operatorHidden.value = operatorSelect.value;
+        confirmBtn.disabled  = !operatorSelect.value;
+    });
 
-            operatorSelect.addEventListener("change", () => {
-                syncConfirmState();
-            });
-
-            function escapeHtml(str) {
-                return str?.replace(/[&<>"']/g, m => ({
-                    "&": "&amp;",
-                    "<": "&lt;",
-                    ">": "&gt;",
-                    '"': "&quot;",
-                    "'": "&#039;"
-                } [m])) ?? "";
-            }
-
-            function formatQty(num) {
-                const value = Number(num || 0);
-                if (!Number.isFinite(value) || value <= 0) return "0";
-                return value.toLocaleString("id-ID", {
-                    minimumFractionDigits: 0,
-                    maximumFractionDigits: 4
-                });
-            }
-
-            function materialQtyFromPieces(item, pieces) {
-                return Math.max(Number(pieces || 0), 0) * Number(item.qtyPerPiece || 0);
-            }
-
-            function buildSupplyChecklist(selectedLines) {
-                const aggregate = new Map();
-
-                selectedLines.forEach(line => {
-                    const supplies = bomSuppliesByItem[line.finishedItemId] || [];
-                    supplies.forEach(supply => {
-                        const key = String(supply.id || supply.code);
-                        const current = aggregate.get(key) || {
-                            id: supply.id,
-                            code: supply.code || "-",
-                            name: supply.name || "",
-                            uom: supply.uom || "",
-                            qty: 0,
-                            totalPieces: 0,
-                            stockAvailable: Number(supply.stock_available || 0),
-                        };
-                        current.qty += (Number(line.qty || 0) * Number(supply.qty || 0));
-                        current.totalPieces += Number(line.qty || 0);
-                        current.stockAvailable = Number(supply.stock_available || current.stockAvailable || 0);
-                        aggregate.set(key, current);
-                    });
-                });
-
-                activeSupplyItems = Array.from(aggregate.values())
-                    .map(item => {
-                        const qtyPerPiece = Number(item.totalPieces || 0) > 0
-                            ? Number(item.qty || 0) / Number(item.totalPieces || 0)
-                            : 0;
-                        const stockPieces = qtyPerPiece > 0
-                            ? Number(item.stockAvailable || 0) / qtyPerPiece
-                            : 0;
-                        const issuedPieces = 0; // biarkan operator isi manual
-
-                        return {
-                            ...item,
-                            qtyPerPiece,
-                            stockPieces,
-                            issuedPieces,
-                            issuedQty: 0,
-                            shortagePieces: Number(item.totalPieces || 0),
-                            shortage: Number(item.qty || 0),
-                        };
-                    })
-                    .sort((a, b) => String(a.code).localeCompare(String(b.code)));
-
-                if (!supplyChecklist) return;
-
-                if (!activeSupplyItems.length) {
-                    supplyChecklist.innerHTML = `<div class="text-muted small">Tidak ada kelengkapan jahit dari BOM untuk bundle ini.</div>`;
-                    syncConfirmState();
-                    return;
-                }
-
-                supplyChecklist.innerHTML = activeSupplyItems.map((item, idx) => {
-                    const issuedPieces = Number(item.issuedPieces || 0);
-                    const currentShortPieces = Math.max(Number(item.totalPieces || 0) - issuedPieces, 0);
-                    const isShort = currentShortPieces > 0.000001;
-
-                    return `
-                        <label class="sewing-supply-check-item ${isShort ? 'is-short' : ''}">
-                            <span class="flex-grow-1">
-                                <span class="d-flex align-items-center gap-2 flex-wrap">
-                                    <span class="mono sewing-supply-code">${escapeHtml(item.code)}</span>
-                                    <span class="sewing-supply-qty">Butuh ${formatQty(item.totalPieces)} pcs</span>
-                                    <span class="sewing-supply-qty">Stok cukup ${formatQty(item.stockPieces)} pcs</span>
-                                    ${isShort ? `<span class="sewing-supply-shortage">Kurang ${formatQty(currentShortPieces)} pcs</span>` : ''}
-                                </span>
-                                <span class="sewing-supply-name">${escapeHtml(item.name)}</span>
-                                <span class="d-block sewing-supply-qty">BOM: ${formatQty(item.qty)} ${escapeHtml(item.uom)}</span>
-                            </span>
-                            <span>
-                                <span class="d-block text-muted small mb-1">Dibawa (pcs)</span>
-                                <input type="number" step="1" min="0" inputmode="numeric"
-                                    class="form-control form-control-sm sewing-supply-issue-input js-sewing-supply-issued"
-                                    data-index="${idx}" value="${issuedPieces > 0 ? Math.floor(issuedPieces) : ''}" placeholder="0">
-                            </span>
-                        </label>
-                    `;
-                }).join("");
-
-                supplyChecklist.querySelectorAll(".js-sewing-supply-issued").forEach(input => {
-                    input.addEventListener("input", function () {
-                        const idx = Number(this.dataset.index || -1);
-                        const item = activeSupplyItems[idx];
-                        if (!item) return;
-
-                        item.issuedPieces = Math.max(parseFloat(this.value || "0") || 0, 0);
-                        item.issuedQty = materialQtyFromPieces(item, item.issuedPieces);
-                        item.issued_qty = item.issuedQty;
-                        item.issued_pcs = item.issuedPieces;
-
-                        const shortagePieces = Math.max(Number(item.totalPieces || 0) - Number(item.issuedPieces || 0), 0);
-                        item.shortagePieces = shortagePieces;
-                        item.shortage = materialQtyFromPieces(item, shortagePieces);
-
-                        const wrap = this.closest(".sewing-supply-check-item");
-                        const shortageEl = wrap?.querySelector(".sewing-supply-shortage");
-                        wrap?.classList.toggle("is-short", shortagePieces > 0.000001);
-                        if (shortageEl) {
-                            if (shortagePieces > 0.000001) {
-                                shortageEl.textContent = `Kurang ${formatQty(shortagePieces)} pcs`;
-                            } else {
-                                shortageEl.remove();
-                            }
-                        } else if (shortagePieces > 0.000001) {
-                            const line = wrap?.querySelector(".d-flex.align-items-center");
-                            line?.insertAdjacentHTML("beforeend", `<span class="sewing-supply-shortage">Kurang ${formatQty(shortagePieces)} pcs</span>`);
-                        }
-                        syncConfirmState();
-                    });
-                });
-
-                syncConfirmState();
-            }
-
-            // Build summary content
-            function buildSummary() {
-                const dateInput = document.querySelector("input[name='date']");
-                summaryDate.textContent = dateInput?.value || "-";
-
-                let list = [];
-                rows.forEach(row => {
-                    const input = row.querySelector("input.qty-input");
-                    if (!input) return;
-                    const qty = parseFloat(input.value || 0);
-                    if (qty <= 0) return;
-
-                    const code = row.dataset.itemCode || "-";
-                    const finishedItemId = row.dataset.finishedItemId || "";
-
-                    list.push({
-                        code,
-                        qty,
-                        finishedItemId,
-                    });
-                });
-
-                tblBody.innerHTML = "";
-                let total = 0;
-
-                if (!list.length) {
-                    tblBody.innerHTML = `
-                        <tr>
-                            <td colspan="3" class="text-muted small">Belum ada bundle yang diambil.</td>
-                        </tr>
-                    `;
-                } else {
-                    list.forEach((line, idx) => {
-                        total += line.qty;
-                        tblBody.innerHTML += `
-                            <tr>
-                                <td>${idx + 1}</td>
-                                <td><span class="mono">${escapeHtml(line.code)}</span></td>
-                                <td class="text-end mono">${line.qty.toFixed(2)}</td>
-                            </tr>
-                        `;
-                    });
-                }
-
-                summaryTotal.textContent = total.toFixed(2);
-                buildSupplyChecklist(list);
-            }
-
-            // Intercept submit
-            form.addEventListener("submit", function(e) {
-                if (operatorHidden.value && modal?._isShown) return;
-
-                e.preventDefault();
-
-                let hasQty = false;
-                rows.forEach(r => {
-                    let input = r.querySelector("input.qty-input");
-                    if (parseFloat(input?.value || 0) > 0) {
-                        hasQty = true;
-                    }
-                });
-
-                if (!hasQty) return;
-
-                modalStep = 'summary';
-                supplyStep?.classList.add('d-none');
-                confirmBtn.textContent = 'Selanjutnya';
-                buildSummary();
-                modal.show();
-            });
-
-            confirmBtn.addEventListener("click", function() {
-                if (!operatorHidden.value) return;
-
-                if (modalStep === 'summary') {
-                    modalStep = 'supplies';
-                    supplyStep?.classList.remove('d-none');
-                    confirmBtn.textContent = 'Simpan';
-                    supplyStep?.scrollIntoView({ behavior: 'smooth', block: 'nearest' });
-                    syncConfirmState();
-                    return;
-                }
-
-                if (checklistPayload) {
-                    checklistPayload.value = JSON.stringify({
-                        checked_at: new Date().toISOString(),
-                        items: activeSupplyItems.map(item => ({
-                            ...item,
-                            issued_qty: Number(item.issuedQty || item.issued_qty || 0),
-                            issued_pcs: Number(item.issuedPieces || item.issued_pcs || 0),
-                        })),
-                    });
-                }
-                form.submit();
-            });
-
+    /* ── ambil baris yang ada qty ── */
+    function getSelectedLines() {
+        return [...rows].flatMap(row => {
+            const qty = parseFloat(row.querySelector('input.qty-input')?.value || 0);
+            return qty > 0
+                ? [{
+                    bundleId: row.dataset.bundleId || row.querySelector('input[name*="[bundle_id]"]')?.value || '',
+                    code: row.dataset.itemCode || '-',
+                    qty,
+                    finishedItemId: row.dataset.finishedItemId || '',
+                }]
+                : [];
         });
-    </script>
+    }
+
+    /* ══ PHASE 1: tampilkan konfirmasi ══ */
+    function showConfirm(lines) {
+        phase         = 'confirm';
+        selectedLines = lines;
+
+        phaseConfirm.style.display = '';
+        phaseSupply.style.display  = 'none';
+        modalTitle.textContent     = 'Konfirmasi Sewing Pickup';
+        backBtn.style.display      = 'none';
+        confirmBtn.textContent     = 'Lanjut →';
+        confirmBtn.disabled        = !operatorSelect.value;
+
+        // Tanggal ambil dari input form utama
+        const dateRaw = form.querySelector('input[name="date"]')?.value || '';
+        let dateFormatted = '';
+        if (dateRaw) {
+            const [y, m, d] = dateRaw.split('-');
+            dateFormatted = `${d}/${m}/${y}`;
+        }
+
+        bundleListEl.innerHTML = `
+            <table class="sc-tbl">
+                <thead>
+                    <tr>
+                        <th class="sc-td-no">No</th>
+                        <th>Tanggal</th>
+                        <th>Kode Barang</th>
+                        <th class="text-end">Qty</th>
+                    </tr>
+                </thead>
+                <tbody>
+                    ${lines.map((l, i) => `
+                        <tr>
+                            <td class="sc-td-no">${i + 1}</td>
+                            <td class="sc-td-date">${dateFormatted}</td>
+                            <td class="sc-td-code">${esc(l.code)}</td>
+                            <td class="sc-td-qty">${fmt(l.qty)} pcs</td>
+                        </tr>`).join('')}
+                </tbody>
+            </table>`;
+    }
+
+    /* ══ PHASE 2: init supply steps ══ */
+    function startSupplyPhase() {
+        activeSupplyItems = selectedLines.map(line => {
+            const fid  = String(line.finishedItemId);
+            const bom  = bomSuppliesByItem[fid] || [];
+            const qty  = Number(line.qty || 0);
+
+            return {
+                bundleId:       line.bundleId,
+                code:           line.code,
+                qty,
+                finishedItemId:  line.finishedItemId,
+                supplies:       bom.map(s => ({
+                    id:          s.id,
+                    code:        s.code || '-',
+                    name:        s.name || '',
+                    uom:         s.uom || '',
+                    qty:         qty,
+                    qtyPerPiece: Number(s.qty || 0),
+                    issued:      0,
+                })),
+            };
+        }).filter(line => line.supplies.length);
+
+        if (!activeSupplyItems.length) {
+            // Tidak ada BOM → langsung submit tanpa supply checklist
+            submitForm();
+            return;
+        }
+
+        phase       = 'supply';
+        currentStep = 0;
+        phaseConfirm.style.display = 'none';
+        phaseSupply.style.display  = '';
+        modalTitle.textContent     = 'Kelengkapan Jahit';
+        renderStep(0);
+    }
+
+    /* ── render satu step supply ── */
+    function renderStep(idx) {
+        const line  = activeSupplyItems[idx];
+        const total = activeSupplyItems.length;
+
+        // Title: tampilkan daftar item, potong jika terlalu panjang
+        const titleText = line.code.length > 40
+            ? line.code.substring(0, 38) + '…'
+            : line.code;
+        stepTitle.textContent = `${titleText}  ·  ${fmt(line.qty)} pcs`;
+        stepProg.style.display = '';
+        stepProg.textContent = `${idx + 1} / ${total}`;
+
+        backBtn.style.display = '';   // selalu tampil di phase supply (untuk kembali ke confirm juga)
+        const isLast = idx === total - 1;
+        confirmBtn.textContent = isLast ? 'Simpan' : 'Lanjut →';
+        confirmBtn.disabled    = !operatorSelect.value;
+
+        if (!line.supplies.length) {
+            supplyChecklist.innerHTML = `<div class="text-muted small py-2">Tidak ada kelengkapan dari BOM untuk bundle ini.</div>`;
+            return;
+        }
+
+        supplyChecklist.innerHTML = line.supplies.map((sup, si) => {
+            const isOk = sup.issued >= sup.qty - 0.0001;
+            return `
+                <div class="sc-row ${isOk ? 'is-ok' : ''}" data-si="${si}">
+                    <input type="checkbox" class="sc-chk js-chk" data-si="${si}" ${isOk ? 'checked' : ''}>
+                    <div>
+                        <div class="sc-label">${esc(sup.name)}</div>
+                        <div class="sc-sub">Butuh ${fmt(sup.qty)} pcs</div>
+                    </div>
+                    <input type="number" step="1" min="0" inputmode="numeric"
+                           class="sc-input js-inp" data-si="${si}"
+                           value="${sup.issued > 0 ? Math.floor(sup.issued) : 0}"
+                           placeholder="${fmt(sup.qty)}">
+                </div>`;
+        }).join('');
+
+        /* helper: sync visual state dari sup.issued */
+        function syncRow(row, sup) {
+            const chk  = row.querySelector('.js-chk');
+            const inp  = row.querySelector('.js-inp');
+            const isOk = sup.issued >= sup.qty - 0.0001;
+            row.classList.toggle('is-ok',    isOk);
+            row.classList.toggle('is-short', sup.issued > 0.0001 && !isOk);
+            if (chk) chk.checked = isOk;
+            if (inp) inp.value = sup.issued > 0 ? Math.floor(sup.issued) : 0;
+        }
+
+        /* klik baris → toggle isi penuh / kosong */
+        supplyChecklist.querySelectorAll('.sc-row').forEach(row => {
+            row.addEventListener('click', function (e) {
+                if (e.target.classList.contains('js-inp')) return; // biarkan input ketik bebas
+                const sup = activeSupplyItems[currentStep]?.supplies?.[Number(this.dataset.si)];
+                if (!sup) return;
+                const isOk = sup.issued >= sup.qty - 0.0001;
+                sup.issued = isOk ? 0 : sup.qty;  // toggle
+                syncRow(this, sup);
+            });
+        });
+
+        /* input manual → auto-checklist jika terpenuhi */
+        supplyChecklist.querySelectorAll('.js-inp').forEach(inp => {
+            inp.addEventListener('input', function () {
+                const sup = activeSupplyItems[currentStep]?.supplies?.[Number(this.dataset.si)];
+                if (!sup) return;
+                sup.issued = Math.max(parseFloat(this.value || '0') || 0, 0);
+                const row = this.closest('.sc-row');
+                const chk = row?.querySelector('.js-chk');
+                const isOk = sup.issued >= sup.qty - 0.0001;
+                row?.classList.toggle('is-ok',    isOk);
+                row?.classList.toggle('is-short', sup.issued > 0.0001 && !isOk);
+                if (chk) chk.checked = isOk;
+            });
+        });
+
+        /* checkbox diklik langsung (fallback) */
+        supplyChecklist.querySelectorAll('.js-chk').forEach(chk => {
+            chk.addEventListener('change', function (e) {
+                e.stopPropagation(); // sudah ditangani row click
+            });
+        });
+    }
+
+    /* ── aggregate & submit ── */
+    function submitForm() {
+        const agg = new Map();
+        const bundlePayload = [];
+        activeSupplyItems.forEach(line => {
+            const bundleSupplies = [];
+            line.supplies.forEach(sup => {
+                const key = String(sup.id);
+                const cur = agg.get(key) || { id: sup.id, code: sup.code, name: sup.name, uom: sup.uom, issued_pcs: 0, issued_qty: 0, issuedPieces: 0, issuedQty: 0 };
+                cur.issued_pcs += sup.issued;
+                cur.issued_qty += sup.issued * sup.qtyPerPiece;
+                cur.issuedPieces = cur.issued_pcs;
+                cur.issuedQty    = cur.issued_qty;
+                agg.set(key, cur);
+
+                bundleSupplies.push({
+                    id: sup.id,
+                    code: sup.code,
+                    name: sup.name,
+                    uom: sup.uom,
+                    required_pcs: sup.qty,
+                    issued_pcs: sup.issued,
+                    qty_per_piece: sup.qtyPerPiece,
+                    required_qty: sup.qty * sup.qtyPerPiece,
+                    issued_qty: sup.issued * sup.qtyPerPiece,
+                });
+            });
+
+            bundlePayload.push({
+                bundle_id: line.bundleId,
+                code: line.code,
+                qty: line.qty,
+                finished_item_id: line.finishedItemId,
+                supplies: bundleSupplies,
+            });
+        });
+        if (checklistPayload) {
+            checklistPayload.value = JSON.stringify({
+                checked_at: new Date().toISOString(),
+                items: [...agg.values()],
+                bundles: bundlePayload,
+            });
+        }
+        form.submit();
+    }
+
+    /* ── form submit → buka modal phase 1 ── */
+    form.addEventListener('submit', function (e) {
+        if (modal._isShown) return;
+        e.preventDefault();
+        const list = getSelectedLines();
+        if (!list.length) return;
+        showConfirm(list);
+        modal.show();
+    });
+
+    /* ── tombol utama (Lanjut / Simpan) ── */
+    confirmBtn.addEventListener('click', function () {
+        if (!operatorSelect.value) return;
+
+        if (phase === 'confirm') {
+            startSupplyPhase();
+            return;
+        }
+
+        // phase supply
+        if (currentStep < activeSupplyItems.length - 1) {
+            currentStep++;
+            renderStep(currentStep);
+        } else {
+            submitForm();
+        }
+    });
+
+    /* ── tombol Kembali ── */
+    backBtn.addEventListener('click', function () {
+        if (phase === 'supply') {
+            if (currentStep > 0) {
+                currentStep--;
+                renderStep(currentStep);
+            } else {
+                // kembali ke phase confirm
+                phaseConfirm.style.display = '';
+                phaseSupply.style.display  = 'none';
+                modalTitle.textContent     = 'Konfirmasi Sewing Pickup';
+                phase                      = 'confirm';
+                backBtn.style.display      = 'none';
+                confirmBtn.textContent     = 'Lanjut →';
+                confirmBtn.disabled        = !operatorSelect.value;
+            }
+        }
+    });
+
+    /* ── reset saat modal ditutup ── */
+    modalEl.addEventListener('hidden.bs.modal', function () {
+        operatorSelect.value     = '';
+        operatorHidden.value     = '';
+        confirmBtn.disabled      = true;
+        confirmBtn.textContent   = 'Lanjut →';
+        backBtn.style.display    = 'none';
+        phase                    = 'confirm';
+        currentStep              = 0;
+        activeSupplyItems        = [];
+        phaseConfirm.style.display = '';
+        phaseSupply.style.display  = 'none';
+        modalTitle.textContent     = 'Konfirmasi Sewing Pickup';
+    });
+});
+</script>
 @endpush

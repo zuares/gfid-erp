@@ -33,6 +33,7 @@ class Item extends Model
         'default_expense_account_id',
 
         'is_stocked',
+        'allow_negative',
         'hpp_behavior',
 
         // optional fields yang kamu sempat pakai di model lama
@@ -52,6 +53,7 @@ class Item extends Model
         'active' => 'boolean',
         'affects_hpp' => 'boolean',
         'is_stocked' => 'boolean',
+        'allow_negative' => 'boolean',
 
         'consumption_cutting' => 'decimal:4',
         'consumption_cutting_basis_qty' => 'decimal:4',
