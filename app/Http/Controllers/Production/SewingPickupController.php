@@ -6,8 +6,12 @@ use App\Helpers\CodeGenerator;
 use App\Http\Controllers\Controller;
 use App\Models\CuttingJobBundle;
 use App\Models\Employee;
+use App\Models\ItemBom;
+use App\Models\ItemBomLine;
+use App\Models\ItemRole;
 use App\Models\SewingPickup;
 use App\Models\SewingPickupLine;
+use App\Models\SewingPickupSupplyLine;
 use App\Models\Warehouse;
 use App\Services\Inventory\InventoryService;
 use Illuminate\Http\Request;
@@ -145,14 +149,18 @@ class SewingPickupController extends Controller
         $wipSewWarehouse = Warehouse::where('code', 'WIP-SEW')->firstOrFail();
 
         $bundles = CuttingJobBundle::with(['finishedItem', 'cuttingJob.lot.item', 'qcResults'])
+            ->withLedgerBalances(['WIP-CUT'])
             ->readyForSewing($wipCutId)
             ->get();
+
+        $bomSuppliesByItem = $this->buildSewingSupplyChecklist($bundles);
 
         return view('production.sewing_pickups.create', [
             'operators' => $operators,
             'warehouses' => $warehouses,
             'wipSewWarehouse' => $wipSewWarehouse,
             'bundles' => $bundles,
+            'bomSuppliesByItem' => $bomSuppliesByItem,
         ]);
     }
 
@@ -169,6 +177,7 @@ class SewingPickupController extends Controller
             'warehouse_id' => ['required', 'exists:warehouses,id'], // gudang sewing (WIP-SEW)
             'operator_id' => ['required', 'exists:employees,id'],
             'notes' => ['nullable', 'string'],
+            'supplies_checklist' => ['nullable', 'string'],
 
             'lines' => ['required', 'array', 'min:1'],
             'lines.*.bundle_id' => ['required', 'exists:cutting_job_bundles,id'],
@@ -179,7 +188,7 @@ class SewingPickupController extends Controller
             'lines.*.qty_bundle.required' => 'Qty pickup wajib diisi.',
         ]);
 
-        DB::transaction(function () use ($validated) {
+        $pickup = DB::transaction(function () use ($validated) {
 
             $wipCutWarehouseId = Warehouse::where('code', 'WIP-CUT')->value('id');
             if (!$wipCutWarehouseId) {
@@ -191,6 +200,11 @@ class SewingPickupController extends Controller
             $sewingWarehouseId = (int) $validated['warehouse_id']; // biasanya WIP-SEW
             $date = $validated['date'];
             $code = CodeGenerator::generate('SWP');
+            $notes = trim((string) ($validated['notes'] ?? ''));
+            $suppliesChecklist = $this->formatSuppliesChecklistNote($validated['supplies_checklist'] ?? null);
+            if ($suppliesChecklist !== '') {
+                $notes = trim($notes . "\n\n" . $suppliesChecklist);
+            }
 
             /** @var SewingPickup $pickup */
             $pickup = SewingPickup::create([
@@ -199,11 +213,12 @@ class SewingPickupController extends Controller
                 'warehouse_id' => $sewingWarehouseId,
                 'operator_id' => $validated['operator_id'],
                 'status' => 'draft',
-                'notes' => $validated['notes'] ?? null,
+                'notes' => $notes !== '' ? $notes : null,
             ]);
 
             $createdLines = 0;
             $epsilon = 0.000001;
+            $qtyByFinishedItem = [];
 
             foreach ($validated['lines'] as $row) {
 
@@ -284,6 +299,9 @@ class SewingPickupController extends Controller
                     'status' => 'in_progress',
                 ]);
 
+                $finishedItemId = (int) $bundle->finished_item_id;
+                $qtyByFinishedItem[$finishedItemId] = ($qtyByFinishedItem[$finishedItemId] ?? 0) + $qty;
+
                 // 🔹 UPDATE qty pick di bundle
                 $newPicked = $alreadyPicked + $qty;
                 if ($newPicked > $maxQtyOk) {
@@ -342,11 +360,295 @@ class SewingPickupController extends Controller
                     'lines' => 'Minimal satu bundle harus punya Qty Pickup > 0 dan qty ready yang masih tersisa.',
                 ]);
             }
+
+            $this->storeSewingPickupSupplies(
+                pickup: $pickup,
+                qtyByFinishedItem: $qtyByFinishedItem,
+                submittedPayload: $validated['supplies_checklist'] ?? null,
+            );
+
+            return $pickup;
         });
 
         return redirect()
             ->route('production.sewing.returns.create')
             ->with('success', 'Sewing pickup berhasil dibuat. Stok sudah dipindahkan dari WIP-CUT ke gudang sewing.');
+    }
+
+    private function buildSewingSupplyChecklist($bundles): array
+    {
+        $finishedItemIds = $bundles
+            ->pluck('finished_item_id')
+            ->filter()
+            ->unique()
+            ->values();
+
+        if ($finishedItemIds->isEmpty()) {
+            return [];
+        }
+
+        $boms = ItemBom::query()
+            ->whereIn('item_id', $finishedItemIds)
+            ->where('active', true)
+            ->with(['lines.material.role'])
+            ->get();
+
+        $rmWarehouseId = Warehouse::where('code', 'RM')->value('id');
+        $stockCache = [];
+        $result = [];
+
+        foreach ($boms as $bom) {
+            $supplies = $bom->lines
+                ->filter(fn($line) => $this->isSewingSupplyBomLine($line))
+                ->map(function ($line) use ($rmWarehouseId, &$stockCache) {
+                    $material = $line->material;
+                    $materialId = (int) $material->id;
+
+                    if (!array_key_exists($materialId, $stockCache)) {
+                        $stockCache[$materialId] = $rmWarehouseId
+                            ? $this->inventory->getOnHandQty((int) $rmWarehouseId, $materialId)
+                            : 0.0;
+                    }
+
+                    return [
+                        'id' => $materialId,
+                        'code' => (string) $material->code,
+                        'name' => (string) $material->name,
+                        'qty' => (float) $line->qty,
+                        'uom' => (string) ($line->uom ?: $material->unit ?: 'pcs'),
+                        'optional' => (bool) $line->is_optional,
+                        'stock_available' => (float) $stockCache[$materialId],
+                    ];
+                })
+                ->values()
+                ->all();
+
+            $result[(int) $bom->item_id] = $supplies;
+        }
+
+        return $result;
+    }
+
+    public function editSupplies(SewingPickup $pickup): View
+    {
+        $pickup->load([
+            'operator:id,code,name',
+            'warehouse:id,code,name',
+            'lines.finishedItem:id,code,name',
+            'supplyLines.material:id,code,name,unit',
+        ]);
+
+        return view('production.sewing_pickups.supplies', [
+            'pickup' => $pickup,
+        ]);
+    }
+
+    public function updateSupplies(Request $request, SewingPickup $pickup)
+    {
+        $validated = $request->validate([
+            'supplies' => ['nullable', 'array'],
+            'supplies.*.issued_pcs' => ['nullable', 'numeric', 'min:0'],
+        ]);
+
+        DB::transaction(function () use ($pickup, $validated) {
+            $pickup->load('supplyLines');
+
+            foreach ($pickup->supplyLines as $line) {
+                $input = $validated['supplies'][$line->id]['issued_pcs'] ?? 0;
+                $issuedPcs = max((float) $input, 0);
+                $requiredPcs = (float) ($line->required_pcs ?? 0);
+                $requiredQty = (float) ($line->required_qty ?? 0);
+                $qtyPerPiece = $requiredPcs > 0 ? ($requiredQty / $requiredPcs) : 0;
+
+                $line->issued_pcs = $issuedPcs;
+                $line->issued_qty = $qtyPerPiece > 0 ? ($issuedPcs * $qtyPerPiece) : $issuedPcs;
+                $line->save();
+            }
+        });
+
+        // Kalau ada redirect_to (misal dari halaman Sewing Return), kembali ke sana
+        $redirectTo = $request->input('redirect_to');
+        if ($redirectTo && str_starts_with($redirectTo, '/')) {
+            return redirect($redirectTo)->with('success', 'Kelengkapan jahit tersimpan.');
+        }
+
+        return redirect()
+            ->route('production.sewing.pickups.show', $pickup)
+            ->with('success', 'Kelengkapan jahit tersimpan.');
+    }
+
+    private function storeSewingPickupSupplies(SewingPickup $pickup, array $qtyByFinishedItem, ?string $submittedPayload): void
+    {
+        $requirements = $this->buildSewingSupplyRequirements($qtyByFinishedItem);
+        if (empty($requirements)) {
+            return;
+        }
+
+        $submittedItems = [];
+        $decoded = $submittedPayload ? json_decode($submittedPayload, true) : null;
+        if (is_array($decoded)) {
+            foreach (($decoded['items'] ?? []) as $item) {
+                if (!is_array($item)) {
+                    continue;
+                }
+
+                $materialId = (int) ($item['id'] ?? 0);
+                if ($materialId <= 0) {
+                    continue;
+                }
+
+                $submittedItems[$materialId] = [
+                    'issued_qty' => max((float) ($item['issued_qty'] ?? $item['issuedQty'] ?? 0), 0),
+                    'issued_pcs' => max((float) ($item['issued_pcs'] ?? $item['issuedPieces'] ?? 0), 0),
+                ];
+            }
+        }
+
+        foreach ($requirements as $materialId => $row) {
+            SewingPickupSupplyLine::updateOrCreate(
+                [
+                    'sewing_pickup_id' => $pickup->id,
+                    'material_item_id' => (int) $materialId,
+                ],
+                [
+                    'required_qty' => (float) $row['need'],
+                    'issued_qty' => (float) ($submittedItems[$materialId]['issued_qty'] ?? 0),
+                    'required_pcs' => (float) ($row['total_pieces'] ?? 0),
+                    'issued_pcs' => (float) ($submittedItems[$materialId]['issued_pcs'] ?? 0),
+                    'uom' => $row['uom'] ?: null,
+                    'stock_available_snapshot' => (float) ($row['stock_available'] ?? 0),
+                ]
+            );
+        }
+    }
+
+    private function buildSewingSupplyRequirements(array $qtyByFinishedItem): array
+    {
+        if (empty($qtyByFinishedItem)) {
+            return [];
+        }
+
+        $boms = ItemBom::query()
+            ->whereIn('item_id', array_keys($qtyByFinishedItem))
+            ->where('active', true)
+            ->with(['lines.material.role'])
+            ->get();
+
+        $requirements = [];
+        foreach ($boms as $bom) {
+            $pickupQty = (float) ($qtyByFinishedItem[(int) $bom->item_id] ?? 0);
+            if ($pickupQty <= 0) {
+                continue;
+            }
+
+            foreach ($bom->lines as $line) {
+                $material = $line->material;
+                if (!$this->isSewingSupplyBomLine($line)) {
+                    continue;
+                }
+
+                $materialId = (int) $material->id;
+                if (!isset($requirements[$materialId])) {
+                    $requirements[$materialId] = [
+                        'code' => (string) $material->code,
+                        'name' => (string) $material->name,
+                        'uom' => (string) ($line->uom ?: $material->unit ?: 'pcs'),
+                        'need' => 0.0,
+                        'total_pieces' => 0.0,
+                    ];
+                }
+
+                $requirements[$materialId]['need'] += $pickupQty * (float) $line->qty;
+                $requirements[$materialId]['total_pieces'] += $pickupQty;
+            }
+        }
+
+        if (empty($requirements)) {
+            return [];
+        }
+
+        $rmWarehouseId = Warehouse::where('code', 'RM')->value('id');
+        foreach ($requirements as $materialId => $row) {
+            $requirements[$materialId]['stock_available'] = $rmWarehouseId
+                ? $this->inventory->getOnHandQty((int) $rmWarehouseId, (int) $materialId)
+                : 0.0;
+        }
+
+        return $requirements;
+    }
+
+    private function isSewingSupplyMaterial($material): bool
+    {
+        if (!$material) {
+            return false;
+        }
+
+        $roleCode = $material->role_code;
+        $legacyRole = (string) ($material->item_role ?? '');
+        $code = strtoupper((string) ($material->code ?? ''));
+
+        return $roleCode === ItemRole::SUP
+            || $legacyRole === 'production_supply'
+            || str_starts_with($code, 'RIB')
+            || str_starts_with($code, 'KRT')
+            || str_starts_with($code, 'TLK')
+            || str_starts_with($code, 'OPP');
+    }
+
+    private function isSewingSupplyBomLine($line): bool
+    {
+        if (!$line || !$line->material) {
+            return false;
+        }
+
+        $stage = (string) ($line->usage_stage ?? '');
+        if ($stage !== '') {
+            return $stage === ItemBomLine::STAGE_SEWING_SUPPLY;
+        }
+
+        return $this->isSewingSupplyMaterial($line->material);
+    }
+
+    private function formatSuppliesChecklistNote(?string $payload): string
+    {
+        if (!$payload) {
+            return '';
+        }
+
+        $decoded = json_decode($payload, true);
+        if (!is_array($decoded)) {
+            return '';
+        }
+
+        $items = collect($decoded['items'] ?? [])
+            ->filter(fn($item) => is_array($item) && !empty($item['code']))
+            ->map(function ($item) {
+                $qty = isset($item['qty']) ? (float) $item['qty'] : 0;
+                $issuedQty = isset($item['issued_qty']) ? (float) $item['issued_qty'] : (float) ($item['issuedQty'] ?? 0);
+                $requiredPcs = isset($item['totalPieces']) ? (float) $item['totalPieces'] : 0;
+                $issuedPcs = isset($item['issued_pcs']) ? (float) $item['issued_pcs'] : (float) ($item['issuedPieces'] ?? 0);
+                $uom = trim((string) ($item['uom'] ?? ''));
+
+                if ($requiredPcs > 0) {
+                    $qtyLabel = ' - butuh ' . rtrim(rtrim(number_format($requiredPcs, 2, '.', ''), '0'), '.') . ' pcs'
+                        . ', dibawa ' . rtrim(rtrim(number_format($issuedPcs, 2, '.', ''), '0'), '.') . ' pcs'
+                        . ($qty > 0 ? ' (BOM ' . rtrim(rtrim(number_format($qty, 4, '.', ''), '0'), '.') . ($uom ? ' ' . $uom : '') . ')' : '');
+                } else {
+                    $qtyLabel = $qty > 0
+                        ? ' - butuh ' . rtrim(rtrim(number_format($qty, 4, '.', ''), '0'), '.') . ($uom ? ' ' . $uom : '')
+                        . ', dibawa ' . rtrim(rtrim(number_format($issuedQty, 4, '.', ''), '0'), '.') . ($uom ? ' ' . $uom : '')
+                        : '';
+                }
+
+                return '- ' . $item['code'] . $qtyLabel;
+            })
+            ->values();
+
+        if ($items->isEmpty()) {
+            return '';
+        }
+
+        return "Bahan pendukung ambil jahit:\n" . $items->implode("\n");
     }
 
     /**

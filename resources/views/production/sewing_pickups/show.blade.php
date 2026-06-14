@@ -550,6 +550,13 @@
                             <i class="bi bi-arrow-left me-1"></i> Kembali
                         </a>
 
+                        @if ($pickup->status !== 'void')
+                            <a href="{{ route('production.sewing.pickups.supplies.edit', $pickup) }}"
+                                class="btn btn-sm btn-outline-primary">
+                                <i class="bi bi-ui-checks-grid me-1"></i> Kelengkapan Jahit
+                            </a>
+                        @endif
+
                         {{-- Header VOID (opsional) --}}
                         @if ($pickup->status !== 'void')
                             <button type="button" class="btn btn-sm btn-outline-danger" data-bs-toggle="modal"

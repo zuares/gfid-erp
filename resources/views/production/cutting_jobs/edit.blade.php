@@ -426,6 +426,7 @@
                                             <td>
                                                 <x-item-suggest idName="bundles[{{ $i }}][finished_item_id]"
                                                     categoryName="bundles[{{ $i }}][item_category_id]"
+                                                    displayName="bundles[{{ $i }}][finished_item_display]"
                                                     :items="collect()" displayValue="{{ $disp }}"
                                                     idValue="{{ $fiId }}" categoryValue="{{ $catId }}"
                                                     placeholder="Cari item jadi…" type="finished_good" :minChars="1"
@@ -518,7 +519,8 @@
 
                     <td>
                         <x-item-suggest idName="bundles[__INDEX__][finished_item_id]"
-                            categoryName="bundles[__INDEX__][item_category_id]" :items="collect()" displayValue=""
+                            categoryName="bundles[__INDEX__][item_category_id]"
+                            displayName="bundles[__INDEX__][finished_item_display]" :items="collect()" displayValue=""
                             idValue="" categoryValue="" placeholder="Cari item jadi…" type="finished_good"
                             :minChars="1" :maxResults="5" variant="mini" :required="true" :skipSubmitValidation="true" />
                     </td>

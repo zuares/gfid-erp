@@ -3,6 +3,7 @@
 use App\Http\Controllers\Inventory\InventoryAdjustmentController;
 use App\Http\Controllers\Production\CuttingJobController;
 use App\Http\Controllers\Production\FinishingJobController;
+use App\Http\Controllers\Production\FinishingRepairController;
 use App\Http\Controllers\Production\PackingJobController;
 use App\Http\Controllers\Production\ProductionDashboardController;
 use App\Http\Controllers\Production\ProductionPriorityController;
@@ -38,6 +39,9 @@ Route::middleware(['web', 'auth', 'access:production'])
 
             Route::post('/{cuttingJob}/send-to-qc', [CuttingJobController::class, 'sendToQc'])
                 ->name('send_to_qc');
+
+            Route::post('/{cuttingJob}/void', [CuttingJobController::class, 'void'])
+                ->name('void');
         });
 
         /*
@@ -53,6 +57,9 @@ Route::middleware(['web', 'auth', 'access:production'])
 
             Route::put('/cutting/{cuttingJob}', [QcController::class, 'updateCutting'])
                 ->name('cutting.update');
+
+            Route::post('/cutting/{cuttingJob}/quick-ok', [QcController::class, 'quickOkCutting'])
+                ->name('cutting.quick_ok');
 
             Route::post('/cutting/{cuttingJob}/cancel', [QcController::class, 'cancelCutting'])
                 ->middleware('role:owner')
@@ -81,6 +88,9 @@ Route::middleware(['web', 'auth', 'access:production'])
 
                 Route::get('/create', [SewingPickupController::class, 'create'])->name('create');
                 Route::post('/', [SewingPickupController::class, 'store'])->name('store');
+
+                Route::get('/{pickup}/supplies', [SewingPickupController::class, 'editSupplies'])->name('supplies.edit');
+                Route::put('/{pickup}/supplies', [SewingPickupController::class, 'updateSupplies'])->name('supplies.update');
 
                 Route::get('/{pickup}', [SewingPickupController::class, 'show'])->name('show');
                 Route::get('/{pickup}/edit', [SewingPickupController::class, 'edit'])->name('edit');
@@ -140,6 +150,10 @@ Route::middleware(['web', 'auth', 'access:production'])
             ->name('finishing_jobs.force_post');
 
         Route::resource('finishing_jobs', FinishingJobController::class)->except(['destroy']);
+
+        Route::resource('finishing-repairs', FinishingRepairController::class)
+            ->only(['index', 'create', 'store', 'show'])
+            ->names('finishing_repairs');
 
         /*
     |--------------------------------------------------------------------------

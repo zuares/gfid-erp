@@ -95,8 +95,8 @@
 
   {{-- THEME + GLOBAL STYLES --}}
   @include('layouts.partials.styles')
-  <link rel="stylesheet" href="{{ asset('css/light-minimal.css') }}">
-  <link rel="stylesheet" href="{{ asset('css/dark-high-contrast.css') }}">
+  <link rel="stylesheet" href="{{ asset('css/light.css') }}">
+  <link rel="stylesheet" href="{{ asset('css/dark.css') }}">
 
   @stack('head')
 
@@ -467,7 +467,8 @@
         $gfIsOwner =
             (bool) ($gfOwnerUser->is_owner ?? false) ||
             (($gfOwnerUser->role ?? null) === 'owner') ||
-            (($gfOwnerUser->email ?? null) === $gfOwnerEmail);
+            (($gfOwnerUser->email ?? null) === $gfOwnerEmail) ||
+            ($gfOwnerUser->isDeveloper());
     @endphp
 
     @if ($gfIsOwner)
@@ -499,4 +500,3 @@
   GFID.initDateRange('#range1', { showMonths: 2 });
 </script>
 @endpush --}}
-

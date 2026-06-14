@@ -214,7 +214,8 @@
                         <td>
                             {{-- ITEM JADI pakai component item-suggest (idName wajib) --}}
                             <x-item-suggest idName="bundles[__INDEX__][finished_item_id]"
-                                placeholder="- Input Item Jadi -" type="finished_good" :extraParams="['lot_id' => null]" />
+                                displayName="bundles[__INDEX__][finished_item_display]" placeholder="- Input Item Jadi -"
+                                type="finished_good" :extraParams="['lot_id' => null]" />
                         </td>
                         <td>
                             <x-number-input name="bundles[__INDEX__][qty_pcs]" step="0.01" min="0"
@@ -252,15 +253,25 @@
         </div>
 
         {{-- ACTIONS --}}
-        <div class="d-flex justify-content-between align-items-center mt-3 cutting-actions">
-            {{-- type="button" karena submit lewat modal --}}
-            <button type="button" class="btn btn-primary btn-sm" id="btn-save-cutting">
-                Pilih Operator
-            </button>
+        @if (!app()->isProduction())
+            <div class="mt-3">
+                <label class="form-check d-inline-flex align-items-center gap-2 small text-muted mb-0">
+                    <input type="checkbox" class="form-check-input mt-0" name="dev_rollback" value="1"
+                        @checked(old('dev_rollback'))>
+                    <span>Mode Developer: test rollback</span>
+                </label>
+            </div>
+        @endif
 
+        <div class="d-flex justify-content-between align-items-center mt-2 cutting-actions">
             <a href="{{ route('production.cutting_jobs.index') }}" class="btn btn-outline-secondary btn-sm">
                 Batal
             </a>
+
+            {{-- type="button" karena submit lewat modal --}}
+            <button type="button" class="btn btn-primary btn-sm" id="btn-save-cutting">
+                Pilih Operator &amp; Simpan
+            </button>
         </div>
     </div> {{-- /#cutting-main-content --}}
 
@@ -294,6 +305,9 @@
 
             // hidden select untuk item kain (diset dari LOT)
             const fabricSelect = document.getElementById('fabric_item_id');
+
+            // BOM data dari controller: { finishedItemId: { fabricItemId: { qty, scrap_pct } } }
+            const bomData = @json($bomData ?? []);
 
             function isMobile() {
                 return window.matchMedia('(max-width: 767.98px)').matches;
@@ -489,10 +503,11 @@
                 });
 
                 const totalBalance = parseFloat(lotBalanceInput.value || '0');
+                const fabricItemId = fabricSelect ? parseInt(fabricSelect.value || '0', 10) : 0;
 
                 while (lotSummaryList.firstChild) lotSummaryList.removeChild(lotSummaryList.firstChild);
 
-                if (totalBalance <= 0 && totalPcs <= 0) {
+                if (totalPcs <= 0 && validRowCount === 0) {
                     const li = document.createElement('li');
                     li.classList.add('text-muted');
                     li.textContent = 'Belum ada pemilihan LOT atau qty bundle.';
@@ -500,9 +515,11 @@
                     return;
                 }
 
+                // Total kain tersedia di LOT
                 const li1 = document.createElement('li');
-                li1.innerHTML =
-                    `<span>Total kain tersedia (dari LOT):</span><span class="mono">${totalBalance.toFixed(2)}</span>`;
+                li1.innerHTML = totalBalance > 0
+                    ? `<span>Total kain tersedia (LOT):</span><span class="mono">${totalBalance.toFixed(2)} kg</span>`
+                    : `<span>Total kain tersedia (LOT):</span><span class="mono" style="color:#dc2626">0,00 kg (akan minus di RM)</span>`;
                 lotSummaryList.appendChild(li1);
 
                 const li2 = document.createElement('li');
@@ -510,20 +527,49 @@
                     `<span>Total qty pcs bundles:</span><span class="mono">${totalPcs.toFixed(2)}</span>`;
                 lotSummaryList.appendChild(li2);
 
-                if (validRowCount > 0) {
+                // Hitung estimasi BOM per bundle dari tabel
+                let totalBomFabric = 0;
+                let bomRowCount = 0;
+                const bundleRows = bundlesTbody.querySelectorAll('.bundle-row');
+                bundleRows.forEach(tr => {
+                    const qtyInput = tr.querySelector('.bundle-qty-pcs');
+                    const itemIdInput = tr.querySelector('[name*="finished_item_id"]');
+                    if (!qtyInput || !itemIdInput) return;
+                    const qty = parseFloat(qtyInput.value || '0');
+                    const finishedItemId = parseInt(itemIdInput.value || '0', 10);
+                    if (qty <= 0 || !finishedItemId || !fabricItemId) return;
+
+                    const bom = bomData[finishedItemId];
+                    if (bom && bom[fabricItemId]) {
+                        const { qty: bomQty, scrap_pct } = bom[fabricItemId];
+                        totalBomFabric += qty * bomQty * (1 + scrap_pct / 100);
+                        bomRowCount++;
+                    }
+                });
+
+                if (bomRowCount > 0) {
+                    const liBom = document.createElement('li');
+                    liBom.innerHTML =
+                        `<span>Estimasi kain pakai (BOM):</span><span class="mono" style="color:#1d4ed8;font-weight:700">${totalBomFabric.toFixed(4)} kg</span>`;
+                    lotSummaryList.appendChild(liBom);
+
+                    const liNote = document.createElement('li');
+                    liNote.classList.add('text-muted');
+                    liNote.style.fontSize = '.72rem';
+                    liNote.innerHTML = `<span>⚡ BOM tersedia — backend akan pakai kalkulasi BOM</span><span></span>`;
+                    lotSummaryList.appendChild(liNote);
+                } else if (validRowCount > 0 && totalBalance > 0) {
                     const perRow = totalBalance / validRowCount;
                     const li3 = document.createElement('li');
                     li3.innerHTML =
                         `<span>Estimasi kain per baris (bagi rata):</span><span class="mono">${perRow.toFixed(2)}</span>`;
                     lotSummaryList.appendChild(li3);
-                }
-
-                if (totalPcs > 0 && totalBalance > 0) {
-                    const perPcs = totalBalance / totalPcs;
-                    const li4 = document.createElement('li');
-                    li4.innerHTML =
-                        `<span>Estimasi kain per pcs:</span><span class="mono">${perPcs.toFixed(4)}</span>`;
-                    lotSummaryList.appendChild(li4);
+                } else if (validRowCount > 0 && totalBalance <= 0) {
+                    const liWarn = document.createElement('li');
+                    liWarn.classList.add('text-muted');
+                    liWarn.style.fontSize = '.72rem';
+                    liWarn.innerHTML = `<span>⚠️ Tidak ada BOM & saldo LOT 0 — tidak ada pengurangan kain</span><span></span>`;
+                    lotSummaryList.appendChild(liWarn);
                 }
 
                 const labels = Object.keys(itemSummary).filter(label => itemSummary[label] > 0);

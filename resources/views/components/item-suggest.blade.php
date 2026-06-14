@@ -2,6 +2,9 @@
     // hidden: item_id yang dikirim ke server (wajib)
     'idName',
 
+    // visible text name, useful when backend wants to resolve typed exact code
+    'displayName' => null,
+
     // hidden: item_category_id yang dikirim ke server (opsional)
     'categoryName' => null,
 
@@ -77,7 +80,7 @@
     data-extra-params='@json($extraParams)' data-required="{{ $required ? '1' : '0' }}"
     data-skip-submit="{{ $skipSubmitValidation ? '1' : '0' }}">
 
-    <input type="text" value="{{ strtoupper($displayValue) }}" autocomplete="off"
+    <input type="text" @if($displayName) name="{{ $displayName }}" @endif value="{{ strtoupper($displayValue) }}" autocomplete="off"
         class="form-control form-control-sm js-item-suggest-input" placeholder="{{ $placeholder }}"
         data-items='@json($jsItems)' id="{{ $uid }}" aria-autocomplete="list">
 

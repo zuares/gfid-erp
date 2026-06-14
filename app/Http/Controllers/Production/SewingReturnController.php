@@ -9,6 +9,7 @@ use App\Models\InventoryStock;
 use App\Models\Item;
 use App\Models\SewingPickup;
 use App\Models\SewingPickupLine;
+use App\Models\SewingPickupSupplyLine;
 use App\Models\SewingReturn;
 use App\Models\SewingReturnLine;
 use App\Models\Warehouse;
@@ -281,6 +282,7 @@ class SewingReturnController extends Controller
             ->with([
                 'sewingPickup:id,code,date,operator_id',
                 'sewingPickup.operator:id,code,name',
+                'sewingPickup.supplyLines.material:id,code,name',
                 'finishedItem:id,code,name',
                 'bundle.cuttingJob.lot',
             ])
@@ -320,7 +322,53 @@ class SewingReturnController extends Controller
 
         $lines = $lines->map(function ($l) use ($wipStockByItemId) {
             $itemId = (int) ($l->finished_item_id ?? 0);
-            $l->wip_stock = (float) ($wipStockByItemId[$itemId] ?? 0);
+            $l->wip_stock  = (float) ($wipStockByItemId[$itemId] ?? 0);
+            $remaining     = (float) ($l->remaining_qty ?? 0);
+
+            $supplyLines = $l->sewingPickup?->supplyLines ?? collect();
+
+            // Supply lines yang kekurangan
+            $shortSupplies = $supplyLines->filter(
+                fn($s) => (float) $s->issued_qty + 0.000001 < (float) $s->required_qty
+            );
+
+            if ($shortSupplies->isEmpty()) {
+                // Semua supply terpenuhi
+                $l->supply_incomplete  = false;
+                $l->supply_partial     = false;
+                $l->supply_max_setor   = null;
+                $l->supply_shortage_label = '';
+                return $l;
+            }
+
+            // Hitung max setor dari pcs yang supply-nya tersedia
+            // Gunakan issued_pcs / required_pcs (integer piece count) untuk hindari float error
+            $supplyMaxSetor = $shortSupplies->reduce(function ($carry, $s) use ($remaining) {
+                $reqPcs = (float) ($s->required_pcs ?? 0);
+                $issPcs = (float) ($s->issued_pcs ?? 0);
+                if ($reqPcs <= 0) return $carry;
+                // Berapa pcs bundle yang bisa dilayani dengan supply yang ada
+                $canServe = (int) floor($issPcs / $reqPcs * $remaining + 0.00001);
+                return $carry === null ? $canServe : min($carry, $canServe);
+            }, null);
+            $supplyMaxSetor = (int) min($supplyMaxSetor ?? 0, $remaining);
+
+            // Hard block hanya jika 0 pcs pun tidak bisa disetor
+            $l->supply_incomplete = $supplyMaxSetor < 1;
+            $l->supply_partial    = !$l->supply_incomplete;
+            $l->supply_max_setor  = $l->supply_partial ? $supplyMaxSetor : 0;
+
+            $l->supply_shortage_label = $shortSupplies->map(function ($s) {
+                $needPcs   = (float) ($s->required_pcs ?? 0);
+                $issuedPcs = (float) ($s->issued_pcs ?? 0);
+                $short     = max((float) $s->required_qty - (float) $s->issued_qty, 0);
+                $uom       = $s->uom ?: '';
+                if ($needPcs > 0) {
+                    return ($s->material?->code ?: 'Bahan') . ' kurang ' . number_format(max($needPcs - $issuedPcs, 0), 0, ',', '.') . ' pcs';
+                }
+                return ($s->material?->code ?: 'Bahan') . ' kurang ' . number_format($short, 4, ',', '.') . ($uom ? ' ' . $uom : '');
+            })->implode('; ');
+
             return $l;
         })->filter(fn($l) => (float) $l->wip_stock > 0.000001)->values();
 
@@ -340,6 +388,118 @@ class SewingReturnController extends Controller
             'canChooseDestination',
             'isRejectReworkMode',
         ));
+    }
+
+    private function assertPickupSuppliesCompleteForReturn($normalRows, $pickupLines): void
+    {
+        if ($normalRows->isEmpty()) {
+            return;
+        }
+
+        // Developer mode: bypass supply validation HANYA saat real save (bukan dry run)
+        // Saat dry run, validasi tetap jalan agar hasil dry run realistis
+        if (auth()->check() && auth()->user()->isDeveloper() && !request()->boolean('dry_run')) {
+            return;
+        }
+
+        $lineIds = $normalRows->pluck('sewing_pickup_line_id')->unique()->values()->all();
+        $pickupIds = $pickupLines
+            ->only($lineIds)
+            ->pluck('sewing_pickup_id')
+            ->filter()
+            ->unique()
+            ->values()
+            ->all();
+
+        if (empty($pickupIds)) {
+            return;
+        }
+
+        $supplyLines = SewingPickupSupplyLine::query()
+            ->whereIn('sewing_pickup_id', $pickupIds)
+            ->with('material:id,code,name')
+            ->get()
+            ->groupBy('sewing_pickup_id');
+
+        if ($supplyLines->isEmpty()) {
+            return;
+        }
+
+        // Hitung max setor per pickup berdasarkan coverage supply (pakai issued_pcs / required_pcs)
+        $maxSetorByPickupId = [];
+        foreach ($supplyLines as $pickupId => $lines) {
+            $shortLines = $lines->filter(
+                fn($l) => (float) $l->issued_qty + 0.000001 < (float) $l->required_qty
+            );
+            if ($shortLines->isEmpty()) {
+                $maxSetorByPickupId[(int) $pickupId] = null; // tidak dibatasi
+                continue;
+            }
+            // Gunakan issued_pcs / required_pcs untuk menghindari floating point error
+            // max setor dihitung per pickup line (akan disesuaikan dengan remaining di bawah)
+            $minRatio = $shortLines->reduce(function ($carry, $l) {
+                $reqPcs = (float) ($l->required_pcs ?? 0);
+                $issPcs = (float) ($l->issued_pcs ?? 0);
+                if ($reqPcs <= 0) return $carry;
+                $ratio = $issPcs / $reqPcs;
+                return $carry === null ? $ratio : min($carry, $ratio);
+            }, null);
+            $maxSetorByPickupId[(int) $pickupId] = $minRatio; // null = tak terbatas, 0 = hard block
+        }
+
+        // Validasi setiap row yang di-submit
+        $errors = [];
+        foreach ($normalRows as $r) {
+            $lineId   = (int) ($r['sewing_pickup_line_id'] ?? 0);
+            $qtyOk    = (float) ($r['qty_ok'] ?? 0);
+            $qtyRj    = (float) ($r['qty_reject'] ?? 0);
+            $totalQty = $qtyOk + $qtyRj;
+            if ($totalQty <= 0.000001) continue;
+
+            $pickupLine = $pickupLines[$lineId] ?? null;
+            $pickupId   = (int) ($pickupLine?->sewing_pickup_id ?? 0);
+            if (!$pickupId || !array_key_exists($pickupId, $maxSetorByPickupId)) continue;
+
+            $minRatio = $maxSetorByPickupId[$pickupId];
+            if ($minRatio === null) continue; // supply lengkap, tidak dibatasi
+
+            // Hitung remaining bundle (sebelum submission ini)
+            $bundleQty   = (float) ($pickupLine?->qty_bundle ?? 0);
+            $returnedOk  = (float) ($pickupLine?->qty_returned_ok ?? 0);
+            $returnedRj  = (float) ($pickupLine?->qty_returned_reject ?? 0);
+            $remaining   = max($bundleQty - $returnedOk - $returnedRj, 0);
+            $maxAllowed  = (int) floor($minRatio * $remaining + 0.00001);
+
+            $shortLabels = ($supplyLines[$pickupId] ?? collect())
+                ->filter(fn($l) => (float) $l->issued_qty + 0.000001 < (float) $l->required_qty)
+                ->map(fn($l) => $this->supplyShortLabel($l))
+                ->implode('; ');
+
+            if ($maxAllowed < 1) {
+                $errors[] = 'Bahan jahit belum siap, tidak bisa setor sekarang. Hubungi bagian gudang.';
+            } elseif ($totalQty > $maxAllowed + 0.001) {
+                $errors[] = 'Jumlah setor terlalu banyak. Maksimal ' . $maxAllowed . ' pcs untuk pickup ini. Kurangi jumlah dan coba lagi.';
+            }
+        }
+
+        if (!empty($errors)) {
+            throw ValidationException::withMessages([
+                'results' => implode(' | ', array_unique($errors)),
+            ]);
+        }
+    }
+
+    private function supplyShortLabel(SewingPickupSupplyLine $line): string
+    {
+        $code      = $line->material?->code ?: ('Item #' . $line->material_item_id);
+        $needPcs   = (float) ($line->required_pcs ?? 0);
+        $issuedPcs = (float) ($line->issued_pcs ?? 0);
+        if ($needPcs > 0) {
+            return $code . ' kurang ' . number_format(max($needPcs - $issuedPcs, 0), 0, ',', '.') . ' pcs';
+        }
+        $uom   = (string) ($line->uom ?: '');
+        $short = max((float) $line->required_qty - (float) $line->issued_qty, 0);
+        return $code . ' kurang ' . number_format($short, 4, ',', '.') . ($uom ? ' ' . $uom : '');
     }
 
     private function buildRejectReworkLines(?int $operatorId, ?int $selectedRejectLineId, ?int $rejectWarehouseId, ?int $selectedFinishingLineId = null): \Illuminate\Support\Collection
@@ -581,7 +741,15 @@ class SewingReturnController extends Controller
         $date = Carbon::parse($validated['date'])->toDateString();
         $operatorId = (int) $validated['operator_id'];
 
-        return DB::transaction(function () use ($validated, $date, $operatorId): RedirectResponse {
+        // ── DRY RUN MODE (developer only) ────────────────────────────────────
+        // Semua validasi + DB writes jalan normal di dalam transaction,
+        // tapi di akhir di-rollback → data tidak tersimpan.
+        $isDryRun = $request->boolean('dry_run')
+            && auth()->check()
+            && auth()->user()->isDeveloper();
+
+        try {
+        return DB::transaction(function () use ($validated, $date, $operatorId, $isDryRun): RedirectResponse {
 
             $wipSewWarehouse = Warehouse::query()
                 ->whereIn('code', ['WIP-SEW', 'WH-SEWING'])
@@ -651,6 +819,8 @@ class SewingReturnController extends Controller
             $normalRows = $rawResults
                 ->filter(fn($r) => (int) ($r['source_reject_return_line_id'] ?? 0) <= 0 && (int) ($r['source_finishing_job_line_id'] ?? 0) <= 0)
                 ->values();
+
+            $this->assertPickupSuppliesCompleteForReturn($normalRows, $pickupLines);
 
             // touched pickups
             $touchedPickupIds = $pickupLines->pluck('sewing_pickup_id')
@@ -1053,10 +1223,32 @@ class SewingReturnController extends Controller
                 $sewingReturn->save();
             }
 
+            // ── DRY RUN: kumpulkan info lalu throw → transaction di-rollback ──
+            if ($isDryRun) {
+                throw new \App\Exceptions\DryRunRollbackException($sewingReturn);
+            }
+
             return redirect()
                 ->route('production.sewing.returns.show', $sewingReturn)
                 ->with('success', 'Sewing Return berhasil disimpan.');
         });
+        } catch (\App\Exceptions\DryRunRollbackException $e) {
+            // Transaction sudah di-rollback otomatis. Tampilkan hasil dry run.
+            $sr = $e->sewingReturn;
+            return back()
+                ->withInput()
+                ->with('dev_dry_run', [
+                    'ok'      => true,
+                    'code'    => $sr->code ?? '(generated)',
+                    'date'    => ($sr->date ? \Carbon\Carbon::parse($sr->date)->format('d/m/Y') : \Carbon\Carbon::parse($date)->format('d/m/Y')),
+                    'lines'   => $sr->lines?->map(fn($l) => [
+                        'item'       => $l->finishedItem?->code ?? $l->finished_item_id,
+                        'qty_ok'     => $l->qty_ok,
+                        'qty_reject' => $l->qty_reject,
+                    ])->toArray() ?? [],
+                    'message' => 'Dry run selesai — validasi LOLOS, transaksi di-rollback. Data tidak tersimpan.',
+                ]);
+        }
     }
 
     /* ============================================================

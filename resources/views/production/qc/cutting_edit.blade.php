@@ -248,7 +248,7 @@
 
         $status = $cuttingJob->status;
         $stepCurrent = 1;
-        if ($status === 'sent_to_qc') {
+        if (in_array($status, ['draft', 'cut', 'cut_sent_to_qc', 'sent_to_qc'], true)) {
             $stepCurrent = 2;
         } elseif (in_array($status, ['qc_ok', 'qc_mixed', 'qc_reject', 'qc_done'])) {
             $stepCurrent = 3;
@@ -332,7 +332,7 @@
                                 </div>
                                 <div
                                     class="status-label {{ $step2State === 'current' ? 'current' : ($step2State === 'done' ? 'done' : '') }}">
-                                    Dikirim ke QC</div>
+                                    Input QC</div>
                             </div>
                             <div class="status-separator"></div>
                             <div class="status-step">
@@ -405,7 +405,7 @@
                             </div>
                             <div
                                 class="status-label {{ $step2State === 'current' ? 'current' : ($step2State === 'done' ? 'done' : '') }}">
-                                Kirim QC</div>
+                                Input QC</div>
                         </div>
                         <div class="status-step">
                             <div

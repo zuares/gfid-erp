@@ -723,9 +723,7 @@
 
                                 $oldQtyName = 'lines.' . $idx . '.qty_bundle';
 
-                                $cutDateObj =
-                                    $b->cuttingJob?->cutting_date ??
-                                    ($b->cuttingJob?->cut_date ?? $b->cuttingJob?->created_at);
+                                $cutDateObj = $b->cuttingJob?->date ?? $b->cuttingJob?->created_at;
                                 $cutDateLabel = $cutDateObj ? $cutDateObj->format('d/m/Y') : '-';
 
                                 $lotCode = $b->cuttingJob?->lot?->code;
@@ -733,6 +731,7 @@
 
                             <tr class="bundle-row bundle-card-row row-empty" data-row-index="{{ $idx }}"
                                 data-qty-ready="{{ $qtyRemain }}" data-bundle-code="{{ $b->bundle_code }}"
+                                data-finished-item-id="{{ $b->finished_item_id }}"
                                 data-item-code="{{ $b->finishedItem?->code }}"
                                 data-item-name="{{ $b->finishedItem?->name }}" data-lot-code="{{ $lotCode }}">
 

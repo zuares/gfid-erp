@@ -234,6 +234,103 @@
 
 <div class="page-wrap">
 
+    {{-- DEVELOPER MODE — hanya tampil untuk akun developer --}}
+    @if (auth()->check() && auth()->user()->isDeveloper())
+    <div style="
+        background: #0f172a;
+        border: 1px solid #334155;
+        border-left: 3px solid #6366f1;
+        border-radius: 12px;
+        padding: 10px 14px;
+        margin-bottom: 14px;
+        display: flex;
+        align-items: center;
+        gap: 12px;
+        flex-wrap: wrap;
+    ">
+        {{-- Label --}}
+        <div style="display:flex; align-items:center; gap:7px; flex-shrink:0;">
+            <span style="font-size:.78rem;">🔧</span>
+            <span style="font-weight:800; font-size:.78rem; color:#94a3b8; letter-spacing:.05em;">DEV MODE</span>
+        </div>
+
+        {{-- Divider --}}
+        <div style="width:1px; height:18px; background:#1e293b; flex-shrink:0;"></div>
+
+        {{-- Dry Run toggle --}}
+        <label id="dev-dry-run-label" style="
+            display: flex; align-items: center; gap: 7px; cursor: pointer;
+            background: #0f2a1a; border: 1px solid #166534;
+            border-radius: 8px; padding: 6px 12px;
+            transition: all .15s;
+        ">
+            <input type="checkbox" id="dev-dry-run-chk" checked
+                   style="width:15px; height:15px; accent-color:#22c55e; cursor:pointer; flex-shrink:0;">
+            <span style="font-size:.8rem; font-weight:700; color:#86efac; white-space:nowrap; user-select:none;">
+                Dry Run
+                <span style="font-weight:400; color:#4ade80; font-size:.72rem;">— tidak menyimpan data</span>
+            </span>
+        </label>
+        <input type="hidden" name="dry_run" id="dev-dry-run-input" value="1" form="sewing-return-form">
+    </div>
+    @endif
+
+    {{-- Hasil Dry Run --}}
+    @if (session('dev_dry_run'))
+    @php $dr = session('dev_dry_run'); @endphp
+    <div style="
+        background: #0a1f14;
+        border: 1px solid #166534;
+        border-left: 3px solid #22c55e;
+        border-radius: 12px;
+        padding: 12px 16px;
+        margin-bottom: 14px;
+    ">
+        <div style="display:flex; align-items:center; gap:8px; margin-bottom:8px;">
+            <span style="font-size:.85rem;">🧪</span>
+            <span style="font-weight:800; font-size:.85rem; color:#4ade80;">Dry Run Selesai</span>
+            <span style="
+                background: #14532d; border-radius:6px;
+                padding:.15rem .55rem; font-size:.72rem; font-weight:700;
+                color: #86efac;
+            ">{{ $dr['ok'] ? '✓ Validasi lolos' : '✕ Validasi gagal' }}</span>
+            <span style="font-size:.75rem; color:#4b7a5e; margin-left:auto;">Data tidak tersimpan</span>
+        </div>
+
+        @if (!empty($dr['code']))
+        <div style="
+            background:#0f2a1a; border-radius:8px; padding:8px 12px;
+            font-size:.8rem; color:#86efac; margin-bottom:8px;
+        ">
+            <span style="color:#4b7a5e;">Kode SR</span>
+            <strong style="font-family:monospace; color:#4ade80; margin:0 6px;">{{ $dr['code'] }}</strong>
+            <span style="color:#4b7a5e;">•</span>
+            <span style="color:#4b7a5e; margin-left:6px;">Tanggal</span>
+            <strong style="font-family:monospace; color:#86efac; margin-left:6px;">{{ $dr['date'] }}</strong>
+        </div>
+        @endif
+
+        @if (!empty($dr['lines']))
+        <div style="display:grid; gap:4px;">
+            @foreach ($dr['lines'] as $dl)
+            <div style="
+                background:#0f2a1a; border-radius:7px; padding:6px 12px;
+                display:flex; align-items:center; gap:10px;
+                font-size:.78rem; font-family:monospace;
+            ">
+                <span style="font-weight:800; color:#4ade80; min-width:80px;">{{ $dl['item'] ?? '-' }}</span>
+                <span style="color:#4b7a5e;">setor</span>
+                <strong style="color:#86efac;">{{ $dl['qty_ok'] }}</strong>
+                <span style="color:#334155;">•</span>
+                <span style="color:#4b7a5e;">reject</span>
+                <strong style="color:#fca5a5;">{{ $dl['qty_reject'] }}</strong>
+            </div>
+            @endforeach
+        </div>
+        @endif
+    </div>
+    @endif
+
     @if (session('status'))
         <div class="alert alert-success alert-dismissible fade show mb-3" role="alert">
             {{ session('status') }}
@@ -243,7 +340,9 @@
 
     @if ($errors->any())
         <div class="alert alert-danger alert-dismissible fade show mb-3" role="alert">
-            <strong>Oops!</strong> Ada error input, cek form di bawah.
+            @foreach ($errors->all() as $err)
+                <div>⚠ {{ $err }}</div>
+            @endforeach
             <button type="button" class="btn-close" data-bs-dismiss="alert" aria-label="Close"></button>
         </div>
     @endif
@@ -482,12 +581,27 @@
 
                                 $remaining = (float) ($line->remaining_qty ?? 0);
                                 $wip = (float) ($line->wip_stock ?? 0);
+                                $isRejectLine = (int) ($line->source_reject_return_line_id ?? 0) > 0 || (int) ($line->source_finishing_job_line_id ?? 0) > 0;
+                                $rowRemainingLabel = $isRejectLine ? 'SISA REJECT' : 'BELUM';
+                                $rowSourceStockLabel = $isRejectLine ? 'REJ-SEW' : 'WIP';
 
                                 $oldRow = old("results.$idx", []);
                                 $okVal = $oldRow['qty_ok'] ?? '';
                                 $rjVal = $oldRow['qty_reject'] ?? '';
                                 $notes = $oldRow['notes'] ?? '';
                                 $showNotes = (float) ($rjVal ?: 0) > 0 || trim((string) $notes) !== '';
+                                $supplyIncomplete    = (bool) ($line->supply_incomplete ?? false);
+                                $supplyPartial       = (bool) ($line->supply_partial ?? false);
+                                $supplyMaxSetor      = (int) ($line->supply_max_setor ?? 0);
+                                $supplyShortageLabel = (string) ($line->supply_shortage_label ?? '');
+                                $isBlocked = $supplyIncomplete; // partial = bisa input, tapi dibatasi
+
+                                // Prepare back URL untuk link "Isi Kelengkapan"
+                                $qs = request()->getQueryString();
+                                $backUrl = request()->getPathInfo() . ($qs ? '?' . $qs : '');
+                                $suppliesUrl = $line->sewingPickup?->id
+                                    ? route('production.sewing.pickups.supplies.edit', $line->sewingPickup->id) . '?redirect_to=' . urlencode($backUrl)
+                                    : null;
                             @endphp
 
                             <div class="cardx mono fin-item"
@@ -495,10 +609,11 @@
                                  data-item="{{ $code }}"
                                  data-pickupdate="{{ $pickupDateRaw }}"
                                  data-remaining="{{ $remaining }}"
-                                 data-wip="{{ $wip }}">
+                                 data-wip="{{ $wip }}"
+                                 data-supply-blocked="{{ $supplyIncomplete ? 1 : 0 }}">
                                 <div class="cardx-h">
                                     <div class="cardx-left">
-                                        <input type="checkbox" class="chk row-check" aria-label="Pilih baris">
+                                        <input type="checkbox" class="chk row-check" aria-label="Pilih baris" {{ $isBlocked ? 'disabled' : '' }}>
                                         <div>
                                             <div class="code">{{ $code }}</div>
                                             <div class="meta-inline">
@@ -509,26 +624,53 @@
                                                     <span class="truncate" title="{{ $opLabel }}">OP: {{ $opLabel }}</span>
                                                 @endif
                                             </div>
+
+                                            {{-- Hard block: supply 0, tidak bisa setor sama sekali --}}
+                                            @if ($supplyIncomplete)
+                                                <div class="text-danger small mt-1" style="white-space:normal; line-height:1.4;">
+                                                    ✕ Bahan tidak tersedia: {{ $supplyShortageLabel }}
+                                                </div>
+                                                @if ($suppliesUrl)
+                                                    <a href="{{ $suppliesUrl }}" class="btn btn-xs btn-outline-danger mt-1"
+                                                       style="font-size:.72rem; padding:.2rem .55rem; border-radius:999px; font-weight:900; display:inline-flex; align-items:center; gap:.3rem;">
+                                                        <i class="bi bi-pencil-square"></i> Isi Kelengkapan
+                                                    </a>
+                                                @endif
+
+                                            {{-- Partial: supply ada tapi kurang → bisa setor sebagian --}}
+                                            @elseif ($supplyPartial)
+                                                <div class="small mt-1" style="white-space:normal; line-height:1.4; color:#b45309;">
+                                                    ⚠ {{ $supplyShortageLabel }}
+                                                    — maks setor <strong>{{ $supplyMaxSetor }}</strong> pcs
+                                                </div>
+                                                @if ($suppliesUrl)
+                                                    <a href="{{ $suppliesUrl }}" class="btn btn-xs mt-1"
+                                                       style="font-size:.72rem; padding:.2rem .55rem; border-radius:999px; font-weight:900; display:inline-flex; align-items:center; gap:.3rem; color:#b45309; border:1px solid #b45309;">
+                                                        <i class="bi bi-pencil-square"></i> Lengkapi Bahan
+                                                    </a>
+                                                @endif
+                                            @endif
                                         </div>
                                     </div>
 
                                     <div class="right-metrics">
-                                        {{ $remainingLabel }} {{ number_format($remaining, 2, ',', '.') }}<br>
-                                        {{ $sourceStockLabel }} {{ number_format($wip, 2, ',', '.') }}
+                                        {{ $rowRemainingLabel }} {{ number_format($remaining, 2, ',', '.') }}<br>
+                                        {{ $rowSourceStockLabel }} {{ number_format($wip, 2, ',', '.') }}
                                     </div>
                                 </div>
 
                                 <div class="cardx-b">
                                     <div class="grid2">
                                         <div class="field">
-                                            <label>{{ $isRejectReworkMode ? 'Setor Ulang' : 'Di setor' }}</label>
-                                            <input type="number" step="0.01" min="0" inputmode="decimal"
-                                                   class="form-control form-control-sm qty ok num-input select-all-on-focus"
+                                            <label>{{ $isRejectLine ? 'Setor Ulang' : 'Di setor' }}</label>
+                                            <input type="number" step="1" min="0"
+                                                   inputmode="numeric"
+                                                   class="form-control form-control-sm qty ok num-input select-all-on-focus {{ $supplyPartial ? 'border-warning' : '' }}"
                                                    name="results[{{ $idx }}][qty_ok]"
-                                                   value="{{ $okVal }}" placeholder="0">
+                                                   value="{{ $okVal }}" placeholder="0" {{ $isBlocked ? 'disabled' : '' }}>
                                         </div>
 
-                                        @if ($isRejectReworkMode)
+                                        @if ($isRejectLine)
                                             <input type="hidden" name="results[{{ $idx }}][qty_reject]" value="0">
                                             <div class="field">
                                                 <label>Sumber</label>
@@ -542,25 +684,23 @@
                                                 <input type="number" step="0.01" min="0" inputmode="decimal"
                                                        class="form-control form-control-sm qty rj num-input select-all-on-focus"
                                                        name="results[{{ $idx }}][qty_reject]"
-                                                       value="{{ $rjVal }}" placeholder="0">
+                                                       value="{{ $rjVal }}" placeholder="0" {{ $isBlocked ? 'disabled' : '' }}>
                                             </div>
                                         @endif
                                     </div>
 
-                                    <div class="notes {{ (!$isRejectReworkMode && $showNotes) ? 'is-show' : '' }}">
+                                    <div class="notes {{ (!$isRejectLine && $showNotes) ? 'is-show' : '' }}">
                                         <input type="text" class="form-control form-control-sm"
                                                name="results[{{ $idx }}][notes]"
                                                placeholder="Catatan reject (opsional)" value="{{ $notes }}">
                                     </div>
 
                                     <input type="hidden" name="results[{{ $idx }}][sewing_pickup_line_id]" value="{{ $line->id }}">
-                                    @if ($isRejectReworkMode)
-                                        @if ((int) ($line->source_reject_return_line_id ?? 0) > 0)
-                                            <input type="hidden" name="results[{{ $idx }}][source_reject_return_line_id]" value="{{ (int) $line->source_reject_return_line_id }}">
-                                        @endif
-                                        @if ((int) ($line->source_finishing_job_line_id ?? 0) > 0)
-                                            <input type="hidden" name="results[{{ $idx }}][source_finishing_job_line_id]" value="{{ (int) $line->source_finishing_job_line_id }}">
-                                        @endif
+                                    @if ((int) ($line->source_reject_return_line_id ?? 0) > 0)
+                                        <input type="hidden" name="results[{{ $idx }}][source_reject_return_line_id]" value="{{ (int) $line->source_reject_return_line_id }}">
+                                    @endif
+                                    @if ((int) ($line->source_finishing_job_line_id ?? 0) > 0)
+                                        <input type="hidden" name="results[{{ $idx }}][source_finishing_job_line_id]" value="{{ (int) $line->source_finishing_job_line_id }}">
                                     @endif
                                 </div>
                             </div>
@@ -738,6 +878,10 @@ document.addEventListener('DOMContentLoaded', () => {
         };
     }
 
+    function isSupplyBlocked(card) {
+        return (card?.dataset?.supplyBlocked || '0') === '1';
+    }
+
     function clampCard(card, changed) {
         const rem = parseFloat(card.dataset.remaining || '0') || 0;
         const wip = parseFloat(card.dataset.wip || '0') || 0;
@@ -778,6 +922,7 @@ document.addEventListener('DOMContentLoaded', () => {
     }
 
     function autoFillCard(card) {
+        if (isSupplyBlocked(card)) return;
         const rem = parseFloat(card.dataset.remaining || '0') || 0;
         const wip = parseFloat(card.dataset.wip || '0') || 0;
         const fill = Math.max(0, Math.min(rem, wip));
@@ -896,6 +1041,12 @@ document.addEventListener('DOMContentLoaded', () => {
 
         const card = t.closest('.fin-item');
         if (!card) return;
+        if (isSupplyBlocked(card)) {
+            t.value = '';
+            computeSubmitEnabled();
+            computeTopSummary();
+            return;
+        }
 
         const changed = (t.name || '').includes('[qty_reject]') ? 'rj' : 'ok';
         clampCard(card, changed);
@@ -920,21 +1071,46 @@ document.addEventListener('DOMContentLoaded', () => {
 
         const card = t.closest('.fin-item');
         if (!card) return;
+        if (isSupplyBlocked(card)) {
+            t.checked = false;
+            return;
+        }
 
         const { ok, rj } = getEls(card);
 
-        if (t.checked) {
-            const a = parseFloat(ok?.value || '0') || 0;
-            const b = parseFloat(rj?.value || '0') || 0;
-            if ((a + b) <= 0) autoFillCard(card);
-        } else {
+        // Uncheck: kosongkan nilai
+        if (!t.checked) {
             if (ok) ok.value = '';
             if (rj) rj.value = '';
             syncNotes(card);
         }
+        // Check: TIDAK auto-fill — hanya fokus input qty_ok supaya keyboard muncul
+        else {
+            const a = parseFloat(ok?.value || '0') || 0;
+            const b = parseFloat(rj?.value || '0') || 0;
+            if ((a + b) <= 0 && ok && !ok.disabled) {
+                ok.focus();
+                setTimeout(() => { try { ok.select(); } catch (_) {} }, 50);
+            }
+        }
 
         computeSubmitEnabled();
         computeTopSummary();
+    });
+
+    // Tap card (area di luar input/button) → fokus langsung ke input qty_ok
+    listByOp?.addEventListener('click', (e) => {
+        if (isAllMode()) return;
+        if (e.target.tagName === 'INPUT' || e.target.tagName === 'BUTTON' || e.target.closest('button') || e.target.closest('a')) return;
+
+        const card = e.target.closest('.fin-item');
+        if (!card || isSupplyBlocked(card)) return;
+
+        const { ok } = getEls(card);
+        if (ok && !ok.disabled) {
+            ok.focus();
+            setTimeout(() => { try { ok.select(); } catch (_) {} }, 50);
+        }
     });
 
     q?.addEventListener('input', () => {
@@ -956,16 +1132,23 @@ document.addEventListener('DOMContentLoaded', () => {
 
     btnCheckVisible?.addEventListener('click', () => {
         if (isAllMode() || !listByOp) return;
+        let firstOk = null;
         $$('.fin-item', listByOp).forEach(card => {
             if (card.style.display === 'none') return;
-            const { cb } = getEls(card);
-            if (!cb) return;
-            cb.checked = true;
-            autoFillCard(card);
+            if (isSupplyBlocked(card)) return;
+            const { cb, ok } = getEls(card);
+            if (cb) cb.checked = true;
+            syncCheck(card);
+            if (!firstOk && ok && !ok.disabled) firstOk = ok;
         });
         computeSubmitEnabled();
         computeTopSummary();
         applyFilter();
+        // Fokus ke input pertama supaya keyboard muncul
+        if (firstOk) {
+            firstOk.focus();
+            setTimeout(() => { try { firstOk.select(); } catch (_) {} }, 50);
+        }
     });
 
     btnUncheckAll?.addEventListener('click', () => {
@@ -1092,6 +1275,34 @@ document.addEventListener('DOMContentLoaded', () => {
     applyFilter();
     computeSubmitEnabled();
     computeTopSummary();
+
+    // ── DEVELOPER DRY RUN ─────────────────────────────────────────────
+    const dryRunChk   = document.getElementById('dev-dry-run-chk');
+    const dryRunInput = document.getElementById('dev-dry-run-input');
+    const dryRunLabel = document.getElementById('dev-dry-run-label');
+    const submitBtn   = document.querySelector('#sewing-return-form [type="submit"]');
+    const submitOrig  = submitBtn?.textContent?.trim() ?? 'Simpan';
+
+    if (dryRunChk && dryRunInput) {
+        const applyDryRun = () => {
+            const on = dryRunChk.checked;
+            dryRunInput.value = on ? '1' : '0';
+            if (dryRunLabel) {
+                dryRunLabel.style.background    = on ? '#052e16' : '#0f2a1a';
+                dryRunLabel.style.borderColor   = on ? '#22c55e' : '#166534';
+                dryRunLabel.style.boxShadow     = on ? '0 0 0 3px rgba(34,197,94,.15)' : 'none';
+            }
+            if (submitBtn) {
+                submitBtn.textContent    = on ? '🧪 Dry Run' : submitOrig;
+                submitBtn.style.cssText += on
+                    ? '; background:#166534 !important; border-color:#22c55e !important;'
+                    : '; background:; border-color:;';
+            }
+        };
+        dryRunChk.addEventListener('change', applyDryRun);
+        applyDryRun(); // apply state awal (default: checked)
+    }
+    // ─────────────────────────────────────────────────────────────────
 });
 </script>
 @endpush

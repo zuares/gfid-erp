@@ -28,4 +28,22 @@ class ItemBom extends Model
     {
         return $this->hasMany(ItemBomLine::class)->orderBy('sort_order');
     }
+
+    public function mainMaterialLines(): HasMany
+    {
+        return $this->hasMany(ItemBomLine::class)
+            ->where('usage_stage', ItemBomLine::STAGE_MAIN_MATERIAL);
+    }
+
+    public function sewingSupplyLines(): HasMany
+    {
+        return $this->hasMany(ItemBomLine::class)
+            ->where('usage_stage', ItemBomLine::STAGE_SEWING_SUPPLY);
+    }
+
+    public function packingSupplyLines(): HasMany
+    {
+        return $this->hasMany(ItemBomLine::class)
+            ->where('usage_stage', ItemBomLine::STAGE_PACKING_SUPPLY);
+    }
 }

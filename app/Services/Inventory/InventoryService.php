@@ -365,29 +365,36 @@ class InventoryService
     }
 
     /**
-     * Ambil daftar LOT yang masih memiliki saldo (qty_balance > 0),
-     * bisa difilter per gudang dan per item.
+     * Ambil daftar LOT yang memiliki saldo, bisa difilter per gudang dan per item.
+     * Set $includeZeroBalance = true untuk termasuk LOT yang sudah habis (saldo 0/minus).
+     * Dipakai di halaman Cutting Job Create agar LOT kosong tetap bisa dipilih (boleh minus di RM).
      */
     public function getAvailableLots(
         ?int $warehouseId = null,
         ?int $itemId = null,
+        bool $includeZeroBalance = false,
     ): Collection {
         $q = InventoryMutation::query()
             ->selectRaw('
                 lot_id,
                 warehouse_id,
                 item_id,
-                SUM(qty_change) as qty_balance
+                SUM(qty_change) as qty_balance,
+                MIN(CASE WHEN direction = \'in\' AND source_type = \'purchase_receipt\' THEN date END) as purchase_date,
+                MIN(CASE WHEN direction = \'in\' THEN date END) as first_in_date
             ')
             ->whereNotNull('lot_id')
             ->groupBy('lot_id', 'warehouse_id', 'item_id')
-            ->having('qty_balance', '>', 0)
             ->with([
                 'lot.item',
                 'warehouse',
             ])
             ->orderBy('lot_id')
             ->orderBy('warehouse_id');
+
+        if (!$includeZeroBalance) {
+            $q->having('qty_balance', '>', 0);
+        }
 
         if ($warehouseId) {
             $q->where('warehouse_id', $warehouseId);
@@ -397,7 +404,55 @@ class InventoryService
             $q->where('item_id', $itemId);
         }
 
-        return $q->get();
+        $rows = $q->get();
+
+        // Kalau include zero balance, langsung return (tidak di-cap ke stock on-hand)
+        if ($includeZeroBalance) {
+            return $rows;
+        }
+
+        return $this->capLotRowsToStock($rows);
+    }
+
+    private function capLotRowsToStock(Collection $rows): Collection
+    {
+        return $rows
+            ->groupBy(fn($row) => ((int) $row->warehouse_id) . ':' . ((int) $row->item_id))
+            ->flatMap(function (Collection $group) {
+                $first = $group->first();
+                if (!$first) {
+                    return $group;
+                }
+
+                $stockQty = $this->getOnHandQty((int) $first->warehouse_id, (int) $first->item_id);
+                $totalLotQty = (float) $group->sum('qty_balance');
+
+                if ($stockQty <= 0) {
+                    return collect();
+                }
+
+                if ($totalLotQty <= $stockQty + 0.000001) {
+                    return $group;
+                }
+
+                $used = 0.0;
+                $count = $group->count();
+
+                return $group->values()->map(function ($row, int $index) use ($totalLotQty, $stockQty, $count, &$used) {
+                    if ($index === $count - 1) {
+                        $row->qty_balance = max(round($stockQty - $used, 4), 0);
+                        return $row;
+                    }
+
+                    $qty = round(((float) $row->qty_balance / $totalLotQty) * $stockQty, 4);
+                    $row->qty_balance = max($qty, 0);
+                    $used += $qty;
+
+                    return $row;
+                });
+            })
+            ->filter(fn($row) => (float) ($row->qty_balance ?? 0) > 0.000001)
+            ->values();
     }
 
     // =====================================================================

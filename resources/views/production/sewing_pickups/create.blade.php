@@ -271,6 +271,7 @@
                 {{-- Hidden operator_id (di-set lewat modal), dan gudang --}}
                 <input type="hidden" name="operator_id" id="operator_id_hidden" value="{{ $autoDefaultOperatorId }}">
                 <input type="hidden" name="warehouse_id" value="{{ $defaultWarehouseId }}">
+                <input type="hidden" name="supplies_checklist" id="supplies_checklist_payload" value="">
 
                 <div class="card-main mb-3">
                     {{-- HEADER FORM: TANGGAL + GUDANG --}}
@@ -314,6 +315,7 @@
                 {{-- LIST BUNDLE + FILTER + MOBILE CARD --}}
                 @include('production.sewing_pickups._bundle_picker', [
                     'bundles' => $bundles,
+                    'bomSuppliesByItem' => $bomSuppliesByItem ?? [],
                 ])
 
                 {{-- SUBMIT --}}
@@ -354,7 +356,7 @@
                 btn.disabled = true;
                 icon.classList.remove('bi-check2-circle');
                 icon.classList.add('bi-arrow-repeat', 'spin-slow');
-                label.textContent = 'Menyimpan...';
+                label.textContent = 'Memproses...';
             });
         });
     </script>

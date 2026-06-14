@@ -321,6 +321,7 @@
             'edit_cut' => Route::has('production.cutting_jobs.edit'),
             'send_qc' => Route::has('production.cutting_jobs.send_to_qc'),
             'qc_edit' => Route::has('production.qc.cutting.edit'),
+            'qc_quick_ok' => Route::has('production.qc.cutting.quick_ok'),
             'qc_cancel' => Route::has('production.qc.cutting.cancel'),
             'overprod' => Route::has('production.cutting_overproduction.create'),
         ];
@@ -333,16 +334,33 @@
             $routes['edit_cut'] &&
             in_array($status, ['draft', 'cut', 'cut_sent_to_qc', 'sent_to_qc'], true);
 
-        // Kirim QC cuma saat draft/cut dan QC belum ada
-        $canSendToQc = !$hasQcCutting && $routes['send_qc'] && in_array($status, ['draft', 'cut'], true);
+        // Flow ringkas: operator langsung input QC dari job cutting.
+        // Route kirim QC tetap ada, tapi tidak lagi jadi langkah utama di UI.
+        $canSendToQc = false;
 
-        // Input QC saat status sudah terkirim ke QC dan QC belum ada (atau tetap boleh lihat/edit kalau QC sudah ada)
+        // Input QC boleh langsung dari draft/cut/sent_to_qc. Saat simpan, sistem tetap membuat WIP-CUT.
         $canInputQc =
             $routes['qc_edit'] &&
-            ((!$hasQcCutting && in_array($status, ['cut_sent_to_qc', 'sent_to_qc'], true)) || $hasQcCutting); // view/edit QC
+            ((!$hasQcCutting && in_array($status, ['draft', 'cut', 'cut_sent_to_qc', 'sent_to_qc'], true)) || $hasQcCutting); // view/edit QC
+
+        $canQuickOkCutting =
+            !$hasQcCutting &&
+            $routes['qc_quick_ok'] &&
+            in_array($status, ['draft', 'cut', 'cut_sent_to_qc', 'sent_to_qc'], true);
 
         $canCancelQc = $isOwner && $hasQcCutting && $routes['qc_cancel'];
         $canOverproduction = $isOwner && $hasQcCutting && $routes['overprod'];
+
+        // Void: owner, belum QC, belum WIP posted, belum ada sewing pickup
+        // Status 'cut_sent_to_qc'/'sent_to_qc' tetap bisa di-void selama QC belum diinput
+        $hasWipPosted    = $job->bundles->contains(fn ($b) => ! empty($b->wip_posted_at));
+        $hasSewingPickup = $job->bundles->contains(fn ($b) => ((float) ($b->sewing_picked_qty ?? 0)) > 0);
+        $canVoid = $isOwner
+            && in_array($status, ['draft', 'cut', 'cut_sent_to_qc', 'sent_to_qc'], true)
+            && ! $hasQcCutting
+            && ! $hasWipPosted
+            && ! $hasSewingPickup
+            && Route::has('production.cutting_jobs.void');
 
         // ========= QC operator (1 orang utk header) =========
         $qcOperator = null;
@@ -389,11 +407,12 @@
         ];
 
         $statusMapNoQc = [
-            'draft' => ['label' => 'DRAFT', 'class' => 'secondary'],
-            'cut' => ['label' => 'CUTTING', 'class' => 'primary'],
-            'cut_sent_to_qc' => ['label' => 'KIRIM QC', 'class' => 'info'],
-            'sent_to_qc' => ['label' => 'KIRIM QC', 'class' => 'info'],
-            'posted' => ['label' => 'POSTED', 'class' => 'primary'],
+            'draft'         => ['label' => 'DRAFT',      'class' => 'secondary'],
+            'cut'           => ['label' => 'CUTTING',    'class' => 'primary'],
+            'cut_sent_to_qc'=> ['label' => 'KIRIM QC',  'class' => 'info'],
+            'sent_to_qc'    => ['label' => 'KIRIM QC',  'class' => 'info'],
+            'posted'        => ['label' => 'POSTED',     'class' => 'primary'],
+            'voided'        => ['label' => 'VOID',       'class' => 'danger'],
         ];
 
         $cfg = $hasQcCutting
@@ -418,16 +437,6 @@
 
     <div class="page-wrap">
 
-        {{-- DEBUG (hapus nanti) --}}
-        <div class="alert alert-info py-2 px-3 mono small">
-            status={{ $status }} |
-            role={{ $userRole ?? '-' }} |
-            isOwner={{ $isOwner ? '1' : '0' }} |
-            hasQcCutting={{ $hasQcCutting ? '1' : '0' }} |
-            canEditCutting={{ $canEditCutting ? '1' : '0' }} |
-            canOverproduction={{ $canOverproduction ? '1' : '0' }}
-        </div>
-
         {{-- ====== ACTIONS SNIPPET (dipakai desktop & mobile) ====== --}}
         @php
             $renderActions = function ($isMobile = false) use (
@@ -437,8 +446,10 @@
                 $canEditCutting,
                 $canSendToQc,
                 $canInputQc,
+                $canQuickOkCutting,
                 $canCancelQc,
                 $canOverproduction,
+                $canVoid,
             ) {
                 $btn = $isMobile ? 'btn btn-sm' : 'btn btn-sm';
                 $wrapClass = $isMobile ? '' : 'cutting-actions';
@@ -495,6 +506,16 @@
                         '</a>';
                 }
 
+                if ($canQuickOkCutting) {
+                    echo '<form action="' .
+                        e(route('production.qc.cutting.quick_ok', $job)) .
+                        '" method="post" class="d-inline"
+                            onsubmit="return confirm(\'Selesai Cutting & Siap Jahit?\\n\\nSemua bundle akan dianggap OK dan langsung masuk WIP-CUT.\')">';
+                    echo csrf_field();
+                    echo '<button type="submit" class="' . e($btn) . ' btn-success">Selesai Cutting & Siap Jahit</button>';
+                    echo '</form>';
+                }
+
                 // Cancel QC (owner + QC ada)
                 if ($canCancelQc) {
                     echo '<form action="' .
@@ -503,6 +524,17 @@
                             onsubmit="return confirm(\'Batalkan QC Cutting?\\n\\nJika sudah dipakai sewing, aksi ini akan ditolak.\')">';
                     echo csrf_field();
                     echo '<button type="submit" class="' . e($btn) . ' btn-outline-danger">Batalkan QC</button>';
+                    echo '</form>';
+                }
+
+                // Void Cutting Job (owner, belum QC, belum sewing)
+                if ($canVoid) {
+                    echo '<form action="' .
+                        e(route('production.cutting_jobs.void', $job)) .
+                        '" method="post" class="d-inline"
+                            onsubmit="return confirm(\'⚠️ VOID Cutting Job ' . e($job->code) . '?\\n\\nStok kain akan dikembalikan ke LOT semula.\\nAksi ini tidak bisa dibatalkan.\')">';
+                    echo csrf_field();
+                    echo '<button type="submit" class="' . e($btn) . ' btn-outline-danger">🗑 Void</button>';
                     echo '</form>';
                 }
 
@@ -531,7 +563,7 @@
                         <div class="status-separator"></div>
                         <div class="status-step">
                             <div class="status-dot {{ $dotClass(2) }}"></div>
-                            <div class="status-label {{ $lblClass(2) }}">Kirim ke QC</div>
+                            <div class="status-label {{ $lblClass(2) }}">Input QC</div>
                         </div>
                         <div class="status-separator"></div>
                         <div class="status-step">
@@ -587,7 +619,7 @@
                 </div>
                 <div class="status-step">
                     <div class="status-dot {{ $dotClass(2) }}"></div>
-                    <div class="status-label {{ $lblClass(2) }}">Kirim QC</div>
+                    <div class="status-label {{ $lblClass(2) }}">Input QC</div>
                 </div>
                 <div class="status-step">
                     <div class="status-dot {{ $dotClass(3) }}"></div>

@@ -7,9 +7,14 @@ use Illuminate\Database\Eloquent\Relations\BelongsTo;
 
 class ItemBomLine extends Model
 {
+    public const STAGE_MAIN_MATERIAL = 'main_material';
+    public const STAGE_SEWING_SUPPLY = 'sewing_supply';
+    public const STAGE_PACKING_SUPPLY = 'packing_supply';
+
     protected $fillable = [
         'item_bom_id',
         'material_item_id',
+        'usage_stage',
         'qty',
         'uom',
         'scrap_pct',
@@ -22,6 +27,15 @@ class ItemBomLine extends Model
         'scrap_pct' => 'decimal:2',
         'is_optional' => 'boolean',
     ];
+
+    public static function usageStageLabels(): array
+    {
+        return [
+            self::STAGE_MAIN_MATERIAL => 'Bahan baku utama',
+            self::STAGE_SEWING_SUPPLY => 'Kelengkapan jahit',
+            self::STAGE_PACKING_SUPPLY => 'Kelengkapan packing',
+        ];
+    }
 
     public function bom(): BelongsTo
     {

@@ -359,7 +359,7 @@
 
                 summaryFabric.textContent = fabricText;
                 summaryLotCount.textContent = String(lotCount);
-                summaryLotBalance.textContent = balance.toFixed(2);
+                summaryLotBalance.textContent = balance.toFixed(2) + ' kg';
                 summaryBundlePcs.textContent = totalPcs.toFixed(2);
 
                 const details = collectBundleDetails();

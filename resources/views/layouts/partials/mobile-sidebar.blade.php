@@ -241,8 +241,9 @@
     }
     $role = strtolower((string) ($user?->role ?? ''));
 
-    $isOwner = $role === 'owner';
-    $isAdmin = $role === 'admin';
+    $isDev = $user && $user->isDeveloper();
+    $isOwner = $role === 'owner' || $isDev;
+    $isAdmin = $role === 'admin' && !$isDev;
     $isOperating = $role === 'operating';
 
     // operator lapangan
@@ -330,6 +331,7 @@
 
     $hasProdFinishingJobsIndex = $router->has('production.finishing_jobs.index');
     $hasProdFinishingJobsCreate = $router->has('production.finishing_jobs.create');
+    $hasProdFinishingRepairsIndex = $router->has('production.finishing_repairs.index');
 
     $hasProdQcIndex = $router->has('production.qc.index');
     $hasProdPackingIndex = $router->has('production.packing_jobs.index');
@@ -400,7 +402,7 @@
         $hasProdSewPickupsIndex = $hasProdSewPickupsCreate = false;
         $hasProdSewReturnsIndex = $hasProdSewReturnsCreate = false;
         $hasProdSewRejectReturnsIndex = false;
-        $hasProdFinishingJobsIndex = $hasProdFinishingJobsCreate = false;
+        $hasProdFinishingJobsIndex = $hasProdFinishingJobsCreate = $hasProdFinishingRepairsIndex = false;
         $hasProdQcIndex = $hasProdPackingIndex = false;
         $hasProdPriorityIndex = $hasProdReportsIndex = false;
         $hasProdDashboard = false;
@@ -461,6 +463,7 @@
         request()->routeIs('production.cutting_jobs.*') ||
         request()->routeIs('production.sewing.*') ||
         request()->routeIs('production.finishing_jobs.*') ||
+        request()->routeIs('production.finishing_repairs.*') ||
         request()->routeIs('production.qc.*') ||
         request()->routeIs('production.dashboard') ||
         request()->routeIs('production.packing_jobs.*') ||
@@ -726,6 +729,15 @@
                                 <a href="{{ route('production.finishing_jobs.index') }}"
                                    class="mobile-sidebar-link {{ request()->routeIs('production.finishing_jobs.*') ? 'active' : '' }}">
                                     <span class="icon">🧶</span><span>Daftar Finishing</span>
+                                </a>
+                            </li>
+                        @endif
+
+                        @if ($hasProdFinishingRepairsIndex)
+                            <li>
+                                <a href="{{ route('production.finishing_repairs.index') }}"
+                                   class="mobile-sidebar-link {{ request()->routeIs('production.finishing_repairs.*') ? 'active' : '' }}">
+                                    <span class="icon">🩹</span><span>Perbaikan Finishing</span>
                                 </a>
                             </li>
                         @endif
@@ -1318,6 +1330,13 @@
                                 <a href="{{ route('production.finishing_jobs.index') }}"
                                    class="mobile-sidebar-link mobile-sidebar-link-sub {{ request()->routeIs('production.finishing_jobs.*') ? 'active' : '' }}">
                                     <span class="icon">🧶</span><span>Finishing Jobs</span>
+                                </a>
+                            @endif
+
+                            @if ($hasProdFinishingRepairsIndex)
+                                <a href="{{ route('production.finishing_repairs.index') }}"
+                                   class="mobile-sidebar-link mobile-sidebar-link-sub {{ request()->routeIs('production.finishing_repairs.*') ? 'active' : '' }}">
+                                    <span class="icon">🩹</span><span>Perbaikan Finishing</span>
                                 </a>
                             @endif
 

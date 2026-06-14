@@ -478,8 +478,9 @@
             <th style="width:56px">#</th>
             <th style="width:170px">SKU</th>
             <th>Nama</th>
+            <th style="width:260px">Struktur BOM</th>
             <th style="width:120px">Status</th>
-            <th style="width:140px">Aksi</th>
+            <th style="width:180px">Aksi</th>
           </tr>
         </thead>
         <tbody>
@@ -489,6 +490,14 @@
               <td class="mono" style="font-weight:950">{{ $b->item->code }}</td>
               <td>{{ $b->item->name }}</td>
               <td>
+                <div class="d-flex flex-wrap gap-1">
+                  <span class="badge bg-light text-dark border">Utama {{ (int) $b->main_material_lines_count }}</span>
+                  <span class="badge bg-primary-subtle text-primary border">Jahit {{ (int) $b->sewing_supply_lines_count }}</span>
+                  <span class="badge bg-info-subtle text-info border">Packing {{ (int) $b->packing_supply_lines_count }}</span>
+                </div>
+                <div class="small text-muted mt-1">Total {{ (int) $b->lines_count }} material</div>
+              </td>
+              <td>
                 @if($b->active)
                   <span class="badge bg-success">Active</span>
                 @else
@@ -496,11 +505,18 @@
                 @endif
               </td>
               <td>
-                <a class="btn btn-sm btn-outline-primary" href="{{ route('master.item_boms.edit',$b) }}">Edit</a>
+                <div class="d-flex gap-1">
+                  <a class="btn btn-sm btn-outline-primary" href="{{ route('master.item_boms.edit',$b) }}">Edit</a>
+                  <form method="post" action="{{ route('master.item_boms.destroy', $b) }}" class="js-delete-bom-form">
+                    @csrf
+                    @method('DELETE')
+                    <button type="submit" class="btn btn-sm btn-outline-danger">Hapus</button>
+                  </form>
+                </div>
               </td>
             </tr>
           @empty
-            <tr><td colspan="5" class="text-muted">Belum ada BOM.</td></tr>
+            <tr><td colspan="6" class="text-muted">Belum ada BOM.</td></tr>
           @endforelse
         </tbody>
       </table>
@@ -598,5 +614,35 @@ document.addEventListener('DOMContentLoaded', function () {
     });
 });
 </script>
-@endpush
 
+<script>
+document.addEventListener('DOMContentLoaded', function () {
+    document.querySelectorAll('.js-delete-bom-form').forEach(function (form) {
+        form.addEventListener('submit', function (event) {
+            event.preventDefault();
+
+            const submit = () => form.submit();
+
+            if (window.Swal) {
+                Swal.fire({
+                    title: 'Hapus BOM?',
+                    text: 'Semua line material pada BOM ini ikut terhapus.',
+                    icon: 'warning',
+                    showCancelButton: true,
+                    confirmButtonText: 'Ya, hapus',
+                    cancelButtonText: 'Batal',
+                    confirmButtonColor: '#dc2626',
+                }).then(result => {
+                    if (result.isConfirmed) submit();
+                });
+                return;
+            }
+
+            if (confirm('Hapus BOM ini? Semua line material ikut terhapus.')) {
+                submit();
+            }
+        });
+    });
+});
+</script>
+@endpush

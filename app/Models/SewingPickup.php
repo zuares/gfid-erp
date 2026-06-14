@@ -35,6 +35,11 @@ class SewingPickup extends Model
         return $this->hasMany(SewingPickupLine::class);
     }
 
+    public function supplyLines()
+    {
+        return $this->hasMany(SewingPickupSupplyLine::class, 'sewing_pickup_id');
+    }
+
     /**
      * Hitung status berdasarkan sisa qty di semua line.
      * Status:

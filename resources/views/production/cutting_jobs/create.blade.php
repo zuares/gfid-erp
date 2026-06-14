@@ -310,7 +310,7 @@
     <div class="cutting-create-page">
         <div class="page-wrap">
             {{-- FLASH --}}
-            @if (session('success'))
+            @if (session('success') && !session('dev_rollback_result'))
                 <div class="alert alert-success py-2 px-3 mb-2">
                     {{ session('success') }}
                 </div>
@@ -332,3 +332,37 @@
         </div>
     </div>
 @endsection
+
+@if (session('dev_rollback_result'))
+    @push('scripts')
+        <script>
+            document.addEventListener('DOMContentLoaded', function () {
+                if (!window.Swal) return;
+
+                const result = @json(session('dev_rollback_result'));
+                const fmt = new Intl.NumberFormat('id-ID', {
+                    minimumFractionDigits: 0,
+                    maximumFractionDigits: 2
+                });
+
+                Swal.fire({
+                    icon: 'success',
+                    title: 'Simulasi Berhasil',
+                    html: `
+                        <div style="text-align:left;font-size:.9rem;line-height:1.65">
+                            <div><b>Job:</b> <code>${result.code || '-'}</code></div>
+                            <div><b>Bundle:</b> ${fmt.format(result.bundle_count || 0)}</div>
+                            <div><b>Total pcs:</b> ${fmt.format(result.qty_pcs || 0)}</div>
+                            <div><b>Kain terpakai:</b> ${fmt.format(result.used_fabric || 0)}</div>
+                            <div><b>LOT:</b> ${fmt.format(result.lot_count || 0)}</div>
+                            <hr>
+                            <div>Tidak ada data atau stok yang berubah karena mode rollback aktif.</div>
+                        </div>
+                    `,
+                    confirmButtonText: 'Oke',
+                    confirmButtonColor: '#2563eb'
+                });
+            });
+        </script>
+    @endpush
+@endif

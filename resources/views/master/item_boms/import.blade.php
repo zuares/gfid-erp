@@ -434,7 +434,7 @@
           <div class="h1">Import BOM CSV</div>
           <div class="subt">
           Kolom wajib: <span class="mono">sku_code, material_code, qty</span>.
-          Opsional: <span class="mono">uom, scrap_pct, is_optional, sort_order</span>.
+          Opsional: <span class="mono">usage_stage, uom, scrap_pct, is_optional, sort_order</span>.
         </div>
 
         <div class="rowx" style="margin-top:10px">
@@ -453,7 +453,11 @@
     <div class="cardx sub" style="padding:12px">
       <div class="small">Contoh baris:</div>
       <div class="mono" style="font-weight:950;margin-top:6px">
-        C5BLK,FLC280BLK,1.20,pcs,2,0,10
+        C5BLK,FLC280BLK,main_material,1.20,kg,2,0,10
+      </div>
+      <div class="small" style="margin-top:6px">
+        <span class="mono">usage_stage</span>: <span class="mono">main_material</span>,
+        <span class="mono">sewing_supply</span>, atau <span class="mono">packing_supply</span>.
       </div>
       <div class="small" style="margin-top:6px">
         Mode <span class="mono">replace</span> akan menghapus lines lama lalu isi dari CSV.

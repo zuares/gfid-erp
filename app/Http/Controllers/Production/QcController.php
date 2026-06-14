@@ -188,6 +188,65 @@ class QcController extends Controller
             ->with('success', 'QC Cutting berhasil disimpan & WIP-CUT sudah dibuat.');
     }
 
+    public function quickOkCutting(CuttingJob $cuttingJob): RedirectResponse
+    {
+        $cuttingJob->loadMissing([
+            'bundles.qcResults' => function ($q) {
+                $q->where('stage', QcResult::STAGE_CUTTING);
+            },
+        ]);
+
+        $hasQcCutting = $cuttingJob->bundles->contains(
+            fn($bundle) => $bundle->qcResults->isNotEmpty()
+        );
+
+        if ($hasQcCutting) {
+            return redirect()
+                ->route('production.cutting_jobs.show', $cuttingJob)
+                ->with('error', 'QC Cutting sudah pernah diinput. Gunakan Lihat / Edit QC atau Batalkan QC dulu.');
+        }
+
+        if ($cuttingJob->bundles->isEmpty()) {
+            return back()->with('error', 'Belum ada bundle cutting untuk diproses.');
+        }
+
+        $operatorId = Auth::user()->employee?->id;
+        $qcDate = now()->toDateString();
+
+        $payload = [
+            'qc_date' => $qcDate,
+            'operator_id' => $operatorId,
+            'results' => $cuttingJob->bundles->map(fn(CuttingJobBundle $bundle) => [
+                'cutting_job_bundle_id' => $bundle->id,
+                'qty_ok' => (float) $bundle->qty_pcs,
+                'qty_reject' => 0,
+                'reject_reason' => null,
+                'notes' => 'Auto OK dari tombol Selesai Cutting & Siap Jahit',
+            ])->values()->all(),
+        ];
+
+        try {
+            $this->qc->saveCuttingQc($cuttingJob, $payload);
+
+            $this->cutting->createWipFromCuttingQc(
+                job: $cuttingJob->fresh('bundles'),
+                qcDate: $qcDate,
+            );
+        } catch (\Throwable $e) {
+            return back()
+                ->with('error', 'Selesai Cutting gagal: ' . $e->getMessage());
+        }
+
+        $cuttingJob->update([
+            'status' => 'qc_done',
+            'updated_by' => Auth::id(),
+        ]);
+
+        return redirect()
+            ->route('production.cutting_jobs.show', $cuttingJob)
+            ->with('success', 'Cutting selesai. Semua bundle otomatis OK dan sudah masuk WIP-CUT / siap jahit.');
+    }
+
     public function cancelCutting(CuttingJob $cuttingJob): RedirectResponse
     {
         $role = Auth::user()->role ?? null;

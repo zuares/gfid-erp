@@ -9,9 +9,10 @@
     }
     $role = strtolower((string) ($user->role ?? ''));
 
-    $isOwner = $role === 'owner';
+    $isDev = $user && $user->isDeveloper();
+    $isOwner = $role === 'owner' || $isDev;  // developer = akses owner (semua menu)
     $isOperating = $role === 'operating';
-    $isAdmin = $role === 'admin';
+    $isAdmin = $role === 'admin' && !$isDev; // developer TIDAK masuk branch admin agar masuk branch owner
 
     // ✅ capability flags
     $canViewRts = $isOwner || $isAdmin || $isOperating;
@@ -146,6 +147,7 @@
     $hasProdSewReturnsIndex = $router->has('production.sewing.returns.index');
     $hasProdSewRejectReturnsIndex = $router->has('production.sewing.reject_returns.index');
     $hasProdFinishingJobsIndex = $router->has('production.finishing_jobs.index');
+    $hasProdFinishingRepairsIndex = $router->has('production.finishing_repairs.index');
     $hasProdQcIndex = $router->has('production.qc.index');
     $hasProdPackingIndex = $router->has('production.packing_jobs.index');
     $hasProdPriorityIndex = $router->has('production.priority.index');
@@ -228,7 +230,7 @@
     if (!$canModule('production')) {
         $hasProdCuttingJobsIndex = $hasProdSewPickupsIndex = $hasProdSewReturnsIndex = false;
         $hasProdSewRejectReturnsIndex = false;
-        $hasProdFinishingJobsIndex = $hasProdQcIndex = false;
+        $hasProdFinishingJobsIndex = $hasProdFinishingRepairsIndex = $hasProdQcIndex = false;
         $hasProdPackingIndex = $hasProdPriorityIndex = false;
         $hasProdReportsIndex = $hasProdDashboard = false;
     }
@@ -306,6 +308,7 @@
         $open('production.cutting_jobs.*') ||
         $open('production.sewing.*') ||
         $open('production.finishing_jobs.*') ||
+        $open('production.finishing_repairs.*') ||
         $open('production.qc.*') ||
         $open('production.dashboard') ||
         $open('production.packing_jobs.*') ||
@@ -726,6 +729,7 @@
                 $hasProdSewPickupsIndex,
                 $hasProdSewReturnsIndex,
                 $hasProdFinishingJobsIndex,
+                $hasProdFinishingRepairsIndex,
                 $hasProdPackingIndex,
                 $hasProdQcIndex,
                 $hasProdPriorityIndex,
@@ -779,6 +783,13 @@
                         <x-sidebar.simple-link href="{{ route('production.finishing_jobs.index') }}" icon="🧶"
                             :active="request()->routeIs('production.finishing_jobs.*')">
                             Finishing
+                        </x-sidebar.simple-link>
+                    @endif
+
+                    @if ($hasProdFinishingRepairsIndex)
+                        <x-sidebar.simple-link href="{{ route('production.finishing_repairs.index') }}" icon="🩹"
+                            :active="request()->routeIs('production.finishing_repairs.*')">
+                            Perbaikan Finishing
                         </x-sidebar.simple-link>
                     @endif
 
@@ -1324,6 +1335,7 @@
                 $hasProdSewPickupsIndex,
                 $hasProdSewReturnsIndex,
                 $hasProdFinishingJobsIndex,
+                $hasProdFinishingRepairsIndex,
                 $hasProdPackingIndex,
                 $hasProdQcIndex,
                 $hasProdDashboard,
@@ -1396,6 +1408,12 @@
                             <x-sidebar.sub-link href="{{ route('production.finishing_jobs.index') }}" icon="🧶"
                                 :active="request()->routeIs('production.finishing_jobs.*')">
                                 Finishing Jobs
+                            </x-sidebar.sub-link>
+                        @endif
+                        @if ($hasProdFinishingRepairsIndex)
+                            <x-sidebar.sub-link href="{{ route('production.finishing_repairs.index') }}" icon="🩹"
+                                :active="request()->routeIs('production.finishing_repairs.*')">
+                                Perbaikan Finishing
                             </x-sidebar.sub-link>
                         @endif
                         @if ($hasProdPackingIndex)

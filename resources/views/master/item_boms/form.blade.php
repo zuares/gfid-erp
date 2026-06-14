@@ -518,6 +518,7 @@
             <tr>
               <th style="width:56px">#</th>
               <th style="min-width:380px">Material</th>
+              <th style="width:190px">Kelompok</th>
               <th style="width:160px">Qty (raw)</th>
               <th style="width:110px">UOM</th>
               <th style="width:120px">Scrap %</th>
@@ -539,6 +540,15 @@
                     @if(!empty($mid))
                       <option value="{{ $mid }}" selected>{{ $mtext ?: 'Material terpilih' }}</option>
                     @endif
+                  </select>
+                </td>
+                <td>
+                  <select class="inp mono usage-stage" name="lines[{{ $i }}][usage_stage]">
+                    @foreach(\App\Models\ItemBomLine::usageStageLabels() as $value => $label)
+                      <option value="{{ $value }}" {{ data_get($r,'usage_stage', \App\Models\ItemBomLine::STAGE_MAIN_MATERIAL) === $value ? 'selected' : '' }}>
+                        {{ $label }}
+                      </option>
+                    @endforeach
                   </select>
                 </td>
                 <td>
@@ -645,6 +655,7 @@
 
       // rename index after delete
       $(this).find('select.mat').attr('name', `lines[${idx}][material_item_id]`);
+      $(this).find('select.usage-stage').attr('name', `lines[${idx}][usage_stage]`);
       $(this).find('input.qty').attr('name', `lines[${idx}][qty]`);
       $(this).find('input.uom').attr('name', `lines[${idx}][uom]`);
       $(this).find('input.scrap').attr('name', `lines[${idx}][scrap_pct]`);
@@ -661,13 +672,18 @@
   function addRow(){
     const $tbody = $('#lines');
     const i = $tbody.find('tr.line').length;
-    const sort = (i+1)*10;
+	    const sort = (i+1)*10;
+        const usageOptions = @json(\App\Models\ItemBomLine::usageStageLabels());
+        const usageHtml = Object.entries(usageOptions)
+          .map(([value, label]) => `<option value="${value}" ${value === 'main_material' ? 'selected' : ''}>${label}</option>`)
+          .join('');
 
-    const html = `
-      <tr class="line" data-i="${i}">
-        <td class="mono idx" style="font-weight:950">${i+1}</td>
-        <td><select class="mat" name="lines[${i}][material_item_id]" style="width:100%"></select></td>
-        <td><input class="inp mono qty" name="lines[${i}][qty]" placeholder="0.00"></td>
+	    const html = `
+	      <tr class="line" data-i="${i}">
+	        <td class="mono idx" style="font-weight:950">${i+1}</td>
+	        <td><select class="mat" name="lines[${i}][material_item_id]" style="width:100%"></select></td>
+            <td><select class="inp mono usage-stage" name="lines[${i}][usage_stage]">${usageHtml}</select></td>
+	        <td><input class="inp mono qty" name="lines[${i}][qty]" placeholder="0.00"></td>
         <td><input class="inp mono uom" name="lines[${i}][uom]" value="pcs" placeholder="pcs"></td>
         <td><input class="inp mono scrap" name="lines[${i}][scrap_pct]" value="0" placeholder="0"></td>
         <td>

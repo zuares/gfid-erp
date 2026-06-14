@@ -18,6 +18,7 @@ class User extends Authenticatable
     protected $fillable = [
         'employee_code',
         'role',
+        'is_developer',
         'employee_id',
         'name',
         'email',
@@ -27,6 +28,10 @@ class User extends Authenticatable
     protected $hidden = [
         'password',
         'remember_token',
+    ];
+
+    protected $casts = [
+        'is_developer' => 'boolean',
     ];
 
     public function employee()
@@ -39,16 +44,31 @@ class User extends Authenticatable
         return $this->hasMany(UserModuleAccess::class);
     }
 
+    /**
+     * Developer mode — akses semua modul + bypass validasi tertentu saat testing.
+     * Fallback ke employee_code 'DEV' agar bekerja bahkan sebelum migration dijalankan.
+     */
+    public function isDeveloper(): bool
+    {
+        // Cek kolom is_developer jika sudah ada di DB
+        $attrs = $this->getAttributes();
+        if (array_key_exists('is_developer', $attrs)) {
+            return (bool) $attrs['is_developer'];
+        }
+        // Fallback: employee_code = DEV → otomatis developer
+        return strtoupper((string) ($this->employee_code ?? '')) === 'DEV';
+    }
+
     public function isOwner(): bool
     {
-        return $this->role === 'owner';
+        return $this->role === 'owner' || $this->isDeveloper();
     }
 
     public function hasRole(string | array $roles): bool
     {
         $roles = (array) $roles;
         if ($this->isOwner()) {
-            return true; // OWNER akses semua
+            return true; // OWNER & DEV akses semua
         }
 
         return in_array($this->role, $roles, true);

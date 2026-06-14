@@ -127,6 +127,7 @@ class ItemBomSeeder extends Seeder
                 ItemBomLine::create([
                     'item_bom_id' => (int) $bom->id,
                     'material_item_id' => (int) $mat->id,
+                    'usage_stage' => $t['stage'] ?? ItemBomLine::STAGE_MAIN_MATERIAL,
                     'qty' => $t['qty'], // ✅ string raw
                     'uom' => $uom,
                     'scrap_pct' => $t['scrap_pct'] ?? '0', // ✅ string raw
@@ -142,20 +143,20 @@ class ItemBomSeeder extends Seeder
     private function templateShorts(): array
     {
         return [
-            ['codes' => ['FLC280{COLOR}', 'FLC240{COLOR}'], 'qty' => '0.31', 'uom' => 'kg', 'scrap_pct' => '0', 'sort' => 10],
-            ['codes' => ['RIB280{COLOR}', 'RIB280MST'], 'qty' => '0.06', 'uom' => 'kg', 'scrap_pct' => '0', 'sort' => 20],
-            ['codes' => ['KRT4CM'], 'qty' => '0.019', 'uom' => 'kg', 'scrap_pct' => '0', 'sort' => 30],
-            ['codes' => ['TLKADDS'], 'qty' => '0.009', 'uom' => 'kg', 'scrap_pct' => '0', 'sort' => 40],
+            ['codes' => ['FLC280{COLOR}', 'FLC240{COLOR}'], 'qty' => '0.31', 'uom' => 'kg', 'scrap_pct' => '0', 'sort' => 10, 'stage' => ItemBomLine::STAGE_MAIN_MATERIAL],
+            ['codes' => ['RIB280{COLOR}', 'RIB280MST'], 'qty' => '0.06', 'uom' => 'kg', 'scrap_pct' => '0', 'sort' => 20, 'stage' => ItemBomLine::STAGE_SEWING_SUPPLY],
+            ['codes' => ['KRT4CM'], 'qty' => '0.019', 'uom' => 'kg', 'scrap_pct' => '0', 'sort' => 30, 'stage' => ItemBomLine::STAGE_SEWING_SUPPLY],
+            ['codes' => ['TLKADDS'], 'qty' => '0.009', 'uom' => 'kg', 'scrap_pct' => '0', 'sort' => 40, 'stage' => ItemBomLine::STAGE_PACKING_SUPPLY],
         ];
     }
 
     private function templateLongPants(): array
     {
         return [
-            ['codes' => ['FLC280{COLOR}', 'FLC240{COLOR}'], 'qty' => '0.45', 'uom' => 'kg', 'scrap_pct' => '0', 'sort' => 10],
-            ['codes' => ['RIB280{COLOR}', 'RIB280MST'], 'qty' => '0.07', 'uom' => 'kg', 'scrap_pct' => '0', 'sort' => 20],
-            ['codes' => ['KRT4CM'], 'qty' => '0.022', 'uom' => 'kg', 'scrap_pct' => '0', 'sort' => 30],
-            ['codes' => ['TLKADDS'], 'qty' => '0.010', 'uom' => 'kg', 'scrap_pct' => '0', 'sort' => 40],
+            ['codes' => ['FLC280{COLOR}', 'FLC240{COLOR}'], 'qty' => '0.45', 'uom' => 'kg', 'scrap_pct' => '0', 'sort' => 10, 'stage' => ItemBomLine::STAGE_MAIN_MATERIAL],
+            ['codes' => ['RIB280{COLOR}', 'RIB280MST'], 'qty' => '0.07', 'uom' => 'kg', 'scrap_pct' => '0', 'sort' => 20, 'stage' => ItemBomLine::STAGE_SEWING_SUPPLY],
+            ['codes' => ['KRT4CM'], 'qty' => '0.022', 'uom' => 'kg', 'scrap_pct' => '0', 'sort' => 30, 'stage' => ItemBomLine::STAGE_SEWING_SUPPLY],
+            ['codes' => ['TLKADDS'], 'qty' => '0.010', 'uom' => 'kg', 'scrap_pct' => '0', 'sort' => 40, 'stage' => ItemBomLine::STAGE_PACKING_SUPPLY],
         ];
     }
 

@@ -2,6 +2,11 @@
 
 use App\Http\Controllers\Owner\AccessControlController;
 use App\Http\Controllers\Owner\WorkLogController;
+use App\Http\Controllers\Api\ItemController as ApiItemController;
+
+Route::middleware(['auth'])
+    ->get('/api/v1/items/suggest', [ApiItemController::class, 'suggest'])
+    ->name('web_api.items.suggest');
 
 // Grouping per domain
 require __DIR__ . '/web/auth.php';

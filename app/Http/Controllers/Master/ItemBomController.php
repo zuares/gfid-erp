@@ -22,6 +22,12 @@ class ItemBomController extends Controller
 
         $boms = ItemBom::query()
             ->with(['item:id,code,name'])
+            ->withCount([
+                'lines',
+                'mainMaterialLines',
+                'sewingSupplyLines',
+                'packingSupplyLines',
+            ])
             ->when($q !== '', function ($qq) use ($q) {
                 $qq->whereHas('item', function ($i) use ($q) {
                     $i->where('code', 'like', "%{$q}%")
@@ -63,6 +69,7 @@ class ItemBomController extends Controller
                     'id' => $l->id,
                     'material_item_id' => (int) $l->material_item_id,
                     'material_text' => $text !== '—' ? $text : null,
+                    'usage_stage' => $l->usage_stage ?: ItemBomLine::STAGE_MAIN_MATERIAL,
                     'qty' => (string) $l->qty, // keep as string
                     'uom' => $l->uom ?: ($l->material?->unit ?? 'pcs'),
                     'scrap_pct' => (string) ($l->scrap_pct ?? 0),
@@ -120,6 +127,18 @@ class ItemBomController extends Controller
         });
     }
 
+    public function destroy(ItemBom $bom)
+    {
+        return DB::transaction(function () use ($bom) {
+            $bom->lines()->delete();
+            $bom->delete();
+
+            return redirect()
+                ->route('master.item_boms.index')
+                ->with('success', 'BOM berhasil dihapus.');
+        });
+    }
+
     /**
      * =========================
      * VALIDATION + NORMALIZATION
@@ -152,6 +171,7 @@ class ItemBomController extends Controller
 
             'lines' => ['required', 'array', 'min:1'],
             'lines.*.material_item_id' => ['required', 'integer', 'exists:items,id'],
+            'lines.*.usage_stage' => ['nullable', 'in:' . implode(',', array_keys(ItemBomLine::usageStageLabels()))],
 
             // ✅ min kecil biar 0.0095 valid
             // sebelumnya 0.0001
@@ -168,6 +188,7 @@ class ItemBomController extends Controller
 
         foreach ($data['lines'] as $idx => $l) {
             $data['lines'][$idx]['uom'] = $l['uom'] ?? 'pcs';
+            $data['lines'][$idx]['usage_stage'] = $l['usage_stage'] ?? ItemBomLine::STAGE_MAIN_MATERIAL;
 
             // keep as string normalized (avoid float)
             $data['lines'][$idx]['qty'] = $this->normalizeDecimal($l['qty']) ?? '0';
@@ -215,6 +236,7 @@ class ItemBomController extends Controller
         return [
             'material_item_id' => null,
             'material_text' => null,
+            'usage_stage' => ItemBomLine::STAGE_MAIN_MATERIAL,
             'qty' => '',
             'uom' => 'pcs',
             'scrap_pct' => 0,
@@ -231,6 +253,7 @@ class ItemBomController extends Controller
             ItemBomLine::create([
                 'item_bom_id' => $bom->id,
                 'material_item_id' => (int) $l['material_item_id'],
+                'usage_stage' => (string) ($l['usage_stage'] ?? ItemBomLine::STAGE_MAIN_MATERIAL),
 
                 // ✅ simpan string, biar decimal DB yang handle presisi
                 'qty' => (string) ($this->normalizeDecimal($l['qty']) ?? '0'),
@@ -241,6 +264,38 @@ class ItemBomController extends Controller
                 'sort_order' => (int) ($l['sort_order'] ?? 0),
             ]);
         }
+    }
+
+    private function inferUsageStageFromCode(string $code): string
+    {
+        $code = strtoupper(trim($code));
+
+        if (str_starts_with($code, 'RIB') || str_starts_with($code, 'KRT')) {
+            return ItemBomLine::STAGE_SEWING_SUPPLY;
+        }
+
+        if (str_starts_with($code, 'TLK') || str_starts_with($code, 'OPP') || str_starts_with($code, 'PACK')) {
+            return ItemBomLine::STAGE_PACKING_SUPPLY;
+        }
+
+        return ItemBomLine::STAGE_MAIN_MATERIAL;
+    }
+
+    private function normalizeUsageStage(string $value): ?string
+    {
+        $value = strtolower(trim($value));
+        if ($value === '') {
+            return null;
+        }
+
+        $value = str_replace([' ', '-'], '_', $value);
+
+        return match ($value) {
+            'main_material', 'bahan_baku', 'bahan_baku_utama', 'utama', 'rm' => ItemBomLine::STAGE_MAIN_MATERIAL,
+            'sewing_supply', 'kelengkapan_jahit', 'jahit', 'sewing' => ItemBomLine::STAGE_SEWING_SUPPLY,
+            'packing_supply', 'kelengkapan_packing', 'packing', 'pack' => ItemBomLine::STAGE_PACKING_SUPPLY,
+            default => null,
+        };
     }
 
     /**
@@ -350,6 +405,9 @@ class ItemBomController extends Controller
             }
 
             $uom = isset($idx['uom']) ? trim((string) $row[$idx['uom']]) : 'pcs';
+            $usageStage = isset($idx['usage_stage'])
+                ? $this->normalizeUsageStage((string) $row[$idx['usage_stage']])
+                : null;
             $scrapRaw = isset($idx['scrap_pct']) ? (string) $row[$idx['scrap_pct']] : '0';
             $scrapNorm = $this->normalizeDecimal($scrapRaw) ?? '0';
 
@@ -359,6 +417,7 @@ class ItemBomController extends Controller
             $rowsBySku[$skuCode][] = [
                 'material_code' => $matCode,
                 'qty' => $qtyNorm, // ✅ string
+                'usage_stage' => $usageStage,
                 'uom' => $uom ?: 'pcs',
                 'scrap_pct' => $scrapNorm, // ✅ string
                 'is_optional' => $opt ? 1 : 0,
@@ -404,6 +463,7 @@ class ItemBomController extends Controller
 
                     $normalized[] = [
                         'material_item_id' => (int) $mat->id,
+                        'usage_stage' => $l['usage_stage'] ?: $this->inferUsageStageFromCode($code),
                         'qty' => (string) $l['qty'],
                         'uom' => (string) ($l['uom'] ?? 'pcs'),
                         'scrap_pct' => (string) ($l['scrap_pct'] ?? '0'),
@@ -441,13 +501,13 @@ class ItemBomController extends Controller
 
     public function downloadTemplate()
     {
-        $header = "sku_code,material_code,qty,uom,scrap_pct,is_optional,sort_order\n";
+        $header = "sku_code,material_code,usage_stage,qty,uom,scrap_pct,is_optional,sort_order\n";
         $sample = [
-            "C5BLK,FLC280BLK,1.2000,pcs,2,0,10",
-            "C5BLK,RIB280BLK,0.2500,pcs,2,0,20",
-            "C5BLK,TLKADDS,0.0095,pcs,0,0,30",
-            "C5BLK,KRT4CM,1.0000,pcs,0,0,40",
-            "C5BLK,BNGJHT,0.1000,pcs,0,0,50",
+            "C5BLK,FLC280BLK,main_material,1.2000,kg,2,0,10",
+            "C5BLK,RIB280BLK,sewing_supply,0.2500,kg,2,0,20",
+            "C5BLK,KRT4CM,sewing_supply,1.0000,pcs,0,0,30",
+            "C5BLK,TLKADDS,packing_supply,0.0095,kg,0,0,40",
+            "C5BLK,OPP001,packing_supply,1.0000,pcs,0,0,50",
         ];
 
         $csv = $header . implode("\n", $sample) . "\n";
@@ -512,6 +572,7 @@ class ItemBomController extends Controller
 
             $sourceLines = $fromBom->lines->map(fn($l) => [
                 'material_item_id' => (int) $l->material_item_id,
+                'usage_stage' => (string) ($l->usage_stage ?: ItemBomLine::STAGE_MAIN_MATERIAL),
                 'qty' => (string) $l->qty, // ✅ string
                 'uom' => (string) $l->uom,
                 'scrap_pct' => (string) $l->scrap_pct, // ✅ string

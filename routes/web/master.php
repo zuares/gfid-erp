@@ -106,6 +106,9 @@ Route::middleware(['web', 'auth', 'access:master'])->group(function () {
         Route::put('item-boms/{bom}', [ItemBomController::class, 'update'])
             ->name('item_boms.update');
 
+        Route::delete('item-boms/{bom}', [ItemBomController::class, 'destroy'])
+            ->name('item_boms.destroy');
+
         // AJAX search select2
         Route::get('item-boms/ajax/items', [ItemBomController::class, 'ajaxItems'])
             ->name('item_boms.ajax_items');
