@@ -251,7 +251,27 @@ class SewingPickupController extends Controller
 
                 // WIP per bundle (pakai kolom cutting-WIP yang kebal dari tahap hilir)
                 $wipQty = (float) ($bundle->cut_wip_qty ?? 0);
-                $alreadyPicked = (float) ($bundle->sewing_picked_qty ?? 0);
+
+                // ✅ FIX: hitung alreadyPicked dari SUM(sewing_pickup_lines.qty_bundle) aktif.
+                // JANGAN pakai bundle->sewing_picked_qty — bisa terkontaminasi bug lama / qty_direct_picked.
+                // Invariant: sewing_picked_qty = SUM(pickup_lines.qty_bundle WHERE status != 'void').
+                $alreadyPicked = (float) SewingPickupLine::query()
+                    ->where('cutting_job_bundle_id', $bundle->id)
+                    ->where('status', '!=', 'void')
+                    ->sum('qty_bundle');
+
+                // ✅ VALIDASI KETAT: qty_bundle tidak boleh melebihi sisa (qty_pcs - alreadyPicked).
+                // qty_direct_picked dan qty_progress_adjusted tidak menaikkan sewing_picked_qty.
+                $qtyPcs = (float) ($bundle->qty_pcs ?? 0);
+                $remainingByBundle = max($qtyPcs - $alreadyPicked, 0.0);
+                if ($qty > $remainingByBundle + $epsilon) {
+                    throw ValidationException::withMessages([
+                        'lines' => "Bundle {$bundle->bundle_code}: qty {$qty} melebihi sisa "
+                            . "{$remainingByBundle} pcs (qty_pcs={$qtyPcs}, sudah dipick={$alreadyPicked}). "
+                            . "Pickup tidak boleh melebihi qty_pcs bundle.",
+                    ]);
+                }
+
                 $maxFromWip = max($wipQty - $alreadyPicked, 0.0);
 
                 // QC Cutting terakhir
@@ -308,9 +328,11 @@ class SewingPickupController extends Controller
                 $qtyByFinishedItem[$finishedItemId] = ($qtyByFinishedItem[$finishedItemId] ?? 0) + $qty;
 
                 // 🔹 UPDATE qty pick di bundle
+                // ✅ FIX: newPicked = SUM dari pickup lines setelah baris ini ditambahkan.
+                // Hard cap oleh qty_pcs — sewing_picked_qty tidak boleh melebihi qty_pcs.
                 $newPicked = $alreadyPicked + $qty;
-                if ($newPicked > $maxQtyOk) {
-                    $newPicked = $maxQtyOk;
+                if ($newPicked > $qtyPcs) {
+                    $newPicked = $qtyPcs;
                 }
 
                 $bundle->sewing_picked_qty = $newPicked;
@@ -1148,15 +1170,6 @@ class SewingPickupController extends Controller
 
                 $bundle = CuttingJobBundle::lockForUpdate()->findOrFail((int) $line->cutting_job_bundle_id);
 
-                if ($qty > ((float) $bundle->sewing_picked_qty + $epsilon)) {
-                    throw ValidationException::withMessages([
-                        'pickup' => "Data tidak konsisten (bundle {$bundle->bundle_code}).",
-                    ]);
-                }
-
-                $bundle->sewing_picked_qty = max(((float) $bundle->sewing_picked_qty) - $qty, 0.0);
-                $bundle->save();
-
                 $notes = "VOID Sewing pickup {$pickup->code} - bundle {$bundle->bundle_code}";
 
                 $unitCost = (float) ($line->unit_cost ?? 0);
@@ -1195,6 +1208,15 @@ class SewingPickupController extends Controller
 
                 $line->status = 'void';
                 $line->save();
+
+                // ✅ FIX: recalculate sewing_picked_qty dari SUM(non-void pickup lines).
+                // Lebih aman daripada subtraksi — otomatis membenahi data korup.
+                $newPicked = (float) SewingPickupLine::query()
+                    ->where('cutting_job_bundle_id', $bundle->id)
+                    ->where('status', '!=', 'void')
+                    ->sum('qty_bundle');
+                $bundle->sewing_picked_qty = $newPicked;
+                $bundle->save();
             }
 
             $pickup->status = 'void';
@@ -1273,16 +1295,8 @@ class SewingPickupController extends Controller
             // lock bundle
             $bundle = CuttingJobBundle::lockForUpdate()->findOrFail($line->cutting_job_bundle_id);
 
-            // konsistensi picked qty
-            if ($qty > (float) $bundle->sewing_picked_qty + $epsilon) {
-                throw ValidationException::withMessages([
-                    'pickup' => "Data tidak konsisten (bundle {$bundle->bundle_code}). sewing_picked_qty lebih kecil dari qty pickup.",
-                ]);
-            }
-
-            // reverse picked qty
-            $bundle->sewing_picked_qty = max(((float) $bundle->sewing_picked_qty) - $qty, 0);
-            $bundle->save();
+            // ✅ FIX: consistency check dihapus — nanti dihitung ulang dari SUM setelah void.
+            // Arithmetic decrement dihapus karena rawan bug jika sewing_picked_qty sebelumnya korup.
 
             $notes = "VOID LINE Sewing pickup {$pickup->code} - bundle {$bundle->bundle_code} - line {$line->id}";
 
@@ -1328,6 +1342,15 @@ class SewingPickupController extends Controller
             $line->voided_at = now();
             $line->voided_by = auth()->id();
             $line->save();
+
+            // ✅ FIX: recalculate sewing_picked_qty dari SUM(non-void pickup lines).
+            // Ini membenahi data korup sekaligus menjamin invariant ke depan.
+            $newPicked = (float) SewingPickupLine::query()
+                ->where('cutting_job_bundle_id', $bundle->id)
+                ->where('status', '!=', 'void')
+                ->sum('qty_bundle');
+            $bundle->sewing_picked_qty = $newPicked;
+            $bundle->save();
 
             // OPTIONAL (rapi): kalau semua line sudah void, otomatis void header juga
             $hasNonVoid = SewingPickupLine::where('sewing_pickup_id', $pickup->id)

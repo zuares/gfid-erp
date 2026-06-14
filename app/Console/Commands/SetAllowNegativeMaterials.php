@@ -11,17 +11,6 @@ class SetAllowNegativeMaterials extends Command
     protected $signature   = 'supply:allow-negative {--dry-run : Lihat daftar tanpa mengubah}';
     protected $description = 'Set allow_negative = true untuk bahan baku dan bahan pendukung produksi (RIB, KRT, FLC, TLK, OPP, LBL, dst.)';
 
-    // Item roles yang boleh minus
-    private array $allowedRoles = [
-        'production_supply',
-        'raw_material',
-    ];
-
-    // Prefix kode item yang boleh minus
-    private array $codePrefixes = [
-        'RIB', 'KRT', 'FLC', 'TLK', 'OPP', 'LBL',
-    ];
-
     public function handle(): int
     {
         if (! Schema::hasColumn('items', 'allow_negative')) {
@@ -31,19 +20,21 @@ class SetAllowNegativeMaterials extends Command
 
         $isDryRun = $this->option('dry-run');
 
-        // Build query: item_role IN (...) OR code LIKE 'RIB%' OR ...
-        $query = DB::table('items')
-            ->where(function ($q) {
-                $q->whereIn('item_role', $this->allowedRoles);
+        // Ambil semua material yang terdaftar di BOM manapun
+        $materialIds = DB::table('item_bom_lines')
+            ->distinct()
+            ->pluck('material_item_id');
 
-                foreach ($this->codePrefixes as $prefix) {
-                    $q->orWhere('code', 'like', $prefix . '%');
-                }
-            })
+        if ($materialIds->isEmpty()) {
+            $this->warn('Tidak ada material di item_bom_lines. Pastikan BOM sudah di-seed.');
+            return self::SUCCESS;
+        }
+
+        $items = DB::table('items')
+            ->whereIn('id', $materialIds)
             ->orderBy('item_role')
-            ->orderBy('code');
-
-        $items = $query->get(['id', 'code', 'name', 'item_role', 'allow_negative']);
+            ->orderBy('code')
+            ->get(['id', 'code', 'name', 'item_role', 'allow_negative']);
 
         if ($items->isEmpty()) {
             $this->warn('Tidak ada item yang cocok ditemukan.');

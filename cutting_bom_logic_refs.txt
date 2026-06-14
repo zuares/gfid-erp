@@ -1,0 +1,65 @@
+app/Http/Controllers/Production/SewingPickupController.php:948:        $stage = (string) ($line->usage_stage ?? '');
+app/Http/Controllers/Production/CuttingJobController.php:112:        //    Format: { finished_item_id => { fabric_item_id => { qty, scrap_pct } } }
+app/Http/Controllers/Production/CuttingJobController.php:119:                ->map(fn($l) => ['qty' => (float) $l->qty, 'scrap_pct' => (float) $l->scrap_pct])
+app/Http/Controllers/Production/CuttingJobController.php:202:                    'planned' => (float) $cjLot->planned_fabric_qty,
+app/Http/Controllers/Production/CuttingJobController.php:225:                    'qty_used_fabric' => (float) ($b->qty_used_fabric ?? 0),
+app/Http/Controllers/Production/CuttingJobController.php:240:                    'qty_used_fabric' => 0,
+app/Http/Controllers/Production/CuttingJobController.php:246:        $lotBalance = (float) $cuttingJob->bundles->sum('qty_used_fabric');
+app/Http/Controllers/Production/CuttingJobController.php:290:    //         'bundles.*.qty_used_fabric' => ['nullable', 'numeric', 'min:0'],
+app/Http/Controllers/Production/CuttingJobController.php:376:    //     // 4) HEADER lot_id & qty_used_fabric
+app/Http/Controllers/Production/CuttingJobController.php:384:    //     // Hitung qty_used_fabric per baris (estimasi, TOTAL kain dibagi jumlah bundle valid)
+app/Http/Controllers/Production/CuttingJobController.php:394:    //             $validBundles[$i]['qty_used_fabric'] = $perRow;
+app/Http/Controllers/Production/CuttingJobController.php:396:    //             $validBundles[$i]['qty_used_fabric'] = 0;
+app/Http/Controllers/Production/CuttingJobController.php:424:    //             // 🔥 sekarang planned_fabric_qty = SALDO REAL per LOT,
+app/Http/Controllers/Production/CuttingJobController.php:426:    //             'planned_fabric_qty' => $saldoLot,
+app/Http/Controllers/Production/CuttingJobController.php:461:            'bundles.*.qty_used_fabric' => ['nullable', 'numeric', 'min:0'],
+app/Http/Controllers/Production/CuttingJobController.php:576:        // 5) HITUNG qty_used_fabric — PAKAI BOM jika tersedia,
+app/Http/Controllers/Production/CuttingJobController.php:605:                    $scrapPct = (float) $bomLine->scrap_pct;
+app/Http/Controllers/Production/CuttingJobController.php:606:                    $validBundles[$idx]['qty_used_fabric'] = round(
+app/Http/Controllers/Production/CuttingJobController.php:616:                // Jika saldo 0 → qty_used_fabric juga 0 (tidak ada deduction)
+app/Http/Controllers/Production/CuttingJobController.php:622:                        $validBundles[$idx]['qty_used_fabric'] = max($saldoLot - $usedSoFar, 0);
+app/Http/Controllers/Production/CuttingJobController.php:624:                        $validBundles[$idx]['qty_used_fabric'] = $perRow;
+app/Http/Controllers/Production/CuttingJobController.php:638:            $fabricByLot[$lotId] = ($fabricByLot[$lotId] ?? 0.0) + (float) ($b['qty_used_fabric'] ?? 0);
+app/Http/Controllers/Production/CuttingJobController.php:660:                    // planned_fabric_qty = total BOM/saldo yang direncanakan dari LOT ini
+app/Http/Controllers/Production/CuttingJobController.php:661:                    'planned_fabric_qty' => $fabricByLot[$lotId] ?? 0.0,
+app/Http/Controllers/Production/CuttingJobController.php:685:                'used_fabric' => (float) $job->bundles()->sum('qty_used_fabric'),
+app/Http/Controllers/Production/CuttingJobController.php:731:            'bundles.*.qty_used_fabric' => ['nullable', 'numeric', 'min:0'],
+app/Http/Controllers/Production/CuttingJobController.php:792:        // - kalau ada pivot CuttingJobLot: pakai planned_fabric_qty
+app/Http/Controllers/Production/CuttingJobController.php:799:                $plannedMap[(int) $cjLot->lot_id] = (float) $cjLot->planned_fabric_qty;
+app/Http/Controllers/Production/CuttingJobController.php:813:        // ✅ HITUNG qty_used_fabric = planned per LOT dibagi baris valid per LOT (last row remainder)
+app/Http/Controllers/Production/CuttingJobController.php:818:                return back()->withErrors(['bundles' => "Planned kain untuk LOT {$lotId} = 0. Cek CuttingJobLot / planned_fabric_qty."])->withInput();
+app/Http/Controllers/Production/CuttingJobController.php:827:                    $validBundles[$idx]['qty_used_fabric'] = max($planned - $usedSoFar, 0);
+app/Http/Controllers/Production/CuttingJobController.php:829:                    $validBundles[$idx]['qty_used_fabric'] = $perRow;
+app/Services/Production/CuttingService.php:29:     *   berdasarkan qty_used_fabric per bundle.
+app/Services/Production/CuttingService.php:78:                $qtyUsedFabric = $this->num($row['qty_used_fabric'] ?? 0);
+app/Services/Production/CuttingService.php:92:                    'qty_used_fabric' => $qtyUsedFabric,
+app/Services/Production/CuttingService.php:159:                $qtyUsedFabric = $this->num($row['qty_used_fabric'] ?? 0);
+app/Services/Production/CuttingService.php:177:                            'qty_used_fabric' => $qtyUsedFabric,
+app/Services/Production/CuttingService.php:192:                        'qty_used_fabric' => $qtyUsedFabric,
+app/Services/Production/CuttingService.php:248:            $qtyUsed = $this->num($bundle->qty_used_fabric ?? 0);
+app/Services/Production/CuttingService.php:261:            $totalPlanned = (float) $lotPlans->sum('planned_fabric_qty');
+app/Services/Production/CuttingService.php:308:                $planned = (float) $plan->planned_fabric_qty;
+app/Services/Production/CuttingService.php:363:            $qtyUsed = $this->num($bundle->qty_used_fabric ?? 0);
+app/Services/Production/FinishingBomService.php:92:                $scrap = (float) ($bl->scrap_pct ?? 0);
+app/Models/CuttingJobBundle.php:61:        'qty_used_fabric',
+app/Models/CuttingJobBundle.php:76:        'qty_used_fabric' => 'float',
+app/Models/ItemBom.php:35:            ->where('usage_stage', ItemBomLine::STAGE_MAIN_MATERIAL);
+app/Models/ItemBom.php:41:            ->where('usage_stage', ItemBomLine::STAGE_SEWING_SUPPLY);
+app/Models/ItemBom.php:47:            ->where('usage_stage', ItemBomLine::STAGE_PACKING_SUPPLY);
+app/Models/CuttingJobLot.php:15:        'planned_fabric_qty',
+app/Models/CuttingJobLot.php:20:        'planned_fabric_qty' => 'float',
+app/Models/CuttingJobLot.php:41:        : $this->planned_fabric_qty;
+app/Models/ItemBomLine.php:17:        'usage_stage',
+app/Models/ItemBomLine.php:20:        'scrap_pct',
+app/Models/ItemBomLine.php:27:        'scrap_pct' => 'decimal:2',
+app/Models/ItemBomLine.php:54:        return $base + ($base * ((float) $this->scrap_pct / 100));
+resources/views/production/cutting_jobs/_form.blade.php:309:            // BOM data dari controller: { finishedItemId: { fabricItemId: { qty, scrap_pct } } }
+resources/views/production/cutting_jobs/_form.blade.php:544:                        const { qty: bomQty, scrap_pct } = bom[fabricItemId];
+resources/views/production/cutting_jobs/_form.blade.php:545:                        totalBomFabric += qty * bomQty * (1 + scrap_pct / 100);
+resources/views/production/cutting_jobs/edit.blade.php:24:                'qty_used_fabric' => 0,
+resources/views/production/cutting_jobs/edit.blade.php:408:                                                name="bundles[{{ $i }}][qty_used_fabric]"
+resources/views/production/cutting_jobs/edit.blade.php:409:                                                value="{{ old("bundles.$i.qty_used_fabric", $r['qty_used_fabric'] ?? 0) }}">
+resources/views/production/cutting_jobs/edit.blade.php:450:                                                        {{ number_format((float) old("bundles.$i.qty_used_fabric", $r['qty_used_fabric'] ?? 0), 2, ',', '.') }}
+resources/views/production/cutting_jobs/edit.blade.php:509:                    <input type="hidden" class="bundle-used-fabric" name="bundles[__INDEX__][qty_used_fabric]"
+resources/views/production/cutting_jobs/show.blade.php:380:        $totalUsedFabric = (float) $job->bundles->sum('qty_used_fabric');
+resources/views/production/cutting_jobs/show.blade.php:843:                                    <td>{{ number_format((float) ($row->qty_used_fabric ?? 0), 2, ',', '.') }}</td>

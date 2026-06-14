@@ -384,35 +384,115 @@
 @endphp
 
 <style>
-    @media (min-width: 992px) {
+    /* Tablet (768px–991px): sidebar 180px — sempit tapi full navigasi */
+    @media (min-width: 768px) {
         .sidebar-modern {
             position: fixed;
             top: 0;
             left: 0;
-            width: 260px;
+            width: 180px;
             height: 100vh;
-            padding: 1rem 1rem 1.6rem;
+            padding: .8rem .65rem 1.4rem;
             display: flex;
             flex-direction: column;
-            gap: 1rem;
+            gap: .75rem;
             background: color-mix(in srgb, var(--card) 92%, var(--bg) 8%);
             backdrop-filter: blur(14px);
             border-right: 1px solid rgba(148, 163, 184, .35);
             box-shadow: 8px 0 24px rgba(15,23,42,.05), 2px 0 8px rgba(15,23,42,.03);
-            border-radius: 0 22px 22px 0;
+            border-radius: 0 18px 18px 0;
             z-index: 1030;
             overflow-y: auto;
+            overflow-x: hidden;
             scrollbar-width: thin;
-            scrollbar-color: rgba(148, 163, 184, .4) transparent;
+            scrollbar-color: rgba(148, 163, 184, .35) transparent;
         }
 
-        .app-main {
-            margin-left: 260px;
+        .app-main { margin-left: 180px; }
+
+        /* Kecilkan font dan padding sedikit agar muat di 180px */
+        .sidebar-modern .sidebar-brand {
+            font-size: 1rem;
+            padding: .55rem .2rem .75rem;
+            gap: .5rem;
+        }
+        .sidebar-modern .sidebar-brand .role-pill {
+            font-size: .62rem;
+            padding: .12rem .4rem;
+        }
+        .sidebar-modern .sidebar-subhead {
+            font-size: .6rem;
+            letter-spacing: .1em;
+        }
+        .sidebar-modern .sidebar-link,
+        .sidebar-modern .sidebar-toggle {
+            font-size: .82rem;
+            padding: .52rem .7rem;
+            gap: .4rem;
+        }
+        .sidebar-modern .sidebar-link .icon,
+        .sidebar-modern .sidebar-toggle .icon {
+            width: 18px;
+            font-size: .95rem;
+        }
+        .sidebar-modern .sidebar-link-sub {
+            font-size: .78rem;
+            padding: .38rem .65rem .38rem 1.6rem;
+        }
+        .sidebar-modern .sidebar-link-sub .icon {
+            width: 14px;
+            font-size: .8rem;
+        }
+    }
+
+    /* Desktop (992px+): sidebar penuh 260px */
+    @media (min-width: 992px) {
+        .sidebar-modern {
+            width: 260px;
+            padding: 1rem 1rem 1.6rem;
+            gap: 1rem;
+            border-radius: 0 22px 22px 0;
+        }
+
+        .app-main { margin-left: 260px; }
+
+        /* Kembalikan ukuran font/padding ke default */
+        .sidebar-modern .sidebar-brand {
+            font-size: 1.15rem;
+            padding: .7rem .35rem .9rem;
+            gap: .75rem;
+        }
+        .sidebar-modern .sidebar-brand .role-pill {
+            font-size: .7rem;
+            padding: .18rem .55rem;
+        }
+        .sidebar-modern .sidebar-subhead {
+            font-size: .65rem;
+            letter-spacing: .12em;
+        }
+        .sidebar-modern .sidebar-link,
+        .sidebar-modern .sidebar-toggle {
+            font-size: .93rem;
+            padding: .6rem .9rem;
+            gap: .55rem;
+        }
+        .sidebar-modern .sidebar-link .icon,
+        .sidebar-modern .sidebar-toggle .icon {
+            width: 22px;
+            font-size: 1.05rem;
+        }
+        .sidebar-modern .sidebar-link-sub {
+            font-size: .86rem;
+            padding: .42rem .9rem .42rem 2.3rem;
+        }
+        .sidebar-modern .sidebar-link-sub .icon {
+            width: 18px;
+            font-size: .9rem;
         }
     }
 
     .sidebar-modern { display: none; }
-    @media (min-width: 992px) { .sidebar-modern { display: flex; } }
+    @media (min-width: 768px) { .sidebar-modern { display: flex; } }
 
     .sidebar-modern::-webkit-scrollbar { width: 6px; }
     .sidebar-modern::-webkit-scrollbar-thumb { background: rgba(148, 163, 184, .35); border-radius: 20px; }

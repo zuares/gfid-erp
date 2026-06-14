@@ -1,0 +1,1767 @@
+=== AUDIT MODUL CUTTING GFID ===
+Project: /Users/ariefmuhamad/Herd/gfid-dev
+
+[1] FILE TERKAIT CUTTING
+- app/Http/Controllers/Accounting/JournalController.php
+- app/Http/Controllers/Costing/ProductionCostPeriodController.php
+- app/Http/Controllers/Master/ItemController.php
+- app/Http/Controllers/Master/EmployeeController.php
+- app/Http/Controllers/Inventory/StockCardController.php
+- app/Http/Controllers/Inventory/WipAdjustmentController.php
+- app/Http/Controllers/Inventory/InventoryAdjustmentController.php
+- app/Http/Controllers/Inventory/ExternalTransferController.php
+- app/Http/Controllers/Inventory/WipCutReconcileController.php
+- app/Http/Controllers/Inventory/RtsDirectReceiveController.php
+- app/Http/Controllers/Production/SewingPickupController.php
+- app/Http/Controllers/Production/ProductionOrderController.php
+- app/Http/Controllers/Production/ProductionReceiptController.php
+- app/Http/Controllers/Production/FinishingRepairController.php
+- app/Http/Controllers/Production/QcController.php
+- app/Http/Controllers/Production/ProductionActivityController.php
+- app/Http/Controllers/Production/SewingRejectReturnController.php
+- app/Http/Controllers/Production/ProductionIssueController.php
+- app/Http/Controllers/Production/ProductionDashboardController.php
+- app/Http/Controllers/Production/FinishingJobController.php
+- app/Http/Controllers/Production/SewingReturnController.php
+- app/Http/Controllers/Production/CuttingJobController.php
+- app/Http/Controllers/Api/ItemController.php
+- app/Http/Controllers/Payroll/PieceRateController.php
+- app/Http/Controllers/Payroll/PieceworkPayrollController.php
+- app/Http/Controllers/Payroll/PayrollDashboardController.php
+- app/Http/Controllers/Payroll/PayrollReportController.php
+- app/Models/SewingReturnLine.php
+- app/Models/PieceRate.php
+- app/Models/InventoryMutation.php
+- app/Models/CuttingJobBundle.php
+- app/Models/PieceworkPayrollPeriod.php
+- app/Models/InventoryAdjustmentLine.php
+- app/Models/ProductionMovement.php
+- app/Models/SewingPickupLine.php
+- app/Models/PackingJob.php
+- app/Models/QcResult.php
+- app/Models/FinishingJob.php
+- app/Models/Supplier.php
+- app/Models/ItemCostSnapshot.php
+- app/Models/ProductionCostPeriod.php
+- app/Models/Item.php
+- app/Models/CuttingJobLot.php
+- app/Models/FinishingJobLine.php
+- app/Models/FinishingRepairLine.php
+- app/Models/CuttingJob.php
+- app/Models/Lot.php
+- app/Services/Costing/FgHppAutoService.php
+- app/Services/Costing/FinishingRmHppService.php
+- app/Services/Costing/ProductionCostService.php
+- app/Services/Costing/HppService.php
+- app/Services/Inventory/StockOpnameService.php
+- app/Services/Inventory/InventoryService.php
+- app/Services/Production/CuttingService.php
+- app/Services/Production/QcService.php
+- app/Services/Production/ProductionFlowService.php
+- app/Services/Production/FinishingBomService.php
+- app/Services/Payroll/CuttingPayrollGenerator.php
+- app/Services/Payroll/PieceRateService.php
+- database/migrations/2026_01_09_185623_add_production_refs_to_inventory_adjustment_lines_table.php
+- database/migrations/2026_01_08_123410_create_wip_fin_adjustment_lines_table.php
+- database/migrations/2026_05_31_170000_add_cutting_job_bundle_id_to_inventory_mutations.php
+- database/migrations/2025_11_25_150826_create_sewing_pickup_lines_table.php
+- database/migrations/2025_11_25_084644_create_qc_results_table.php
+- database/migrations/2026_06_14_020000_create_finishing_repairs_table.php
+- database/migrations/2025_11_28_184739_create_piecework_payroll_periods_table.php
+- database/migrations/2026_01_09_185605_add_wip_fields_to_inventory_adjustments_table.php
+- database/migrations/2025_12_04_000000_create_item_cost_snapshots_table.php
+- database/migrations/2026_01_30_183919_create_bom_issues_tables.php
+- database/migrations/2025_11_26_082352_add_sewing_picked_qty_to_cutting_job_bundles.php
+- database/migrations/2025_11_25_154401_add_qc_qty_to_cutting_job_bundles_table.php
+- database/migrations/2025_11_30_131501_create_piece_rates_table.php
+- database/migrations/2025_11_20_191712_create_employees_table.php
+- database/migrations/2026_05_31_164200_add_cut_wip_columns_to_cutting_job_bundles.php
+- database/migrations/2025_11_25_030041_create_cutting_jobs_table.php
+- database/migrations/2025_11_25_163214_add_wip_to_cutting_job_bundles.php
+- database/migrations/2025_12_05_000000_create_production_cost_periods_table.php
+- database/migrations/2025_11_26_135452_create_finishing_job_lines_table.php
+- database/migrations/2025_12_07_000000_create_cutting_job_lots_table.php
+- database/migrations/2025_11_25_030104_create_cutting_job_bundles_table.php
+- database/migrations/2026_01_10_025229_add_wip_posted_at_to_cutting_job_bundles_table.php
+- database/migrations/2025_11_20_210255_create_suppliers_table.php
+- database/migrations/2025_11_20_192129_update_users_for_employee_login.php
+- database/migrations/2026_01_10_033704_add_cutting_bundle_ref_to_inventory_adjustments_table.php
+- database/migrations/2026_06_01_000200_create_production_movements_table.php
+- resources/views/costing/production_cost_periods/index.blade.php
+- resources/views/costing/production_cost_periods/edit.blade.php
+- resources/views/costing/production_cost_periods/show.blade.php
+- resources/views/costing/hpp/index.blade.php
+- resources/views/components/mobile-bottom-nav.blade.php
+- resources/views/components/modal-confirm-operator.blade.php
+- resources/views/layouts/partials/mobile-bottom-nav.blade.php
+- resources/views/layouts/partials/mobile-sidebar.blade.php
+- resources/views/layouts/partials/sidebar.blade.php
+- resources/views/inventory/wip_cut_reconcile/index.blade.php
+- resources/views/inventory/wip_cut_reconcile/show.blade.php
+- resources/views/inventory/external_transfers/create.blade.php
+- resources/views/inventory/external_transfers/show.blade.php
+- resources/views/inventory/adjustments/show.blade.php
+- resources/views/inventory/adjustments/cutting_overproduction/create.blade.php
+- resources/views/inventory/wip_adjustments/create.blade.php
+- resources/views/production/sewing_pickups/bundles_ready.blade.php
+- resources/views/production/sewing_pickups/_bundle_picker.blade.php
+- resources/views/production/sewing_pickups/create.blade copy.php
+- resources/views/production/sewing_pickups/show.blade.php
+- resources/views/production/cutting_jobs/_modal_confirm.blade.php
+- resources/views/production/cutting_jobs/index.blade.php
+- resources/views/production/cutting_jobs/_form.blade.php
+- resources/views/production/cutting_jobs/create.blade copy 2.php
+- resources/views/production/cutting_jobs/_pick_lot.blade copy.php
+- resources/views/production/cutting_jobs/edit.blade.php
+- resources/views/production/cutting_jobs/_pick_lot.blade.php
+- resources/views/production/cutting_jobs/create.blade.php
+- resources/views/production/cutting_jobs/create.blade copy.php
+- resources/views/production/cutting_jobs/show.blade.php
+- resources/views/production/cutting_jobs/_form.blade copy.php
+- resources/views/production/sewing_returns/show.blade.php
+- resources/views/production/sewing_progress_adjustments/create.blade.php
+- resources/views/production/sewing_progress_adjustments/show.blade.php
+- resources/views/production/dashboard/index.blade.php
+- resources/views/production/dashboard/partials/_reject.blade.php
+- resources/views/production/dashboard/partials/_ringkasan.blade.php
+- resources/views/production/finishing_jobs/index.blade.php
+- resources/views/production/finishing_jobs/_bundle_row.blade.php
+- resources/views/production/finishing_jobs/edit.blade.php
+- resources/views/production/finishing_jobs/show.blade.php
+- resources/views/production/qc/index.blade.php
+- resources/views/production/qc/cutting_edit.blade.php
+- resources/views/payroll/dashboard/index.blade.php
+- resources/views/payroll/dashboard/partials/_cutting.blade.php
+- resources/views/payroll/dashboard/partials/_keseluruhan.blade.php
+- resources/views/payroll/sewing/slip_all.blade.php
+- resources/views/payroll/cutting/index.blade.php
+- resources/views/payroll/cutting/create.blade.php
+- resources/views/payroll/cutting/slip.blade.php
+- resources/views/payroll/cutting/show.blade.php
+- resources/views/payroll/reports/operator_summary.blade.php
+- resources/views/payroll/reports/operator_slips.blade.php
+- resources/views/payroll/reports/operator_detail.blade.php
+
+[2] ROUTE CUTTING
+--- routes/web.php ---
+Tidak ada route cutting.
+
+--- routes/api.php ---
+Tidak ada route cutting.
+
+[3] CONTROLLER DAN METHOD
+--- app/Http/Controllers/Accounting/JournalController.php ---
+- sourceTypeLabel
+- buildSourceTypeOptions
+- safeRoute
+- index
+- show
+
+--- app/Http/Controllers/Costing/ProductionCostPeriodController.php ---
+- __construct
+- index
+- show
+- generate
+- edit
+- update
+
+--- app/Http/Controllers/Master/ItemController.php ---
+- index
+- create
+- show
+- editHppTemp
+- storeHppTemp
+- store
+- edit
+- update
+- destroy
+- bulkUpdate
+- validateRequest
+- validateCategoryForType
+- allowedCategoryKindsForType
+- classificationFor
+- productionSourceFor
+- categoryOptions
+- syncBarcodes
+- meta
+
+--- app/Http/Controllers/Master/EmployeeController.php ---
+- index
+- create
+- store
+- edit
+- update
+- destroy
+- validateData
+
+--- app/Http/Controllers/Inventory/StockCardController.php ---
+- index
+- export
+
+--- app/Http/Controllers/Inventory/WipAdjustmentController.php ---
+- index
+- create
+- items
+- bundles
+- store
+- show
+- approve
+- generateCodeForDate
+
+--- app/Http/Controllers/Inventory/InventoryAdjustmentController.php ---
+- __construct
+- index
+- show
+- formatRupiah
+- resolveUnitCostForLine
+- resolveUnitCostForAdjustmentApprove
+- createManual
+- storeManual
+- approve
+- approveManualAdjustment
+- approveFromStockOpname
+- approveFromStockOpnameOpening
+- approveFromStockOpnamePeriodic
+- itemsForWarehouse
+- generateCodeForDate
+- post
+- cuttingOverproductionCreate
+- cuttingOverproductionStore
+- cuttingOverproductionPost
+- cuttingOverproductionVoid
+
+--- app/Http/Controllers/Inventory/ExternalTransferController.php ---
+- __construct
+- index
+- show
+- create
+- store
+- validateHeader
+- num
+
+--- app/Http/Controllers/Inventory/WipCutReconcileController.php ---
+- index
+- show
+
+--- app/Http/Controllers/Inventory/RtsDirectReceiveController.php ---
+- __construct
+- index
+- create
+- operatorWip
+- store
+- storeNormal
+- storeAutoSr
+- show
+- generateCode
+
+--- app/Http/Controllers/Production/SewingPickupController.php ---
+- __construct
+- index
+- show
+- bundlesReady
+- create
+- store
+- buildSewingSupplyChecklist
+- editSupplies
+- updateSupplies
+- updateLineSupplies
+- storeSewingPickupSupplies
+- storeSewingPickupLineSupplies
+- parseSubmittedSewingSupplies
+- parseSubmittedSewingSupplyBundles
+- buildSewingSupplyRequirements
+- isSewingSupplyMaterial
+- isSewingSupplyBomLine
+- formatSuppliesChecklistNote
+- ajaxReadyBundles
+- void
+- voidLine
+
+--- app/Http/Controllers/Production/ProductionOrderController.php ---
+- index
+- create
+- store
+- show
+- edit
+- update
+- destroy
+
+--- app/Http/Controllers/Production/ProductionReceiptController.php ---
+- create
+- store
+- post
+
+--- app/Http/Controllers/Production/FinishingRepairController.php ---
+- __construct
+- index
+- create
+- store
+- show
+- availableRejectLines
+- resolveRejectItem
+
+--- app/Http/Controllers/Production/QcController.php ---
+- __construct
+- index
+- editCutting
+- updateCutting
+- quickOkCutting
+- cancelCutting
+- humanizeCancelCuttingQcError
+- buildCancelQcUiPayload
+- adjustCuttingBundle
+- overproductionCuttingBundle
+- revertCuttingToCutting
+
+--- app/Http/Controllers/Production/ProductionActivityController.php ---
+- store
+- destroy
+
+--- app/Http/Controllers/Production/SewingRejectReturnController.php ---
+- index
+- rows
+
+--- app/Http/Controllers/Production/ProductionIssueController.php ---
+- create
+- store
+- post
+
+--- app/Http/Controllers/Production/ProductionDashboardController.php ---
+- __construct
+- index
+- data
+- slip
+- resolveFilters
+- periodLabel
+- partialFor
+- tabData
+- tabCounts
+- readySewingBundleCount
+- sewingOutstandingBaseQuery
+- sewingOutstandingBundleCount
+- sewingReturnBundleCount
+- rejectBundleCount
+- productionActivityCount
+- priorityBundleCount
+- applyNotVoid
+- buildSummary
+- buildActivityTimeline
+- buildSiapJahit
+- buildSedangJahit
+- buildSetorQc
+- buildReject
+- repairedQtyByLine
+- buildPenjahitActivity
+- buildCuttingActivity
+- buildOperatorPerformance
+
+--- app/Http/Controllers/Production/FinishingJobController.php ---
+- __construct
+- readinessFromLedger
+- wipFinLedgerSql
+- index
+- create
+- store
+- show
+- edit
+- update
+- post
+- postCreatedJob
+- getRequiredWarehouses
+- resolveMovementDate
+- applyPostingMovements
+- getSupUnitCostFromFinishingBom
+
+--- app/Http/Controllers/Production/SewingReturnController.php ---
+- __construct
+- index
+- show
+- create
+- applyLineSupplyStateToPickupLine
+- assertPickupSuppliesCompleteForReturn
+- supplyShortLabel
+- buildRejectReworkLines
+- store
+- void
+
+--- app/Http/Controllers/Production/CuttingJobController.php ---
+- __construct
+- index
+- create
+- edit
+- store
+- store
+- update
+- resolveTypedFinishedItems
+- onlyMainRawMaterialLots
+- capLotBalancesToOnHand
+- humanizeStockError
+- show
+- void
+- sendToQc
+
+--- app/Http/Controllers/Api/ItemController.php ---
+- applyCommonFilters
+- mapItem
+- index
+- suggest
+- show
+- findByBarcode
+
+--- app/Http/Controllers/Payroll/PieceRateController.php ---
+- index
+- create
+- store
+- edit
+- update
+- destroy
+- validateData
+
+--- app/Http/Controllers/Payroll/PieceworkPayrollController.php ---
+- moduleConfig
+- index
+- create
+- store
+- show
+- slip
+- slipAll
+- finalize
+- pay
+- regenerate
+
+--- app/Http/Controllers/Payroll/PayrollDashboardController.php ---
+- __construct
+- index
+- data
+- slip
+- resolveFilters
+- periodLabel
+- partialFor
+- tabData
+- buildKeseluruhan
+- buildPenjahitActivity
+- buildCuttingActivity
+
+--- app/Http/Controllers/Payroll/PayrollReportController.php ---
+- operatorSummary
+- operatorSlips
+- operatorDetail
+
+[4] MODEL, FILLABLE, RELATION
+--- app/Models/SewingReturnLine.php ---
+table: default
+fillable:
+'sewing_return_id',
+        'sewing_pickup_line_id',
+        'qty_ok',
+        'qty_reject',
+        'notes',
+        'source_type',
+        'source_reject_return_line_id',
+        'source_finishing_job_line_id',
+relations:
+- sewingReturn: belongsTo
+- pickupLine: belongsTo
+- bundle: hasOne
+- finishedItem: belongsTo
+- sourceRejectReturnLine: belongsTo
+- sourceFinishingJobLine: belongsTo
+
+--- app/Models/PieceRate.php ---
+table: default
+fillable:
+'module',
+        'employee_id',
+        'item_category_id',
+        'item_id',
+        'rate_per_pcs',
+        'effective_from',
+        'effective_to',
+        'notes',
+relations:
+- employee: belongsTo
+- category: belongsTo
+- item: belongsTo
+
+--- app/Models/InventoryMutation.php ---
+table: inventory_mutations
+fillable:
+'date',
+        'warehouse_id',
+        'item_id',
+        'qty_change',
+        'direction',
+        'source_type',
+        'source_id',
+        'cutting_job_bundle_id',
+        'notes',
+        'lot_id', // ⭐ WAJIB
+        'unit_cost', // ⭐ WAJIB
+        'total_cost', // ⭐ WAJIB
+relations:
+- warehouse: belongsTo
+- item: belongsTo
+- getSourceUrlAttribute: belongsTo
+
+--- app/Models/CuttingJobBundle.php ---
+table: default
+fillable:
+'cutting_job_id',
+        'bundle_code',
+        'bundle_no',
+        'lot_id',
+        'finished_item_id',
+        'item_category_id',
+        'qty_pcs',
+        'qty_used_fabric',
+        'operator_id',
+        'status',
+        'notes',
+        'qty_qc_ok',
+        'qty_qc_reject',
+        'wip_warehouse_id',
+        'wip_qty',
+        'cut_wip_warehouse_id',
+        'cut_wip_qty',
+        'sewing_picked_qty',
+relations:
+- booted: belongsTo
+- finishedItem: belongsTo
+- item: belongsTo
+- lot: belongsTo
+- operator: belongsTo
+- wipWarehouse: belongsTo
+- cutWipWarehouse: belongsTo
+- itemCategory: belongsTo
+- qcResults: hasMany
+
+--- app/Models/PieceworkPayrollPeriod.php ---
+table: default
+fillable:
+'module',
+        'period_start',
+        'period_end',
+        'status',
+        'notes',
+        'created_by',
+        'posted_by',
+relations:
+- lines: hasMany
+- creator: belongsTo
+- poster: belongsTo
+
+--- app/Models/InventoryAdjustmentLine.php ---
+table: default
+fillable:
+'inventory_adjustment_id',
+        'item_id',
+        'qty_before',
+        'qty_after',
+        'qty_change',
+        'direction',
+        'notes',
+        'lot_id',
+
+        // ✅ WIP production refs
+        'cutting_job_bundle_id',
+        'sewing_pickup_line_id',
+        'finishing_job_line_id',
+relations:
+- adjustment: belongsTo
+- item: belongsTo
+- cuttingBundle: belongsTo
+- sewingPickupLine: belongsTo
+- finishingLine: belongsTo
+
+--- app/Models/ProductionMovement.php ---
+table: default
+fillable:
+'code',
+        'date',
+        'cutting_job_bundle_id',
+        'item_id',
+        'from_warehouse_id',
+        'to_warehouse_id',
+        'from_status',
+        'to_status',
+        'qty',
+        'operator_id',
+        'deadline',
+        'notes',
+        'created_by',
+        'inventory_mutation_id',
+relations:
+- item: belongsTo
+- bundle: belongsTo
+- fromWarehouse: belongsTo
+- toWarehouse: belongsTo
+- operator: belongsTo
+- creator: belongsTo
+- inventoryMutation: belongsTo
+
+--- app/Models/SewingPickupLine.php ---
+table: default
+fillable:
+'sewing_pickup_id',
+        'cutting_job_bundle_id',
+        'finished_item_id',
+        'operator_id',
+        'qty_bundle',
+        'qty_returned_ok',
+        'qty_returned_reject',
+        'status',
+        'notes',
+relations:
+- sewingPickup: belongsTo
+- bundle: belongsTo
+- finishedItem: belongsTo
+- operator: belongsTo
+- getReturnedQtyAttribute: hasMany
+- supplyLines: hasMany
+- getSupplyStatusAttribute: hasMany
+
+--- app/Models/PackingJob.php ---
+table: packing_jobs
+fillable:
+'code',
+        'date',
+        'status',
+        'posted_at',
+        'unposted_at',
+        'channel',
+        'reference',
+        'notes',
+        'warehouse_from_id',
+        'warehouse_to_id',
+        'created_by',
+        'updated_by',
+relations:
+- lines: hasMany
+- warehouseFrom: belongsTo
+- warehouseTo: belongsTo
+- createdBy: belongsTo
+- creator: belongsTo
+
+--- app/Models/QcResult.php ---
+table: default
+fillable:
+'stage',
+        'cutting_job_bundle_id',
+        'cutting_job_id',
+        'sewing_job_id',
+        'finishing_job_id',
+        'qc_date',
+        'qty_ok',
+        'qty_reject',
+        'reject_reason',
+        'operator_id',
+        'status',
+        'notes',
+relations:
+- cuttingJob: belongsTo
+- cuttingBundle: belongsTo
+- finishingJob: belongsTo
+- operator: belongsTo
+
+--- app/Models/FinishingJob.php ---
+table: default
+fillable:
+'code',
+        'date',
+        'status',
+        'notes',
+        'created_by',
+        'updated_by',
+relations:
+- lines: hasMany
+- createdBy: belongsTo
+- updatedBy: belongsTo
+- postedBy: belongsTo
+- isPosted: belongsTo
+- sewingOperator: belongsTo
+
+--- app/Models/Supplier.php ---
+table: default
+fillable:
+'code',
+        'name',
+        'phone',
+        'email',
+        'address',
+        'type',
+        'active',
+relations:
+- purchaseOrders: hasMany
+- prices: hasMany
+- isMaterialSupplier: belongsTo
+
+--- app/Models/ItemCostSnapshot.php ---
+table: item_cost_snapshots
+fillable:
+'item_id',
+        'warehouse_id',
+        'snapshot_date',
+        'reference_type',
+        'reference_id',
+        'qty_basis',
+        'rm_unit_cost',
+        'cutting_unit_cost',
+        'sewing_unit_cost',
+        'finishing_unit_cost',
+        'packaging_unit_cost',
+        'overhead_unit_cost',
+        'unit_cost',
+        'notes',
+        'is_active',
+        'created_by',
+relations:
+- item: belongsTo
+- warehouse: belongsTo
+- creator: belongsTo
+- productionCostPeriod: belongsTo
+
+--- app/Models/ProductionCostPeriod.php ---
+table: default
+fillable:
+'code',
+        'name',
+        'date_from',
+        'date_to',
+        'snapshot_date',
+        'cutting_payroll_period_id',
+        'sewing_payroll_period_id',
+        'finishing_payroll_period_id',
+        'status',
+        'is_active',
+        'notes',
+        'created_by',
+        'updated_by',
+relations:
+- cuttingPayrollPeriod: belongsTo
+- sewingPayrollPeriod: belongsTo
+- finishingPayrollPeriod: belongsTo
+
+--- app/Models/Item.php ---
+table: default
+fillable:
+'code',
+        'name',
+        'unit',
+        'type', // material / finished_good
+        'item_category_id', // sementara masih dipakai (keluarga produk / legacy)
+        'product_category_id', // kalau kamu sudah tambah kolom ini (opsional)
+        'item_role', // legacy string (raw_material/production_supply/...)
+        'item_role_id', // FK ke item_roles
+        'production_source', // in_house / outsource / buy
+
+        'last_purchase_price',
+        'hpp',
+        'base_unit_cost',
+
+        'active',
+        'affects_hpp',
+        'default_allocation', // hpp / expense
+        'default_expense_account_id',
+
+        'is_stocked',
+        'allow_negative',
+        'hpp_behavior',
+
+        // optional fields yang kamu sempat pakai di model lama
+        'consumption_cutting',
+        'consumption_cutting_basis_qty',
+relations:
+- productionSourceLabels: belongsTo
+- productCategory: belongsTo
+- role: belongsTo
+- lots: hasMany
+- inventoryStocks: hasMany
+- purchaseOrderLines: hasMany
+- supplierPrices: hasMany
+- shipmentLines: hasMany
+- finishingLines: hasMany
+- productionBatchMaterials: hasMany
+- barcodes: hasMany
+- suppliers: belongsTo
+- costSnapshots: hasMany
+- activeCostSnapshot: hasOne
+
+--- app/Models/CuttingJobLot.php ---
+table: cutting_job_lots
+fillable:
+'cutting_job_id',
+        'lot_id',
+        'planned_fabric_qty',
+        'used_fabric_qty',
+relations:
+- job: belongsTo
+- lot: belongsTo
+
+--- app/Models/FinishingJobLine.php ---
+table: default
+fillable:
+'finishing_job_id',
+        'bundle_id',
+        'operator_id',
+        'item_id',
+        'qty_in',
+        'qty_ok',
+        'qty_reject',
+        'reject_reason',
+        'reject_cause',
+        'reject_notes',
+        'processed_at',
+        'sewing_operator_id', // new
+        'sewing_operator_name', // new
+relations:
+- job: belongsTo
+- bundle: belongsTo
+- operator: belongsTo
+- item: belongsTo
+- sewingOperator: belongsTo
+
+--- app/Models/FinishingRepairLine.php ---
+table: default
+fillable:
+'finishing_repair_id',
+        'finishing_job_line_id',
+        'item_id',
+        'reject_item_id',
+        'cutting_job_bundle_id',
+        'qty_ok',
+        'qty_reject',
+        'notes',
+relations:
+- repair: belongsTo
+- finishingJobLine: belongsTo
+- item: belongsTo
+- rejectItem: belongsTo
+- bundle: belongsTo
+
+--- app/Models/CuttingJob.php ---
+table: default
+fillable:
+'code',
+        'date',
+        'warehouse_id',
+        'lot_id',
+        'fabric_item_id',
+        'operator_id',
+        'total_bundles',
+        'total_qty_pcs',
+        'status',
+        'notes',
+        'created_by',
+        'updated_by',
+relations:
+- warehouse: belongsTo
+- lot: belongsTo
+- fabricItem: belongsTo
+- operator: belongsTo
+- bundles: hasMany
+- qcResults: hasMany
+- lots: hasMany
+
+--- app/Models/Lot.php ---
+table: default
+fillable:
+'code',
+        'item_id',
+        'initial_qty',
+        'initial_cost',
+        'qty_onhand',
+        'total_cost',
+        'avg_cost',
+        'status',
+relations:
+- item: belongsTo
+- externalTransferLines: hasMany
+- cuttingJobs: hasMany
+
+[5] MIGRATION CUTTING
+--- database/migrations/2026_01_09_185623_add_production_refs_to_inventory_adjustment_lines_table.php ---
+alter: inventory_adjustment_lines, inventory_adjustment_lines
+columns:
+- cutting_job_bundle_id: unsignedBigInteger
+- sewing_pickup_line_id: unsignedBigInteger
+- finishing_job_line_id: unsignedBigInteger
+
+--- database/migrations/2026_01_08_123410_create_wip_fin_adjustment_lines_table.php ---
+create: wip_fin_adjustment_lines
+columns:
+- wip_fin_adjustment_id: unsignedBigInteger
+- bundle_id: unsignedBigInteger
+- item_id: unsignedBigInteger
+- qty: unsignedInteger
+- line_notes: string
+- wip_fin_adjustment_id: foreign
+- bundle_id: foreign
+- item_id: foreign
+
+--- database/migrations/2026_05_31_170000_add_cutting_job_bundle_id_to_inventory_mutations.php ---
+alter: inventory_mutations, inventory_mutations
+columns:
+- cutting_job_bundle_id: unsignedBigInteger
+- cutting_job_bundle_id: index
+- inv_mut_cjb_idx: dropIndex
+- cutting_job_bundle_id: dropColumn
+
+--- database/migrations/2025_11_25_150826_create_sewing_pickup_lines_table.php ---
+create: sewing_pickup_lines
+columns:
+- sewing_pickup_id: foreignId
+- cutting_job_bundle_id: foreignId
+- finished_item_id: foreignId
+- qty_bundle: decimal
+- qty_returned_ok: decimal
+- qty_returned_reject: decimal
+- status: string
+- notes: text
+
+--- database/migrations/2025_11_25_084644_create_qc_results_table.php ---
+create: qc_results
+columns:
+- stage: string
+- cutting_job_bundle_id: foreignId
+- cutting_job_id: foreignId
+- sewing_job_id: foreignId
+- finishing_job_id: foreignId
+- qc_date: date
+- qty_ok: decimal
+- qty_reject: decimal
+- reject_reason: string
+- operator_id: foreignId
+- status: string
+- notes: text
+
+--- database/migrations/2026_06_14_020000_create_finishing_repairs_table.php ---
+create: finishing_repairs, finishing_repair_lines
+columns:
+- code: string
+- date: date
+- status: string
+- created_by_user_id: foreignId
+- notes: text
+- finishing_repair_id: foreignId
+- finishing_job_line_id: foreignId
+- item_id: foreignId
+- cutting_job_bundle_id: foreignId
+- qty_ok: decimal
+- notes: string
+
+--- database/migrations/2025_11_28_184739_create_piecework_payroll_periods_table.php ---
+create: piecework_payroll_periods
+columns:
+- module: string
+- period_start: date
+- period_end: date
+- status: string
+- notes: text
+- created_by: foreignId
+- posted_by: foreignId
+
+--- database/migrations/2026_01_09_185605_add_wip_fields_to_inventory_adjustments_table.php ---
+alter: inventory_adjustments, inventory_adjustments
+columns:
+- purpose: string
+- wip_stage: string
+- reference_type: string
+- reference_id: unsignedBigInteger
+- operator_id: unsignedBigInteger
+
+--- database/migrations/2025_12_04_000000_create_item_cost_snapshots_table.php ---
+create: item_cost_snapshots
+columns:
+- item_id: unsignedBigInteger
+- warehouse_id: unsignedBigInteger
+- snapshot_date: date
+- reference_type: string
+- reference_id: unsignedBigInteger
+- qty_basis: decimal
+- rm_unit_cost: decimal
+- cutting_unit_cost: decimal
+- sewing_unit_cost: decimal
+- finishing_unit_cost: decimal
+- packaging_unit_cost: decimal
+- overhead_unit_cost: decimal
+- unit_cost: decimal
+- notes: string
+- is_active: boolean
+- created_by: unsignedBigInteger
+- item_id: foreign
+- warehouse_id: foreign
+- created_by: foreign
+
+--- database/migrations/2026_01_30_183919_create_bom_issues_tables.php ---
+create: bom_issues, bom_issue_lines
+columns:
+- item_bom_id: foreignId
+- source_type: string
+- source_id: unsignedBigInteger
+- date: date
+- warehouse_id: foreignId
+- fg_qty: decimal
+- status: string
+- bom_issue_id: foreignId
+- material_item_id: foreignId
+- bom_qty: decimal
+- scrap_pct: decimal
+- need_qty: decimal
+- uom: string
+- sort_order: unsignedInteger
+
+--- database/migrations/2025_11_26_082352_add_sewing_picked_qty_to_cutting_job_bundles.php ---
+alter: cutting_job_bundles, cutting_job_bundles
+columns:
+- sewing_picked_qty: decimal
+- sewing_picked_qty: dropColumn
+
+--- database/migrations/2025_11_25_154401_add_qc_qty_to_cutting_job_bundles_table.php ---
+alter: cutting_job_bundles, cutting_job_bundles
+columns:
+- qty_qc_ok: decimal
+- qty_qc_reject: decimal
+
+--- database/migrations/2025_11_30_131501_create_piece_rates_table.php ---
+create: piece_rates
+columns:
+- module: string
+- employee_id: foreignId
+- item_category_id: foreignId
+- item_id: foreignId
+- rate_per_pcs: decimal
+- effective_from: date
+- effective_to: date
+- notes: text
+
+--- database/migrations/2025_11_20_191712_create_employees_table.php ---
+create: employees
+columns:
+- code: string
+- name: string
+- role: enum
+- payment_type: enum
+- weekly_fixed_salary: decimal
+- default_piece_rate: decimal
+- active: boolean
+- phone: string
+- address: string
+
+--- database/migrations/2026_05_31_164200_add_cut_wip_columns_to_cutting_job_bundles.php ---
+alter: cutting_job_bundles, cutting_job_bundles
+columns:
+- cut_wip_warehouse_id: unsignedBigInteger
+- cut_wip_qty: decimal
+- cut_wip_warehouse_id: index
+
+--- database/migrations/2025_11_25_030041_create_cutting_jobs_table.php ---
+create: cutting_jobs
+columns:
+- code: string
+- date: date
+- warehouse_id: foreignId
+- lot_id: foreignId
+- fabric_item_id: foreignId
+- operator_id: foreignId
+- total_bundles: unsignedInteger
+- total_qty_pcs: decimal
+- status: string
+- notes: text
+- created_by: foreignId
+- updated_by: foreignId
+
+--- database/migrations/2025_11_25_163214_add_wip_to_cutting_job_bundles.php ---
+alter: cutting_job_bundles, cutting_job_bundles
+columns:
+- wip_warehouse_id: foreignId
+- wip_qty: decimal
+- wip_warehouse_id: dropConstrainedForeignId
+- wip_qty: dropColumn
+
+--- database/migrations/2025_12_05_000000_create_production_cost_periods_table.php ---
+create: production_cost_periods
+columns:
+- code: string
+- name: string
+- date_from: date
+- date_to: date
+- snapshot_date: date
+- cutting_payroll_period_id: unsignedBigInteger
+- sewing_payroll_period_id: unsignedBigInteger
+- finishing_payroll_period_id: unsignedBigInteger
+- status: string
+- is_active: boolean
+- notes: text
+- created_by: unsignedBigInteger
+- updated_by: unsignedBigInteger
+- created_by: foreign
+- updated_by: foreign
+- cutting_payroll_period_id: foreign
+- sewing_payroll_period_id: foreign
+- finishing_payroll_period_id: foreign
+
+--- database/migrations/2025_11_26_135452_create_finishing_job_lines_table.php ---
+create: finishing_job_lines
+columns:
+- finishing_job_id: foreignId
+- bundle_id: foreignId
+- operator_id: foreignId
+- item_id: foreignId
+- qty_in: decimal
+- qty_ok: decimal
+- qty_reject: decimal
+- reject_reason: string
+- reject_notes: text
+- processed_at: date
+
+--- database/migrations/2025_12_07_000000_create_cutting_job_lots_table.php ---
+create: cutting_job_lots
+columns:
+- cutting_job_id: foreignId
+- lot_id: foreignId
+- planned_fabric_qty: decimal
+- used_fabric_qty: decimal
+
+--- database/migrations/2025_11_25_030104_create_cutting_job_bundles_table.php ---
+create: cutting_job_bundles
+columns:
+- cutting_job_id: foreignId
+- bundle_code: string
+- bundle_no: unsignedInteger
+- lot_id: foreignId
+- finished_item_id: foreignId
+- item_category_id: foreignId
+- qty_pcs: decimal
+- qty_used_fabric: decimal
+- operator_id: foreignId
+- status: string
+- notes: text
+
+--- database/migrations/2026_01_10_025229_add_wip_posted_at_to_cutting_job_bundles_table.php ---
+alter: cutting_job_bundles, cutting_job_bundles
+columns:
+- wip_posted_at: dateTime
+- wip_posted_at: dropColumn
+
+--- database/migrations/2025_11_20_210255_create_suppliers_table.php ---
+create: suppliers
+columns:
+- code: string
+- name: string
+- phone: string
+- email: string
+- address: string
+- type: string
+- active: boolean
+
+--- database/migrations/2025_11_20_192129_update_users_for_employee_login.php ---
+alter: users, users
+columns:
+- employee_code: string
+- role: enum
+- employee_id: unsignedBigInteger
+- email: string
+- employee_id: foreign
+- employee_code: dropColumn
+- role: dropColumn
+- employee_id: dropColumn
+
+--- database/migrations/2026_01_10_033704_add_cutting_bundle_ref_to_inventory_adjustments_table.php ---
+alter: inventory_adjustments, inventory_adjustments
+columns:
+- cutting_job_bundle_id: unsignedBigInteger
+- cutting_job_bundle_id: dropColumn
+
+--- database/migrations/2026_06_01_000200_create_production_movements_table.php ---
+create: production_movements
+columns:
+- code: string
+- date: date
+- cutting_job_bundle_id: foreignId
+- item_id: foreignId
+- from_warehouse_id: foreignId
+- to_warehouse_id: foreignId
+- from_status: string
+- to_status: string
+- qty: decimal
+- operator_id: foreignId
+- deadline: date
+- notes: text
+- created_by: foreignId
+- inventory_mutation_id: foreignId
+- date: index
+- item_id: index
+- cutting_job_bundle_id: index
+
+[6] BLADE CUTTING
+--- resources/views/costing/production_cost_periods/index.blade.php ---
+forms: 0
+tables: 1
+foreach: 0
+routes dipakai:
+- costing.production_cost_periods.create
+- costing.production_cost_periods.edit
+- costing.production_cost_periods.show
+
+--- resources/views/costing/production_cost_periods/edit.blade.php ---
+forms: 2
+tables: 0
+foreach: 4
+routes dipakai:
+- costing.production_cost_periods.generate
+- costing.production_cost_periods.index
+- costing.production_cost_periods.show
+- costing.production_cost_periods.update
+
+--- resources/views/costing/production_cost_periods/show.blade.php ---
+forms: 1
+tables: 1
+foreach: 1
+routes dipakai:
+- costing.production_cost_periods.edit
+- costing.production_cost_periods.generate
+- costing.production_cost_periods.index
+
+--- resources/views/costing/hpp/index.blade.php ---
+forms: 3
+tables: 2
+foreach: 5
+routes dipakai:
+
+--- resources/views/components/mobile-bottom-nav.blade.php ---
+forms: 0
+tables: 0
+foreach: 0
+routes dipakai:
+- production.cutting_jobs.index
+- production.dashboard
+- production.finishing_jobs.create
+- production.qc.index
+- production.sewing.returns.create
+
+--- resources/views/components/modal-confirm-operator.blade.php ---
+forms: 0
+tables: 0
+foreach: 1
+
+--- resources/views/layouts/partials/mobile-bottom-nav.blade.php ---
+forms: 0
+tables: 0
+foreach: 0
+routes dipakai:
+- production.cutting_jobs.create
+- production.cutting_jobs.index
+- production.dashboard
+- production.finishing_jobs.create
+- production.qc.index
+- production.sewing.pickups.create
+- production.sewing.returns.create
+
+--- resources/views/layouts/partials/mobile-sidebar.blade.php ---
+forms: 0
+tables: 0
+foreach: 0
+routes dipakai:
+- costing.production_cost_periods.index
+- inventory.wip_cut_reconcile.index
+- production.cutting_jobs.create
+- production.cutting_jobs.index
+- production.dashboard
+- production.finishing_jobs.create
+- production.finishing_jobs.index
+- production.finishing_repairs.index
+- production.packing_jobs.index
+- production.priority.index
+- production.qc.index
+- production.reports.index
+- production.sewing.pickups.create
+- production.sewing.pickups.index
+- production.sewing.reject_returns.index
+- production.sewing.returns.create
+- production.sewing.returns.index
+
+--- resources/views/layouts/partials/sidebar.blade.php ---
+forms: 0
+tables: 0
+foreach: 0
+routes dipakai:
+- costing.production_cost_periods.index
+- inventory.wip_cut_reconcile.index
+- production.cutting_jobs.index
+- production.dashboard
+- production.finishing_jobs.index
+- production.finishing_repairs.index
+- production.packing_jobs.index
+- production.priority.index
+- production.qc.index
+- production.reports.index
+- production.sewing.pickups.index
+- production.sewing.reject_returns.index
+- production.sewing.returns.index
+
+--- resources/views/inventory/wip_cut_reconcile/index.blade.php ---
+forms: 1
+tables: 1
+foreach: 0
+routes dipakai:
+- inventory.wip_cut_reconcile.index
+- inventory.wip_cut_reconcile.show
+
+--- resources/views/inventory/wip_cut_reconcile/show.blade.php ---
+forms: 0
+tables: 4
+foreach: 1
+routes dipakai:
+- inventory.wip_cut_reconcile.index
+
+--- resources/views/inventory/external_transfers/create.blade.php ---
+forms: 1
+tables: 1
+foreach: 3
+routes dipakai:
+
+--- resources/views/inventory/external_transfers/show.blade.php ---
+forms: 0
+tables: 1
+foreach: 0
+routes dipakai:
+- production.vendor_cutting.receive
+
+--- resources/views/inventory/adjustments/show.blade.php ---
+forms: 3
+tables: 1
+foreach: 0
+routes dipakai:
+- production.cutting_jobs.show
+- production.cutting_overproduction.create
+- production.cutting_overproduction.post
+- production.cutting_overproduction.void
+
+--- resources/views/inventory/adjustments/cutting_overproduction/create.blade.php ---
+forms: 1
+tables: 1
+foreach: 2
+routes dipakai:
+- production.cutting_jobs.show
+- production.cutting_overproduction.store
+
+--- resources/views/inventory/wip_adjustments/create.blade.php ---
+forms: 1
+tables: 1
+foreach: 2
+routes dipakai:
+
+--- resources/views/production/sewing_pickups/bundles_ready.blade.php ---
+forms: 0
+tables: 1
+foreach: 1
+routes dipakai:
+- production.sewing.pickups.create
+- production.sewing.pickups.index
+
+--- resources/views/production/sewing_pickups/_bundle_picker.blade.php ---
+forms: 0
+tables: 1
+foreach: 1
+
+--- resources/views/production/sewing_pickups/create.blade copy.php ---
+forms: 1
+tables: 1
+foreach: 2
+routes dipakai:
+- production.sewing_pickups.index
+- production.sewing_pickups.store
+
+--- resources/views/production/sewing_pickups/show.blade.php ---
+forms: 2
+tables: 1
+foreach: 0
+routes dipakai:
+- production.sewing.pickups.index
+- production.sewing.pickups.lines.void
+- production.sewing.pickups.supplies.edit
+- production.sewing.pickups.void
+
+--- resources/views/production/cutting_jobs/_modal_confirm.blade.php ---
+forms: 0
+tables: 2
+foreach: 1
+
+--- resources/views/production/cutting_jobs/index.blade.php ---
+forms: 0
+tables: 1
+foreach: 1
+routes dipakai:
+- production.cutting_jobs.create
+- production.cutting_jobs.index
+- production.cutting_jobs.show
+- production.qc.cutting.edit
+
+--- resources/views/production/cutting_jobs/_form.blade.php ---
+forms: 1
+tables: 1
+foreach: 1
+routes dipakai:
+- production.cutting_jobs.index
+- production.cutting_jobs.store
+
+--- resources/views/production/cutting_jobs/create.blade copy 2.php ---
+forms: 1
+tables: 2
+foreach: 4
+routes dipakai:
+- production.cutting_jobs.index
+- production.cutting_jobs.store
+
+--- resources/views/production/cutting_jobs/_pick_lot.blade copy.php ---
+forms: 0
+tables: 0
+foreach: 1
+routes dipakai:
+- production.cutting_jobs.create
+
+--- resources/views/production/cutting_jobs/edit.blade.php ---
+forms: 1
+tables: 2
+foreach: 5
+routes dipakai:
+- production.cutting_jobs.index
+- production.cutting_jobs.show
+- production.cutting_jobs.update
+
+--- resources/views/production/cutting_jobs/_pick_lot.blade.php ---
+forms: 0
+tables: 0
+foreach: 3
+
+--- resources/views/production/cutting_jobs/create.blade.php ---
+forms: 0
+tables: 0
+foreach: 1
+
+--- resources/views/production/cutting_jobs/create.blade copy.php ---
+forms: 0
+tables: 0
+foreach: 0
+
+--- resources/views/production/cutting_jobs/show.blade.php ---
+forms: 4
+tables: 2
+foreach: 1
+routes dipakai:
+- production.cutting_jobs.edit
+- production.cutting_jobs.index
+- production.cutting_jobs.send_to_qc
+- production.cutting_jobs.void
+- production.cutting_overproduction.create
+- production.qc.cutting.cancel
+- production.qc.cutting.edit
+- production.qc.cutting.quick_ok
+
+--- resources/views/production/cutting_jobs/_form.blade copy.php ---
+forms: 1
+tables: 2
+foreach: 4
+routes dipakai:
+- production.cutting_jobs.store
+- production.cutting_jobs.update
+
+--- resources/views/production/sewing_returns/show.blade.php ---
+forms: 1
+tables: 2
+foreach: 2
+routes dipakai:
+- production.sewing.pickups.show
+- production.sewing.returns.index
+- production.sewing.returns.void
+
+--- resources/views/production/sewing_progress_adjustments/create.blade.php ---
+forms: 2
+tables: 1
+foreach: 2
+routes dipakai:
+- production.sewing.adjustments.create
+- production.sewing.adjustments.index
+- production.sewing.adjustments.store
+
+--- resources/views/production/sewing_progress_adjustments/show.blade.php ---
+forms: 0
+tables: 1
+foreach: 0
+routes dipakai:
+- production.sewing.adjustments.create
+- production.sewing.adjustments.index
+- production.sewing.pickups.show
+
+--- resources/views/production/dashboard/index.blade.php ---
+forms: 1
+tables: 0
+foreach: 5
+routes dipakai:
+- production.dashboard
+- production.dashboard.data
+- production.dashboard.slip
+
+--- resources/views/production/dashboard/partials/_reject.blade.php ---
+forms: 0
+tables: 1
+foreach: 1
+
+--- resources/views/production/dashboard/partials/_ringkasan.blade.php ---
+forms: 0
+tables: 0
+foreach: 2
+
+--- resources/views/production/finishing_jobs/index.blade.php ---
+forms: 0
+tables: 1
+foreach: 4
+routes dipakai:
+- production.finishing_jobs.create
+- production.finishing_jobs.show
+
+--- resources/views/production/finishing_jobs/_bundle_row.blade.php ---
+forms: 0
+tables: 0
+foreach: 1
+
+--- resources/views/production/finishing_jobs/edit.blade.php ---
+forms: 1
+tables: 1
+foreach: 0
+routes dipakai:
+- production.finishing_jobs.show
+- production.finishing_jobs.update
+
+--- resources/views/production/finishing_jobs/show.blade.php ---
+forms: 1
+tables: 4
+foreach: 3
+routes dipakai:
+- production.finishing_jobs.edit
+- production.finishing_jobs.index
+- production.finishing_jobs.post
+
+--- resources/views/production/qc/index.blade.php ---
+forms: 0
+tables: 2
+foreach: 5
+routes dipakai:
+- production.qc.cutting.edit
+- production.qc.index
+- production.sewing.pickups.show
+- production.sewing.returns.show
+
+--- resources/views/production/qc/cutting_edit.blade.php ---
+forms: 4
+tables: 2
+foreach: 3
+routes dipakai:
+- production.cutting_jobs.show
+- production.qc.cutting.bundle_adjust
+- production.qc.cutting.cancel
+- production.qc.cutting.update
+
+--- resources/views/payroll/dashboard/index.blade.php ---
+forms: 1
+tables: 0
+foreach: 5
+routes dipakai:
+
+--- resources/views/payroll/dashboard/partials/_cutting.blade.php ---
+forms: 0
+tables: 1
+foreach: 2
+
+--- resources/views/payroll/dashboard/partials/_keseluruhan.blade.php ---
+forms: 0
+tables: 1
+foreach: 2
+
+--- resources/views/payroll/sewing/slip_all.blade.php ---
+forms: 0
+tables: 1
+foreach: 2
+routes dipakai:
+- payroll.cutting.show
+
+--- resources/views/payroll/cutting/index.blade.php ---
+forms: 1
+tables: 1
+foreach: 0
+routes dipakai:
+- payroll.cutting.create
+- payroll.cutting.show
+
+--- resources/views/payroll/cutting/create.blade.php ---
+forms: 1
+tables: 0
+foreach: 1
+routes dipakai:
+- payroll.cutting.index
+- payroll.cutting.store
+
+--- resources/views/payroll/cutting/slip.blade.php ---
+forms: 0
+tables: 1
+foreach: 1
+routes dipakai:
+- payroll.cutting.show
+
+--- resources/views/payroll/cutting/show.blade.php ---
+forms: 2
+tables: 2
+foreach: 0
+routes dipakai:
+- payroll.cutting.finalize
+- payroll.cutting.index
+- payroll.cutting.regenerate
+- payroll.cutting.slip
+
+--- resources/views/payroll/reports/operator_summary.blade.php ---
+forms: 1
+tables: 1
+foreach: 0
+routes dipakai:
+
+--- resources/views/payroll/reports/operator_slips.blade.php ---
+forms: 1
+tables: 1
+foreach: 0
+routes dipakai:
+
+--- resources/views/payroll/reports/operator_detail.blade.php ---
+forms: 0
+tables: 3
+foreach: 2
+routes dipakai:
+
+[7] KONEKSI CUTTING KE SEWING
+- app/Http/Controllers/Accounting/JournalController.php
+- app/Http/Controllers/Costing/ProductionCostPeriodController.php
+- app/Http/Controllers/Master/ItemController.php
+- app/Http/Controllers/Master/EmployeeController.php
+- app/Http/Controllers/Inventory/StockCardController.php
+- app/Http/Controllers/Inventory/WipAdjustmentController.php
+- app/Http/Controllers/Inventory/InventoryAdjustmentController.php
+- app/Http/Controllers/Inventory/ExternalTransferController.php
+- app/Http/Controllers/Inventory/WipCutReconcileController.php
+- app/Http/Controllers/Inventory/RtsDirectReceiveController.php
+- app/Http/Controllers/Production/SewingPickupController.php
+- app/Http/Controllers/Production/ProductionOrderController.php
+- app/Http/Controllers/Production/ProductionReceiptController.php
+- app/Http/Controllers/Production/FinishingRepairController.php
+- app/Http/Controllers/Production/QcController.php
+- app/Http/Controllers/Production/ProductionActivityController.php
+- app/Http/Controllers/Production/SewingRejectReturnController.php
+- app/Http/Controllers/Production/ProductionIssueController.php
+- app/Http/Controllers/Production/ProductionDashboardController.php
+- app/Http/Controllers/Production/FinishingJobController.php
+- app/Http/Controllers/Production/SewingReturnController.php
+- app/Http/Controllers/Production/CuttingJobController.php
+- app/Http/Controllers/Api/ItemController.php
+- app/Http/Controllers/Payroll/PieceRateController.php
+- app/Http/Controllers/Payroll/PieceworkPayrollController.php
+- app/Http/Controllers/Payroll/PayrollDashboardController.php
+- app/Http/Controllers/Payroll/PayrollReportController.php
+- app/Models/SewingReturnLine.php
+- app/Models/PieceRate.php
+- app/Models/InventoryMutation.php
+- app/Models/CuttingJobBundle.php
+- app/Models/PieceworkPayrollPeriod.php
+- app/Models/InventoryAdjustmentLine.php
+- app/Models/ProductionMovement.php
+- app/Models/SewingPickupLine.php
+- app/Models/PackingJob.php
+- app/Models/QcResult.php
+- app/Models/FinishingJob.php
+- app/Models/Supplier.php
+- app/Models/ItemCostSnapshot.php
+- app/Models/ProductionCostPeriod.php
+- app/Models/Item.php
+- app/Models/CuttingJobLot.php
+- app/Models/FinishingJobLine.php
+- app/Models/FinishingRepairLine.php
+- app/Models/CuttingJob.php
+- app/Models/Lot.php
+- app/Services/Costing/FgHppAutoService.php
+- app/Services/Costing/FinishingRmHppService.php
+- app/Services/Costing/ProductionCostService.php
+- app/Services/Costing/HppService.php
+- app/Services/Inventory/StockOpnameService.php
+- app/Services/Inventory/InventoryService.php
+- app/Services/Production/CuttingService.php
+- app/Services/Production/QcService.php
+- app/Services/Production/ProductionFlowService.php
+- app/Services/Payroll/CuttingPayrollGenerator.php
+- app/Services/Payroll/PieceRateService.php
+- database/migrations/2026_01_09_185623_add_production_refs_to_inventory_adjustment_lines_table.php
+- database/migrations/2026_01_08_123410_create_wip_fin_adjustment_lines_table.php
+- database/migrations/2026_05_31_170000_add_cutting_job_bundle_id_to_inventory_mutations.php
+- database/migrations/2025_11_25_150826_create_sewing_pickup_lines_table.php
+- database/migrations/2025_11_25_084644_create_qc_results_table.php
+- database/migrations/2026_06_14_020000_create_finishing_repairs_table.php
+- database/migrations/2025_11_28_184739_create_piecework_payroll_periods_table.php
+- database/migrations/2026_01_09_185605_add_wip_fields_to_inventory_adjustments_table.php
+- database/migrations/2025_12_04_000000_create_item_cost_snapshots_table.php
+- database/migrations/2026_01_30_183919_create_bom_issues_tables.php
+- database/migrations/2025_11_26_082352_add_sewing_picked_qty_to_cutting_job_bundles.php
+- database/migrations/2025_11_25_154401_add_qc_qty_to_cutting_job_bundles_table.php
+- database/migrations/2025_11_30_131501_create_piece_rates_table.php
+- database/migrations/2025_11_20_191712_create_employees_table.php
+- database/migrations/2026_05_31_164200_add_cut_wip_columns_to_cutting_job_bundles.php
+- database/migrations/2025_11_25_030041_create_cutting_jobs_table.php
+- database/migrations/2025_11_25_163214_add_wip_to_cutting_job_bundles.php
+- database/migrations/2025_12_05_000000_create_production_cost_periods_table.php
+- database/migrations/2025_11_26_135452_create_finishing_job_lines_table.php
+- database/migrations/2025_12_07_000000_create_cutting_job_lots_table.php
+- database/migrations/2025_11_25_030104_create_cutting_job_bundles_table.php
+- database/migrations/2026_01_10_025229_add_wip_posted_at_to_cutting_job_bundles_table.php
+- database/migrations/2025_11_20_210255_create_suppliers_table.php
+- database/migrations/2025_11_20_192129_update_users_for_employee_login.php
+- database/migrations/2026_01_10_033704_add_cutting_bundle_ref_to_inventory_adjustments_table.php
+- database/migrations/2026_06_01_000200_create_production_movements_table.php
+- resources/views/costing/production_cost_periods/index.blade.php
+- resources/views/costing/production_cost_periods/edit.blade.php
+- resources/views/costing/production_cost_periods/show.blade.php
+- resources/views/costing/hpp/index.blade.php
+- resources/views/components/mobile-bottom-nav.blade.php
+- resources/views/components/modal-confirm-operator.blade.php
+- resources/views/layouts/partials/mobile-bottom-nav.blade.php
+- resources/views/layouts/partials/mobile-sidebar.blade.php
+- resources/views/layouts/partials/sidebar.blade.php
+- resources/views/inventory/wip_cut_reconcile/index.blade.php
+- resources/views/inventory/external_transfers/create.blade.php
+- resources/views/inventory/adjustments/show.blade.php
+- resources/views/inventory/adjustments/cutting_overproduction/create.blade.php
+- resources/views/inventory/wip_adjustments/create.blade.php
+- resources/views/production/sewing_pickups/bundles_ready.blade.php
+- resources/views/production/sewing_pickups/_bundle_picker.blade.php
+- resources/views/production/sewing_pickups/create.blade copy.php
+- resources/views/production/sewing_pickups/show.blade.php
+- resources/views/production/cutting_jobs/_modal_confirm.blade.php
+- resources/views/production/cutting_jobs/_form.blade.php
+- resources/views/production/cutting_jobs/create.blade copy 2.php
+- resources/views/production/cutting_jobs/_pick_lot.blade copy.php
+- resources/views/production/cutting_jobs/edit.blade.php
+- resources/views/production/cutting_jobs/_pick_lot.blade.php
+- resources/views/production/cutting_jobs/create.blade.php
+- resources/views/production/cutting_jobs/show.blade.php
+- resources/views/production/cutting_jobs/_form.blade copy.php
+- resources/views/production/sewing_returns/show.blade.php
+- resources/views/production/sewing_progress_adjustments/create.blade.php
+- resources/views/production/sewing_progress_adjustments/show.blade.php
+- resources/views/production/dashboard/index.blade.php
+- resources/views/production/dashboard/partials/_reject.blade.php
+- resources/views/production/dashboard/partials/_ringkasan.blade.php
+- resources/views/production/finishing_jobs/index.blade.php
+- resources/views/production/finishing_jobs/edit.blade.php
+- resources/views/production/finishing_jobs/show.blade.php
+- resources/views/production/qc/index.blade.php
+- resources/views/production/qc/cutting_edit.blade.php
+- resources/views/payroll/dashboard/index.blade.php
+- resources/views/payroll/dashboard/partials/_keseluruhan.blade.php
+- resources/views/payroll/cutting/show.blade.php
+- resources/views/payroll/reports/operator_summary.blade.php
+- resources/views/payroll/reports/operator_slips.blade.php
+- resources/views/payroll/reports/operator_detail.blade.php
