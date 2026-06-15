@@ -335,7 +335,7 @@
 @endif
 
 
-                @if ($user && $user->role === 'owner' && $status === 'draft')
+                @if ($user && (in_array($user->role, ['owner','admin']) || $user->isDeveloper()) && $status === 'draft')
                     <form action="{{ route('purchasing.purchase_orders.approve', $order->id) }}" method="POST"
                         onsubmit="return confirm('Approve PO ini? Setelah di-approve, PO tidak bisa diedit lagi.');">
                         @csrf
@@ -345,7 +345,7 @@
                     </form>
                 @endif
 
-                @if ($user && $user->role === 'owner' && in_array($status, ['draft', 'approved'], true) && $grnCount === 0)
+                @if ($user && $user->isOwner() && in_array($status, ['draft', 'approved'], true) && $grnCount === 0)
                     <form action="{{ route('purchasing.purchase_orders.cancel', $order->id) }}" method="POST"
                         onsubmit="return confirm('Batalkan PO ini? Tindakan ini tidak bisa dibatalkan.');">
                         @csrf
@@ -384,12 +384,14 @@
                 </div>
 
                 <div class="col-md-3 col-6">
-                    <div class="text-muted small">Preferensi metode</div>
+                    <div class="text-muted small">Tipe Pembayaran</div>
                     @if ($pm)
-                        <div class="fw-semibold">{{ $pm->name }}</div>
-                        @if (!empty($pm->code))
-                            <div class="text-muted small mono">{{ $pm->code }}</div>
-                        @endif
+                        @php
+                            $pmModeLabel = ['cash' => 'Tunai', 'transfer' => 'Transfer (TF)', 'credit' => 'Hutang / Tempo'];
+                            $pmMode = strtolower((string) ($pm->mode ?? ''));
+                        @endphp
+                        <div class="fw-semibold">{{ $pmModeLabel[$pmMode] ?? $pm->name }}</div>
+                        <div class="text-muted small mono">{{ $pm->name }}</div>
                     @else
                         <div class="fw-semibold text-muted">—</div>
                     @endif
@@ -398,15 +400,17 @@
                 <div class="col-md-3 col-6">
                     <div class="text-muted small">Status PO</div>
                     <span class="{{ $statusClass }} mono">{{ strtoupper($status) }}</span>
-                    @if ($grnCount > 0)
+                    @if ($grnCount > 0 && $user && $user->isOwner())
                         <span class="tag-grn mono ms-1">GRN x{{ $grnCount }}</span>
                     @endif
                 </div>
 
+                @if ($user && $user->isOwner())
                 <div class="col-md-3 col-6">
                     <div class="text-muted small">GRN Posted</div>
                     <div class="fw-semibold mono">{{ rupiah($grnPostedTotal) }}</div>
                 </div>
+                @endif
 
                 <div class="col-md-3 col-6">
                     <div class="text-muted small">DP</div>
@@ -569,7 +573,8 @@
             </div>
         @endif
 
-        {{-- GOODS RECEIPTS (GRN) --}}
+        {{-- GOODS RECEIPTS (GRN) — hanya owner --}}
+        @if ($user && $user->isOwner())
         <div class="card mb-4">
             <div class="card-header d-flex justify-content-between align-items-center flex-wrap gap-2">
                 <div class="fw-semibold">Goods Receipts (GRN) terkait</div>
@@ -731,6 +736,7 @@
                 @endif
             </div>
         </div>
+        @endif {{-- end isOwner GRN --}}
 
         {{-- DETAIL BARANG --}}
         <div class="card mb-4">

@@ -505,6 +505,24 @@
                         </select>
                     </div>
 
+                    <div>
+                        <label class="form-label">Jenis PO</label>
+                        <div class="d-flex flex-wrap gap-3 mt-1">
+                            @foreach (['material' => 'Bahan Baku', 'finished_good' => 'Barang Jadi'] as $val => $label)
+                            <div class="form-check">
+                                <input class="form-check-input" type="checkbox"
+                                    name="po_types[]" value="{{ $val }}"
+                                    id="pt_c_{{ $val }}"
+                                    {{ in_array($val, old('po_types', []), true) ? 'checked' : '' }}>
+                                <label class="form-check-label" for="pt_c_{{ $val }}">{{ $label }}</label>
+                            </div>
+                            @endforeach
+                        </div>
+                        <div class="text-muted" style="font-size:.75rem; margin-top:.25rem;">
+                            Kosong = bisa untuk semua jenis PO
+                        </div>
+                    </div>
+
                     <div style="grid-column: 1 / -1;">
                         <label class="form-label">Alamat</label>
                         <textarea name="address" rows="3" class="form-control"

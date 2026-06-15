@@ -20,9 +20,11 @@ class SupplierController extends Controller
 
     public function index(Request $request): View
     {
-        $q = trim((string) $request->input('q', ''));
+        $q      = trim((string) $request->input('q', ''));
+        $poType = $request->input('po_type', '');   // '' | 'material' | 'finished_good' | 'none'
 
         $suppliers = Supplier::query()
+            ->with(['bankAccounts' => fn ($q) => $q->orderBy('created_at')])
             ->when($q !== '', function ($query) use ($q) {
                 $query->where(function ($w) use ($q) {
                     $w->where('name', 'like', "%{$q}%")
@@ -31,11 +33,16 @@ class SupplierController extends Controller
                         ->orWhere('email', 'like', "%{$q}%");
                 });
             })
+            ->when($poType === 'none', fn ($q) => $q->where(function ($w) {
+                $w->whereNull('po_types')->orWhere('po_types', '')->orWhere('po_types', '[]');
+            }))
+            ->when(in_array($poType, ['material', 'finished_good'], true),
+                fn ($q) => $q->where('po_types', 'like', "%{$poType}%"))
             ->orderBy('name')
             ->paginate(20)
             ->withQueryString();
 
-        return view('master.suppliers.index', compact('suppliers', 'q'));
+        return view('master.suppliers.index', compact('suppliers', 'q', 'poType'));
     }
 
     public function create(): View
@@ -46,15 +53,18 @@ class SupplierController extends Controller
     public function store(Request $request): RedirectResponse
     {
         $data = $request->validate([
-            'code' => ['required', 'string', 'max:50', 'unique:suppliers,code'],
-            'name' => ['required', 'string', 'max:255'],
-            'phone' => ['nullable', 'string', 'max:50'],
-            'email' => ['nullable', 'email', 'max:255'],
-            'address' => ['nullable', 'string'],
-            'active' => ['nullable', 'boolean'],
+            'code'     => ['required', 'string', 'max:50', 'unique:suppliers,code'],
+            'name'     => ['required', 'string', 'max:255'],
+            'phone'    => ['nullable', 'string', 'max:50'],
+            'email'    => ['nullable', 'email', 'max:255'],
+            'address'  => ['nullable', 'string'],
+            'po_types' => ['nullable', 'array'],
+            'po_types.*' => ['in:material,finished_good'],
+            'active'   => ['nullable', 'boolean'],
         ]);
 
-        $data['active'] = (int) ($data['active'] ?? 1);
+        $data['active']   = (int) ($data['active'] ?? 1);
+        $data['po_types'] = !empty($data['po_types']) ? $data['po_types'] : null;
 
         $supplier = Supplier::create($data);
 
@@ -84,23 +94,26 @@ class SupplierController extends Controller
         return view('master.suppliers.show', compact('supplier', 'itemsForPicker'));
     }
 
-    public function edit(Supplier $supplier): View
+    public function edit(Supplier $supplier): RedirectResponse
     {
-        return view('master.suppliers.edit', compact('supplier'));
+        return redirect()->route('master.suppliers.show', $supplier);
     }
 
     public function update(Request $request, Supplier $supplier): RedirectResponse
     {
         $data = $request->validate([
-            'code' => ['required', 'string', 'max:50', Rule::unique('suppliers', 'code')->ignore($supplier->id)],
-            'name' => ['required', 'string', 'max:255'],
-            'phone' => ['nullable', 'string', 'max:50'],
-            'email' => ['nullable', 'email', 'max:255'],
-            'address' => ['nullable', 'string'],
-            'active' => ['nullable', 'boolean'],
+            'code'     => ['required', 'string', 'max:50', Rule::unique('suppliers', 'code')->ignore($supplier->id)],
+            'name'     => ['required', 'string', 'max:255'],
+            'phone'    => ['nullable', 'string', 'max:50'],
+            'email'    => ['nullable', 'email', 'max:255'],
+            'address'  => ['nullable', 'string'],
+            'po_types' => ['nullable', 'array'],
+            'po_types.*' => ['in:material,finished_good'],
+            'active'   => ['nullable', 'boolean'],
         ]);
 
-        $data['active'] = (int) ($data['active'] ?? 0);
+        $data['active']   = (int) ($data['active'] ?? 0);
+        $data['po_types'] = !empty($data['po_types']) ? $data['po_types'] : null;
 
         $supplier->update($data);
 

@@ -109,7 +109,7 @@ class PurchaseOrderController extends Controller
 
         $order->payment_method_id = $paymentMethods->first()?->id;
 
-        $suppliers = Supplier::query()->orderBy('name')->get();
+        $suppliers = Supplier::query()->orderBy('name')->get(['id', 'name', 'po_types']);
 
         // ✅ FIX: category_id -> item_category_id
         // ✅ PACK di atas (OPP/PLY/THR ngumpul dulu)
@@ -153,11 +153,15 @@ class PurchaseOrderController extends Controller
      */
     public function store(Request $request)
     {
-
         $data = $this->validateData($request);
 
         $data['created_by'] = (int) $request->user()->id;
         $data['status'] = 'draft';
+
+        // Auto-set payment_status berdasarkan mode payment method
+        $pm = PaymentMethod::find($data['payment_method_id'] ?? null);
+        $mode = strtolower((string) ($pm?->mode ?? 'credit'));
+        $data['payment_status'] = in_array($mode, ['cash', 'transfer'], true) ? 'paid' : 'unpaid';
 
         $order = $this->service->create($data);
 
@@ -346,6 +350,14 @@ class PurchaseOrderController extends Controller
         $data = $this->validateData($request);
         $data['status'] = 'draft';
 
+        // Auto-set payment_status berdasarkan mode payment method
+        $pm = PaymentMethod::find($data['payment_method_id'] ?? null);
+        $mode = strtolower((string) ($pm?->mode ?? 'credit'));
+        // Jangan overwrite kalau sudah ada payment aktif (partial/paid)
+        if (!in_array($purchase_order->payment_status, ['partial', 'paid'], true)) {
+            $data['payment_status'] = in_array($mode, ['cash', 'transfer'], true) ? 'paid' : 'unpaid';
+        }
+
         $order = $this->service->update($purchase_order, $data);
 
         // hanya buat payment dari form kalau belum ada payment aktif
@@ -379,6 +391,11 @@ class PurchaseOrderController extends Controller
 
     public function approve(PurchaseOrder $purchase_order)
     {
+        abort_unless(
+            in_array(auth()->user()?->role, ['owner', 'admin'], true) || auth()->user()?->isDeveloper(),
+            403, 'Hanya owner atau admin yang bisa approve PO.'
+        );
+
         if ($purchase_order->status !== 'draft') {
             return redirect()
                 ->route('purchasing.purchase_orders.show', $purchase_order->id)

@@ -5,6 +5,7 @@ use App\Http\Controllers\Master\EmployeeController;
 use App\Http\Controllers\Master\ItemBomController;
 use App\Http\Controllers\Master\ItemCategoryController;
 use App\Http\Controllers\Master\ItemController;
+use App\Http\Controllers\Master\SupplierBankAccountController;
 use App\Http\Controllers\Master\SupplierController;
 use Illuminate\Support\Facades\Route;
 
@@ -85,6 +86,14 @@ Route::middleware(['web', 'auth', 'access:master'])->group(function () {
 
         Route::post('suppliers/{supplier}/items/bulk', [SupplierController::class, 'bulkAttach'])
             ->name('suppliers.items.bulk');
+
+        // Bank accounts (AJAX)
+        Route::get('suppliers/{supplier}/bank-accounts', [SupplierBankAccountController::class, 'index'])
+            ->name('suppliers.bank_accounts.index');
+        Route::post('suppliers/{supplier}/bank-accounts', [SupplierBankAccountController::class, 'store'])
+            ->name('suppliers.bank_accounts.store');
+        Route::delete('suppliers/{supplier}/bank-accounts/{bankAccount}', [SupplierBankAccountController::class, 'destroy'])
+            ->name('suppliers.bank_accounts.destroy');
 
         /*
         |--------------------------------------------------------------------------

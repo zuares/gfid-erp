@@ -37,9 +37,10 @@ class PurchaseOrderInventoryService
      */
     public function postApprovedPurchaseOrderToInventory(PurchaseOrder $po): array
     {
-        // ── 1. Hanya material PO ────────────────────────────────────────
-        if (($po->order_type ?? 'material') !== 'material') {
-            return ['posted' => 0, 'lots' => [], 'skipped' => true, 'reason' => 'not_material_order'];
+        // ── 1. Hanya material atau finished_good PO ─────────────────────
+        $orderType = $po->order_type ?? 'material';
+        if (!in_array($orderType, ['material', 'finished_good'], true)) {
+            return ['posted' => 0, 'lots' => [], 'skipped' => true, 'reason' => 'unsupported_order_type'];
         }
 
         // ── 2. Anti-double-posting: cek mutation sudah ada ──────────────
@@ -53,13 +54,16 @@ class PurchaseOrderInventoryService
             return ['posted' => 0, 'lots' => [], 'skipped' => true, 'reason' => 'already_posted'];
         }
 
-        // ── 3. Cari gudang RM (Bahan Baku) ──────────────────────────────
-        $warehouse = Warehouse::where('code', 'RM')->where('active', 1)->first();
+        // ── 3. Pilih gudang tujuan berdasarkan order_type ───────────────
+        //  material      → RM (Bahan Baku)
+        //  finished_good → WH-RTS (Barang Jadi Siap Kirim)
+        $warehouseCode = $orderType === 'finished_good' ? 'WH-RTS' : 'RM';
+        $warehouse = Warehouse::where('code', $warehouseCode)->where('active', 1)->first();
 
         if (!$warehouse) {
             throw ValidationException::withMessages([
-                'warehouse' => 'Gudang RM (Bahan Baku) tidak ditemukan atau tidak aktif. '
-                    . 'Pastikan warehouse dengan code=RM sudah terdaftar.',
+                'warehouse' => "Gudang {$warehouseCode} tidak ditemukan atau tidak aktif. "
+                    . "Pastikan warehouse dengan code={$warehouseCode} sudah terdaftar.",
             ]);
         }
 
@@ -112,10 +116,11 @@ class PurchaseOrderInventoryService
             $line->lot_id = $lot->id;
             $line->save();
 
-            // ── Stock-in ke gudang RM ────────────────────────────────────
+            // ── Stock-in ke gudang tujuan ────────────────────────────────
             $notes = sprintf(
-                'Direct stock-in dari approval PO %s — %s (%.3f %s × Rp%s)',
+                'Direct stock-in dari approval PO %s → %s — %s (%.3f %s × Rp%s)',
                 $po->code,
+                $warehouseCode,
                 $itemCode,
                 $qty,
                 $line->item->unit ?? 'pcs',

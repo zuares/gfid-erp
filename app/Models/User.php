@@ -82,8 +82,8 @@ class User extends Authenticatable
 
         $module = strtolower(trim($module));
 
-        // Admin selalu boleh akses production (tidak bisa di-override DB)
-        if ($this->role === 'admin' && $module === 'production') {
+        // Admin selalu boleh akses modul-modul ini (tidak bisa di-override DB)
+        if ($this->role === 'admin' && in_array($module, ['production', 'purchasing'], true)) {
             return true;
         }
 

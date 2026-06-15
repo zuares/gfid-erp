@@ -21,11 +21,15 @@
 
     // === SUPPLIER ===
     $defaultSupplierId = $suppliers->first()->id ?? null;
-    $selectedSupplierId = old('supplier_id', $order?->supplier_id ?? $defaultSupplierId);
+    $selectedSupplierId = old('supplier_id', $order?->supplier_id ?? request('supplier_id') ?? $defaultSupplierId);
 
-    // === PAYMENT METHOD (HIDDEN) ===
-    $defaultPaymentMethodId = $paymentMethods->first()->id ?? null;
+    // === PAYMENT METHOD ===
+    // Filter: exclude DP_APPLY (internal only)
+    $visiblePaymentMethods = ($paymentMethods ?? collect())->filter(fn($pm) => $pm->code !== 'DP_APPLY')->values();
+    $defaultPaymentMethodId = $visiblePaymentMethods->first()->id ?? null;
     $selectedPaymentMethodId = old('payment_method_id', $order?->payment_method_id ?? $defaultPaymentMethodId);
+    // Label singkat untuk tiap mode
+    $pmModeLabel = ['cash' => 'Tunai', 'transfer' => 'Transfer (TF)', 'credit' => 'Hutang / Tempo'];
 
     // === ONGKIR (display + raw) ===
     $shippingCostDb = (float) ($order?->shipping_cost ?? 0);
@@ -58,12 +62,17 @@
         .po-card {
             background: var(--card);
             border: 1px solid var(--line);
-            border-radius: 16px;
+            border-radius: 18px;
             overflow: visible;
+            margin-bottom: 1rem;
         }
 
         .po-card .card-body {
-            padding: 1rem 1rem 1.05rem;
+            padding: 1.25rem 1.5rem 1.35rem;
+        }
+
+        .po-card .card-header {
+            padding: .9rem 1.5rem;
         }
 
         .po-section-title {
@@ -72,11 +81,12 @@
         }
 
         .po-label {
-            font-size: .75rem;
+            font-size: .72rem;
             color: var(--muted);
-            margin-bottom: .25rem;
+            margin-bottom: .3rem;
             text-transform: uppercase;
             letter-spacing: .08em;
+            font-weight: 700;
         }
 
         .po-field {
@@ -88,10 +98,12 @@
             letter-spacing: .08em;
             font-size: .72rem;
             color: var(--muted);
+            padding: .75rem 1rem;
         }
 
         .po-lines-table tbody td {
-            vertical-align: middle
+            vertical-align: middle;
+            padding: .65rem 1rem;
         }
 
         .po-subtotal-label {
@@ -104,43 +116,51 @@
         .po-table-wrapper {
             -webkit-overflow-scrolling: touch;
             overflow-x: auto;
-            overflow-y: visible
+            overflow-y: visible;
         }
 
         .po-lines-table td,
         .po-lines-table th {
             position: relative;
-            overflow: visible
+            overflow: visible;
         }
 
         .item-suggest-wrap {
             position: relative;
-            overflow: visible
+            overflow: visible;
         }
 
         .item-suggest-dropdown {
-            z-index: 5000
+            z-index: 5000;
         }
 
         .po-meta-wrap {
             display: flex;
             justify-content: flex-end;
-            margin-top: .75rem;
+            margin-top: 1rem;
+            padding: 0 1.5rem 1.5rem;
         }
 
         .po-meta-card {
             border: 1px solid var(--line);
             background: color-mix(in srgb, var(--card) 92%, var(--bg) 8%);
             border-radius: 14px;
-            padding: .8rem .85rem;
-            width: min(560px, 100%);
+            padding: 1rem 1.25rem 1.25rem;
+            width: min(620px, 100%);
         }
 
-        .po-meta-grid {
+        /* 3-col: Status | Tipe Bayar | Ongkir */
+        .po-meta-inputs {
             display: grid;
-            grid-template-columns: 1fr 1fr;
-            gap: .65rem .75rem;
-            align-items: end;
+            grid-template-columns: 1fr 1fr 1fr;
+            gap: .75rem 1rem;
+            margin-bottom: 1rem;
+        }
+
+        /* Totals selalu full-width */
+        .po-meta-totals {
+            border-top: 1px solid var(--line);
+            padding-top: .75rem;
         }
 
         .po-num-display {
@@ -156,7 +176,7 @@
             justify-content: space-between;
             align-items: center;
             gap: .75rem;
-            padding: .35rem 0;
+            padding: .4rem 0;
             border-top: 1px dashed rgba(148, 163, 184, .22);
         }
 
@@ -167,35 +187,49 @@
 
         .po-total-key {
             font-size: .72rem;
-            letter-spacing: .08em;
+            letter-spacing: .07em;
             text-transform: uppercase;
             color: var(--muted);
+            font-weight: 700;
         }
 
         .po-total-val {
             font-weight: 800;
+            font-size: .9rem;
         }
 
         .po-total-val.subtle {
             font-weight: 700;
             color: var(--muted);
+            font-size: .85rem;
+        }
+
+        /* Mobile meta: 2 kolom (Status | Tipe Bayar), Ongkir span-2 */
+        @media (max-width: 560px) {
+            .po-meta-inputs {
+                grid-template-columns: 1fr 1fr;
+            }
+            .po-meta-inputs .po-meta-ongkir {
+                grid-column: span 2;
+            }
         }
 
         @media (max-width: 992px) {
             .po-card .card-body {
-                padding: .9rem .9rem 1rem;
+                padding: 1rem 1rem 1.1rem;
+            }
+
+            .po-card .card-header {
+                padding: .8rem 1rem;
             }
 
             .po-meta-wrap {
                 justify-content: stretch;
+                padding: 0 1rem 1rem;
             }
 
             .po-meta-card {
                 width: 100%;
-            }
-
-            .po-meta-grid {
-                grid-template-columns: 1fr;
             }
 
             .po-lines-table {
@@ -299,9 +333,6 @@
         }
     </style>
 @endpush
-
-{{-- HIDDEN: payment_method_id tetap dikirim tanpa UI --}}
-<input type="hidden" name="payment_method_id" value="{{ $selectedPaymentMethodId }}">
 
 {{-- HEADER --}}
 <div class="card po-card mb-3" data-order-type="{{ $orderType }}">
@@ -506,20 +537,36 @@
     {{-- META --}}
     <div class="po-meta-wrap">
         <div class="po-meta-card">
-            <div class="po-meta-grid">
 
+            {{-- Baris input: Status | Tipe Pembayaran | Ongkir --}}
+            <div class="po-meta-inputs">
                 <div>
                     <div class="po-label">Status</div>
                     <input type="hidden" name="status" value="{{ $statusValue }}">
                     <select class="form-select po-field" disabled>
                         @foreach ($statusOptions as $key => $label)
-                            <option value="{{ $key }}" @selected($statusValue === $key)>{{ $label }}
-                            </option>
+                            <option value="{{ $key }}" @selected($statusValue === $key)>{{ $label }}</option>
                         @endforeach
                     </select>
                 </div>
 
                 <div>
+                    <div class="po-label">Tipe Pembayaran</div>
+                    <select name="payment_method_id" id="po-payment-method"
+                        class="form-select po-field @error('payment_method_id') is-invalid @enderror">
+                        @foreach ($visiblePaymentMethods as $pm)
+                            <option value="{{ $pm->id }}" data-mode="{{ $pm->mode }}"
+                                @selected((string) $selectedPaymentMethodId === (string) $pm->id)>
+                                {{ $pmModeLabel[$pm->mode] ?? $pm->name }}
+                            </option>
+                        @endforeach
+                    </select>
+                    @error('payment_method_id')
+                        <div class="invalid-feedback">{{ $message }}</div>
+                    @enderror
+                </div>
+
+                <div class="po-meta-ongkir">
                     <div class="po-label">Ongkir (Rp)</div>
                     <input type="text"
                         class="form-control po-field po-num-display shipping-display @error('shipping_cost') is-invalid @enderror"
@@ -529,23 +576,24 @@
                         <div class="invalid-feedback">{{ $message }}</div>
                     @enderror
                 </div>
-
-                <div style="grid-column: span 2;">
-                    <div class="po-total-line">
-                        <div class="po-total-key">Subtotal Items</div>
-                        <div class="po-total-val subtle" id="po-subtotal-meta">0</div>
-                    </div>
-                    <div class="po-total-line">
-                        <div class="po-total-key">Ongkir</div>
-                        <div class="po-total-val subtle" id="po-shipping-meta">0</div>
-                    </div>
-                    <div class="po-total-line">
-                        <div class="po-total-key">Grand Total</div>
-                        <div class="po-total-val" id="po-grand-meta">0</div>
-                    </div>
-                </div>
-
             </div>
+
+            {{-- Ringkasan total --}}
+            <div class="po-meta-totals">
+                <div class="po-total-line">
+                    <div class="po-total-key">Subtotal Items</div>
+                    <div class="po-total-val subtle" id="po-subtotal-meta">0</div>
+                </div>
+                <div class="po-total-line">
+                    <div class="po-total-key">Ongkir</div>
+                    <div class="po-total-val subtle" id="po-shipping-meta">0</div>
+                </div>
+                <div class="po-total-line">
+                    <div class="po-total-key">Grand Total</div>
+                    <div class="po-total-val" id="po-grand-meta">0</div>
+                </div>
+            </div>
+
         </div>
     </div>
 </div>

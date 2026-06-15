@@ -132,10 +132,14 @@
 
     .gf-filter {
         display: grid;
-        grid-template-columns: minmax(220px, 1fr) auto;
+        grid-template-columns: minmax(220px, 1fr) 180px auto;
         gap: 10px;
         align-items: end;
         margin-bottom: 12px;
+    }
+
+    @media (max-width: 640px) {
+        .gf-filter { grid-template-columns: 1fr; }
     }
 
     .gf-label {
@@ -433,7 +437,8 @@
     $collection = method_exists($suppliers, 'getCollection') ? $suppliers->getCollection() : collect($suppliers);
     $activeCount = $collection->where('active', 1)->count();
     $inactiveCount = $collection->where('active', 0)->count();
-    $hasFilter = filled($q ?? request('q'));
+    $poType = $poType ?? request('po_type', '');
+    $hasFilter = filled($q ?? request('q')) || filled($poType);
 @endphp
 
 @section('content')
@@ -503,6 +508,16 @@
                         placeholder="Cari nama, kode, HP, atau email..." autofocus>
                 </div>
 
+                <div>
+                    <label class="gf-label">Jenis PO</label>
+                    <select name="po_type" class="form-select" id="filterPoType">
+                        <option value=""        @selected($poType === '')>Semua Jenis</option>
+                        <option value="material"      @selected($poType === 'material')>Bahan Baku</option>
+                        <option value="finished_good" @selected($poType === 'finished_good')>Barang Jadi</option>
+                        <option value="none"          @selected($poType === 'none')>Tanpa Jenis</option>
+                    </select>
+                </div>
+
                 <div class="d-flex gap-2">
                     <button class="btn btn-outline-secondary btn-sm" type="submit">
                         <i class="bi bi-funnel"></i>
@@ -526,7 +541,7 @@
                                 <th style="width:130px;">Kode</th>
                                 <th>Supplier</th>
                                 <th style="width:170px;">Kontak</th>
-                                <th style="width:220px;">Email</th>
+                                <th style="width:160px;">Jenis PO</th>
                                 <th style="width:110px;" class="text-center">Status</th>
                                 <th style="width:130px;" class="text-end">Aksi</th>
                             </tr>
@@ -552,12 +567,38 @@
 
                                     <td>
                                         <div class="gf-name">{{ $s->phone ?: '-' }}</div>
-                                        <div class="gf-sub">Nomor kontak</div>
+                                        @php $banks = $s->bankAccounts ?? collect(); @endphp
+                                        @if ($banks->isNotEmpty())
+                                            @foreach ($banks as $bk)
+                                                <div class="gf-sub" style="display:flex;align-items:center;gap:4px;margin-top:2px;">
+                                                    <span style="font-size:.68rem;font-weight:900;background:#f1f5f9;border:1px solid #e2e8f0;border-radius:999px;padding:1px 6px;color:#334155;font-family:ui-monospace,monospace;">{{ $bk->bank_name }}</span>
+                                                    <span style="font-size:.74rem;">{{ $bk->account_number }}</span>
+                                                </div>
+                                            @endforeach
+                                        @else
+                                            <div class="gf-sub">—</div>
+                                        @endif
                                     </td>
 
                                     <td>
-                                        <div class="gf-name">{{ $s->email ?: '-' }}</div>
-                                        <div class="gf-sub">Email supplier</div>
+                                        @php
+                                            $poTypes = $s->po_types ?? [];
+                                            $labels  = ['material' => 'Bahan Baku', 'finished_good' => 'Barang Jadi'];
+                                        @endphp
+                                        @if (empty($poTypes))
+                                            <span class="text-muted" style="font-size:.78rem;">Semua</span>
+                                        @else
+                                            <div class="d-flex flex-wrap gap-1">
+                                                @foreach ($poTypes as $pt)
+                                                    <span class="badge rounded-pill"
+                                                        style="font-size:.7rem; font-weight:700;
+                                                            background:{{ $pt === 'material' ? 'rgba(37,99,235,.12)' : 'rgba(16,185,129,.12)' }};
+                                                            color:{{ $pt === 'material' ? '#2563eb' : '#059669' }};">
+                                                        {{ $labels[$pt] ?? $pt }}
+                                                    </span>
+                                                @endforeach
+                                            </div>
+                                        @endif
                                     </td>
 
                                     <td class="text-center">
@@ -671,6 +712,12 @@ document.addEventListener('DOMContentLoaded', function () {
             submitLive(0);
         }
     });
+
+    // auto-submit saat dropdown jenis PO berubah
+    const poSelect = form.querySelector('#filterPoType');
+    if (poSelect) {
+        poSelect.addEventListener('change', function () { submitLive(0); });
+    }
 });
 </script>
 @endpush

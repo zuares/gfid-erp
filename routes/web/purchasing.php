@@ -51,11 +51,15 @@ Route::middleware(['web', 'auth', 'access:purchasing'])
                 ->name('purchase_receipts.create_from_order');
         });
 
-        // OWNER only actions
-        Route::middleware('role:owner')->group(function () {
+        // OWNER + ADMIN actions
+        Route::middleware('role:owner,admin')->group(function () {
 
             Route::post('purchase-orders/{purchase_order}/approve', [PurchaseOrderController::class, 'approve'])
                 ->name('purchase_orders.approve');
+        });
+
+        // OWNER only actions
+        Route::middleware('role:owner')->group(function () {
 
             Route::post('purchase-orders/{purchase_order}/cancel', [PurchaseOrderController::class, 'cancel'])
                 ->name('purchase_orders.cancel');

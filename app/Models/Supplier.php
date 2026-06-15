@@ -16,11 +16,13 @@ class Supplier extends Model
         'email',
         'address',
         'type',
+        'po_types',
         'active',
     ];
 
     protected $casts = [
-        'active' => 'boolean',
+        'active'   => 'boolean',
+        'po_types' => 'array',
     ];
 
     /* ==========================
@@ -69,6 +71,11 @@ class Supplier extends Model
         return $this->belongsToMany(Item::class, 'supplier_items')
             ->withPivot('last_price')
             ->withTimestamps();
+    }
+
+    public function bankAccounts()
+    {
+        return $this->hasMany(SupplierBankAccount::class);
     }
 
 }

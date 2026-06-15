@@ -826,6 +826,38 @@
                 </li>
             @endif
 
+            {{-- Purchasing (admin only) --}}
+            @php
+                $adminHasPoIndex  = $isAdmin && $router->has('purchasing.purchase_orders.index');
+                $adminHasPoCreate = $isAdmin && $router->has('purchasing.purchase_orders.create');
+            @endphp
+            @if ($adminHasPoIndex || $adminHasPoCreate)
+                <x-sidebar.label text="Procurement" />
+                <li class="mb-1">
+                    <button class="sidebar-link sidebar-toggle {{ $openPurchasing ? 'is-open' : '' }}" type="button"
+                        data-bs-toggle="collapse" data-bs-target="#navPurchasingAdmin"
+                        aria-expanded="{{ $openPurchasing ? 'true' : 'false' }}" aria-controls="navPurchasingAdmin">
+                        <span class="icon">🧾</span>
+                        <span>Purchasing</span>
+                        <span class="chevron">▸</span>
+                    </button>
+                    <div class="collapse {{ $openPurchasing ? 'show' : '' }}" id="navPurchasingAdmin">
+                        @if ($adminHasPoIndex)
+                            <x-sidebar.sub-link href="{{ route('purchasing.purchase_orders.index') }}" icon="≡"
+                                :active="request()->routeIs('purchasing.purchase_orders.index')">
+                                Daftar PO
+                            </x-sidebar.sub-link>
+                        @endif
+                        @if ($adminHasPoCreate)
+                            <x-sidebar.sub-link href="{{ route('purchasing.purchase_orders.create') }}" icon="＋"
+                                :active="request()->routeIs('purchasing.purchase_orders.create')">
+                                PO Baru
+                            </x-sidebar.sub-link>
+                        @endif
+                    </div>
+                </li>
+            @endif
+
             {{-- Production (operating only) --}}
             @if ($isOperating && $canShow(
                 $hasProdDashboard,
