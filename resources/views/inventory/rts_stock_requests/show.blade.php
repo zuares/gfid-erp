@@ -207,9 +207,10 @@
 
         $reqTotal = (float) $stockRequest->lines->sum('qty_request');
         $recvTotal = (float) $stockRequest->lines->sum('qty_received');
-        $outTotal = max($reqTotal - $recvTotal, 0);
+        $pickTotal = (float) $stockRequest->lines->sum('qty_picked');
+        $outTotal = max($reqTotal - $recvTotal - $pickTotal, 0);
 
-        $canReceive = $stockRequest->status === 'submitted';
+        $canReceive = in_array($stockRequest->status, ['submitted', 'shipped', 'partial'], true) && $outTotal > 0.0000001;
     @endphp
 
     <div class="page-wrap">
@@ -228,7 +229,7 @@
                 <x-status-pill :status="$stockRequest->status" />
                 <a href="{{ route('rts.stock-requests.index') }}" class="btn btn-outline">← List</a>
                 @if ($canManage && $canReceive)
-                    <a href="{{ route('rts.stock-requests.confirm', $stockRequest) }}" class="btn btn-primary">Terima</a>
+                    <a href="{{ route('rts.stock-requests.confirm', $stockRequest) }}" class="btn btn-primary">Terima Jadi</a>
                 @endif
             </div>
         </div>
@@ -240,7 +241,7 @@
                     <div class="v mono">{{ rtrim(rtrim(number_format($reqTotal, 2, '.', ''), '0'), '.') }}</div>
                 </div>
                 <div class="stat">
-                    <div class="k">Terima</div>
+                    <div class="k">Terima Jadi</div>
                     <div class="v mono">{{ rtrim(rtrim(number_format($recvTotal, 2, '.', ''), '0'), '.') }}</div>
                 </div>
                 <div class="stat">
@@ -270,7 +271,7 @@
                             <th class="no">No</th>
                             <th class="item-cell">Item</th>
                             <th class="td-right">Req</th>
-                            <th class="td-right">Terima</th>
+                            <th class="td-right">Terima Jadi</th>
                             <th class="td-right">Sisa</th>
                         </tr>
                     </thead>
@@ -279,7 +280,8 @@
                             @php
                                 $req = (float) ($line->qty_request ?? 0);
                                 $recv = (float) ($line->qty_received ?? 0);
-                                $out = max($req - $recv, 0);
+                                $pick = (float) ($line->qty_picked ?? 0);
+                                $out = max($req - $recv - $pick, 0);
                             @endphp
                             <tr>
                                 <td class="no td-center">{{ $i + 1 }}</td>

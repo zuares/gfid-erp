@@ -2,10 +2,10 @@
 
 @php
     $map = [
-        'submitted' => ['label' => 'Menunggu PRD', 'cls' => 'pill pill-submitted'],
-        'shipped' => ['label' => 'Dikirim ke Transit', 'cls' => 'pill pill-shipped'],
-        'partial' => ['label' => 'Sebagian Sampai', 'cls' => 'pill pill-partial'],
-        'completed' => ['label' => 'Selesai (Sudah di RTS)', 'cls' => 'pill pill-completed'],
+        'submitted' => ['label' => 'Menunggu', 'cls' => 'pill pill-submitted'],
+        'shipped' => ['label' => 'Diproses', 'cls' => 'pill pill-shipped'],
+        'partial' => ['label' => 'Sebagian', 'cls' => 'pill pill-partial'],
+        'completed' => ['label' => 'Selesai', 'cls' => 'pill pill-completed'],
     ];
 
     $item = $map[$status] ?? ['label' => strtoupper((string) $status), 'cls' => 'pill'];

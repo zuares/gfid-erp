@@ -226,6 +226,20 @@
                         </div>
 
                         <div class="col-6 col-md-3">
+                            <label class="form-label form-label-sm">Tujuan Gudang</label>
+                            <select name="destination_warehouse_id"
+                                    class="form-select form-select-sm @error('destination_warehouse_id') is-invalid @enderror">
+                                @foreach($destinationWarehouses ?? [] as $wh)
+                                    <option value="{{ $wh->id }}"
+                                        @selected(old('destination_warehouse_id', $defaultDestinationId ?? '') == $wh->id)>
+                                        {{ $wh->code }} — {{ $wh->name }}
+                                    </option>
+                                @endforeach
+                            </select>
+                            @error('destination_warehouse_id')<div class="invalid-feedback">{{ $message }}</div>@enderror
+                        </div>
+
+                        <div class="col-6 col-md-3">
                             <label class="form-label form-label-sm">Filter operator</label>
                             <select id="op-filter" class="form-select form-select-sm">
                                 <option value="">Semua (gabung)</option>

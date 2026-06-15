@@ -802,26 +802,6 @@
                 </li>
             @endif
 
-            {{-- Production (admin only) — Finishing + Sewing Returns --}}
-            @if ($isAdmin && $canShow($hasProdFinishingJobsIndex, $hasProdSewReturnsIndex))
-                <x-sidebar.label text="Production" />
-                <li class="simple-group">
-                    @if ($hasProdSewReturnsIndex)
-                        <x-sidebar.simple-link href="{{ route('production.sewing.returns.index') }}" icon="📥"
-                            :active="request()->routeIs('production.sewing.returns.*')">
-                            Sewing Returns
-                        </x-sidebar.simple-link>
-                    @endif
-
-                    @if ($hasProdFinishingJobsIndex)
-                        <x-sidebar.simple-link href="{{ route('production.finishing_jobs.index') }}" icon="🧶"
-                            :active="request()->routeIs('production.finishing_jobs.*')">
-                            Finishing
-                        </x-sidebar.simple-link>
-                    @endif
-                </li>
-            @endif
-
             {{-- Production (operating only) --}}
             @if ($isOperating && $canShow(
                 $hasProdDashboard,

@@ -24,17 +24,19 @@ class RtsStockRequestController extends Controller
 
     /**
      * List RTS Requests
-     * Status: submitted | completed | all
-     * Outstanding: requested - received
+     * Status: submitted | shipped | partial | completed | all
+     * Outstanding RTS: requested - received - picked
      */
     public function index(Request $request): View
     {
         // ✅ Default tab: ALL untuk status & period
-        $statusFilter = (string) $request->input('status', 'all'); // submitted|completed|all
-        $period = (string) $request->input('period', 'all'); // today|week|month|all
+        $statusFilter = (string) $request->input('status', 'all');
+        $period       = (string) $request->input('period', 'all');
+        $search       = trim((string) $request->input('search', ''));
+        $dateFrom     = $request->input('date_from');
+        $dateTo       = $request->input('date_to');
 
-        // Normalisasi input (biar aman dari input aneh)
-        if (!in_array($statusFilter, ['submitted', 'completed', 'all'], true)) {
+        if (!in_array($statusFilter, ['submitted', 'shipped', 'partial', 'completed', 'all'], true)) {
             $statusFilter = 'all';
         }
         if (!in_array($period, ['today', 'week', 'month', 'all'], true)) {
@@ -43,41 +45,37 @@ class RtsStockRequestController extends Controller
 
         $now = Carbon::now();
 
-        $dateFrom = null;
-        $dateTo = null;
-
-        switch ($period) {
-            case 'today':
-                $dateFrom = $now->copy()->startOfDay();
-                $dateTo = $now->copy()->endOfDay();
-                break;
-
-            case 'week':
-                $dateFrom = $now->copy()->startOfWeek();
-                $dateTo = $now->copy()->endOfWeek();
-                break;
-
-            case 'month':
-                $dateFrom = $now->copy()->startOfMonth();
-                $dateTo = $now->copy()->endOfMonth();
-                break;
-
-            case 'all':
-            default:
-                // no date filter
-                break;
+        // period preset overrides manual date only when no manual date given
+        if (!$dateFrom && !$dateTo) {
+            switch ($period) {
+                case 'today':
+                    $dateFrom = $now->copy()->startOfDay()->toDateString();
+                    $dateTo   = $now->copy()->endOfDay()->toDateString();
+                    break;
+                case 'week':
+                    $dateFrom = $now->copy()->startOfWeek()->toDateString();
+                    $dateTo   = $now->copy()->endOfWeek()->toDateString();
+                    break;
+                case 'month':
+                    $dateFrom = $now->copy()->startOfMonth()->toDateString();
+                    $dateTo   = $now->copy()->endOfMonth()->toDateString();
+                    break;
+            }
+        } else {
+            // manual date → reset period to 'all'
+            $period = 'all';
         }
 
         $applyDateFilter = function ($query) use ($dateFrom, $dateTo) {
-            if ($dateFrom && $dateTo) {
-                $query->whereBetween('date', [$dateFrom, $dateTo]);
-            }
+            if ($dateFrom) $query->where('date', '>=', $dateFrom);
+            if ($dateTo)   $query->where('date', '<=', $dateTo);
             return $query;
         };
 
         $baseQuery = StockRequest::rtsReplenish()
-            ->with(['sourceWarehouse', 'destinationWarehouse', 'requestedBy'])
+            ->with(['sourceWarehouse', 'destinationWarehouse', 'requestedBy', 'lines.item'])
             ->withSum('lines as total_requested_qty', 'qty_request')
+            ->withSum('lines as total_picked_qty', 'qty_picked')
             ->withSum('lines as total_received_qty', 'qty_received');
 
         $baseQuery = $applyDateFilter($baseQuery);
@@ -87,27 +85,40 @@ class RtsStockRequestController extends Controller
 
         $stats = [
             'total' => (clone $statsBase)->count(),
-            'submitted' => (clone $statsBase)->where('status', 'submitted')->count(),
+            'submitted' => (clone $statsBase)->whereIn('status', ['submitted', 'shipped'])->count(),
+            'partial' => (clone $statsBase)->where('status', 'partial')->count(),
             'completed' => (clone $statsBase)->where('status', 'completed')->count(),
         ];
 
         $outstandingQty = (clone $statsBase)
             ->withSum('lines as total_requested_qty', 'qty_request')
             ->withSum('lines as total_received_qty', 'qty_received')
+            ->withSum('lines as total_picked_qty', 'qty_picked')
             ->get()
             ->sum(function ($req) {
                 $reqQty = (float) ($req->total_requested_qty ?? 0);
                 $recvQty = (float) ($req->total_received_qty ?? 0);
-                return max($reqQty - $recvQty, 0);
+                $pickQty = (float) ($req->total_picked_qty ?? 0);
+                return max($reqQty - $recvQty - $pickQty, 0);
             });
 
         $listQuery = clone $baseQuery;
 
         // status filter
-        if (in_array($statusFilter, ['submitted', 'completed'], true)) {
+        if ($statusFilter === 'submitted') {
+            $listQuery->whereIn('status', ['submitted', 'shipped']);
+        } elseif (in_array($statusFilter, ['shipped', 'partial', 'completed'], true)) {
             $listQuery->where('status', $statusFilter);
         } else {
             $statusFilter = 'all';
+        }
+
+        // search: by code or item code
+        if ($search !== '') {
+            $listQuery->where(function ($q) use ($search) {
+                $q->where('code', 'like', "%{$search}%")
+                  ->orWhereHas('lines.item', fn($qi) => $qi->where('code', 'like', "%{$search}%"));
+            });
         }
 
         $stockRequests = $listQuery
@@ -121,7 +132,10 @@ class RtsStockRequestController extends Controller
             'stats',
             'outstandingQty',
             'statusFilter',
-            'period'
+            'period',
+            'search',
+            'dateFrom',
+            'dateTo',
         ));
     }
 
@@ -142,6 +156,11 @@ class RtsStockRequestController extends Controller
             ->orderBy('code')
             ->get();
 
+        $prdStockByItem = DB::table('inventory_stocks')
+            ->where('warehouse_id', $prdWarehouse->id)
+            ->whereIn('item_id', $finishedGoodsItems->pluck('id'))
+            ->pluck('qty', 'item_id');
+
         // ✅ selalu dokumen baru
         $prefillDate = $date;
         $prefillLines = [];
@@ -150,6 +169,7 @@ class RtsStockRequestController extends Controller
             'prdWarehouse',
             'rtsWarehouse',
             'finishedGoodsItems',
+            'prdStockByItem',
             'prefillDate',
             'prefillLines',
         ));
@@ -204,9 +224,11 @@ class RtsStockRequestController extends Controller
             $sr->code = $code;
             $sr->date = $date;
             $sr->purpose = 'rts_replenish';
-            $sr->status = 'submitted';
+            $sr->status = 'completed';
             $sr->source_warehouse_id = (int) $data['source_warehouse_id'];
             $sr->destination_warehouse_id = (int) $data['destination_warehouse_id'];
+            $sr->received_by_user_id = Auth::id();
+            $sr->received_at = now();
 
             // sesuaikan kolom creator kamu:
             if (property_exists($sr, 'created_by')) {
@@ -217,27 +239,41 @@ class RtsStockRequestController extends Controller
 
             $sr->save();
 
-            $lines = [];
             $lineNo = 1;
 
             foreach ($data['lines'] as $row) {
-                $lines[] = [
+                $qty = (float) $row['qty_request'];
+                $itemId = (int) $row['item_id'];
+
+                try {
+                    $this->inventory->move(
+                        itemId: $itemId,
+                        fromWarehouseId: (int) $data['source_warehouse_id'],
+                        toWarehouseId: (int) $data['destination_warehouse_id'],
+                        qty: $qty,
+                        referenceType: 'stock_request',
+                        referenceId: $sr->id,
+                        notes: 'RTS direct receive (PRD → RTS)',
+                        date: $date,
+                        allowNegative: true,
+                    );
+                } catch (\RuntimeException $e) {
+                    throw ValidationException::withMessages(['stock' => $e->getMessage()]);
+                }
+
+                StockRequestLine::create([
                     'stock_request_id' => $sr->id,
                     'line_no' => $lineNo++,
-                    'item_id' => (int) $row['item_id'],
-                    'qty_request' => (float) $row['qty_request'],
+                    'item_id' => $itemId,
+                    'qty_request' => $qty,
                     'qty_dispatched' => 0,
-                    'qty_received' => 0,
-                    'created_at' => now(),
-                    'updated_at' => now(),
-                ];
+                    'qty_received' => $qty,
+                ]);
             }
-
-            StockRequestLine::insert($lines);
 
             return redirect()
                 ->route('rts.stock-requests.show', $sr)
-                ->with('success', 'Permintaan RTS berhasil dibuat.');
+                ->with('success', 'Terima Jadi berhasil. Stok WH-PRD langsung berpindah ke WH-RTS.');
         });
     }
 
@@ -278,13 +314,12 @@ class RtsStockRequestController extends Controller
     }
 
     /**
-     * Receive form: input qty yang datang.
-     * Live stock ambil dari source warehouse SR (PRD).
+     * Receive form: input qty yang diambil langsung dari WH-PRD ke WH-RTS.
      */
     public function confirmReceive(StockRequest $stockRequest): View
     {
         abort_unless($stockRequest->purpose === 'rts_replenish', 404);
-        abort_if($stockRequest->status !== 'submitted', 404);
+        abort_unless(in_array($stockRequest->status, ['submitted', 'shipped', 'partial'], true), 404);
 
         $stockRequest->load(['lines.item', 'sourceWarehouse', 'destinationWarehouse']);
 
@@ -304,7 +339,7 @@ class RtsStockRequestController extends Controller
     public function finalize(Request $request, StockRequest $stockRequest): RedirectResponse
     {
         abort_unless($stockRequest->purpose === 'rts_replenish', 404);
-        abort_if($stockRequest->status !== 'submitted', 404);
+        abort_unless(in_array($stockRequest->status, ['submitted', 'shipped', 'partial'], true), 404);
 
         $validated = $request->validate([
             'lines' => ['required', 'array'],
@@ -327,8 +362,16 @@ class RtsStockRequestController extends Controller
                     continue;
                 }
 
-                // ✅ NEW RULE: BOLEH terima melebihi request
-                // Jadi TIDAK ADA guard maxReceivable lagi.
+                $alreadyReceived = (float) ($line->qty_received ?? 0);
+                $picked = (float) ($line->qty_picked ?? 0);
+                $requested = (float) ($line->qty_request ?? 0);
+                $maxReceivable = max($requested - $alreadyReceived - $picked, 0);
+
+                if ($qty > $maxReceivable + 0.0000001) {
+                    throw ValidationException::withMessages([
+                        "lines.{$line->id}.qty_received" => "Qty terima melebihi sisa permintaan untuk item ini (maks: {$maxReceivable}).",
+                    ]);
+                }
 
                 $anyReceived = true;
 
@@ -340,9 +383,9 @@ class RtsStockRequestController extends Controller
                         qty: $qty,
                         referenceType: 'stock_request',
                         referenceId: $stockRequest->id,
-                        notes: 'RTS receive (PRD → RTS) — allow over-receive',
+                        notes: 'RTS receive (PRD → RTS)',
                         date: $stockRequest->date ?? now(),
-                        allowNegative: true, // ✅ PRD boleh minus
+                        allowNegative: true,
                     );
                 } catch (\RuntimeException $e) {
                     throw ValidationException::withMessages(['stock' => $e->getMessage()]);
@@ -356,7 +399,15 @@ class RtsStockRequestController extends Controller
                 return;
             }
 
-            $stockRequest->status = 'completed';
+            $stockRequest->load('lines');
+
+            $reqTotal = (float) $stockRequest->lines->sum('qty_request');
+            $recvTotal = (float) $stockRequest->lines->sum('qty_received');
+            $pickTotal = (float) $stockRequest->lines->sum('qty_picked');
+
+            $stockRequest->status = ($recvTotal + $pickTotal) + 0.0000001 >= $reqTotal
+                ? 'completed'
+                : 'partial';
             $stockRequest->received_by_user_id = $stockRequest->received_by_user_id ?? Auth::id();
             $stockRequest->received_at = $stockRequest->received_at ?? now();
             $stockRequest->save();
@@ -368,7 +419,7 @@ class RtsStockRequestController extends Controller
 
         return redirect()
             ->route('rts.stock-requests.show', $stockRequest)
-            ->with('status', 'Penerimaan berhasil. PRD→RTS diposting (PRD boleh minus) dan dokumen ditutup (completed).');
+            ->with('status', 'Penerimaan berhasil. Stok dipindahkan dari WH-PRD ke WH-RTS.');
     }
 
     public function quickToday(): RedirectResponse
@@ -386,7 +437,7 @@ class RtsStockRequestController extends Controller
         }
 
         $todayRequest = $query
-            ->whereIn('status', ['submitted', 'completed'])
+            ->whereIn('status', ['submitted', 'shipped', 'partial', 'completed'])
             ->orderByDesc('id')
             ->first();
 

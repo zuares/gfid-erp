@@ -24,7 +24,7 @@ use Illuminate\Support\Facades\Route;
 |   - owner/admin: FULL (create/store/confirm/finalize)
 | - RTS Direct Receives (Dadakan):
 |   - owner/admin: index/create/store/show + operator-wip (ajax)
-| - PRD process removed (no more PRD -> TRANSIT)
+| - RTS receive langsung mengambil stok WH-PRD -> WH-RTS
 |--------------------------------------------------------------------------
  */
 

@@ -110,14 +110,6 @@ class FinishingJobController extends Controller
         $today = Carbon::today()->toDateString();
         $wipFinWarehouseId = Warehouse::where('code', 'WIP-FIN')->value('id');
 
-        // Destination warehouse: WH-RTS (default) dan WH-PRD sebagai alternatif
-        $destinationWarehouses = Warehouse::whereIn('code', ['WH-RTS', 'WH-PRD'])
-            ->get(['id', 'code', 'name'])
-            ->sortBy(fn($w) => ['WH-RTS' => 0, 'WH-PRD' => 1][$w->code] ?? 99)
-            ->values();
-        $defaultDestinationId = $destinationWarehouses->firstWhere('code', 'WH-RTS')?->id
-            ?? $destinationWarehouses->first()?->id;
-
         $operators = Employee::query()
             ->where('role', 'sewing')
             ->orderBy('name')
@@ -129,8 +121,6 @@ class FinishingJobController extends Controller
                 'linesAll' => [],
                 'linesByOp' => [],
                 'operators' => $operators,
-                'destinationWarehouses' => $destinationWarehouses,
-                'defaultDestinationId' => $defaultDestinationId,
             ])->withErrors(['warehouse' => 'Gudang WIP-FIN belum dikonfigurasi.']);
         }
 
@@ -153,8 +143,6 @@ class FinishingJobController extends Controller
                 'linesAll' => [],
                 'linesByOp' => [],
                 'operators' => $operators,
-                'destinationWarehouses' => $destinationWarehouses,
-                'defaultDestinationId' => $defaultDestinationId,
             ]);
         }
 
@@ -336,8 +324,6 @@ class FinishingJobController extends Controller
             'linesAll' => $linesAll,
             'linesByOp' => $linesByOp,
             'operators' => $operators,
-            'destinationWarehouses' => $destinationWarehouses,
-            'defaultDestinationId' => $defaultDestinationId,
         ]);
     }
 
@@ -359,7 +345,6 @@ class FinishingJobController extends Controller
         $rules = [
             'date' => ['required', 'date'],
             'notes' => ['nullable', 'string'],
-            'destination_warehouse_id' => ['nullable', 'integer', 'exists:warehouses,id'],
             'operator_mode' => ['required', 'in:all,byop'],
 
             'operator_global_id' => [
@@ -516,7 +501,6 @@ class FinishingJobController extends Controller
                 'date' => $validated['date'],
                 'status' => 'draft',
                 'notes' => $validated['notes'] ?? null,
-                'destination_warehouse_id' => $validated['destination_warehouse_id'] ?? null,
                 'created_by' => $request->user()->id,
                 'updated_by' => $request->user()->id,
             ]);
@@ -954,35 +938,22 @@ class FinishingJobController extends Controller
         }
 
         $requiredCodes = ['WIP-FIN', 'WH-PRD', 'REJ-FIN', 'REJ-SEW', 'RM'];
-        // Jika ada destination_warehouse, load juga kodenya agar masuk koleksi
-        $destCode = $job->destination_warehouse_id
-            ? Warehouse::where('id', $job->destination_warehouse_id)->value('code')
-            : null;
-        if ($destCode && !in_array(strtoupper($destCode), $requiredCodes, true)) {
-            $requiredCodes[] = strtoupper($destCode);
-        }
         $warehouses = $this->getRequiredWarehouses($requiredCodes);
 
-        $baseCodes = ['WIP-FIN', 'WH-PRD', 'REJ-FIN', 'REJ-SEW', 'RM'];
-        $missing = array_diff($baseCodes, $warehouses->keys()->all());
+        $missing = array_diff($requiredCodes, $warehouses->keys()->all());
         if (!empty($missing)) {
             throw new \RuntimeException('Warehouse berikut belum dikonfigurasi: ' . implode(', ', $missing) . '. Silakan setting dulu di Master Gudang.');
         }
 
-        // Resolve destination: pakai destination_warehouse jika diset, fallback WH-PRD
-        $prodWarehouse = ($destCode && $warehouses->has(strtoupper($destCode)))
-            ? $warehouses->get(strtoupper($destCode))
-            : $warehouses['WH-PRD'];
-
         $movementDate = $this->resolveMovementDate($job);
 
-        DB::transaction(function () use ($job, $warehouses, $prodWarehouse, $movementDate) {
+        DB::transaction(function () use ($job, $warehouses, $movementDate) {
             $this->finBom->applySupOnlyForPostedJob($job, $movementDate);
 
             $this->applyPostingMovements(
                 job: $job,
                 wipFinWarehouseId: $warehouses['WIP-FIN']->id,
-                prodWarehouseId: $prodWarehouse->id,
+                prodWarehouseId: $warehouses['WH-PRD']->id,
                 rejectFinWarehouseId: $warehouses['REJ-FIN']->id,
                 rejectSewWarehouseId: $warehouses['REJ-SEW']->id,
                 movementDate: $movementDate,

@@ -187,15 +187,6 @@
       <main class="app-main py-3">
         <div class="page-wrap">
 
-          {{-- Flash message --}}
-          @if (session('success'))
-            <div class="alert alert-success mb-3">{{ session('success') }}</div>
-          @endif
-
-          @if (session('error'))
-            <div class="alert alert-danger mb-3">{{ session('error') }}</div>
-          @endif
-
           @php
             $hasValidationErrors = $errors instanceof \Illuminate\Support\ViewErrorBag ? $errors->any() : false;
           @endphp
@@ -230,6 +221,24 @@
   {{-- ✅ Flatpickr GLOBAL --}}
   <script src="https://cdn.jsdelivr.net/npm/flatpickr"></script>
   <script src="https://cdn.jsdelivr.net/npm/sweetalert2@11"></script>
+
+  @if (session('success') || session('error'))
+    <script>
+      document.addEventListener('DOMContentLoaded', function() {
+        if (!window.Swal) return;
+
+        window.Swal.fire({
+          toast: true,
+          position: 'top-end',
+          icon: @json(session('success') ? 'success' : 'error'),
+          title: @json(session('success') ?: session('error')),
+          showConfirmButton: false,
+          timer: 2600,
+          timerProgressBar: true
+        });
+      });
+    </script>
+  @endif
 
   {{-- THEME TOGGLER SCRIPT --}}
   @include('layouts.partials.theme-script')

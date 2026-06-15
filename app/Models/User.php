@@ -101,7 +101,7 @@ class User extends Authenticatable
     {
         return match (strtolower($role)) {
             'owner' => array_keys(UserModuleAccess::MODULES),
-            'admin' => ['dashboard', 'inventory', 'sales', 'purchasing', 'marketplace', 'imports', 'accounting'],
+            'admin' => ['dashboard', 'inventory', 'sales', 'purchasing', 'production'],
             'operating' => ['dashboard', 'inventory', 'production'],
             default => ['dashboard'],
         };

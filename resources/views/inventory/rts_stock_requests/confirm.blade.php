@@ -186,6 +186,62 @@
             color: rgba(239, 68, 68, 1);
         }
 
+        .confirm-backdrop {
+            position: fixed;
+            inset: 0;
+            z-index: 80;
+            display: none;
+            align-items: center;
+            justify-content: center;
+            padding: 1rem;
+            background: rgba(15, 23, 42, .48);
+        }
+
+        .confirm-backdrop.is-open {
+            display: flex;
+        }
+
+        .confirm-modal {
+            width: min(440px, 100%);
+            border-radius: 14px;
+            border: 1px solid rgba(148, 163, 184, .28);
+            background: var(--card);
+            box-shadow: 0 22px 60px rgba(15, 23, 42, .28);
+            padding: .95rem;
+        }
+
+        .confirm-title {
+            font-size: 1rem;
+            font-weight: 900;
+            margin: 0;
+        }
+
+        .confirm-copy {
+            margin-top: .45rem;
+            font-size: .88rem;
+            line-height: 1.45;
+            opacity: .86;
+        }
+
+        .confirm-total {
+            margin-top: .75rem;
+            padding: .6rem .7rem;
+            border-radius: 12px;
+            border: 1px dashed rgba(148, 163, 184, .34);
+            display: flex;
+            justify-content: space-between;
+            gap: .8rem;
+            align-items: center;
+        }
+
+        .confirm-actions {
+            margin-top: .9rem;
+            display: flex;
+            justify-content: flex-end;
+            gap: .5rem;
+            flex-wrap: wrap;
+        }
+
         @media (max-width: 820px) {
             .tbl {
                 min-width: 0;
@@ -270,10 +326,10 @@
 
             <div class="card">
                 <div style="display:flex;justify-content:space-between;align-items:center;gap:.6rem;flex-wrap:wrap">
-                    <div style="font-weight:900;letter-spacing:-.01em">Input Qty Terima</div>
+                    <div style="font-weight:900;letter-spacing:-.01em">Terima Barang Jadi</div>
 
                     <div class="actions">
-                        <button type="button" class="btn btn-outline" id="btnFillReq">Isi = Req</button>
+                        <button type="button" class="btn btn-outline" id="btnFillRemaining">Isi Sisa</button>
                         <button type="button" class="btn btn-outline" id="btnClearAll">Kosongkan</button>
                         <button class="btn btn-primary" type="submit">Simpan</button>
                     </div>
@@ -287,8 +343,8 @@
                             <tr>
                                 <th>Item</th>
                                 <th class="td-right">Req</th>
-                                <th class="td-right">PRD Live</th>
-                                <th class="td-right">Qty Terima</th>
+                                <th class="td-right">Stok WH-PRD Jadi</th>
+                                <th class="td-right">Terima Jadi</th>
                                 <th class="td-right">Status</th>
                             </tr>
                         </thead>
@@ -297,12 +353,15 @@
                             @foreach ($stockRequest->lines as $line)
                                 @php
                                     $req = (float) ($line->qty_request ?? 0);
+                                    $recv = (float) ($line->qty_received ?? 0);
+                                    $pick = (float) ($line->qty_picked ?? 0);
+                                    $remaining = max($req - $recv - $pick, 0);
                                     $live = (float) ($liveStocks[$line->id] ?? 0);
                                     $old = old("lines.{$line->id}.qty_received", 0);
 
                                     // status awal (berdasarkan live)
-                                    $liveBadge = $live <= 0.0000001 ? 'badge warn' : 'badge ok';
-                                    $liveText = $live <= 0.0000001 ? 'PRD Minus' : 'OK';
+                                    $liveBadge = $remaining <= 0.0000001 ? 'badge ok' : ($live <= 0.0000001 ? 'badge warn' : 'badge ok');
+                                    $liveText = $remaining <= 0.0000001 ? 'Sudah cukup' : ($live <= 0.0000001 ? 'PRD minus' : 'Siap');
                                 @endphp
 
                                 <tr>
@@ -315,14 +374,15 @@
                                         {{ rtrim(rtrim(number_format($req, 2, '.', ''), '0'), '.') }}
                                     </td>
 
-                                    <td class="td-right mono" data-k="PRD Live">
+                                    <td class="td-right mono" data-k="Stok WH-PRD Jadi">
                                         {{ rtrim(rtrim(number_format($live, 2, '.', ''), '0'), '.') }}
                                     </td>
 
-                                    <td class="td-right" data-k="Qty Terima">
+                                    <td class="td-right" data-k="Terima Jadi">
                                         <input class="num js-recv" type="number" step="0.01" min="0"
                                             name="lines[{{ $line->id }}][qty_received]" value="{{ $old }}"
-                                            data-req="{{ $req }}" data-live="{{ $live }}"
+                                            data-req="{{ $req }}" data-remaining="{{ $remaining }}"
+                                            data-live="{{ $live }}"
                                             inputmode="decimal">
                                         @error("lines.{$line->id}.qty_received")
                                             <div class="err">{{ $message }}</div>
@@ -345,6 +405,23 @@
                 @enderror
             </div>
         </form>
+
+        <div class="confirm-backdrop" id="confirmBackdrop" aria-hidden="true">
+            <div class="confirm-modal" role="dialog" aria-modal="true" aria-labelledby="confirmTitle">
+                <h2 class="confirm-title" id="confirmTitle">Konfirmasi Terima Jadi</h2>
+                <div class="confirm-copy">
+                    Stok akan langsung berpindah dari <b>WH-PRD</b> ke <b>WH-RTS</b>. Pastikan qty sudah benar.
+                </div>
+                <div class="confirm-total">
+                    <span>Total Qty</span>
+                    <b class="mono" id="confirmTotal">0</b>
+                </div>
+                <div class="confirm-actions">
+                    <button type="button" class="btn btn-outline" id="confirmCancel">Batal</button>
+                    <button type="button" class="btn btn-primary" id="confirmSubmit">Ya, Pindahkan</button>
+                </div>
+            </div>
+        </div>
     </div>
 
     <script>
@@ -356,6 +433,7 @@
 
             function fmtBadge(el, qty) {
                 const req = toNum(el.dataset.req || 0);
+                const remaining = toNum(el.dataset.remaining || 0);
                 const live = toNum(el.dataset.live || 0);
 
                 // cari badge status di row yang sama
@@ -365,11 +443,17 @@
 
                 // default
                 badge.className = 'badge js-status';
-                let text = (live <= 0.0000001) ? 'PRD Minus' : 'OK';
+                let text = (remaining <= 0.0000001) ? 'Sudah cukup' : ((live <= 0.0000001) ? 'PRD minus' : 'Siap');
 
                 if (qty <= 0.0000001) {
                     badge.classList.add('badge');
                     badge.textContent = '-';
+                    return;
+                }
+
+                if (qty > remaining + 0.0000001) {
+                    badge.classList.add('danger');
+                    badge.textContent = 'Lebih dari sisa';
                     return;
                 }
 
@@ -379,9 +463,9 @@
                     return;
                 }
 
-                if (live <= 0.0000001) {
+                if (remaining <= 0.0000001 || live <= 0.0000001) {
                     badge.classList.add('warn');
-                    badge.textContent = 'PRD Minus';
+                    badge.textContent = text;
                     return;
                 }
 
@@ -408,10 +492,10 @@
                 clampNonNegative(el);
             });
 
-            document.getElementById('btnFillReq')?.addEventListener('click', () => {
+            document.getElementById('btnFillRemaining')?.addEventListener('click', () => {
                 inputs.forEach(el => {
-                    const req = toNum(el.dataset.req || 0);
-                    el.value = req > 0 ? req : 0;
+                    const remaining = toNum(el.dataset.remaining || 0);
+                    el.value = remaining > 0 ? remaining : 0;
                     clampNonNegative(el);
                 });
             });
@@ -421,6 +505,52 @@
                     el.value = 0;
                     clampNonNegative(el);
                 });
+            });
+
+            const form = document.getElementById('formReceive');
+            const modal = document.getElementById('confirmBackdrop');
+            const totalEl = document.getElementById('confirmTotal');
+            const cancelBtn = document.getElementById('confirmCancel');
+            const submitBtn = document.getElementById('confirmSubmit');
+            let confirmed = false;
+
+            function totalQty() {
+                return inputs.reduce((sum, el) => sum + toNum(el.value), 0);
+            }
+
+            function fmt(n) {
+                return (Math.round(n * 100) / 100).toString();
+            }
+
+            function openModal(total) {
+                totalEl.textContent = fmt(total);
+                modal.classList.add('is-open');
+                modal.setAttribute('aria-hidden', 'false');
+            }
+
+            function closeModal() {
+                modal.classList.remove('is-open');
+                modal.setAttribute('aria-hidden', 'true');
+            }
+
+            form?.addEventListener('submit', (event) => {
+                if (confirmed) return;
+                inputs.forEach(clampNonNegative);
+                const total = totalQty();
+                if (total <= 0.0000001) return;
+
+                event.preventDefault();
+                openModal(total);
+            });
+
+            cancelBtn?.addEventListener('click', closeModal);
+            modal?.addEventListener('click', (event) => {
+                if (event.target === modal) closeModal();
+            });
+            submitBtn?.addEventListener('click', () => {
+                confirmed = true;
+                closeModal();
+                form?.submit();
             });
         })();
     </script>
