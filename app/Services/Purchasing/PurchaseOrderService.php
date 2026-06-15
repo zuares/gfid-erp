@@ -15,7 +15,8 @@ use Illuminate\Validation\ValidationException;
 class PurchaseOrderService
 {
     public function __construct(
-        protected JournalService $journalService
+        protected JournalService $journalService,
+        protected PurchaseOrderInventoryService $inventoryPoster,
     ) {}
 
     /**
@@ -167,11 +168,17 @@ class PurchaseOrderService
                 }
             }
 
-            // ✅ APPROVE ORDER (NO JOURNAL)
+            // ✅ APPROVE ORDER
             $order->status = 'approved';
             $order->approved_by = $approvedBy;
             $order->approved_at = now();
             $order->save();
+
+            // ─────────────────────────────────────────────────────────────
+            // Temporary direct stock-in after PO approval; GRN module kept for future workflow.
+            // Hanya untuk PO material (bahan baku). Idempotent — tidak double-post.
+            // ─────────────────────────────────────────────────────────────
+            $this->inventoryPoster->postApprovedPurchaseOrderToInventory($order);
 
             return $order->fresh(['supplier', 'lines', 'paymentMethod']);
         });

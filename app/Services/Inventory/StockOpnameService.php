@@ -85,6 +85,66 @@ class StockOpnameService
     }
 
     /**
+     * Generate lines KHUSUS bahan baku RM (periodic):
+     * - system_qty = SUM(lots.qty_onhand WHERE status='open') per item
+     * - hanya item dengan item_role IN ('raw_material','production_supply') dan active=1
+     * - semua item bahan baku masuk (termasuk yang saldo 0 agar tetap bisa dicek fisik)
+     *
+     * Berbeda dari generateLinesFromWarehouse() yang pakai SUM(mutations).
+     * Untuk bahan baku kain/RIB, lots adalah sumber kebenaran saldo.
+     */
+    public function generateRawMaterialLines(StockOpname $opname, int $warehouseId): void
+    {
+        // 1) Item bahan baku aktif
+        $eligibleItems = Item::query()
+            ->whereIn('item_role', ['raw_material', 'production_supply'])
+            ->where('active', true)
+            ->orderBy('code')
+            ->get(['id', 'code', 'hpp']);
+
+        if ($eligibleItems->isEmpty()) {
+            return;
+        }
+
+        $itemIds = $eligibleItems->pluck('id')->all();
+
+        // 2) system_qty dari SUM(lots.qty_onhand) — sumber kebenaran untuk bahan baku
+        $lotQtys = \Illuminate\Support\Facades\DB::table('lots')
+            ->whereIn('item_id', $itemIds)
+            ->where('status', 'open')
+            ->groupBy('item_id')
+            ->selectRaw('item_id, SUM(qty_onhand) as total_qty')
+            ->get()
+            ->keyBy('item_id');
+
+        $now  = now();
+        $rows = [];
+
+        foreach ($eligibleItems as $item) {
+            $lotRow    = $lotQtys->get($item->id);
+            $systemQty = $lotRow ? (float) $lotRow->total_qty : 0.0;
+            $unitCost  = ((float) ($item->hpp ?? 0)) > 0 ? (float) $item->hpp : null;
+
+            $rows[] = [
+                'stock_opname_id' => $opname->id,
+                'item_id'         => $item->id,
+                'system_qty'      => $systemQty,
+                'physical_qty'    => null,
+                'difference_qty'  => 0,
+                'is_counted'      => false,
+                'notes'           => null,
+                'unit_cost'       => $unitCost,
+                'created_at'      => $now,
+                'updated_at'      => $now,
+            ];
+        }
+
+        if (!empty($rows)) {
+            StockOpnameLine::insert($rows);
+        }
+    }
+
+    /**
      * Finalize Stock Opname:
      * - opening: SEKARANG juga bikin InventoryAdjustment (biar muncul di menu adjustment)
      * - periodic: tetap bikin InventoryAdjustment
@@ -286,54 +346,129 @@ class StockOpnameService
                     $unitCost = (float) $line->item->hpp;
                 }
 
-                // ✅ selalu simpan adjustment line untuk audit (even difference 0)
-                $direction = $difference >= 0 ? 'in' : 'out';
+                $direction    = $difference >= 0 ? 'in' : 'out';
+                $hasDiff      = abs($difference) >= 0.0000001;
+                $postedLotId  = null;
 
+                // ── Non-owner: catat untuk audit saja, stok belum berubah ──
+                if (!$isOwner) {
+                    InventoryAdjustmentLine::create([
+                        'inventory_adjustment_id' => $adjustment->id,
+                        'item_id'   => $itemId,
+                        'qty_before' => $qtyBefore,
+                        'qty_after'  => $physicalQty,
+                        'qty_change' => $hasDiff ? $difference : 0,
+                        'direction'  => $direction,
+                        'notes'      => $line->notes,
+                        'lot_id'     => null,
+                    ]);
+                    continue;
+                }
+
+                // ── Owner: posting ke lots ────────────────────────────────
+                if ($hasDiff) {
+
+                    if ($difference > 0) {
+                        // SURPLUS → tambah ke LOT adjustment khusus ADJ-{ITEM_CODE}
+                        $adjLotCode = 'ADJ-' . ($line->item?->code ?? "item{$itemId}");
+
+                        $adjLot = \App\Models\Lot::firstOrCreate(
+                            ['code' => $adjLotCode, 'item_id' => $itemId],
+                            [
+                                'initial_qty'  => 0,
+                                'initial_cost' => 0,
+                                'qty_onhand'   => 0,
+                                'avg_cost'     => 0,
+                                'total_cost'   => 0,
+                                'status'       => 'open',
+                            ]
+                        );
+
+                        $postedLotId = $adjLot->id;
+
+                        $this->inventory->stockIn(
+                            warehouseId:   $warehouseId,
+                            itemId:        $itemId,
+                            qty:           $difference,
+                            date:          $date,
+                            sourceType:    'stock_opname_adjustment',
+                            sourceId:      $adjustment->id,
+                            notes:         "Surplus opname {$opname->code}",
+                            lotId:         $adjLot->id,
+                            unitCost:      $unitCost,
+                            affectLotCost: $unitCost !== null && $unitCost > 0,
+                        );
+
+                    } else {
+                        // SHORTAGE → kurangi dari lot open, dimulai dari yang terbesar
+                        $remaining = abs($difference);
+
+                        $openLots = \App\Models\Lot::where('item_id', $itemId)
+                            ->where('status', 'open')
+                            ->where('qty_onhand', '>', 0)
+                            ->orderByDesc('qty_onhand')
+                            ->get();
+
+                        foreach ($openLots as $openLot) {
+                            if ($remaining <= 0.0000001) {
+                                break;
+                            }
+
+                            $deduct = min($remaining, (float) $openLot->qty_onhand);
+
+                            if ($postedLotId === null) {
+                                $postedLotId = $openLot->id; // lot utama untuk audit line
+                            }
+
+                            $this->inventory->stockOut(
+                                warehouseId:    $warehouseId,
+                                itemId:         $itemId,
+                                qty:            $deduct,
+                                date:           $date,
+                                sourceType:     'stock_opname_adjustment',
+                                sourceId:       $adjustment->id,
+                                notes:          "Shortage opname {$opname->code}",
+                                allowNegative:  false,
+                                lotId:          $openLot->id,
+                                affectLotCost:  true,
+                            );
+
+                            $remaining -= $deduct;
+                        }
+
+                        // Jika masih sisa setelah semua lot habis → log saja, tidak paksa minus
+                        if ($remaining > 0.0000001) {
+                            \Illuminate\Support\Facades\Log::warning(
+                                "[StockOpname] {$opname->code}: shortage item #{$itemId} tidak terpenuhi penuh. "
+                                . "Sisa kekurangan: {$remaining} (tidak ada lot open dengan saldo cukup)."
+                            );
+                        }
+                    }
+                }
+
+                // ── Simpan adjustment line (dengan lot_id jika ada) ───────
                 InventoryAdjustmentLine::create([
                     'inventory_adjustment_id' => $adjustment->id,
-                    'item_id' => $itemId,
+                    'item_id'    => $itemId,
                     'qty_before' => $qtyBefore,
-                    'qty_after' => $physicalQty,
-                    'qty_change' => (abs($difference) < 0.0000001) ? 0 : $difference,
-                    'direction' => $direction,
-                    'notes' => $line->notes,
-                    'lot_id' => null,
+                    'qty_after'  => $physicalQty,
+                    'qty_change' => $hasDiff ? $difference : 0,
+                    'direction'  => $direction,
+                    'notes'      => $line->notes,
+                    'lot_id'     => $postedLotId,
                 ]);
 
-                // non-owner -> pending: stop (stok belum berubah)
-                if (!$isOwner) {
-                    continue;
+                // ── Snapshot HPP periodic ─────────────────────────────────
+                if ($hasDiff) {
+                    $this->snapshotPeriodicCost(
+                        itemId:       $itemId,
+                        warehouseId:  $warehouseId,
+                        snapshotDate: $date,
+                        qtyBasis:     $physicalQty,
+                        opname:       $opname,
+                        notes:        $notes
+                    );
                 }
-
-                // kalau beda 0, tidak perlu mutasi stok & snapshot
-                if (abs($difference) < 0.0000001) {
-                    continue;
-                }
-
-                // ✅ gunakan adjustByDifference agar qty_before sesuai realtime
-                $this->inventory->adjustByDifference(
-                    warehouseId: $warehouseId,
-                    itemId: $itemId,
-                    qtyChange: $difference, // SIGNED
-                    date: $date,
-                    sourceType: InventoryAdjustment::class,
-                    sourceId: $adjustment->id,
-                    notes: $adjustment->reason,
-                    lotId: null,
-                    allowNegative: false,
-                    unitCostOverride: $unitCost,
-                    affectLotCost: false,
-                );
-
-                // snapshot periodic (pakai qtyBasis physicalQty + unit cost resolved)
-                $this->snapshotPeriodicCost(
-                    itemId: $itemId,
-                    warehouseId: $warehouseId,
-                    snapshotDate: $date,
-                    qtyBasis: $physicalQty,
-                    opname: $opname,
-                    notes: $notes
-                );
             }
 
             $opname->status = StockOpname::STATUS_FINALIZED;

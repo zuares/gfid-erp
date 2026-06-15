@@ -180,6 +180,7 @@
                                 <th style="min-width: 120px;" class="bundle-lot-col">LOT</th>
                                 <th style="min-width: 140px;">Item Jadi</th>
                                 <th style="min-width: 90px;" class="text-end">Qty (pcs)</th>
+                                <th style="min-width: 90px;" class="text-end">Kain (kg)</th>
                                 <th style="min-width: 150px;" class="bundle-notes-header">Catatan</th>
                                 <th style="width: 40px;"></th>
                             </tr>
@@ -189,7 +190,7 @@
                         </tbody>
                         <tfoot>
                             <tr>
-                                <td colspan="6">
+                                <td colspan="7">
                                     <button type="button" class="btn btn-sm btn-outline-primary btn-pill-sm"
                                         id="btn-add-row">
                                         + Tambah Baris
@@ -220,6 +221,13 @@
                         <td>
                             <x-number-input name="bundles[__INDEX__][qty_pcs]" step="0.01" min="0"
                                 inputmode="decimal" size="sm" align="end" class="bundle-qty-pcs bundle-qty" />
+                        </td>
+                        <td>
+                            {{-- qty_used_fabric: auto-fill dari BOM jika tersedia, bisa diisi manual --}}
+                            <input type="text" inputmode="decimal" autocomplete="off"
+                                name="bundles[__INDEX__][qty_used_fabric]"
+                                class="form-control form-control-sm text-end bundle-qty-fabric"
+                                placeholder="auto" />
                         </td>
                         <td class="bundle-notes-cell">
                             <input type="text" class="form-control form-control-sm" name="bundles[__INDEX__][notes]">
@@ -706,9 +714,33 @@
                     }
                 });
 
+                // Helper: isi qty_used_fabric dari BOM berdasarkan item & qty_pcs di baris ini
+                function autofillFabricQty() {
+                    const hiddenItemId = tr.querySelector('[name*="finished_item_id"]');
+                    const qtyFabricInput = tr.querySelector('.bundle-qty-fabric');
+                    if (!hiddenItemId || !qtyFabricInput) return;
+
+                    const finishedItemId = parseInt(hiddenItemId.value || '0', 10);
+                    const fabricItemId   = fabricSelect ? parseInt(fabricSelect.value || '0', 10) : 0;
+                    const qtyPcs         = parseFloat(tr.querySelector('.bundle-qty-pcs')?.value || '0');
+
+                    if (finishedItemId && fabricItemId) {
+                        const bom = bomData[finishedItemId];
+                        if (bom && bom[fabricItemId]) {
+                            const { qty: bomQty, scrap_pct } = bom[fabricItemId];
+                            qtyFabricInput.value = (qtyPcs * bomQty * (1 + scrap_pct / 100)).toFixed(4);
+                            return;
+                        }
+                    }
+                    // Tidak ada BOM — biarkan kosong agar user bisa isi manual
+                }
+
                 const qtyInput = tr.querySelector('.bundle-qty-pcs');
                 if (qtyInput) {
-                    qtyInput.addEventListener('input', recalcLotSummary);
+                    qtyInput.addEventListener('input', () => {
+                        autofillFabricQty();
+                        recalcLotSummary();
+                    });
                     qtyInput.addEventListener('focus', () => {
                         setTimeout(() => {
                             qtyInput.scrollIntoView({
@@ -741,6 +773,15 @@
 
                 if (window.initItemSuggestInputs) {
                     window.initItemSuggestInputs(tr);
+                }
+
+                // Auto-fill kain dari BOM saat item jadi dipilih (change event bubble dari item-suggest)
+                const hiddenItemId = tr.querySelector('[name*="finished_item_id"]');
+                if (hiddenItemId) {
+                    hiddenItemId.addEventListener('change', () => {
+                        autofillFabricQty();
+                        recalcLotSummary();
+                    });
                 }
 
                 const itemCell = tr.querySelector('td:nth-child(3)');

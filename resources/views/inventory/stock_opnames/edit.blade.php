@@ -383,6 +383,37 @@
                 box-shadow: inset 0 0 0 0 rgba(59, 130, 246, 0), 0 0 0 0 rgba(59, 130, 246, 0);
             }
         }
+
+        /* ── Inline qty edit ────────────────────────── */
+        .so-inline-qty {
+            width: 90px;
+            min-width: 70px;
+            margin-left: auto;
+            font-size: .82rem;
+            padding: .18rem .42rem;
+            text-align: right;
+            border-radius: 6px;
+            transition: border-color .15s, box-shadow .15s, opacity .15s;
+            font-variant-numeric: tabular-nums;
+        }
+        .so-inline-qty.is-saving {
+            border-color: #93c5fd !important;
+            opacity: .6;
+            pointer-events: none;
+        }
+        .so-inline-qty.is-saved {
+            border-color: #22c55e !important;
+            box-shadow: 0 0 0 2px rgba(34,197,94,.2) !important;
+        }
+        .so-inline-qty.is-error {
+            border-color: #ef4444 !important;
+            box-shadow: 0 0 0 2px rgba(239,68,68,.2) !important;
+        }
+        .so-inline-diff {
+            font-variant-numeric: tabular-nums;
+            font-size: .82rem;
+            font-weight: 800;
+        }
     </style>
 @endpush
 
@@ -736,11 +767,20 @@
                                                 @endunless
 
                                                 {{-- ✅ Qty Fisik --}}
-                                                <td class="text-end">
-                                                    @if ($isOpening)
+                                                <td class="text-end" style="min-width:100px;">
+                                                    @if ($canModifyLines && !$isOpening)
+                                                        {{-- PERIODIC + bisa edit: inline input --}}
+                                                        <input type="text" inputmode="decimal" autocomplete="off"
+                                                            class="form-control form-control-sm so-inline-qty"
+                                                            value="{{ $hasPhysicalValue ? number_format((float)$rawPhysical, 2, '.', '') : '' }}"
+                                                            placeholder="-"
+                                                            data-item-id="{{ $line->item_id }}"
+                                                            data-system-qty="{{ $rawSystemQty }}"
+                                                            data-original="{{ $hasPhysicalValue ? (float)$rawPhysical : '' }}"
+                                                            data-line-id="{{ $line->id }}">
+                                                    @elseif ($isOpening)
                                                         @if ($hasPhysicalForDisplay)
-                                                            <span
-                                                                class="text-mono">{{ number_format($rawPhysical, 2) }}</span>
+                                                            <span class="text-mono">{{ number_format($rawPhysical, 2) }}</span>
                                                             <input type="hidden"
                                                                 name="{{ $inputNamePrefix }}[physical_qty]"
                                                                 value="{{ $rawPhysical }}">
@@ -748,13 +788,9 @@
                                                             <span class="meta">-</span>
                                                         @endif
                                                     @else
-                                                        {{-- PERIODIC: hanya kirim jika sudah ada input --}}
+                                                        {{-- READ-ONLY (reviewed/finalized) --}}
                                                         @if ($hasPhysicalForDisplay)
-                                                            <span
-                                                                class="text-mono">{{ number_format($rawPhysical, 2) }}</span>
-                                                            <input type="hidden"
-                                                                name="{{ $inputNamePrefix }}[physical_qty]"
-                                                                value="{{ $rawPhysical }}">
+                                                            <span class="text-mono">{{ number_format($rawPhysical, 2) }}</span>
                                                         @else
                                                             <span class="meta">-</span>
                                                         @endif
@@ -762,11 +798,12 @@
                                                 </td>
 
                                                 {{-- Selisih --}}
-                                                <td class="text-end text-mono col-diff d-none d-md-table-cell">
+                                                <td class="text-end col-diff d-none d-md-table-cell"
+                                                    id="diff-cell-{{ $line->id }}">
                                                     @if ($hasPhysicalForDisplay)
-                                                        <span class="{{ $diffClass }}">{{ $diffDisplay }}</span>
+                                                        <span class="so-inline-diff {{ $diffClass }}">{{ $diffDisplay }}</span>
                                                     @else
-                                                        <span class="meta">-</span>
+                                                        <span class="meta so-inline-diff">-</span>
                                                     @endif
                                                 </td>
 
@@ -903,7 +940,10 @@
 
 @push('scripts')
     <script>
-        window.IS_OPENING_MODE = @json($isOpening);
+        window.IS_OPENING_MODE   = @json($isOpening);
+        window.SO_CAN_MODIFY     = @json($canModifyLines);
+        window.SO_INLINE_SAVE_URL = @json(route('inventory.stock_opnames.lines.store', $opname));
+        window.SO_CSRF           = @json(csrf_token());
     </script>
 
     <script>
@@ -912,6 +952,7 @@
 
         document.addEventListener('DOMContentLoaded', function() {
             initDuplicateItemModal();
+            initInlineQtyEdit();
 
             initOpeningAddBlock({
                 rootSelector: '#openingAddMobile',
@@ -1308,6 +1349,157 @@
             const meta = document.querySelector('meta[name="csrf-token"]');
             if (meta) return meta.getAttribute('content');
             return '';
+        }
+
+        /* ────────────────────────────────────────────────────
+         * INLINE QTY EDIT — auto-save on blur / Enter
+         * ──────────────────────────────────────────────────── */
+        function initInlineQtyEdit() {
+            if (!window.SO_CAN_MODIFY || window.IS_OPENING_MODE) return;
+
+            const tableWrap = document.getElementById('opname-lines-table');
+            if (!tableWrap) return;
+
+            tableWrap.querySelectorAll('.so-inline-qty').forEach(input => {
+                // filter angka + titik + koma
+                input.addEventListener('input', function() {
+                    let v = this.value.replace(/,/g, '.').replace(/[^0-9.]/g, '');
+                    const parts = v.split('.');
+                    if (parts.length > 2) v = parts[0] + '.' + parts.slice(1).join('');
+                    this.value = v;
+
+                    // update diff column real-time
+                    updateDiffCell(this);
+                    // hapus state saved/error kalau user mulai ngetik lagi
+                    this.classList.remove('is-saved', 'is-error');
+                });
+
+                // select all on focus
+                input.addEventListener('focus', function() {
+                    this.select && this.select();
+                });
+
+                // Enter → blur (trigger save)
+                input.addEventListener('keydown', function(e) {
+                    if (e.key === 'Enter') {
+                        e.preventDefault();
+                        this.blur();
+                    }
+                    // Escape → restore original
+                    if (e.key === 'Escape') {
+                        this.value = this.dataset.original ?? '';
+                        updateDiffCell(this);
+                        this.blur();
+                    }
+                });
+
+                // blur → save jika ada perubahan
+                input.addEventListener('blur', function() {
+                    const raw = this.value.trim();
+                    const newVal = raw === '' ? null : parseFloat(raw);
+                    const original = this.dataset.original === '' ? null : parseFloat(this.dataset.original || '');
+
+                    // tidak ada perubahan → skip
+                    if (newVal === original) return;
+                    // null dan belum pernah diisi → skip
+                    if (newVal === null && original === null) return;
+
+                    saveInlineQty(this, newVal);
+                });
+            });
+        }
+
+        function updateDiffCell(input) {
+            const lineId    = input.dataset.lineId;
+            const systemQty = parseFloat(input.dataset.systemQty || '0');
+            const raw       = input.value.trim();
+            const physical  = raw === '' ? null : parseFloat(raw);
+
+            const cell = document.getElementById('diff-cell-' + lineId);
+            if (!cell) return;
+
+            const span = cell.querySelector('.so-inline-diff');
+            if (!span) return;
+
+            if (physical === null) {
+                span.textContent = '-';
+                span.className = 'so-inline-diff meta';
+            } else {
+                const diff = physical - systemQty;
+                const formatted = (diff > 0 ? '+' : '') + diff.toFixed(2);
+                span.textContent = formatted;
+                span.className = 'so-inline-diff ' + (
+                    diff < 0 ? 'diff-negative' : diff > 0 ? 'diff-positive' : 'diff-zero'
+                );
+            }
+
+            // Update warna baris not-counted
+            const tr = input.closest('tr');
+            if (tr) {
+                if (physical === null) {
+                    tr.classList.add('so-row-not-counted');
+                } else {
+                    tr.classList.remove('so-row-not-counted');
+                }
+            }
+        }
+
+        function saveInlineQty(input, newVal) {
+            const itemId = input.dataset.itemId;
+            if (!itemId) return;
+
+            input.classList.remove('is-saved', 'is-error');
+            input.classList.add('is-saving');
+
+            const formData = new FormData();
+            formData.append('_token', window.SO_CSRF || getCsrfToken());
+            formData.append('item_id', itemId);
+            formData.append('update_existing', '1');
+            formData.append('physical_qty', newVal !== null ? String(newVal) : '');
+            formData.append('unit_cost', '');
+            formData.append('notes', '');
+
+            fetch(window.SO_INLINE_SAVE_URL, {
+                method: 'POST',
+                headers: {
+                    'X-CSRF-TOKEN': window.SO_CSRF || getCsrfToken(),
+                    'X-Requested-With': 'XMLHttpRequest',
+                    'Accept': 'application/json',
+                },
+                body: formData,
+            })
+            .then(async (res) => {
+                input.classList.remove('is-saving');
+                if (!res.ok) {
+                    let msg = 'Gagal menyimpan.';
+                    try { const d = await res.json(); msg = d?.message || msg; } catch(e) {}
+                    input.classList.add('is-error');
+                    // tooltip singkat
+                    input.title = msg;
+                    return;
+                }
+                const d = await res.json();
+                if (d?.status === 'ok') {
+                    // update data-original supaya next blur bisa compare dengan benar
+                    input.dataset.original = newVal !== null ? String(newVal) : '';
+                    // format nilai setelah save
+                    if (newVal !== null) {
+                        input.value = newVal.toFixed(2);
+                    }
+                    input.classList.add('is-saved');
+                    input.title = '';
+                    // hapus class saved setelah 2 detik
+                    setTimeout(() => input.classList.remove('is-saved'), 2000);
+                } else {
+                    input.classList.add('is-error');
+                    input.title = d?.message || 'Gagal menyimpan.';
+                }
+            })
+            .catch(() => {
+                input.classList.remove('is-saving');
+                input.classList.add('is-error');
+                input.title = 'Koneksi error.';
+            });
         }
 
         function initDeleteLineAjax() {

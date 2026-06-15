@@ -124,8 +124,8 @@ class LotCostService
             return (float) $value;
         }
 
-        // format ribuan 1.234.567
-        if (preg_match('/^\d{1,3}(\.\d{3})+$/', $value)) {
+        // format ribuan 1.234.567 — hanya strip jika ada 2+ grup titik (menghindari salah baca "25.000" dari cast decimal:3)
+        if (preg_match('/^\d{1,3}(\.\d{3}){2,}$/', $value)) {
             return (float) str_replace('.', '', $value);
         }
 

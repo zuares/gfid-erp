@@ -109,8 +109,10 @@ class CuttingJobController extends Controller
         $warehouses = Warehouse::orderBy('code')->get();
 
         // 6️⃣ BOM data — untuk estimasi pemakaian kain di frontend & kalkulasi backend
+        //    Hanya bahan baku utama (usage_stage=main_material) yang dikirim ke frontend.
         //    Format: { finished_item_id => { fabric_item_id => { qty, scrap_pct } } }
         $bomData = \App\Models\ItemBomLine::query()
+            ->where('usage_stage', \App\Models\ItemBomLine::STAGE_MAIN_MATERIAL)
             ->whereHas('bom', fn($q) => $q->where('active', true))
             ->with('bom:id,item_id')
             ->get()
@@ -578,9 +580,10 @@ class CuttingJobController extends Controller
         //    LOT dengan saldo 0 tetap diproses (boleh minus di RM).
         // =======================================================
 
-        // Load active BOM lines untuk fabric item ini, keyed by finished_item_id
+        // Load active BOM lines untuk fabric item ini — hanya main_material, keyed by finished_item_id
         $bomLines = \App\Models\ItemBomLine::query()
             ->where('material_item_id', $fabricItemId)
+            ->where('usage_stage', \App\Models\ItemBomLine::STAGE_MAIN_MATERIAL)
             ->whereHas('bom', fn($q) => $q->where('active', true))
             ->with('bom:id,item_id')
             ->get()
@@ -593,15 +596,24 @@ class CuttingJobController extends Controller
                 continue;
             }
 
-            // Coba hitung dari BOM per baris
+            // Hitung qty_used_fabric per baris
+            // Prioritas: (1) user submit manual → (2) hitung dari BOM → (3) fallback saldo LOT
             $anyBom = false;
             foreach ($indexes as $idx) {
                 $finishedItemId = (int) ($validBundles[$idx]['finished_item_id'] ?? 0);
-                $qtyPcs = (float) ($validBundles[$idx]['qty_pcs'] ?? 0);
+                $qtyPcs         = (float) ($validBundles[$idx]['qty_pcs'] ?? 0);
 
+                // Prioritas 1: user sudah isi qty_used_fabric manual di form
+                $userFabric = (float) ($validBundles[$idx]['qty_used_fabric'] ?? 0);
+                if ($userFabric > 0) {
+                    $anyBom = true; // ada nilai → skip fallback LOT
+                    continue;       // nilai sudah ada di $validBundles[$idx], tidak perlu overwrite
+                }
+
+                // Prioritas 2: hitung dari BOM main_material
                 $bomLine = $bomLines[$finishedItemId] ?? null;
                 if ($bomLine && $qtyPcs > 0) {
-                    $bomQty = (float) $bomLine->qty;
+                    $bomQty   = (float) $bomLine->qty;
                     $scrapPct = (float) $bomLine->scrap_pct;
                     $validBundles[$idx]['qty_used_fabric'] = round(
                         $qtyPcs * $bomQty * (1 + $scrapPct / 100),
@@ -1003,11 +1015,20 @@ class CuttingJobController extends Controller
         }
 
         DB::transaction(function () use ($cuttingJob) {
-            // 5) Reverse mutasi kain (stock out → dikembalikan ke LOT)
-            $hasMutasi = \App\Models\InventoryMutation::query()
+            // 5) Reverse mutasi kain — kembalikan saldo gudang (inventory_stocks)
+            //    reverseBySource pakai affectLotCost=false, jadi lots.qty_onhand diurus terpisah di bawah.
+            $outMutations = \App\Models\InventoryMutation::query()
                 ->where('source_type', 'cutting_job')
                 ->where('source_id', $cuttingJob->id)
-                ->exists();
+                ->where('direction', 'out')
+                ->whereNotNull('lot_id')
+                ->get();
+
+            $hasMutasi = $outMutations->isNotEmpty()
+                || \App\Models\InventoryMutation::query()
+                    ->where('source_type', 'cutting_job')
+                    ->where('source_id', $cuttingJob->id)
+                    ->exists();
 
             if ($hasMutasi) {
                 $this->inventory->reverseBySource(
@@ -1018,6 +1039,33 @@ class CuttingJobController extends Controller
                     notesPrefix:         "VOID {$cuttingJob->code}",
                     date:                now(),
                 );
+            }
+
+            // 5b) Restore lots.qty_onhand per LOT yang terlibat
+            //     (reverseBySource tidak update LOT karena affectLotCost=false)
+            if ($outMutations->isNotEmpty()) {
+                $lotRestore = [];
+                foreach ($outMutations as $m) {
+                    $lotId = (int) $m->lot_id;
+                    $lotRestore[$lotId] = ($lotRestore[$lotId] ?? 0.0) + abs((float) $m->qty_change);
+                }
+
+                foreach ($lotRestore as $lotId => $restoreQty) {
+                    $lot = \App\Models\Lot::lockForUpdate()->find($lotId);
+                    if (! $lot || $restoreQty <= 0) {
+                        continue;
+                    }
+
+                    $lot->qty_onhand = round((float) $lot->qty_onhand + $restoreQty, 4);
+                    $lot->total_cost = round($lot->qty_onhand * (float) $lot->avg_cost, 4);
+
+                    // Buka kembali LOT jika sempat tertutup
+                    if ($lot->qty_onhand > 0 && $lot->status === 'closed') {
+                        $lot->status = 'open';
+                    }
+
+                    $lot->save();
+                }
             }
 
             // 6) Set status bundles → voided

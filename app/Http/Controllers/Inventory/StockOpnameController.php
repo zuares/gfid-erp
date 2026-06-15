@@ -146,11 +146,22 @@ class StockOpnameController extends Controller
             $opname->save();
 
             if ($autoGenerate) {
-                $this->stockOpnameService->generateLinesFromWarehouse(
-                    opname: $opname,
-                    warehouseId: $opname->warehouse_id,
-                    onlyWithStock: true,
-                );
+                // Gudang RM (id=2 / code='RM'): pakai lot-based method untuk bahan baku
+                $warehouse = \App\Models\Warehouse::find($opname->warehouse_id);
+                $isRmWarehouse = $warehouse && strtoupper((string) $warehouse->code) === 'RM';
+
+                if ($isRmWarehouse) {
+                    $this->stockOpnameService->generateRawMaterialLines(
+                        opname: $opname,
+                        warehouseId: $opname->warehouse_id,
+                    );
+                } else {
+                    $this->stockOpnameService->generateLinesFromWarehouse(
+                        opname: $opname,
+                        warehouseId: $opname->warehouse_id,
+                        onlyWithStock: true,
+                    );
+                }
             }
         });
 
