@@ -802,18 +802,22 @@
                 </li>
             @endif
 
-            {{-- Production (admin only) — Finishing + Sewing Returns --}}
-            @if ($isAdmin && $canShow($hasProdFinishingJobsIndex, $hasProdSewReturnsIndex))
+            {{-- Production (admin only) — Setor Jahit + Beres Packing --}}
+            @php
+                $adminHasSewReturns  = $isAdmin && $router->has('production.sewing.returns.create');
+                $adminHasFinishing   = $isAdmin && $router->has('production.finishing_jobs.create');
+            @endphp
+            @if ($adminHasSewReturns || $adminHasFinishing)
                 <x-sidebar.label text="Production" />
                 <li class="simple-group">
-                    @if ($hasProdSewReturnsIndex)
+                    @if ($adminHasSewReturns)
                         <x-sidebar.simple-link href="{{ route('production.sewing.returns.create') }}" icon="📥"
                             :active="request()->routeIs('production.sewing.returns.*')">
                             Setor Jahit
                         </x-sidebar.simple-link>
                     @endif
 
-                    @if ($hasProdFinishingJobsIndex)
+                    @if ($adminHasFinishing)
                         <x-sidebar.simple-link href="{{ route('production.finishing_jobs.create') }}" icon="🧶"
                             :active="request()->routeIs('production.finishing_jobs.*')">
                             Beres Packing
