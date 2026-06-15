@@ -807,16 +807,16 @@
                 <x-sidebar.label text="Production" />
                 <li class="simple-group">
                     @if ($hasProdSewReturnsIndex)
-                        <x-sidebar.simple-link href="{{ route('production.sewing.returns.index') }}" icon="📥"
+                        <x-sidebar.simple-link href="{{ route('production.sewing.returns.create') }}" icon="📥"
                             :active="request()->routeIs('production.sewing.returns.*')">
-                            Sewing Returns
+                            Setor Jahit
                         </x-sidebar.simple-link>
                     @endif
 
                     @if ($hasProdFinishingJobsIndex)
-                        <x-sidebar.simple-link href="{{ route('production.finishing_jobs.index') }}" icon="🧶"
+                        <x-sidebar.simple-link href="{{ route('production.finishing_jobs.create') }}" icon="🧶"
                             :active="request()->routeIs('production.finishing_jobs.*')">
-                            Finishing
+                            Beres Packing
                         </x-sidebar.simple-link>
                     @endif
                 </li>
