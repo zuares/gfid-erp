@@ -82,6 +82,16 @@ class User extends Authenticatable
 
         $module = strtolower(trim($module));
 
+        // Admin selalu boleh akses production (tidak bisa di-override DB)
+        if ($this->role === 'admin' && $module === 'production') {
+            return true;
+        }
+
+        // Admin tidak boleh akses finance/marketplace/imports apapun setting DB-nya
+        if ($this->role === 'admin' && in_array($module, ['accounting', 'marketplace', 'imports'], true)) {
+            return false;
+        }
+
         if (!self::moduleAccessTableExists()) {
             return in_array($module, self::defaultModulesForRole((string) $this->role), true);
         }
