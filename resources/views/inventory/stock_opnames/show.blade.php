@@ -119,6 +119,10 @@
             || !empty($opname->cancel_reason ?? null)
             || !empty($opname->cancelled_by ?? null)
         );
+
+    $countedPercent = $totalLinesGlobal > 0
+        ? min(100, max(0, round(($countedLinesGlobal / $totalLinesGlobal) * 100)))
+        : 0;
 @endphp
 
 @push('head')
@@ -164,6 +168,23 @@
     .sum-card{ border-radius:10px; border:1px solid rgba(148,163,184,.20); background:rgba(15,23,42,.01); padding:.6rem .7rem; }
     body[data-theme=dark] .sum-card{ background:rgba(148,163,184,.06); }
     .sum-label{ font-size:.66rem; text-transform:uppercase; letter-spacing:.06em; color:rgba(100,116,139,1); font-weight:900; margin-bottom:.2rem; }
+    .so-info-grid{ display:grid; grid-template-columns:1.15fr .85fr; gap:.55rem; }
+    .so-info-card{ border:1px solid rgba(148,163,184,.18); border-radius:12px; padding:.65rem .7rem; background:rgba(148,163,184,.05); }
+    body[data-theme=dark] .so-info-card{ background:rgba(15,23,42,.28); }
+    .so-info-line{ display:grid; grid-template-columns:78px 1fr; gap:.45rem; align-items:start; padding:.16rem 0; font-size:.82rem; }
+    .so-info-line .k{ color:rgba(100,116,139,1); font-weight:900; font-size:.68rem; }
+    .so-info-line .v{ font-weight:900; min-width:0; }
+    .so-progress-main{ display:flex; align-items:baseline; justify-content:space-between; gap:.65rem; }
+    .so-progress-main .val{ font-size:1.45rem; line-height:1; font-weight:950; color:#2563eb; }
+    .so-progress-main .lbl{ color:rgba(100,116,139,1); font-size:.68rem; font-weight:900; }
+    .so-progress-bar{ height:7px; border-radius:999px; background:rgba(148,163,184,.18); overflow:hidden; margin-top:.55rem; }
+    .so-progress-bar span{ display:block; height:100%; border-radius:999px; background:#2563eb; }
+    .so-summary-kpis{ display:grid; grid-template-columns:repeat(3,minmax(0,1fr)); gap:.45rem; margin-top:.55rem; }
+    .so-summary-kpi{ border:1px solid rgba(148,163,184,.18); border-radius:12px; padding:.5rem .58rem; background:rgba(255,255,255,.45); min-width:0; }
+    body[data-theme=dark] .so-summary-kpi{ background:rgba(15,23,42,.20); }
+    .so-summary-kpi .lbl{ display:block; color:rgba(100,116,139,1); font-size:.6rem; font-weight:900; line-height:1; white-space:nowrap; overflow:hidden; text-overflow:ellipsis; }
+    .so-summary-kpi .val{ display:block; margin-top:.2rem; font-size:.95rem; line-height:1; font-weight:950; white-space:nowrap; overflow:hidden; text-overflow:ellipsis; }
+    .so-summary-kpi.is-main{ border-color:rgba(37,99,235,.20); background:rgba(37,99,235,.06); }
 
     .diff-plus{ color:#16a34a; font-weight:900; }
     .diff-minus{ color:#dc2626; font-weight:900; }
@@ -175,8 +196,38 @@
     .form-control-sm,.form-select-sm{ padding:.28rem .45rem; font-size:.78rem; }
 
     .filter-bar{ margin-top:.35rem; }
-    .filter-bar .row{ row-gap:.35rem; }
-    .pill-label{ font-size:.66rem; text-transform:uppercase; letter-spacing:.06em; color:rgba(100,116,139,1); font-weight:900; }
+    .so-filter-box{ border:1px solid rgba(148,163,184,.18); border-radius:12px; padding:.55rem; background:rgba(148,163,184,.05); }
+    body[data-theme=dark] .so-filter-box{ background:rgba(15,23,42,.35); }
+    .so-filter-row{ --bs-gutter-x:.45rem; --bs-gutter-y:.42rem; }
+    .pill-label{ display:block; margin-bottom:.18rem; font-size:.62rem; color:rgba(100,116,139,1); font-weight:900; line-height:1.05; white-space:nowrap; }
+    .so-filter-row .form-control-sm,
+    .so-filter-row .form-select-sm{ min-height:36px; border-radius:10px; padding:.34rem .45rem; font-size:.8rem; }
+    .so-filter-reset{ min-height:36px; border-radius:10px; font-weight:900; width:100%; display:inline-flex; align-items:center; justify-content:center; }
+    .so-mini-kpis{ display:grid; grid-template-columns:repeat(4,minmax(0,1fr)); gap:.4rem; margin-top:.5rem; }
+    .so-mini-kpi{ border:1px solid rgba(148,163,184,.18); border-radius:10px; padding:.4rem .45rem; background:rgba(255,255,255,.45); min-width:0; }
+    body[data-theme=dark] .so-mini-kpi{ background:rgba(15,23,42,.20); }
+    .so-mini-kpi .lbl{ display:block; color:rgba(100,116,139,1); font-size:.58rem; font-weight:900; line-height:1; white-space:nowrap; overflow:hidden; text-overflow:ellipsis; }
+    .so-mini-kpi .val{ display:block; margin-top:.16rem; font-size:.84rem; line-height:1; font-weight:950; white-space:nowrap; overflow:hidden; text-overflow:ellipsis; }
+    .so-mini-kpi.is-main{ border-color:rgba(37,99,235,.20); background:rgba(37,99,235,.06); }
+    .so-mini-kpi.is-main .val{ color:#2563eb; }
+    .so-sort-btn{
+        border:0;
+        background:transparent;
+        color:inherit;
+        padding:0;
+        margin:0;
+        font:inherit;
+        font-weight:900;
+        text-transform:inherit;
+        letter-spacing:inherit;
+        display:inline-flex;
+        align-items:center;
+        gap:.22rem;
+        cursor:pointer;
+    }
+    .so-sort-btn .arr{ opacity:.35; font-size:.72em; transform:translateY(-1px); }
+    .so-sort-btn.is-active{ color:#2563eb; }
+    .so-sort-btn.is-active .arr{ opacity:.9; }
 
     .table-wrap{ margin-top:.5rem; border-radius:10px; border:1px solid rgba(148,163,184,.22); overflow-x:auto; overflow-y:auto; max-height:460px; background:rgba(248,250,252,.9); }
     body[data-theme=dark] .table-wrap{ background:rgba(15,23,42,.92); border-color:rgba(51,65,85,.9); }
@@ -218,6 +269,20 @@
         .table-wrap{ display:none; }
         .mobile-compact-table{ display:block; }
         .kv{ grid-template-columns:110px 1fr; }
+        .so-info-grid{ grid-template-columns:1fr; gap:.45rem; }
+        .so-info-card{ padding:.55rem .6rem; border-radius:11px; }
+        .so-info-line{ grid-template-columns:70px 1fr; font-size:.8rem; }
+        .so-progress-main .val{ font-size:1.25rem; }
+        .so-summary-kpis{ grid-template-columns:repeat(3,minmax(0,1fr)); gap:.32rem; margin-top:.45rem; }
+        .so-summary-kpi{ padding:.42rem .4rem; border-radius:10px; }
+        .so-summary-kpi .val{ font-size:.78rem; }
+        .card-main .card-body{ padding:.65rem; }
+        .so-filter-box{ padding:.5rem; border-radius:12px; }
+        .so-filter-row{ --bs-gutter-x:.35rem; --bs-gutter-y:.35rem; }
+        .so-mini-kpis{ gap:.32rem; }
+        .so-mini-kpi{ padding:.36rem .38rem; }
+        .so-mini-kpi .val{ font-size:.78rem; }
+        .so-sort-btn .arr{ font-size:.8em; }
     }
 </style>
 @endpush
@@ -320,94 +385,82 @@
     {{-- INFO --}}
     <div class="card card-main mb-2">
         <div class="card-body">
-            <div class="row g-2">
-                <div class="col-md-6">
-                    <div class="kv">
+            <div class="so-info-grid">
+                <div class="so-info-card">
+                    <div class="so-info-line">
                         <div class="k">Tanggal</div>
                         <div class="v">{{ $opname->date?->format('d M Y') ?? '-' }}</div>
+                    </div>
 
+                    <div class="so-info-line">
                         <div class="k">Gudang</div>
                         <div class="v">
                             {{ $opname->warehouse?->code ?? '-' }}
                             <div class="meta">{{ $opname->warehouse?->name }}</div>
                         </div>
+                    </div>
 
+                    <div class="so-info-line">
                         <div class="k">Dibuat</div>
                         <div class="v">
                             {{ $opname->creator?->name ?? '-' }}
                             <div class="meta">{{ $opname->created_at?->format('d M H:i') }}</div>
                         </div>
+                    </div>
 
-                        @if ($opname->finalized_at)
+                    @if ($opname->finalized_at)
+                        <div class="so-info-line">
                             <div class="k">Final</div>
                             <div class="v">
                                 {{ $opname->finalizer?->name ?? '-' }}
                                 <div class="meta">{{ $opname->finalized_at?->format('d M H:i') }}</div>
                             </div>
-                        @endif
-                    </div>
+                        </div>
+                    @endif
                 </div>
 
-                <div class="col-md-6">
-                    <div class="sum-card" style="height:100%;">
-                        @if ($opname->notes)
-                            <div class="sum-label">Catatan</div>
-                            <div style="font-size:.86rem;">{!! nl2br(e($opname->notes)) !!}</div>
-                        @else
-                            <div class="sum-label">Progress</div>
-                            <div style="font-size:.86rem;">
-                                <span class="fw-semibold">{{ $countedLinesGlobal }}</span> / {{ $totalLinesGlobal }} counted
-                                @if ($notCountedGlobal > 0)
-                                    <div class="meta mt-1">{{ $notCountedGlobal }} belum</div>
-                                @endif
-                            </div>
-                        @endif
+                <div class="so-info-card">
+                    <div class="so-progress-main">
+                        <div>
+                            <div class="lbl">Progress</div>
+                            <div class="val text-mono">{{ $countedLinesGlobal }}/{{ $totalLinesGlobal }}</div>
+                        </div>
+                        <div class="text-end">
+                            <div class="lbl">Selesai</div>
+                            <div class="fw-black text-mono">{{ $countedPercent }}%</div>
+                        </div>
                     </div>
+                    <div class="so-progress-bar"><span style="width:{{ $countedPercent }}%;"></span></div>
+                    @if ($notCountedGlobal > 0)
+                        <div class="meta mt-2">{{ $notCountedGlobal }} item belum dihitung</div>
+                    @endif
+                    @if ($opname->notes)
+                        <div class="meta mt-2">{!! nl2br(e($opname->notes)) !!}</div>
+                    @endif
                 </div>
             </div>
 
             {{-- SUMMARY (FILTERED) --}}
-            <div class="summary-grid">
-                <div class="sum-card">
-                    <div class="sum-label">Qty</div>
-                    <div style="font-size:.9rem;">
-                        <div>+ <span class="text-mono diff-plus" id="sumPlusQty">+{{ number_format($totalPlusQty, 2) }}</span></div>
-                        <div>- <span class="text-mono diff-minus" id="sumMinusQty">{{ number_format($totalMinusQty, 2) }}</span></div>
-                    </div>
+            <div class="so-summary-kpis">
+                <div class="so-summary-kpi">
+                    <span class="lbl">Lebih Stok</span>
+                    <span class="val text-mono diff-plus" id="sumPlusQty">+{{ number_format($totalPlusQty, 2) }}</span>
                 </div>
 
-                <div class="sum-card">
-                    <div class="sum-label">Nilai</div>
-                    <div style="font-size:.9rem;">
-                        <div>+ <span class="text-mono diff-plus" id="sumPlusValue">Rp {{ number_format($totalPlusValue, 0, ',', '.') }}</span></div>
-                        <div>- <span class="text-mono diff-minus" id="sumMinusValue">Rp {{ $totalMinusValue < 0 ? '-' : '' }}{{ number_format(abs($totalMinusValue), 0, ',', '.') }}</span></div>
-                    </div>
+                <div class="so-summary-kpi">
+                    <span class="lbl">Kurang Stok</span>
+                    <span class="val text-mono diff-minus" id="sumMinusQty">{{ number_format($totalMinusQty, 2) }}</span>
                 </div>
 
-                <div class="sum-card">
-                    <div class="sum-label">Net</div>
-                    <div style="font-size:.9rem;">
-                        <div>
-                            Qty:
-                            <span class="text-mono {{ $netQtyClass }}" id="sumNetQty">
-                                @if (abs($netQty) < 0.0000001)
-                                    0.00
-                                @else
-                                    {{ $netQty > 0 ? '+' : '' }}{{ number_format($netQty, 2) }}
-                                @endif
-                            </span>
-                        </div>
-                        <div>
-                            Rp:
-                            <span class="text-mono {{ $netValueClass }}" id="sumNetValue">
-                                @if (abs($netValue) < 0.0000001)
-                                    Rp 0
-                                @else
-                                    {{ $netValue > 0 ? '+Rp' : '-Rp' }} {{ number_format(abs($netValue), 0, ',', '.') }}
-                                @endif
-                            </span>
-                        </div>
-                    </div>
+                <div class="so-summary-kpi is-main">
+                    <span class="lbl">Selisih Bersih</span>
+                    <span class="val text-mono {{ $netQtyClass }}" id="sumNetQty">
+                        @if (abs($netQty) < 0.0000001)
+                            0.00
+                        @else
+                            {{ $netQty > 0 ? '+' : '' }}{{ number_format($netQty, 2) }}
+                        @endif
+                    </span>
                 </div>
             </div>
 
@@ -444,66 +497,81 @@
 
             {{-- FILTER (AJAX realtime) --}}
             <form method="GET" class="filter-bar" id="soFilterForm" autocomplete="off">
-                <div class="row g-2 align-items-end">
-                    <div class="col-md-4">
-                        <label class="pill-label mb-1">Cari</label>
+                @php
+                    $diffMode = ($filters['diff_sign'] ?? 'all') === 'plus'
+                        ? 'plus'
+                        : ((($filters['diff_sign'] ?? 'all') === 'minus')
+                            ? 'minus'
+                            : (($filters['diff_only'] ?? false) ? 'different' : 'all'));
+                @endphp
+                <div class="so-filter-box">
+                    <div class="row align-items-end so-filter-row">
+                    <div class="col-7 col-lg-3">
+                        <label class="pill-label">Cari</label>
                         <input type="text" name="q" id="soFilterQ" value="{{ $filters['q'] ?? '' }}"
                                class="form-control form-control-sm" placeholder="Kode / nama"
                                @disabled($isCancelled)>
                     </div>
 
-                    <div class="col-md-2">
-                        <label class="pill-label mb-1">Hitung</label>
+                    <div class="col-5 col-lg-2">
+                        <label class="pill-label">Status</label>
                         <select name="counted" class="form-select form-select-sm" @disabled($isCancelled)>
-                            <option value="all" @selected(($filters['counted'] ?? 'all') === 'all')>All</option>
-                            <option value="yes" @selected(($filters['counted'] ?? '') === 'yes')>Yes</option>
-                            <option value="no" @selected(($filters['counted'] ?? '') === 'no')>No</option>
+                            <option value="all" @selected(($filters['counted'] ?? 'all') === 'all')>Semua</option>
+                            <option value="yes" @selected(($filters['counted'] ?? '') === 'yes')>Sudah</option>
+                            <option value="no" @selected(($filters['counted'] ?? '') === 'no')>Belum</option>
                         </select>
                     </div>
 
-                    <div class="col-md-2">
-                        <label class="pill-label mb-1">Selisih</label>
-                        <select name="diff_sign" class="form-select form-select-sm" @disabled($isCancelled)>
-                            <option value="all" @selected(($filters['diff_sign'] ?? 'all') === 'all')>All</option>
-                            <option value="plus" @selected(($filters['diff_sign'] ?? '') === 'plus')>+</option>
-                            <option value="minus" @selected(($filters['diff_sign'] ?? '') === 'minus')>-</option>
+                    <div class="col-6 col-lg-2">
+                        <label class="pill-label">Selisih</label>
+                        <select id="soDiffMode" class="form-select form-select-sm" @disabled($isCancelled)>
+                            <option value="all" @selected($diffMode === 'all')>Semua</option>
+                            <option value="different" @selected($diffMode === 'different')>Ada selisih</option>
+                            <option value="plus" @selected($diffMode === 'plus')>Lebih</option>
+                            <option value="minus" @selected($diffMode === 'minus')>Kurang</option>
                         </select>
+                        <input type="hidden" name="diff_sign" id="soDiffSign" value="{{ $filters['diff_sign'] ?? 'all' }}">
+                        <input type="hidden" name="diff_only" id="soDiffOnly" value="{{ ($filters['diff_only'] ?? false) ? 1 : 0 }}">
                     </div>
 
-                    <div class="col-md-2">
-                        <label class="pill-label mb-1">Sort</label>
-                        <select name="sort" class="form-select form-select-sm" @disabled($isCancelled)>
-                            <option value="item" @selected(($filters['sort'] ?? 'item') === 'item')>Item</option>
-                            <option value="updated" @selected(($filters['sort'] ?? '') === 'updated')>New</option>
-                            <option value="system" @selected(($filters['sort'] ?? '') === 'system')>Sys</option>
-                            <option value="physical" @selected(($filters['sort'] ?? '') === 'physical')>Fisik</option>
-                            <option value="diff" @selected(($filters['sort'] ?? '') === 'diff')>Selisih</option>
-                            <option value="value" @selected(($filters['sort'] ?? '') === 'value')>Rp</option>
-                        </select>
+                    <input type="hidden" name="sort" id="soSortField" value="{{ $filters['sort'] ?? 'item' }}">
+                    <input type="hidden" name="dir" id="soSortDir" value="{{ $filters['dir'] ?? 'asc' }}">
+
+                    <div class="col-6 col-lg-3">
+                        <label class="pill-label">&nbsp;</label>
+                        <a class="btn btn-sm btn-light so-filter-reset" href="{{ route('inventory.stock_opnames.show', $opname) }}">Reset</a>
+                    </div>
                     </div>
 
-                    <div class="col-md-1">
-                        <label class="pill-label mb-1">Dir</label>
-                        <select name="dir" class="form-select form-select-sm" @disabled($isCancelled)>
-                            <option value="asc" @selected(($filters['dir'] ?? 'asc') === 'asc')>↑</option>
-                            <option value="desc" @selected(($filters['dir'] ?? '') === 'desc')>↓</option>
-                        </select>
-                    </div>
-
-                    <div class="col-md-1">
-                        <div class="form-check">
-                            <input class="form-check-input" type="checkbox" name="diff_only" value="1"
-                                   id="diff_only" @checked($filters['diff_only'] ?? false)
-                                   @disabled($isCancelled)>
-                            <label class="form-check-label" for="diff_only" style="font-size:.74rem;">Selisih</label>
+                    <div class="so-mini-kpis">
+                        <div class="so-mini-kpi">
+                            <span class="lbl">Tampil</span>
+                            <span class="val text-mono" id="soKpiShown">{{ $lines->count() }}</span>
                         </div>
-                    </div>
-
-                    <div class="col-12 d-flex gap-2">
-                        <a class="btn btn-sm btn-light" href="{{ route('inventory.stock_opnames.show', $opname) }}">Reset</a>
-                        @if($isCancelled)
-                            <span class="meta align-self-center">SO cancelled: filter nonaktif.</span>
-                        @endif
+                        <div class="so-mini-kpi">
+                            <span class="lbl">Sudah</span>
+                            <span class="val text-mono">{{ $countedLinesGlobal }}/{{ $totalLinesGlobal }}</span>
+                        </div>
+                        <div class="so-mini-kpi is-main">
+                            <span class="lbl">Selisih</span>
+                            <span class="val text-mono" id="soKpiNetQty">
+                                @if (abs($netQty) < 0.0000001)
+                                    0
+                                @else
+                                    {{ $netQty > 0 ? '+' : '' }}{{ number_format($netQty, 0, ',', '.') }}
+                                @endif
+                            </span>
+                        </div>
+                        <div class="so-mini-kpi">
+                            <span class="lbl">Nilai</span>
+                            <span class="val text-mono" id="soKpiNetValue">
+                                @if (abs($netValue) < 0.0000001)
+                                    Rp 0
+                                @else
+                                    {{ $netValue > 0 ? '+Rp' : '-Rp' }} {{ number_format(abs($netValue), 0, ',', '.') }}
+                                @endif
+                            </span>
+                        </div>
                     </div>
                 </div>
             </form>
@@ -514,11 +582,31 @@
                     <thead>
                     <tr>
                         <th style="width: 40px;">#</th>
-                        <th>Item</th>
-                        <th class="text-end">Sys</th>
-                        <th class="text-end">Fisik</th>
-                        <th class="text-end">Selisih</th>
-                        <th class="text-end">Rp</th>
+                        <th>
+                            <button type="button" class="so-sort-btn js-so-sort @if(($filters['sort'] ?? 'item') === 'item') is-active @endif" data-sort="item">
+                                Item <span class="arr">{{ ($filters['sort'] ?? 'item') === 'item' && ($filters['dir'] ?? 'asc') === 'desc' ? '↓' : '↑' }}</span>
+                            </button>
+                        </th>
+                        <th class="text-end">
+                            <button type="button" class="so-sort-btn js-so-sort @if(($filters['sort'] ?? '') === 'system') is-active @endif" data-sort="system">
+                                Stok <span class="arr">{{ ($filters['sort'] ?? '') === 'system' && ($filters['dir'] ?? 'asc') === 'desc' ? '↓' : '↑' }}</span>
+                            </button>
+                        </th>
+                        <th class="text-end">
+                            <button type="button" class="so-sort-btn js-so-sort @if(($filters['sort'] ?? '') === 'physical') is-active @endif" data-sort="physical">
+                                Fisik <span class="arr">{{ ($filters['sort'] ?? '') === 'physical' && ($filters['dir'] ?? 'asc') === 'desc' ? '↓' : '↑' }}</span>
+                            </button>
+                        </th>
+                        <th class="text-end">
+                            <button type="button" class="so-sort-btn js-so-sort @if(($filters['sort'] ?? '') === 'diff') is-active @endif" data-sort="diff">
+                                Selisih <span class="arr">{{ ($filters['sort'] ?? '') === 'diff' && ($filters['dir'] ?? 'asc') === 'desc' ? '↓' : '↑' }}</span>
+                            </button>
+                        </th>
+                        <th class="text-end">
+                            <button type="button" class="so-sort-btn js-so-sort @if(($filters['sort'] ?? '') === 'value') is-active @endif" data-sort="value">
+                                Nilai <span class="arr">{{ ($filters['sort'] ?? '') === 'value' && ($filters['dir'] ?? 'asc') === 'desc' ? '↓' : '↑' }}</span>
+                            </button>
+                        </th>
                         <th class="col-notes-compact">Catatan</th>
                     </tr>
                     </thead>
@@ -592,8 +680,16 @@
                     <thead>
                     <tr>
                         <th class="m-col-no">#</th>
-                        <th class="m-col-item">Item</th>
-                        <th class="m-col-diff text-end">Selisih</th>
+                        <th class="m-col-item">
+                            <button type="button" class="so-sort-btn js-so-sort @if(($filters['sort'] ?? 'item') === 'item') is-active @endif" data-sort="item">
+                                Item <span class="arr">{{ ($filters['sort'] ?? 'item') === 'item' && ($filters['dir'] ?? 'asc') === 'desc' ? '↓' : '↑' }}</span>
+                            </button>
+                        </th>
+                        <th class="m-col-diff text-end">
+                            <button type="button" class="so-sort-btn js-so-sort @if(($filters['sort'] ?? '') === 'diff') is-active @endif" data-sort="diff">
+                                Selisih <span class="arr">{{ ($filters['sort'] ?? '') === 'diff' && ($filters['dir'] ?? 'asc') === 'desc' ? '↓' : '↑' }}</span>
+                            </button>
+                        </th>
                     </tr>
                     </thead>
                     <tbody id="soMobileTbody">
@@ -767,12 +863,21 @@ document.addEventListener('DOMContentLoaded', function () {
     const desktopTbody = document.getElementById('soDesktopTbody');
     const mobileTbody  = document.getElementById('soMobileTbody');
     const countEl      = document.getElementById('soShownCount');
+    const kpiShown     = document.getElementById('soKpiShown');
+    const kpiNetQty    = document.getElementById('soKpiNetQty');
+    const kpiNetValue  = document.getElementById('soKpiNetValue');
+    const diffMode     = document.getElementById('soDiffMode');
+    const diffSign     = document.getElementById('soDiffSign');
+    const diffOnly     = document.getElementById('soDiffOnly');
+    const sortSelect   = document.getElementById('soSortField');
+    const sortDir      = document.getElementById('soSortDir');
 
     // kalau cancelled: jangan nyalain AJAX (read-only)
     const isCancelled = @json($isCancelled);
     if(isCancelled) return;
 
     let abortCtrl = null;
+    syncDiffInputs();
     let lastQs = new URLSearchParams(new FormData(form)).toString(); // init from current
 
     const showUrl = @json(route('inventory.stock_opnames.show', $opname));
@@ -811,6 +916,25 @@ document.addEventListener('DOMContentLoaded', function () {
         if(el) el.textContent = text;
     }
 
+    function syncDiffInputs(){
+        if(!diffMode || !diffSign || !diffOnly) return;
+        const mode = diffMode.value || 'all';
+        diffSign.value = (mode === 'plus' || mode === 'minus') ? mode : 'all';
+        diffOnly.value = (mode === 'different') ? '1' : '0';
+    }
+
+    function syncSortButtons(){
+        const activeSort = sortSelect?.value || 'item';
+        const activeDir = sortDir?.value || 'asc';
+
+        document.querySelectorAll('.js-so-sort').forEach(btn => {
+            const isActive = btn.dataset.sort === activeSort;
+            btn.classList.toggle('is-active', isActive);
+            const arr = btn.querySelector('.arr');
+            if(arr) arr.textContent = isActive && activeDir === 'desc' ? '↓' : '↑';
+        });
+    }
+
     function applySummary(s){
         if(!s) return;
 
@@ -842,6 +966,16 @@ document.addEventListener('DOMContentLoaded', function () {
         setText('mSumMinusQty', `${fmt2(s.minus_qty)}`);
         setText('mSumPlusValue', `+${fmt0abs(s.plus_value)}`);
         setText('mSumMinusValue', `${Number(s.minus_value) < 0 ? '-' : ''}${fmt0abs(s.minus_value)}`);
+
+        if(kpiNetQty){
+            const v = Number(s.net_qty || 0);
+            kpiNetQty.textContent = (Math.abs(v) < 1e-7) ? '0' : `${v > 0 ? '+' : ''}${fmt0abs(v)}`;
+        }
+
+        if(kpiNetValue){
+            const v = Number(s.net_value || 0);
+            kpiNetValue.textContent = Math.abs(v) < 1e-7 ? 'Rp 0' : `${v > 0 ? '+Rp' : '-Rp'} ${fmt0abs(v)}`;
+        }
     }
 
     function renderDesktopRows(lines){
@@ -936,6 +1070,7 @@ document.addEventListener('DOMContentLoaded', function () {
     }
 
     async function fetchAndRender(force = false){
+        syncDiffInputs();
         const qs = new URLSearchParams(new FormData(form)).toString();
         if(!force && qs === lastQs) return;
         lastQs = qs;
@@ -972,6 +1107,7 @@ document.addEventListener('DOMContentLoaded', function () {
                 countEl.textContent = txt;
                 countEl.dataset.base = txt;
             }
+            if(kpiShown) kpiShown.textContent = new Intl.NumberFormat('id-ID').format(Number(data.count ?? 0));
 
             applySummary(data.summary);
 
@@ -989,7 +1125,23 @@ document.addEventListener('DOMContentLoaded', function () {
     const fetchDebounced = debounce(function(){ fetchAndRender(false); }, 350);
 
     if(qInput){
-        qInput.addEventListener('input', fetchDebounced);
+        qInput.addEventListener('focus', function(){
+            setTimeout(() => {
+                try { qInput.select(); } catch (_) {}
+            }, 0);
+        });
+        qInput.addEventListener('click', function(){
+            setTimeout(() => {
+                try { qInput.select(); } catch (_) {}
+            }, 0);
+        });
+        qInput.addEventListener('input', function(){
+            const start = qInput.selectionStart;
+            const end = qInput.selectionEnd;
+            qInput.value = qInput.value.toUpperCase();
+            try { qInput.setSelectionRange(start, end); } catch (_) {}
+            fetchDebounced();
+        });
         qInput.addEventListener('keydown', function(e){
             if(e.key === 'Enter'){
                 e.preventDefault();
@@ -1002,10 +1154,27 @@ document.addEventListener('DOMContentLoaded', function () {
         el.addEventListener('change', function(){ fetchAndRender(true); });
     });
 
+    document.querySelectorAll('.js-so-sort').forEach(btn => {
+        btn.addEventListener('click', function(){
+            if(!sortSelect || !sortDir) return;
+
+            const nextSort = btn.dataset.sort || 'item';
+            const sameSort = sortSelect.value === nextSort;
+
+            sortSelect.value = nextSort;
+            sortDir.value = sameSort && sortDir.value === 'asc' ? 'desc' : 'asc';
+
+            syncSortButtons();
+            fetchAndRender(true);
+        });
+    });
+
     form.addEventListener('submit', function(e){
         e.preventDefault();
         fetchAndRender(true);
     });
+
+    syncSortButtons();
 });
 </script>
 @endpush

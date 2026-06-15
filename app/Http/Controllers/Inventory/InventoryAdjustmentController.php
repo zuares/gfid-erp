@@ -8,7 +8,9 @@ use App\Models\InventoryAdjustment;
 use App\Models\InventoryMutation;
 use App\Models\InventoryStock;
 use App\Models\Item;
+use App\Models\ItemCategory;
 use App\Models\ItemCostSnapshot;
+use App\Models\ItemRole;
 use App\Models\StockOpname;
 use App\Models\Warehouse;
 use App\Services\Inventory\InventoryService;
@@ -417,7 +419,17 @@ class InventoryAdjustmentController extends Controller
     public function createManual(): View
     {
         $warehouses = Warehouse::orderBy('code')->get();
-        return view('inventory.adjustments.manual_create', compact('warehouses'));
+        $itemCategories = ItemCategory::query()
+            ->where('active', true)
+            ->orderBy('kind')
+            ->orderBy('code')
+            ->get();
+        $itemRoles = ItemRole::query()
+            ->where('active', true)
+            ->orderBy('code')
+            ->get();
+
+        return view('inventory.adjustments.manual_create', compact('warehouses', 'itemCategories', 'itemRoles'));
     }
 
     /**
@@ -852,37 +864,137 @@ class InventoryAdjustmentController extends Controller
         }
 
         $q = trim((string) $request->get('q', ''));
+        $itemId = $request->integer('item_id');
 
-        $query = InventoryStock::query()
-            ->with('item')
-            ->where('warehouse_id', $warehouseId);
+        if ($itemId) {
+            $item = Item::find($itemId);
+            if (!$item) {
+                return response()->json([], 404);
+            }
 
-        // Kalau user TIDAK mengisi q → hanya tampilkan yang qty != 0
-        if ($q === '') {
-            $query->where('qty', '!=', 0);
+            $qty = (float) InventoryStock::query()
+                ->where('warehouse_id', $warehouseId)
+                ->where('item_id', $item->id)
+                ->value('qty');
+
+            return response()->json([[
+                'id' => $item->id,
+                'code' => $item->code ?? '',
+                'name' => $item->name ?? '',
+                'on_hand' => $qty,
+                'not_in_warehouse' => abs($qty) < 0.000001,
+            ]]);
         }
 
-        // Kalau user isi q → boleh cari semua item di warehouse tsb (termasuk qty = 0)
-        if ($q !== '') {
-            $query->whereHas('item', function ($sub) use ($q) {
+        if ($q === '') {
+            $rows = InventoryStock::query()
+                ->with('item')
+                ->where('warehouse_id', $warehouseId)
+                ->where('qty', '!=', 0)
+                ->orderBy('item_id')
+                ->limit(500)
+                ->get();
+
+            return response()->json(
+                $rows->map(fn(InventoryStock $row) => [
+                    'id' => $row->item_id,
+                    'code' => $row->item?->code ?? '',
+                    'name' => $row->item?->name ?? '',
+                    'on_hand' => (float) $row->qty,
+                ])
+            );
+        }
+
+        $stocks = InventoryStock::query()
+            ->where('warehouse_id', $warehouseId)
+            ->whereIn('item_id', function ($sub) use ($q) {
+                $sub->select('id')
+                    ->from('items')
+                    ->where('code', 'like', '%' . $q . '%')
+                    ->orWhere('name', 'like', '%' . $q . '%');
+            })
+            ->pluck('qty', 'item_id');
+
+        $items = Item::query()
+            ->where(function ($sub) use ($q) {
                 $sub->where('code', 'like', '%' . $q . '%')
                     ->orWhere('name', 'like', '%' . $q . '%');
-            });
-        }
-
-        $rows = $query
-            ->orderBy('item_id')
-            ->limit(500)
-            ->get();
+            })
+            ->orderBy('code')
+            ->limit(50)
+            ->get(['id', 'code', 'name']);
 
         return response()->json(
-            $rows->map(fn(InventoryStock $row) => [
-                'id' => $row->item_id,
-                'code' => $row->item?->code ?? '',
-                'name' => $row->item?->name ?? '',
-                'on_hand' => (float) $row->qty,
+            $items->map(fn(Item $item) => [
+                'id' => $item->id,
+                'code' => $item->code ?? '',
+                'name' => $item->name ?? '',
+                'on_hand' => (float) ($stocks[$item->id] ?? 0),
+                'not_in_warehouse' => !isset($stocks[$item->id]) || abs((float) ($stocks[$item->id] ?? 0)) < 0.000001,
             ])
         );
+    }
+
+    public function storeQuickItem(Request $request): JsonResponse
+    {
+        $validated = $request->validate([
+            'code' => ['required', 'string', 'max:100', 'unique:items,code'],
+            'name' => ['required', 'string', 'max:255'],
+            'unit' => ['required', 'string', 'max:30'],
+            'item_category_id' => ['nullable', 'exists:item_categories,id'],
+            'item_role_id' => ['nullable', 'exists:item_roles,id'],
+        ]);
+
+        $role = !empty($validated['item_role_id'])
+            ? ItemRole::find((int) $validated['item_role_id'])
+            : null;
+
+        $category = !empty($validated['item_category_id'])
+            ? ItemCategory::find((int) $validated['item_category_id'])
+            : null;
+
+        $roleCode = $role?->code;
+        $categoryKind = $category?->kind;
+
+        $type = match ($roleCode) {
+            ItemRole::FG => 'finished_good',
+            default => 'material',
+        };
+
+        if (!$roleCode && $categoryKind === 'product') {
+            $type = 'finished_good';
+        }
+
+        $legacyRole = match ($roleCode) {
+            ItemRole::FG => 'finished_good',
+            ItemRole::PKG => 'shipping_supply',
+            ItemRole::SUP => 'production_supply',
+            default => 'raw_material',
+        };
+
+        $item = Item::create([
+            'code' => strtoupper(trim($validated['code'])),
+            'name' => trim($validated['name']),
+            'unit' => trim($validated['unit'] ?: 'pcs'),
+            'type' => $type,
+            'item_category_id' => $validated['item_category_id'] ?? null,
+            'item_role_id' => $validated['item_role_id'] ?? ItemRole::idByCode(ItemRole::RM),
+            'item_role' => $legacyRole,
+            'active' => true,
+            'is_stocked' => true,
+            'production_source' => $type === 'finished_good' ? Item::PRODUCTION_IN_HOUSE : Item::PRODUCTION_BUY,
+        ]);
+
+        return response()->json([
+            'ok' => true,
+            'item' => [
+                'id' => $item->id,
+                'code' => $item->code,
+                'name' => $item->name,
+                'on_hand' => 0,
+                'not_in_warehouse' => true,
+            ],
+        ]);
     }
 
     /**

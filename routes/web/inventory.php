@@ -117,6 +117,7 @@ Route::middleware(['web', 'auth', 'access:inventory'])->group(function () {
             Route::post('/manual', [InventoryAdjustmentController::class, 'storeManual'])->name('manual.store');
 
             Route::get('/items', [InventoryAdjustmentController::class, 'itemsForWarehouse'])->name('items_for_warehouse');
+            Route::post('/items', [InventoryAdjustmentController::class, 'storeQuickItem'])->name('items.quick_store');
 
             Route::get('/{inventoryAdjustment}', [InventoryAdjustmentController::class, 'show'])->name('show');
             Route::post('/{inventoryAdjustment}/approve', [InventoryAdjustmentController::class, 'approve'])->name('approve');
