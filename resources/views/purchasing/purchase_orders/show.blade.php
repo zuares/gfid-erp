@@ -578,6 +578,7 @@
         <div class="card mb-4">
             <div class="card-header d-flex justify-content-between align-items-center flex-wrap gap-2">
                 <div class="fw-semibold">Goods Receipts (GRN) terkait</div>
+                @if ($order->order_type !== 'packing')
                 <div class="d-flex flex-wrap gap-2">
                     @if ($status === 'approved')
                         <a href="{{ route('purchasing.purchase_receipts.create_from_order', $order->id) }}"
@@ -591,6 +592,9 @@
                         Lihat semua GRN
                     </a>
                 </div>
+                @else
+                <div class="text-muted" style="font-size:.8rem;">PO Packing tidak memerlukan GRN</div>
+                @endif
             </div>
 
             <div class="table-responsive d-none d-md-block">

@@ -111,7 +111,8 @@ class PurchaseReceiptController extends Controller
             ->with(['item', 'purchaseOrder.supplier'])
             ->withCount('draftReceiptLines')
             ->whereHas('purchaseOrder', function ($q) use ($selectedSupplierId, $selectedOrderType) {
-                $q->where('status', 'approved');
+                $q->where('status', 'approved')
+                  ->where('order_type', '!=', 'packing'); // packing skip GRN
 
                 if (!empty($selectedSupplierId)) {
                     $q->where('supplier_id', (int) $selectedSupplierId);
@@ -130,7 +131,7 @@ class PurchaseReceiptController extends Controller
         });
 
         // ✅ Default warehouse (controller side)
-        // finished_good -> WH-RTS ; material -> RM (atau fallback pertama)
+        // finished_good -> WH-RTS ; material/packing -> RM
         $defaultWhCode = ($selectedOrderType === 'finished_good') ? 'WH-RTS' : 'RM';
         $defaultWarehouse = $warehouses->firstWhere('code', $defaultWhCode) ?: $warehouses->firstWhere('code', 'RM') ?: $warehouses->first();
 
@@ -154,6 +155,12 @@ class PurchaseReceiptController extends Controller
      */
     public function createFromOrder(PurchaseOrder $purchase_order)
     {
+        if ($purchase_order->order_type === 'packing') {
+            return redirect()
+                ->route('purchasing.purchase_orders.show', $purchase_order->id)
+                ->with('info', 'PO Packing tidak memerlukan GRN.');
+        }
+
         if ($purchase_order->status !== 'approved') {
             return redirect()
                 ->route('purchasing.purchase_orders.show', $purchase_order->id)
@@ -541,6 +548,6 @@ class PurchaseReceiptController extends Controller
         }
 
         $v = strtolower(trim((string) $value));
-        return in_array($v, ['material', 'finished_good'], true) ? $v : null;
+        return in_array($v, ['material', 'finished_good', 'packing'], true) ? $v : null;
     }
 }

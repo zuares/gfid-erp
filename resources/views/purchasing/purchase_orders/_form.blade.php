@@ -8,11 +8,12 @@
     // ORDER TYPE (Material / FG)
     // =========================
     $orderTypeRaw = old('order_type') ?? ($order?->order_type ?? (request('order_type') ?? 'material'));
-    $orderType = in_array($orderTypeRaw, ['material', 'finished_good'], true) ? $orderTypeRaw : 'material';
+    $orderType = in_array($orderTypeRaw, ['material', 'finished_good', 'packing'], true) ? $orderTypeRaw : 'material';
 
     $orderTypeOptions = [
-        'material' => 'Bahan Baku (Material)',
-        'finished_good' => 'Barang Jadi (FG)',
+        'material'     => 'Bahan Baku (Material)',
+        'finished_good'=> 'Barang Jadi (FG)',
+        'packing'      => 'Packing (Kemasan)',
     ];
 
     // === DATE ===
@@ -434,7 +435,8 @@
 
                         <td class="po-td-item" data-label="Item">
                             <x-item-suggest :items="$items" idName="lines[{{ $i }}][item_id]"
-                                :idValue="$lineItemId" :displayValue="$itemDisplay" type="{{ $orderType }}" variant="mini"
+                                :idValue="$lineItemId" :displayValue="$itemDisplay" type="{{ $orderType === 'packing' ? 'material' : $orderType }}" variant="mini"
+                                displayMode="{{ $orderType === 'packing' ? 'name' : 'code' }}"
                                 :minChars="1" />
                             @error("lines.$i.item_id")
                                 <div class="text-danger small">{{ $message }}</div>
@@ -482,8 +484,8 @@
                         <td class="text-center align-middle line-index po-col-no">1</td>
 
                         <td class="po-td-item" data-label="Item">
-                            <x-item-suggest idName="lines[0][item_id]" :items="$items" displayMode="code-name"
-                                :showName="true" :showCategory="false" type="{{ $orderType }}"
+                            <x-item-suggest idName="lines[0][item_id]" :items="$items" displayMode="{{ $orderType === 'packing' ? 'name' : 'code-name' }}"
+                                :showName="true" :showCategory="false" type="{{ $orderType === 'packing' ? 'material' : $orderType }}"
                                 placeholder="Masukan kode / nama barang" />
                         </td>
 

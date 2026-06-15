@@ -915,6 +915,16 @@
                                                     class="btn btn-outline-primary btn-sm">
                                                     Edit
                                                 </a>
+
+                                                <form method="POST"
+                                                    action="{{ route('master.items.destroy', $item) }}"
+                                                    onsubmit="return confirm('Hapus item {{ addslashes($item->code) }}? Tindakan ini tidak bisa dibatalkan.')">
+                                                    @csrf
+                                                    @method('DELETE')
+                                                    <button type="submit" class="btn btn-outline-danger btn-sm">
+                                                        Hapus
+                                                    </button>
+                                                </form>
                                             </div>
                                         </td>
                                     </tr>

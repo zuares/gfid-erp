@@ -511,10 +511,11 @@
                 <div>
                     <label class="gf-label">Jenis PO</label>
                     <select name="po_type" class="form-select" id="filterPoType">
-                        <option value=""        @selected($poType === '')>Semua Jenis</option>
-                        <option value="material"      @selected($poType === 'material')>Bahan Baku</option>
-                        <option value="finished_good" @selected($poType === 'finished_good')>Barang Jadi</option>
-                        <option value="none"          @selected($poType === 'none')>Tanpa Jenis</option>
+                        <option value=""             @selected($poType === '')>Semua Jenis</option>
+                        <option value="material"     @selected($poType === 'material')>Bahan Baku</option>
+                        <option value="finished_good"@selected($poType === 'finished_good')>Barang Jadi</option>
+                        <option value="packing"      @selected($poType === 'packing')>Packing</option>
+                        <option value="none"         @selected($poType === 'none')>Tanpa Jenis</option>
                     </select>
                 </div>
 
@@ -583,7 +584,7 @@
                                     <td>
                                         @php
                                             $poTypes = $s->po_types ?? [];
-                                            $labels  = ['material' => 'Bahan Baku', 'finished_good' => 'Barang Jadi'];
+                                            $labels  = ['material' => 'Bahan Baku', 'finished_good' => 'Barang Jadi', 'packing' => 'Packing'];
                                         @endphp
                                         @if (empty($poTypes))
                                             <span class="text-muted" style="font-size:.78rem;">Semua</span>

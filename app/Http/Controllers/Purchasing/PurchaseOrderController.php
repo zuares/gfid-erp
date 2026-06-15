@@ -113,10 +113,12 @@ class PurchaseOrderController extends Controller
 
         // ✅ FIX: category_id -> item_category_id
         // ✅ PACK di atas (OPP/PLY/THR ngumpul dulu)
+        // packing PO memakai item type=material (packing supplies bukan type tersendiri)
+        $itemTypeFilter = $orderType === 'packing' ? 'material' : $orderType;
         $items = Item::query()
             ->select(['id', 'code', 'name', 'item_category_id', 'type', 'active'])
             ->where('active', 1)
-            ->where('type', $orderType)
+            ->where('type', $itemTypeFilter)
             ->with(['category:id,code,name'])
             ->orderByRaw("
                 CASE
@@ -289,9 +291,11 @@ class PurchaseOrderController extends Controller
         );
 
         // ✅ biar konsisten: PACK ditaruh di atas juga di edit form
+        // packing PO memakai item type=material
+        $itemTypeFilter = $orderType === 'packing' ? 'material' : $orderType;
         $itemsBase = Item::query()
             ->where('active', 1)
-            ->where('type', $orderType)
+            ->where('type', $itemTypeFilter)
             ->with('category')
             ->orderByRaw("
                 CASE
@@ -478,7 +482,7 @@ class PurchaseOrderController extends Controller
         $rules = [
             'date' => ['required', 'date'],
             'supplier_id' => ['required', 'integer', 'exists:suppliers,id'],
-            'order_type' => ['required', 'in:material,finished_good'],
+            'order_type' => ['required', 'in:material,finished_good,packing'],
 
             'payment_method_id' => ['nullable', 'integer', 'exists:payment_methods,id'],
 
@@ -651,7 +655,7 @@ class PurchaseOrderController extends Controller
     protected function normalizeOrderType(?string $value): string
     {
         $v = strtolower(trim((string) $value));
-        return in_array($v, ['material', 'finished_good'], true) ? $v : 'material';
+        return in_array($v, ['material', 'finished_good', 'packing'], true) ? $v : 'material';
     }
 
     protected function toNumber($value): float

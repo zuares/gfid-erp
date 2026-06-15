@@ -22,17 +22,19 @@
 
                     <div class="mb-3">
                         <label class="form-label fw-bold" style="font-size:.8rem;">Jenis PO</label>
-                        <div class="d-flex gap-2">
-                            @foreach (['material' => 'Bahan Baku', 'finished_good' => 'Barang Jadi'] as $val => $label)
+                        <div class="d-flex gap-2 flex-wrap">
+                            @foreach ([
+                                'material'      => ['label' => 'Bahan Baku', 'icon' => '🧵'],
+                                'finished_good' => ['label' => 'Barang Jadi', 'icon' => '👕'],
+                                'packing'       => ['label' => 'Packing',     'icon' => '📦'],
+                            ] as $val => $opt)
                             <label class="type-card flex-fill text-center p-3 border rounded-3 cursor-pointer"
-                                style="cursor:pointer; transition:.15s;"
+                                style="cursor:pointer; transition:.15s; min-width:100px;"
                                 data-val="{{ $val }}">
                                 <input type="radio" name="order_type" value="{{ $val }}"
                                     class="d-none type-radio" {{ $val === 'material' ? 'checked' : '' }}>
-                                <div style="font-size:1.4rem; margin-bottom:.25rem;">
-                                    {{ $val === 'material' ? '🧵' : '👕' }}
-                                </div>
-                                <div class="fw-bold" style="font-size:.85rem;">{{ $label }}</div>
+                                <div style="font-size:1.4rem; margin-bottom:.25rem;">{{ $opt['icon'] }}</div>
+                                <div class="fw-bold" style="font-size:.85rem;">{{ $opt['label'] }}</div>
                             </label>
                             @endforeach
                         </div>

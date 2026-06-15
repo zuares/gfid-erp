@@ -36,7 +36,7 @@ class SupplierController extends Controller
             ->when($poType === 'none', fn ($q) => $q->where(function ($w) {
                 $w->whereNull('po_types')->orWhere('po_types', '')->orWhere('po_types', '[]');
             }))
-            ->when(in_array($poType, ['material', 'finished_good'], true),
+            ->when(in_array($poType, ['material', 'finished_good', 'packing'], true),
                 fn ($q) => $q->where('po_types', 'like', "%{$poType}%"))
             ->orderBy('name')
             ->paginate(20)
@@ -59,7 +59,7 @@ class SupplierController extends Controller
             'email'    => ['nullable', 'email', 'max:255'],
             'address'  => ['nullable', 'string'],
             'po_types' => ['nullable', 'array'],
-            'po_types.*' => ['in:material,finished_good'],
+            'po_types.*' => ['in:material,finished_good,packing'],
             'active'   => ['nullable', 'boolean'],
         ]);
 
@@ -108,7 +108,7 @@ class SupplierController extends Controller
             'email'    => ['nullable', 'email', 'max:255'],
             'address'  => ['nullable', 'string'],
             'po_types' => ['nullable', 'array'],
-            'po_types.*' => ['in:material,finished_good'],
+            'po_types.*' => ['in:material,finished_good,packing'],
             'active'   => ['nullable', 'boolean'],
         ]);
 

@@ -68,10 +68,12 @@ class ItemController extends Controller
         }
 
         // 🎯 Filter type (single / multi, comma separated)
+        // 'packing' order_type maps to item type 'material' (packing supplies tidak punya type sendiri)
         if ($type = $request->input('type')) {
             $types = collect(explode(',', $type))
-                ->map(fn($t) => trim($t))
+                ->map(fn($t) => trim($t) === 'packing' ? 'material' : trim($t))
                 ->filter()
+                ->unique()
                 ->values();
 
             if ($types->isNotEmpty()) {

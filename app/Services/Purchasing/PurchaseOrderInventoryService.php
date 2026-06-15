@@ -37,7 +37,7 @@ class PurchaseOrderInventoryService
      */
     public function postApprovedPurchaseOrderToInventory(PurchaseOrder $po): array
     {
-        // ── 1. Hanya material atau finished_good PO ─────────────────────
+        // ── 1. Hanya material atau finished_good PO (packing skip inventory) ──
         $orderType = $po->order_type ?? 'material';
         if (!in_array($orderType, ['material', 'finished_good'], true)) {
             return ['posted' => 0, 'lots' => [], 'skipped' => true, 'reason' => 'unsupported_order_type'];

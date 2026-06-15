@@ -413,7 +413,7 @@ class PurchaseOrderService
     protected function normalizeOrderType(?string $value): string
     {
         $v = strtolower(trim((string) $value));
-        return in_array($v, ['material', 'finished_good'], true) ? $v : 'material';
+        return in_array($v, ['material', 'finished_good', 'packing'], true) ? $v : 'material';
     }
 
     protected function toNumber($value): float

@@ -35,7 +35,7 @@
     'variant' => 'default', // default | mini
 
     // input display mode
-    'displayMode' => 'code-name', // code-name | code
+    'displayMode' => 'code-name', // code-name | code | name
 
     // dropdown toggles (desktop)
     'showName' => true,
@@ -67,7 +67,7 @@
         ->values();
 
     if ($variant === 'mini') {
-        $displayMode = 'code';
+        if ($displayMode === 'code-name') $displayMode = 'code'; // default mini; allow explicit override
         $showName = false;
         $showCategory = false;
     }
@@ -223,7 +223,7 @@
                     initialItems = [];
                 }
 
-                if (input.value) input.value = (input.value || '').toUpperCase();
+                if (input.value && displayMode !== 'name') input.value = (input.value || '').toUpperCase();
 
                 let timer = null;
                 let lastItems = [];
@@ -296,15 +296,20 @@
                         btn.type = "button";
                         btn.className = "item-suggest-option list-group-item list-group-item-action";
 
-                        let html = `<div class='item-suggest-option-code'>${(item.code || '').toUpperCase()}</div>`;
-
-                        if (!mobile) {
-                            const sub = [];
-                            if (showName && item.name) sub.push(item.name);
-                            if (showCategory && (item.item_category_name || item.item_category)) {
-                                sub.push(item.item_category_name || item.item_category);
+                        let html;
+                        if (displayMode === 'name') {
+                            html = `<div class='item-suggest-option-code'>${item.name || ''}</div>`;
+                            html += `<div class='item-suggest-option-name'>${(item.code || '').toUpperCase()}</div>`;
+                        } else {
+                            html = `<div class='item-suggest-option-code'>${(item.code || '').toUpperCase()}</div>`;
+                            if (!mobile) {
+                                const sub = [];
+                                if (showName && item.name) sub.push(item.name);
+                                if (showCategory && (item.item_category_name || item.item_category)) {
+                                    sub.push(item.item_category_name || item.item_category);
+                                }
+                                if (sub.length) html += `<div class='item-suggest-option-name'>${sub.join(" • ")}</div>`;
                             }
-                            if (sub.length) html += `<div class='item-suggest-option-name'>${sub.join(" • ")}</div>`;
                         }
 
                         btn.innerHTML = html;
@@ -324,10 +329,15 @@
 
                 function setSelection(item) {
                     const mobile = isMobileViewport();
-                    let text = item.code || '';
+                    let text;
 
-                    if (!mobile && displayMode === "code-name" && item.name) text += " — " + item.name;
-                    text = (text || '').toUpperCase();
+                    if (displayMode === 'name') {
+                        text = item.name || item.code || '';
+                    } else {
+                        text = item.code || '';
+                        if (!mobile && displayMode === "code-name" && item.name) text += " — " + item.name;
+                        text = (text || '').toUpperCase();
+                    }
 
                     input.value = text;
                     hiddenId.value = item.id || '';
@@ -418,10 +428,12 @@
                     const start = input.selectionStart;
                     const end = input.selectionEnd;
 
-                    const upper = (input.value || '').toUpperCase();
-                    if (upper !== input.value) {
-                        input.value = upper;
-                        if (start !== null && end !== null) input.setSelectionRange(start, end);
+                    if (displayMode !== 'name') {
+                        const upper = (input.value || '').toUpperCase();
+                        if (upper !== input.value) {
+                            input.value = upper;
+                            if (start !== null && end !== null) input.setSelectionRange(start, end);
+                        }
                     }
 
                     if (!isSelecting) {
@@ -442,7 +454,7 @@
                 input.addEventListener("focus", () => {
                     if (isDisabled()) return;
 
-                    input.value = (input.value || '').toUpperCase();
+                    if (displayMode !== 'name') input.value = (input.value || '').toUpperCase();
                     input.select && input.select();
 
                     if (initialItems.length && input.value.trim() === '') buildDropdown(initialItems);
@@ -484,6 +496,7 @@
                     setTimeout(() => {
                         if (isDisabled()) return;
                         input.focus();
+                        if (displayMode !== 'name') input.value = (input.value || '').toUpperCase();
                         input.select && input.select();
 
                         if (initialItems.length) buildDropdown(initialItems);

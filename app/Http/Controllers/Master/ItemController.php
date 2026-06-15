@@ -225,7 +225,7 @@ class ItemController extends Controller
         });
 
         return redirect()
-            ->route('master.items.edit', $item)
+            ->route('master.items.index')
             ->with('success', 'Item & barcode berhasil diperbarui.');
     }
 

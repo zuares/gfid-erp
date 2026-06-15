@@ -240,7 +240,7 @@
 @php
     $csrf = csrf_token();
     $poTypes  = $supplier->po_types ?? [];
-    $poLabels = ['material' => 'Bahan Baku', 'finished_good' => 'Barang Jadi'];
+    $poLabels = ['material' => 'Bahan Baku', 'finished_good' => 'Barang Jadi', 'packing' => 'Packing'];
 @endphp
 
 <div class="gf-master-page">
@@ -268,7 +268,7 @@
                     @endif
                     @if (!empty($poTypes))
                         @foreach ($poTypes as $pt)
-                            <span class="gf-badge {{ $pt === 'material' ? 'gf-badge-blue' : 'gf-badge-teal' }}" style="font-size:.68rem;">
+                            <span class="gf-badge {{ $pt === 'material' ? 'gf-badge-blue' : ($pt === 'packing' ? 'gf-badge-slate' : 'gf-badge-teal') }}" style="font-size:.68rem;">
                                 {{ $poLabels[$pt] ?? $pt }}
                             </span>
                         @endforeach
@@ -340,7 +340,7 @@
                     <div>
                         <label class="gf-label">Jenis PO</label>
                         <div class="d-flex flex-wrap gap-3 pt-1">
-                            @foreach (['material' => 'Bahan Baku', 'finished_good' => 'Barang Jadi'] as $val => $lbl)
+                            @foreach (['material' => 'Bahan Baku', 'finished_good' => 'Barang Jadi', 'packing' => 'Packing'] as $val => $lbl)
                             @php $chk = in_array($val, old('po_types', $supplier->po_types ?? []), true); @endphp
                             <div class="form-check">
                                 <input class="form-check-input" type="checkbox"

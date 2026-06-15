@@ -508,7 +508,7 @@
                     <div>
                         <label class="form-label">Jenis PO</label>
                         <div class="d-flex flex-wrap gap-3 mt-1">
-                            @foreach (['material' => 'Bahan Baku', 'finished_good' => 'Barang Jadi'] as $val => $label)
+                            @foreach (['material' => 'Bahan Baku', 'finished_good' => 'Barang Jadi', 'packing' => 'Packing'] as $val => $label)
                             <div class="form-check">
                                 <input class="form-check-input" type="checkbox"
                                     name="po_types[]" value="{{ $val }}"
