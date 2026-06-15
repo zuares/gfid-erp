@@ -245,3 +245,47 @@
 
 </div>
 @endsection
+
+@if (session('stock_insufficient'))
+@push('scripts')
+<script>
+document.addEventListener('DOMContentLoaded', function () {
+    if (!window.Swal) return;
+    const items = @json(session('stock_insufficient'));
+    const rows = items.map(r => `
+        <tr>
+            <td style="padding:6px 8px;font-weight:700;font-family:monospace;font-size:.8rem;white-space:nowrap;">${r.code}</td>
+            <td style="padding:6px 8px;font-size:.8rem;text-align:left;">${r.name}</td>
+            <td style="padding:6px 8px;text-align:right;font-size:.8rem;color:#dc2626;">${r.stock.toLocaleString('id')}</td>
+            <td style="padding:6px 8px;text-align:right;font-size:.8rem;">${r.needed.toLocaleString('id')}</td>
+            <td style="padding:6px 8px;text-align:right;font-size:.8rem;font-weight:700;color:#dc2626;">-${r.short.toLocaleString('id')}</td>
+        </tr>`).join('');
+    Swal.fire({
+        icon: 'error',
+        title: 'Stok WH-RTS Tidak Cukup',
+        html: `
+            <p style="margin-bottom:12px;font-size:.85rem;color:#64748b;">
+                Shipment <strong>ditolak</strong>. Tambah stok terlebih dahulu sebelum submit ulang.
+            </p>
+            <div style="overflow-x:auto;">
+            <table style="width:100%;border-collapse:collapse;font-size:.82rem;">
+                <thead>
+                    <tr style="background:#f8fafc;border-bottom:2px solid #e2e8f0;">
+                        <th style="padding:6px 8px;text-align:left;font-size:.72rem;color:#64748b;text-transform:uppercase;letter-spacing:.04em;">Kode</th>
+                        <th style="padding:6px 8px;text-align:left;font-size:.72rem;color:#64748b;text-transform:uppercase;letter-spacing:.04em;">Item</th>
+                        <th style="padding:6px 8px;text-align:right;font-size:.72rem;color:#64748b;text-transform:uppercase;letter-spacing:.04em;">Stok</th>
+                        <th style="padding:6px 8px;text-align:right;font-size:.72rem;color:#64748b;text-transform:uppercase;letter-spacing:.04em;">Butuh</th>
+                        <th style="padding:6px 8px;text-align:right;font-size:.72rem;color:#dc2626;text-transform:uppercase;letter-spacing:.04em;">Kurang</th>
+                    </tr>
+                </thead>
+                <tbody>${rows}</tbody>
+            </table>
+            </div>`,
+        confirmButtonText: 'Mengerti',
+        confirmButtonColor: '#dc2626',
+        width: 580,
+    });
+});
+</script>
+@endpush
+@endif

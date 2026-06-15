@@ -3,6 +3,7 @@
 namespace App\Http\Controllers\Sales;
 
 use App\Http\Controllers\Controller;
+use App\Models\InventoryStock;
 use App\Models\Item;
 use App\Models\MpReconciliation;
 use App\Models\SalesInvoice;
@@ -380,6 +381,42 @@ class ShipmentController extends Controller
     }
 
     /**
+     * Cek apakah semua lines shipment cukup stok di WH-RTS.
+     * Return array error per item jika ada yang kurang, array kosong jika aman.
+     */
+    protected function checkStockSufficiency(Shipment $shipment, Warehouse $warehouse): array
+    {
+        $lines = $shipment->lines()->with('item:id,code,name')->get();
+
+        // Ambil stok WH-RTS untuk semua item sekaligus (1 query)
+        $itemIds = $lines->pluck('item_id')->filter()->unique()->values();
+        $stocks  = InventoryStock::where('warehouse_id', $warehouse->id)
+            ->whereIn('item_id', $itemIds)
+            ->pluck('qty', 'item_id'); // [item_id => qty]
+
+        $errors = [];
+        foreach ($lines as $line) {
+            $qty    = (float) ($line->qty_scanned ?? 0);
+            if ($qty <= 0) continue;
+
+            $itemId  = (int) $line->item_id;
+            $current = (float) ($stocks[$itemId] ?? 0);
+
+            if (($current + 0.0000001) < $qty) {
+                $errors[] = [
+                    'code'    => $line->item->code ?? "item#{$itemId}",
+                    'name'    => $line->item->name ?? '',
+                    'stock'   => (int) $current,
+                    'needed'  => (int) $qty,
+                    'short'   => (int) ($qty - $current),
+                ];
+            }
+        }
+
+        return $errors;
+    }
+
+    /**
      * ✅ Single source of truth untuk melakukan stockOut + set posted + realtime daily sales.
      * dipakai oleh submit() dan post()
      */
@@ -412,7 +449,7 @@ class ShipmentController extends Controller
                 sourceType: 'shipment',
                 sourceId: (int) $locked->id,
                 notes: 'Shipment ' . $locked->code . ' ke store ' . ($locked->store->code ?? '-'),
-                allowNegative: true,
+                allowNegative: false,
                 lotId: null,
                 unitCostOverride: null,
                 affectLotCost: false,
@@ -456,6 +493,16 @@ class ShipmentController extends Controller
                 ->with('status', 'error')->with('message', 'Warehouse WH-RTS belum dikonfigurasi.');
         }
 
+        // ✅ Tolak jika ada item yang stok WH-RTS tidak cukup
+        $shipment->load('lines.item');
+        $stockErrors = $this->checkStockSufficiency($shipment, $warehouse);
+        if (!empty($stockErrors)) {
+            return redirect()->route('sales.shipments.edit', $shipment)
+                ->with('status', 'error')
+                ->with('message', 'Stok WH-RTS belum cukup, jadi barang belum bisa dikirim.')
+                ->with('stock_insufficient', $stockErrors);
+        }
+
         try {
             DB::transaction(function () use ($shipment, $warehouse) {
                 $this->doPostShipment($shipment, $warehouse);
@@ -487,6 +534,14 @@ class ShipmentController extends Controller
         if (!$warehouse) {
             return redirect()->route('sales.shipments.show', $shipment)
                 ->with('status', 'error')->with('message', 'Warehouse WH-RTS belum dikonfigurasi.');
+        }
+
+        // ✅ Tolak jika ada item yang stok WH-RTS tidak cukup
+        $shipment->load('lines.item');
+        $stockErrors = $this->checkStockSufficiency($shipment, $warehouse);
+        if (!empty($stockErrors)) {
+            return redirect()->route('sales.shipments.show', $shipment)
+                ->with('stock_insufficient', $stockErrors);
         }
 
         try {

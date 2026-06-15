@@ -303,6 +303,53 @@
         .scan-toast-success { background: #16a34a; color: #ecfdf5; }
         .scan-toast-error { background: #b91c1c; color: #fee2e2; }
 
+        /* ========= ERROR HELP ========= */
+        .shipment-help {
+            border-radius: 14px;
+            border: 1px solid rgba(245, 158, 11, 0.35);
+            background: rgba(255, 251, 235, 0.96);
+            color: #78350f;
+            box-shadow: 0 6px 18px rgba(180, 83, 9, 0.08);
+        }
+        body[data-theme="dark"] .shipment-help {
+            background: rgba(69, 26, 3, 0.72);
+            border-color: rgba(245, 158, 11, 0.55);
+            color: #fef3c7;
+        }
+        .shipment-help-title {
+            font-weight: 800;
+            font-size: .95rem;
+        }
+        .shipment-help-copy {
+            font-size: .86rem;
+            line-height: 1.45;
+        }
+        .shipment-help-list {
+            margin: .5rem 0 0;
+            padding-left: 1.15rem;
+        }
+        .shipment-help-list li { margin-bottom: .2rem; }
+        .stock-short-table {
+            overflow: hidden;
+            border-radius: 12px;
+            border: 1px solid rgba(245, 158, 11, 0.24);
+        }
+        .stock-short-table table { margin-bottom: 0; }
+        .stock-short-table th {
+            font-size: .68rem;
+            text-transform: uppercase;
+            letter-spacing: .06em;
+            color: #92400e;
+            background: rgba(254, 243, 199, 0.82);
+        }
+        body[data-theme="dark"] .stock-short-table {
+            border-color: rgba(245, 158, 11, 0.35);
+        }
+        body[data-theme="dark"] .stock-short-table th {
+            background: rgba(120, 53, 15, 0.68);
+            color: #fde68a;
+        }
+
         /* ========= BUTTON KE SCAN TERAKHIR ========= */
         .btn-jump-last {
             border-radius: 999px;
@@ -334,6 +381,8 @@
         $totalQty = $shipment->lines->sum('qty_scanned');
         $totalLines = $shipment->lines->count();
         $lastScannedLineId = session('last_scanned_line_id');
+        $stockInsufficient = collect(session('stock_insufficient', []));
+        $hasEditError = session('status') === 'error' || $errors->any() || $stockInsufficient->isNotEmpty();
 
         $storeName = $shipment->store->name ?? '';
         $storeCode = $shipment->store->code ?? '';
@@ -400,6 +449,63 @@
         @elseif (session('status') === 'success')
             <div class="alert alert-success js-auto-hide-alert" role="alert">
                 {{ session('message') }}
+            </div>
+        @endif
+
+        @if ($hasEditError)
+            <div class="shipment-help p-3 mb-3" role="alert">
+                <div class="d-flex justify-content-between align-items-start gap-3 flex-wrap">
+                    <div>
+                        <div class="shipment-help-title">
+                            Kenapa belum bisa dikirim?
+                        </div>
+                        <div class="shipment-help-copy mt-1">
+                            Biasanya karena stok barang di <strong>WH-RTS</strong> belum siap. Cek beberapa hal ini dulu:
+                        </div>
+                    </div>
+                    @if ($stockInsufficient->isNotEmpty())
+                        <div class="summary-pill">
+                            Kurang:
+                            <span class="fw-semibold ms-1">{{ $stockInsufficient->count() }} barang</span>
+                        </div>
+                    @endif
+                </div>
+
+                <ul class="shipment-help-list shipment-help-copy">
+                    <li>Barang retur masih ada di produksi atau belum diterima kembali ke gudang.</li>
+                    <li>Barang masih proses produksi, jadi belum masuk stok WH-RTS.</li>
+                    <li>PO belum dibuat atau belum di-approve, jadi stok belum tersedia.</li>
+                    <li>Qty yang discan lebih besar dari stok yang ada sekarang.</li>
+                </ul>
+
+                @if ($stockInsufficient->isNotEmpty())
+                    <div class="stock-short-table table-responsive mt-3">
+                        <table class="table table-sm align-middle">
+                            <thead>
+                                <tr>
+                                    <th>Kode</th>
+                                    <th>Nama Barang</th>
+                                    <th class="text-end">Stok RTS</th>
+                                    <th class="text-end">Mau Kirim</th>
+                                    <th class="text-end">Kurang</th>
+                                </tr>
+                            </thead>
+                            <tbody>
+                                @foreach ($stockInsufficient as $row)
+                                    <tr>
+                                        <td class="fw-semibold">{{ $row['code'] ?? '-' }}</td>
+                                        <td>{{ $row['name'] ?? '-' }}</td>
+                                        <td class="text-end">{{ number_format((int) ($row['stock'] ?? 0), 0, ',', '.') }}</td>
+                                        <td class="text-end">{{ number_format((int) ($row['needed'] ?? 0), 0, ',', '.') }}</td>
+                                        <td class="text-end fw-semibold text-danger">
+                                            {{ number_format((int) ($row['short'] ?? 0), 0, ',', '.') }}
+                                        </td>
+                                    </tr>
+                                @endforeach
+                            </tbody>
+                        </table>
+                    </div>
+                @endif
             </div>
         @endif
 
@@ -1231,3 +1337,49 @@
         })();
     </script>
 @endpush
+
+@if (session('stock_insufficient'))
+@push('scripts')
+<script>
+document.addEventListener('DOMContentLoaded', function () {
+    if (!window.Swal) return;
+    const items = @json(session('stock_insufficient'));
+    const rows = items.map(r => `
+        <tr>
+            <td style="padding:6px 8px;font-weight:700;font-family:monospace;font-size:.8rem;white-space:nowrap;">${r.code}</td>
+            <td style="padding:6px 8px;font-size:.8rem;text-align:left;">${r.name}</td>
+            <td style="padding:6px 8px;text-align:right;font-size:.8rem;color:#dc2626;">${r.stock.toLocaleString('id')}</td>
+            <td style="padding:6px 8px;text-align:right;font-size:.8rem;">${r.needed.toLocaleString('id')}</td>
+            <td style="padding:6px 8px;text-align:right;font-size:.8rem;font-weight:700;color:#dc2626;">-${r.short.toLocaleString('id')}</td>
+        </tr>`).join('');
+    Swal.fire({
+        icon: 'error',
+        title: 'Barang Belum Siap Dikirim',
+        html: `
+            <p style="margin-bottom:12px;font-size:.85rem;color:#64748b;">
+                Ada barang yang stoknya belum cukup di <strong>WH-RTS</strong>, jadi shipment belum bisa disimpan.
+                Biasanya karena barang retur masih di produksi / belum diterima, barang masih proses produksi,
+                atau PO belum dibuat / belum di-approve.
+            </p>
+            <div style="overflow-x:auto;">
+            <table style="width:100%;border-collapse:collapse;font-size:.82rem;">
+                <thead>
+                    <tr style="background:#f8fafc;border-bottom:2px solid #e2e8f0;">
+                        <th style="padding:6px 8px;text-align:left;font-size:.72rem;color:#64748b;text-transform:uppercase;letter-spacing:.04em;">Kode</th>
+                        <th style="padding:6px 8px;text-align:left;font-size:.72rem;color:#64748b;text-transform:uppercase;letter-spacing:.04em;">Item</th>
+                        <th style="padding:6px 8px;text-align:right;font-size:.72rem;color:#64748b;text-transform:uppercase;letter-spacing:.04em;">Stok</th>
+                        <th style="padding:6px 8px;text-align:right;font-size:.72rem;color:#64748b;text-transform:uppercase;letter-spacing:.04em;">Butuh</th>
+                        <th style="padding:6px 8px;text-align:right;font-size:.72rem;color:#dc2626;text-transform:uppercase;letter-spacing:.04em;">Kurang</th>
+                    </tr>
+                </thead>
+                <tbody>${rows}</tbody>
+            </table>
+            </div>`,
+        confirmButtonText: 'Mengerti',
+        confirmButtonColor: '#dc2626',
+        width: 580,
+    });
+});
+</script>
+@endpush
+@endif
