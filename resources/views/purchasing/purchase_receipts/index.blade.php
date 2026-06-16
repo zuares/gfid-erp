@@ -562,11 +562,13 @@
                             <div class="col-12 col-md-4">
                                 <label class="form-label mb-1">Periode Tanggal</label>
                                 <div class="input-group input-group-sm">
-                                    <input type="date" name="from_date" class="form-control"
-                                        value="{{ request('from_date') }}" placeholder="Dari">
+                                    <input type="text" name="from_date" class="form-control gf-date-input"
+                                        value="{{ request('from_date') }}" placeholder="Dari" data-gf-date
+                                        autocomplete="off">
                                     <span class="input-group-text">s.d.</span>
-                                    <input type="date" name="to_date" class="form-control"
-                                        value="{{ request('to_date') }}" placeholder="Sampai">
+                                    <input type="text" name="to_date" class="form-control gf-date-input"
+                                        value="{{ request('to_date') }}" placeholder="Sampai" data-gf-date
+                                        autocomplete="off">
                                 </div>
                                 <div class="form-text">
                                     Filter otomatis diterapkan saat Anda mengubah nilai.
@@ -722,7 +724,7 @@
                     select.addEventListener('change', autoSubmit);
                 });
 
-                const dateInputs = filterForm.querySelectorAll('input[type="date"]');
+                const dateInputs = filterForm.querySelectorAll('input[name="from_date"], input[name="to_date"]');
                 dateInputs.forEach(function(input) {
                     input.addEventListener('change', autoSubmit);
                 });

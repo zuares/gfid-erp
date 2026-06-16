@@ -48,6 +48,19 @@ class SewingPickupController extends Controller
         ]);
     }
 
+    public function print(SewingPickup $pickup): View
+    {
+        $pickup->load([
+            'warehouse',
+            'operator',
+            'lines.bundle.finishedItem',
+            'lines.bundle.cuttingJob.lot',
+            'supplyLines.material',
+        ]);
+
+        return view('production.sewing_pickups.print', compact('pickup'));
+    }
+
     public function show(SewingPickup $pickup): View
     {
         $pickup->load([
@@ -402,6 +415,15 @@ class SewingPickupController extends Controller
 
             return $pickup;
         });
+
+        if ($request->input('print_after_save') === '1') {
+            $paperWidth = in_array($request->input('paper_width'), ['50mm','58mm','80mm','100mm'])
+                ? $request->input('paper_width')
+                : '50mm';
+            return redirect()->route('production.sewing.pickups.print', $pickup)
+                ->with('auto_print', true)
+                ->with('paper_width', $paperWidth);
+        }
 
         return redirect()
             ->route('production.sewing.returns.create')

@@ -51,6 +51,29 @@ class FinishingJobController extends Controller
             . "WHERE im.cutting_job_bundle_id = {$alias}.id AND w.code = '{$code}'), 0)";
     }
 
+    private function finishingDestinationWarehouses()
+    {
+        return Warehouse::whereIn('code', ['WH-PRD', 'WH-RTS'])
+            ->get(['id', 'code', 'name'])
+            ->sortBy(fn($w) => ['WH-PRD' => 0, 'WH-RTS' => 1][$w->code] ?? 99)
+            ->values();
+    }
+
+    private function defaultDestinationCodeForUser($user): string
+    {
+        $role = strtolower(trim((string) ($user?->role ?? '')));
+
+        return $role === 'admin' ? 'WH-PRD' : 'WH-RTS';
+    }
+
+    private function defaultDestinationIdForUser($user, $destinationWarehouses): ?int
+    {
+        $defaultCode = $this->defaultDestinationCodeForUser($user);
+
+        return $destinationWarehouses->firstWhere('code', $defaultCode)?->id
+            ?? $destinationWarehouses->first()?->id;
+    }
+
     /* ============================================================
      * INDEX
      * ============================================================
@@ -110,13 +133,9 @@ class FinishingJobController extends Controller
         $today = Carbon::today()->toDateString();
         $wipFinWarehouseId = Warehouse::where('code', 'WIP-FIN')->value('id');
 
-        // Destination warehouse: WH-RTS (default) dan WH-PRD sebagai alternatif
-        $destinationWarehouses = Warehouse::whereIn('code', ['WH-RTS', 'WH-PRD'])
-            ->get(['id', 'code', 'name'])
-            ->sortBy(fn($w) => ['WH-RTS' => 0, 'WH-PRD' => 1][$w->code] ?? 99)
-            ->values();
-        $defaultDestinationId = $destinationWarehouses->firstWhere('code', 'WH-RTS')?->id
-            ?? $destinationWarehouses->first()?->id;
+        // Admin default ke WH-PRD, role lain tetap ke WH-RTS.
+        $destinationWarehouses = $this->finishingDestinationWarehouses();
+        $defaultDestinationId = $this->defaultDestinationIdForUser($request->user(), $destinationWarehouses);
 
         $operators = Employee::query()
             ->where('role', 'sewing')
@@ -392,6 +411,20 @@ class FinishingJobController extends Controller
             ]);
         }
 
+        $destinationWarehouses = $this->finishingDestinationWarehouses();
+        $defaultDestinationId = $this->defaultDestinationIdForUser($request->user(), $destinationWarehouses);
+        $destinationWarehouseId = (int) ($validated['destination_warehouse_id'] ?? 0);
+
+        if ($destinationWarehouseId <= 0) {
+            $destinationWarehouseId = (int) ($defaultDestinationId ?? 0);
+        }
+
+        if ($destinationWarehouseId <= 0 || !$destinationWarehouses->contains('id', $destinationWarehouseId)) {
+            throw ValidationException::withMessages([
+                'destination_warehouse_id' => 'Tujuan gudang finishing hanya boleh WH-PRD atau WH-RTS.',
+            ]);
+        }
+
         if ($mode === 'all' && $finishingOperatorId <= 0) {
             return back()->withInput()->withErrors([
                 'operator_global_id' => 'Wajib pilih operator jahit (mode ALL).',
@@ -509,6 +542,7 @@ class FinishingJobController extends Controller
             $hasSplVoided,
             $hasSrVoided,
             $finishingOperatorId,
+            $destinationWarehouseId,
             &$empNameCache
         ) {
             $job = FinishingJob::create([
@@ -516,7 +550,7 @@ class FinishingJobController extends Controller
                 'date' => $validated['date'],
                 'status' => 'draft',
                 'notes' => $validated['notes'] ?? null,
-                'destination_warehouse_id' => $validated['destination_warehouse_id'] ?? null,
+                'destination_warehouse_id' => $destinationWarehouseId,
                 'created_by' => $request->user()->id,
                 'updated_by' => $request->user()->id,
             ]);
@@ -704,9 +738,11 @@ class FinishingJobController extends Controller
                 ->with('error', 'Finishing berhasil dibuat, tapi gagal auto-post: ' . $e->getMessage());
         }
 
+        $destinationCode = Warehouse::whereKey($destinationWarehouseId)->value('code') ?: 'WH-PRD';
+
         return redirect()
             ->route('production.finishing_jobs.index')
-            ->with('status', "Finishing {$job->code} berhasil diposting. OK ke WH-PRD, reject jahit ke REJ-SEW, reject finishing ke REJ-FIN.");
+            ->with('status', "Finishing {$job->code} berhasil diposting. OK ke {$destinationCode}, reject jahit ke REJ-SEW, reject finishing ke REJ-FIN.");
     }
 
     /* ============================================================

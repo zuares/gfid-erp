@@ -17,15 +17,16 @@
 @push('head')
     <style>
         .cutting-card {
-            border-radius: 14px;
-            border: 1px solid rgba(148, 163, 184, 0.45);
+            border-radius: 12px;
+            border: 1px solid rgba(148, 163, 184, 0.18);
             background: var(--card);
             margin-bottom: .75rem;
+            overflow: hidden;
         }
 
         .cutting-card-header {
-            padding: .55rem .75rem .45rem;
-            border-bottom: 1px solid rgba(148, 163, 184, 0.35);
+            padding: .58rem .68rem;
+            border-bottom: 1px solid rgba(148, 163, 184, 0.12);
             display: flex;
             justify-content: space-between;
             align-items: center;
@@ -33,22 +34,28 @@
         }
 
         .cutting-card-header h5 {
-            font-size: .9rem;
+            color: var(--text);
+            font-size: .88rem;
+            font-weight: 900;
+            letter-spacing: .01em;
             margin: 0;
         }
 
         .cutting-card-body {
-            padding: .6rem .75rem .6rem;
+            padding: .62rem .68rem;
             overflow: visible;
             position: relative;
         }
 
         .badge-soft {
-            font-size: .7rem;
+            color: var(--muted);
+            font-size: .64rem;
+            font-weight: 900;
             border-radius: 999px;
-            padding: .08rem .5rem;
-            border: 1px solid rgba(148, 163, 184, 0.6);
-            background: rgba(148, 163, 184, 0.14);
+            padding: .12rem .48rem;
+            border: 1px solid rgba(148, 163, 184, 0.18);
+            background: rgba(148, 163, 184, 0.06);
+            white-space: nowrap;
         }
 
         .mono {
@@ -64,6 +71,24 @@
         .bundles-table {
             border-collapse: separate;
             border-spacing: 0;
+            margin-bottom: 0;
+            font-size: .8rem;
+        }
+
+        .bundles-table thead th {
+            color: var(--muted);
+            font-size: .64rem;
+            font-weight: 900;
+            letter-spacing: .05em;
+            text-transform: uppercase;
+            border-bottom: 1px solid rgba(148, 163, 184, 0.16);
+            padding: .38rem .42rem;
+        }
+
+        .bundles-table tbody td {
+            padding: .34rem .42rem;
+            vertical-align: middle;
+            border-bottom: 1px solid rgba(148, 163, 184, 0.08);
         }
 
         .bundle-notes-cell {
@@ -97,13 +122,237 @@
             gap: .5rem;
         }
 
+        .cutting-selected-lot-strip {
+            border: 1px solid rgba(148, 163, 184, 0.18);
+            border-radius: 12px;
+            background: rgba(255, 255, 255, .42);
+        }
+
+        body[data-theme="dark"] .cutting-selected-lot-strip {
+            background: rgba(15, 23, 42, .20);
+        }
+
+        .cutting-selected-lot-main {
+            display: grid;
+            grid-template-columns: minmax(0, 1fr) auto;
+            align-items: center;
+            gap: .75rem;
+            width: 100%;
+        }
+
+        .cutting-selected-label {
+            display: block;
+            color: var(--muted);
+            font-size: .58rem;
+            font-weight: 900;
+            letter-spacing: .04em;
+            line-height: 1;
+            text-transform: uppercase;
+        }
+
+        .cutting-selected-value {
+            display: block;
+            margin-top: .18rem;
+            font-size: .82rem;
+            font-weight: 900;
+            line-height: 1.2;
+            min-width: 0;
+        }
+
+        .cutting-stepbar {
+            display: flex;
+            align-items: center;
+            justify-content: space-between;
+            gap: .6rem;
+            margin-bottom: .5rem;
+        }
+
+        .cutting-stepbar-text {
+            color: var(--muted);
+            font-size: .74rem;
+            font-weight: 800;
+        }
+
         @media (max-width: 767.98px) {
+            .cutting-card {
+                border-radius: 10px;
+                box-shadow: none;
+            }
+
+            .cutting-card-header {
+                padding: .48rem .56rem;
+                gap: .4rem;
+            }
+
+            .cutting-card-header h5 {
+                font-size: .82rem;
+            }
+
+            .cutting-card-body {
+                padding: .52rem .56rem;
+            }
+
+            .badge-soft {
+                font-size: .58rem;
+                padding: .08rem .34rem;
+            }
+
+            .cutting-selected-lot-strip {
+                border-radius: 10px;
+            }
+
+            .cutting-selected-lot-main {
+                grid-template-columns: minmax(0, 1fr);
+                gap: .48rem;
+            }
+
+            .cutting-selected-label {
+                font-size: .5rem;
+            }
+
+            .cutting-selected-value {
+                font-size: .76rem;
+                margin-top: .12rem;
+            }
+
+            .cutting-stepbar {
+                align-items: stretch;
+                flex-direction: column;
+                gap: .36rem;
+            }
+
+            .cutting-stepbar-text {
+                font-size: .68rem;
+            }
+
             .cutting-actions {
                 flex-direction: column-reverse;
                 align-items: stretch;
             }
 
             .cutting-actions .btn-primary {
+                width: 100%;
+            }
+
+            .bundles-table-wrap {
+                overflow-x: visible;
+            }
+
+            .bundles-table,
+            .bundles-table tbody,
+            .bundles-table tfoot {
+                display: block;
+                width: 100%;
+            }
+
+            .bundles-table thead {
+                display: none;
+            }
+
+            .bundles-table tbody tr.bundle-row {
+                display: block;
+                border: 1px solid rgba(148, 163, 184, .18);
+                border-radius: 10px;
+                padding: .5rem .56rem;
+                margin-bottom: .36rem;
+                background: var(--card);
+            }
+
+            .bundles-table tbody td {
+                display: grid;
+                grid-template-columns: 72px minmax(0, 1fr);
+                align-items: center;
+                gap: .45rem;
+                border: 0;
+                padding: .18rem 0;
+            }
+
+            .bundles-table tbody td::before {
+                color: var(--muted);
+                font-size: .56rem;
+                font-weight: 900;
+                letter-spacing: .04em;
+                line-height: 1;
+                text-transform: uppercase;
+            }
+
+            .bundles-table tbody td:nth-child(1) {
+                display: inline-flex;
+                width: auto;
+                padding: 0 .35rem .08rem 0;
+                color: var(--muted);
+                font-size: .68rem;
+                font-weight: 900;
+            }
+
+            .bundles-table tbody td:nth-child(1)::before,
+            .bundles-table tbody td:nth-child(2)::before {
+                content: none;
+            }
+
+            .bundles-table tbody td:nth-child(3)::before {
+                content: "Item";
+            }
+
+            .bundles-table tbody td:nth-child(4)::before {
+                content: "Qty";
+            }
+
+            .bundles-table tbody td:nth-child(5)::before {
+                content: "Kain";
+            }
+
+            .bundles-table tbody td:nth-child(6)::before {
+                content: "Catatan";
+            }
+
+            .bundles-table tbody td:nth-child(7) {
+                display: flex;
+                justify-content: flex-end;
+                padding-top: .12rem;
+            }
+
+            .bundles-table tbody td:nth-child(7)::before {
+                content: none;
+            }
+
+            .bundles-table .form-control-sm,
+            .bundles-table .form-select-sm {
+                min-height: 32px;
+                border-radius: 8px;
+                font-size: .78rem;
+                padding: .28rem .42rem;
+            }
+
+            .bundle-qty-pcs,
+            .bundle-qty-fabric {
+                text-align: center !important;
+                font-weight: 900;
+            }
+
+            .btn-remove-row {
+                width: 28px;
+                height: 28px;
+                border: 1px solid rgba(220, 38, 38, .18) !important;
+                border-radius: 999px;
+                background: rgba(254, 242, 242, .72);
+                line-height: 1;
+                padding: 0 !important;
+                text-decoration: none;
+            }
+
+            .bundles-table tfoot tr,
+            .bundles-table tfoot td {
+                display: block;
+                width: 100%;
+            }
+
+            .bundles-table tfoot td {
+                padding: .14rem 0 0;
+                border: 0;
+            }
+
+            #btn-add-row {
                 width: 100%;
             }
         }
@@ -132,30 +381,33 @@
     {{-- STEP 2: KONTEN UTAMA (muncul setelah LOT disimpan) --}}
     <div id="cutting-main-content" class="cutting-main-content d-none">
         {{-- RINGKASAN LOT TERPILIH + TOMBOL UBAH LOT --}}
-        <div class="cutting-card mb-2">
-            <div class="cutting-card-body d-flex justify-content-between align-items-center flex-wrap gap-2">
+        <div class="cutting-card cutting-selected-lot-strip mb-2">
+            <div class="cutting-card-body">
+                <div class="cutting-selected-lot-main">
                 <div class="small">
                     <div>
-                        <span class="text-muted">Item kain:</span>
-                        <span class="fw-semibold" id="current-fabric-label">-</span>
+                        <span class="cutting-selected-label">Item Kain</span>
+                        <span class="cutting-selected-value" id="current-fabric-label">-</span>
                     </div>
-                    <div>
-                        <span class="text-muted">LOT terpilih:</span>
-                        <span class="fw-semibold" id="current-lot-count">0 LOT</span>
-                        <span class="text-muted ms-2">Total kain:</span>
+                    <div class="mt-1">
+                        <span class="text-muted">LOT:</span>
+                        <span class="fw-semibold mono" id="current-lot-count">0 LOT</span>
+                        <span class="text-muted ms-2">Kain:</span>
                         <span class="fw-semibold mono" id="current-lot-balance">0.00</span>
+                        <span class="text-muted">kg</span>
                     </div>
                 </div>
                 <button type="button" class="btn btn-outline-secondary btn-sm btn-pill-sm" id="btn-change-lots">
                     Ubah LOT
                 </button>
+                </div>
             </div>
         </div>
 
         {{-- BARIS KONTROL ATAS: tombol buka modal info job --}}
-        <div class="d-flex justify-content-between align-items-center mb-2">
-            <div class="small text-muted">
-                Step 2: Atur info cutting job & isi bundles.
+        <div class="cutting-stepbar">
+            <div class="cutting-stepbar-text">
+                Isi item hasil cutting dan qty bundle.
             </div>
             <button type="button" class="btn btn-outline-secondary btn-sm btn-pill-sm" data-bs-toggle="modal"
                 data-bs-target="#cuttingInfoModal">
@@ -166,9 +418,9 @@
         {{-- CARD: BUNDLES --}}
         <div class="cutting-card">
             <div class="cutting-card-header">
-                <h5>Bundles</h5>
+                <h5>Hasil Cutting</h5>
                 <span class="badge-soft">
-                    Step 2: Input baris bundles (pilih LOT & item jadi per baris)
+                    Item jadi & qty
                 </span>
             </div>
             <div class="cutting-card-body">
@@ -193,7 +445,7 @@
                                 <td colspan="7">
                                     <button type="button" class="btn btn-sm btn-outline-primary btn-pill-sm"
                                         id="btn-add-row">
-                                        + Tambah Baris
+                                        + Tambah Item
                                     </button>
                                 </td>
                             </tr>

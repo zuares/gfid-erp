@@ -276,45 +276,8 @@
                 <input type="hidden" name="operator_id" id="operator_id_hidden" value="{{ $autoDefaultOperatorId }}">
                 <input type="hidden" name="warehouse_id" value="{{ $defaultWarehouseId }}">
                 <input type="hidden" name="supplies_checklist" id="supplies_checklist_payload" value="">
-
-                <div class="card-main mb-3">
-                    {{-- HEADER FORM: TANGGAL + GUDANG --}}
-                    <div class="card-section">
-                        <div class="row g-3 align-items-end">
-                            <div class="col-12 col-md-3">
-                                <div class="field-block">
-                                    <div class="field-label">Tanggal ambil</div>
-                                    <input type="date" name="date"
-                                        class="form-control form-control-sm field-input-sm @error('date') is-invalid @enderror"
-                                        value="{{ old('date', now()->format('Y-m-d')) }}">
-                                    @error('date')
-                                        <div class="invalid-feedback">{{ $message }}</div>
-                                    @enderror
-                                </div>
-                            </div>
-
-                            <div class="col-12 col-md-4 gudang-section">
-                                <div class="field-block">
-                                    <div class="field-label">Gudang tujuan</div>
-                                    <div class="field-static">
-                                        @if ($defaultWarehouse)
-                                            <span class="code">{{ $defaultWarehouse->code }}</span>
-                                            <span class="name">— {{ $defaultWarehouse->name }}</span>
-                                        @else
-                                            <span class="text-danger small">Gudang WIP-SEW belum diset.</span>
-                                        @endif
-                                    </div>
-                                    @error('warehouse_id')
-                                        <div class="invalid-feedback d-block">{{ $message }}</div>
-                                    @enderror
-                                </div>
-                            </div>
-
-                            {{-- kolom kanan dikosongkan agar simetris --}}
-                            <div class="col-12 col-md-5"></div>
-                        </div>
-                    </div>
-                </div>
+                <input type="hidden" name="print_after_save" id="print_after_save" value="0">
+                <input type="hidden" name="paper_width" id="paper_width" value="50mm">
 
                 {{-- LIST BUNDLE + FILTER + MOBILE CARD --}}
                 @include('production.sewing_pickups._bundle_picker', [
@@ -329,10 +292,17 @@
                         <span class="d-none d-sm-inline">Batal</span>
                     </a>
 
-                    <button type="submit" class="btn btn-sm btn-primary" id="btn-submit-main" disabled>
-                        <i class="bi bi-check2-circle" id="btn-submit-icon"></i>
-                        <span class="text-light" id="btn-submit-label">Belum Ambil</span>
-                    </button>
+                    <div class="d-flex gap-2">
+                        <button type="submit" class="btn btn-sm btn-outline-primary" id="btn-submit-print" disabled
+                            onclick="document.getElementById('print_after_save').value='1'">
+                            <i class="bi bi-printer"></i>
+                            <span class="d-none d-sm-inline">Simpan & Cetak</span>
+                        </button>
+                        <button type="submit" class="btn btn-sm btn-primary" id="btn-submit-main" disabled>
+                            <i class="bi bi-check2-circle" id="btn-submit-icon"></i>
+                            <span class="text-light" id="btn-submit-label">Belum Ambil</span>
+                        </button>
+                    </div>
                 </div>
             </form>
 

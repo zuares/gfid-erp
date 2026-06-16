@@ -262,15 +262,22 @@ document.addEventListener('DOMContentLoaded', function () {
         </tr>`).join('');
     Swal.fire({
         icon: 'error',
-        title: 'Stok WH-RTS Tidak Cukup',
+        title: 'Barang Belum Siap Dikirim',
         html: `
-            <p style="margin-bottom:12px;font-size:.85rem;color:#64748b;">
-                Shipment <strong>ditolak</strong>. Tambah stok terlebih dahulu sebelum submit ulang.
+            <p style="margin-bottom:8px;font-size:.85rem;color:#0f172a;font-weight:700;">
+                Shipment ditolak — stok WH-RTS tidak mencukupi.
             </p>
+            <p style="margin-bottom:4px;font-size:.8rem;color:#64748b;text-align:left;">Kemungkinan penyebab:</p>
+            <ul style="text-align:left;font-size:.8rem;color:#475569;margin:0 0 12px 0;padding-left:18px;line-height:1.9;">
+                <li>Ada <strong>return barang</strong> yang belum diproses masuk ke WH-RTS</li>
+                <li>Barang masih dalam proses <strong>produksi / belum selesai</strong></li>
+                <li><strong>PO pembelian</strong> barang jadi belum dibuat atau belum di-approve</li>
+                <li>Stok belum diinput / <strong>GRN belum diposting</strong></li>
+            </ul>
             <div style="overflow-x:auto;">
             <table style="width:100%;border-collapse:collapse;font-size:.82rem;">
                 <thead>
-                    <tr style="background:#f8fafc;border-bottom:2px solid #e2e8f0;">
+                    <tr style="background:#fef2f2;border-bottom:2px solid #fecaca;">
                         <th style="padding:6px 8px;text-align:left;font-size:.72rem;color:#64748b;text-transform:uppercase;letter-spacing:.04em;">Kode</th>
                         <th style="padding:6px 8px;text-align:left;font-size:.72rem;color:#64748b;text-transform:uppercase;letter-spacing:.04em;">Item</th>
                         <th style="padding:6px 8px;text-align:right;font-size:.72rem;color:#64748b;text-transform:uppercase;letter-spacing:.04em;">Stok</th>
@@ -283,7 +290,7 @@ document.addEventListener('DOMContentLoaded', function () {
             </div>`,
         confirmButtonText: 'Mengerti',
         confirmButtonColor: '#dc2626',
-        width: 580,
+        width: 600,
     });
 });
 </script>

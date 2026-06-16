@@ -3,13 +3,37 @@
 use App\Http\Controllers\Purchasing\PurchaseOrderController;
 use App\Http\Controllers\Purchasing\PurchasePaymentController;
 use App\Http\Controllers\Purchasing\PurchaseReceiptController;
+use App\Http\Controllers\Purchasing\PurchaseRequestController;
 use App\Http\Controllers\Purchasing\PurchaseReturnController;
+use App\Http\Controllers\Purchasing\PurchasingDashboardController;
+use App\Http\Controllers\Purchasing\SupplierInvoiceController;
 use Illuminate\Support\Facades\Route;
 
 Route::middleware(['web', 'auth', 'access:purchasing'])
     ->prefix('purchasing')
     ->name('purchasing.')
     ->group(function () {
+
+        // DASHBOARD — owner + admin + accounting
+        Route::get('dashboard', [PurchasingDashboardController::class, 'index'])
+            ->name('dashboard');  // full name: purchasing.dashboard
+
+        // PURCHASE REQUEST — semua yang punya access:purchasing
+        // CRUD resource (index, create, store, show, edit, update)
+        Route::resource('purchase-requests', PurchaseRequestController::class)
+            ->names('purchase_requests')
+            ->except(['destroy']);
+
+        // PR-C + PR-D: Approve / Reject / Convert — hanya owner + admin
+        Route::middleware('role:owner,admin')->group(function () {
+            Route::post('purchase-requests/{purchase_request}/approve', [PurchaseRequestController::class, 'approve'])
+                ->name('purchase_requests.approve');
+            Route::post('purchase-requests/{purchase_request}/reject', [PurchaseRequestController::class, 'reject'])
+                ->name('purchase_requests.reject');
+            // PR-D: Convert PR → PO (redirect, bukan langsung buat PO)
+            Route::post('purchase-requests/{purchase_request}/convert', [PurchaseRequestController::class, 'convert'])
+                ->name('purchase_requests.convert');
+        });
 
         // OWNER + ADMIN
         Route::middleware('access:purchasing')->group(function () {
@@ -46,6 +70,17 @@ Route::middleware(['web', 'auth', 'access:purchasing'])
                 [PurchaseReturnController::class, 'createFromGrn']
             )->name('grn.returns.create');
 
+            // Tahap 6: QC / Pemeriksaan Barang (opsional, satu per GRN)
+            Route::prefix('purchase-receipts/{purchase_receipt}/qc')
+                ->name('purchase_receipts.qc.')
+                ->group(function () {
+                    Route::get('create',  [\App\Http\Controllers\Purchasing\PurchaseReceiptQcController::class, 'create'])->name('create');
+                    Route::post('',       [\App\Http\Controllers\Purchasing\PurchaseReceiptQcController::class, 'store'])->name('store');
+                    Route::get('edit',    [\App\Http\Controllers\Purchasing\PurchaseReceiptQcController::class, 'edit'])->name('edit');
+                    Route::put('',        [\App\Http\Controllers\Purchasing\PurchaseReceiptQcController::class, 'update'])->name('update');
+                    Route::delete('',     [\App\Http\Controllers\Purchasing\PurchaseReceiptQcController::class, 'cancel'])->name('cancel');
+                });
+
             // Create GRN from PO
             Route::get('purchase-orders/{purchase_order}/create-grn', [PurchaseReceiptController::class, 'createFromOrder'])
                 ->name('purchase_receipts.create_from_order');
@@ -58,19 +93,57 @@ Route::middleware(['web', 'auth', 'access:purchasing'])
                 ->name('purchase_orders.approve');
         });
 
-        // OWNER only actions
-        Route::middleware('role:owner')->group(function () {
+        // SUPPLIER INVOICE — owner + accounting (akses dikontrol di controller)
+        Route::get('supplier-invoices', [SupplierInvoiceController::class, 'index'])
+            ->name('supplier_invoices.index');
+        Route::get('supplier-invoices/create', [SupplierInvoiceController::class, 'create'])
+            ->name('supplier_invoices.create');
+        Route::post('supplier-invoices', [SupplierInvoiceController::class, 'store'])
+            ->name('supplier_invoices.store');
+        Route::get('supplier-invoices/{supplierInvoice}', [SupplierInvoiceController::class, 'show'])
+            ->name('supplier_invoices.show');
+        Route::post('supplier-invoices/{supplierInvoice}/post', [SupplierInvoiceController::class, 'post'])
+            ->name('supplier_invoices.post');
+        Route::delete('supplier-invoices/{supplierInvoice}/void', [SupplierInvoiceController::class, 'void'])
+            ->name('supplier_invoices.void');
 
-            Route::post('purchase-orders/{purchase_order}/cancel', [PurchaseOrderController::class, 'cancel'])
-                ->name('purchase_orders.cancel');
+        // OWNER + ADMIN — read + edit return (draft only), close PO, cancel PO
+        Route::middleware('role:owner,admin')->group(function () {
 
-            // RETURN lifecycle
+            // RETURN — index, show, edit draft (owner+admin)
+            Route::get('purchase-returns', [PurchaseReturnController::class, 'index'])
+                ->name('purchase_returns.index');
+
             Route::get('purchase-returns/{purchase_return}', [PurchaseReturnController::class, 'show'])
                 ->name('purchase_returns.show');
 
             Route::put('purchase-returns/{purchase_return}', [PurchaseReturnController::class, 'update'])
                 ->name('purchase_returns.update');
 
+            // Tahap 9 — QC resolve route (owner+admin)
+            Route::post(
+                'purchase-receipt-qcs/{qc}/resolve',
+                [\App\Http\Controllers\Purchasing\PurchaseReceiptQcController::class, 'resolve']
+            )->name('purchase_receipt_qcs.resolve');
+
+            // Tahap 9 — Invoice deduction update (owner+admin)
+            Route::post(
+                'supplier-invoices/{supplier_invoice}/set-deduction',
+                [\App\Http\Controllers\Purchasing\SupplierInvoiceController::class, 'setDeduction']
+            )->name('supplier_invoices.set_deduction');
+        });
+
+        // OWNER only — destructive actions
+        Route::middleware('role:owner')->group(function () {
+
+            Route::post('purchase-orders/{purchase_order}/cancel', [PurchaseOrderController::class, 'cancel'])
+                ->name('purchase_orders.cancel');
+
+            // Tahap 4: Close PO
+            Route::post('purchase-orders/{purchase_order}/close', [PurchaseOrderController::class, 'close'])
+                ->name('purchase_orders.close');
+
+            // RETURN — post + void (owner only — jurnal + stok)
             Route::post('purchase-returns/{purchase_return}/post', [PurchaseReturnController::class, 'post'])
                 ->name('purchase_returns.post');
 

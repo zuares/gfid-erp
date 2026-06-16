@@ -60,53 +60,78 @@ class ShipmentReturnController extends Controller
     public function store(Request $request)
     {
         $data = $request->validate([
-            'store_id' => ['required', 'exists:stores,id'],
-            'shipment_id' => ['nullable', 'exists:shipments,id'],
-            'date' => ['required', 'date'],
-            'reason' => ['nullable', 'string'],
-            'notes' => ['nullable', 'string'],
+            'store_id'      => ['required', 'exists:stores,id'],
+            'shipment_id'   => ['nullable', 'exists:shipments,id'],
+            'order_number'  => ['nullable', 'string', 'max:100'],
+            'date'          => ['required', 'date'],
+            'reason'        => ['nullable', 'string'],
+            'notes'         => ['nullable', 'string'],
+            'lines'         => ['nullable', 'array'],
+            'lines.*.item_id' => ['required_with:lines', 'exists:items,id'],
+            'lines.*.qty'     => ['required_with:lines', 'numeric', 'min:1'],
+            'lines.*.remarks' => ['nullable', 'string', 'max:255'],
         ]);
+
+        // Lookup shipment by order_number (code) jika shipment_id tidak langsung dikirim
+        $shipmentId = $data['shipment_id'] ?? null;
+        if (!$shipmentId && !empty($data['order_number'])) {
+            $found = Shipment::where('code', trim($data['order_number']))->first();
+            $shipmentId = $found?->id;
+        }
 
         $store = Store::findOrFail($data['store_id']);
-
-        $storeName = strtoupper(trim($store->name ?? ''));
         $storeCode = strtoupper(trim($store->code ?? ''));
-        $storeKey = $storeCode . ' ' . $storeName;
+        $storeKey  = $storeCode . ' ' . strtoupper(trim($store->name ?? ''));
 
-        // Default prefix
         $prefix = 'RTP';
-
-        // Kalau store punya code, bisa dipakai sebagai base prefix
         $cleanCode = preg_replace('/[^A-Z0-9]/', '', $storeCode);
         if ($cleanCode !== '') {
-            // Mis: SHP → SHPR (retur)
             $prefix = substr($cleanCode, 0, 3) . 'R';
         }
-
-        // Override khusus marketplace
         if (str_contains($storeKey, 'SHP') || str_contains($storeKey, 'SHOPEE')) {
-            $prefix = 'SHR'; // Shopee Return
+            $prefix = 'SHR';
         } elseif (str_contains($storeKey, 'TTK') || str_contains($storeKey, 'TIKTOK')) {
-            $prefix = 'TTR'; // TikTok Return
+            $prefix = 'TTR';
         }
 
-        $code = ShipmentReturn::generateCode($prefix);
+        $ret = DB::transaction(function () use ($data, $shipmentId, $prefix) {
+            $ret = ShipmentReturn::create([
+                'code'        => ShipmentReturn::generateCode($prefix),
+                'store_id'    => $data['store_id'],
+                'shipment_id' => $shipmentId,
+                'date'        => $data['date'],
+                'status'      => 'draft',
+                'reason'      => $data['reason'] ?? null,
+                'notes'       => $data['notes'] ?? null,
+                'created_by'  => Auth::id(),
+            ]);
 
-        $ret = ShipmentReturn::create([
-            'code' => $code,
-            'store_id' => $data['store_id'],
-            'shipment_id' => $data['shipment_id'] ?? null,
-            'date' => $data['date'],
-            'status' => 'draft',
-            'reason' => $data['reason'] ?? null,
-            'notes' => $data['notes'] ?? null,
-            'created_by' => Auth::id(),
-        ]);
+            $totalQty = 0;
+            foreach (($data['lines'] ?? []) as $line) {
+                $qty = (int) ($line['qty'] ?? 0);
+                if ($qty <= 0 || empty($line['item_id'])) continue;
+
+                ShipmentReturnLine::create([
+                    'shipment_return_id' => $ret->id,
+                    'item_id'            => (int) $line['item_id'],
+                    'qty'                => $qty,
+                    'remarks'            => $line['remarks'] ?? null,
+                ]);
+                $totalQty += $qty;
+            }
+
+            if ($totalQty > 0) {
+                $ret->total_qty = $totalQty;
+                $ret->save();
+            }
+
+            return $ret;
+        });
 
         return redirect()
             ->route('sales.shipment_returns.show', $ret)
             ->with('status', 'success')
-            ->with('message', 'Retur pengiriman dibuat. Silakan scan barang yang kembali.');
+            ->with('message', 'Retur pengiriman dibuat' . ($ret->total_qty > 0 ? ' dengan ' . $ret->total_qty . ' item.' : '. Silakan scan barang yang kembali.'));
     }
 
     /**

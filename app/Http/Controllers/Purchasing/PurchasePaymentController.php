@@ -7,6 +7,7 @@ use App\Models\Account;
 use App\Models\PaymentMethod;
 use App\Models\PurchaseOrder;
 use App\Models\PurchasePayment;
+use App\Models\SupplierInvoice;
 use App\Services\Accounting\JournalService;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\DB;
@@ -34,6 +35,7 @@ class PurchasePaymentController extends Controller
      */
     public function store(Request $request, PurchaseOrder $purchase_order)
     {
+        $this->ensureOwner($request);
 
         $grnPostedTotal = (float) $purchase_order->purchaseReceipts()
             ->where('status', 'posted')
@@ -57,6 +59,8 @@ class PurchasePaymentController extends Controller
             'amount' => ['required', 'string'],
             'ref_no' => ['nullable', 'string', 'max:100'],
             'notes' => ['nullable', 'string', 'max:255'],
+            // Tahap 4: link ke Supplier Invoice (opsional — backward compat)
+            'supplier_invoice_id' => ['nullable', 'integer', 'exists:supplier_invoices,id'],
         ]);
 
         $amount = $this->toNumber($data['amount']);
@@ -131,9 +135,12 @@ class PurchasePaymentController extends Controller
             }
         }
 
-        DB::transaction(function () use ($purchase_order, $data, $amount, $request, $cashAccountId) {
+        $supplierInvoiceId = !empty($data['supplier_invoice_id']) ? (int) $data['supplier_invoice_id'] : null;
+
+        DB::transaction(function () use ($purchase_order, $data, $amount, $request, $cashAccountId, $supplierInvoiceId) {
             $payment = PurchasePayment::create([
                 'purchase_order_id' => (int) $purchase_order->id,
+                'supplier_invoice_id' => $supplierInvoiceId, // nullable
                 'date' => $data['date'],
                 'payment_method_id' => (int) $data['payment_method_id'],
                 'cash_account_id' => $cashAccountId ? (int) $cashAccountId : null, // CREDIT => null
@@ -156,6 +163,11 @@ class PurchasePaymentController extends Controller
             }
 
             $this->recalcPaymentStatus($purchase_order);
+
+            // Tahap 4: sync paid_amount + status ke Supplier Invoice jika dipilih
+            if ($supplierInvoiceId) {
+                $this->syncInvoicePaymentStatus($supplierInvoiceId);
+            }
         });
 
         return back()->with('success', 'Pembayaran tersimpan.');
@@ -163,6 +175,8 @@ class PurchasePaymentController extends Controller
 
     public function void(Request $request, PurchaseOrder $purchase_order, PurchasePayment $payment)
     {
+        $this->ensureOwner($request);
+
         if ((int) $payment->purchase_order_id !== (int) $purchase_order->id) {
             abort(404);
         }
@@ -172,6 +186,8 @@ class PurchasePaymentController extends Controller
         }
 
         DB::transaction(function () use ($payment, $purchase_order, $request) {
+            $invoiceId = $payment->supplier_invoice_id; // ambil sebelum void
+
             $payment->voided_at = now();
             $payment->voided_by = (int) $request->user()->id;
             $payment->save();
@@ -185,6 +201,11 @@ class PurchasePaymentController extends Controller
             }
 
             $this->recalcPaymentStatus($purchase_order);
+
+            // Tahap 4: re-sync invoice jika payment ini terkait invoice
+            if ($invoiceId) {
+                $this->syncInvoicePaymentStatus($invoiceId);
+            }
         });
 
         return back()->with('success', 'Pembayaran berhasil di-VOID.');
@@ -197,6 +218,8 @@ class PurchasePaymentController extends Controller
      */
     public function applyDp(Request $request, PurchaseOrder $purchase_order)
     {
+        $this->ensureOwner($request);
+
         if (($purchase_order->status ?? '') === 'cancelled') {
             return back()->with('error', 'PO cancelled tidak bisa diproses.');
         }
@@ -397,6 +420,11 @@ class PurchasePaymentController extends Controller
         }
     }
 
+    protected function ensureOwner(Request $request): void
+    {
+        abort_unless($request->user()?->isOwner(), 403, 'Hanya owner yang boleh mengakses nominal pembayaran purchasing.');
+    }
+
     /**
      * Deteksi mode pembayaran
      */
@@ -457,6 +485,53 @@ class PurchasePaymentController extends Controller
             ->where('code', $fallbackCode)
             ->where('is_active', 1)
             ->value('id');
+    }
+
+    // ======================================================================
+    // INTERNAL: Supplier Invoice Payment Sync (Tahap 4)
+    // ======================================================================
+
+    /**
+     * Recalculate paid_amount dan status di supplier_invoices
+     * berdasarkan semua active payment yang terkait invoice tersebut.
+     * Dipanggil setelah store() dan void() payment.
+     */
+    protected function syncInvoicePaymentStatus(int $invoiceId): void
+    {
+        // Guard: tabel supplier_invoices harus ada
+        if (!\Illuminate\Support\Facades\Schema::hasTable('supplier_invoices')) {
+            return;
+        }
+
+        $invoice = SupplierInvoice::find($invoiceId);
+        if (!$invoice) {
+            return;
+        }
+
+        // Void invoice tidak di-sync
+        if ($invoice->status === 'void') {
+            return;
+        }
+
+        // Hitung total payment aktif (non-void) yang terkait invoice ini
+        $totalPaid = (float) PurchasePayment::query()
+            ->where('supplier_invoice_id', $invoiceId)
+            ->whereNull('voided_at')
+            ->sum('amount');
+
+        $totalAmount = (float) $invoice->total_amount;
+        $eps = 0.01;
+
+        $newStatus = 'posted';
+        if ($totalPaid >= $totalAmount - $eps && $totalAmount > 0) {
+            $newStatus = 'paid';
+        } elseif ($totalPaid > $eps) {
+            $newStatus = 'partial_paid';
+        }
+
+        $invoice->paid_amount = round($totalPaid, 2);
+        $invoice->status = $newStatus;
+        $invoice->save();
     }
 
     /**

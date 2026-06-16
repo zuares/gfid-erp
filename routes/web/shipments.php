@@ -2,6 +2,7 @@
 
 use App\Http\Controllers\Sales\ShipmentController;
 use App\Http\Controllers\Sales\ShipmentReturnController;
+use App\Models\Shipment;
 use Illuminate\Support\Facades\Route;
 
 Route::middleware(['web', 'auth', 'access:sales'])
@@ -79,4 +80,24 @@ Route::middleware(['web', 'auth', 'access:sales'])
 
         Route::patch('shipment-return-lines/{line}', [ShipmentReturnController::class, 'updateLineQty'])
             ->name('shipment_returns.update_line_qty');
+
+        // AJAX: lookup shipment by code (for return create form)
+        Route::get('api/shipments/lookup', function (\Illuminate\Http\Request $req) {
+            $code = strtoupper(trim($req->query('code', '')));
+            if (!$code) return response()->json(null);
+
+            $shipment = Shipment::with('store:id,code,name')
+                ->where('code', $code)
+                ->first(['id', 'code', 'store_id', 'date']);
+
+            if (!$shipment) return response()->json(null);
+
+            return response()->json([
+                'id'         => $shipment->id,
+                'code'       => $shipment->code,
+                'store_id'   => $shipment->store_id,
+                'store_code' => $shipment->store?->code,
+                'store_name' => $shipment->store?->name,
+            ]);
+        })->name('api.shipments.lookup');
     });

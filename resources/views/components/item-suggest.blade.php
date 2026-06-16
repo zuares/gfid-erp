@@ -71,6 +71,8 @@
         $showName = false;
         $showCategory = false;
     }
+
+    $inputDisplayValue = $displayMode === 'code' ? strtoupper($displayValue) : $displayValue;
 @endphp
 
 <div class="item-suggest-wrap" data-type="{{ $type }}" data-item-category-id="{{ $itemCategoryId }}"
@@ -80,7 +82,7 @@
     data-extra-params='@json($extraParams)' data-required="{{ $required ? '1' : '0' }}"
     data-skip-submit="{{ $skipSubmitValidation ? '1' : '0' }}">
 
-    <input type="text" @if($displayName) name="{{ $displayName }}" @endif value="{{ strtoupper($displayValue) }}" autocomplete="off"
+    <input type="text" @if($displayName) name="{{ $displayName }}" @endif value="{{ $inputDisplayValue }}" autocomplete="off"
         class="form-control form-control-sm js-item-suggest-input" placeholder="{{ $placeholder }}"
         data-items='@json($jsItems)' id="{{ $uid }}" aria-autocomplete="list">
 
@@ -131,7 +133,7 @@
             }
 
             .item-suggest-option-code {
-                font-weight: 600;
+                font-weight: 700;
             }
 
             .item-suggest-option-name {
@@ -223,7 +225,7 @@
                     initialItems = [];
                 }
 
-                if (input.value && displayMode !== 'name') input.value = (input.value || '').toUpperCase();
+                if (input.value && displayMode === 'code') input.value = (input.value || '').toUpperCase();
 
                 let timer = null;
                 let lastItems = [];
@@ -300,6 +302,14 @@
                         if (displayMode === 'name') {
                             html = `<div class='item-suggest-option-code'>${item.name || ''}</div>`;
                             html += `<div class='item-suggest-option-name'>${(item.code || '').toUpperCase()}</div>`;
+                        } else if (displayMode === 'code-name') {
+                            html = `<div class='item-suggest-option-code'>${item.name || ''}</div>`;
+                            const sub = [];
+                            if (item.code) sub.push((item.code || '').toUpperCase());
+                            if (!mobile && showCategory && (item.item_category_name || item.item_category)) {
+                                sub.push(item.item_category_name || item.item_category);
+                            }
+                            if (sub.length) html += `<div class='item-suggest-option-name'>${sub.join(" • ")}</div>`;
                         } else {
                             html = `<div class='item-suggest-option-code'>${(item.code || '').toUpperCase()}</div>`;
                             if (!mobile) {
@@ -333,9 +343,11 @@
 
                     if (displayMode === 'name') {
                         text = item.name || item.code || '';
+                    } else if (displayMode === 'code-name') {
+                        text = item.name || item.code || '';
+                        if (!mobile && item.code && item.name) text += " — " + (item.code || '').toUpperCase();
                     } else {
                         text = item.code || '';
-                        if (!mobile && displayMode === "code-name" && item.name) text += " — " + item.name;
                         text = (text || '').toUpperCase();
                     }
 
@@ -428,7 +440,7 @@
                     const start = input.selectionStart;
                     const end = input.selectionEnd;
 
-                    if (displayMode !== 'name') {
+                    if (displayMode === 'code') {
                         const upper = (input.value || '').toUpperCase();
                         if (upper !== input.value) {
                             input.value = upper;
@@ -454,7 +466,7 @@
                 input.addEventListener("focus", () => {
                     if (isDisabled()) return;
 
-                    if (displayMode !== 'name') input.value = (input.value || '').toUpperCase();
+                    if (displayMode === 'code') input.value = (input.value || '').toUpperCase();
                     input.select && input.select();
 
                     if (initialItems.length && input.value.trim() === '') buildDropdown(initialItems);
@@ -496,7 +508,7 @@
                     setTimeout(() => {
                         if (isDisabled()) return;
                         input.focus();
-                        if (displayMode !== 'name') input.value = (input.value || '').toUpperCase();
+                        if (displayMode === 'code') input.value = (input.value || '').toUpperCase();
                         input.select && input.select();
 
                         if (initialItems.length) buildDropdown(initialItems);

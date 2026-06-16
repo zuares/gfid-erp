@@ -74,6 +74,43 @@ if (!function_exists('toNumber')) {
 
 }
 
+if (!function_exists('po_order_type_label')) {
+    /**
+     * Kembalikan label user-friendly untuk order_type Purchase Order.
+     * @param string|null $type
+     * @param bool $withIcon  Sertakan emoji di depan label
+     */
+    function po_order_type_label(?string $type, bool $withIcon = false): string
+    {
+        $map = [
+            'material'     => ['label' => 'Bahan Baku',  'icon' => '🧵'],
+            'finished_good'=> ['label' => 'Barang Jadi', 'icon' => '👕'],
+            'packing'      => ['label' => 'Packing',     'icon' => '📦'],
+            'asset'        => ['label' => 'Aset',        'icon' => '🏭'],
+            'service'      => ['label' => 'Service',     'icon' => '🔧'],
+            'jasa'         => ['label' => 'Jasa',        'icon' => '🤝'],
+            'lainnya'      => ['label' => 'Lainnya',     'icon' => '📋'],
+        ];
+        $entry = $map[$type ?? ''] ?? ['label' => ucfirst((string) $type ?: '—'), 'icon' => '📄'];
+        return $withIcon ? $entry['icon'] . ' ' . $entry['label'] : $entry['label'];
+    }
+}
+
+if (!function_exists('received_status_label')) {
+    /**
+     * Label user-friendly untuk received_status di Purchase Order.
+     */
+    function received_status_label(?string $status): string
+    {
+        return match ($status) {
+            'not_received'  => 'Belum Diterima',
+            'partial'       => 'Sebagian',
+            'fully_received'=> 'Lengkap',
+            default         => '—',
+        };
+    }
+}
+
 if (!function_exists('to_num')) {
     /**
      * Convert string angka format ID/EN -> float.
@@ -117,5 +154,22 @@ if (!function_exists('to_num')) {
 
         // default (1234.56 atau 1234)
         return (float) $v;
+    }
+}
+
+if (!function_exists('pr_status_label')) {
+    /**
+     * Label user-friendly untuk status Purchase Request.
+     */
+    function pr_status_label(?string $status): string
+    {
+        return match ($status) {
+            'draft'     => 'Draft',
+            'approved'  => 'Approved',
+            'rejected'  => 'Ditolak',
+            'converted' => 'Converted',
+            'cancelled' => 'Dibatalkan',
+            default     => $status ?? '—',
+        };
     }
 }

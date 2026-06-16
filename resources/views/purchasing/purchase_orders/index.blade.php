@@ -2,6 +2,11 @@
 
 @section('title', 'Daftar Purchase Order')
 
+@php
+    $user = auth()->user();
+    $canSeeMoney = $user?->isOwner() ?? false;
+@endphp
+
 @push('head')
     <style>
         .page-wrap {
@@ -108,6 +113,46 @@
             color: #1d4ed8;
             border: 1px solid rgba(59, 130, 246, .5);
             white-space: nowrap;
+        }
+
+        /* PR-E: badge "Dari PR" di PO index */
+        .badge-pr-ref {
+            border-radius: 999px;
+            font-size: .62rem;
+            padding: .04rem .42rem;
+            margin-left: .2rem;
+            background: rgba(99,102,241,.08);
+            color: #4f46e5;
+            border: 1px solid rgba(99,102,241,.4);
+            white-space: nowrap;
+            text-decoration: none;
+            display: inline-block;
+        }
+        .badge-pr-ref:hover { background: rgba(99,102,241,.16); color: #4f46e5; }
+
+        /* received_status badge */
+        .badge-rcv {
+            border-radius: 999px;
+            font-size: .65rem;
+            padding: .05rem .45rem;
+            border: 1px solid transparent;
+            white-space: nowrap;
+            display: inline-block;
+        }
+        .badge-rcv-none {
+            background: rgba(148,163,184,.08);
+            color: #94a3b8;
+            border-color: rgba(148,163,184,.4);
+        }
+        .badge-rcv-partial {
+            background: rgba(234,179,8,.10);
+            color: #a16207;
+            border-color: rgba(234,179,8,.5);
+        }
+        .badge-rcv-full {
+            background: rgba(22,163,74,.10);
+            color: #15803d;
+            border-color: rgba(22,163,74,.5);
         }
 
         .row-draft {
@@ -272,28 +317,28 @@
                         </select>
                     </div>
 
-                    {{-- NEW: filter bayar (opsional, kalau kamu belum implement di controller, aman tetap tampil.
-                         Kalau mau aktif beneran, tinggal tambah where di controller index(). --}}
-                    <div class="col-md-2 col-6">
-                        <label class="form-label small">Status Bayar</label>
-                        <select name="pay_status" class="form-select form-select-sm">
-                            @foreach ($payStatusOptions as $value => $label)
-                                <option value="{{ $value }}" @selected(request('pay_status') === $value)>{{ $label }}
-                                </option>
-                            @endforeach
-                        </select>
-                    </div>
+                    @if ($canSeeMoney)
+                        <div class="col-md-2 col-6">
+                            <label class="form-label small">Status Bayar</label>
+                            <select name="pay_status" class="form-select form-select-sm">
+                                @foreach ($payStatusOptions as $value => $label)
+                                    <option value="{{ $value }}" @selected(request('pay_status') === $value)>{{ $label }}
+                                    </option>
+                                @endforeach
+                            </select>
+                        </div>
+                    @endif
 
                     <div class="col-md-2 col-6">
                         <label class="form-label small">Dari</label>
-                        <input type="date" name="from_date" value="{{ request('from_date') }}"
-                            class="form-control form-control-sm" />
+                        <input type="text" name="from_date" value="{{ request('from_date') }}"
+                            class="form-control form-control-sm gf-date-input" data-gf-date autocomplete="off" />
                     </div>
 
                     <div class="col-md-2 col-6">
                         <label class="form-label small">Sampai</label>
-                        <input type="date" name="to_date" value="{{ request('to_date') }}"
-                            class="form-control form-control-sm" />
+                        <input type="text" name="to_date" value="{{ request('to_date') }}"
+                            class="form-control form-control-sm gf-date-input" data-gf-date autocomplete="off" />
                     </div>
 
                     <div class="col-md-1 col-12">
@@ -362,14 +407,17 @@
                     <thead>
                         <tr>
                             <th class="text-center" style="width: 4%;">#</th>
-                            <th style="width: 12%;">Tanggal</th>
-                            <th style="width: 14%;">Kode</th>
+                            <th style="width: 11%;">Tanggal</th>
+                            <th style="width: 13%;">Kode</th>
                             <th>Supplier</th>
-                            <th style="width: 14%;">Bayar</th>
-                            <th style="width: 14%;" class="text-end">Grand Total</th>
+                            <th style="width: 10%;">Jenis</th>
+                            @if ($canSeeMoney)
+                                <th style="width: 13%;">Bayar</th>
+                                <th style="width: 13%;" class="text-end">Grand Total</th>
+                            @endif
                             <th style="width: 12%;">Status</th>
-                            <th style="width: 12%;">Approved by</th>
-                            <th style="width: 12%;" class="text-end">Aksi</th>
+                            <th style="width: 10%;">Approved by</th>
+                            <th style="width: 10%;" class="text-end">Aksi</th>
                         </tr>
                     </thead>
                     <tbody>
@@ -407,29 +455,52 @@
 
                                 <td>{{ optional($order->supplier)->name ?? '—' }}</td>
 
-                                {{-- NEW: bayar --}}
                                 <td>
-                                    <div class="d-flex flex-column gap-1">
-                                        <div>
-                                            <span class="{{ $payBadgeClass }}">{{ strtoupper($ps) }}</span>
-                                            @if (!empty($order->due_date))
-                                                <span class="text-muted small mono ms-1">JT:
-                                                    {{ id_date($order->due_date) }}</span>
-                                            @endif
-                                        </div>
-                                        <div class="text-muted small mono">
-                                            Paid {{ rupiah($paid) }} • Sisa {{ rupiah($bal) }}
-                                        </div>
-                                    </div>
+                                    <span class="small text-muted">{{ po_order_type_label($order->order_type) }}</span>
                                 </td>
 
-                                <td class="text-end mono">{{ rupiah($order->grand_total) }}</td>
+                                @if ($canSeeMoney)
+                                    <td>
+                                        <div class="d-flex flex-column gap-1">
+                                            <div>
+                                                <span class="{{ $payBadgeClass }}">{{ strtoupper($ps) }}</span>
+                                                @if (!empty($order->due_date))
+                                                    <span class="text-muted small mono ms-1">JT:
+                                                        {{ id_date($order->due_date) }}</span>
+                                                @endif
+                                            </div>
+                                            <div class="text-muted small mono">
+                                                Paid {{ rupiah($paid) }} • Sisa {{ rupiah($bal) }}
+                                            </div>
+                                        </div>
+                                    </td>
+
+                                    <td class="text-end mono">{{ rupiah($order->grand_total) }}</td>
+                                @endif
 
                                 <td>
                                     <span class="{{ $poBadgeClass }}">{{ strtoupper($order->status) }}</span>
+                                    @if (!empty($order->purchase_request_id))
+                                        @if (\Illuminate\Support\Facades\Route::has('purchasing.purchase_requests.show'))
+                                            <a href="{{ route('purchasing.purchase_requests.show', $order->purchase_request_id) }}"
+                                                class="badge-pr-ref" title="Dibuat dari Purchase Request">Dari PR</a>
+                                        @else
+                                            <span class="badge-pr-ref">Dari PR</span>
+                                        @endif
+                                    @endif
                                     @if ($grnCount > 0)
-                                        <span class="badge-grn" title="{{ $grnCount }} GRN untuk PO ini">GRN
-                                            x{{ $grnCount }}</span>
+                                        <span class="badge-grn" title="{{ $grnCount }} GRN untuk PO ini">GRN x{{ $grnCount }}</span>
+                                    @endif
+                                    @php
+                                        $rcv = $order->received_status ?? 'not_received';
+                                        $rcvClass = match($rcv) {
+                                            'fully_received' => 'badge-rcv badge-rcv-full',
+                                            'partial'        => 'badge-rcv badge-rcv-partial',
+                                            default          => 'badge-rcv badge-rcv-none',
+                                        };
+                                    @endphp
+                                    @if ($rcv !== 'not_received')
+                                        <br><span class="{{ $rcvClass }} mt-1">{{ received_status_label($rcv) }}</span>
                                     @endif
                                 </td>
 
@@ -453,7 +524,7 @@
                             </tr>
                         @empty
                             <tr>
-                                <td colspan="9" class="text-center text-muted py-3">Belum ada Purchase Order.</td>
+                                <td colspan="{{ $canSeeMoney ? 10 : 8 }}" class="text-center text-muted py-3">Belum ada Purchase Order.</td>
                             </tr>
                         @endforelse
                     </tbody>
@@ -499,38 +570,61 @@
                                 @if ($order->supplier)
                                     <span>{{ $order->supplier->name }}</span>
                                 @endif
+                                <span class="text-muted">· {{ po_order_type_label($order->order_type) }}</span>
                             </div>
                         </div>
 
                         <div class="text-end">
                             <span class="{{ $poBadgeClass }}">{{ strtoupper($order->status) }}</span>
+                            @if (!empty($order->purchase_request_id))
+                                <div class="mt-1">
+                                    @if (\Illuminate\Support\Facades\Route::has('purchasing.purchase_requests.show'))
+                                        <a href="{{ route('purchasing.purchase_requests.show', $order->purchase_request_id) }}"
+                                            class="badge-pr-ref">Dari PR</a>
+                                    @else
+                                        <span class="badge-pr-ref">Dari PR</span>
+                                    @endif
+                                </div>
+                            @endif
                             @if ($grnCount > 0)
                                 <div class="mt-1"><span class="badge-grn">GRN x{{ $grnCount }}</span></div>
                             @endif
-                        </div>
-                    </div>
-
-                    {{-- payment status --}}
-                    <div class="d-flex justify-content-between align-items-center mt-2">
-                        <div class="text-muted meta">Bayar</div>
-                        <div class="text-end">
-                            <span class="{{ $payBadgeClass }}">{{ strtoupper($ps) }}</span>
-                            @if (!empty($order->due_date))
-                                <div class="text-muted meta mono mt-1">JT: {{ id_date($order->due_date) }}</div>
+                            @php
+                                $rcv = $order->received_status ?? 'not_received';
+                                $rcvClass = match($rcv) {
+                                    'fully_received' => 'badge-rcv badge-rcv-full',
+                                    'partial'        => 'badge-rcv badge-rcv-partial',
+                                    default          => 'badge-rcv badge-rcv-none',
+                                };
+                            @endphp
+                            @if ($rcv !== 'not_received')
+                                <div class="mt-1"><span class="{{ $rcvClass }}">{{ received_status_label($rcv) }}</span></div>
                             @endif
                         </div>
                     </div>
 
-                    <div class="d-flex justify-content-between align-items-center mt-2">
-                        <div>
-                            <div class="text-muted meta mb-1">Grand Total</div>
-                            <div class="amount mono">{{ rupiah($order->grand_total) }}</div>
+                    @if ($canSeeMoney)
+                        <div class="d-flex justify-content-between align-items-center mt-2">
+                            <div class="text-muted meta">Bayar</div>
+                            <div class="text-end">
+                                <span class="{{ $payBadgeClass }}">{{ strtoupper($ps) }}</span>
+                                @if (!empty($order->due_date))
+                                    <div class="text-muted meta mono mt-1">JT: {{ id_date($order->due_date) }}</div>
+                                @endif
+                            </div>
                         </div>
-                        <div class="text-end">
-                            <div class="text-muted meta mb-1">Sisa</div>
-                            <div class="amount mono fw-semibold">{{ rupiah($bal) }}</div>
+
+                        <div class="d-flex justify-content-between align-items-center mt-2">
+                            <div>
+                                <div class="text-muted meta mb-1">Grand Total</div>
+                                <div class="amount mono">{{ rupiah($order->grand_total) }}</div>
+                            </div>
+                            <div class="text-end">
+                                <div class="text-muted meta mb-1">Sisa</div>
+                                <div class="amount mono fw-semibold">{{ rupiah($bal) }}</div>
+                            </div>
                         </div>
-                    </div>
+                    @endif
 
                     <div class="d-flex justify-content-end gap-1 mt-2 actions">
                         <a href="{{ route('purchasing.purchase_orders.show', $order->id) }}"

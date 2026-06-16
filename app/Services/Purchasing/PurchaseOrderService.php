@@ -31,7 +31,11 @@ class PurchaseOrderService
             $payload = $this->onlyHeaderFields($payload);
 
             if (empty($payload['code'] ?? null)) {
-                $payload['code'] = CodeGenerator::generate('PO');
+                $suppCode = DB::table('suppliers')
+                    ->where('id', (int) ($payload['supplier_id'] ?? 0))
+                    ->value('code');
+                $prefix = $suppCode ? 'PO-' . strtoupper($suppCode) : 'PO';
+                $payload['code'] = CodeGenerator::make($prefix);
             }
 
             // normalize numbers

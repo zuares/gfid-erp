@@ -295,8 +295,8 @@
                         item.item_category ??
                         '';
 
-                    // display di input (tidak dikirim ke server)
-                    input.value = `${item.code}${displayName ? ' — ' + displayName : ''}`;
+                    // display di input (tidak dikirim ke server): nama barang jadi fokus utama
+                    input.value = `${displayName || item.code}${displayName && item.code ? ' — ' + item.code : ''}`;
 
                     // hidden id
                     if (hiddenId) {
@@ -355,9 +355,9 @@
                         btn.className = 'item-suggest-option list-group-item list-group-item-action';
 
                         btn.innerHTML = `
-                            <div class="item-suggest-option-code">${item.code}</div>
+                            <div class="item-suggest-option-code">${displayName || item.code || ''}</div>
                             <div class="item-suggest-option-name">
-                                ${displayName}
+                                ${item.code || ''}
                                 ${
                                     categoryName
                                         ? ' • <span class="text-muted">' + categoryName + '</span>'

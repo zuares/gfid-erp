@@ -11,6 +11,7 @@ use App\Models\Supplier;
 use App\Models\Warehouse;
 use App\Services\Purchasing\GoodsReceiptService;
 use Illuminate\Http\Request;
+use Illuminate\Support\Facades\DB;
 use Illuminate\Validation\ValidationException;
 
 class PurchaseReceiptController extends Controller
@@ -122,8 +123,14 @@ class PurchaseReceiptController extends Controller
                     $q->where('order_type', $selectedOrderType);
                 }
             })
-            ->orderBy('purchase_order_id')
-            ->orderBy('id')
+            ->orderByDesc(
+                PurchaseOrder::query()
+                    ->select('date')
+                    ->whereColumn('purchase_orders.id', 'purchase_order_lines.purchase_order_id')
+                    ->limit(1)
+            )
+            ->orderByDesc('purchase_order_id')
+            ->orderByDesc('id')
             ->get();
 
         $lines->each(function (PurchaseOrderLine $line) {
@@ -242,6 +249,8 @@ class PurchaseReceiptController extends Controller
             'warehouse',
             'lines.item',
             'order',
+            'qc.checkedBy',
+            'qc.purchaseReturn',
         ]);
 
         return view('purchasing.purchase_receipts.show', [
@@ -285,10 +294,10 @@ class PurchaseReceiptController extends Controller
                 ->with('error', 'Hanya GRN draft yang bisa diupdate.');
         }
 
-        $data = $this->validateHeader($request);
+        $data = $this->validateHeader($request, $purchase_receipt);
 
         // edit: tidak wajib checkbox selected (anggap baris qty>0 dianggap masuk)
-        $lines = $this->buildLinesFromRequest($request, requireSelected: false);
+        $lines = $this->buildLinesFromRequest($request, requireSelected: false, existingReceipt: $purchase_receipt);
 
         if (empty($lines)) {
             return back()
@@ -350,7 +359,7 @@ class PurchaseReceiptController extends Controller
     /**
      * Validasi header GRN (tanpa array detail).
      */
-    protected function validateHeader(Request $request): array
+    protected function validateHeader(Request $request, ?PurchaseReceipt $existingReceipt = null): array
     {
         $data = $request->validate([
             'date' => ['required', 'date'],
@@ -362,12 +371,19 @@ class PurchaseReceiptController extends Controller
             'tax_percent' => ['nullable', 'string'],
             'shipping_cost' => ['nullable', 'string'],
             'notes' => ['nullable', 'string'],
+            'surat_jalan_no' => ['nullable', 'string', 'max:100'],
         ]);
 
         // normalize numerics (Indonesia-friendly)
         $data['discount'] = $this->num($data['discount'] ?? 0);
         $data['tax_percent'] = $this->num($data['tax_percent'] ?? 0);
         $data['shipping_cost'] = $this->num($data['shipping_cost'] ?? 0);
+
+        if (!$this->canSeeMoney($request)) {
+            $data['discount'] = $existingReceipt ? (float) ($existingReceipt->discount ?? 0) : 0.0;
+            $data['tax_percent'] = $existingReceipt ? (float) ($existingReceipt->tax_percent ?? 0) : 0.0;
+            $data['shipping_cost'] = $existingReceipt ? (float) ($existingReceipt->shipping_cost ?? 0) : 0.0;
+        }
 
         $data['supplier_id'] = (int) $data['supplier_id'];
         $data['warehouse_id'] = (int) $data['warehouse_id'];
@@ -384,7 +400,7 @@ class PurchaseReceiptController extends Controller
      * Input yang dipakai:
      * - po_line_id[], item_id[], qty_received[], qty_reject[], unit_price[], unit[], line_notes[], selected[index]
      */
-    protected function buildLinesFromRequest(Request $request, bool $requireSelected): array
+    protected function buildLinesFromRequest(Request $request, bool $requireSelected, ?PurchaseReceipt $existingReceipt = null): array
     {
         $poLineIds = $request->input('po_line_id', []);
         $itemIds = $request->input('item_id', []);
@@ -399,14 +415,49 @@ class PurchaseReceiptController extends Controller
             throw ValidationException::withMessages(['lines' => 'Detail item tidak ditemukan.']);
         }
 
-        // Preload PO qty untuk validasi (hindari N+1)
+        // Preload PO qty + harga untuk validasi (hindari N+1)
         $poQtyMap = [];
+        $poPriceMap = [];
+        $cumulativeReceivedMap = []; // total qty sudah diterima dari GRN lain (cumulative)
+
         if (is_array($poLineIds) && count($poLineIds) > 0) {
-            $ids = collect($poLineIds)->filter()->unique()->values();
+            $ids = collect($poLineIds)->filter()->map(fn($v) => (int) $v)->unique()->values();
             if ($ids->count()) {
-                $poQtyMap = PurchaseOrderLine::whereIn('id', $ids)
-                    ->pluck('qty', 'id')
+                $poLines = PurchaseOrderLine::whereIn('id', $ids)
+                    ->get(['id', 'qty', 'unit_price']);
+                $poQtyMap   = $poLines->pluck('qty', 'id')->toArray();
+                $poPriceMap = $poLines->pluck('unit_price', 'id')->toArray();
+
+                // ✅ Cumulative: total qty_received + qty_reject dari GRN lain untuk po_line_id ini
+                $cumulativeQuery = \DB::table('purchase_receipt_lines as prl')
+                    ->join('purchase_receipts as pr', 'pr.id', '=', 'prl.purchase_receipt_id')
+                    ->whereIn('prl.purchase_order_line_id', $ids->all())
+                    ->whereIn('pr.status', ['draft', 'posted']);
+
+                // Kalau edit: kecualikan GRN yang sedang diedit
+                if ($existingReceipt) {
+                    $cumulativeQuery->where('pr.id', '!=', (int) $existingReceipt->id);
+                }
+
+                $cumulativeReceivedMap = $cumulativeQuery
+                    ->groupBy('prl.purchase_order_line_id')
+                    ->selectRaw('prl.purchase_order_line_id, SUM(prl.qty_received + prl.qty_reject) as total_received')
+                    ->pluck('total_received', 'purchase_order_line_id')
+                    ->map(fn($v) => (float) $v)
                     ->toArray();
+            }
+        }
+
+        $existingPriceByItem = [];
+        if ($existingReceipt) {
+            $existingReceipt->loadMissing('lines');
+            foreach ($existingReceipt->lines as $line) {
+                $itemId = (int) ($line->item_id ?? 0);
+                if ($itemId <= 0) {
+                    continue;
+                }
+                $existingPriceByItem[$itemId] ??= [];
+                $existingPriceByItem[$itemId][] = (float) ($line->unit_price ?? 0);
             }
         }
 
@@ -436,16 +487,31 @@ class PurchaseReceiptController extends Controller
                 continue;
             }
 
-            $unitPrice = $this->num($unitPrices[$i] ?? 0);
-
             $poLineId = $poLineIds[$i] ?? null;
             $poLineId = ($poLineId === null || $poLineId === '') ? null : (int) $poLineId;
 
+            $unitPrice = $this->num($unitPrices[$i] ?? 0);
+            if (!$this->canSeeMoney($request)) {
+                if ($poLineId && array_key_exists($poLineId, $poPriceMap)) {
+                    $unitPrice = (float) $poPriceMap[$poLineId];
+                } elseif (!empty($existingPriceByItem[$itemId])) {
+                    $unitPrice = (float) array_shift($existingPriceByItem[$itemId]);
+                } else {
+                    $unitPrice = 0.0;
+                }
+            }
+
             if ($poLineId) {
-                $poQty = (float) ($poQtyMap[$poLineId] ?? 0);
-                if ($poQty > 0 && ($qtyRec + $qtyRej) > $poQty + 0.0001) {
-                    $errors["qty_received.$i"] = "Qty diterima + reject tidak boleh melebihi Qty PO ($poQty).";
-                    $errors["qty_reject.$i"] = "Qty diterima + reject tidak boleh melebihi Qty PO ($poQty).";
+                $poQty           = (float) ($poQtyMap[$poLineId] ?? 0);
+                $alreadyReceived = (float) ($cumulativeReceivedMap[$poLineId] ?? 0);
+                $remaining       = max(0, round($poQty - $alreadyReceived, 4));
+
+                if ($poQty > 0 && ($qtyRec + $qtyRej) > $remaining + 0.0001) {
+                    $msg = $alreadyReceived > 0
+                        ? "Qty melebihi sisa PO. PO: {$poQty}, sudah diterima: {$alreadyReceived}, sisa: {$remaining}."
+                        : "Qty diterima + reject tidak boleh melebihi Qty PO ({$poQty}).";
+                    $errors["qty_received.$i"] = $msg;
+                    $errors["qty_reject.$i"]   = $msg;
                 }
             }
 
@@ -549,5 +615,11 @@ class PurchaseReceiptController extends Controller
 
         $v = strtolower(trim((string) $value));
         return in_array($v, ['material', 'finished_good', 'packing'], true) ? $v : null;
+    }
+
+    protected function canSeeMoney(?Request $request = null): bool
+    {
+        $user = $request?->user() ?: auth()->user();
+        return $user && method_exists($user, 'isOwner') && $user->isOwner();
     }
 }

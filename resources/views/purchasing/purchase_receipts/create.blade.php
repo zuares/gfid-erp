@@ -51,6 +51,55 @@
             color: var(--muted);
         }
 
+        .grn-create-page .quick-filter-panel {
+            border-radius: 14px;
+            border: 1px solid var(--line);
+            background: color-mix(in srgb, var(--card) 96%, var(--bg) 4%);
+            padding: .75rem;
+        }
+
+        .grn-create-page .quick-filter-title {
+            font-size: .78rem;
+            font-weight: 800;
+            letter-spacing: .08em;
+            text-transform: uppercase;
+            color: var(--muted);
+        }
+
+        .grn-create-page .quick-stat {
+            border: 1px solid var(--line);
+            border-radius: 10px;
+            padding: .48rem .65rem;
+            background: rgba(148, 163, 184, .07);
+            min-width: 120px;
+        }
+
+        .grn-create-page .quick-stat .lbl {
+            display: block;
+            font-size: .7rem;
+            color: var(--muted);
+            line-height: 1.1;
+        }
+
+        .grn-create-page .quick-stat .val {
+            display: block;
+            font-size: .92rem;
+            font-weight: 800;
+            line-height: 1.2;
+        }
+
+        .grn-create-page .row-hidden-by-filter {
+            display: none !important;
+        }
+
+        .grn-create-page .filter-empty-state {
+            border-top: 1px solid var(--line);
+            color: var(--muted);
+            padding: 1rem;
+            text-align: center;
+            font-size: .88rem;
+        }
+
         @media (max-width: 767.98px) {
             .grn-create-page .page-header {
                 flex-direction: column;
@@ -229,6 +278,11 @@
             .supplier-helper {
                 text-align: center;
             }
+
+            .grn-create-page .quick-stat {
+                min-width: 0;
+                flex: 1 1 0;
+            }
         }
     </style>
 @endpush
@@ -236,6 +290,8 @@
 @section('content')
     @php
         /** @var \App\Models\PurchaseOrder|null $order */
+        $u = auth()->user();
+        $canSeeMoney = $u?->isOwner() ?? false;   // hanya owner
         $hasOrder = isset($order) && $order?->id;
 
         $defaultDate = old('date', now()->toDateString());
@@ -354,64 +410,69 @@
 
             {{-- FILTER (GET) --}}
             @unless ($hasOrder)
-                <form method="GET" action="{{ route('purchasing.purchase_receipts.create') }}" class="card filter-card mb-3">
-                    <div class="card-header py-2 d-flex justify-content-between align-items-center flex-wrap gap-2">
-                        <div class="d-flex align-items-center gap-2">
-                            <span class="fw-semibold small text-uppercase">Filter</span>
-
-                            <span class="badge bg-light text-dark border small">
-                                Aktif:
-                                <strong>{{ $selectedSupplier ? $selectedSupplier->code . ' — ' . $selectedSupplier->name : 'Semua Supplier' }}</strong>
-                                • <strong>{{ $typeLabel }}</strong>
-                            </span>
-                        </div>
-                    </div>
-
+                <div class="card filter-card mb-3">
                     <div class="card-body small">
-                        <div class="row g-3 align-items-end">
-                            <div class="col-12 col-md-6">
-                                <label for="supplier_filter" class="form-label">Supplier</label>
-                                <select name="supplier_id" id="supplier_filter" class="form-select form-select-sm">
-                                    <option value="">Semua Supplier</option>
-                                    @foreach ($suppliers as $sup)
-                                        <option value="{{ $sup->id }}" @selected((string) $selectedSupplierId === (string) $sup->id)>
-                                            {{ $sup->code }} — {{ $sup->name }}
-                                        </option>
-                                    @endforeach
-                                </select>
-                            </div>
-
-                            {{-- ORDER TYPE AUTO + DISABLED (tetap dikirim pakai hidden) --}}
-                            <div class="col-12 col-md-6">
-                                <label class="form-label">Jenis (Otomatis)</label>
-                                <input type="hidden" name="order_type" value="{{ $selectedOrderType }}">
-                                <select class="form-select form-select-sm" disabled>
-                                    <option value="material" @selected($selectedOrderType === 'material')>Bahan Baku (Material)</option>
-                                    <option value="finished_good" @selected($selectedOrderType === 'finished_good')>Barang Jadi (FG)</option>
-                                </select>
-                                <div class="form-text small text-muted">
-                                    Otomatis mengikuti gudang default:
-                                    <strong>Material → RM</strong>, <strong>FG → WH-RTS</strong>.
+                        <div class="quick-filter-panel">
+                            <div class="d-flex justify-content-between align-items-center flex-wrap gap-2 mb-2">
+                                <div>
+                                    <div class="quick-filter-title">Cari Barang PO</div>
+                                    <div class="text-muted">Ketik kode/nama barang atau nomor PO. Hasil langsung tersaring.</div>
+                                </div>
+                                <div class="d-flex gap-2 flex-wrap">
+                                    <a href="{{ route('purchasing.purchase_receipts.create') }}"
+                                        class="btn btn-outline-secondary btn-sm">Reset</a>
+                                    <a href="{{ route('purchasing.purchase_receipts.index') }}"
+                                        class="btn btn-outline-secondary btn-sm">Daftar GRN</a>
                                 </div>
                             </div>
 
-                            <div class="col-6 col-md-3">
-                                <label class="form-label d-none d-md-block">&nbsp;</label>
-                                <button type="submit" class="btn btn-primary btn-sm w-100">Terapkan Filter</button>
+                            <div class="row g-2 align-items-end">
+                                <div class="col-12 col-lg-5">
+                                    <label for="grn-realtime-search" class="form-label mb-1">Cari</label>
+                                    <div class="input-group input-group-sm">
+                                        <span class="input-group-text bg-white"><i class="bi bi-search text-muted"></i></span>
+                                        <input type="text" id="grn-realtime-search" class="form-control"
+                                            placeholder="Kode barang, nama barang, PO..." autocomplete="off">
+                                    </div>
+                                </div>
+
+                                <div class="col-12 col-md-6 col-lg-4">
+                                    <label for="grn-realtime-supplier" class="form-label mb-1">Supplier</label>
+                                    <select id="grn-realtime-supplier" class="form-select form-select-sm">
+                                        <option value="">Semua Supplier</option>
+                                        @foreach ($suppliers as $sup)
+                                            <option value="{{ $sup->id }}" @selected((string) $selectedSupplierId === (string) $sup->id)>
+                                                {{ $sup->code }} — {{ $sup->name }}
+                                            </option>
+                                        @endforeach
+                                    </select>
+                                </div>
+
+                                <div class="col-12 col-md-6 col-lg-3">
+                                    <label class="form-label mb-1">Jenis</label>
+                                    <div class="form-control form-control-sm bg-light-subtle">
+                                        <span class="badge-type {{ $typeCss }}">{{ $typeLabel }}</span>
+                                    </div>
+                                </div>
                             </div>
 
-                            <div class="col-6 col-md-3">
-                                <label class="form-label d-none d-md-block">&nbsp;</label>
-                                <a href="{{ route('purchasing.purchase_receipts.create') }}"
-                                    class="btn btn-outline-secondary btn-sm w-100">Reset</a>
+                            <div class="d-flex flex-wrap gap-2 mt-3">
+                                <div class="quick-stat">
+                                    <span class="lbl">Baris Tampil</span>
+                                    <span class="val mono" id="visibleRowsCount">0</span>
+                                </div>
+                                <div class="quick-stat">
+                                    <span class="lbl">Dipilih</span>
+                                    <span class="val mono"><span id="selectedRowsCount">0</span> item</span>
+                                </div>
+                                <div class="quick-stat flex-grow-1">
+                                    <span class="lbl">PO Dipilih</span>
+                                    <span class="val mono" id="selectedPoText">-</span>
+                                </div>
                             </div>
-                        </div>
-
-                        <div class="small text-muted mt-2 supplier-helper text-md-start">
-                            Sistem menampilkan item dari PO berstatus <span class="fw-semibold">approved</span>.
                         </div>
                     </div>
-                </form>
+                </div>
             @endunless
 
             {{-- FORM GRN --}}
@@ -434,9 +495,12 @@
                         <div class="row g-3 align-items-end">
                             <div class="col-12 col-md-4">
                                 <label for="date" class="form-label small text-uppercase">Tanggal</label>
-                                <input type="hidden" name="date" value="{{ $defaultDate }}">
-                                <input type="date" id="date" class="form-control form-control-sm"
-                                    value="{{ $defaultDate }}" readonly>
+                                <input type="text" name="date" id="date"
+                                    class="form-control form-control-sm gf-date-input @error('date') is-invalid @enderror"
+                                    value="{{ $defaultDate }}" data-gf-date autocomplete="off">
+                                @error('date')
+                                    <div class="invalid-feedback">{{ $message }}</div>
+                                @enderror
                             </div>
 
                             <div class="col-12 col-md-4">
@@ -469,6 +533,29 @@
                                     <span id="totalReceivedDisplay">0,00</span>
                                 </div>
                             </div>
+
+                            <div class="col-12 col-md-4">
+                                <label for="surat_jalan_no" class="form-label small text-uppercase">No. Surat Jalan</label>
+                                <input type="text" name="surat_jalan_no" id="surat_jalan_no"
+                                    class="form-control form-control-sm @error('surat_jalan_no') is-invalid @enderror"
+                                    value="{{ old('surat_jalan_no') }}"
+                                    placeholder="Kosongkan untuk auto-generate (SJ-...)"
+                                    maxlength="100">
+                                @error('surat_jalan_no')
+                                    <div class="invalid-feedback">{{ $message }}</div>
+                                @enderror
+                            </div>
+
+                            <div class="col-12 col-md-4">
+                                <label for="notes" class="form-label small text-uppercase">Catatan</label>
+                                <input type="text" name="notes" id="notes"
+                                    class="form-control form-control-sm @error('notes') is-invalid @enderror"
+                                    value="{{ old('notes') }}"
+                                    placeholder="Opsional">
+                                @error('notes')
+                                    <div class="invalid-feedback">{{ $message }}</div>
+                                @enderror
+                            </div>
                         </div>
                     </div>
                 </div>
@@ -492,7 +579,9 @@
                                         <th class="text-end">Qty PO</th>
                                         <th class="text-end">Qty Diterima</th>
                                         <th class="text-end">Qty Reject</th>
-                                        <th class="text-end col-price">Harga/Unit</th>
+                                        @if ($canSeeMoney)
+                                            <th class="text-end col-price">Harga/Unit</th>
+                                        @endif
                                         <th class="text-center">Unit</th>
                                     </tr>
                                 </thead>
@@ -510,10 +599,21 @@
                                             $hasDraftGrn = (bool) ($poLine->has_draft_grn ?? false);
                                             $poId = $po?->id;
                                             $poCode = $po?->code;
+                                            $supplier = $po?->supplier ?? null;
+                                            $supplierId = $supplier?->id ?? '';
+                                            $supplierLabel = trim(($supplier?->code ? $supplier->code . ' ' : '') . ($supplier?->name ?? ''));
+                                            $itemSearchText = trim(
+                                                ($poLine->item?->code ?? '') . ' ' .
+                                                ($poLine->item?->name ?? '') . ' ' .
+                                                ($poCode ?? '') . ' ' .
+                                                $supplierLabel
+                                            );
                                         @endphp
 
                                         <tr data-line-index="{{ $idx }}" data-qty-po="{{ $poLine->qty }}"
                                             data-po-id="{{ $poId }}" data-po-code="{{ $poCode }}"
+                                            data-supplier-id="{{ $supplierId }}"
+                                            data-search="{{ e(mb_strtolower($itemSearchText)) }}"
                                             class="{{ $hasDraftGrn ? 'line-muted' : '' }}">
                                             <td class="text-center" data-label="Pilih">
                                                 @if ($hasDraftGrn)
@@ -544,8 +644,10 @@
 
                                                 <input type="hidden" name="po_line_id[]" value="{{ $poLine->id }}">
                                                 <input type="hidden" name="item_id[]" value="{{ $poLine->item_id }}">
-                                                <input type="hidden" name="unit_price[]"
-                                                    value="{{ $poLine->unit_price }}">
+                                                @if ($canSeeMoney)
+                                                    <input type="hidden" name="unit_price[]"
+                                                        value="{{ $poLine->unit_price }}">
+                                                @endif
                                                 <input type="hidden" name="unit[]"
                                                     value="{{ optional($poLine->item)->unit ?? '' }}">
                                             </td>
@@ -555,10 +657,11 @@
                                             </td>
 
                                             <td class="text-end" data-label="Qty Diterima">
-                                                <input type="number" step="0.01" min="0"
+                                                <input type="text" inputmode="decimal"
                                                     name="qty_received[]"
                                                     class="form-control form-control-sm text-end mono qty-received-input"
                                                     value="{{ $oldQtyReceived }}" placeholder="0,00"
+                                                    autocomplete="off"
                                                     @if ($hasDraftGrn) disabled @endif>
                                                 <div class="invalid-feedback small">
                                                     Qty Diterima tidak boleh &lt; 0, &gt; Qty PO, atau membuat total &gt;
@@ -567,9 +670,10 @@
                                             </td>
 
                                             <td class="text-end" data-label="Qty Reject">
-                                                <input type="number" step="0.01" min="0" name="qty_reject[]"
+                                                <input type="text" inputmode="decimal" name="qty_reject[]"
                                                     class="form-control form-control-sm text-end mono qty-reject-input"
                                                     value="{{ $oldQtyReject }}" placeholder="0,00"
+                                                    autocomplete="off"
                                                     @if ($hasDraftGrn) disabled @endif>
                                                 <div class="invalid-feedback small">
                                                     Qty Reject tidak boleh &lt; 0, &gt; Qty PO, atau membuat total &gt; Qty
@@ -577,9 +681,11 @@
                                                 </div>
                                             </td>
 
-                                            <td class="text-end mono col-price" data-label="Harga/Unit">
-                                                {{ number_format($poLine->unit_price, 0, ',', '.') }}
-                                            </td>
+                                            @if ($canSeeMoney)
+                                                <td class="text-end mono col-price" data-label="Harga/Unit">
+                                                    {{ number_format($poLine->unit_price, 0, ',', '.') }}
+                                                </td>
+                                            @endif
 
                                             <td class="mono text-center" data-label="Unit">
                                                 {{ optional($poLine->item)->unit ?? '-' }}
@@ -587,7 +693,7 @@
                                         </tr>
                                     @empty
                                         <tr>
-                                            <td colspan="8" class="text-center text-muted py-4">
+                                            <td colspan="{{ $canSeeMoney ? 8 : 7 }}" class="text-center text-muted py-4">
                                                 @if (!$hasOrder && !$selectedSupplierId)
                                                     Tidak ada item dari Purchase Order berstatus approved.
                                                 @elseif (!$hasOrder && $selectedSupplierId)
@@ -600,6 +706,9 @@
                                     @endforelse
                                 </tbody>
                             </table>
+                        </div>
+                        <div id="filter-empty-state" class="filter-empty-state d-none">
+                            Tidak ada barang yang cocok dengan filter ini.
                         </div>
                     </div>
 
@@ -661,7 +770,17 @@
 
             function parseNumber(val) {
                 if (val === null || val === undefined) return 0;
-                if (typeof val === 'string') val = val.replace(',', '.');
+                if (typeof val !== 'string') return isNaN(val) ? 0 : Number(val);
+                val = val.trim().replace(/\s/g, '');
+                if (!val) return 0;
+                // Format Indo: titik = ribuan, koma = desimal  →  "1.234,67" atau "25,67"
+                if (val.includes(',')) {
+                    val = val.replace(/\./g, '').replace(',', '.');
+                } else if (/^\d{1,3}(\.\d{3}){2,}$/.test(val)) {
+                    // multi-grup titik tanpa koma: "1.234.567" → ribuan
+                    val = val.replace(/\./g, '');
+                }
+                // single ".XXX" tanpa koma diperlakukan sebagai desimal ("5.5", "25.67")
                 const n = parseFloat(val);
                 return isNaN(n) ? 0 : n;
             }
@@ -675,6 +794,80 @@
                 } catch (e) {
                     return (num || 0).toFixed(2);
                 }
+            }
+
+            function normalizeText(value) {
+                return String(value || '').trim().toLowerCase();
+            }
+
+            function rows() {
+                return Array.from(document.querySelectorAll('#grnLinesBody tr[data-line-index]'));
+            }
+
+            function isRowVisible(row) {
+                return !row.classList.contains('row-hidden-by-filter');
+            }
+
+            function updateVisibleNumbers() {
+                let visibleNo = 1;
+                rows().forEach(function(row) {
+                    const noCell = row.querySelector('td[data-label="#"]');
+                    if (!noCell) return;
+                    if (isRowVisible(row)) {
+                        noCell.textContent = visibleNo++;
+                    }
+                });
+
+                const visibleRowsCount = document.getElementById('visibleRowsCount');
+                if (visibleRowsCount) visibleRowsCount.textContent = String(visibleNo - 1);
+
+                const emptyState = document.getElementById('filter-empty-state');
+                if (emptyState) emptyState.classList.toggle('d-none', rows().length === 0 || visibleNo > 1);
+            }
+
+            function updateSelectionSummary() {
+                const selectedRows = rows().filter(function(row) {
+                    const cb = row.querySelector('.line-check');
+                    return cb && cb.checked;
+                });
+
+                const selectedRowsCount = document.getElementById('selectedRowsCount');
+                if (selectedRowsCount) selectedRowsCount.textContent = String(selectedRows.length);
+
+                const poCodes = Array.from(new Set(selectedRows.map(function(row) {
+                    return row.getAttribute('data-po-code') || '';
+                }).filter(Boolean)));
+
+                const selectedPoText = document.getElementById('selectedPoText');
+                if (selectedPoText) {
+                    if (poCodes.length === 0) {
+                        selectedPoText.textContent = '-';
+                    } else if (poCodes.length === 1) {
+                        selectedPoText.textContent = poCodes[0];
+                    } else {
+                        selectedPoText.textContent = poCodes.length + ' PO';
+                    }
+                }
+            }
+
+            function applyRealtimeFilter() {
+                const keyword = normalizeText(document.getElementById('grn-realtime-search')?.value);
+                const supplierId = String(document.getElementById('grn-realtime-supplier')?.value || '');
+
+                rows().forEach(function(row) {
+                    const haystack = row.getAttribute('data-search') || '';
+                    const rowSupplierId = String(row.getAttribute('data-supplier-id') || '');
+                    const matchKeyword = !keyword || haystack.includes(keyword);
+                    const matchSupplier = !supplierId || rowSupplierId === supplierId;
+
+                    row.classList.toggle('row-hidden-by-filter', !(matchKeyword && matchSupplier));
+                });
+
+                const checkAll = document.getElementById('checkAll');
+                if (checkAll) checkAll.checked = false;
+
+                updateVisibleNumbers();
+                updateSelectionSummary();
             }
 
             function setInvalid(input) {
@@ -738,6 +931,7 @@
 
                 const span = document.getElementById('totalReceivedDisplay');
                 if (span) span.textContent = formatIdNumber(total);
+                updateSelectionSummary();
             }
 
             function handleLineCheckboxChange(checkbox) {
@@ -948,7 +1142,10 @@
                 if (e.target.classList.contains('line-check')) handleLineCheckboxChange(e.target);
 
                 if (e.target.id === 'checkAll') {
-                    const all = document.querySelectorAll('.line-check');
+                    const all = rows()
+                        .filter(isRowVisible)
+                        .map(row => row.querySelector('.line-check'))
+                        .filter(Boolean);
                     all.forEach(function(cb) {
                         cb.checked = e.target.checked;
                         handleLineCheckboxChange(cb);
@@ -994,6 +1191,11 @@
                 const form = document.getElementById('grnForm');
                 const summaryEl = document.getElementById('confirmGrnSummary');
                 const modalEl = document.getElementById('confirmGrnModal');
+                const realtimeSearch = document.getElementById('grn-realtime-search');
+                const realtimeSupplier = document.getElementById('grn-realtime-supplier');
+
+                if (realtimeSearch) realtimeSearch.addEventListener('input', applyRealtimeFilter);
+                if (realtimeSupplier) realtimeSupplier.addEventListener('change', applyRealtimeFilter);
 
                 if (btnSubmit && summaryEl && modalEl && form && btnConfirmSubmit) {
                     btnSubmit.addEventListener('click', function(e) {
@@ -1037,6 +1239,7 @@
                 }
 
                 document.querySelectorAll('.line-check').forEach(cb => handleLineCheckboxChange(cb));
+                applyRealtimeFilter();
                 recalcTotalReceived();
             });
         })();

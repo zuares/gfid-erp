@@ -80,14 +80,41 @@
     ========================= */
     .flatpickr-calendar{
       z-index: 25000 !important; /* di atas modal/sidebar */
-      border-radius: 14px;
-      border: 1px solid rgba(148,163,184,.18);
-      box-shadow: 0 18px 48px rgba(15,23,42,.22);
+      border-radius: 14px !important;
+      border: 1px solid rgba(148,163,184,.22) !important;
+      box-shadow: 0 18px 48px rgba(15,23,42,.22) !important;
       overflow: hidden;
+      font-family: inherit;
     }
     .flatpickr-months .flatpickr-month,
     .flatpickr-weekdays{
       background: transparent;
+    }
+    .flatpickr-current-month .flatpickr-monthDropdown-months,
+    .flatpickr-current-month input.cur-year{
+      font-weight: 800;
+    }
+    .flatpickr-day{
+      border-radius: 9px;
+    }
+    .flatpickr-day.today{
+      border-color: rgba(59,130,246,.55);
+    }
+    .flatpickr-day.selected,
+    .flatpickr-day.startRange,
+    .flatpickr-day.endRange{
+      background: #2563eb;
+      border-color: #2563eb;
+      color: #fff;
+    }
+    input.gf-date-input,
+    input.flatpickr-input{
+      background-color: var(--card) !important;
+      cursor: pointer;
+    }
+    input.gf-date-input[readonly],
+    input.flatpickr-input[readonly]{
+      background-color: var(--card) !important;
     }
     body[data-theme="dark"] .flatpickr-calendar{
       box-shadow: 0 18px 48px rgba(0,0,0,.55);
@@ -263,7 +290,17 @@
         return {
           dateFormat: 'Y-m-d',
           allowInput: true,
-          disableMobile: true
+          disableMobile: true,
+          monthSelectorType: 'static',
+          nextArrow: '&rsaquo;',
+          prevArrow: '&lsaquo;',
+          locale: {
+            firstDayOfWeek: 1
+          },
+          onReady: function(selectedDates, dateStr, instance){
+            instance.input.classList.add('gf-date-input');
+            instance.calendarContainer.classList.add('gf-date-calendar');
+          }
         };
       }
 

@@ -85,6 +85,18 @@ class SewingReturnController extends Controller
      * SHOW
      * ============================================================
      */
+    public function print(SewingReturn $return): View
+    {
+        $return->load([
+            'warehouse',
+            'operator',
+            'pickup',
+            'lines.sewingPickupLine.bundle.finishedItem',
+        ]);
+
+        return view('production.sewing_returns.print', compact('return'));
+    }
+
     public function show(SewingReturn $return): View
     {
         $return->load([

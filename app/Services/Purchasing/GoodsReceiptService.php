@@ -6,6 +6,7 @@ use App\Helpers\CodeGenerator;
 use App\Models\Account;
 use App\Models\Item;
 use App\Models\Lot;
+use App\Models\PurchaseOrderLine;
 use App\Models\PurchaseReceipt;
 use App\Models\PurchaseReceiptLine;
 use App\Models\SupplierPrice;
@@ -32,7 +33,20 @@ class GoodsReceiptService
             unset($payload['lines']);
 
             if (empty($payload['code'] ?? null)) {
-                $payload['code'] = CodeGenerator::generate('GRN');
+                $suppCode = DB::table('suppliers')
+                    ->where('id', (int) ($payload['supplier_id'] ?? 0))
+                    ->value('code');
+                $prefix = $suppCode ? 'GRN-' . strtoupper($suppCode) : 'GRN';
+                $payload['code'] = CodeGenerator::make($prefix);
+            }
+
+            // Auto-generate surat_jalan_no jika user tidak isi manual
+            if (empty($payload['surat_jalan_no'] ?? null)) {
+                $suppCode = $suppCode ?? DB::table('suppliers')
+                    ->where('id', (int) ($payload['supplier_id'] ?? 0))
+                    ->value('code');
+                $sjPrefix = $suppCode ? 'SJ-' . strtoupper($suppCode) : 'SJ';
+                $payload['surat_jalan_no'] = CodeGenerator::make($sjPrefix);
             }
 
             $payload['subtotal'] = 0;
@@ -75,6 +89,7 @@ class GoodsReceiptService
                 'tax_percent',
                 'shipping_cost',
                 'notes',
+                'surat_jalan_no',
             ];
 
             foreach ($allowedFields as $field) {
@@ -119,9 +134,15 @@ class GoodsReceiptService
                 throw ValidationException::withMessages(['grn' => 'GRN tidak punya line.']);
             }
 
+            // Auto-fill harga dari PO line jika unit_price = 0
+            // (terjadi ketika admin buat GRN — tidak bisa input harga)
+            $this->backfillPricesFromPoLines($grn);
+            $grn->refresh();
+            $grn->loadMissing(['lines.item', 'supplier']);
+
             $grandTotal = (float) $grn->grand_total;
             if ($grandTotal <= 0) {
-                throw ValidationException::withMessages(['grn' => 'Total GRN harus > 0.']);
+                throw ValidationException::withMessages(['grn' => 'Total GRN harus > 0. Pastikan harga sudah diisi pada PO.']);
             }
 
             // Map allocation + expense account (sumber dari PO line + master item)
@@ -185,6 +206,11 @@ class GoodsReceiptService
             // ==========================
             $grn->status = 'posted';
             $grn->save();
+
+            // Sync received_status di PO terkait
+            if ($grn->purchase_order_id) {
+                $this->syncReceivedStatus((int) $grn->purchase_order_id);
+            }
 
             // ==========================
             // 3) Resolve akun via CODE
@@ -389,14 +415,28 @@ class GoodsReceiptService
 
             $grn->loadMissing(['lines', 'supplier']);
 
-            $maps = $this->buildLineMetaMapsForGrn($grn);
+            // ==========================
+            // 1) REVERSE STOCK (HPP lines saja)
+            // ==========================
+            $hasStockMutation = DB::table('inventory_mutations')
+                ->where('source_type', 'purchase_receipt')
+                ->where('source_id', (int) $grn->id)
+                ->exists();
 
-            foreach ($grn->lines as $line) {
-                // reverse stock hanya untuk HPP (silakan tetap pakai logic reverse stock kamu yang sudah ada)
-                // (kalau kamu sudah punya implementasi stockOut/reverse mutation, taruh di sini)
+            if ($hasStockMutation) {
+                $this->inventory->reverseBySource(
+                    originalSourceTypes: ['purchase_receipt'],
+                    originalSourceId: (int) $grn->id,
+                    voidSourceType: 'purchase_receipt_void',
+                    voidSourceId: (int) $grn->id,
+                    notesPrefix: "UNPOST GRN {$grn->code}",
+                    date: $grn->date,
+                );
             }
 
-            // ✅ VOID 2 JURNAL TERPISAH
+            // ==========================
+            // 2) VOID 2 JURNAL TERPISAH
+            // ==========================
             $this->journal->voidBySource('grn_inv', (int) $grn->id);
             $this->journal->voidBySource('grn_exp', (int) $grn->id);
 
@@ -405,6 +445,11 @@ class GoodsReceiptService
 
             $grn->status = 'draft';
             $grn->save();
+
+            // Sync received_status di PO terkait
+            if ($grn->purchase_order_id) {
+                $this->syncReceivedStatus((int) $grn->purchase_order_id);
+            }
 
             return $grn->fresh(['lines.item', 'supplier', 'warehouse']);
         });
@@ -684,5 +729,138 @@ class GoodsReceiptService
             ->where('purchase_order_id', $purchaseOrderId)
             ->whereNull('voided_at')
             ->exists();
+    }
+
+    /**
+     * Hitung dan update received_status di purchase_orders berdasarkan
+     * seluruh GRN yang sudah posted.
+     *
+     * Logika:
+     * - Tidak ada GRN posted        → not_received
+     * - Ada GRN posted tapi qty kurang → partial
+     * - Semua PO line sudah terpenuhi  → fully_received
+     *
+     * Catatan: hanya jalan jika kolom received_status sudah ada (safe guard).
+     */
+    public function syncReceivedStatus(int $purchaseOrderId): void
+    {
+        if (!Schema::hasColumn('purchase_orders', 'received_status')) {
+            return; // migration belum dijalankan, skip
+        }
+
+        // Ambil semua PO lines
+        $poLines = DB::table('purchase_order_lines')
+            ->where('purchase_order_id', $purchaseOrderId)
+            ->select('id', 'qty')
+            ->get();
+
+        if ($poLines->isEmpty()) {
+            DB::table('purchase_orders')->where('id', $purchaseOrderId)
+                ->update(['received_status' => 'not_received', 'updated_at' => now()]);
+            return;
+        }
+
+        $poLineIds = $poLines->pluck('id')->all();
+
+        // Total qty yang sudah diterima per PO line (dari GRN posted saja)
+        $receivedByLine = DB::table('purchase_receipt_lines as prl')
+            ->join('purchase_receipts as pr', 'pr.id', '=', 'prl.purchase_receipt_id')
+            ->where('pr.purchase_order_id', $purchaseOrderId)
+            ->where('pr.status', 'posted')
+            ->whereIn('prl.purchase_order_line_id', $poLineIds)
+            ->selectRaw('prl.purchase_order_line_id, SUM(prl.qty_received) as total_received')
+            ->groupBy('prl.purchase_order_line_id')
+            ->pluck('total_received', 'purchase_order_line_id');
+
+        $totalLines = $poLines->count();
+        $fullyReceivedCount = 0;
+        $anyReceived = false;
+
+        foreach ($poLines as $line) {
+            $received = (float) ($receivedByLine[$line->id] ?? 0);
+            $ordered  = (float) $line->qty;
+
+            if ($received > 0) {
+                $anyReceived = true;
+            }
+
+            if ($ordered > 0 && $received >= $ordered) {
+                $fullyReceivedCount++;
+            }
+        }
+
+        if ($fullyReceivedCount >= $totalLines) {
+            $status = 'fully_received';
+        } elseif ($anyReceived) {
+            $status = 'partial';
+        } else {
+            $status = 'not_received';
+        }
+
+        DB::table('purchase_orders')->where('id', $purchaseOrderId)
+            ->update(['received_status' => $status, 'updated_at' => now()]);
+    }
+
+    /**
+     * Backfill unit_price dari PO line jika GRN line masih 0.
+     * Dipanggil saat post() — agar admin yang tidak input harga tetap bisa posting
+     * dengan harga yang diambil dari PO (yang diisi owner).
+     */
+    protected function backfillPricesFromPoLines(PurchaseReceipt $grn): void
+    {
+        $lines = $grn->lines ?? collect();
+        if ($lines->isEmpty()) {
+            return;
+        }
+
+        // Kumpulkan po_line_id yang unit_price-nya masih 0
+        $zeroLines = $lines->filter(fn($l) => (float) ($l->unit_price ?? 0) <= 0
+            && !empty($l->purchase_order_line_id));
+
+        if ($zeroLines->isEmpty()) {
+            return;
+        }
+
+        // Ambil harga PO sekaligus
+        $poLineIds = $zeroLines->pluck('purchase_order_line_id')->unique()->filter();
+        $poPrices  = PurchaseOrderLine::whereIn('id', $poLineIds)
+            ->pluck('unit_price', 'id');
+
+        $subtotal = (float) ($grn->subtotal ?? 0);
+
+        foreach ($zeroLines as $line) {
+            $poPrice = (float) ($poPrices[$line->purchase_order_line_id] ?? 0);
+            if ($poPrice <= 0) {
+                continue; // tidak ada fallback, biarkan 0
+            }
+
+            $lineTotal = round($poPrice * (float) ($line->qty_received ?? 0), 2);
+
+            PurchaseReceiptLine::where('id', $line->id)->update([
+                'unit_price' => $poPrice,
+                'line_total' => $lineTotal,
+                'updated_at' => now(),
+            ]);
+
+            $subtotal += $lineTotal;
+        }
+
+        // Recalculate header
+        $freshSubtotal = (float) PurchaseReceiptLine::where('purchase_receipt_id', $grn->id)
+            ->sum('line_total');
+
+        $discount   = (float) ($grn->discount ?? 0);
+        $taxPct     = (float) ($grn->tax_percent ?? 0);
+        $shipping   = (float) ($grn->shipping_cost ?? 0);
+        $base       = max(0, $freshSubtotal - $discount);
+        $taxAmount  = round($base * $taxPct / 100, 2);
+        $grandTotal = round($base + $taxAmount + $shipping, 2);
+
+        DB::table('purchase_receipts')->where('id', $grn->id)->update([
+            'subtotal'    => round($freshSubtotal, 2),
+            'tax_amount'  => $taxAmount,
+            'grand_total' => $grandTotal,
+            'updated_at'  => now(),
+        ]);
     }
 }

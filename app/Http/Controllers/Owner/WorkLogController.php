@@ -32,7 +32,7 @@ class WorkLogController extends Controller
         $activeTab = $request->get('tab', 'progress');
         $activeTab = in_array($activeTab, ['progress', 'done'], true) ? $activeTab : 'progress';
 
-        $logs = OwnerWorkLog::query()
+        $logsQuery = OwnerWorkLog::query()
             ->with('creator')
             ->where('status', $activeTab)
             ->when($request->filled('q'), function ($q) use ($request) {
@@ -44,8 +44,19 @@ class WorkLogController extends Controller
                         ->orWhere('page_url', 'like', "%{$keyword}%");
                 });
             })
-            ->when($request->filled('category'), fn ($q) => $q->where('category', $request->category))
-            ->latest('id')
+            ->when($request->filled('category'), fn ($q) => $q->where('category', $request->category));
+
+        if ($activeTab === 'done') {
+            $logsQuery
+                ->orderByDesc('done_at')
+                ->orderByDesc('completed_at')
+                ->orderByDesc('updated_at')
+                ->orderByDesc('id');
+        } else {
+            $logsQuery->latest('id');
+        }
+
+        $logs = $logsQuery
             ->paginate(20)
             ->withQueryString();
 

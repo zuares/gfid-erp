@@ -122,6 +122,12 @@
 @endpush
 
 @section('content')
+@php
+  $user = auth()->user();
+  $isOwner = $user?->isOwner() ?? false;
+  $isAdmin = strtolower((string)($user->role ?? '')) === 'admin';
+  $canSeeMoney = $isOwner;          // hanya owner
+@endphp
 <div class="grn-edit-page">
   <div class="page-wrap">
 
@@ -206,8 +212,9 @@
               <div class="row g-3">
                 <div class="col-md-4">
                   <label class="form-label small text-muted">Tanggal</label>
-                  <input type="date" name="date" class="form-control"
-                         value="{{ old('date', $purchase_receipt->date?->toDateString()) }}" required>
+                  <input type="text" name="date" class="form-control gf-date-input"
+                         value="{{ old('date', $purchase_receipt->date?->toDateString()) }}"
+                         data-gf-date autocomplete="off" required>
                 </div>
 
                 <div class="col-md-8">
@@ -234,25 +241,39 @@
                   </select>
                 </div>
 
-                <div class="col-md-4">
-                  <label class="form-label small text-muted">PPN (%)</label>
-                  <input type="text" name="tax_percent" class="form-control mono text-end"
-                         value="{{ old('tax_percent', $purchase_receipt->tax_percent) }}">
+                @if ($canSeeMoney)
+                  <div class="col-md-4">
+                    <label class="form-label small text-muted">PPN (%)</label>
+                    <input type="text" name="tax_percent" class="form-control mono text-end"
+                           value="{{ old('tax_percent', $purchase_receipt->tax_percent) }}">
+                  </div>
+
+                  <div class="col-md-4">
+                    <label class="form-label small text-muted">Diskon</label>
+                    <input type="text" name="discount" class="form-control mono text-end"
+                           value="{{ old('discount', $purchase_receipt->discount) }}">
+                  </div>
+
+                  <div class="col-md-4">
+                    <label class="form-label small text-muted">Ongkir</label>
+                    <input type="text" name="shipping_cost" class="form-control mono text-end"
+                           value="{{ old('shipping_cost', $purchase_receipt->shipping_cost) }}">
+                  </div>
+                @endif
+
+                <div class="col-12 col-md-6">
+                  <label class="form-label small text-muted">No. Surat Jalan</label>
+                  <input type="text" name="surat_jalan_no"
+                    class="form-control @error('surat_jalan_no') is-invalid @enderror"
+                    value="{{ old('surat_jalan_no', $purchase_receipt->surat_jalan_no) }}"
+                    placeholder="Opsional — dari supplier"
+                    maxlength="100">
+                  @error('surat_jalan_no')
+                    <div class="invalid-feedback">{{ $message }}</div>
+                  @enderror
                 </div>
 
-                <div class="col-md-4">
-                  <label class="form-label small text-muted">Diskon</label>
-                  <input type="text" name="discount" class="form-control mono text-end"
-                         value="{{ old('discount', $purchase_receipt->discount) }}">
-                </div>
-
-                <div class="col-md-4">
-                  <label class="form-label small text-muted">Ongkir</label>
-                  <input type="text" name="shipping_cost" class="form-control mono text-end"
-                         value="{{ old('shipping_cost', $purchase_receipt->shipping_cost) }}">
-                </div>
-
-                <div class="col-12">
+                <div class="col-12 col-md-6">
                   <label class="form-label small text-muted">Catatan</label>
                   <textarea name="notes" rows="2" class="form-control">{{ old('notes', $purchase_receipt->notes) }}</textarea>
                 </div>
@@ -262,37 +283,39 @@
           </div>
         </div>
 
-        {{-- Ringkasan (estimasi live di client) --}}
-        <div class="col-12 col-lg-6 order-2">
-          <div class="card-soft h-100">
-            <div class="card-body p-3 p-md-4">
-              <h6 class="section-title mb-3">Ringkasan Nilai (Preview)</h6>
+        @if ($canSeeMoney)
+          {{-- Ringkasan (estimasi live di client) --}}
+          <div class="col-12 col-lg-6 order-2">
+            <div class="card-soft h-100">
+              <div class="card-body p-3 p-md-4">
+                <h6 class="section-title mb-3">Ringkasan Nilai (Preview)</h6>
 
-              <dl class="row mb-0 small mono">
-                <dt class="col-6">Subtotal</dt>
-                <dd class="col-6 text-end" id="js-subtotal">0</dd>
+                <dl class="row mb-0 small mono">
+                  <dt class="col-6">Subtotal</dt>
+                  <dd class="col-6 text-end" id="js-subtotal">0</dd>
 
-                <dt class="col-6">Diskon</dt>
-                <dd class="col-6 text-end" id="js-discount">0</dd>
+                  <dt class="col-6">Diskon</dt>
+                  <dd class="col-6 text-end" id="js-discount">0</dd>
 
-                <dt class="col-6">PPN</dt>
-                <dd class="col-6 text-end" id="js-tax">0</dd>
+                  <dt class="col-6">PPN</dt>
+                  <dd class="col-6 text-end" id="js-tax">0</dd>
 
-                <dt class="col-6">Ongkir</dt>
-                <dd class="col-6 text-end" id="js-ship">0</dd>
+                  <dt class="col-6">Ongkir</dt>
+                  <dd class="col-6 text-end" id="js-ship">0</dd>
 
-                <hr class="my-2" style="border-top-color: var(--line); opacity:1;">
+                  <hr class="my-2" style="border-top-color: var(--line); opacity:1;">
 
-                <dt class="col-6 fw-semibold">Grand Total</dt>
-                <dd class="col-6 text-end fw-semibold fs-6" id="js-grand">0</dd>
-              </dl>
+                  <dt class="col-6 fw-semibold">Grand Total</dt>
+                  <dd class="col-6 text-end fw-semibold fs-6" id="js-grand">0</dd>
+                </dl>
 
-              <div class="small text-muted mt-2">
-                Preview ini dihitung dari input di form (akan final di server saat Simpan).
+                <div class="small text-muted mt-2">
+                  Preview ini dihitung dari input di form (akan final di server saat Simpan).
+                </div>
               </div>
             </div>
           </div>
-        </div>
+        @endif
 
       </div>
 
@@ -317,7 +340,9 @@
                   <th style="width:34%">Item</th>
                   <th style="width:12%" class="text-end">Qty In</th>
                   <th style="width:12%" class="text-end">Reject</th>
-                  <th style="width:16%" class="text-end">Harga</th>
+                  @if ($canSeeMoney)
+                    <th style="width:16%" class="text-end">Harga</th>
+                  @endif
                   <th style="width:10%">Unit</th>
                   <th style="width:18%">Catatan</th>
                   <th style="width:4%"></th>
@@ -342,6 +367,7 @@
                       <td class="text-center mono js-no">{{ $loop->iteration }}</td>
 
                       <td>
+                        <input type="hidden" name="po_line_id[]" value="{{ old('po_line_id.' . $i, '') }}">
                         <x-item-suggest
                           idName="item_id[]"
                           :items="$items"
@@ -366,11 +392,13 @@
                                class="form-control form-control-sm text-end mono js-reject"
                                value="{{ $oldQtyReject[$i] ?? 0 }}">
                       </td>
-                      <td>
-                        <input type="text" name="unit_price[]"
-                               class="form-control form-control-sm text-end mono js-price"
-                               value="{{ $oldUnitPrice[$i] ?? 0 }}">
-                      </td>
+                      @if ($canSeeMoney)
+                        <td>
+                          <input type="text" name="unit_price[]"
+                                 class="form-control form-control-sm text-end mono js-price"
+                                 value="{{ $oldUnitPrice[$i] ?? 0 }}">
+                        </td>
+                      @endif
                       <td>
                         <input type="text" name="unit[]"
                                class="form-control form-control-sm mono"
@@ -394,6 +422,7 @@
                       <td class="text-center mono js-no">{{ $loop->iteration }}</td>
 
                       <td>
+                        <input type="hidden" name="po_line_id[]" value="{{ $line->purchase_order_line_id ?? '' }}">
                         <x-item-suggest
                           idName="item_id[]"
                           :items="$items"
@@ -411,18 +440,20 @@
                       <td>
                         <input type="text" name="qty_received[]"
                                class="form-control form-control-sm text-end mono js-qty"
-                               value="{{ $line->qty_received }}">
+                               value="{{ (float) $line->qty_received }}">
                       </td>
                       <td>
                         <input type="text" name="qty_reject[]"
                                class="form-control form-control-sm text-end mono js-reject"
-                               value="{{ $line->qty_reject }}">
+                               value="{{ (float) $line->qty_reject }}">
                       </td>
-                      <td>
-                        <input type="text" name="unit_price[]"
-                               class="form-control form-control-sm text-end mono js-price"
-                               value="{{ $line->unit_price }}">
-                      </td>
+                      @if ($canSeeMoney)
+                        <td>
+                          <input type="text" name="unit_price[]"
+                                 class="form-control form-control-sm text-end mono js-price"
+                                 value="{{ $line->unit_price }}">
+                        </td>
+                      @endif
                       <td>
                         <input type="text" name="unit[]"
                                class="form-control form-control-sm mono"
@@ -458,7 +489,9 @@
                       </td>
                       <td><input type="text" name="qty_received[]" class="form-control form-control-sm text-end mono js-qty" value="0"></td>
                       <td><input type="text" name="qty_reject[]" class="form-control form-control-sm text-end mono js-reject" value="0"></td>
-                      <td><input type="text" name="unit_price[]" class="form-control form-control-sm text-end mono js-price" value="0"></td>
+                      @if ($canSeeMoney)
+                        <td><input type="text" name="unit_price[]" class="form-control form-control-sm text-end mono js-price" value="0"></td>
+                      @endif
                       <td><input type="text" name="unit[]" class="form-control form-control-sm mono" placeholder="kg/pcs/m"></td>
                       <td><input type="text" name="line_notes[]" class="form-control form-control-sm"></td>
                       <td class="text-center">
@@ -474,8 +507,10 @@
                   <td colspan="2" class="text-end">Total</td>
                   <td class="text-end mono" id="js-total-qty">0</td>
                   <td class="text-end mono" id="js-total-reject">0</td>
-                  <td class="text-end mono" id="js-total-amount">0</td>
-                  <td colspan="3"></td>
+                  @if ($canSeeMoney)
+                    <td class="text-end mono" id="js-total-amount">0</td>
+                  @endif
+                  <td colspan="{{ $canSeeMoney ? 3 : 2 }}"></td>
                 </tr>
               </tfoot>
             </table>
@@ -550,16 +585,24 @@
     const grand = base + tax + Math.max(0, ship);
 
     // footer
-    document.getElementById('js-total-qty').textContent = fmtId(tQty);
-    document.getElementById('js-total-reject').textContent = fmtId(tRej);
-    document.getElementById('js-total-amount').textContent = fmtId(subtotal);
+    const totalQtyEl = document.getElementById('js-total-qty');
+    const totalRejectEl = document.getElementById('js-total-reject');
+    const totalAmountEl = document.getElementById('js-total-amount');
+    if (totalQtyEl) totalQtyEl.textContent = fmtId(tQty);
+    if (totalRejectEl) totalRejectEl.textContent = fmtId(tRej);
+    if (totalAmountEl) totalAmountEl.textContent = fmtId(subtotal);
 
     // summary
-    document.getElementById('js-subtotal').textContent = fmtId(subtotal);
-    document.getElementById('js-discount').textContent = fmtId(discount);
-    document.getElementById('js-tax').textContent = fmtId(tax);
-    document.getElementById('js-ship').textContent = fmtId(ship);
-    document.getElementById('js-grand').textContent = fmtId(grand);
+    const subtotalEl = document.getElementById('js-subtotal');
+    const discountEl = document.getElementById('js-discount');
+    const taxEl = document.getElementById('js-tax');
+    const shipEl = document.getElementById('js-ship');
+    const grandEl = document.getElementById('js-grand');
+    if (subtotalEl) subtotalEl.textContent = fmtId(subtotal);
+    if (discountEl) discountEl.textContent = fmtId(discount);
+    if (taxEl) taxEl.textContent = fmtId(tax);
+    if (shipEl) shipEl.textContent = fmtId(ship);
+    if (grandEl) grandEl.textContent = fmtId(grand);
   }
 
   function renumber(){

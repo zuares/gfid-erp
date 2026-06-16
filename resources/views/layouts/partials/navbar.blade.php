@@ -1,4 +1,55 @@
 {{-- resources/views/layouts/partials/navbar.blade.php --}}
+@php
+use Illuminate\Support\Facades\Cache;
+
+$navUser     = auth()->user();
+$navIsOwner  = $navUser && method_exists($navUser, 'isOwner') && $navUser->isOwner();
+
+$navPendingCount = 0;
+$navPendingItems = [];
+
+if ($navIsOwner) {
+    $navCacheKey = 'navbar_notif_owner_v2_' . (int) $navUser->id;
+    $navPending  = Cache::remember($navCacheKey, now()->addSeconds(20), function () {
+        $poDrafts = \App\Models\PurchaseOrder::where('status', 'draft')
+            ->where('grand_total', '>', 0)
+            ->orderByDesc('id')
+            ->limit(10)
+            ->get(['id', 'code', 'grand_total']);
+
+        $grnDrafts = \App\Models\PurchaseReceipt::where('status', 'draft')
+            ->orderByDesc('id')
+            ->limit(10)
+            ->get(['id', 'code']);
+
+        return [
+            'po_drafts'  => $poDrafts,
+            'grn_drafts' => $grnDrafts,
+        ];
+    });
+
+    foreach (($navPending['po_drafts'] ?? collect()) as $po) {
+        $navPendingItems[] = [
+            'type'  => 'po',
+            'label' => $po->code ?? 'PO #' . $po->id,
+            'sub'   => 'Menunggu approval',
+            'url'   => route('purchasing.purchase_orders.show', $po->id),
+            'icon'  => '🧾',
+        ];
+    }
+    foreach (($navPending['grn_drafts'] ?? collect()) as $grn) {
+        $navPendingItems[] = [
+            'type'  => 'grn',
+            'label' => $grn->code ?? 'GRN #' . $grn->id,
+            'sub'   => 'Belum di-post',
+            'url'   => route('purchasing.purchase_receipts.show', $grn->id),
+            'icon'  => '📦',
+        ];
+    }
+
+    $navPendingCount = count($navPendingItems);
+}
+@endphp
 
 <style>
     /* ============================
@@ -137,6 +188,103 @@
         }
     }
 
+    /* ============================
+       NOTIFICATION BELL
+    ============================ */
+    .notif-bell-btn {
+        position: relative;
+        border: 0;
+        background: transparent;
+        padding: .22rem .4rem;
+        display: inline-flex;
+        align-items: center;
+        justify-content: center;
+        color: var(--muted);
+        cursor: pointer;
+        border-radius: 8px;
+        transition: background .15s;
+    }
+    .notif-bell-btn:hover {
+        background: color-mix(in srgb, var(--accent-soft) 60%, transparent 40%);
+        color: var(--accent);
+    }
+    .notif-bell-btn svg {
+        width: 20px;
+        height: 20px;
+        stroke-width: 2;
+        stroke: currentColor;
+        fill: none;
+    }
+    .notif-badge {
+        position: absolute;
+        top: 1px;
+        right: 1px;
+        min-width: 16px;
+        height: 16px;
+        padding: 0 4px;
+        border-radius: 999px;
+        background: #ef4444;
+        color: #fff;
+        font-size: 10px;
+        font-weight: 700;
+        line-height: 16px;
+        text-align: center;
+        pointer-events: none;
+    }
+    .notif-dropdown {
+        position: absolute;
+        top: calc(100% + 6px);
+        right: 0;
+        min-width: 260px;
+        background: var(--card);
+        border: 1px solid var(--line);
+        border-radius: 10px;
+        box-shadow: 0 8px 28px rgba(0,0,0,.18);
+        z-index: 2000;
+        overflow: hidden;
+        display: none;
+    }
+    .notif-dropdown.open { display: block; }
+    .notif-dropdown-header {
+        padding: .55rem .85rem;
+        font-size: .78rem;
+        font-weight: 600;
+        color: var(--muted);
+        border-bottom: 1px solid var(--line);
+        text-transform: uppercase;
+        letter-spacing: .04em;
+    }
+    .notif-item {
+        display: flex;
+        align-items: center;
+        gap: .6rem;
+        padding: .6rem .85rem;
+        text-decoration: none;
+        color: var(--text);
+        font-size: .875rem;
+        border-bottom: 1px solid var(--line);
+        transition: background .12s;
+    }
+    .notif-item:last-child { border-bottom: 0; }
+    .notif-item:hover { background: color-mix(in srgb, var(--accent-soft) 50%, var(--card) 50%); }
+    .notif-item-icon { font-size: 1.1rem; flex-shrink: 0; }
+    .notif-item-label { flex: 1; }
+    .notif-item-count {
+        background: #ef4444;
+        color: #fff;
+        font-size: .72rem;
+        font-weight: 700;
+        border-radius: 999px;
+        padding: 1px 7px;
+        flex-shrink: 0;
+    }
+    .notif-empty {
+        padding: .8rem .85rem;
+        font-size: .85rem;
+        color: var(--muted);
+        text-align: center;
+    }
+
     /* DESKTOP NAV LINKS */
     .app-navbar .desktop-nav {
         display: none;
@@ -204,6 +352,44 @@
 
         {{-- RIGHT: mobile cluster (theme + logout + hamburger) + desktop nav --}}
         <div class="d-flex align-items-center gap-2">
+
+            {{-- NOTIFICATION BELL (owner only) --}}
+            @if ($navIsOwner)
+            <div style="position:relative;" id="notifWrapper">
+                <button type="button" class="notif-bell-btn" id="notifBellBtn" aria-label="Notifikasi">
+                    <svg viewBox="0 0 24 24" xmlns="http://www.w3.org/2000/svg">
+                        <path d="M18 8A6 6 0 0 0 6 8c0 7-3 9-3 9h18s-3-2-3-9"/>
+                        <path d="M13.73 21a2 2 0 0 1-3.46 0"/>
+                    </svg>
+                    @if ($navPendingCount > 0)
+                        <span class="notif-badge">{{ $navPendingCount > 99 ? '99+' : $navPendingCount }}</span>
+                    @endif
+                </button>
+
+                <div class="notif-dropdown" id="notifDropdown">
+                    <div class="notif-dropdown-header">
+                        Perlu Tindakan
+                        @if ($navPendingCount > 0)
+                            <span style="float:right;background:#ef4444;color:#fff;border-radius:999px;padding:0 7px;font-size:10px;font-weight:700;line-height:16px;">{{ $navPendingCount }}</span>
+                        @endif
+                    </div>
+                    @if (count($navPendingItems) > 0)
+                        @foreach ($navPendingItems as $item)
+                            <a href="{{ $item['url'] }}" class="notif-item">
+                                <span class="notif-item-icon">{{ $item['icon'] }}</span>
+                                <span class="notif-item-label">
+                                    <span style="display:block;font-weight:600;font-size:.83rem;">{{ $item['label'] }}</span>
+                                    <span style="display:block;font-size:.75rem;color:var(--muted);">{{ $item['sub'] }}</span>
+                                </span>
+                                <svg style="width:14px;height:14px;stroke:var(--muted);fill:none;stroke-width:2;flex-shrink:0;" viewBox="0 0 24 24"><path d="M9 18l6-6-6-6"/></svg>
+                            </a>
+                        @endforeach
+                    @else
+                        <div class="notif-empty">Semua beres ✓</div>
+                    @endif
+                </div>
+            </div>
+            @endif
 
             {{-- THEME TOGGLE --}}
             <button type="button" class="theme-toggle-btn" id="themeToggleBtn">
@@ -276,14 +462,36 @@
 
 <script>
     document.addEventListener('DOMContentLoaded', function() {
+        // Mobile logout
         const mobileLogoutBtn = document.getElementById('mobileLogoutBtn');
         const mobileLogoutForm = document.getElementById('mobileLogoutForm');
-
         if (mobileLogoutBtn && mobileLogoutForm) {
             mobileLogoutBtn.addEventListener('click', function() {
                 if (confirm('Yakin mau logout?')) {
                     mobileLogoutForm.submit();
                 }
+            });
+        }
+
+        // Notification bell toggle
+        const notifBellBtn  = document.getElementById('notifBellBtn');
+        const notifDropdown = document.getElementById('notifDropdown');
+        if (notifBellBtn && notifDropdown) {
+            notifBellBtn.addEventListener('click', function(e) {
+                e.stopPropagation();
+                notifDropdown.classList.toggle('open');
+            });
+            // Tutup kalau klik di luar
+            document.addEventListener('click', function(e) {
+                if (!notifDropdown.contains(e.target) && e.target !== notifBellBtn) {
+                    notifDropdown.classList.remove('open');
+                }
+            });
+            // Tutup kalau klik item di dalam (navigasi)
+            notifDropdown.querySelectorAll('.notif-item').forEach(function(a) {
+                a.addEventListener('click', function() {
+                    notifDropdown.classList.remove('open');
+                });
             });
         }
     });

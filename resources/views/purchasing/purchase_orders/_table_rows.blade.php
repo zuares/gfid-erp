@@ -98,6 +98,7 @@
 
 @php
     use Illuminate\Support\Carbon;
+    $canSeeMoney = auth()->user()?->isOwner() ?? false;
 @endphp
 
 @forelse ($orders as $order)
@@ -153,10 +154,11 @@
             </div>
         </td>
 
-        {{-- GRAND TOTAL --}}
-        <td class="text-end mono">
-            {{ rupiah($order->grand_total) }}
-        </td>
+        @if ($canSeeMoney)
+            <td class="text-end mono">
+                {{ rupiah($order->grand_total) }}
+            </td>
+        @endif
 
         {{-- STATUS --}}
         <td>
@@ -175,7 +177,7 @@
     </tr>
 @empty
     <tr>
-        <td colspan="6" class="text-center index-row-subtext py-3">
+        <td colspan="{{ $canSeeMoney ? 6 : 5 }}" class="text-center index-row-subtext py-3">
             Belum ada data PO.
         </td>
     </tr>

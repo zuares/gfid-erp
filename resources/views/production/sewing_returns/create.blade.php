@@ -1,7 +1,7 @@
 {{-- resources/views/production/sewing_returns/create.blade.php --}}
 @extends('layouts.app')
 
-@section('title', 'Produksi • Sewing Return')
+@section('title', 'Produksi • Setoran Jahit')
 
 @php
     $errors = $errors ?? new \Illuminate\Support\ViewErrorBag;
@@ -106,8 +106,8 @@
 
         .list { display: grid; gap: .6rem; margin-top: 12px; }
 
-        .cardx { border: 1px solid rgba(148, 163, 184, .22); border-radius: 16px; background: var(--card); overflow: hidden; }
-        .cardx-h { padding: 10px 12px; border-bottom: 1px solid rgba(148, 163, 184, .12); display: flex; justify-content: space-between; gap: 10px; align-items: flex-start; }
+        .cardx { border: 1px solid rgba(148, 163, 184, .18); border-radius: 14px; background: var(--card); overflow: hidden; }
+        .cardx-h { padding: 10px 12px 4px; display: flex; justify-content: space-between; gap: 10px; align-items: flex-start; }
 
         .cardx-left { display: flex; gap: 10px; align-items: flex-start; min-width: 0; }
         .cardx-left>div { min-width: 0; }
@@ -179,18 +179,76 @@
 
         /* ── Mobile + Tablet optimized card ── */
         @media(max-width:991.98px) {
-            .cardx { border-radius: 14px; }
+            .list { gap: .34rem; margin-top: 10px; }
 
-            .code { font-size: 1.1rem; letter-spacing: .06em; }
+            .cardx {
+                border-radius: 10px;
+                border-color: rgba(148, 163, 184, .18);
+                box-shadow: none;
+            }
+
+            .code { font-size: clamp(.84rem, 3.35vw, 1rem); letter-spacing: .05em; }
 
             /* Header: kode kiri, sisa kanan */
-            .cardx-h { padding: 10px 12px 8px; align-items: center; }
-            .right-metrics { font-size: .82rem; }
-            .card-metrics { min-width: 84px; }
-            .metric-main { padding: .32rem .45rem; border-radius: 11px; }
-            .metric-main .val { font-size: 1.08rem; }
-            .metric-sub { font-size: .66rem; }
-            .supply-mini-btn { max-width: 190px; }
+            .cardx-h {
+                padding: .44rem .58rem .18rem;
+                align-items: center;
+                gap: .58rem;
+            }
+            .cardx-left { gap: .48rem; }
+            .chk {
+                width: 16px;
+                height: 16px;
+                border-radius: 5px;
+                margin-top: 1px;
+            }
+            .meta-inline {
+                margin-top: .12rem;
+                font-size: clamp(.62rem, 2.2vw, .72rem);
+                gap: .26rem;
+            }
+            .right-metrics { font-size: clamp(.66rem, 2.3vw, .78rem); }
+            .card-metrics {
+                min-width: clamp(68px, 24vw, 84px);
+                gap: .04rem;
+            }
+            .metric-main {
+                display: inline-flex;
+                align-items: baseline;
+                justify-content: flex-end;
+                gap: .22rem;
+                border: 0;
+                background: transparent;
+                padding: 0;
+                border-radius: 0;
+            }
+            .metric-main .lbl,
+            .metric-sub .lbl { font-size: .52rem; }
+            .metric-main .lbl {
+                display: inline;
+                font-size: .54rem;
+                letter-spacing: .04em;
+            }
+            .metric-main .val {
+                display: inline;
+                margin-top: 0;
+                font-size: clamp(.78rem, 3vw, .9rem);
+            }
+            .metric-sub { font-size: clamp(.58rem, 2vw, .66rem); line-height: 1.08; }
+            .metric-sub.is-returned { display: none; }
+            .supply-mini-btn {
+                max-width: 170px;
+                margin-top: .14rem;
+                gap: .24rem;
+            }
+            .supply-mini-status,
+            .supply-mini-action {
+                font-size: .56rem;
+                border: 1px solid rgba(148, 163, 184, .18);
+                border-radius: 999px;
+                padding: .06rem .32rem;
+                background: rgba(148, 163, 184, .06);
+            }
             .supply-mini-hint { display: none; }
             /* Sembunyikan baris WIP */
             .right-metrics .wip-line { display: none; }
@@ -199,10 +257,23 @@
             .meta-inline .op-label { display: none; }
             .meta-inline .op-dot   { display: none; }
 
-            /* Input lebih besar */
-            .qty { padding: .7rem .55rem !important; font-size: 1rem !important; }
-            .field label { font-size: .68rem; }
-            .cardx-b { padding: 8px 12px 10px; gap: .45rem; }
+            .qty {
+                padding: .24rem .5rem !important;
+                font-size: clamp(.82rem, 3vw, .94rem) !important;
+                border-radius: 8px !important;
+                background: transparent !important;
+            }
+            .qty.ok { border-color: rgba(22, 163, 74, .26) !important; }
+            .qty.rj { border-color: rgba(185, 28, 28, .22) !important; }
+            .field label {
+                font-size: .58rem;
+                margin-bottom: .08rem;
+            }
+            .grid2 { gap: .42rem; }
+            .cardx-b {
+                padding: .28rem .58rem .48rem;
+                gap: .24rem;
+            }
 
             /* Shortage pill: tampilkan detail kurang di baris baru */
             .shortage-pill {
@@ -249,31 +320,41 @@
         .mini-kpi-row {
             display: grid;
             grid-template-columns: repeat(4, minmax(0, 1fr));
-            gap: .45rem;
             margin-top: .55rem;
-        }
-        .mini-kpi {
             border: 1px solid rgba(148, 163, 184, .18);
-            background: rgba(255, 255, 255, .45);
             border-radius: 12px;
-            padding: .45rem .55rem;
-            min-width: 0;
+            overflow: hidden;
+            background: rgba(255, 255, 255, .42);
         }
-        body[data-theme="dark"] .mini-kpi { background: rgba(15, 23, 42, .20); }
+        .mini-kpi-row.kpi-3 { grid-template-columns: repeat(3, minmax(0, 1fr)); }
+        .mini-kpi-row.kpi-4 { grid-template-columns: repeat(4, minmax(0, 1fr)); }
+        body[data-theme="dark"] .mini-kpi-row { background: rgba(15, 23, 42, .20); }
+        .mini-kpi {
+            border-right: 1px solid rgba(148, 163, 184, .16);
+            padding: .42rem .5rem;
+            min-width: 0;
+            text-align: center;
+        }
+        .mini-kpi:last-child { border-right: 0; }
         .mini-kpi .lbl {
             display: block;
             color: var(--muted);
-            font-size: .62rem;
+            font-size: .58rem;
             font-weight: 900;
             line-height: 1;
+            letter-spacing: .04em;
+            text-transform: uppercase;
             white-space: nowrap;
             overflow: hidden;
             text-overflow: ellipsis;
         }
         .mini-kpi .val {
-            display: block;
-            margin-top: .16rem;
-            font-size: .96rem;
+            display: flex;
+            align-items: baseline;
+            justify-content: center;
+            gap: .18rem;
+            margin-top: .14rem;
+            font-size: .9rem;
             line-height: 1;
             font-weight: 950;
             color: var(--text);
@@ -281,17 +362,22 @@
             overflow: hidden;
             text-overflow: ellipsis;
         }
+        .mini-kpi .unit {
+            color: var(--muted);
+            font-size: .68em;
+            font-weight: 900;
+        }
         .mini-kpi.is-main {
-            border-color: rgba(37, 99, 235, .20);
             background: rgba(37, 99, 235, .06);
         }
         .mini-kpi.is-main .val { color: #2563eb; }
 
         @media(max-width:991.98px) {
-            .mini-kpi-row { gap: .35rem; margin-top: .45rem; }
-            .mini-kpi { padding: .4rem .42rem; border-radius: 10px; }
-            .mini-kpi .lbl { font-size: .58rem; }
-            .mini-kpi .val { font-size: .82rem; }
+            .mini-kpi-row { margin-top: .45rem; border-radius: 10px; }
+            .mini-kpi { padding: .32rem .34rem; }
+            .mini-kpi .lbl { font-size: .5rem; letter-spacing: .03em; }
+            .mini-kpi .val { font-size: .78rem; margin-top: .1rem; gap: .1rem; }
+            .mini-kpi .unit { font-size: .62em; }
         }
 
         .sum-box { border: 1px solid rgba(148, 163, 184, .18); border-radius: 14px; padding: 10px 12px; background: rgba(148, 163, 184, .06); }
@@ -308,13 +394,22 @@
         .sum-pill .lbl { display: block; font-size: .7rem; color: var(--muted); font-weight: 900; letter-spacing: .08em; text-transform: uppercase; }
         .sum-pill .val { display: block; margin-top: .12rem; }
 
-        .acc-op-btn { font-weight: 900; padding: .7rem .85rem; }
+        .acc-op-btn {
+            font-weight: 900;
+            padding: .58rem .68rem;
+            background: transparent;
+        }
+        .acc-op-btn.accordion-button:not(.collapsed) {
+            background: transparent;
+            color: var(--text);
+            box-shadow: inset 0 -1px 0 rgba(148, 163, 184, .12);
+        }
         .acc-op-btn.accordion-button::after {
             width: .65rem;
             height: .65rem;
             background-size: .65rem;
             opacity: .42;
-            margin-left: .55rem;
+            margin-left: .45rem;
         }
         .acc-op-btn.accordion-button:not(.collapsed)::after { opacity: .62; }
         .acc-op-btn.accordion-button:focus { box-shadow: none; }
@@ -322,59 +417,64 @@
         body[data-theme="dark"] .acc-pill { background: rgba(15, 23, 42, .22); }
         .acc-sub { font-size: .78rem; font-weight: 900; color: var(--muted); }
         .all-card {
-            border-radius: 16px;
+            border-radius: 12px;
             overflow: hidden;
-            border: 1px solid rgba(148,163,184,.18);
+            border: 1px solid rgba(148,163,184,.16);
             background: var(--card);
-            margin-bottom: .55rem;
+            margin-bottom: .36rem;
         }
-        .all-btn-main { display: flex; width: 100%; justify-content: space-between; align-items: center; gap: .75rem; }
-        .all-code { font-weight: 950; font-size: 1rem; letter-spacing: .04em; max-width: 48vw; }
-        .all-metrics { display: flex; align-items: center; gap: .4rem; flex-wrap: wrap; justify-content: flex-end; }
+        .all-btn-main { display: flex; width: 100%; justify-content: space-between; align-items: center; gap: .62rem; }
+        .all-code { font-weight: 950; font-size: .96rem; letter-spacing: .04em; max-width: 48vw; color: var(--accent); }
+        .all-metrics { display: flex; align-items: baseline; gap: .22rem; justify-content: flex-end; color: #2563eb; }
         .all-pill-main {
             display: inline-flex;
-            flex-direction: column;
-            align-items: flex-end;
-            gap: .05rem;
-            border: 1px solid rgba(37, 99, 235, .20);
-            background: rgba(37, 99, 235, .06);
-            color: #2563eb;
-            border-radius: 12px;
-            padding: .28rem .52rem;
+            align-items: baseline;
+            gap: .22rem;
             font-weight: 950;
             line-height: 1;
         }
-        .all-pill-main .lbl { font-size: .58rem; color: var(--muted); letter-spacing: .05em; text-transform: uppercase; }
-        .all-pill-main .val { font-size: .95rem; color: #2563eb; }
-        .all-op-count { color: var(--muted); font-size: .72rem; font-weight: 900; white-space: nowrap; }
-        .all-subline { display: flex; align-items: center; gap: .45rem; flex-wrap: wrap; margin-top: .18rem; }
+        .all-pill-main .lbl { font-size: .56rem; color: var(--muted); letter-spacing: .05em; text-transform: uppercase; }
+        .all-pill-main .val { font-size: .9rem; color: #2563eb; }
+        .all-pill-main .unit { font-size: .62rem; color: var(--muted); }
+        .all-op-count { color: var(--muted); font-size: .66rem; font-weight: 900; white-space: nowrap; }
+        .all-subline { display: flex; align-items: center; gap: .36rem; flex-wrap: wrap; margin-top: .12rem; }
+        .all-detail-list { display: grid; gap: 0; }
         .all-detail-row {
             display: grid;
-            grid-template-columns: 1fr auto auto;
-            gap: .6rem;
+            grid-template-columns: 1fr auto;
+            gap: .55rem;
             align-items: center;
-            padding: .58rem 0;
+            padding: .46rem 0;
             border-bottom: 1px solid rgba(148,163,184,.12);
             cursor: pointer;
-            border-radius: 10px;
+            border-radius: 0;
             transition: background .15s ease;
         }
         .all-detail-row:hover { background: rgba(37, 99, 235, .05); }
         .all-detail-row:last-child { border-bottom: 0; }
         .all-op-name { font-weight: 900; min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
-        .all-detail-val { font-weight: 950; text-align: right; }
-        .all-detail-sub { color: var(--muted); font-size: .68rem; font-weight: 900; text-align: right; }
+        .all-detail-right { text-align: right; }
+        .all-detail-val { font-weight: 950; text-align: right; color: var(--text); }
+        .all-detail-unit { color: var(--muted); font-size: .66rem; font-weight: 900; }
+        .all-detail-sub { color: var(--muted); font-size: .64rem; font-weight: 900; text-align: right; margin-top: .05rem; }
+        .all-accordion-body { padding: .2rem .68rem .54rem; }
 
         @media(max-width:991.98px) {
             .sum-box { display: none; }
-            .acc-op-btn { padding: .62rem .72rem; }
-            .all-card { border-radius: 14px; margin-bottom: .45rem; }
-            .all-code { font-size: 1.05rem; max-width: 44vw; }
-            .all-pill-main { padding: .3rem .48rem; min-width: 78px; }
-            .all-pill-main .val { font-size: .96rem; }
-            .all-detail-row { grid-template-columns: 1fr auto; gap: .5rem; padding: .6rem 0; }
-            .all-detail-sub { display: block; font-size: .66rem; }
+            .acc-op-btn { padding: .46rem .56rem; }
+            .all-card { border-radius: 10px; margin-bottom: .34rem; }
+            .all-code { font-size: clamp(.84rem, 3.35vw, 1rem); max-width: 42vw; }
+            .all-pill-main .lbl { font-size: .52rem; }
+            .all-pill-main .val { font-size: clamp(.78rem, 3vw, .9rem); }
+            .all-op-count { font-size: .6rem; }
+            .all-subline { gap: .28rem; margin-top: .08rem; }
+            .all-accordion-body { padding: .12rem .56rem .42rem; }
+            .all-detail-row { gap: .45rem; padding: .4rem 0; }
+            .all-op-name { font-size: .76rem; }
+            .all-detail-val { font-size: .78rem; }
+            .all-detail-sub { display: block; font-size: .58rem; }
         }
+
     </style>
 @endpush
 
@@ -392,7 +492,7 @@
     $isRejectReworkMode = (bool) ($isRejectReworkMode ?? false);
     $lines = $lines ?? collect();
     $hasRejectRows = $lines->contains(fn($line) => (int) ($line->source_reject_return_line_id ?? 0) > 0 || (int) ($line->source_finishing_job_line_id ?? 0) > 0);
-    $pageTitle = $isRejectReworkMode ? 'Setor Ulang Reject Jahit' : 'Sewing Return';
+    $pageTitle = $isRejectReworkMode ? 'Setor Ulang Reject Jahit' : 'Setoran Jahit';
     $sourceStockLabel = $isRejectReworkMode ? 'REJ-SEW' : ($hasRejectRows ? 'STOK' : 'WIP');
     $remainingLabel = $isRejectReworkMode ? 'SISA REJECT' : ($hasRejectRows ? 'SISA' : 'BELUM');
 
@@ -716,7 +816,7 @@
                         </div>
                     </div>
 
-                    <div class="mini-kpi-row">
+                    <div class="mini-kpi-row {{ $isAllMode ? 'kpi-4' : 'kpi-3' }}">
                         @if ($isAllMode)
                             <div class="mini-kpi">
                                 <span class="lbl">Item</span>
@@ -728,7 +828,10 @@
                             </div>
                             <div class="mini-kpi is-main">
                                 <span class="lbl">{{ $isRejectReworkMode ? 'Reject' : 'Belum Setor' }}</span>
-                                <span class="val mono">{{ number_format($summaryRemaining, 0, ',', '.') }} pcs</span>
+                                <span class="val mono">
+                                    <span>{{ number_format($summaryRemaining, 0, ',', '.') }}</span>
+                                    <span class="unit">pcs</span>
+                                </span>
                             </div>
                             <div class="mini-kpi">
                                 <span class="lbl">Penjahit</span>
@@ -740,12 +843,18 @@
                                 <span class="val mono">{{ number_format($lineBundleCount, 0, ',', '.') }}</span>
                             </div>
                             <div class="mini-kpi is-main">
-                                <span class="lbl">Maks Setor</span>
-                                <span class="val mono">{{ number_format($lineMaxSetorTotal, 0, ',', '.') }} pcs</span>
+                                <span class="lbl">Maks</span>
+                                <span class="val mono">
+                                    <span>{{ number_format($lineMaxSetorTotal, 0, ',', '.') }}</span>
+                                    <span class="unit">pcs</span>
+                                </span>
                             </div>
                             <div class="mini-kpi">
-                                <span class="lbl">Sudah Setor</span>
-                                <span class="val mono">{{ number_format($lineReturnedTotal, 0, ',', '.') }} pcs</span>
+                                <span class="lbl">Sudah</span>
+                                <span class="val mono">
+                                    <span>{{ number_format($lineReturnedTotal, 0, ',', '.') }}</span>
+                                    <span class="unit">pcs</span>
+                                </span>
                             </div>
                         @endif
                     </div>
@@ -820,7 +929,8 @@
                                                 <div class="all-metrics">
                                                     <span class="all-pill-main">
                                                         <span class="lbl">{{ $isRejectReworkMode ? 'Reject' : 'Belum' }}</span>
-                                                        <span class="val mono">{{ number_format($remainingSum, 0, ',', '.') }} pcs</span>
+                                                        <span class="val mono">{{ number_format($remainingSum, 0, ',', '.') }}</span>
+                                                        <span class="unit">pcs</span>
                                                     </span>
                                                     <span class="acc-pill d-none d-lg-inline-flex">{{ $sourceStockLabel }} <span class="mono">{{ number_format($wip, 0, ',', '.') }}</span></span>
                                                 </div>
@@ -830,11 +940,11 @@
 
                                     <div id="{{ $collapseId }}" class="accordion-collapse collapse"
                                          aria-labelledby="{{ $headingId }}" data-bs-parent="#all-items-accordion">
-                                        <div class="accordion-body" style="padding:.7rem .85rem;">
+                                        <div class="accordion-body all-accordion-body">
                                             @if ($ops->isEmpty())
                                                 <div class="text-muted text-center py-2">Tidak ada detail operator.</div>
                                             @else
-                                                <div>
+                                                <div class="all-detail-list">
                                                     @foreach ($ops as $op)
                                                         <div class="all-detail-row js-open-operator-item"
                                                              role="button"
@@ -845,11 +955,14 @@
                                                             <div class="mono all-op-name">
                                                                 {{ $op['label'] ?: 'Penjahit ' . $op['operator_id'] }}
                                                             </div>
-                                                            <div class="mono all-detail-val">
-                                                                {{ number_format((float) $op['remaining_sum'], 0, ',', '.') }} pcs
-                                                            </div>
-                                                            <div class="all-detail-sub">
-                                                                {{ number_format((int) $op['lines_count'], 0, ',', '.') }} iket
+                                                            <div class="all-detail-right">
+                                                                <div class="mono all-detail-val">
+                                                                    {{ number_format((float) $op['remaining_sum'], 0, ',', '.') }}
+                                                                    <span class="all-detail-unit">pcs</span>
+                                                                </div>
+                                                                <div class="all-detail-sub">
+                                                                    {{ number_format((int) $op['lines_count'], 0, ',', '.') }} iket
+                                                                </div>
                                                             </div>
                                                         </div>
                                                     @endforeach
@@ -874,14 +987,6 @@
                             )->sortKeys();
                         @endphp
                         @foreach ($linesByCode as $groupCode => $groupLines)
-                            {{-- Group header --}}
-                            <div class="byop-group-header"
-                                 data-group-code="{{ $groupCode }}"
-                                 style="font-size:.7rem; font-weight:800; letter-spacing:.06em; text-transform:uppercase;
-                                        color:var(--muted); padding:.55rem .1rem .25rem; border-bottom:1px solid rgba(148,163,184,.18);
-                                        margin-bottom:.5rem; font-family:ui-monospace,SFMono-Regular,Menlo,Consolas,monospace;">
-                                {{ $groupCode }}
-                            </div>
                         @foreach ($groupLines as $line)
                             @php $idx = $lines->search(fn($l) => $l->id === $line->id); @endphp
                             @php
@@ -990,7 +1095,7 @@
 
                                     <div class="right-metrics card-metrics">
                                         <div class="metric-main">
-                                            <span class="lbl">Maks Setor</span>
+                                            <span class="lbl">Maks</span>
                                             <span class="val">{{ number_format($maxSetor, 0, ',', '.') }}</span>
                                         </div>
                                         <div class="metric-sub">
@@ -1512,16 +1617,6 @@ document.addEventListener('DOMContentLoaded', () => {
             card.style.display = (matchSearch && matchItem && matchDate) ? '' : 'none';
         });
 
-        $$('.byop-group-header', listByOp).forEach(header => {
-            const code = (header.dataset.groupCode || '').toString().toUpperCase();
-            const hasVisibleCard = $$('.fin-item', listByOp).some(card => {
-                return card.style.display !== 'none'
-                    && (card.dataset.item || '').toString().toUpperCase() === code;
-            });
-
-            header.style.display = (!selItem && hasVisibleCard) ? '' : 'none';
-        });
-
         computeSubmitEnabled();
         computeTopSummary();
     }
@@ -1770,6 +1865,27 @@ document.addEventListener('DOMContentLoaded', () => {
     applyFilter();
     computeSubmitEnabled();
     computeTopSummary();
+
+    if (q) {
+        setTimeout(() => {
+            try {
+                q.scrollIntoView({
+                    behavior: 'smooth',
+                    block: 'center',
+                    inline: 'nearest'
+                });
+            } catch (_) {}
+
+            setTimeout(() => {
+                try {
+                    q.focus({ preventScroll: true });
+                    q.select();
+                } catch (_) {
+                    q.focus();
+                }
+            }, 160);
+        }, 80);
+    }
 
     // ── DEVELOPER DRY RUN ─────────────────────────────────────────────
     const dryRunChk   = document.getElementById('dev-dry-run-chk');

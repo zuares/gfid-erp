@@ -1,4 +1,5 @@
 {{-- resources/views/production/sewing_pickups/_operator_modal.blade.php --}}
+@php $isOwner = auth()->user()?->isOwner() ?? false; @endphp
 
 @push('head')
     <style>
@@ -32,6 +33,9 @@
                        margin-bottom:.75rem; }
         .sc-step-main { font-size:1.15rem; font-weight:900; letter-spacing:-.01em;
                         font-family:ui-monospace,SFMono-Regular,Menlo,Consolas,monospace; }
+
+        #btn-confirm-submit,
+        #btn-confirm-submit * { color: #fff !important; }
     </style>
 @endpush
 
@@ -75,10 +79,27 @@
 
             </div>
 
-            <div class="modal-footer py-2 gap-1">
-                <button class="btn btn-sm btn-outline-secondary" data-bs-dismiss="modal">Batal</button>
-                <button class="btn btn-sm btn-outline-secondary" id="btn-step-back" style="display:none">← Kembali</button>
-                <button class="btn btn-sm btn-primary" id="btn-confirm-submit" disabled>Lanjut →</button>
+            <div class="modal-footer py-2 d-flex justify-content-between align-items-center gap-1">
+                <button class="btn btn-sm btn-outline-secondary" data-bs-dismiss="modal">
+                    <i class="bi bi-x-lg"></i>
+                    <span class="d-none d-sm-inline ms-1">Batal</span>
+                </button>
+                <div class="d-flex gap-1">
+                    <button class="btn btn-sm btn-outline-secondary" id="btn-step-back" style="display:none">
+                        <i class="bi bi-arrow-left"></i>
+                        <span class="d-none d-sm-inline ms-1">Kembali</span>
+                    </button>
+                    <button class="btn btn-sm btn-outline-primary" id="btn-simpan-cetak" style="display:none"
+                        @disabled(!$isOwner) title="{{ !$isOwner ? 'Hanya owner yang dapat menyimpan' : '' }}">
+                        <i class="bi bi-printer"></i>
+                        <span class="d-none d-sm-inline ms-1">Simpan & Cetak</span>
+                    </button>
+                    <button class="btn btn-sm btn-primary" id="btn-confirm-submit" disabled style="color:#fff !important"
+                        title="{{ !$isOwner ? 'Hanya owner yang dapat menyimpan' : '' }}">
+                        <i class="bi bi-arrow-right" id="btn-confirm-icon"></i>
+                        <span class="ms-1" id="btn-confirm-label">Lanjut</span>
+                    </button>
+                </div>
             </div>
 
         </div>
@@ -89,13 +110,31 @@
 <script>
 document.addEventListener('DOMContentLoaded', function () {
     const bomSuppliesByItem  = @json($bomSuppliesByItem ?? []);
+    const isOwner            = {{ json_encode($isOwner) }};
 
     const operatorHidden     = document.getElementById('operator_id_hidden');
     const operatorSelect     = document.getElementById('operator_select_modal');
     const checklistPayload   = document.getElementById('supplies_checklist_payload');
     const modalEl            = document.getElementById('confirmSubmitModal');
     const confirmBtn         = document.getElementById('btn-confirm-submit');
+    const confirmIcon        = document.getElementById('btn-confirm-icon');
+    const confirmLabel       = document.getElementById('btn-confirm-label');
     const backBtn            = document.getElementById('btn-step-back');
+    const simpanCetakBtn     = document.getElementById('btn-simpan-cetak');
+
+    function setConfirmState(isLast) {
+        if (confirmIcon) {
+            confirmIcon.className = isLast ? 'bi bi-check2-circle' : 'bi bi-arrow-right';
+        }
+        if (confirmLabel) {
+            confirmLabel.textContent = isLast ? 'Simpan' : 'Lanjut';
+        }
+        if (simpanCetakBtn) simpanCetakBtn.style.display = isLast ? '' : 'none';
+        // non-owner: disable tombol simpan di step terakhir
+        if (isLast && !isOwner) {
+            confirmBtn.disabled = true;
+        }
+    }
     const rows               = document.querySelectorAll('.bundle-row');
     const form               = document.getElementById('sewing-pickup-form');
 
@@ -128,7 +167,8 @@ document.addEventListener('DOMContentLoaded', function () {
     /* ── operator sync ── */
     operatorSelect.addEventListener('change', () => {
         operatorHidden.value = operatorSelect.value;
-        confirmBtn.disabled  = !operatorSelect.value;
+        const atLastStep = phase === 'supply' && currentStep === activeSupplyItems.length - 1;
+        confirmBtn.disabled = !operatorSelect.value || (atLastStep && !isOwner);
     });
 
     /* ── ambil baris yang ada qty ── */
@@ -155,7 +195,7 @@ document.addEventListener('DOMContentLoaded', function () {
         phaseSupply.style.display  = 'none';
         modalTitle.textContent     = 'Konfirmasi Sewing Pickup';
         backBtn.style.display      = 'none';
-        confirmBtn.textContent     = 'Lanjut →';
+        setConfirmState(false);
         confirmBtn.disabled        = !operatorSelect.value;
 
         // Tanggal ambil dari input form utama
@@ -241,7 +281,7 @@ document.addEventListener('DOMContentLoaded', function () {
 
         backBtn.style.display = '';   // selalu tampil di phase supply (untuk kembali ke confirm juga)
         const isLast = idx === total - 1;
-        confirmBtn.textContent = isLast ? 'Simpan' : 'Lanjut →';
+        setConfirmState(isLast);
         confirmBtn.disabled    = !operatorSelect.value;
 
         if (!line.supplies.length) {
@@ -381,9 +421,195 @@ document.addEventListener('DOMContentLoaded', function () {
             currentStep++;
             renderStep(currentStep);
         } else {
+            if (!isOwner) return; // guard: non-owner tidak bisa simpan
             submitForm();
         }
     });
+
+    /* ── tombol Simpan & Cetak → preview popup dulu ── */
+    if (simpanCetakBtn) {
+        simpanCetakBtn.addEventListener('click', function () {
+            openPreviewWindow();
+        });
+    }
+
+    function openPreviewWindow() {
+        /* ── kumpulkan data untuk preview ── */
+        const operatorName = operatorSelect.options[operatorSelect.selectedIndex]?.text || '—';
+        const dateRaw  = form.querySelector('input[name="date"]')?.value || '';
+        let dateFmt = '—';
+        if (dateRaw) {
+            const [y, m, d] = dateRaw.split('-');
+            dateFmt = `${d}/${m}/${y}`;
+        }
+
+        /* items */
+        const lines    = selectedLines;
+        const totalQty = lines.reduce((s, l) => s + Number(l.qty), 0);
+        const itemRows = lines.map((l, i) =>
+            `<tr>
+                <td>${i + 1}</td>
+                <td>${esc(l.code)}</td>
+                <td class="r">${Number(l.qty).toLocaleString('id-ID')}</td>
+            </tr>`
+        ).join('');
+
+        /* supplies — aggregate across all bundles */
+        const supplyMap = new Map();
+        activeSupplyItems.forEach(line => {
+            line.supplies.forEach(sup => {
+                const key = String(sup.id);
+                const cur = supplyMap.get(key) || { code: sup.code, issued: 0 };
+                cur.issued += Number(sup.issued);
+                supplyMap.set(key, cur);
+            });
+        });
+        const supplyEntries = [...supplyMap.values()];
+        const supplySection = supplyEntries.length
+            ? `<hr class="div">
+               <p class="sec-lbl">Kelengkapan</p>
+               <table>
+                   <thead><tr><th>#</th><th>Kode</th><th class="r">Qty</th></tr></thead>
+                   <tbody>
+                       ${supplyEntries.map((s, i) =>
+                           `<tr>
+                               <td>${i + 1}</td>
+                               <td>${esc(s.code)}</td>
+                               <td class="r">${Number(s.issued).toLocaleString('id-ID')}</td>
+                           </tr>`
+                       ).join('')}
+                   </tbody>
+               </table>`
+            : '';
+
+        /* ── bangun HTML popup ── */
+        const html = `<!DOCTYPE html>
+<html lang="id">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<title>Preview Slip</title>
+<style id="ps">@media print { @page { size: 50mm auto; margin: 2mm 3mm; } }</style>
+<style>
+*{box-sizing:border-box;margin:0;padding:0}
+body{font-family:'Courier New',Courier,monospace;background:#f3f4f6}
+.wrap{max-width:420px;margin:0 auto;padding:1rem}
+.bar{display:flex;justify-content:space-between;align-items:center;gap:.5rem;
+     background:#fff;border-radius:8px;padding:.6rem .8rem;
+     box-shadow:0 1px 4px rgba(0,0,0,.12);margin-bottom:1rem;
+     font-family:system-ui,-apple-system,sans-serif}
+.bar label{font-size:.8rem;color:#64748b;white-space:nowrap}
+.bar select{border:1px solid #d1d5db;border-radius:6px;padding:.25rem .5rem;font-size:.8rem;background:#fff;cursor:pointer}
+.btn{background:#2563eb;color:#fff;border:none;border-radius:6px;
+     padding:.32rem .9rem;font-size:.82rem;font-weight:600;cursor:pointer;white-space:nowrap}
+.btn:hover{background:#1d4ed8}
+.slip{background:#fff;border:1px solid #d1d5db;border-radius:8px;
+      padding:.9rem .75rem;font-size:8.5px;color:#000;line-height:1.4}
+.hdr{text-align:center;margin-bottom:4px}
+.title{font-size:10px;font-weight:900;text-transform:uppercase;letter-spacing:.04em}
+.meta{font-size:7.5px;color:#555;margin-top:2px}
+.draft{display:inline-block;font-size:6px;color:#f59e0b;border:1px dashed #f59e0b;
+       border-radius:3px;padding:0 3px;margin-left:4px;font-weight:700;vertical-align:middle}
+.div{border:none;border-top:1px dashed #999;margin:4px 0}
+.sec-lbl{font-size:7px;text-transform:uppercase;letter-spacing:.05em;color:#777;margin:5px 0 2px}
+table{width:100%;border-collapse:collapse;font-size:9px}
+th{font-size:7.5px;text-transform:uppercase;letter-spacing:.03em;
+   border-bottom:1px solid #999;padding:1px 2px 3px;font-weight:700}
+td{padding:3px 2px;vertical-align:middle;border-bottom:1px dotted #ddd;font-weight:700}
+tfoot td{border-top:1px solid #999;border-bottom:none;font-weight:900;padding-top:3px;font-size:9px}
+.r{text-align:right}
+.ttd{display:grid;grid-template-columns:1fr 1fr;gap:6px;margin-top:8px}
+.ttd-box{text-align:center}
+.ttd-lbl{font-size:7px;color:#555;margin-bottom:2px}
+.ttd-line{border-bottom:1px solid #000;height:18px;margin-bottom:2px}
+.ttd-name{font-size:7px;font-weight:700}
+.slip-ft{margin-top:5px;font-size:6.5px;color:#aaa;text-align:center}
+@media print{.bar{display:none!important}body{background:#fff}
+.wrap{max-width:none;padding:0;margin:0}.slip{border:none;border-radius:0;padding:0}}
+</style>
+</head>
+<body>
+<div class="wrap">
+  <div class="bar">
+    <label>Lebar kertas:</label>
+    <select id="pw">
+      <option value="50mm" selected>50 mm</option>
+      <option value="58mm">58 mm</option>
+      <option value="80mm">80 mm</option>
+      <option value="100mm">100 mm</option>
+    </select>
+    <button class="btn" id="btnOk">&#128438;&nbsp;Simpan &amp; Cetak</button>
+  </div>
+
+  <div class="slip">
+    <div class="hdr">
+      <div class="title">Serah Terima Jahit <span class="draft">DRAFT</span></div>
+      <div class="meta">${dateFmt} &middot; ${esc(operatorName)}</div>
+    </div>
+    <hr class="div">
+    <p class="sec-lbl">Item</p>
+    <table>
+      <thead><tr><th>#</th><th>Kode</th><th class="r">Qty</th></tr></thead>
+      <tbody>${itemRows}</tbody>
+      <tfoot><tr>
+        <td colspan="2" class="r">Total</td>
+        <td class="r">${totalQty.toLocaleString('id-ID')}</td>
+      </tr></tfoot>
+    </table>
+    ${supplySection}
+    <hr class="div">
+    <div class="ttd">
+      <div class="ttd-box">
+        <div class="ttd-lbl">Diserahkan oleh</div>
+        <div class="ttd-line"></div>
+        <div class="ttd-name">( _____________ )</div>
+      </div>
+      <div class="ttd-box">
+        <div class="ttd-lbl">Diterima oleh</div>
+        <div class="ttd-line"></div>
+        <div class="ttd-name">${esc(operatorName)}</div>
+      </div>
+    </div>
+    <div class="slip-ft">Preview &middot; Belum Disimpan</div>
+  </div>
+</div>
+<script>
+  var pw = document.getElementById('pw');
+  var ps = document.getElementById('ps');
+  pw.addEventListener('change', function() {
+    ps.textContent = '@media print { @page { size: ' + this.value + ' auto; margin: 2mm 3mm; } }';
+  });
+  document.getElementById('btnOk').addEventListener('click', function() {
+    if (window.opener) {
+      window.opener.postMessage({ action: 'save_and_print', paperWidth: pw.value }, '*');
+    }
+    window.close();
+  });
+<\/script>
+</body>
+</html>`;
+
+        /* ── buka popup ── */
+        const popup = window.open('', '_blank', 'width=520,height=700,menubar=no,toolbar=no,location=no,status=no,resizable=yes');
+        if (!popup) {
+            // fallback: kalau popup diblokir, langsung submit biasa
+            alert('Pop-up diblokir browser. Izinkan pop-up untuk halaman ini, atau gunakan tombol Simpan.');
+            return;
+        }
+        popup.document.write(html);
+        popup.document.close();
+
+        /* ── terima konfirmasi dari popup ── */
+        function handleMsg(e) {
+            if (!e.data || e.data.action !== 'save_and_print') return;
+            window.removeEventListener('message', handleMsg);
+            document.getElementById('print_after_save').value = '1';
+            const pwInput = document.getElementById('paper_width');
+            if (pwInput) pwInput.value = e.data.paperWidth || '50mm';
+            submitForm();
+        }
+        window.addEventListener('message', handleMsg);
+    }
 
     /* ── tombol Kembali ── */
     backBtn.addEventListener('click', function () {
@@ -398,7 +624,7 @@ document.addEventListener('DOMContentLoaded', function () {
                 modalTitle.textContent     = 'Konfirmasi Sewing Pickup';
                 phase                      = 'confirm';
                 backBtn.style.display      = 'none';
-                confirmBtn.textContent     = 'Lanjut →';
+                setConfirmState(false);
                 confirmBtn.disabled        = !operatorSelect.value;
             }
         }
@@ -409,7 +635,7 @@ document.addEventListener('DOMContentLoaded', function () {
         operatorSelect.value     = '';
         operatorHidden.value     = '';
         confirmBtn.disabled      = true;
-        confirmBtn.textContent   = 'Lanjut →';
+        setConfirmState(false);
         backBtn.style.display    = 'none';
         phase                    = 'confirm';
         currentStep              = 0;

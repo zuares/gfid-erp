@@ -23,6 +23,55 @@ class PurchaseReturnController extends Controller
         protected \App\Services\Inventory\InventoryService $inventory,
     ) {}
 
+    public function index(Request $request)
+    {
+        $query = PurchaseReturn::query()
+            ->with(['grn.warehouse', 'supplier', 'order'])
+            ->withCount('lines')
+            ->withSum('lines as total_qty', 'qty')
+            ->orderByDesc('date')
+            ->orderByDesc('id');
+
+        $search = trim((string) $request->input('search', ''));
+        if ($search !== '') {
+            $query->where(function ($q) use ($search) {
+                $q->where('code', 'like', "%{$search}%")
+                    ->orWhereHas('grn', fn($qq) => $qq->where('code', 'like', "%{$search}%"))
+                    ->orWhereHas('supplier', fn($qq) => $qq->where('name', 'like', "%{$search}%")
+                        ->orWhere('code', 'like', "%{$search}%"));
+            });
+        }
+
+        $status = (string) $request->input('status', '');
+        if (in_array($status, ['draft', 'posted'], true)) {
+            $query->where('status', $status)->whereNull('voided_at');
+        } elseif ($status === 'void') {
+            $query->whereNotNull('voided_at');
+        }
+
+        if ($request->filled('from_date')) {
+            $query->whereDate('date', '>=', $request->input('from_date'));
+        }
+
+        if ($request->filled('to_date')) {
+            $query->whereDate('date', '<=', $request->input('to_date'));
+        }
+
+        $returns = $query->paginate(15)->withQueryString();
+
+        $summary = (clone $query)
+            ->reorder()
+            ->selectRaw('COUNT(*) as total_returns')
+            ->selectRaw("SUM(CASE WHEN status = 'draft' AND voided_at IS NULL THEN 1 ELSE 0 END) as draft_count")
+            ->selectRaw("SUM(CASE WHEN status = 'posted' AND voided_at IS NULL THEN 1 ELSE 0 END) as posted_count")
+            ->selectRaw("SUM(CASE WHEN voided_at IS NOT NULL THEN 1 ELSE 0 END) as void_count")
+            ->selectRaw('COALESCE(SUM(total), 0) as total_value')
+            ->selectRaw('MAX(date) as last_date')
+            ->first();
+
+        return view('purchasing.purchase_returns.index', compact('returns', 'summary', 'search', 'status'));
+    }
+
     public function createFromGrn(PurchaseReceipt $purchase_receipt)
     {
         $purchase_receipt->loadMissing(['lines.item', 'order', 'supplier', 'warehouse']);
@@ -430,6 +479,22 @@ class PurchaseReturnController extends Controller
                 'voided_at' => now(),
                 'voided_by' => (int) auth()->id(),
             ])->save();
+
+            // 4) Tahap 9 — jika return ini berasal dari QC, unlink QC
+            if (!empty($purchase_return->qc_id)) {
+                $qc = \App\Models\PurchaseReceiptQc::find((int) $purchase_return->qc_id);
+                if ($qc && (int) ($qc->purchase_return_id ?? 0) === (int) $purchase_return->id) {
+                    $voidNote = '[Return ' . $purchase_return->code . ' di-VOID pada ' . now()->format('d/m/Y H:i') . ']';
+                    $existingNotes = $qc->resolution_notes ?? '';
+                    $qc->update([
+                        'purchase_return_id' => null,
+                        'resolved_at'        => null,
+                        // Pertahankan resolution_type agar user tahu rencana awal
+                        // Tambahkan keterangan void di resolution_notes
+                        'resolution_notes'   => trim($existingNotes . "\n" . $voidNote),
+                    ]);
+                }
+            }
         });
 
         return back()->with('success', 'Return berhasil di-VOID.');

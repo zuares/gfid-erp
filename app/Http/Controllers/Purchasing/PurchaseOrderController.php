@@ -8,6 +8,7 @@ use App\Models\Item;
 use App\Models\PaymentMethod;
 use App\Models\PurchaseOrder;
 use App\Models\PurchasePayment;
+use App\Models\PurchaseReceiptLine;
 use App\Models\Supplier;
 use App\Services\Purchasing\PurchaseOrderService;
 use Illuminate\Http\Request;
@@ -114,11 +115,12 @@ class PurchaseOrderController extends Controller
         // ✅ FIX: category_id -> item_category_id
         // ✅ PACK di atas (OPP/PLY/THR ngumpul dulu)
         // packing PO memakai item type=material (packing supplies bukan type tersendiri)
+        // asset/service/jasa/lainnya: tampilkan semua item aktif (tidak filter by type)
+        $nonInventoryTypes = ['asset', 'service', 'jasa', 'lainnya'];
         $itemTypeFilter = $orderType === 'packing' ? 'material' : $orderType;
-        $items = Item::query()
+        $itemQuery = Item::query()
             ->select(['id', 'code', 'name', 'item_category_id', 'type', 'active'])
             ->where('active', 1)
-            ->where('type', $itemTypeFilter)
             ->with(['category:id,code,name'])
             ->orderByRaw("
                 CASE
@@ -127,8 +129,11 @@ class PurchaseOrderController extends Controller
                 END
             ")
             ->orderBy('name')
-            ->limit(300)
-            ->get();
+            ->limit(300);
+        if (!in_array($orderType, $nonInventoryTypes, true)) {
+            $itemQuery->where('type', $itemTypeFilter);
+        }
+        $items = $itemQuery->get();
 
         $cashAccounts = Account::query()
             ->where('type', 'asset')
@@ -137,16 +142,63 @@ class PurchaseOrderController extends Controller
             ->orderBy('code')
             ->get();
 
-        $lines = collect();
+        $lines  = collect();
+        $fromPr = null; // PR-D: null by default
+
+        // PR-D: Pre-fill dari Purchase Request jika from_pr dikirim
+        if ($request->filled('from_pr') && \Illuminate\Support\Facades\Schema::hasTable('purchase_requests')) {
+            $pr = \App\Models\PurchaseRequest::with('lines.item')->find((int) $request->from_pr);
+
+            if ($pr && $pr->isApproved() && is_null($pr->converted_to_po_id)) {
+                $fromPr = $pr;
+
+                // Pre-fill supplier
+                if ($pr->supplier_id && !$request->filled('supplier_id')) {
+                    $order->supplier_id = $pr->supplier_id;
+                }
+
+                // Build lines dari PR (format compatible dengan _form.blade.php)
+                $prLinesMapped = $pr->lines->map(function ($prLine) {
+                    $item = $prLine->item;
+                    return [
+                        'item_id'             => $prLine->item_id,
+                        'item'                => $item ? [
+                            'id'                         => $item->id,
+                            'code'                       => $item->code,
+                            'name'                       => $item->name,
+                            'default_allocation'         => $item->default_allocation ?? 'hpp',
+                            'default_expense_account_id' => $item->default_expense_account_id ?? null,
+                        ] : null,
+                        'qty'                 => $prLine->qty,
+                        'unit_price'          => $prLine->unit_price ?? 0,
+                        'discount'            => 0,
+                        'allocation'          => $item->default_allocation ?? 'hpp',
+                        'expense_account_id'  => $item->default_expense_account_id ?? '',
+                    ];
+                });
+
+                if ($prLinesMapped->isNotEmpty()) {
+                    $lines = $prLinesMapped;
+                }
+
+                // PR notes sebagai referensi di PO notes
+                if (!empty($pr->notes)) {
+                    $order->notes = '[PR: ' . $pr->code . '] ' . $pr->notes;
+                } else {
+                    $order->notes = '[PR: ' . $pr->code . ']';
+                }
+            }
+        }
 
         return view('purchasing.purchase_orders.create', [
-            'order' => $order,
-            'suppliers' => $suppliers,
+            'order'          => $order,
+            'suppliers'      => $suppliers,
             'paymentMethods' => $paymentMethods,
-            'items' => $items,
-            'lines' => $lines,
-            'cashAccounts' => $cashAccounts,
-            'orderType' => $orderType,
+            'items'          => $items,
+            'lines'          => $lines,
+            'cashAccounts'   => $cashAccounts,
+            'orderType'      => $orderType,
+            'fromPr'         => $fromPr, // PR-D: null atau PurchaseRequest model
         ]);
     }
 
@@ -170,9 +222,30 @@ class PurchaseOrderController extends Controller
         // auto-create payment from form (pay_now)
         $this->maybeCreatePayNowPayment($request, $order, allowIfHasExistingPayments: true);
 
+        // PR-D: Jika PO dibuat dari Purchase Request, simpan relasi + update status PR
+        $successMsg = 'Purchase Order berhasil dibuat.';
+        $prId = (int) $request->input('purchase_request_id', 0);
+        if ($prId > 0 && \Illuminate\Support\Facades\Schema::hasTable('purchase_requests')) {
+            $pr = \App\Models\PurchaseRequest::find($prId);
+            if ($pr && $pr->isApproved() && is_null($pr->converted_to_po_id)) {
+                // Simpan reference di PO
+                $order->purchase_request_id = $prId;
+                $order->save();
+
+                // Update status PR → converted
+                $pr->update([
+                    'status'           => 'converted',
+                    'converted_to_po_id' => $order->id,
+                    'converted_at'     => now(),
+                ]);
+
+                $successMsg = "PO {$order->code} berhasil dibuat dari PR {$pr->code}.";
+            }
+        }
+
         return redirect()
             ->route('purchasing.purchase_orders.show', $order->id)
-            ->with('success', 'Purchase Order berhasil dibuat.');
+            ->with('success', $successMsg);
     }
 
     /**
@@ -189,6 +262,7 @@ class PurchaseOrderController extends Controller
             'cancelledBy',
             'purchaseReceipts.warehouse',
             'purchaseReceipts',
+            'purchaseRequest', // PR-D: relasi ke PR asal (nullable)
             'payments' => function ($q) {
                 $q->with(['paymentMethod', 'cashAccount'])
                     ->orderByDesc('date')
@@ -252,6 +326,44 @@ class PurchaseOrderController extends Controller
         $settled = $paidPaymentTotal + $dpAppliedTotal;
         $apOutstanding = max(0, round($grnPostedTotal - $settled, 2));
 
+        // Cek apakah semua PO line sudah fully received (dari GRN posted)
+        // → dipakai untuk disable tombol "+ GRN baru"
+        $poLines = $purchase_order->lines;
+        $canCreateGrn = true; // default: boleh
+        if ($poLines->isNotEmpty()) {
+            $poLineIds = $poLines->pluck('id');
+            $receivedByLine = PurchaseReceiptLine::query()
+                ->whereIn('purchase_order_line_id', $poLineIds)
+                ->whereHas('receipt', fn($q) => $q->where('status', 'posted'))
+                ->selectRaw('purchase_order_line_id, SUM(qty_received) as total_received')
+                ->groupBy('purchase_order_line_id')
+                ->pluck('total_received', 'purchase_order_line_id');
+
+            // Masih bisa GRN kalau ada minimal 1 line yang belum lunas terima
+            $canCreateGrn = $poLines->contains(function ($line) use ($receivedByLine) {
+                return (float) ($receivedByLine[$line->id] ?? 0) < (float) $line->qty;
+            });
+        }
+
+        // Tahap 4: Supplier Invoices untuk dropdown payment + ringkasan
+        $poInvoices = \App\Models\SupplierInvoice::query()
+            ->where('purchase_order_id', $purchase_order->id)
+            ->whereNotIn('status', ['void'])
+            ->orderByDesc('invoice_date')
+            ->get();
+
+        // Invoice yang belum lunas (untuk dropdown di form payment)
+        $unpaidInvoices = $poInvoices->whereNotIn('status', ['paid', 'void']);
+
+        // Ringkasan invoice untuk UI
+        $invoiceTotalAmount = (float) $poInvoices->whereNotIn('status', ['void'])->sum('total_amount');
+        $invoiceTotalPaid   = (float) $poInvoices->whereNotIn('status', ['void'])->sum('paid_amount');
+        $invoiceOutstanding = max(0, round($invoiceTotalAmount - $invoiceTotalPaid, 2));
+
+        // Cek syarat Close PO
+        $closeBlockers = $this->calcCloseBlockers($purchase_order, $poInvoices);
+        $canClose = empty($closeBlockers) && !$purchase_order->isClosed();
+
         return view('purchasing.purchase_orders.show', [
             'order' => $purchase_order,
             'paymentMethods' => $paymentMethods,
@@ -262,6 +374,15 @@ class PurchaseOrderController extends Controller
             'dpAppliedTotal' => $dpAppliedTotal,
             'dpAvailable' => $dpAvailable,
             'apOutstanding' => $apOutstanding,
+            'canCreateGrn' => $canCreateGrn,
+            // Tahap 4
+            'poInvoices' => $poInvoices,
+            'unpaidInvoices' => $unpaidInvoices,
+            'invoiceTotalAmount' => $invoiceTotalAmount,
+            'invoiceTotalPaid' => $invoiceTotalPaid,
+            'invoiceOutstanding' => $invoiceOutstanding,
+            'closeBlockers' => $closeBlockers,
+            'canClose' => $canClose,
         ]);
     }
 
@@ -292,10 +413,11 @@ class PurchaseOrderController extends Controller
 
         // ✅ biar konsisten: PACK ditaruh di atas juga di edit form
         // packing PO memakai item type=material
+        // asset/service/jasa/lainnya: tampilkan semua item aktif
+        $nonInventoryTypes = ['asset', 'service', 'jasa', 'lainnya'];
         $itemTypeFilter = $orderType === 'packing' ? 'material' : $orderType;
-        $itemsBase = Item::query()
+        $itemsBaseQuery = Item::query()
             ->where('active', 1)
-            ->where('type', $itemTypeFilter)
             ->with('category')
             ->orderByRaw("
                 CASE
@@ -304,8 +426,11 @@ class PurchaseOrderController extends Controller
                 END
             ")
             ->orderBy('name')
-            ->limit(300)
-            ->get();
+            ->limit(300);
+        if (!in_array($orderType, $nonInventoryTypes, true)) {
+            $itemsBaseQuery->where('type', $itemTypeFilter);
+        }
+        $itemsBase = $itemsBaseQuery->get();
 
         $lineItemIds = $purchase_order->lines
             ->pluck('item_id')
@@ -351,7 +476,7 @@ class PurchaseOrderController extends Controller
                 ->with('error', 'PO yang sudah di-approve/cancel tidak bisa diubah.');
         }
 
-        $data = $this->validateData($request);
+        $data = $this->validateData($request, $purchase_order);
         $data['status'] = 'draft';
 
         // Auto-set payment_status berdasarkan mode payment method
@@ -440,6 +565,10 @@ class PurchaseOrderController extends Controller
 
     public function getSupplierLastPrice(Request $request)
     {
+        if (!$this->canSeeMoney($request)) {
+            return response()->json(['last_price' => null]);
+        }
+
         $supplierId = (int) $request->query('supplier_id');
         $itemId = (int) $request->query('item_id');
 
@@ -477,12 +606,12 @@ class PurchaseOrderController extends Controller
     // VALIDASI + NORMALISASI
     // ======================================================================
 
-    protected function validateData(Request $request): array
+    protected function validateData(Request $request, ?PurchaseOrder $existingOrder = null): array
     {
         $rules = [
             'date' => ['required', 'date'],
             'supplier_id' => ['required', 'integer', 'exists:suppliers,id'],
-            'order_type' => ['required', 'in:material,finished_good,packing'],
+            'order_type' => ['required', 'in:material,finished_good,packing,asset,service,jasa,lainnya'],
 
             'payment_method_id' => ['nullable', 'integer', 'exists:payment_methods,id'],
 
@@ -518,6 +647,10 @@ class PurchaseOrderController extends Controller
         }
         unset($line);
 
+        if (!$this->canSeeMoney($request)) {
+            $this->stripMoneyFromNonOwnerPayload($data, $existingOrder);
+        }
+
         // Auto default payment_method_id kalau kosong
         if (empty($data['payment_method_id'])) {
             $transferId = PaymentMethod::query()
@@ -545,6 +678,10 @@ class PurchaseOrderController extends Controller
 
     protected function maybeCreatePayNowPayment(Request $request, PurchaseOrder $order, bool $allowIfHasExistingPayments = true): void
     {
+        if (!$this->canSeeMoney($request)) {
+            return;
+        }
+
         $payNow = $this->toNumber($request->input('pay_now'));
         if ($payNow <= 0.0001) {
             return;
@@ -655,7 +792,80 @@ class PurchaseOrderController extends Controller
     protected function normalizeOrderType(?string $value): string
     {
         $v = strtolower(trim((string) $value));
-        return in_array($v, ['material', 'finished_good', 'packing'], true) ? $v : 'material';
+        $allowed = ['material', 'finished_good', 'packing', 'asset', 'service', 'jasa', 'lainnya'];
+        return in_array($v, $allowed, true) ? $v : 'material';
+    }
+
+    protected function canSeeMoney(?Request $request = null): bool
+    {
+        $user = $request?->user() ?: auth()->user();
+        return $user && method_exists($user, 'isOwner') && $user->isOwner();
+    }
+
+    protected function stripMoneyFromNonOwnerPayload(array &$data, ?PurchaseOrder $existingOrder = null): void
+    {
+        $data['discount']      = $existingOrder ? (float) ($existingOrder->discount ?? 0) : 0.0;
+        $data['tax_percent']   = $existingOrder ? (float) ($existingOrder->tax_percent ?? 0) : 0.0;
+        $data['shipping_cost'] = $existingOrder ? (float) ($existingOrder->shipping_cost ?? 0) : 0.0;
+        $data['pay_now']       = 0.0;
+
+        // Harga existing PO (untuk edit — pertahankan harga yang sudah diisi owner)
+        $moneyByItem = [];
+        if ($existingOrder) {
+            $existingOrder->loadMissing('lines');
+            foreach ($existingOrder->lines as $line) {
+                $itemId = (int) ($line->item_id ?? 0);
+                if ($itemId <= 0) continue;
+                $moneyByItem[$itemId] ??= [];
+                $moneyByItem[$itemId][] = [
+                    'unit_price' => (float) ($line->unit_price ?? 0),
+                    'discount'   => (float) ($line->discount ?? 0),
+                ];
+            }
+        }
+
+        // Preload supplier_prices untuk supplier ini (dipakai sebagai fallback harga)
+        $supplierId = (int) ($data['supplier_id'] ?? 0);
+        $itemIds    = array_filter(array_map(fn($l) => (int) ($l['item_id'] ?? 0), $data['lines']));
+        $supplierPriceMap = [];
+        $itemLastPriceMap = [];
+        if ($supplierId > 0 && !empty($itemIds)) {
+            $supplierPriceMap = DB::table('supplier_prices')
+                ->where('supplier_id', $supplierId)
+                ->whereIn('item_id', $itemIds)
+                ->pluck('last_price', 'item_id')
+                ->toArray();
+
+            $itemLastPriceMap = DB::table('items')
+                ->whereIn('id', $itemIds)
+                ->pluck('last_purchase_price', 'id')
+                ->toArray();
+        }
+
+        foreach ($data['lines'] as &$line) {
+            $itemId = (int) ($line['item_id'] ?? 0);
+            $money  = null;
+            if ($itemId > 0 && !empty($moneyByItem[$itemId])) {
+                $money = array_shift($moneyByItem[$itemId]);
+            }
+
+            $existingPrice = (float) ($money['unit_price'] ?? 0);
+
+            if ($existingPrice > 0) {
+                // Edit PO: pertahankan harga owner
+                $line['unit_price'] = $existingPrice;
+                $line['discount']   = (float) ($money['discount'] ?? 0);
+            } else {
+                // PO baru atau harga belum diisi: ambil dari supplier_prices / item
+                $fallback = (float) ($supplierPriceMap[$itemId] ?? 0);
+                if ($fallback <= 0) {
+                    $fallback = (float) ($itemLastPriceMap[$itemId] ?? 0);
+                }
+                $line['unit_price'] = $fallback;
+                $line['discount']   = 0.0;
+            }
+        }
+        unset($line);
     }
 
     protected function toNumber($value): float
@@ -685,5 +895,80 @@ class PurchaseOrderController extends Controller
         }
 
         return (float) $value;
+    }
+
+    // ======================================================================
+    // TAHAP 4 — Close PO
+    // ======================================================================
+
+    /**
+     * Close PO — hanya owner, hanya jika semua syarat terpenuhi.
+     */
+    public function close(Request $request, PurchaseOrder $purchase_order)
+    {
+        abort_unless($request->user()?->isOwner(), 403, 'Hanya owner yang boleh menutup PO.');
+
+        if ($purchase_order->isClosed()) {
+            return back()->with('error', 'PO sudah di-close.');
+        }
+
+        // Load invoice untuk cek blockers
+        $poInvoices = \App\Models\SupplierInvoice::query()
+            ->where('purchase_order_id', $purchase_order->id)
+            ->whereNotIn('status', ['void'])
+            ->get();
+
+        $blockers = $this->calcCloseBlockers($purchase_order, $poInvoices);
+
+        if (!empty($blockers)) {
+            return back()->with('error', 'PO belum bisa di-close: ' . implode('; ', $blockers));
+        }
+
+        $purchase_order->closed_at = now();
+        $purchase_order->closed_by = (int) $request->user()->id;
+        $purchase_order->save();
+
+        return back()->with('success', 'PO berhasil di-close.');
+    }
+
+    /**
+     * Hitung daftar alasan PO belum bisa di-close.
+     * Return array kosong = bisa close.
+     *
+     * @param \Illuminate\Support\Collection $poInvoices
+     */
+    protected function calcCloseBlockers(PurchaseOrder $order, $poInvoices): array
+    {
+        $blockers = [];
+
+        if ($order->status !== 'approved') {
+            $blockers[] = 'Status PO harus APPROVED (saat ini: ' . strtoupper($order->status ?? 'draft') . ')';
+        }
+
+        $rcvStatus = $order->received_status ?? 'not_received';
+        if ($rcvStatus !== 'fully_received') {
+            $label = match ($rcvStatus) {
+                'partial' => 'baru sebagian diterima',
+                default   => 'belum ada barang diterima',
+            };
+            $blockers[] = 'Status terima barang ' . $label . ' (harus Lunas Terima)';
+        }
+
+        $payStatus = $order->payment_status ?? 'unpaid';
+        if ($payStatus !== 'paid') {
+            $label = match ($payStatus) {
+                'partial' => 'baru dibayar sebagian',
+                default   => 'belum dibayar',
+            };
+            $blockers[] = 'Status pembayaran ' . $label . ' (harus Lunas)';
+        }
+
+        // Cek invoice outstanding
+        $outstandingInvoices = $poInvoices->whereIn('status', ['posted', 'partial_paid', 'draft']);
+        if ($outstandingInvoices->isNotEmpty()) {
+            $blockers[] = 'Ada ' . $outstandingInvoices->count() . ' Faktur Supplier yang belum lunas/dibayar';
+        }
+
+        return $blockers;
     }
 }

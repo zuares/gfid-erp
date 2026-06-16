@@ -26,7 +26,11 @@ class PurchaseOrder extends Model
         'approved_at',
         'cancelled_by',
         'cancelled_at',
+        'closed_at',            // Tahap 4 — additive, nullable
+        'closed_by',            // Tahap 4 — nullable
         'order_type',
+        'received_status',
+        'purchase_request_id',  // PR-D — additive, nullable
     ];
 
     protected $casts = [
@@ -39,6 +43,7 @@ class PurchaseOrder extends Model
         'grand_total' => 'float',
         'approved_at' => 'datetime',
         'cancelled_at' => 'datetime',
+        'closed_at' => 'datetime',  // Tahap 4
     ];
 
     /*
@@ -82,6 +87,17 @@ class PurchaseOrder extends Model
         return $this->hasMany(PurchaseReceipt::class, 'purchase_order_id');
     }
 
+    public function supplierInvoices(): HasMany
+    {
+        return $this->hasMany(\App\Models\SupplierInvoice::class, 'purchase_order_id');
+    }
+
+    /** PR-D — relasi balik ke Purchase Request asal (nullable) */
+    public function purchaseRequest(): BelongsTo
+    {
+        return $this->belongsTo(\App\Models\PurchaseRequest::class, 'purchase_request_id');
+    }
+
     /*
     |--------------------------------------------------------------------------
     | HELPERS
@@ -101,6 +117,27 @@ class PurchaseOrder extends Model
     public function isCancelled(): bool
     {
         return $this->status === 'cancelled';
+    }
+
+    /** Closed ditandai oleh closed_at (additive — tidak mengubah kolom status) */
+    public function isClosed(): bool
+    {
+        return !is_null($this->closed_at);
+    }
+
+    public function isFullyReceived(): bool
+    {
+        return $this->received_status === 'fully_received';
+    }
+
+    public function isPartiallyReceived(): bool
+    {
+        return $this->received_status === 'partial';
+    }
+
+    public function isNotReceived(): bool
+    {
+        return ($this->received_status ?? 'not_received') === 'not_received';
     }
 
     public function payments()

@@ -20,10 +20,11 @@ class PurchaseReceiptLine extends Model
     ];
 
     protected $casts = [
-        'qty_received' => 'decimal:3',
-        'qty_reject' => 'decimal:3',
-        'unit_price' => 'decimal:2',
-        'line_total' => 'decimal:2',
+        // float bukan decimal:3 — hindari "5.000" yg disalah-baca num() sebagai 5000
+        'qty_received' => 'float',
+        'qty_reject'   => 'float',
+        'unit_price'   => 'decimal:2',
+        'line_total'   => 'decimal:2',
     ];
 
     public function receipt()

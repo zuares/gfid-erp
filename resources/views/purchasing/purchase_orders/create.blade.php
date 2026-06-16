@@ -19,6 +19,10 @@
                 <p class="text-muted mb-4" style="font-size:.85rem;">Pilih jenis PO dan supplier terlebih dahulu.</p>
 
                 <form id="step1-form" method="GET" action="{{ route('purchasing.purchase_orders.create') }}">
+                    {{-- PR-D: carry from_pr through step 1 --}}
+                    @if (request()->filled('from_pr'))
+                        <input type="hidden" name="from_pr" value="{{ (int) request('from_pr') }}">
+                    @endif
 
                     <div class="mb-3">
                         <label class="form-label fw-bold" style="font-size:.8rem;">Jenis PO</label>
@@ -27,6 +31,10 @@
                                 'material'      => ['label' => 'Bahan Baku', 'icon' => '🧵'],
                                 'finished_good' => ['label' => 'Barang Jadi', 'icon' => '👕'],
                                 'packing'       => ['label' => 'Packing',     'icon' => '📦'],
+                                'asset'         => ['label' => 'Aset',        'icon' => '🏭'],
+                                'service'       => ['label' => 'Service',     'icon' => '🔧'],
+                                'jasa'          => ['label' => 'Jasa',        'icon' => '🤝'],
+                                'lainnya'       => ['label' => 'Lainnya',     'icon' => '📋'],
                             ] as $val => $opt)
                             <label class="type-card flex-fill text-center p-3 border rounded-3 cursor-pointer"
                                 style="cursor:pointer; transition:.15s; min-width:100px;"
@@ -111,8 +119,27 @@ document.querySelectorAll('.type-card').forEach(card => {
     <div class="container py-3">
         <h1 class="mb-3">Purchase Order Baru</h1>
 
+        {{-- PR-D: banner jika PO ini dibuat dari PR --}}
+        @if (!empty($fromPr))
+            <div class="alert alert-info d-flex align-items-center gap-2 py-2 mb-3"
+                style="font-size:.88rem; border-radius:10px;">
+                <span style="font-size:1rem;">📋</span>
+                <div>
+                    Dibuat dari <strong>Purchase Request: {{ $fromPr->code }}</strong>
+                    @if ($fromPr->notes)
+                        — <span class="text-muted">{{ Str::limit($fromPr->notes, 80) }}</span>
+                    @endif
+                </div>
+            </div>
+        @endif
+
         <form action="{{ route('purchasing.purchase_orders.store') }}" method="POST">
             @csrf
+
+            {{-- PR-D: hidden purchase_request_id agar store() bisa link PR → PO --}}
+            @if (!empty($fromPr))
+                <input type="hidden" name="purchase_request_id" value="{{ $fromPr->id }}">
+            @endif
 
             @include('purchasing.purchase_orders._form')
 

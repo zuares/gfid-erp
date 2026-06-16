@@ -55,52 +55,43 @@
         }
 
         /* ====== HEADER / RINGKASAN ====== */
+        .bundle-picker-control-panel {
+            display: flex;
+            flex-direction: column;
+            gap: .6rem;
+            padding: .75rem;
+            margin: -.25rem -.35rem .25rem;
+            border: 1px solid rgba(148, 163, 184, .24);
+            border-radius: 14px;
+            background: #ffffff;
+            box-shadow:
+                0 12px 28px rgba(15, 23, 42, .12),
+                0 0 0 1px rgba(255, 255, 255, .72);
+        }
+
+        body[data-theme="dark"] .bundle-picker-control-panel {
+            background: #0f172a;
+            border-color: rgba(71, 85, 105, .82);
+            box-shadow:
+                0 14px 30px rgba(0, 0, 0, .55),
+                0 0 0 1px rgba(15, 23, 42, .9);
+        }
+
+        .pickup-control-meta {
+            border-bottom: 1px dashed rgba(148, 163, 184, .36);
+            padding-bottom: .65rem;
+        }
+
+        .pickup-control-meta .field-block {
+            margin-bottom: 0;
+        }
+
         .filter-header {
             display: flex;
             flex-wrap: wrap;
             justify-content: space-between;
             gap: .7rem;
             align-items: flex-start;
-        }
-
-        .filter-header-left {
-            display: flex;
-            flex-direction: column;
-            gap: .25rem;
-        }
-
-        .filter-header-left-title {
-            display: flex;
-            align-items: center;
-            gap: .3rem;
-        }
-
-        .filter-header-left-title h2 {
-            margin: 0;
-            font-size: .96rem;
-            font-weight: 700;
-        }
-
-        .summary-inline {
-            font-size: .78rem;
-            color: var(--muted);
-            display: flex;
-            flex-wrap: wrap;
-            gap: .35rem;
-            align-items: baseline;
-        }
-
-        .summary-inline-label {
-            font-weight: 600;
-            color: #4b5563;
-        }
-
-        body[data-theme="dark"] .summary-inline-label {
-            color: #e5e7eb;
-        }
-
-        .summary-inline-dot {
-            opacity: .7;
         }
 
         /* ========= SEARCH + FILTER SECTION ========= */
@@ -197,6 +188,20 @@
             font-size: .8rem;
         }
 
+        .bundle-picker-control-panel .input-group-text,
+        .bundle-picker-control-panel .form-control,
+        .bundle-picker-control-panel .form-select {
+            background-color: #ffffff;
+        }
+
+        body[data-theme="dark"] .bundle-picker-control-panel .input-group-text,
+        body[data-theme="dark"] .bundle-picker-control-panel .form-control,
+        body[data-theme="dark"] .bundle-picker-control-panel .form-select {
+            background-color: #0f172a;
+            color: #e5e7eb;
+            border-color: rgba(71, 85, 105, .82);
+        }
+
         .selection-toggle-row {
             display: flex;
             justify-content: flex-end;
@@ -214,6 +219,155 @@
 
         .selection-toggle-right .form-check-input {
             cursor: pointer;
+        }
+
+        .selected-bundle-summary {
+            border: 1px solid rgba(37, 99, 235, .22);
+            border-radius: 10px;
+            background: rgba(239, 246, 255, .72);
+            padding: .48rem .58rem;
+            display: flex;
+            flex-direction: column;
+            gap: .36rem;
+        }
+
+        body[data-theme="dark"] .selected-bundle-summary {
+            background: rgba(30, 41, 59, .78);
+            border-color: rgba(96, 165, 250, .28);
+        }
+
+        .selected-summary-head {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            gap: .5rem;
+            flex-wrap: wrap;
+        }
+
+        .selected-summary-title {
+            display: inline-flex;
+            align-items: center;
+            gap: .28rem;
+            font-size: .74rem;
+            font-weight: 800;
+            color: #1d4ed8;
+        }
+
+        body[data-theme="dark"] .selected-summary-title {
+            color: #93c5fd;
+        }
+
+        .selected-summary-clear {
+            border: 1px solid rgba(220, 38, 38, .22);
+            border-radius: 999px;
+            background: rgba(254, 242, 242, .86);
+            color: #dc2626;
+            font-size: .66rem;
+            font-weight: 900;
+            padding: .16rem .46rem;
+            line-height: 1.2;
+        }
+
+        body[data-theme="dark"] .selected-summary-clear {
+            background: rgba(127, 29, 29, .28);
+            border-color: rgba(248, 113, 113, .30);
+            color: #fca5a5;
+        }
+
+        .selected-summary-table-wrap {
+            border: 1px solid rgba(148, 163, 184, .24);
+            border-radius: 9px;
+            overflow: auto;
+            max-height: 132px;
+            background: #ffffff;
+            -webkit-overflow-scrolling: touch;
+        }
+
+        body[data-theme="dark"] .selected-summary-table-wrap {
+            background: rgba(15, 23, 42, .96);
+            border-color: rgba(71, 85, 105, .82);
+        }
+
+        .selected-summary-table {
+            width: 100%;
+            margin: 0;
+            border-collapse: collapse;
+            font-size: .7rem;
+        }
+
+        .selected-summary-table th {
+            background: rgba(248, 250, 252, .9);
+            color: var(--muted);
+            font-size: .58rem;
+            font-weight: 900;
+            letter-spacing: .06em;
+            padding: .28rem .4rem;
+            text-transform: uppercase;
+            border-bottom: 1px solid rgba(148, 163, 184, .20);
+        }
+
+        body[data-theme="dark"] .selected-summary-table th {
+            background: rgba(30, 41, 59, .72);
+        }
+
+        .selected-summary-table td {
+            padding: .3rem .4rem;
+            border-bottom: 1px solid rgba(148, 163, 184, .14);
+            vertical-align: middle;
+        }
+
+        .selected-summary-table tbody tr:last-child td {
+            border-bottom: none;
+        }
+
+        .selected-summary-table tfoot td {
+            background: rgba(248, 250, 252, .92);
+            border-top: 1px solid rgba(148, 163, 184, .24);
+            color: #0f172a;
+            font-weight: 900;
+            padding: .34rem .4rem;
+        }
+
+        body[data-theme="dark"] .selected-summary-table tfoot td {
+            background: rgba(30, 41, 59, .74);
+            color: #e5e7eb;
+        }
+
+        .selected-summary-table .item-code-cell {
+            font-weight: 900;
+            color: #1d4ed8;
+        }
+
+        body[data-theme="dark"] .selected-summary-table .item-code-cell {
+            color: #93c5fd;
+        }
+
+        .selected-summary-remove {
+            width: 22px;
+            height: 22px;
+            border: 1px solid rgba(220, 38, 38, .24);
+            border-radius: 999px;
+            background: rgba(254, 242, 242, .9);
+            color: #dc2626;
+            font-size: .82rem;
+            font-weight: 800;
+            line-height: 1;
+            display: inline-flex;
+            align-items: center;
+            justify-content: center;
+            padding: 0;
+        }
+
+        body[data-theme="dark"] .selected-summary-remove {
+            background: rgba(127, 29, 29, .28);
+            color: #fca5a5;
+            border-color: rgba(248, 113, 113, .30);
+        }
+
+        .selected-summary-empty {
+            font-size: .78rem;
+            color: var(--muted);
+            font-weight: 600;
         }
 
         /* ========== TABLE / BUNDLE ROW ========== */
@@ -272,6 +426,11 @@
             box-shadow:
                 0 0 0 1px rgba(59, 130, 246, 0.8),
                 0 18px 32px rgba(15, 23, 42, 0.9);
+        }
+
+        .bundle-card-row.summary-focus {
+            outline: 2px solid rgba(37, 99, 235, .75);
+            outline-offset: 2px;
         }
 
         .row-empty {
@@ -358,6 +517,16 @@
                 order: 1;
             }
 
+            .bundle-picker-control-panel {
+                gap: .55rem;
+                margin: -.15rem -.15rem .25rem;
+                padding: .65rem;
+            }
+
+            .pickup-control-meta {
+                padding-bottom: .55rem;
+            }
+
             .table-wrap {
                 order: 2;
                 overflow-x: visible;
@@ -389,10 +558,10 @@
                 display: block;
                 width: 100%;
                 box-sizing: border-box;
-                border-radius: 14px;
+                border-radius: 12px;
                 border: 1px solid rgba(148, 163, 184, 0.3);
-                padding: .7rem .8rem .75rem;
-                margin-bottom: .45rem;
+                padding: .48rem .62rem .52rem;
+                margin-bottom: .34rem;
                 background: #ffffff;
                 cursor: pointer;
                 box-shadow:
@@ -427,15 +596,15 @@
                 display: flex;
                 justify-content: space-between;
                 align-items: flex-start;
-                gap: .75rem;
-                margin-bottom: .22rem;
+                gap: .58rem;
+                margin-bottom: .12rem;
             }
 
             .mobile-row-header-left {
-                font-size: clamp(.78rem, 2.5vw, .9rem);
+                font-size: clamp(.74rem, 2.4vw, .86rem);
                 display: flex;
                 flex-direction: column;
-                gap: .06rem;
+                gap: .02rem;
                 flex: 1;
                 min-width: 0;
             }
@@ -449,14 +618,14 @@
             }
 
             .mobile-row-header-left .row-index {
-                font-size: clamp(.68rem, 2vw, .78rem);
+                font-size: clamp(.62rem, 1.9vw, .72rem);
                 color: var(--muted);
                 flex-shrink: 0;
             }
 
             /* ✅ KODE BARANG RESPONSIVE */
             .mobile-row-header-left .item-code {
-                font-size: clamp(.9rem, 3.6vw, 1.1rem) !important;
+                font-size: clamp(.84rem, 3.35vw, 1rem) !important;
                 font-weight: 800 !important;
                 color: #2563eb !important;
                 letter-spacing: .12px;
@@ -479,18 +648,19 @@
 
             .mobile-row-header-right {
                 text-align: right;
-                font-size: clamp(.7rem, 2.4vw, .82rem);
-                min-width: 110px;
+                font-size: clamp(.66rem, 2.3vw, .78rem);
+                width: clamp(128px, 42vw, 180px);
+                min-width: clamp(128px, 42vw, 180px);
                 flex-shrink: 0;
             }
 
             .mobile-row-header-right .qty-ready-label {
-                font-size: clamp(.6rem, 2vw, .7rem) !important;
+                font-size: clamp(.56rem, 1.9vw, .66rem) !important;
                 font-weight: 600;
                 color: var(--muted);
                 text-transform: uppercase;
                 letter-spacing: .28px;
-                margin-bottom: .04rem;
+                margin-bottom: .02rem;
             }
 
             .mobile-row-header-right .qty-ready-value {
@@ -501,9 +671,9 @@
             .mobile-row-header-right .qty-ready-value .qty-ready-pill {
                 background: rgba(37, 99, 235, 0.12) !important;
                 color: #1d4ed8 !important;
-                padding: .18rem .58rem !important;
+                padding: .12rem .46rem !important;
                 border-radius: 999px !important;
-                font-size: clamp(.86rem, 3.2vw, .98rem) !important;
+                font-size: clamp(.78rem, 3vw, .9rem) !important;
                 font-weight: 800 !important;
                 max-width: 100%;
                 min-width: 0;
@@ -512,12 +682,12 @@
             }
 
             .mobile-row-meta {
-                font-size: clamp(.7rem, 2.4vw, .8rem);
+                font-size: clamp(.64rem, 2.25vw, .74rem);
                 color: var(--muted);
-                margin-bottom: .18rem;
+                margin-bottom: .06rem;
                 display: flex;
                 justify-content: space-between;
-                gap: .5rem;
+                gap: .4rem;
             }
 
             .mobile-row-meta-left {
@@ -526,7 +696,7 @@
             }
 
             .mobile-row-meta-label {
-                font-size: clamp(.62rem, 2vw, .7rem);
+                font-size: clamp(.56rem, 1.9vw, .64rem);
                 text-transform: uppercase;
                 color: var(--muted);
                 opacity: .9;
@@ -534,7 +704,7 @@
             }
 
             .mobile-row-meta-value {
-                font-size: clamp(.7rem, 2.4vw, .8rem);
+                font-size: clamp(.64rem, 2.25vw, .74rem);
                 word-break: break-word;
             }
 
@@ -543,22 +713,35 @@
             }
 
             .mobile-row-footer-left .pickup-label {
-                font-size: clamp(.7rem, 2.4vw, .8rem) !important;
+                font-size: clamp(.62rem, 2.2vw, .72rem) !important;
                 font-weight: 600 !important;
                 color: #2563eb !important;
-                margin-bottom: .1rem;
+                margin-bottom: .04rem;
                 letter-spacing: .17px;
                 text-transform: uppercase;
             }
 
             .mobile-row-footer-left input.qty-input {
-                font-size: clamp(.9rem, 3.2vw, 1rem) !important;
+                width: 100% !important;
+                min-width: 0;
+                font-size: clamp(.82rem, 3vw, .94rem) !important;
                 font-weight: 600 !important;
-                padding-block: .35rem !important;
+                padding-block: .24rem !important;
                 border: 1.4px solid rgba(37, 99, 235, .45) !important;
-                border-radius: 10px !important;
+                border-radius: 8px !important;
                 box-shadow: inset 0 0 0 1px rgba(37, 99, 235, .18) !important;
                 text-align: center !important;
+            }
+
+            @media (max-width: 380px) {
+                .mobile-row-header {
+                    gap: .5rem;
+                }
+
+                .mobile-row-header-right {
+                    width: clamp(120px, 44vw, 156px);
+                    min-width: clamp(120px, 44vw, 156px);
+                }
             }
 
             .mobile-row-footer-left input.qty-input:focus {
@@ -612,72 +795,119 @@
     <div class="card sewing-pickup-bundle-picker-card">
         <div class="card-section">
 
-            {{-- HEADER + SUMMARY --}}
-            <div class="filter-header">
-                <div class="filter-header-left">
-                    <div class="filter-header-left-title">
-                        <i class="bi bi-funnel text-muted"></i>
-                        <h2>Daftar ambil jahit</h2>
-                    </div>
+            <div class="bundle-picker-control-panel">
+                <div class="pickup-control-meta">
+                    <div class="row g-2 align-items-end">
+                        <div class="col-12 col-md-3">
+                            <div class="field-block">
+                                <div class="field-label">Tanggal ambil</div>
+                                <input type="date" name="date"
+                                    class="form-control form-control-sm field-input-sm @error('date') is-invalid @enderror"
+                                    value="{{ old('date', now()->format('Y-m-d')) }}">
+                                @error('date')
+                                    <div class="invalid-feedback">{{ $message }}</div>
+                                @enderror
+                            </div>
+                        </div>
 
-                    <div class="summary-inline">
-                        <span class="summary-inline-label">Dipilih:</span>
-                        <span id="summary-selected-bundles">0</span>
-
-                        <span class="summary-inline-dot">•</span>
-
-                        <span class="summary-inline-label">Pickup:</span>
-                        <span><span id="summary-selected-qty">0,00</span> pcs</span>
-
-                        <span class="summary-inline-dot d-none d-md-inline">•</span>
-
-                        <span class="summary-inline-label d-none d-md-inline">Ready:</span>
-                        <span class="d-none d-md-inline">
-                            {{ number_format($totalQtyReady, 2, ',', '.') }} pcs
-                        </span>
+                        <div class="col-12 col-md-4 gudang-section">
+                            <div class="field-block">
+                                <div class="field-label">Gudang tujuan</div>
+                                <div class="field-static">
+                                    @if ($defaultWarehouse)
+                                        <span class="code">{{ $defaultWarehouse->code }}</span>
+                                        <span class="name">— {{ $defaultWarehouse->name }}</span>
+                                    @else
+                                        <span class="text-danger small">Gudang WIP-SEW belum diset.</span>
+                                    @endif
+                                </div>
+                                @error('warehouse_id')
+                                    <div class="invalid-feedback d-block">{{ $message }}</div>
+                                @enderror
+                            </div>
+                        </div>
                     </div>
                 </div>
 
                 {{-- DESKTOP: toggle hanya baris yang ada pickup --}}
-                <div class="selection-toggle-row d-none d-md-flex">
-                    <div class="selection-toggle-right">
-                        <label class="form-check-label" for="toggle-only-picked">
-                            Tampilkan hanya baris dengan pickup
-                        </label>
-                        <input type="checkbox" class="form-check-input" id="toggle-only-picked">
+                <div class="filter-header">
+                    <div class="selection-toggle-row d-none d-md-flex">
+                        <div class="selection-toggle-right">
+                            <label class="form-check-label" for="toggle-only-picked">
+                                Tampilkan hanya baris dengan pickup
+                            </label>
+                            <input type="checkbox" class="form-check-input" id="toggle-only-picked">
+                        </div>
+                    </div>
+                </div>
+
+                {{-- FILTER (select kode barang + search) --}}
+                <div class="search-filter-section">
+                    <div class="search-filter-top">
+                        <div class="search-left">
+                            <div class="search-label">
+                                Cari item
+                            </div>
+
+                            <div class="item-code-select-wrap" id="item-code-select-wrap">
+                                <select id="item-code-select" class="form-select form-select-sm">
+                                    <option value="">Semua kode item</option>
+                                    @foreach ($itemCodes as $code)
+                                        <option value="{{ $code }}">{{ $code }}</option>
+                                    @endforeach
+                                </select>
+                            </div>
+                        </div>
+
+                        <div class="input-group input-group-sm search-input-wrap">
+                            <span class="input-group-text border-end-0 bg-white">
+                                <i class="bi bi-search text-muted"></i>
+                            </span>
+                            <input type="text" id="bundle-filter-input"
+                                class="form-control form-control-sm border-start-0 text-uppercase"
+                                placeholder="Kode item / lot.." autocomplete="off">
+                        </div>
+                    </div>
+                </div>
+
+                <div class="selected-bundle-summary" id="selected-bundle-summary">
+                    <div class="selected-summary-head">
+                        <div class="selected-summary-title">
+                            <i class="bi bi-check2-square"></i>
+                            <span>Item sudah dipilih</span>
+                            <span class="badge bg-primary rounded-pill" id="selected-summary-count">0</span>
+                        </div>
+                        <button type="button" class="selected-summary-clear d-none" id="selected-summary-clear">
+                            Bersihkan semua
+                        </button>
+                    </div>
+                    <div class="selected-summary-table-wrap d-none" id="selected-summary-list">
+                        <table class="selected-summary-table">
+                            <thead>
+                                <tr>
+                                    <th style="width:44px;">No</th>
+                                    <th>Kode Item</th>
+                                    <th class="text-end" style="width:110px;">Qty</th>
+                                    <th class="text-end" style="width:80px;">Aksi</th>
+                                </tr>
+                            </thead>
+                            <tbody id="selected-summary-body"></tbody>
+                            <tfoot>
+                                <tr>
+                                    <td colspan="2">Total</td>
+                                    <td class="text-end mono" id="selected-summary-total-qty">0,00</td>
+                                    <td class="text-end mono">
+                                        <span id="selected-summary-total-items">0</span> ikat
+                                    </td>
+                                </tr>
+                            </tfoot>
+                        </table>
+                    </div>
+                    <div class="selected-summary-empty" id="selected-summary-empty">
+                        Belum ada item yang diambil.
                     </div>
                 </div>
             </div>
-
-            {{-- FILTER (select kode barang + search) --}}
-            <div class="search-filter-section">
-                <div class="search-filter-top">
-                    <div class="search-left">
-                        <div class="search-label">
-                            Cari bundles
-                        </div>
-
-                        <div class="item-code-select-wrap" id="item-code-select-wrap">
-                            <select id="item-code-select" class="form-select form-select-sm">
-                                <option value="">Semua kode barang</option>
-                                @foreach ($itemCodes as $code)
-                                    <option value="{{ $code }}">{{ $code }}</option>
-                                @endforeach
-                            </select>
-                        </div>
-                    </div>
-
-                    <div class="input-group input-group-sm search-input-wrap">
-                        <span class="input-group-text border-end-0 bg-white">
-                            <i class="bi bi-search text-muted"></i>
-                        </span>
-                        <input type="text" id="bundle-filter-input"
-                            class="form-control form-control-sm border-start-0 text-uppercase"
-                            placeholder="Kode / bundle / lot.." autocomplete="off">
-                    </div>
-                </div>
-            </div>
-
             @error('lines')
                 <div class="alert alert-danger py-1 small mb-2">
                     {{ $message }}
@@ -724,7 +954,7 @@
                                 $oldQtyName = 'lines.' . $idx . '.qty_bundle';
 
                                 $cutDateObj = $b->cuttingJob?->date ?? $b->cuttingJob?->created_at;
-                                $cutDateLabel = $cutDateObj ? $cutDateObj->format('d/m/Y') : '-';
+                                $cutDateLabel = $cutDateObj ? $cutDateObj->format('d/m') : '-';
 
                                 $lotCode = $b->cuttingJob?->lot?->code;
                             @endphp
@@ -808,11 +1038,6 @@
                                                     {{ $b->finishedItem?->code ?? '-' }}
                                                 </span>
                                             </div>
-                                            @if ($b->finishedItem?->name)
-                                                <div class="item-name text-truncate">
-                                                    {{ $b->finishedItem?->name }}
-                                                </div>
-                                            @endif
                                         </div>
                                         <div class="mobile-row-header-right">
                                             <div class="qty-ready-label">Qty Ready</div>
@@ -842,7 +1067,7 @@
                                     {{-- MOBILE META: tgl cutting & qty cutting --}}
                                     <div class="mobile-row-meta">
                                         <div class="mobile-row-meta-left">
-                                            <div class="mobile-row-meta-label">Tgl Cutting</div>
+                                            <div class="mobile-row-meta-label">Tanggal</div>
                                             <div class="mobile-row-meta-value">
                                                 {{ $cutDateLabel }}
                                             </div>
@@ -884,12 +1109,17 @@
         document.addEventListener('DOMContentLoaded', function() {
             const rowsArr = Array.from(document.querySelectorAll('.bundle-row'));
 
-            const summaryBundlesSpan = document.getElementById('summary-selected-bundles');
-            const summaryQtySpan = document.getElementById('summary-selected-qty');
             const searchInput = document.getElementById('bundle-filter-input');
             const toggleOnlyPicked = document.getElementById('toggle-only-picked');
             const itemCodeSelect = document.getElementById('item-code-select');
             const itemCodeSelectWrap = document.getElementById('item-code-select-wrap');
+            const selectedSummaryCount = document.getElementById('selected-summary-count');
+            const selectedSummaryList = document.getElementById('selected-summary-list');
+            const selectedSummaryBody = document.getElementById('selected-summary-body');
+            const selectedSummaryEmpty = document.getElementById('selected-summary-empty');
+            const selectedSummaryClear = document.getElementById('selected-summary-clear');
+            const selectedSummaryTotalItems = document.getElementById('selected-summary-total-items');
+            const selectedSummaryTotalQty = document.getElementById('selected-summary-total-qty');
 
             const submitBtn = document.getElementById('btn-submit-main');
             const submitLabel = document.getElementById('btn-submit-label');
@@ -917,6 +1147,98 @@
             }
 
             const normalizeText = v => (v || '').toString().trim().toUpperCase();
+            const draftStorageKey = 'gfid:sewing-pickup:create:selected-bundles';
+            let restoringDraft = false;
+
+            function getRowBundleId(row) {
+                return row?.querySelector('input[name$="[bundle_id]"]')?.value || '';
+            }
+
+            function readPickupDraft() {
+                try {
+                    const parsed = JSON.parse(localStorage.getItem(draftStorageKey) || '{}');
+                    return parsed && typeof parsed === 'object' ? parsed : {};
+                } catch (e) {
+                    return {};
+                }
+            }
+
+            function savePickupDraft() {
+                if (restoringDraft) return;
+
+                const draft = {};
+                rowsArr.forEach(row => {
+                    const bundleId = getRowBundleId(row);
+                    const input = row.querySelector('input.qty-input');
+                    const qty = parseFloat(input?.value || '0') || 0;
+
+                    if (bundleId && qty > 0) {
+                        draft[bundleId] = qty;
+                    }
+                });
+
+                try {
+                    if (Object.keys(draft).length > 0) {
+                        localStorage.setItem(draftStorageKey, JSON.stringify(draft));
+                    } else {
+                        localStorage.removeItem(draftStorageKey);
+                    }
+                } catch (e) {
+                    // Kalau storage browser penuh/nonaktif, form tetap bisa dipakai normal.
+                }
+            }
+
+            function restorePickupDraft() {
+                const draft = readPickupDraft();
+                if (!Object.keys(draft).length) return;
+
+                restoringDraft = true;
+                rowsArr.forEach(row => {
+                    const bundleId = getRowBundleId(row);
+                    if (!bundleId || !Object.prototype.hasOwnProperty.call(draft, bundleId)) return;
+
+                    const qtyInputs = row.querySelectorAll('input.qty-input');
+                    if (!qtyInputs.length) return;
+
+                    const existingQty = parseFloat(qtyInputs[0].value || '0') || 0;
+                    if (existingQty > 0) return;
+
+                    const qty = parseFloat(draft[bundleId] || '0') || 0;
+                    if (qty <= 0) return;
+
+                    qtyInputs.forEach(input => {
+                        input.value = qty;
+                        clampToReady(input, row);
+                    });
+                });
+                restoringDraft = false;
+            }
+
+            function focusSearchInput() {
+                if (!searchInput) return;
+                setTimeout(() => {
+                    try {
+                        searchInput.scrollIntoView({
+                            behavior: 'smooth',
+                            block: 'center',
+                            inline: 'nearest'
+                        });
+                    } catch (e) {
+                        // fallback fokus tetap jalan walau browser tidak support scrollIntoView options
+                    }
+
+                    setTimeout(() => {
+                        try {
+                            searchInput.focus({
+                                preventScroll: true
+                            });
+                            searchInput.select();
+                        } catch (e) {
+                            searchInput.focus();
+                        }
+                    }, 180);
+                }, 80);
+            }
 
             function rowHasPickup(row) {
                 const input = row.querySelector('input.qty-input');
@@ -978,11 +1300,61 @@
                 if (submitShortcutBtn) {
                     submitShortcutBtn.disabled = !canSubmit;
                 }
+
+                const printBtn = document.getElementById('btn-submit-print');
+                if (printBtn) printBtn.disabled = !canSubmit;
+            }
+
+            function renderSelectedSummary(items) {
+                if (selectedSummaryCount) selectedSummaryCount.textContent = items.length.toString();
+                if (!selectedSummaryList || !selectedSummaryBody || !selectedSummaryEmpty) return;
+
+                selectedSummaryBody.innerHTML = '';
+                selectedSummaryList.classList.toggle('d-none', items.length === 0);
+                selectedSummaryEmpty.classList.toggle('d-none', items.length > 0);
+                selectedSummaryClear?.classList.toggle('d-none', items.length === 0);
+
+                const totalQty = items.reduce((sum, item) => sum + (item.qtyValue || 0), 0);
+                if (selectedSummaryTotalItems) selectedSummaryTotalItems.textContent = items.length.toString();
+                if (selectedSummaryTotalQty) selectedSummaryTotalQty.textContent = nf.format(totalQty);
+
+                items.forEach((item, index) => {
+                    const tr = document.createElement('tr');
+                    tr.dataset.rowIndex = item.rowIndex;
+
+                    const numberTd = document.createElement('td');
+                    numberTd.className = 'text-muted';
+                    numberTd.textContent = index + 1;
+
+                    const itemTd = document.createElement('td');
+                    itemTd.className = 'item-code-cell mono';
+                    itemTd.textContent = item.itemCode || 'Item';
+
+                    const qtyTd = document.createElement('td');
+                    qtyTd.className = 'text-end mono fw-bold';
+                    qtyTd.textContent = item.qtyLabel;
+
+                    const actionTd = document.createElement('td');
+                    actionTd.className = 'text-end';
+
+                    const removeBtn = document.createElement('button');
+                    removeBtn.type = 'button';
+                    removeBtn.className = 'selected-summary-remove';
+                    removeBtn.dataset.rowIndex = item.rowIndex;
+                    removeBtn.textContent = '×';
+                    removeBtn.title = 'Hapus item dari pilihan';
+
+                    actionTd.appendChild(removeBtn);
+                    tr.append(numberTd, itemTd, qtyTd, actionTd);
+                    selectedSummaryBody.appendChild(tr);
+                });
+
             }
 
             function recalcSummaryAndUI() {
                 let pickedBundles = 0;
                 let totalPickupQty = 0;
+                const selectedItems = [];
 
                 rowsArr.forEach(row => {
                     const input = row.querySelector('input.qty-input');
@@ -991,15 +1363,56 @@
                     if (current > 0) {
                         pickedBundles++;
                         totalPickupQty += current;
+                        selectedItems.push({
+                            rowIndex: row.dataset.rowIndex || '',
+                            bundleCode: row.dataset.bundleCode || '',
+                            itemCode: row.dataset.itemCode || '',
+                            qtyValue: current,
+                            qtyLabel: nf.format(current),
+                        });
                     }
                 });
 
-                if (summaryBundlesSpan) summaryBundlesSpan.textContent = pickedBundles.toString();
-                if (summaryQtySpan) summaryQtySpan.textContent = nf.format(totalPickupQty);
+                renderSelectedSummary(selectedItems);
 
                 updateSubmitButtons(pickedBundles, totalPickupQty);
+                savePickupDraft();
                 applyRowVisibility();
             }
+
+            function clearPickedRow(row) {
+                if (!row) return;
+
+                const inputs = row.querySelectorAll('input.qty-input');
+                inputs.forEach(input => {
+                    input.value = '';
+                    input.classList.remove('qty-input-active', 'border-warning');
+                });
+
+                const checks = row.querySelectorAll('.row-check');
+                checks.forEach(check => check.checked = false);
+
+                row.classList.remove('row-picked', 'is-selected', 'summary-focus');
+                row.classList.add('row-empty');
+            }
+
+            selectedSummaryList?.addEventListener('click', function(e) {
+                const trigger = e.target.closest('.selected-summary-remove');
+                if (!trigger) return;
+
+                const row = rowsArr.find(item => item.dataset.rowIndex === trigger.dataset.rowIndex);
+                if (!row) return;
+
+                clearPickedRow(row);
+                recalcSummaryAndUI();
+                focusSearchInput();
+            });
+
+            selectedSummaryClear?.addEventListener('click', function() {
+                rowsArr.forEach(row => clearPickedRow(row));
+                recalcSummaryAndUI();
+                focusSearchInput();
+            });
 
             // DESKTOP toggle only picked
             toggleOnlyPicked?.addEventListener('change', function() {
@@ -1061,6 +1474,8 @@
             });
 
             // PER-ROW BEHAVIOR
+            restorePickupDraft();
+
             rowsArr.forEach(row => {
                 const qtyReady = parseFloat(row.dataset.qtyReady || '0');
                 const qtyInputs = row.querySelectorAll('input.qty-input');
@@ -1099,6 +1514,10 @@
 
                     updateVisual();
                     recalcSummaryAndUI();
+
+                    if (picked) {
+                        focusSearchInput();
+                    }
                 }
 
                 function togglePicked() {
@@ -1137,6 +1556,10 @@
                     syncInputsFromDesktop();
                     updateVisual();
                     recalcSummaryAndUI();
+
+                    if (isPicked()) {
+                        focusSearchInput();
+                    }
                 });
 
                 desktopInput.addEventListener('input', function() {
@@ -1170,6 +1593,10 @@
                         syncDesktopFromMobile();
                         updateVisual();
                         recalcSummaryAndUI();
+
+                        if (isPicked()) {
+                            focusSearchInput();
+                        }
                     });
 
                     mobileInput.addEventListener('input', function() {
@@ -1185,9 +1612,9 @@
                 updateVisual();
             });
 
-            // Auto fokus ke search di desktop
-            if (!isMobile() && searchInput) {
-                searchInput.focus();
+            // Auto fokus ke search saat halaman dibuka
+            if (searchInput) {
+                focusSearchInput();
             }
 
             // Scroll ke input pertama yang error (kalau ada)

@@ -550,6 +550,11 @@
                             <i class="bi bi-arrow-left me-1"></i> Kembali
                         </a>
 
+                        <a href="{{ route('production.sewing.pickups.print', $pickup) }}"
+                           target="_blank" class="btn btn-sm btn-outline-secondary">
+                            <i class="bi bi-printer me-1"></i> Cetak
+                        </a>
+
                         @if ($pickup->status !== 'void')
                             <a href="{{ route('production.sewing.pickups.supplies.edit', $pickup) }}"
                                 class="btn btn-sm btn-outline-primary">

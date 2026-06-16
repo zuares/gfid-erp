@@ -157,8 +157,9 @@
   $user = auth()->user();
   $role = strtolower((string)($user->role ?? ''));
 
-  $isOwner = $role === 'owner';
+  $isOwner = $user?->isOwner() ?? false;
   $isAdmin = $role === 'admin';
+  $canSeeMoney = $isOwner;          // hanya owner
   $canManage = $isOwner || $isAdmin;
 
   $isDraft = $receipt->status === 'draft';
@@ -192,6 +193,19 @@
 
   // ✅ rule aman: unpost hanya jika belum pernah return
   $canUnpostSafely = $isPosted && $canManage && !$hasAnyReturn;
+
+  // Cek apakah harga sudah ada (untuk warning admin)
+  // Cek: grand_total GRN > 0, atau minimal 1 PO line punya harga > 0
+  $grnHasPrice = (float) ($receipt->grand_total ?? 0) > 0;
+  if (!$grnHasPrice && $isDraft && $isAdmin) {
+      $poId = $receipt->purchase_order_id ?? null;
+      if ($poId) {
+          $grnHasPrice = \Illuminate\Support\Facades\DB::table('purchase_order_lines')
+              ->where('purchase_order_id', $poId)
+              ->where('unit_price', '>', 0)
+              ->exists();
+      }
+  }
 
   // Return yang “utama” untuk CTA:
   $primaryDraftReturn = $draftReturns->sortByDesc('id')->first();
@@ -283,11 +297,20 @@
         {{-- DRAFT actions --}}
         @if ($isDraft && $canManage)
           <a href="{{ route('purchasing.purchase_receipts.edit', $receipt->id) }}" class="btn btn-primary btn-sm">Edit</a>
-          <form action="{{ route('purchasing.purchase_receipts.post', $receipt->id) }}" method="POST"
-                onsubmit="return confirm('Post GRN ini?\n\n• Stok akan bertambah\n• Jurnal akan tercatat');">
-            @csrf
-            <button type="submit" class="btn btn-success btn-sm">Post GRN</button>
-          </form>
+          @if ($isAdmin && !$grnHasPrice)
+            {{-- Admin: harga belum ada di PO → tombol disabled + tooltip --}}
+            <button type="button" class="btn btn-success btn-sm disabled"
+                    title="Harga belum diisi di PO. Hubungi owner."
+                    style="opacity:.55; cursor:not-allowed;">
+                Post GRN
+            </button>
+          @else
+            <form action="{{ route('purchasing.purchase_receipts.post', $receipt->id) }}" method="POST"
+                  onsubmit="return confirm('Post GRN ini?\n\n• Stok akan bertambah\n• Jurnal akan tercatat');">
+              @csrf
+              <button type="submit" class="btn btn-success btn-sm">Post GRN</button>
+            </form>
+          @endif
         @endif
 
         {{-- UNPOST only if safe --}}
@@ -307,6 +330,30 @@
     @endif
     @if (session('error'))
       <div class="alert alert-danger py-2 mb-3">{{ session('error') }}</div>
+    @endif
+
+    {{-- WARNING admin: belum bisa post, tanpa menyebut harga --}}
+    @if ($isDraft && $isAdmin && !$grnHasPrice)
+      <div class="alert mb-3 d-flex align-items-start gap-2"
+           style="background:var(--bs-warning-bg-subtle,#fff3cd);border:1px solid var(--bs-warning-border-subtle,#ffc107);border-radius:10px;padding:.75rem 1rem;">
+        <span style="font-size:1.15rem;line-height:1.3;">⚠️</span>
+        <div style="font-size:.875rem;">
+          <strong>GRN ini belum bisa di-post.</strong>
+          Hubungi owner untuk menyelesaikan dokumen ini.
+        </div>
+      </div>
+    @endif
+
+    {{-- WARNING owner: grand_total = 0 pada draft GRN --}}
+    @if ($isDraft && $isOwner && (float)($receipt->grand_total ?? 0) <= 0)
+      <div class="alert mb-3 d-flex align-items-start gap-2"
+           style="background:var(--bs-warning-bg-subtle,#fff3cd);border:1px solid var(--bs-warning-border-subtle,#ffc107);border-radius:10px;padding:.75rem 1rem;">
+        <span style="font-size:1.15rem;line-height:1.3;">⚠️</span>
+        <div style="font-size:.875rem;">
+          <strong>Harga belum diisi.</strong>
+          Grand total GRN ini masih Rp 0. Silakan edit GRN atau isi harga di PO terkait sebelum melakukan posting.
+        </div>
+      </div>
     @endif
 
     <div class="row g-3 mb-3">
@@ -351,6 +398,11 @@
                     {{ $receipt->purchaseOrder->code }}
                   </a>
                 </dd>
+              @endif
+
+              @if ($receipt->surat_jalan_no)
+              <dt class="col-sm-4">No. Surat Jalan</dt>
+              <dd class="col-sm-8 mono">{{ $receipt->surat_jalan_no }}</dd>
               @endif
 
               <dt class="col-sm-4">Catatan</dt>
@@ -414,55 +466,57 @@
         </div>
       </div>
 
-      {{-- 2) RINGKASAN NILAI + GRAND TOTAL --}}
-      <div class="col-12 col-lg-6 order-2 order-lg-2">
-        <div class="card-soft h-100">
-          <div class="card-body">
-            <h6 class="section-title mb-3">Ringkasan Nilai</h6>
+      @if ($canSeeMoney)
+        {{-- 2) RINGKASAN NILAI + GRAND TOTAL --}}
+        <div class="col-12 col-lg-6 order-2 order-lg-2">
+          <div class="card-soft h-100">
+            <div class="card-body">
+              <h6 class="section-title mb-3">Ringkasan Nilai</h6>
 
-            <div class="grand-card p-3 mb-3">
-              <div class="d-flex justify-content-between align-items-start gap-2">
-                <div>
-                  <div class="text-muted small">Grand Total</div>
-                  <div class="grand-amt mono">{{ rupiah($receipt->grand_total ?? 0) }}</div>
-                </div>
-                <div class="text-end">
-                  <div class="grand-pill d-inline-flex align-items-center gap-2">
-                    <span class="text-muted">Subtotal</span>
-                    <span class="mono fw-semibold">{{ rupiah($receipt->subtotal ?? 0) }}</span>
+              <div class="grand-card p-3 mb-3">
+                <div class="d-flex justify-content-between align-items-start gap-2">
+                  <div>
+                    <div class="text-muted small">Grand Total</div>
+                    <div class="grand-amt mono">{{ rupiah($receipt->grand_total ?? 0) }}</div>
+                  </div>
+                  <div class="text-end">
+                    <div class="grand-pill d-inline-flex align-items-center gap-2">
+                      <span class="text-muted">Subtotal</span>
+                      <span class="mono fw-semibold">{{ rupiah($receipt->subtotal ?? 0) }}</span>
+                    </div>
                   </div>
                 </div>
               </div>
+
+              <dl class="row mb-0 small mono">
+                <dt class="col-sm-5">Subtotal</dt>
+                <dd class="col-sm-7 text-end">{{ rupiah($receipt->subtotal ?? 0) }}</dd>
+
+                <dt class="col-sm-5">Diskon</dt>
+                <dd class="col-sm-7 text-end">{{ rupiah($receipt->discount ?? 0) }}</dd>
+
+                <dt class="col-sm-5">PPN ({{ decimal_id($receipt->tax_percent ?? 0, 2) }}%)</dt>
+                <dd class="col-sm-7 text-end">{{ rupiah($receipt->tax_amount ?? 0) }}</dd>
+
+                <dt class="col-sm-5">Ongkir</dt>
+                <dd class="col-sm-7 text-end">{{ rupiah($receipt->shipping_cost ?? 0) }}</dd>
+
+                <hr class="my-2 summary-hr">
+
+                <dt class="col-sm-5 fw-semibold">Grand Total</dt>
+                <dd class="col-sm-7 text-end fw-semibold fs-6">{{ rupiah($receipt->grand_total ?? 0) }}</dd>
+              </dl>
+
+              @if($isPosted)
+                <div class="mt-3 small text-muted">
+                  • GRN sudah posted → stok sudah masuk & jurnal tercatat. <br>
+                  • Pembatalan setelah posted: gunakan <b>Return</b>.
+                </div>
+              @endif
             </div>
-
-            <dl class="row mb-0 small mono">
-              <dt class="col-sm-5">Subtotal</dt>
-              <dd class="col-sm-7 text-end">{{ rupiah($receipt->subtotal ?? 0) }}</dd>
-
-              <dt class="col-sm-5">Diskon</dt>
-              <dd class="col-sm-7 text-end">{{ rupiah($receipt->discount ?? 0) }}</dd>
-
-              <dt class="col-sm-5">PPN ({{ decimal_id($receipt->tax_percent ?? 0, 2) }}%)</dt>
-              <dd class="col-sm-7 text-end">{{ rupiah($receipt->tax_amount ?? 0) }}</dd>
-
-              <dt class="col-sm-5">Ongkir</dt>
-              <dd class="col-sm-7 text-end">{{ rupiah($receipt->shipping_cost ?? 0) }}</dd>
-
-              <hr class="my-2 summary-hr">
-
-              <dt class="col-sm-5 fw-semibold">Grand Total</dt>
-              <dd class="col-sm-7 text-end fw-semibold fs-6">{{ rupiah($receipt->grand_total ?? 0) }}</dd>
-            </dl>
-
-            @if($isPosted)
-              <div class="mt-3 small text-muted">
-                • GRN sudah posted → stok sudah masuk & jurnal tercatat. <br>
-                • Pembatalan setelah posted: gunakan <b>Return</b>.
-              </div>
-            @endif
           </div>
         </div>
-      </div>
+      @endif
 
       {{-- 3) DETAIL BARANG DITERIMA --}}
       <div class="col-12 order-3">
@@ -482,8 +536,10 @@
                     <th style="width:16%"><span class="th-full">LOT</span><span class="th-abbr">LOT</span></th>
                     <th style="width:9%" class="text-end"><span class="th-full">Qty In</span><span class="th-abbr">Qty</span></th>
                     <th style="width:9%" class="text-end"><span class="th-full">Qty Reject</span><span class="th-abbr">Rej</span></th>
-                    <th style="width:12%" class="text-end"><span class="th-full">Harga/Unit</span><span class="th-abbr">Harga</span></th>
-                    <th style="width:12%" class="text-end"><span class="th-full">Total</span><span class="th-abbr">Total</span></th>
+                    @if ($canSeeMoney)
+                      <th style="width:12%" class="text-end"><span class="th-full">Harga/Unit</span><span class="th-abbr">Harga</span></th>
+                      <th style="width:12%" class="text-end"><span class="th-full">Total</span><span class="th-abbr">Total</span></th>
+                    @endif
                     <th style="width:8%"><span class="th-full">Unit</span><span class="th-abbr">U</span></th>
                     <th style="width:8%"><span class="th-full">Catatan</span><span class="th-abbr">Cat</span></th>
                   </tr>
@@ -508,7 +564,7 @@
                           <div class="badge bg-light border text-body mono lot-badge">{{ $line->lot->code }}</div>
                           <div class="lot-extra text-muted mt-1">
                             Saldo LOT: {{ decimal_id($line->lot->qty_onhand, 2) }}
-                            @if (!is_null($line->lot->avg_cost))
+                            @if ($canSeeMoney && !is_null($line->lot->avg_cost))
                               • Avg: {{ rupiah($line->lot->avg_cost) }}
                             @endif
                           </div>
@@ -527,22 +583,24 @@
                         <span class="val-mobile">{{ decimal_id($line->qty_reject, 0) }}</span>
                       </td>
 
-                      <td class="text-end mono">
-                        <span class="val-full">{{ rupiah($line->unit_price) }}</span>
-                        <span class="val-mobile">{{ number_format($line->unit_price ?? 0, 0, ',', '.') }}</span>
-                      </td>
+                      @if ($canSeeMoney)
+                        <td class="text-end mono">
+                          <span class="val-full">{{ rupiah($line->unit_price) }}</span>
+                          <span class="val-mobile">{{ number_format($line->unit_price ?? 0, 0, ',', '.') }}</span>
+                        </td>
 
-                      <td class="text-end mono">
-                        <span class="val-full">{{ rupiah($line->line_total) }}</span>
-                        <span class="val-mobile">{{ number_format($line->line_total ?? 0, 0, ',', '.') }}</span>
-                      </td>
+                        <td class="text-end mono">
+                          <span class="val-full">{{ rupiah($line->line_total) }}</span>
+                          <span class="val-mobile">{{ number_format($line->line_total ?? 0, 0, ',', '.') }}</span>
+                        </td>
+                      @endif
 
                       <td class="mono">{{ $line->unit ?: ($line->item->unit ?? '-') }}</td>
                       <td>{{ $line->notes ?: '-' }}</td>
                     </tr>
                   @empty
                     <tr>
-                      <td colspan="9" class="text-center text-muted py-3">Tidak ada detail barang.</td>
+                      <td colspan="{{ $canSeeMoney ? 9 : 7 }}" class="text-center text-muted py-3">Tidak ada detail barang.</td>
                     </tr>
                   @endforelse
                 </tbody>
@@ -559,11 +617,13 @@
                         <span class="val-full">{{ decimal_id($receipt->lines->sum('qty_reject'), 2) }}</span>
                         <span class="val-mobile">{{ decimal_id($receipt->lines->sum('qty_reject'), 0) }}</span>
                       </td>
-                      <td class="text-end"></td>
-                      <td class="text-end mono">
-                        <span class="val-full">{{ rupiah($receipt->lines->sum('line_total')) }}</span>
-                        <span class="val-mobile">{{ number_format($receipt->lines->sum('line_total') ?? 0, 0, ',', '.') }}</span>
-                      </td>
+                      @if ($canSeeMoney)
+                        <td class="text-end"></td>
+                        <td class="text-end mono">
+                          <span class="val-full">{{ rupiah($receipt->lines->sum('line_total')) }}</span>
+                          <span class="val-mobile">{{ number_format($receipt->lines->sum('line_total') ?? 0, 0, ',', '.') }}</span>
+                        </td>
+                      @endif
                       <td colspan="2"></td>
                     </tr>
                   </tfoot>
@@ -575,6 +635,276 @@
       </div>
 
     </div>
+
+    {{-- ══════════════════════════════════════════════
+         Tahap 6: QC / Pemeriksaan Barang
+         Hanya tampil jika GRN sudah posted
+         QC optional — GRN tetap bisa jalan tanpa QC
+    ══════════════════════════════════════════════ --}}
+    @if ($isPosted && \Illuminate\Support\Facades\Schema::hasTable('purchase_receipt_qcs'))
+      @php
+        $qc = $receipt->qc ?? null;
+        $canInputQc = $isOwner
+            || $isAdmin
+            || in_array($role, ['gudang', 'warehouse'], true);
+        $qcCreateRoute = 'purchasing.purchase_receipts.qc.create';
+        $qcEditRoute   = 'purchasing.purchase_receipts.qc.edit';
+        $qcCancelRoute = 'purchasing.purchase_receipts.qc.cancel';
+        $hasQcRoutes   = app('router')->has($qcCreateRoute);
+      @endphp
+
+      @if ($hasQcRoutes)
+      <div class="mt-3">
+        <div class="card-soft">
+          <div class="card-body">
+
+            <h6 class="section-title mb-3">QC / Pemeriksaan Barang</h6>
+
+            @if (!$qc || $qc->isCancelled())
+              {{-- Belum ada QC atau sudah dibatalkan --}}
+              <div class="d-flex align-items-center justify-content-between gap-2 flex-wrap">
+                <div class="text-muted" style="font-size:.88rem;">
+                  @if ($qc && $qc->isCancelled())
+                    QC sebelumnya dibatalkan.
+                  @else
+                    Belum ada hasil pemeriksaan QC untuk GRN ini.
+                  @endif
+                  <span class="ms-1">QC bersifat opsional.</span>
+                </div>
+                @if ($canInputQc)
+                  <a href="{{ route($qcCreateRoute, $receipt->id) }}"
+                     class="btn btn-sm btn-outline-primary" style="border-radius:10px;">
+                    📋 Input QC
+                  </a>
+                @endif
+              </div>
+
+            @else
+              {{-- Ada QC --}}
+              @php
+                $qcBadgeStyle = match ($qc->status) {
+                  'passed'    => 'background:rgba(22,163,74,.12);color:#15803d;border-color:rgba(22,163,74,.5)',
+                  'issue'     => 'background:rgba(217,119,6,.10);color:#b45309;border-color:rgba(217,119,6,.5)',
+                  'rejected'  => 'background:rgba(220,38,38,.08);color:#b91c1c;border-color:rgba(220,38,38,.5)',
+                  default     => 'background:rgba(148,163,184,.10);color:#64748b;border-color:rgba(148,163,184,.4)',
+                };
+              @endphp
+
+              {{-- Warning jika ada masalah --}}
+              @if ($qc->hasIssue())
+                <div class="d-flex align-items-start gap-2 p-3 mb-3 rounded-3"
+                     style="background:rgba(220,38,38,.06);border:1px solid rgba(220,38,38,.25);">
+                  <span style="font-size:1.1rem;line-height:1.3;">⚠️</span>
+                  <div style="font-size:.85rem;">
+                    <strong>Hasil QC: {{ \App\Models\PurchaseReceiptQc::statusLabel($qc->status) }}</strong>
+                    @if ($qc->issue_type)
+                      — {{ \App\Models\PurchaseReceiptQc::issueTypeLabel($qc->issue_type) }}
+                    @endif
+                    <div class="mt-1 text-muted">
+                      Jika perlu mengembalikan barang ke supplier, gunakan fitur
+                      <strong>Return Supplier</strong> di atas.
+                    </div>
+                  </div>
+                </div>
+              @endif
+
+              {{-- Detail QC --}}
+              <div class="row g-2 mb-3 small">
+                <div class="col-6 col-sm-3">
+                  <div class="text-muted" style="font-size:.72rem;text-transform:uppercase;letter-spacing:.05em;">Status</div>
+                  <div class="mt-1">
+                    <span class="d-inline-block px-2 py-1 rounded-pill"
+                          style="font-size:.72rem;font-weight:600;border:1px solid;{{ $qcBadgeStyle }}">
+                      {{ \App\Models\PurchaseReceiptQc::statusLabel($qc->status) }}
+                    </span>
+                  </div>
+                </div>
+                <div class="col-6 col-sm-3">
+                  <div class="text-muted" style="font-size:.72rem;text-transform:uppercase;letter-spacing:.05em;">Qty Diperiksa</div>
+                  <div class="fw-semibold mono mt-1">{{ number_format($qc->qty_checked, 2, ',', '.') }}</div>
+                </div>
+                <div class="col-6 col-sm-3">
+                  <div class="text-muted" style="font-size:.72rem;text-transform:uppercase;letter-spacing:.05em;">Qty OK</div>
+                  <div class="fw-semibold mono mt-1" style="color:#15803d;">
+                    {{ number_format($qc->qty_ok, 2, ',', '.') }}
+                  </div>
+                </div>
+                <div class="col-6 col-sm-3">
+                  <div class="text-muted" style="font-size:.72rem;text-transform:uppercase;letter-spacing:.05em;">Qty Masalah</div>
+                  <div class="fw-semibold mono mt-1" style="{{ $qc->qty_issue > 0 ? 'color:#b91c1c;' : '' }}">
+                    {{ number_format($qc->qty_issue, 2, ',', '.') }}
+                  </div>
+                </div>
+
+                @if ($qc->issue_type)
+                  <div class="col-12 col-sm-6">
+                    <div class="text-muted" style="font-size:.72rem;text-transform:uppercase;letter-spacing:.05em;">Jenis Masalah</div>
+                    <div class="mt-1">{{ \App\Models\PurchaseReceiptQc::issueTypeLabel($qc->issue_type) }}</div>
+                  </div>
+                @endif
+
+                @if ($qc->notes)
+                  <div class="col-12">
+                    <div class="text-muted" style="font-size:.72rem;text-transform:uppercase;letter-spacing:.05em;">Catatan</div>
+                    <div class="mt-1" style="white-space:pre-line;">{{ $qc->notes }}</div>
+                  </div>
+                @endif
+
+                <div class="col-12 col-sm-6">
+                  <div class="text-muted" style="font-size:.72rem;text-transform:uppercase;letter-spacing:.05em;">Diperiksa Oleh</div>
+                  <div class="mt-1">
+                    {{ $qc->checkedBy?->name ?? '—' }}
+                    @if ($qc->checked_at)
+                      <span class="text-muted ms-1">· {{ $qc->checked_at->format('d/m/Y H:i') }}</span>
+                    @endif
+                  </div>
+                </div>
+              </div>
+
+              {{-- Aksi: edit / cancel --}}
+              @if ($canInputQc && !$qc->isCancelled())
+                <div class="d-flex gap-2 flex-wrap">
+                  <a href="{{ route($qcEditRoute, $receipt->id) }}"
+                     class="btn btn-sm btn-outline-secondary" style="border-radius:10px;font-size:.82rem;">
+                    ✏ Edit QC
+                  </a>
+                  @if ($canManage)
+                    <form method="POST"
+                          action="{{ route($qcCancelRoute, $receipt->id) }}"
+                          onsubmit="return confirm('Batalkan QC ini?\n\nData QC akan ditandai dibatalkan tapi tidak dihapus.');">
+                      @csrf
+                      @method('DELETE')
+                      <button type="submit" class="btn btn-sm btn-outline-danger"
+                              style="border-radius:10px;font-size:.82rem;">
+                        Batalkan QC
+                      </button>
+                    </form>
+                  @endif
+                </div>
+              @endif
+
+              {{-- ═══════════════════════════════════════════════════
+                   Tahap 9 — RESOLUSI QC (hanya jika issue/rejected)
+              ═══════════════════════════════════════════════════ --}}
+              @if ($qc->hasIssue() && !$qc->isCancelled() && app('router')->has('purchasing.purchase_receipt_qcs.resolve'))
+
+                @if ($qc->isResolved())
+                  {{-- Sudah resolved: tampilkan ringkasan --}}
+                  <div class="mt-3 p-3 rounded-3"
+                       style="background:rgba(22,163,74,.06);border:1px solid rgba(22,163,74,.25);">
+                    <div class="d-flex align-items-center gap-2 mb-2">
+                      <span style="font-size:1rem;">✅</span>
+                      <strong style="font-size:.85rem;">Penyelesaian QC</strong>
+                    </div>
+                    <div class="row g-2" style="font-size:.82rem;">
+                      <div class="col-12 col-sm-4">
+                        <div style="font-size:.70rem;text-transform:uppercase;letter-spacing:.05em;color:var(--muted);">Tindakan</div>
+                        <div class="mt-1 fw-semibold">
+                          {{ \App\Models\PurchaseReceiptQc::resolutionLabel($qc->resolution_type) }}
+                        </div>
+                      </div>
+                      <div class="col-12 col-sm-4">
+                        <div style="font-size:.70rem;text-transform:uppercase;letter-spacing:.05em;color:var(--muted);">Diselesaikan</div>
+                        <div class="mt-1">{{ $qc->resolved_at?->format('d/m/Y H:i') ?? '—' }}</div>
+                      </div>
+                      @if ($qc->resolution_notes)
+                      <div class="col-12">
+                        <div style="font-size:.70rem;text-transform:uppercase;letter-spacing:.05em;color:var(--muted);">Catatan</div>
+                        <div class="mt-1" style="white-space:pre-line;">{{ $qc->resolution_notes }}</div>
+                      </div>
+                      @endif
+                      @if ($qc->purchaseReturn && !$qc->purchaseReturn->voided_at)
+                      <div class="col-12">
+                        <div style="font-size:.70rem;text-transform:uppercase;letter-spacing:.05em;color:var(--muted);">Purchase Return</div>
+                        <div class="mt-1">
+                          @if (app('router')->has('purchasing.purchase_returns.show'))
+                          <a href="{{ route('purchasing.purchase_returns.show', $qc->purchase_return_id) }}"
+                             style="font-size:.82rem;font-weight:600;">
+                            {{ $qc->purchaseReturn->code }}
+                          </a>
+                          <span class="ms-1" style="font-size:.72rem;color:var(--muted);">
+                            — {{ ucfirst($qc->purchaseReturn->status) }}
+                            @if ($qc->purchaseReturn->voided_at) (VOID) @endif
+                          </span>
+                          @else
+                          {{ $qc->purchaseReturn->code }}
+                          @endif
+                        </div>
+                      </div>
+                      @elseif ($qc->resolution_notes && str_contains($qc->resolution_notes, 'di-VOID'))
+                      <div class="col-12">
+                        <div class="text-warning" style="font-size:.78rem;">
+                          ⚠ Return sebelumnya sudah di-VOID. Bisa dibuat return baru jika diperlukan.
+                        </div>
+                      </div>
+                      @endif
+                    </div>
+                  </div>
+
+                @elseif ($canManage)
+                  {{-- Belum resolved: tampilkan form resolusi --}}
+                  <div class="mt-3 p-3 rounded-3"
+                       style="background:rgba(217,119,6,.06);border:1px solid rgba(217,119,6,.25);">
+                    <div class="d-flex align-items-center gap-2 mb-3">
+                      <span style="font-size:1rem;">⚠️</span>
+                      <strong style="font-size:.85rem;">Tindak Lanjuti QC</strong>
+                    </div>
+                    <form method="POST"
+                          action="{{ route('purchasing.purchase_receipt_qcs.resolve', $qc->id) }}"
+                          onsubmit="return confirm('Simpan penyelesaian QC ini?\nPilihan retur tidak bisa dibatalkan dari halaman ini.');">
+                      @csrf
+                      <div class="row g-3">
+                        <div class="col-12 col-sm-6">
+                          <label style="font-size:.75rem;font-weight:600;display:block;margin-bottom:.35rem;">
+                            Tindakan Penyelesaian *
+                          </label>
+                          <select name="resolution_type" class="form-select form-select-sm"
+                                  style="border-radius:8px;font-size:.82rem;" required>
+                            <option value="">— Pilih tindakan —</option>
+                            @foreach (\App\Models\PurchaseReceiptQc::resolutionTypes() as $val => $label)
+                              <option value="{{ $val }}">{{ $label }}</option>
+                            @endforeach
+                          </select>
+                          <div class="mt-1" style="font-size:.70rem;color:var(--muted);">
+                            <em>Retur</em> akan membuat draft Purchase Return otomatis.
+                            <em>Klaim Invoice</em> akan mengarahkan ke Faktur Supplier.
+                          </div>
+                        </div>
+                        <div class="col-12">
+                          <label style="font-size:.75rem;font-weight:600;display:block;margin-bottom:.35rem;">
+                            Catatan Penyelesaian
+                          </label>
+                          <textarea name="resolution_notes" rows="2"
+                                    class="form-control form-control-sm"
+                                    style="border-radius:8px;font-size:.82rem;"
+                                    placeholder="Opsional — deskripsi tindakan, nomor klaim, dll."></textarea>
+                        </div>
+                        <div class="col-12">
+                          <button type="submit" class="btn btn-sm btn-warning"
+                                  style="border-radius:10px;font-size:.82rem;">
+                            Simpan Penyelesaian →
+                          </button>
+                        </div>
+                      </div>
+                    </form>
+                  </div>
+
+                @else
+                  {{-- Punya issue tapi bukan canManage: tampilkan info saja --}}
+                  <div class="mt-3" style="font-size:.80rem;color:var(--muted);">
+                    ⚠ QC ini perlu ditindaklanjuti oleh owner atau admin.
+                  </div>
+                @endif
+
+              @endif
+            @endif
+
+          </div>
+        </div>
+      </div>
+      @endif
+    @endif
+
   </div>
 </div>
 @endsection

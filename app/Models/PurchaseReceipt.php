@@ -20,6 +20,7 @@ class PurchaseReceipt extends Model
         'grand_total',
         'status',
         'notes',
+        'surat_jalan_no',
         'created_by',
         'approved_by',
     ];
@@ -72,6 +73,12 @@ class PurchaseReceipt extends Model
     public function returns()
     {
         return $this->hasMany(\App\Models\PurchaseReturn::class, 'purchase_receipt_id');
+    }
+
+    /** Tahap 6: QC ringan (satu QC per GRN) */
+    public function qc()
+    {
+        return $this->hasOne(\App\Models\PurchaseReceiptQc::class, 'purchase_receipt_id');
     }
 
 }

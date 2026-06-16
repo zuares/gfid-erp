@@ -96,6 +96,7 @@ Route::middleware(['web', 'auth', 'access:production'])
                     ->name('lines.supplies.update');
 
                 Route::get('/{pickup}', [SewingPickupController::class, 'show'])->name('show');
+                Route::get('/{pickup}/print', [SewingPickupController::class, 'print'])->name('print');
                 Route::get('/{pickup}/edit', [SewingPickupController::class, 'edit'])->name('edit');
                 Route::put('/{pickup}', [SewingPickupController::class, 'update'])->name('update');
 
@@ -115,6 +116,10 @@ Route::middleware(['web', 'auth', 'access:production'])
                 Route::get('/{return}', [SewingReturnController::class, 'show'])
                     ->whereNumber('return')
                     ->name('show');
+
+                Route::get('/{return}/print', [SewingReturnController::class, 'print'])
+                    ->whereNumber('return')
+                    ->name('print');
 
                 Route::post('/{return}/void', [SewingReturnController::class, 'void'])
                     ->whereNumber('return')
