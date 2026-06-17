@@ -1,5 +1,8 @@
 {{-- resources/views/production/sewing_pickups/_operator_modal.blade.php --}}
-@php $isOwner = auth()->user()?->isOwner() ?? false; @endphp
+@php
+$isOwner = auth()->user()?->isOwner()
+    || in_array(auth()->user()?->role ?? '', ['admin', 'operating'], true);
+@endphp
 
 @push('head')
     <style>

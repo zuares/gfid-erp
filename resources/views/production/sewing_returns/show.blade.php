@@ -274,6 +274,11 @@
             <i class="bi bi-printer"></i><span>Cetak</span>
           </a>
 
+          <a href="{{ route('production.sewing.returns.barcode', $return) }}" target="_blank"
+             class="btn btn-outline-secondary btn-sm btn-pill">
+            <i class="bi bi-upc-scan"></i><span>Cetak Barcode</span>
+          </a>
+
           @if($return->pickup)
             <a href="{{ route('production.sewing.pickups.show', $return->pickup) }}" class="btn btn-outline-primary btn-sm btn-pill">
               <i class="bi bi-box-seam"></i><span>Lihat Pickup</span>

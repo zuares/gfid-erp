@@ -215,6 +215,26 @@ class RtsStockRequestController extends Controller
             ]);
         }
 
+        // ✅ Tolak jika stok WH-PRD kosong untuk salah satu item
+        $srcWhId = (int) $data['source_warehouse_id'];
+        $prdStocks = DB::table('inventory_stocks')
+            ->where('warehouse_id', $srcWhId)
+            ->whereIn('item_id', $itemIds)
+            ->pluck('qty', 'item_id');
+
+        $emptyErrors = [];
+        foreach ($data['lines'] as $idx => $row) {
+            $iid = (int) $row['item_id'];
+            $stock = (float) ($prdStocks[$iid] ?? 0);
+            if ($stock <= 0) {
+                $itemCode = DB::table('items')->where('id', $iid)->value('code') ?? "item #{$iid}";
+                $emptyErrors["lines.{$idx}.qty_request"] = "{$itemCode}: stok WH-PRD kosong (0), permintaan ditolak.";
+            }
+        }
+        if (!empty($emptyErrors)) {
+            throw ValidationException::withMessages($emptyErrors);
+        }
+
         return DB::transaction(function () use ($data) {
             $date = Carbon::parse($data['date'])->toDateString();
 

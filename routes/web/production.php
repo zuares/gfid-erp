@@ -121,6 +121,10 @@ Route::middleware(['web', 'auth', 'access:production'])
                     ->whereNumber('return')
                     ->name('print');
 
+                Route::get('/{return}/barcode', [SewingReturnController::class, 'barcode'])
+                    ->whereNumber('return')
+                    ->name('barcode');
+
                 Route::post('/{return}/void', [SewingReturnController::class, 'void'])
                     ->whereNumber('return')
                     ->name('void');

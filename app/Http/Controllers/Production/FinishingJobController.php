@@ -63,7 +63,7 @@ class FinishingJobController extends Controller
     {
         $role = strtolower(trim((string) ($user?->role ?? '')));
 
-        return $role === 'admin' ? 'WH-PRD' : 'WH-RTS';
+        return in_array($role, ['admin', 'operating']) ? 'WH-PRD' : 'WH-RTS';
     }
 
     private function defaultDestinationIdForUser($user, $destinationWarehouses): ?int

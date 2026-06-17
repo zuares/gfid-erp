@@ -97,6 +97,17 @@ class SewingReturnController extends Controller
         return view('production.sewing_returns.print', compact('return'));
     }
 
+    public function barcode(SewingReturn $return): View
+    {
+        $return->load([
+            'warehouse',
+            'operator',
+            'lines.sewingPickupLine.bundle.finishedItem',
+        ]);
+
+        return view('production.sewing_returns.barcode', compact('return'));
+    }
+
     public function show(SewingReturn $return): View
     {
         $return->load([
