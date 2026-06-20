@@ -200,8 +200,19 @@
                             </div>
                             <div class="cbr-row-num">Rp {{ $fmt($row->total_amount) }}</div>
                         </div>
+                    @endforelse
+                    @forelse ($payoutByMarketplace ?? [] as $row)
+                        <div class="cbr-row">
+                            <div>
+                                <div class="cbr-row-title">🛒 {{ $row->marketplace_name }}</div>
+                                <div class="cbr-row-meta">Marketplace · {{ $fmt($row->total_docs) }} transaksi</div>
+                            </div>
+                            <div class="cbr-row-num">Rp {{ $fmt($row->total_amount) }}</div>
+                        </div>
                     @empty
-                        <div class="cbr-empty">Belum ada penerimaan tercatat pada periode ini.</div>
+                        @if($receiptBySource->isEmpty())
+                            <div class="cbr-empty">Belum ada penerimaan tercatat pada periode ini.</div>
+                        @endif
                     @endforelse
                 </div>
             </x-gf.panel>
@@ -222,7 +233,7 @@
                 </div>
             </x-gf.panel>
 
-            <x-gf.panel title="Penerimaan Terakhir" subtitle="Klik baris untuk buka detail dan posting jika masih draft.">
+            <x-gf.panel title="Penerimaan Terakhir" subtitle="Kas masuk + marketplace. Klik untuk buka detail.">
                 @if ($recentReceipts->isEmpty())
                     <div class="cbr-empty">Belum ada penerimaan pada periode ini.</div>
                 @else
@@ -239,21 +250,26 @@
                                 </tr>
                             </thead>
                             <tbody>
-                                @foreach ($recentReceipts as $receipt)
-                                    <tr class="cbr-click-row" data-href="{{ route('accounting.cash-receipts.show', $receipt) }}" tabindex="0">
-                                        <td>{{ \Illuminate\Support\Carbon::parse($receipt->date)->format('Y-m-d') }}</td>
+                                @foreach ($recentReceipts as $r)
+                                    <tr class="cbr-click-row" data-href="{{ $r->_route }}" tabindex="0">
+                                        <td>{{ \Illuminate\Support\Carbon::parse($r->date)->format('Y-m-d') }}</td>
                                         <td>
-                                            <div class="cbr-row-title">{{ $receipt->description ?: 'Penerimaan' }}</div>
-                                            <div class="cbr-row-meta">ID #{{ $receipt->id }}{{ $receipt->reference ? ' · Ref: ' . $receipt->reference : '' }}</div>
+                                            <div class="cbr-row-title">{{ $r->description ?: 'Penerimaan' }}</div>
+                                            <div class="cbr-row-meta">
+                                                #{{ $r->id }}{{ $r->reference ? ' · ' . $r->reference : '' }}
+                                                @if($r->_type === 'marketplace_payout')
+                                                    <span style="background:#eff6ff;color:#1d4ed8;border-radius:4px;padding:.1rem .35rem;font-size:.7rem;font-weight:800;margin-left:.25rem">MP</span>
+                                                @endif
+                                            </div>
                                         </td>
-                                        <td>{{ $receipt->sourceAccount?->name ?? '-' }}</td>
-                                        <td>{{ $receipt->cashAccount?->name ?? '-' }}</td>
+                                        <td>{{ $r->source_name }}</td>
+                                        <td>{{ $r->bank_name }}</td>
                                         <td>
-                                            <span class="cbr-status cbr-status-{{ $receipt->status }}">
-                                                {{ $statusLabels[$receipt->status] ?? ucfirst((string) $receipt->status) }}
+                                            <span class="cbr-status cbr-status-{{ $r->status }}">
+                                                {{ $statusLabels[$r->status] ?? ucfirst((string) $r->status) }}
                                             </span>
                                         </td>
-                                        <td class="text-end fw-bold">Rp {{ $fmt($receipt->amount) }}</td>
+                                        <td class="text-end fw-bold">Rp {{ $fmt($r->amount) }}</td>
                                     </tr>
                                 @endforeach
                             </tbody>
@@ -261,20 +277,20 @@
                     </div>
 
                     <div class="cbr-mobile-list">
-                        @foreach ($recentReceipts as $receipt)
-                            <div class="cbr-mobile-card" data-href="{{ route('accounting.cash-receipts.show', $receipt) }}" tabindex="0" role="link">
+                        @foreach ($recentReceipts as $r)
+                            <div class="cbr-mobile-card" data-href="{{ $r->_route }}" tabindex="0" role="link">
                                 <div class="d-flex justify-content-between gap-2">
                                     <div>
-                                        <div class="cbr-row-title">{{ $receipt->description ?: 'Penerimaan' }}</div>
-                                        <div class="cbr-row-meta">{{ \Illuminate\Support\Carbon::parse($receipt->date)->format('Y-m-d') }} · {{ $receipt->sourceAccount?->name ?? '-' }}</div>
+                                        <div class="cbr-row-title">{{ $r->description ?: 'Penerimaan' }}</div>
+                                        <div class="cbr-row-meta">{{ \Illuminate\Support\Carbon::parse($r->date)->format('Y-m-d') }} · {{ $r->source_name }}</div>
                                     </div>
-                                    <div class="cbr-row-num">Rp {{ $fmt($receipt->amount) }}</div>
+                                    <div class="cbr-row-num">Rp {{ $fmt($r->amount) }}</div>
                                 </div>
                                 <div class="d-flex justify-content-between align-items-center gap-2">
-                                    <span class="cbr-status cbr-status-{{ $receipt->status }}">
-                                        {{ $statusLabels[$receipt->status] ?? ucfirst((string) $receipt->status) }}
+                                    <span class="cbr-status cbr-status-{{ $r->status }}">
+                                        {{ $statusLabels[$r->status] ?? ucfirst((string) $r->status) }}
                                     </span>
-                                    <span class="cbr-row-meta">{{ $receipt->cashAccount?->name ?? '-' }}</span>
+                                    <span class="cbr-row-meta">{{ $r->bank_name }}</span>
                                 </div>
                             </div>
                         @endforeach

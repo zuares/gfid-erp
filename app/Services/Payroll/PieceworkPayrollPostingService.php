@@ -16,9 +16,8 @@ class PieceworkPayrollPostingService
     ) {}
 
     /**
-     * FINALIZE:
-     * Dr 5101 HPP
-     * Cr 2102 Hutang Upah Borongan
+     * FINALIZE merekonsiliasi upah yang sudah dikapitalisasi oleh produksi.
+     * Hanya selisih yang diposting agar upah tidak masuk HPP dua kali.
      */
     public function finalize(PieceworkPayrollPeriod $period): PieceworkPayrollPeriod
     {
@@ -35,12 +34,6 @@ class PieceworkPayrollPostingService
                 throw new \RuntimeException('Total payroll 0. Tidak bisa finalize.');
             }
 
-            // akun HPP (5101)
-            $hpp = Account::where('code', '5101')->first();
-            if (!$hpp) {
-                throw new \RuntimeException('Akun 5101 (HPP) tidak ditemukan.');
-            }
-
             // akun hutang upah borongan (2102)
             $payable = Account::where('code', '2102')->first();
             if (!$payable) {
@@ -55,19 +48,47 @@ class PieceworkPayrollPostingService
                 }
             }
 
-            $desc = strtoupper($period->module) . ' Payroll Borongan (FINAL) '
-            . $period->period_start . ' s/d ' . $period->period_end;
+            $sourceTypes = match ((string) $period->module) {
+                'cutting' => [JournalService::SRC_CUTTING_WIP],
+                'sewing' => [JournalService::SRC_SEWING_RETURN_OK, JournalService::SRC_SEWING_REWORK_OK],
+                default => [],
+            };
 
-            $journal = $this->journalService->post(
-                date: $period->period_end, // umumnya accrual di akhir periode
-                sourceType: 'piecework_payroll_period_accrual',
-                sourceId: $period->id,
-                description: $desc,
-                lines: [
-                    ['account_id' => $hpp->id, 'debit' => $total, 'credit' => 0],
-                    ['account_id' => $payable->id, 'debit' => 0, 'credit' => $total],
-                ]
-            );
+            $alreadyAccrued = empty($sourceTypes) ? 0.0 : (float) DB::table('journal_lines as jl')
+                ->join('journals as j', 'j.id', '=', 'jl.journal_id')
+                ->whereNull('j.voided_at')
+                ->whereIn('j.source_type', $sourceTypes)
+                ->whereBetween('j.date', [$period->period_start, $period->period_end])
+                ->where('jl.account_id', $payable->id)
+                ->sum('jl.credit');
+
+            $difference = round($total - $alreadyAccrued, 2);
+            $journal = null;
+
+            if (abs($difference) > 0.01) {
+                $inventoryCode = $period->module === 'finishing' ? '1203' : '1202';
+                $inventory = Account::where('code', $inventoryCode)->firstOrFail();
+                $desc = strtoupper($period->module) . ' Payroll Borongan (REKONSILIASI) '
+                    . $period->period_start . ' s/d ' . $period->period_end;
+
+                $lines = $difference > 0
+                    ? [
+                        ['account_id' => $inventory->id, 'debit' => $difference, 'credit' => 0],
+                        ['account_id' => $payable->id, 'debit' => 0, 'credit' => $difference],
+                    ]
+                    : [
+                        ['account_id' => $payable->id, 'debit' => abs($difference), 'credit' => 0],
+                        ['account_id' => $inventory->id, 'debit' => 0, 'credit' => abs($difference)],
+                    ];
+
+                $journal = $this->journalService->post(
+                    date: $period->period_end,
+                    sourceType: 'piecework_payroll_period_accrual',
+                    sourceId: $period->id,
+                    description: $desc,
+                    lines: $lines,
+                );
+            }
 
             $period->update([
                 'total_amount' => $total,
@@ -75,7 +96,7 @@ class PieceworkPayrollPostingService
                 'finalized_at' => now(),
                 'finalized_by' => Auth::id(),
                 'payable_account_id' => $payable->id,
-                'accrual_journal_id' => $journal->id,
+                'accrual_journal_id' => $journal?->id,
             ]);
 
             return $period;

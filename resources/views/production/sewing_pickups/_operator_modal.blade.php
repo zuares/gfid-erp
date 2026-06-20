@@ -20,15 +20,27 @@ $isOwner = auth()->user()?->isOwner()
         .sc-td-qty  { text-align:right; white-space:nowrap; font-size:.9rem; font-weight:800; }
 
         /* ── Supply phase: checklist rows ── */
-        .sc-row { display:grid; grid-template-columns:24px 1fr auto; align-items:center; gap:.5rem;
+        .sc-supply-cols,
+        .sc-row { display:grid; grid-template-columns:22px minmax(100px,1fr) 88px 58px 66px;
+                  align-items:center; gap:.4rem; }
+        .sc-supply-cols { padding:0 .6rem .25rem; color:var(--muted); font-size:.58rem;
+                          font-weight:900; text-transform:uppercase; letter-spacing:.04em; }
+        .sc-row {
                   padding:.45rem .6rem; border:1px solid rgba(148,163,184,.18); border-radius:10px;
                   margin-bottom:.35rem; transition:background .15s; }
         .sc-row.is-ok    { background:rgba(22,163,74,.06);  border-color:rgba(22,163,74,.25); }
         .sc-row.is-short { background:rgba(239,68,68,.05);  border-color:rgba(239,68,68,.25); }
         .sc-chk   { width:1.1rem; height:1.1rem; cursor:pointer; accent-color:#2563eb; flex-shrink:0; }
         .sc-label { font-size:.78rem; font-weight:700; line-height:1.15; }
-        .sc-sub   { font-size:.69rem; color:var(--muted); }
-        .sc-input { width:68px; text-align:right; font-weight:800; font-size:.8rem;
+        .sc-sub   { font-size:.66rem; color:var(--muted); }
+        .sc-need  { text-align:right; font-size:.72rem; font-weight:800; white-space:nowrap; }
+        .sc-stock { display:block; color:var(--muted); font-size:.59rem; font-weight:600; }
+        .sc-stock.is-zero { color:#dc2626; }
+        .sc-pcs   { text-align:right; font-size:.8rem; font-weight:900; white-space:nowrap; color:#1d4ed8; }
+        .sc-followup-note { margin-top:.6rem; padding:.55rem .65rem; border-radius:8px;
+                            background:#fff7ed; border:1px solid #fed7aa; color:#9a3412;
+                            font-size:.7rem; font-weight:700; }
+        .sc-input { width:66px; text-align:right; font-weight:800; font-size:.8rem;
                     border-radius:8px; padding:.2rem .35rem; border:1px solid rgba(148,163,184,.4);
                     background:var(--card); color:var(--text); }
         .sc-input:focus { outline:none; border-color:#2563eb; box-shadow:0 0 0 2px rgba(37,99,235,.15); }
@@ -36,6 +48,16 @@ $isOwner = auth()->user()?->isOwner()
                        margin-bottom:.75rem; }
         .sc-step-main { font-size:1.15rem; font-weight:900; letter-spacing:-.01em;
                         font-family:ui-monospace,SFMono-Regular,Menlo,Consolas,monospace; }
+        @media (max-width:575.98px) {
+            .sc-supply-cols,
+            .sc-row { grid-template-columns:20px minmax(78px,1fr) 72px 50px 58px; gap:.25rem; }
+            .sc-supply-cols { padding-left:.35rem; padding-right:.35rem; font-size:.52rem; }
+            .sc-row { padding:.4rem .35rem; }
+            .sc-label { font-size:.7rem; }
+            .sc-need { font-size:.65rem; }
+            .sc-pcs { font-size:.7rem; }
+            .sc-input { width:58px; font-size:.72rem; }
+        }
 
         #btn-confirm-submit,
         #btn-confirm-submit * { color: #fff !important; }
@@ -250,6 +272,7 @@ document.addEventListener('DOMContentLoaded', function () {
                     uom:         s.uom || '',
                     qty:         qty,
                     qtyPerPiece: Number(s.qty || 0),
+                    stockAvailable: Number(s.stock_available || 0),
                     issued:      0,
                 })),
             };
@@ -292,21 +315,49 @@ document.addEventListener('DOMContentLoaded', function () {
             return;
         }
 
-        supplyChecklist.innerHTML = line.supplies.map((sup, si) => {
+        supplyChecklist.innerHTML = `
+            <div class="sc-supply-cols" aria-hidden="true">
+                <span></span>
+                <span>Material</span>
+                <span class="text-end">Kebutuhan</span>
+                <span class="text-end">PCS</span>
+                <span class="text-end">Dibawa</span>
+            </div>
+        ` + line.supplies.map((sup, si) => {
             const isOk = sup.issued >= sup.qty - 0.0001;
+            const needQty = sup.qty * sup.qtyPerPiece;
+            const stockIsZero = sup.stockAvailable <= 0.0001;
             return `
                 <div class="sc-row ${isOk ? 'is-ok' : ''}" data-si="${si}">
                     <input type="checkbox" class="sc-chk js-chk" data-si="${si}" ${isOk ? 'checked' : ''}>
                     <div>
                         <div class="sc-label">${esc(sup.name)}</div>
-                        <div class="sc-sub">Butuh ${fmt(sup.qty)} pcs</div>
+                        <div class="sc-sub">${esc(sup.code)}</div>
                     </div>
+                    <div class="sc-need">
+                        ${fmt(needQty)} ${esc(sup.uom)}
+                        <span class="sc-stock ${stockIsZero ? 'is-zero' : ''}">Stok ${fmt(sup.stockAvailable)}</span>
+                    </div>
+                    <div class="sc-pcs">${fmt(sup.qty)} pcs</div>
                     <input type="number" step="1" min="0" inputmode="numeric"
                            class="sc-input js-inp" data-si="${si}"
                            value="${sup.issued > 0 ? Math.floor(sup.issued) : 0}"
                            placeholder="${fmt(sup.qty)}">
                 </div>`;
         }).join('');
+
+        const hasSystemShortage = line.supplies.some(sup =>
+            sup.stockAvailable + 0.0001 < (sup.qty * sup.qtyPerPiece)
+        );
+        if (hasSystemShortage) {
+            supplyChecklist.insertAdjacentHTML('beforeend', `
+                <div class="sc-followup-note">
+                    Stok sistem tidak mencukupi. Isi kolom <b>Dibawa</b> sesuai barang fisik yang benar-benar ada.
+                    Selisih akan dibuat sebagai adjustment pending dan kelengkapan dipenuhi otomatis setelah disetujui.
+                </div>
+            `);
+            if (isLast && confirmLabel) confirmLabel.textContent = 'Simpan - Menyusul';
+        }
 
         /* helper: sync visual state dari sup.issued */
         function syncRow(row, sup) {

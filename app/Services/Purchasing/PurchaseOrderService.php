@@ -16,7 +16,6 @@ class PurchaseOrderService
 {
     public function __construct(
         protected JournalService $journalService,
-        protected PurchaseOrderInventoryService $inventoryPoster,
     ) {}
 
     /**
@@ -178,12 +177,6 @@ class PurchaseOrderService
             $order->approved_at = now();
             $order->save();
 
-            // ─────────────────────────────────────────────────────────────
-            // Temporary direct stock-in after PO approval; GRN module kept for future workflow.
-            // Hanya untuk PO material (bahan baku). Idempotent — tidak double-post.
-            // ─────────────────────────────────────────────────────────────
-            $this->inventoryPoster->postApprovedPurchaseOrderToInventory($order);
-
             return $order->fresh(['supplier', 'lines', 'paymentMethod']);
         });
     }
@@ -231,6 +224,7 @@ class PurchaseOrderService
             'created_by',
             'status',
             'order_type',
+            'purchase_request_id',
         ];
 
         return array_intersect_key($payload, array_flip($allowed));
@@ -387,6 +381,10 @@ class PurchaseOrderService
     protected function touchLastPrices(PurchaseOrder $order, int $itemId, float $unitPrice): void
     {
         $unitPrice = round($unitPrice, 2);
+
+        if ($unitPrice <= 0) {
+            return;
+        }
 
         Item::whereKey($itemId)->update([
             'last_purchase_price' => $unitPrice,

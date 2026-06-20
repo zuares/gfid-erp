@@ -11,6 +11,8 @@ use App\Models\Shipment;
 use App\Models\ShipmentLine;
 use App\Models\Store;
 use App\Models\Warehouse;
+use App\Models\Account;
+use App\Services\Accounting\JournalService;
 use App\Services\Inventory\InventoryService;
 use App\Services\Sales\DailySalesRealtimeService;
 use Illuminate\Http\RedirectResponse;
@@ -24,7 +26,8 @@ class ShipmentController extends Controller
 
     public function __construct(
         protected InventoryService $inventory,
-        protected DailySalesRealtimeService $dailySales
+        protected DailySalesRealtimeService $dailySales,
+        protected JournalService $journalService
     ) {}
 
     protected function whRts(): ?Warehouse
@@ -429,7 +432,7 @@ class ShipmentController extends Controller
             return;
         }
 
-        $locked->load(['lines', 'store']);
+        $locked->load(['lines.item', 'store']);
 
         $totalQty = 0;
 
@@ -469,6 +472,11 @@ class ShipmentController extends Controller
         }
 
         $locked->save();
+
+        // ===================================================
+        // JURNAL COGS: Dr 5101 HPP / Cr Persediaan (per item_role)
+        // ===================================================
+        $this->postShipmentCogs($locked);
 
         // realtime daily sales
         $this->dailySales->applyShipmentPosted($locked, adsDays: 30, onlyActive: true);
@@ -827,6 +835,9 @@ class ShipmentController extends Controller
                 $locked->cancel_reason = $validated['cancel_reason'];
                 $locked->save();
 
+                // Void jurnal COGS jika ada
+                $this->journalService->voidBySource('shipment_cogs', (int) $locked->id);
+
                 $this->dailySales->reverseShipmentCancelled($locked, adsDays: 30, onlyActive: true);
             });
         } catch (\Throwable $e) {
@@ -837,6 +848,11 @@ class ShipmentController extends Controller
         return redirect()->route('sales.shipments.show', $shipment)
             ->with('status', 'success')
             ->with('message', 'Shipment posted berhasil dibatalkan & stok sudah dikembalikan ke WH-RTS.');
+    }
+
+    protected function postShipmentCogs(Shipment $shipment): void
+    {
+        $this->journalService->postShipmentCogsFromMutations($shipment);
     }
 
     public function reconcile(Shipment $shipment)

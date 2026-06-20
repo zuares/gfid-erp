@@ -46,3 +46,8 @@ storage/backups/snapshot_dev.sqlite
 
 # Backup files
 *.bak
+*.bak_*
+reset_owner_password.php
+_backups/
+scripts/
+*.bak2

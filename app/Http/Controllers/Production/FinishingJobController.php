@@ -11,6 +11,7 @@ use App\Models\FinishingJobLine;
 use App\Models\Item;
 use App\Models\ItemCostSnapshot;
 use App\Models\Warehouse;
+use App\Services\Accounting\JournalService;
 use App\Services\Costing\HppService;
 use App\Services\Inventory\InventoryService;
 use App\Services\Production\FinishingBomService;
@@ -26,7 +27,8 @@ class FinishingJobController extends Controller
     public function __construct(
         protected InventoryService $inventory,
         protected HppService $hpp,
-        protected FinishingBomService $finBom, // ✅ NEW
+        protected FinishingBomService $finBom,
+        protected JournalService $journal,
     ) {}
 
     /**
@@ -168,12 +170,13 @@ class FinishingJobController extends Controller
 
         if ($itemIds->isEmpty()) {
             return view('production.finishing_jobs.create', [
-                'dateDefault' => $today,
-                'linesAll' => [],
-                'linesByOp' => [],
-                'operators' => $operators,
+                'dateDefault'           => $today,
+                'linesAll'              => [],
+                'linesByOp'             => [],
+                'operators'             => $operators,
                 'destinationWarehouses' => $destinationWarehouses,
-                'defaultDestinationId' => $defaultDestinationId,
+                'defaultDestinationId'  => $defaultDestinationId,
+                'packingSupplies'       => collect(),
             ]);
         }
 
@@ -350,13 +353,76 @@ class FinishingJobController extends Controller
             ];
         })->filter(fn($l) => (int) $l['total_wip'] > 0)->values()->all();
 
+        // 6) Packing supply status — kebutuhan kelengkapan packing vs stok RM
+        $packingSupplies = collect();
+        $rmWarehouseId   = Warehouse::where('code', 'RM')->value('id');
+        if ($rmWarehouseId && $itemIds->isNotEmpty()) {
+            $bomLines = DB::table('item_bom_lines as ibl')
+                ->join('item_boms as ib', 'ib.id', '=', 'ibl.item_bom_id')
+                ->join('items as mat', 'mat.id', '=', 'ibl.material_item_id')
+                ->whereIn('ib.item_id', $itemIds)
+                ->where('ib.active', true)
+                ->where('ibl.usage_stage', 'packing_supply')
+                ->where('ibl.is_optional', false)
+                ->select([
+                    'ib.item_id as fg_item_id',
+                    'mat.id as mat_id',
+                    'mat.code as mat_code',
+                    'mat.name as mat_name',
+                    'mat.unit as mat_unit',
+                    'ibl.qty as bom_qty',
+                    'ibl.scrap_pct',
+                ])
+                ->get();
+
+            $required = [];
+            foreach ($bomLines as $bom) {
+                $fgId = (int) $bom->fg_item_id;
+                $wip  = (float) optional($wipByItem->get($fgId))->wip_sum;
+                if ($wip <= 0) continue;
+                $need  = $wip * (float) $bom->bom_qty * (1 + ((float) $bom->scrap_pct / 100));
+                $matId = (int) $bom->mat_id;
+                $required[$matId] ??= [
+                    'id'           => $matId,
+                    'code'         => $bom->mat_code,
+                    'name'         => $bom->mat_name,
+                    'unit'         => $bom->mat_unit ?: 'pcs',
+                    'required_qty' => 0.0,
+                ];
+                $required[$matId]['required_qty'] += $need;
+            }
+
+            if (!empty($required)) {
+                $rmStocks = DB::table('inventory_stocks')
+                    ->where('warehouse_id', $rmWarehouseId)
+                    ->whereIn('item_id', array_keys($required))
+                    ->pluck('qty', 'item_id');
+
+                $packingSupplies = collect($required)->map(function ($row) use ($rmStocks) {
+                    $stock    = (float) ($rmStocks[$row['id']] ?? 0);
+                    $shortage = max($row['required_qty'] - $stock, 0);
+                    return (object) [
+                        'id'           => $row['id'],
+                        'code'         => $row['code'],
+                        'name'         => $row['name'],
+                        'unit'         => $row['unit'],
+                        'required_qty' => round($row['required_qty'], 2),
+                        'stock_qty'    => round($stock, 2),
+                        'shortage_qty' => round($shortage, 2),
+                        'has_shortage' => $shortage > 0.001,
+                    ];
+                })->sortByDesc('has_shortage')->values();
+            }
+        }
+
         return view('production.finishing_jobs.create', [
-            'dateDefault' => $today,
-            'linesAll' => $linesAll,
-            'linesByOp' => $linesByOp,
-            'operators' => $operators,
+            'dateDefault'         => $today,
+            'linesAll'            => $linesAll,
+            'linesByOp'           => $linesByOp,
+            'operators'           => $operators,
             'destinationWarehouses' => $destinationWarehouses,
-            'defaultDestinationId' => $defaultDestinationId,
+            'defaultDestinationId'  => $defaultDestinationId,
+            'packingSupplies'     => $packingSupplies,
         ]);
     }
 
@@ -981,6 +1047,7 @@ class FinishingJobController extends Controller
             ->with('status', 'Finishing Job berhasil diposting. OK ke WH-PRD, reject finishing ke REJ-FIN, reject jahit ke REJ-SEW.');
     }
 
+
     protected function postCreatedJob(FinishingJob $job): void
     {
         $job->loadMissing(['lines', 'lines.bundle.cuttingJob', 'lines.item']);
@@ -1036,6 +1103,25 @@ class FinishingJobController extends Controller
 
             $job->update($update);
         });
+
+        // ✅ Jurnal akuntansi SETELAH inventory transaction commit
+        // (query inventory_mutations di postFinishingJob butuh data yang sudah committed)
+        try {
+            $this->journal->postFinishingJob($job);
+        } catch (\Throwable $e) {
+            // Journal gagal tidak boleh rollback inventory — log saja
+            \Log::warning('[FinishingJob] Jurnal tidak terbuat: ' . $e->getMessage(), [
+                'finishing_job_id' => $job->id,
+            ]);
+        }
+
+        try {
+            $this->journal->postFinishingBom($job);
+        } catch (\Throwable $e) {
+            \Log::warning('[FinishingJob] Jurnal BOM finishing tidak terbuat: ' . $e->getMessage(), [
+                'finishing_job_id' => $job->id,
+            ]);
+        }
     }
 
     /* ============================================================
@@ -1196,6 +1282,14 @@ class FinishingJobController extends Controller
                 // 4) IN WH-PRD (OK)
                 // =========================
                 if ($qtyOk > 0) {
+                    $supUnitCost = (float) $this->getSupUnitCostFromFinishingBom(
+                        (int) $line->id,
+                        (float) $qtyOk
+                    );
+                    $finishedUnitCost = $movementUnitCost !== null
+                        ? $movementUnitCost + $supUnitCost
+                        : ($supUnitCost > 0 ? $supUnitCost : null);
+
                     // stockIn($warehouseId, $itemId, $qty, $date, $sourceType, $sourceId, $notes, $lotId=null, $unitCost=null, $affectLotCost=false)
                     $this->inventory->stockIn(
                         $prodWarehouseId,
@@ -1206,18 +1300,13 @@ class FinishingJobController extends Controller
                         $job->id,
                         $notesPrefix . " OK (WIP-FIN→PRD)",
                         null,
-                        $movementUnitCost,
+                        $finishedUnitCost,
                         false,
                         $lineBundleId
                     );
 
                     // snapshot HPP (kalau cost ada)
-                    if ($movementUnitCost !== null && $movementUnitCost > 0) {
-                        $supUnitCost = (float) $this->getSupUnitCostFromFinishingBom(
-                            (int) $line->id,
-                            (float) $qtyOk
-                        );
-
+                    if ($finishedUnitCost !== null && $finishedUnitCost > 0) {
                         $this->hpp->createSnapshot([
                             'item_id' => (int) $line->item_id,
                             'warehouse_id' => null,
@@ -1323,5 +1412,56 @@ class FinishingJobController extends Controller
         $totalSupCost = abs($totalSupCost);
 
         return round($totalSupCost / $qtyOk, 4);
+    }
+
+    /**
+     * Apply ulang BOM untuk baris yang bom_has_gaps=true (setelah GRN diinput).
+     * Hanya reset baris yang belum lengkap — menghindari double stockOut.
+     */
+    public function reapplyBom(FinishingJob $finishingJob): RedirectResponse
+    {
+        $job = $finishingJob->loadMissing(['lines', 'lines.bundle.cuttingJob', 'lines.item']);
+
+        if (($job->status ?? null) !== 'posted') {
+            return back()->withErrors(['bom' => 'Hanya finishing job yang sudah diposting yang bisa di-apply ulang BOM-nya.']);
+        }
+
+        $gapLines = $job->lines->filter(fn($l) => (bool) ($l->bom_has_gaps ?? false));
+
+        if ($gapLines->isEmpty()) {
+            return redirect()
+                ->route('production.finishing_jobs.show', $job->id)
+                ->with('status', 'Tidak ada BOM gap yang perlu di-apply ulang.');
+        }
+
+        // Reset hanya baris yang gap — bom_applied_at=null agar service mau proses ulang
+        foreach ($gapLines as $line) {
+            $line->bom_applied_at = null;
+            $line->bom_has_gaps   = false;
+            $line->save();
+        }
+
+        $movementDate = $this->resolveMovementDate($job);
+
+        try {
+            DB::transaction(function () use ($job, $movementDate) {
+                $this->finBom->applySupOnlyForPostedJob($job, $movementDate);
+            });
+        } catch (\Throwable $e) {
+            return back()->withErrors(['bom' => 'Gagal apply BOM: ' . $e->getMessage()]);
+        }
+
+        $job->refresh()->loadMissing(['lines']);
+        $stillGap = $job->lines->filter(fn($l) => (bool) ($l->bom_has_gaps ?? false))->count();
+
+        if ($stillGap > 0) {
+            return redirect()
+                ->route('production.finishing_jobs.show', $job->id)
+                ->with('warning', "BOM di-apply ulang, tapi masih ada {$stillGap} baris yang belum lengkap. Pastikan GRN sudah diinput untuk semua material.");
+        }
+
+        return redirect()
+            ->route('production.finishing_jobs.show', $job->id)
+            ->with('status', 'BOM berhasil di-apply ulang. Semua material sudah ter-cover dan dicatat ke stok.');
     }
 }

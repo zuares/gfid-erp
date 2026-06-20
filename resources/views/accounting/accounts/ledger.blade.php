@@ -237,9 +237,17 @@
                                 $ref = $l->source_type
                                     ? strtoupper($l->source_type) . ($l->source_id ? '#' . $l->source_id : '')
                                     : '-';
+                                $postedAt = $l->posted_at
+                                    ? \Carbon\Carbon::parse($l->posted_at)->format('H:i')
+                                    : null;
                             @endphp
                             <tr>
-                                <td>{{ \Carbon\Carbon::parse($l->date)->format('d/m/Y') }}</td>
+                                <td>
+                                    <div>{{ \Carbon\Carbon::parse($l->date)->format('d/m/Y') }}</div>
+                                    @if ($postedAt)
+                                        <div class="lg-muted" style="font-size:.76rem">{{ $postedAt }}</div>
+                                    @endif
+                                </td>
                                 <td class="lg-hide-sm lg-muted">{{ $ref }}</td>
                                 <td>
                                     <div style="font-weight:700">{{ $l->journal_description ?? '-' }}</div>

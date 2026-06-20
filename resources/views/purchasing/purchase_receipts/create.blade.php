@@ -1,1247 +1,926 @@
 {{-- resources/views/purchasing/purchase_receipts/create.blade.php --}}
 @extends('layouts.app')
-@section('title', 'Purchasing • Penerimaan Barang (GRN)')
+@section('title', 'GRN Baru')
 
 @push('head')
-    {{-- HEADER & CARD STYLE SELARAS INDEX --}}
-    <style>
-        .grn-create-page .page-header-title {
-            font-size: 1.3rem;
-            font-weight: 600;
-        }
+<style>
+    .page-wrap { max-width: 1080px; margin-inline: auto; }
 
-        .grn-create-page .page-header-subtitle {
-            font-size: .82rem;
-            color: var(--muted);
-        }
+    .card {
+        background: var(--card);
+        border: 1px solid var(--line);
+        border-radius: 14px;
+        overflow: hidden;
+    }
 
-        .grn-create-page .page-header-actions .btn-outline-secondary {
-            border-radius: 999px;
-            padding-inline: 1rem;
-        }
+    .mono {
+        font-variant-numeric: tabular-nums;
+        font-family: ui-monospace, SFMono-Regular, Menlo, Consolas, "Liberation Mono";
+    }
 
-        .grn-create-page .btn-primary {
-            border-radius: 999px;
-            padding-inline: 1rem;
-            box-shadow: 0 8px 18px rgba(59, 130, 246, .30);
-        }
+    /* ── Tag pills (selaras PO show) ── */
+    .tag {
+        border-radius: 999px;
+        padding: .15rem .65rem;
+        font-size: .7rem;
+        border: 1px solid var(--line);
+        background: rgba(148,163,184,.12);
+        white-space: nowrap;
+    }
+    .tag-material  { background:rgba(59,130,246,.08);  color:#1d4ed8; border-color:rgba(59,130,246,.45); }
+    .tag-fg        { background:rgba(22,163,74,.10);   color:#15803d; border-color:rgba(22,163,74,.45); }
+    .tag-partial   { background:rgba(234,179,8,.12);   color:#92400e; border-color:rgba(234,179,8,.45); }
+    .tag-done      { background:rgba(22,163,74,.10);   color:#15803d; border-color:rgba(22,163,74,.35); }
+    .tag-draft-grn { background:rgba(239,68,68,.08);   color:#b91c1c; border-color:rgba(239,68,68,.35); }
+    .tag-po        { background:rgba(148,163,184,.1);  color:#475569; border-color:rgba(148,163,184,.4); }
 
-        .grn-create-page .main-card {
-            border-radius: 16px;
-            background: color-mix(in srgb, var(--card) 94%, var(--bg) 6%);
-            border: 1px solid var(--line);
-        }
+    .btn-pill { border-radius: 999px; padding-inline: 1rem; }
 
-        .grn-create-page .filter-card {
-            border-radius: 16px;
-            background: color-mix(in srgb, var(--card) 94%, var(--bg) 6%);
-            border: 1px solid var(--line);
-        }
+    /* ── Filter bar ── */
+    .filter-bar {
+        background: color-mix(in srgb, var(--card) 94%, var(--bg) 6%);
+        border: 1px solid var(--line);
+        border-radius: 14px;
+        padding: .75rem 1rem;
+    }
+    .filter-bar .form-label {
+        font-size: .72rem;
+        font-weight: 700;
+        text-transform: uppercase;
+        letter-spacing: .06em;
+        color: var(--muted);
+        margin-bottom: .25rem;
+    }
 
-        .grn-create-page .filter-card .card-header {
-            background: transparent;
-            border-bottom-color: var(--line);
-        }
+    /* ── Counter pills ── */
+    .stat-pill {
+        border: 1px solid var(--line);
+        border-radius: 10px;
+        padding: .35rem .75rem;
+        background: rgba(148,163,184,.06);
+        font-size: .8rem;
+    }
+    .stat-pill .lbl { color: var(--muted); font-size: .7rem; display:block; line-height:1.2; }
+    .stat-pill .val { font-weight: 700; }
 
-        .grn-create-page .filter-card .form-label {
-            font-size: .75rem;
-            font-weight: 600;
-            letter-spacing: .06em;
-            text-transform: uppercase;
-            color: var(--muted);
-        }
+    /* ── Table ── */
+    thead th {
+        background: color-mix(in srgb, var(--card) 96%, var(--bg) 4%);
+        position: sticky; top: 0; z-index: 1;
+        font-size: .72rem;
+        font-weight: 700;
+        text-transform: uppercase;
+        letter-spacing: .05em;
+        color: var(--muted);
+        padding-block: .55rem;
+        white-space: nowrap;
+    }
+    .table-sm td { padding-block: .5rem; }
 
-        .grn-create-page .quick-filter-panel {
-            border-radius: 14px;
-            border: 1px solid var(--line);
-            background: color-mix(in srgb, var(--card) 96%, var(--bg) 4%);
-            padding: .75rem;
-        }
+    .item-code { font-weight: 700; font-size: .85rem; }
+    .item-name { font-size: .78rem; color: var(--muted); margin-top: .05rem; }
 
-        .grn-create-page .quick-filter-title {
-            font-size: .78rem;
-            font-weight: 800;
-            letter-spacing: .08em;
-            text-transform: uppercase;
-            color: var(--muted);
-        }
+    .progress-mini {
+        height: 3px;
+        border-radius: 999px;
+        background: rgba(148,163,184,.2);
+        overflow: hidden;
+        margin-top: .3rem;
+        width: 80px;
+    }
+    .progress-mini-bar {
+        height: 100%;
+        border-radius: 999px;
+        background: rgba(234,179,8,.8);
+    }
 
-        .grn-create-page .quick-stat {
+    .qty-input {
+        width: 88px;
+        text-align: right;
+        font-variant-numeric: tabular-nums;
+        font-family: ui-monospace, SFMono-Regular, Menlo, Consolas, "Liberation Mono";
+        font-size: .85rem;
+    }
+
+    .row-hidden-by-filter { display: none !important; }
+    .filter-empty-msg { text-align:center; color:var(--muted); padding: 1.5rem; font-size:.88rem; }
+
+    /* ── Header field labels ── */
+    .field-lbl {
+        font-size: .72rem;
+        font-weight: 700;
+        text-transform: uppercase;
+        letter-spacing: .06em;
+        color: var(--muted);
+        margin-bottom: .25rem;
+    }
+
+    @media (max-width:767.98px) {
+        .page-wrap { padding-inline: .5rem; }
+        thead { display: none; }
+        tbody tr {
+            display: block;
             border: 1px solid var(--line);
             border-radius: 10px;
-            padding: .48rem .65rem;
-            background: rgba(148, 163, 184, .07);
-            min-width: 120px;
+            margin-bottom: .5rem;
+            padding: .5rem .75rem;
         }
-
-        .grn-create-page .quick-stat .lbl {
-            display: block;
-            font-size: .7rem;
-            color: var(--muted);
-            line-height: 1.1;
+        tbody td {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            border: 0;
+            padding-block: .18rem;
         }
-
-        .grn-create-page .quick-stat .val {
-            display: block;
-            font-size: .92rem;
-            font-weight: 800;
-            line-height: 1.2;
-        }
-
-        .grn-create-page .row-hidden-by-filter {
-            display: none !important;
-        }
-
-        .grn-create-page .filter-empty-state {
-            border-top: 1px solid var(--line);
-            color: var(--muted);
-            padding: 1rem;
-            text-align: center;
-            font-size: .88rem;
-        }
-
-        @media (max-width: 767.98px) {
-            .grn-create-page .page-header {
-                flex-direction: column;
-                align-items: center;
-                text-align: center;
-                gap: .35rem;
-            }
-
-            .grn-create-page .page-header-actions {
-                width: 100%;
-                display: flex;
-                justify-content: center;
-            }
-
-            .grn-create-page .page-header-title {
-                font-size: 1.1rem;
-            }
-
-            .grn-create-page .page-header-actions .btn-outline-secondary {
-                width: 100%;
-                justify-content: center;
-            }
-        }
-    </style>
-
-    {{-- DETAIL TABLE + MOBILE STYLE --}}
-    <style>
-        .page-wrap {
-            max-width: 1080px;
-            margin-inline: auto;
-        }
-
-        .card {
-            background: var(--card);
-            border: 1px solid var(--line);
-            border-radius: 14px;
-        }
-
-        .mono {
-            font-variant-numeric: tabular-nums;
-            font-family: ui-monospace, SFMono-Regular, Menlo, Consolas, "Liberation Mono";
-        }
-
-        .table-wrap {
-            overflow-x: auto;
-        }
-
-        thead th {
-            background: var(--panel);
-            position: sticky;
-            top: 0;
-            z-index: 1;
-        }
-
-        .table-sm td,
-        .table-sm th {
-            padding-block: .4rem;
-        }
-
-        .badge-po {
-            border-radius: 999px;
-            padding: .15rem .65rem;
-            font-size: .75rem;
-            border: 1px solid var(--line);
-            background: rgba(148, 163, 184, .12);
-        }
-
-        .badge-draft-grn {
-            border-radius: 999px;
-            padding: .1rem .5rem;
-            font-size: .7rem;
-            border: 1px solid rgba(248, 113, 113, .45);
-            background: rgba(248, 113, 113, .08);
-            color: #b91c1c;
-        }
-
-        .badge-type {
-            border-radius: 999px;
-            padding: .15rem .6rem;
+        tbody td[data-label]::before {
+            content: attr(data-label);
             font-size: .72rem;
-            border: 1px solid var(--line);
-            background: rgba(34, 197, 94, .08);
-            color: rgba(21, 128, 61, 1);
-        }
-
-        .badge-type.material {
-            background: rgba(59, 130, 246, .08);
-            color: rgba(30, 64, 175, 1);
-        }
-
-        .item-main {
-            font-weight: 600;
-        }
-
-        .item-sub {
-            font-size: .8rem;
             color: var(--muted);
+            flex-shrink: 0;
+            margin-right: .75rem;
         }
-
-        .col-price {
-            white-space: nowrap;
-        }
-
-        .line-muted {
-            opacity: .6;
-        }
-
-        .info-pill {
-            border: 1px solid var(--line);
-            background: color-mix(in srgb, var(--card) 92%, var(--bg) 8%);
-            border-radius: 999px;
-            padding: .35rem .7rem;
-            font-size: .82rem;
-        }
-
-        @media (max-width: 767.98px) {
-            .page-wrap {
-                padding-inline: .5rem;
-            }
-
-            .card-header,
-            .card-body,
-            .card-footer {
-                padding-inline: .75rem !important;
-            }
-
-            .table-section {
-                padding-top: .5rem !important;
-            }
-
-            .table thead {
-                display: none;
-            }
-
-            .table tbody tr {
-                display: block;
-                border: 1px solid var(--line);
-                border-radius: 10px;
-                margin-bottom: .5rem;
-                padding: .35rem .6rem .45rem;
-                background: rgba(15, 23, 42, 0.02);
-            }
-
-            .table tbody td {
-                display: flex;
-                justify-content: space-between;
-                align-items: center;
-                border: 0;
-                padding-block: .2rem;
-            }
-
-            .table tbody td[data-label]::before {
-                content: attr(data-label);
-                font-size: .75rem;
-                color: var(--muted);
-                margin-right: .75rem;
-                text-align: left;
-            }
-
-            .table tbody td:nth-child(2) {
-                display: none;
-            }
-
-            .item-main {
-                font-size: .9rem;
-            }
-
-            .item-sub {
-                font-size: .75rem;
-            }
-
-            .col-price {
-                display: none;
-            }
-
-            .supplier-helper {
-                text-align: center;
-            }
-
-            .grn-create-page .quick-stat {
-                min-width: 0;
-                flex: 1 1 0;
-            }
-        }
-    </style>
+        td.td-item { display: block !important; }
+        td.td-item::before { display: none !important; }
+        .qty-input { width: 75px; }
+        .col-harga { display: none !important; }
+    }
+</style>
 @endpush
 
 @section('content')
-    @php
-        /** @var \App\Models\PurchaseOrder|null $order */
-        $u = auth()->user();
-        $canSeeMoney = $u?->isOwner() ?? false;   // hanya owner
-        $hasOrder = isset($order) && $order?->id;
+@php
+    $u = auth()->user();
+    $canSeeMoney = $u?->isOwner() ?? false;
+    $hasOrder    = isset($order) && $order?->id;
 
-        $defaultDate = old('date', now()->toDateString());
+    $defaultDate = old('date', now()->toDateString());
 
-        // Supplier aktif (GET)
-        $selectedSupplierId = old(
-            'supplier_id',
-            $hasOrder ? $order->supplier_id : $selectedSupplierId ?? request('supplier_id'),
-        );
+    $selectedSupplierId = old('supplier_id',
+        $hasOrder ? $order->supplier_id : $selectedSupplierId ?? request('supplier_id'));
 
-        // ORDER TYPE (AUTO)
-        $selectedOrderType = old(
-            'order_type',
-            $hasOrder ? $order->order_type ?? 'material' : ($selectedOrderType ?? request('order_type') ?: null),
-        );
-        $selectedOrderType = in_array($selectedOrderType, ['material', 'finished_good'], true)
-            ? $selectedOrderType
-            : null;
+    $selectedOrderType = old('order_type',
+        $hasOrder ? $order->order_type ?? 'material' : ($selectedOrderType ?? request('order_type') ?: null));
+    $selectedOrderType = in_array($selectedOrderType, ['material','finished_good'], true)
+        ? $selectedOrderType : null;
 
-        $detailLines = $hasOrder ? $order->lines : $lines ?? collect();
+    $detailLines = $hasOrder ? $order->lines : $lines ?? collect();
 
-        if (!$hasOrder && !$selectedSupplierId && $detailLines->isNotEmpty()) {
-            $firstLine = $detailLines->first();
-            $firstPo = $firstLine->purchaseOrder ?? ($firstLine->order ?? null);
-            if ($firstPo) {
-                $selectedSupplierId = $firstPo->supplier_id;
-            }
-        }
+    if (!$hasOrder && !$selectedSupplierId && $detailLines->isNotEmpty()) {
+        $fp = $detailLines->first()?->purchaseOrder ?? null;
+        if ($fp) $selectedSupplierId = $fp->supplier_id;
+    }
 
-        $selectedSupplier = isset($suppliers) ? $suppliers->firstWhere('id', $selectedSupplierId) : null;
+    $selectedSupplier = isset($suppliers) ? $suppliers->firstWhere('id', $selectedSupplierId) : null;
 
-        // DEFAULT WAREHOUSE
-        $defaultWhCode = 'RM';
-        if ($hasOrder && ($order->order_type ?? null) === 'finished_good') {
-            $defaultWhCode = 'WH-RTS';
-        }
-        if (!$hasOrder && $selectedOrderType === 'finished_good') {
-            $defaultWhCode = 'WH-RTS';
-        }
+    $defaultWhCode = 'RM';
+    if ($hasOrder && ($order->order_type ?? null) === 'finished_good') $defaultWhCode = 'WH-RTS';
+    if (!$hasOrder && $selectedOrderType === 'finished_good')           $defaultWhCode = 'WH-RTS';
 
-        $defaultWarehouse = $warehouses->firstWhere('code', $defaultWhCode);
-        if (!$defaultWarehouse) {
-            $defaultWhCode = 'RM';
-            $defaultWarehouse = $warehouses->firstWhere('code', 'RM');
-        }
+    $defaultWarehouse = $warehouses->firstWhere('code', $defaultWhCode) ?? $warehouses->firstWhere('code', 'RM');
+    if (!$defaultWarehouse) { $defaultWhCode = 'RM'; $defaultWarehouse = $warehouses->first(); }
 
-        $selectedWarehouseId = old('warehouse_id', $defaultWarehouse?->id ?? '');
+    $selectedWarehouseId = old('warehouse_id', $defaultWarehouse?->id ?? '');
 
-        // Auto derive order type kalau belum ada (mode list tanpa query)
-        if (!$hasOrder && !$selectedOrderType) {
-            $selectedOrderType = $defaultWhCode === 'WH-RTS' ? 'finished_good' : 'material';
-        }
+    if (!$hasOrder && !$selectedOrderType)
+        $selectedOrderType = $defaultWhCode === 'WH-RTS' ? 'finished_good' : 'material';
 
-        $typeLabel = $selectedOrderType === 'finished_good' ? 'Barang Jadi (FG)' : 'Bahan Baku (Material)';
-        $typeCss = $selectedOrderType === 'material' ? 'material' : '';
-    @endphp
+    $typeLabel  = $selectedOrderType === 'finished_good' ? 'Barang Jadi' : 'Bahan Baku';
+    $typeTagCss = $selectedOrderType === 'material' ? 'tag-material' : 'tag-fg';
 
-    <div class="container py-3 grn-create-page">
-        <div class="page-wrap">
-            {{-- HEADER --}}
-            <div class="page-header d-flex justify-content-between align-items-start flex-wrap gap-2 mb-2">
-                <div class="flex-grow-1">
-                    <h1 class="mb-1 page-header-title">Goods Receipts • GRN Baru</h1>
+    // filter baris yang belum fully received — .values() wajib agar key sequential (0,1,2,…)
+    // supaya name="selected[{{ $idx }}]" cocok dengan index po_line_id[]/item_id[] di controller
+    $activeLines        = $detailLines->filter(fn($l) => !($l->fully_received ?? false))->values();
+    $fullyReceivedCount = $detailLines->count() - $activeLines->count();
+    $colCount           = $canSeeMoney ? 9 : 8;
+@endphp
 
-                    <div class="page-header-subtitle">
-                        @if ($hasOrder)
-                            Penerimaan barang untuk <span class="mono">{{ $order->code }}</span>
-                            dari <span class="fw-semibold">{{ optional($order->supplier)->name ?? '-' }}</span>.
-                            <span class="ms-2 badge-type {{ $typeCss }}">{{ $typeLabel }}</span>
-                        @else
-                            Penerimaan barang dari Purchase Order berstatus <span class="fw-semibold">approved</span>.
-                            Pilih supplier bila ingin mengerucutkan daftar item.
-                            <span class="ms-2 badge-type {{ $typeCss }}">{{ $typeLabel }}</span>
-                        @endif
+<div class="page-wrap py-3 px-2 px-md-0">
+
+    {{-- ── HEADER ── --}}
+    <div class="d-flex justify-content-between align-items-start gap-3 mb-3 flex-wrap">
+        <div>
+            <h2 class="mb-0">Goods Receipt Baru</h2>
+            <div class="text-muted small mt-1">
+                @if ($hasOrder)
+                    Penerimaan untuk <span class="mono fw-semibold">{{ $order->code }}</span>
+                    · {{ $order->supplier?->name ?? '-' }}
+                    &nbsp;<span class="tag {{ $typeTagCss }}">{{ $typeLabel }}</span>
+                @else
+                    Pilih item dari PO yang sudah approved &nbsp;
+                    <span class="tag {{ $typeTagCss }}">{{ $typeLabel }}</span>
+                    @unless ($hasOrder)
+                        &nbsp;<span class="tag" style="font-size:.68rem;">1 GRN = 1 PO</span>
+                    @endunless
+                @endif
+            </div>
+        </div>
+        <div class="d-flex gap-2">
+            @if ($hasOrder)
+                <a href="{{ route('purchasing.purchase_orders.show', $order->id) }}"
+                   class="btn btn-sm btn-outline-secondary btn-pill">&larr; Kembali ke PO</a>
+            @else
+                <a href="{{ route('purchasing.purchase_receipts.index') }}"
+                   class="btn btn-sm btn-outline-secondary btn-pill">&larr; Daftar GRN</a>
+            @endif
+        </div>
+    </div>
+
+    {{-- ── ERRORS ── --}}
+    @if ($errors->any())
+        <div class="alert alert-danger py-2 small mb-3">
+            <ul class="mb-0 ps-3">
+                @foreach ($errors->all() as $err) <li>{{ $err }}</li> @endforeach
+            </ul>
+        </div>
+    @endif
+
+    {{-- ── FILTER BAR (hanya mode list) ── --}}
+    @unless ($hasOrder)
+    <div class="filter-bar mb-3">
+        <div class="row g-2 align-items-end">
+            <div class="col-12 col-md-5">
+                <div class="field-lbl">Cari barang / PO</div>
+                <div class="input-group input-group-sm">
+                    <span class="input-group-text"><i class="bi bi-search"></i></span>
+                    <input type="text" id="grn-search" class="form-control"
+                           placeholder="Kode, nama, nomor PO…" autocomplete="off">
+                </div>
+            </div>
+            <div class="col-12 col-md-4">
+                <div class="field-lbl">Supplier</div>
+                <select id="grn-supplier" class="form-select form-select-sm">
+                    <option value="">Semua supplier</option>
+                    @foreach ($suppliers as $sup)
+                        <option value="{{ $sup->id }}" @selected((string)$selectedSupplierId === (string)$sup->id)>
+                            {{ $sup->code }} — {{ $sup->name }}
+                        </option>
+                    @endforeach
+                </select>
+            </div>
+            <div class="col-12 col-md-3 d-flex gap-2 align-items-end">
+                <div class="stat-pill flex-fill text-center">
+                    <span class="lbl">Tampil</span>
+                    <span class="val mono" id="cntVisible">0</span>
+                </div>
+                <div class="stat-pill flex-fill text-center">
+                    <span class="lbl">Dipilih</span>
+                    <span class="val mono" id="cntSelected">0</span>
+                </div>
+            </div>
+        </div>
+        <div class="mt-2 d-flex align-items-center gap-2 flex-wrap">
+            <span class="field-lbl mb-0" style="font-size:.7rem;">PO dipilih:</span>
+            <span class="mono" id="cntPo" style="font-size:.82rem;">—</span>
+        </div>
+    </div>
+    @endunless
+
+    {{-- ── FORM ── --}}
+    <form id="grnForm" method="POST" action="{{ route('purchasing.purchase_receipts.store') }}">
+        @csrf
+        <input type="hidden" id="purchase_order_id" name="purchase_order_id"
+               value="{{ $hasOrder ? $order->id : '' }}">
+        <input type="hidden" name="order_type"  value="{{ $selectedOrderType }}">
+        <input type="hidden" id="grn_supplier_id" name="supplier_id"
+               value="{{ $hasOrder ? $order->supplier_id : ($selectedSupplierId ?? '') }}">
+
+        {{-- ── HEADER FIELDS ── --}}
+        <div class="card mb-3">
+            <div class="card-body">
+                <div class="row g-3 align-items-end">
+
+                    <div class="col-12 col-sm-4">
+                        <div class="field-lbl">Tanggal</div>
+                        <input type="text" name="date" id="date"
+                               class="form-control form-control-sm @error('date') is-invalid @enderror"
+                               value="{{ $defaultDate }}" data-gf-date autocomplete="off">
+                        @error('date')<div class="invalid-feedback small">{{ $message }}</div>@enderror
                     </div>
 
-                    @unless ($hasOrder)
-                        <div class="mt-2">
-                            <span class="info-pill d-inline-flex align-items-center gap-2">
-                                <i class="bi bi-info-circle"></i>
-                                GRN <strong>tidak boleh campur</strong> item dari beberapa PO. Sistem akan otomatis mengunci ke
-                                1 PO saat submit.
-                            </span>
+                    <div class="col-12 col-sm-4">
+                        <div class="field-lbl">Gudang Tujuan</div>
+                        <input type="hidden" name="warehouse_id" value="{{ $selectedWarehouseId }}">
+                        <div class="form-control form-control-sm bg-light-subtle text-muted" style="cursor:default;">
+                            <span class="mono fw-semibold">{{ $defaultWhCode }}</span>
+                            &mdash; {{ $defaultWarehouse?->name ?? '-' }}
                         </div>
-                    @endunless
-                </div>
+                    </div>
 
-                <div class="page-header-actions d-flex gap-2 ms-auto">
-                    @if ($hasOrder)
-                        <a href="{{ route('purchasing.purchase_orders.show', $order->id) }}"
-                            class="btn btn-outline-secondary btn-sm">
-                            <i class="bi bi-arrow-left me-1"></i> Kembali ke PO
-                        </a>
-                    @else
-                        <a href="{{ route('purchasing.purchase_receipts.index') }}"
-                            class="btn btn-outline-secondary btn-sm">
-                            <i class="bi bi-arrow-left me-1"></i> Ke Daftar GRN
-                        </a>
+                    <div class="col-12 col-sm-4">
+                        <div class="field-lbl">No. Surat Jalan</div>
+                        <input type="text" name="surat_jalan_no" id="surat_jalan_no"
+                               class="form-control form-control-sm @error('surat_jalan_no') is-invalid @enderror"
+                               value="{{ old('surat_jalan_no') }}"
+                               placeholder="Kosongkan → auto SJ-…" maxlength="100">
+                        @error('surat_jalan_no')<div class="invalid-feedback small">{{ $message }}</div>@enderror
+                    </div>
+
+                    <div class="col-12 col-sm-4">
+                        <div class="field-lbl">Catatan</div>
+                        <input type="text" name="notes"
+                               class="form-control form-control-sm @error('notes') is-invalid @enderror"
+                               value="{{ old('notes') }}" placeholder="Opsional">
+                    </div>
+
+                    <div class="col-12 col-sm-4">
+                        <div class="field-lbl">Total Qty Bersih</div>
+                        <div class="form-control form-control-sm bg-light-subtle mono fw-bold">
+                            <span id="totalReceivedDisplay">0,00</span>
+                        </div>
+                    </div>
+
+                </div>
+            </div>
+        </div>
+
+        {{-- ── TABEL DETAIL ── --}}
+        <div class="card mb-4">
+            <div class="card-header d-flex justify-content-between align-items-center gap-2 flex-wrap py-2">
+                <span class="fw-semibold small">Detail Barang</span>
+                <div class="d-flex gap-2 align-items-center flex-wrap">
+                    @if ($fullyReceivedCount > 0)
+                        <span class="tag tag-done">✓ {{ $fullyReceivedCount }} sudah lunas</span>
                     @endif
+                    {{-- Tombol Terima Semua --}}
+                    <button type="button" id="btnReceiveAll"
+                            class="btn btn-sm btn-outline-primary btn-pill d-none">
+                        ⚡ Terima Semua
+                    </button>
+                    <input type="checkbox" id="checkAll" class="form-check-input" title="Pilih semua">
                 </div>
             </div>
 
-            <hr class="mt-0 mb-3">
+            <div class="table-responsive">
+                <table class="table table-sm table-hover align-middle mb-0">
+                    <thead>
+                        <tr>
+                            <th style="width:36px;" class="text-center"></th>
+                            <th style="width:32px;" class="text-center">#</th>
+                            <th>Item</th>
+                            <th class="text-end">Qty PO</th>
+                            <th class="text-end">Sisa</th>
+                            <th class="text-end" style="width:100px;">Diterima</th>
+                            <th class="text-end" style="width:100px;">Reject</th>
+                            @if ($canSeeMoney)
+                                <th class="text-end col-harga">Harga</th>
+                            @endif
+                            <th class="text-center" style="width:60px;">Unit</th>
+                        </tr>
+                    </thead>
+                    <tbody id="grnLinesBody">
 
-            {{-- ALERT VALIDATION --}}
-            @if ($errors->any())
-                <div class="alert alert-danger small">
-                    <div class="fw-semibold mb-1">Terjadi kesalahan:</div>
-                    <ul class="mb-0 ps-3">
-                        @foreach ($errors->all() as $err)
-                            <li>{{ $err }}</li>
-                        @endforeach
-                    </ul>
-                </div>
-            @endif
+                    @forelse ($activeLines as $idx => $line)
+                    @php
+                        $po              = $hasOrder ? $order : ($line->purchaseOrder ?? null);
+                        $hasDraftGrn     = (bool)($line->has_draft_grn ?? false);
+                        $isPartial       = (bool)($line->partially_received ?? false);
+                        $qtyPo           = (float) $line->qty;
+                        $qtyRemaining    = (float)($line->qty_remaining ?? $qtyPo);
+                        $qtyReceivedSoFar= (float)($line->qty_received_posted ?? 0);
+                        $pctDone         = $qtyPo > 0 ? round(($qtyReceivedSoFar / $qtyPo) * 100) : 0;
 
-            {{-- FILTER (GET) --}}
-            @unless ($hasOrder)
-                <div class="card filter-card mb-3">
-                    <div class="card-body small">
-                        <div class="quick-filter-panel">
-                            <div class="d-flex justify-content-between align-items-center flex-wrap gap-2 mb-2">
-                                <div>
-                                    <div class="quick-filter-title">Cari Barang PO</div>
-                                    <div class="text-muted">Ketik kode/nama barang atau nomor PO. Hasil langsung tersaring.</div>
-                                </div>
-                                <div class="d-flex gap-2 flex-wrap">
-                                    <a href="{{ route('purchasing.purchase_receipts.create') }}"
-                                        class="btn btn-outline-secondary btn-sm">Reset</a>
-                                    <a href="{{ route('purchasing.purchase_receipts.index') }}"
-                                        class="btn btn-outline-secondary btn-sm">Daftar GRN</a>
-                                </div>
-                            </div>
+                        $poId   = $po?->id;
+                        $poCode = $po?->code;
+                        $sup    = $po?->supplier ?? null;
+                        $supId  = $sup?->id ?? '';
+                        $searchStr = mb_strtolower(trim(
+                            ($line->item?->code ?? '') . ' ' .
+                            ($line->item?->name ?? '') . ' ' .
+                            ($poCode ?? '') . ' ' .
+                            ($sup?->code ?? '') . ' ' . ($sup?->name ?? '')
+                        ));
+                    @endphp
 
-                            <div class="row g-2 align-items-end">
-                                <div class="col-12 col-lg-5">
-                                    <label for="grn-realtime-search" class="form-label mb-1">Cari</label>
-                                    <div class="input-group input-group-sm">
-                                        <span class="input-group-text bg-white"><i class="bi bi-search text-muted"></i></span>
-                                        <input type="text" id="grn-realtime-search" class="form-control"
-                                            placeholder="Kode barang, nama barang, PO..." autocomplete="off">
-                                    </div>
-                                </div>
+                    <tr data-line-index="{{ $idx }}"
+                        data-qty-po="{{ $qtyPo }}"
+                        data-qty-remaining="{{ $qtyRemaining }}"
+                        data-po-id="{{ $poId }}"
+                        data-po-code="{{ $poCode }}"
+                        data-supplier-id="{{ $supId }}"
+                        data-search="{{ e($searchStr) }}"
+                        class="{{ $hasDraftGrn ? 'opacity-50' : '' }}">
 
-                                <div class="col-12 col-md-6 col-lg-4">
-                                    <label for="grn-realtime-supplier" class="form-label mb-1">Supplier</label>
-                                    <select id="grn-realtime-supplier" class="form-select form-select-sm">
-                                        <option value="">Semua Supplier</option>
-                                        @foreach ($suppliers as $sup)
-                                            <option value="{{ $sup->id }}" @selected((string) $selectedSupplierId === (string) $sup->id)>
-                                                {{ $sup->code }} — {{ $sup->name }}
-                                            </option>
-                                        @endforeach
-                                    </select>
-                                </div>
-
-                                <div class="col-12 col-md-6 col-lg-3">
-                                    <label class="form-label mb-1">Jenis</label>
-                                    <div class="form-control form-control-sm bg-light-subtle">
-                                        <span class="badge-type {{ $typeCss }}">{{ $typeLabel }}</span>
-                                    </div>
-                                </div>
-                            </div>
-
-                            <div class="d-flex flex-wrap gap-2 mt-3">
-                                <div class="quick-stat">
-                                    <span class="lbl">Baris Tampil</span>
-                                    <span class="val mono" id="visibleRowsCount">0</span>
-                                </div>
-                                <div class="quick-stat">
-                                    <span class="lbl">Dipilih</span>
-                                    <span class="val mono"><span id="selectedRowsCount">0</span> item</span>
-                                </div>
-                                <div class="quick-stat flex-grow-1">
-                                    <span class="lbl">PO Dipilih</span>
-                                    <span class="val mono" id="selectedPoText">-</span>
-                                </div>
-                            </div>
-                        </div>
-                    </div>
-                </div>
-            @endunless
-
-            {{-- FORM GRN --}}
-            <form id="grnForm" method="post" action="{{ route('purchasing.purchase_receipts.store') }}">
-                @csrf
-
-                {{-- IMPORTANT: purchase_order_id akan diisi:
-                     - mode order: langsung $order->id
-                     - mode list: JS auto derive dari baris pertama yang dicentang + validasi tidak campur PO
-                --}}
-                <input type="hidden" id="purchase_order_id" name="purchase_order_id"
-                    value="{{ $hasOrder ? $order->id : '' }}">
-                <input type="hidden" name="order_type" value="{{ $selectedOrderType }}">
-                <input type="hidden" name="supplier_id"
-                    value="{{ $hasOrder ? $order->supplier_id : $selectedSupplierId }}">
-
-                {{-- HEADER GRN --}}
-                <div class="card main-card mb-3">
-                    <div class="card-body small">
-                        <div class="row g-3 align-items-end">
-                            <div class="col-12 col-md-4">
-                                <label for="date" class="form-label small text-uppercase">Tanggal</label>
-                                <input type="text" name="date" id="date"
-                                    class="form-control form-control-sm gf-date-input @error('date') is-invalid @enderror"
-                                    value="{{ $defaultDate }}" data-gf-date autocomplete="off">
-                                @error('date')
-                                    <div class="invalid-feedback">{{ $message }}</div>
-                                @enderror
-                            </div>
-
-                            <div class="col-12 col-md-4">
-                                <label class="form-label small text-uppercase">Gudang Tujuan</label>
-                                <input type="hidden" name="warehouse_id" value="{{ $selectedWarehouseId }}">
-
-                                <select class="form-select form-select-sm" disabled>
-                                    @if ($defaultWarehouse)
-                                        <option value="{{ $defaultWarehouse->id }}" selected>
-                                            {{ $defaultWarehouse->code }} — {{ $defaultWarehouse->name }}
-                                        </option>
-                                    @else
-                                        <option value="">Gudang default tidak ditemukan</option>
-                                    @endif
-                                </select>
-
-                                <div class="form-text small text-muted">
-                                    Default: <strong>{{ $defaultWhCode }}</strong>
-                                    @if ($hasOrder)
-                                        (karena PO {{ $typeLabel }})
-                                    @else
-                                        (otomatis)
-                                    @endif
-                                </div>
-                            </div>
-
-                            <div class="col-12 col-md-4">
-                                <label class="form-label small text-uppercase">Total Qty (Net)</label>
-                                <div class="form-control form-control-sm mono bg-light-subtle">
-                                    <span id="totalReceivedDisplay">0,00</span>
-                                </div>
-                            </div>
-
-                            <div class="col-12 col-md-4">
-                                <label for="surat_jalan_no" class="form-label small text-uppercase">No. Surat Jalan</label>
-                                <input type="text" name="surat_jalan_no" id="surat_jalan_no"
-                                    class="form-control form-control-sm @error('surat_jalan_no') is-invalid @enderror"
-                                    value="{{ old('surat_jalan_no') }}"
-                                    placeholder="Kosongkan untuk auto-generate (SJ-...)"
-                                    maxlength="100">
-                                @error('surat_jalan_no')
-                                    <div class="invalid-feedback">{{ $message }}</div>
-                                @enderror
-                            </div>
-
-                            <div class="col-12 col-md-4">
-                                <label for="notes" class="form-label small text-uppercase">Catatan</label>
-                                <input type="text" name="notes" id="notes"
-                                    class="form-control form-control-sm @error('notes') is-invalid @enderror"
-                                    value="{{ old('notes') }}"
-                                    placeholder="Opsional">
-                                @error('notes')
-                                    <div class="invalid-feedback">{{ $message }}</div>
-                                @enderror
-                            </div>
-                        </div>
-                    </div>
-                </div>
-
-                {{-- DETAIL --}}
-                <div class="card main-card mb-4">
-                    <div class="card-header d-flex justify-content-between align-items-center flex-wrap gap-2 py-2">
-                        <span class="fw-semibold small text-uppercase">Detail Barang Diterima</span>
-                    </div>
-
-                    <div class="card-body p-0 table-section">
-                        <div class="table-wrap">
-                            <table class="table table-sm table-hover align-middle mb-0">
-                                <thead>
-                                    <tr>
-                                        <th style="width: 32px;" class="text-center">
-                                            <input type="checkbox" id="checkAll">
-                                        </th>
-                                        <th style="width: 40px;">#</th>
-                                        <th>Item</th>
-                                        <th class="text-end">Qty PO</th>
-                                        <th class="text-end">Qty Diterima</th>
-                                        <th class="text-end">Qty Reject</th>
-                                        @if ($canSeeMoney)
-                                            <th class="text-end col-price">Harga/Unit</th>
-                                        @endif
-                                        <th class="text-center">Unit</th>
-                                    </tr>
-                                </thead>
-
-                                <tbody id="grnLinesBody">
-                                    @forelse ($detailLines as $idx => $line)
-                                        @php
-                                            $poLine = $line;
-                                            $po = $hasOrder ? $order : $line->order ?? ($line->purchaseOrder ?? null);
-
-                                            $oldQtyReceived = old('qty_received.' . $idx, '');
-                                            $oldQtyReject = old('qty_reject.' . $idx, '');
-                                            $oldSelected = old('selected.' . $idx);
-
-                                            $hasDraftGrn = (bool) ($poLine->has_draft_grn ?? false);
-                                            $poId = $po?->id;
-                                            $poCode = $po?->code;
-                                            $supplier = $po?->supplier ?? null;
-                                            $supplierId = $supplier?->id ?? '';
-                                            $supplierLabel = trim(($supplier?->code ? $supplier->code . ' ' : '') . ($supplier?->name ?? ''));
-                                            $itemSearchText = trim(
-                                                ($poLine->item?->code ?? '') . ' ' .
-                                                ($poLine->item?->name ?? '') . ' ' .
-                                                ($poCode ?? '') . ' ' .
-                                                $supplierLabel
-                                            );
-                                        @endphp
-
-                                        <tr data-line-index="{{ $idx }}" data-qty-po="{{ $poLine->qty }}"
-                                            data-po-id="{{ $poId }}" data-po-code="{{ $poCode }}"
-                                            data-supplier-id="{{ $supplierId }}"
-                                            data-search="{{ e(mb_strtolower($itemSearchText)) }}"
-                                            class="{{ $hasDraftGrn ? 'line-muted' : '' }}">
-                                            <td class="text-center" data-label="Pilih">
-                                                @if ($hasDraftGrn)
-                                                    <i class="bi bi-exclamation-circle text-danger small"
-                                                        title="Sudah pernah dibuat GRN (draft)"></i>
-                                                @else
-                                                    <input type="checkbox" class="form-check-input line-check"
-                                                        name="selected[{{ $idx }}]" @checked(!is_null($oldSelected))>
-                                                @endif
-                                            </td>
-
-                                            <td class="mono" data-label="#">{{ $idx + 1 }}</td>
-
-                                            <td data-label="Item">
-                                                <div class="item-main mono">{{ optional($poLine->item)->code ?? '-' }}
-                                                </div>
-                                                <div class="item-sub">
-                                                    {{ optional($poLine->item)->name ?? '-' }}
-                                                    @if (!$hasOrder && $po)
-                                                        <span class="badge-po ms-1">{{ $po->code ?? 'PO?' }}</span>
-                                                    @endif
-                                                    @if ($hasDraftGrn)
-                                                        <span class="badge-draft-grn ms-1">Sudah pernah dibuat GRN
-                                                            (draft)
-                                                        </span>
-                                                    @endif
-                                                </div>
-
-                                                <input type="hidden" name="po_line_id[]" value="{{ $poLine->id }}">
-                                                <input type="hidden" name="item_id[]" value="{{ $poLine->item_id }}">
-                                                @if ($canSeeMoney)
-                                                    <input type="hidden" name="unit_price[]"
-                                                        value="{{ $poLine->unit_price }}">
-                                                @endif
-                                                <input type="hidden" name="unit[]"
-                                                    value="{{ optional($poLine->item)->unit ?? '' }}">
-                                            </td>
-
-                                            <td class="text-end mono" data-label="Qty PO">
-                                                {{ number_format($poLine->qty, 2, ',', '.') }}
-                                            </td>
-
-                                            <td class="text-end" data-label="Qty Diterima">
-                                                <input type="text" inputmode="decimal"
-                                                    name="qty_received[]"
-                                                    class="form-control form-control-sm text-end mono qty-received-input"
-                                                    value="{{ $oldQtyReceived }}" placeholder="0,00"
-                                                    autocomplete="off"
-                                                    @if ($hasDraftGrn) disabled @endif>
-                                                <div class="invalid-feedback small">
-                                                    Qty Diterima tidak boleh &lt; 0, &gt; Qty PO, atau membuat total &gt;
-                                                    Qty PO.
-                                                </div>
-                                            </td>
-
-                                            <td class="text-end" data-label="Qty Reject">
-                                                <input type="text" inputmode="decimal" name="qty_reject[]"
-                                                    class="form-control form-control-sm text-end mono qty-reject-input"
-                                                    value="{{ $oldQtyReject }}" placeholder="0,00"
-                                                    autocomplete="off"
-                                                    @if ($hasDraftGrn) disabled @endif>
-                                                <div class="invalid-feedback small">
-                                                    Qty Reject tidak boleh &lt; 0, &gt; Qty PO, atau membuat total &gt; Qty
-                                                    PO.
-                                                </div>
-                                            </td>
-
-                                            @if ($canSeeMoney)
-                                                <td class="text-end mono col-price" data-label="Harga/Unit">
-                                                    {{ number_format($poLine->unit_price, 0, ',', '.') }}
-                                                </td>
-                                            @endif
-
-                                            <td class="mono text-center" data-label="Unit">
-                                                {{ optional($poLine->item)->unit ?? '-' }}
-                                            </td>
-                                        </tr>
-                                    @empty
-                                        <tr>
-                                            <td colspan="{{ $canSeeMoney ? 8 : 7 }}" class="text-center text-muted py-4">
-                                                @if (!$hasOrder && !$selectedSupplierId)
-                                                    Tidak ada item dari Purchase Order berstatus approved.
-                                                @elseif (!$hasOrder && $selectedSupplierId)
-                                                    Tidak ada item PO berstatus approved untuk supplier ini.
-                                                @else
-                                                    Tidak ada detail item pada PO ini.
-                                                @endif
-                                            </td>
-                                        </tr>
-                                    @endforelse
-                                </tbody>
-                            </table>
-                        </div>
-                        <div id="filter-empty-state" class="filter-empty-state d-none">
-                            Tidak ada barang yang cocok dengan filter ini.
-                        </div>
-                    </div>
-
-                    <div class="card-footer d-flex justify-content-end align-items-center flex-wrap gap-2">
-                        <div class="d-flex gap-2">
-                            @if ($hasOrder)
-                                <a href="{{ route('purchasing.purchase_orders.show', $order->id) }}"
-                                    class="btn btn-outline-secondary btn-sm">Batal</a>
+                        {{-- Checkbox --}}
+                        <td class="text-center" data-label="Pilih">
+                            @if ($hasDraftGrn)
+                                <i class="bi bi-hourglass-split text-warning" style="font-size:.85rem;"
+                                   title="Ada GRN draft belum diposting"></i>
                             @else
-                                <a href="{{ route('purchasing.purchase_receipts.index') }}"
-                                    class="btn btn-outline-secondary btn-sm">Batal</a>
+                                <input type="checkbox" class="form-check-input line-check"
+                                       name="selected[{{ $idx }}]"
+                                       @checked(!is_null(old('selected.' . $idx)))>
+                            @endif
+                        </td>
+
+                        {{-- No --}}
+                        <td class="text-center mono text-muted" style="font-size:.78rem;" data-label="#">
+                            {{ $loop->iteration }}
+                        </td>
+
+                        {{-- Item --}}
+                        <td class="td-item" data-label="Item">
+                            <div class="item-code mono">{{ $line->item?->code ?? '-' }}</div>
+                            <div class="item-name">
+                                {{ $line->item?->name ?? '-' }}
+                                @if (!$hasOrder && $po)
+                                    &nbsp;<span class="tag tag-po" style="font-size:.65rem;">{{ $poCode }}</span>
+                                @endif
+                                @if ($hasDraftGrn)
+                                    &nbsp;<span class="tag tag-draft-grn">Draft GRN</span>
+                                @endif
+                                @if ($isPartial)
+                                    &nbsp;<span class="tag tag-partial">Sebagian diterima</span>
+                                @endif
+                            </div>
+                            @if ($isPartial)
+                                <div class="d-flex align-items-center gap-2 mt-1">
+                                    <div class="progress-mini">
+                                        <div class="progress-mini-bar" style="width:{{ $pctDone }}%;"></div>
+                                    </div>
+                                    <span style="font-size:.7rem;color:var(--muted);">
+                                        {{ number_format($qtyReceivedSoFar,2,',','.') }} / {{ number_format($qtyPo,2,',','.') }} ({{ $pctDone }}%)
+                                    </span>
+                                </div>
                             @endif
 
-                            <button type="button" id="btnSubmitGrn" class="btn btn-primary btn-sm">
-                                Simpan Penerimaan
-                            </button>
-                        </div>
-                    </div>
+                            <input type="hidden" name="po_line_id[]" value="{{ $line->id }}">
+                            <input type="hidden" name="item_id[]"    value="{{ $line->item_id }}">
+                            @if ($canSeeMoney)
+                                <input type="hidden" name="unit_price[]" value="{{ $line->unit_price }}">
+                            @endif
+                            <input type="hidden" name="unit[]" value="{{ $line->item?->unit ?? '' }}">
+                        </td>
+
+                        {{-- Qty PO --}}
+                        <td class="text-end mono text-muted" style="font-size:.82rem;" data-label="Qty PO">
+                            {{ number_format($qtyPo, 2, ',', '.') }}
+                        </td>
+
+                        {{-- Sisa --}}
+                        <td class="text-end mono" data-label="Sisa"
+                            style="font-weight:{{ $isPartial ? '700' : '400' }};
+                                   color:{{ $isPartial ? 'rgba(234,179,8,1)' : 'inherit' }};">
+                            {{ number_format($qtyRemaining, 2, ',', '.') }}
+                        </td>
+
+                        {{-- Qty Diterima --}}
+                        <td class="text-end" data-label="Diterima">
+                            <input type="text" inputmode="decimal" name="qty_received[]"
+                                   class="form-control form-control-sm qty-input qty-received-input @error('qty_received.' . $idx) is-invalid @enderror"
+                                   value="{{ old('qty_received.' . $idx, '') }}"
+                                   placeholder="0,00" autocomplete="off"
+                                   @if ($hasDraftGrn) disabled @endif>
+                        </td>
+
+                        {{-- Qty Reject --}}
+                        <td class="text-end" data-label="Reject">
+                            <input type="text" inputmode="decimal" name="qty_reject[]"
+                                   class="form-control form-control-sm qty-input qty-reject-input"
+                                   value="{{ old('qty_reject.' . $idx, '') }}"
+                                   placeholder="0,00" autocomplete="off"
+                                   @if ($hasDraftGrn) disabled @endif>
+                        </td>
+
+                        @if ($canSeeMoney)
+                            <td class="text-end mono col-harga" data-label="Harga" style="font-size:.82rem;">
+                                {{ number_format($line->unit_price, 0, ',', '.') }}
+                            </td>
+                        @endif
+
+                        {{-- Unit --}}
+                        <td class="text-center mono text-muted" style="font-size:.8rem;" data-label="Unit">
+                            {{ $line->item?->unit ?? '-' }}
+                        </td>
+                    </tr>
+
+                    @empty
+                    <tr id="empty-state-row">
+                        <td colspan="{{ $colCount }}" class="text-center text-muted py-5">
+                            @if ($fullyReceivedCount > 0 && $detailLines->isNotEmpty())
+                                <div style="font-size:1.5rem;margin-bottom:.5rem;">✅</div>
+                                Semua item sudah diterima penuh.
+                            @elseif (!$hasOrder && !$selectedSupplierId)
+                                Tidak ada item dari PO berstatus approved.
+                            @elseif (!$hasOrder && $selectedSupplierId)
+                                Tidak ada item PO approved untuk supplier ini.
+                            @else
+                                Tidak ada detail item.
+                            @endif
+                        </td>
+                    </tr>
+                    @endforelse
+
+                    </tbody>
+                </table>
+            </div>
+
+            <div id="filter-empty-msg" class="filter-empty-msg d-none">
+                Tidak ada item yang cocok.
+            </div>
+
+            <div class="card-footer d-flex justify-content-between align-items-center gap-2 flex-wrap">
+                <div class="text-muted small" id="footer-total">
+                    Total qty bersih: <span class="mono fw-bold" id="footerTotalAlt">0,00</span>
                 </div>
-            </form>
+                <div class="d-flex gap-2">
+                    @if ($hasOrder)
+                        <a href="{{ route('purchasing.purchase_orders.show', $order->id) }}"
+                           class="btn btn-sm btn-outline-secondary btn-pill">Batal</a>
+                    @else
+                        <a href="{{ route('purchasing.purchase_receipts.index') }}"
+                           class="btn btn-sm btn-outline-secondary btn-pill">Batal</a>
+                    @endif
+                    <button type="button" id="btnSubmitGrn" class="btn btn-sm btn-primary btn-pill">
+                        Simpan GRN
+                    </button>
+                </div>
+            </div>
         </div>
 
-        {{-- MODAL KONFIRMASI --}}
-        <div class="modal fade" id="confirmGrnModal" tabindex="-1" aria-labelledby="confirmGrnModalLabel"
-            aria-hidden="true">
-            <div class="modal-dialog modal-lg modal-dialog-scrollable modal-dialog-centered">
-                <div class="modal-content">
-                    <div class="modal-header">
-                        <h6 class="modal-title" id="confirmGrnModalLabel">Konfirmasi Penerimaan Barang</h6>
-                        <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
-                    </div>
+    </form>
+</div>
 
-                    <div class="modal-body">
-                        <p class="small text-muted mb-2">Mohon cek kembali detail barang yang akan disimpan sebagai
-                            penerimaan (GRN).</p>
-                        <div id="confirmGrnSummary" class="small"></div>
-                    </div>
-
-                    <div class="modal-footer d-flex justify-content-between align-items-center">
-                        <div class="small text-muted">Jika sudah sesuai, klik <span class="fw-semibold">Ya, simpan</span>.
-                        </div>
-                        <div class="d-flex gap-2">
-                            <button type="button" class="btn btn-outline-secondary btn-sm"
-                                data-bs-dismiss="modal">Kembali</button>
-                            <button type="button" id="btnConfirmSubmit" class="btn btn-primary btn-sm">Ya,
-                                simpan</button>
-                        </div>
-                    </div>
+{{-- ── MODAL KONFIRMASI ── --}}
+<div class="modal fade" id="confirmModal" tabindex="-1" aria-hidden="true">
+    <div class="modal-dialog modal-lg modal-dialog-centered modal-dialog-scrollable">
+        <div class="modal-content" style="border-radius:16px; overflow:hidden;">
+            <div class="modal-header border-bottom">
+                <h6 class="modal-title fw-bold">Konfirmasi Penerimaan Barang</h6>
+                <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
+            </div>
+            <div class="modal-body">
+                <p class="text-muted small mb-3">Periksa kembali sebelum menyimpan.</p>
+                <div id="confirmSummary"></div>
+            </div>
+            <div class="modal-footer border-top justify-content-between">
+                <span class="text-muted small">Klik <strong>Ya, Simpan</strong> jika sudah sesuai.</span>
+                <div class="d-flex gap-2">
+                    <button type="button" class="btn btn-sm btn-outline-secondary btn-pill"
+                            data-bs-dismiss="modal">Koreksi</button>
+                    <button type="button" id="btnConfirm" class="btn btn-sm btn-primary btn-pill">
+                        Ya, Simpan
+                    </button>
                 </div>
             </div>
         </div>
     </div>
+</div>
 @endsection
 
 @push('scripts')
-    <script>
-        (function() {
-            const HAS_ORDER = @json($hasOrder);
+<script>
+(function () {
+    'use strict';
 
-            function parseNumber(val) {
-                if (val === null || val === undefined) return 0;
-                if (typeof val !== 'string') return isNaN(val) ? 0 : Number(val);
-                val = val.trim().replace(/\s/g, '');
-                if (!val) return 0;
-                // Format Indo: titik = ribuan, koma = desimal  →  "1.234,67" atau "25,67"
-                if (val.includes(',')) {
-                    val = val.replace(/\./g, '').replace(',', '.');
-                } else if (/^\d{1,3}(\.\d{3}){2,}$/.test(val)) {
-                    // multi-grup titik tanpa koma: "1.234.567" → ribuan
-                    val = val.replace(/\./g, '');
-                }
-                // single ".XXX" tanpa koma diperlakukan sebagai desimal ("5.5", "25.67")
-                const n = parseFloat(val);
-                return isNaN(n) ? 0 : n;
+    const HAS_ORDER = @json($hasOrder);
+
+    /* ── helpers ── */
+    function parseNum(v) {
+        if (v === null || v === undefined || v === '') return 0;
+        v = String(v).trim().replace(/\s/g, '');
+        if (!v) return 0;
+        if (v.includes(',')) v = v.replace(/\./g, '').replace(',', '.');
+        else if (/^\d{1,3}(\.\d{3}){2,}$/.test(v)) v = v.replace(/\./g, '');
+        const n = parseFloat(v);
+        return isNaN(n) ? 0 : n;
+    }
+
+    function fmtId(n) {
+        try { return n.toLocaleString('id-ID', { minimumFractionDigits: 2, maximumFractionDigits: 2 }); }
+        catch { return (n || 0).toFixed(2); }
+    }
+
+    function rows() {
+        return Array.from(document.querySelectorAll('#grnLinesBody tr[data-line-index]'));
+    }
+
+    function visibleRows() {
+        return rows().filter(r => !r.classList.contains('row-hidden-by-filter'));
+    }
+
+    function getLimit(row) {
+        const rem = parseNum(row.dataset.qtyRemaining);
+        return rem > 0 ? rem : parseNum(row.dataset.qtyPo);
+    }
+
+    /* ── validation ── */
+    function validateRow(row) {
+        const limit  = getLimit(row);
+        const inpRec = row.querySelector('.qty-received-input');
+        const inpRej = row.querySelector('.qty-reject-input');
+        if (!inpRec || !inpRej) return true;
+
+        const rec = parseNum(inpRec.value || 0);
+        const rej = parseNum(inpRej.value || 0);
+
+        inpRec.classList.remove('is-invalid');
+        inpRej.classList.remove('is-invalid');
+
+        let ok = true;
+        if (rec < 0 || rec > limit) { inpRec.classList.add('is-invalid'); ok = false; }
+        if (rej < 0 || rej > limit) { inpRej.classList.add('is-invalid'); ok = false; }
+        if (rec + rej > limit)      { inpRec.classList.add('is-invalid'); inpRej.classList.add('is-invalid'); ok = false; }
+        return ok;
+    }
+
+    /* ── total recalc ── */
+    function recalcTotal() {
+        let total = 0;
+        rows().forEach(row => {
+            const cb     = row.querySelector('.line-check');
+            const inpRec = row.querySelector('.qty-received-input');
+            const inpRej = row.querySelector('.qty-reject-input');
+            if (!cb || !cb.checked || !inpRec || !inpRej) return;
+            const net = parseNum(inpRec.value || 0) - parseNum(inpRej.value || 0);
+            if (net > 0) total += net;
+        });
+        const fmted = fmtId(total);
+        const d1 = document.getElementById('totalReceivedDisplay');
+        const d2 = document.getElementById('footerTotalAlt');
+        if (d1) d1.textContent = fmted;
+        if (d2) d2.textContent = fmted;
+        updateSelectionSummary();
+    }
+
+    /* ── selection summary ── */
+    function updateSelectionSummary() {
+        const checked = rows().filter(r => r.querySelector('.line-check')?.checked);
+        const cntSel = document.getElementById('cntSelected');
+        if (cntSel) cntSel.textContent = checked.length;
+
+        const poCodes = [...new Set(checked.map(r => r.dataset.poCode).filter(Boolean))];
+        const cntPo = document.getElementById('cntPo');
+        if (cntPo) cntPo.textContent = poCodes.length ? poCodes.join(', ') : '—';
+
+        // Show/hide "Terima Semua" button
+        const btnAll = document.getElementById('btnReceiveAll');
+        if (btnAll) {
+            const hasUnchecked = visibleRows().some(r => {
+                const cb = r.querySelector('.line-check');
+                return cb && !cb.checked && !cb.disabled;
+            });
+            btnAll.classList.toggle('d-none', !hasUnchecked);
+        }
+    }
+
+    /* ── filter ── */
+    function applyFilter() {
+        const kw  = (document.getElementById('grn-search')?.value || '').trim().toLowerCase();
+        const sup = String(document.getElementById('grn-supplier')?.value || '');
+
+        let vis = 0;
+        rows().forEach(row => {
+            const match = (!kw || (row.dataset.search || '').includes(kw))
+                       && (!sup || row.dataset.supplierId === sup);
+            row.classList.toggle('row-hidden-by-filter', !match);
+            if (match) vis++;
+        });
+
+        const cntVis = document.getElementById('cntVisible');
+        if (cntVis) cntVis.textContent = vis;
+
+        const msg = document.getElementById('filter-empty-msg');
+        if (msg) msg.classList.toggle('d-none', vis > 0 || rows().length === 0);
+
+        // uncheck checkAll when filter changes
+        const ca = document.getElementById('checkAll');
+        if (ca) ca.checked = false;
+
+        updateSelectionSummary();
+    }
+
+    /* ── checkbox change ── */
+    function onCheckboxChange(cb) {
+        const row    = cb.closest('tr');
+        if (!row) return;
+        const limit  = getLimit(row);
+        const inpRec = row.querySelector('.qty-received-input');
+        const inpRej = row.querySelector('.qty-reject-input');
+
+        if (cb.checked) {
+            if (!inpRec.value && !inpRej.value && limit > 0) {
+                inpRec.value = limit.toFixed(2);
+                inpRej.value = '0.00';
             }
+        } else {
+            inpRec.value = '';
+            inpRej.value = '';
+            inpRec.classList.remove('is-invalid');
+            inpRej.classList.remove('is-invalid');
+        }
+        validateRow(row);
+        recalcTotal();
+    }
 
-            function formatIdNumber(num) {
-                try {
-                    return num.toLocaleString('id-ID', {
-                        minimumFractionDigits: 2,
-                        maximumFractionDigits: 2
-                    });
-                } catch (e) {
-                    return (num || 0).toFixed(2);
-                }
-            }
+    function ensureChecked(row) {
+        const cb = row.querySelector('.line-check');
+        if (cb && !cb.checked) { cb.checked = true; onCheckboxChange(cb); }
+    }
 
-            function normalizeText(value) {
-                return String(value || '').trim().toLowerCase();
-            }
+    /* ── qty input handlers ── */
+    function onRecInput(inp) {
+        const row  = inp.closest('tr'); if (!row) return;
+        ensureChecked(row);
+        const lim  = getLimit(row);
+        const inpRej = row.querySelector('.qty-reject-input');
+        const rec  = parseNum(inp.value);
+        if (rec >= 0 && rec <= lim && inpRej)
+            inpRej.value = (lim - rec).toFixed(2);
+        validateRow(row);
+        recalcTotal();
+    }
 
-            function rows() {
-                return Array.from(document.querySelectorAll('#grnLinesBody tr[data-line-index]'));
-            }
+    function onRejInput(inp) {
+        const row  = inp.closest('tr'); if (!row) return;
+        ensureChecked(row);
+        const lim  = getLimit(row);
+        const inpRec = row.querySelector('.qty-received-input');
+        const rej  = parseNum(inp.value);
+        if (rej >= 0 && rej <= lim && inpRec)
+            inpRec.value = (lim - rej).toFixed(2);
+        validateRow(row);
+        recalcTotal();
+    }
 
-            function isRowVisible(row) {
-                return !row.classList.contains('row-hidden-by-filter');
-            }
+    /* ── PO lock (list mode) ── */
+    function lockPoOrThrow() {
+        if (HAS_ORDER) return true;
+        const poInput  = document.getElementById('purchase_order_id');
+        const supInput = document.getElementById('grn_supplier_id');
+        const checked  = rows().filter(r => r.querySelector('.line-check')?.checked);
+        if (!checked.length) throw new Error('Belum ada item yang dicentang.');
 
-            function updateVisibleNumbers() {
-                let visibleNo = 1;
-                rows().forEach(function(row) {
-                    const noCell = row.querySelector('td[data-label="#"]');
-                    if (!noCell) return;
-                    if (isRowVisible(row)) {
-                        noCell.textContent = visibleNo++;
-                    }
-                });
+        const poIds = [...new Set(checked.map(r => r.dataset.poId).filter(Boolean))];
+        if (poIds.length > 1) {
+            const codes = [...new Set(checked.map(r => r.dataset.poCode).filter(Boolean))];
+            throw new Error('GRN tidak boleh campur beberapa PO.\nPO dipilih: ' + codes.join(', '));
+        }
 
-                const visibleRowsCount = document.getElementById('visibleRowsCount');
-                if (visibleRowsCount) visibleRowsCount.textContent = String(visibleNo - 1);
+        poInput.value = poIds[0];
 
-                const emptyState = document.getElementById('filter-empty-state');
-                if (emptyState) emptyState.classList.toggle('d-none', rows().length === 0 || visibleNo > 1);
-            }
+        // Sinkronkan supplier_id dari baris yang dipilih
+        const supIds = [...new Set(checked.map(r => r.dataset.supplierId).filter(Boolean))];
+        if (supIds.length === 1 && supInput) supInput.value = supIds[0];
 
-            function updateSelectionSummary() {
-                const selectedRows = rows().filter(function(row) {
-                    const cb = row.querySelector('.line-check');
-                    return cb && cb.checked;
-                });
+        return true;
+    }
 
-                const selectedRowsCount = document.getElementById('selectedRowsCount');
-                if (selectedRowsCount) selectedRowsCount.textContent = String(selectedRows.length);
+    /* ── collect lines for confirmation ── */
+    function collectLines() {
+        const lines = []; let allValid = true;
+        rows().forEach(row => {
+            const cb     = row.querySelector('.line-check');
+            const inpRec = row.querySelector('.qty-received-input');
+            const inpRej = row.querySelector('.qty-reject-input');
+            if (!cb || !cb.checked || !inpRec || !inpRej) return;
+            if (!validateRow(row)) { allValid = false; return; }
+            const rec = parseNum(inpRec.value || 0);
+            const rej = parseNum(inpRej.value || 0);
+            if (rec <= 0 && rej <= 0) return;
+            lines.push({
+                code: row.querySelector('.item-code')?.textContent?.trim() ?? '-',
+                name: row.querySelector('.item-name')?.childNodes?.[0]?.textContent?.trim() ?? '',
+                qtyPo: parseNum(row.dataset.qtyPo),
+                sisa:  parseNum(row.dataset.qtyRemaining),
+                rec, rej,
+                unit: row.querySelector('td[data-label="Unit"]')?.textContent?.trim() ?? '',
+            });
+        });
+        return { lines, allValid };
+    }
 
-                const poCodes = Array.from(new Set(selectedRows.map(function(row) {
-                    return row.getAttribute('data-po-code') || '';
-                }).filter(Boolean)));
+    function buildConfirmTable(lines) {
+        if (!lines.length)
+            return '<div class="alert alert-warning small mb-0">Tidak ada item dengan qty yang diisi.</div>';
 
-                const selectedPoText = document.getElementById('selectedPoText');
-                if (selectedPoText) {
-                    if (poCodes.length === 0) {
-                        selectedPoText.textContent = '-';
-                    } else if (poCodes.length === 1) {
-                        selectedPoText.textContent = poCodes[0];
-                    } else {
-                        selectedPoText.textContent = poCodes.length + ' PO';
-                    }
-                }
-            }
+        let h = `<div class="table-responsive"><table class="table table-sm align-middle mb-0">
+            <thead><tr>
+                <th>#</th><th>Item</th>
+                <th class="text-end">Sisa</th>
+                <th class="text-end">Diterima</th>
+                <th class="text-end">Reject</th>
+                <th class="text-center">Unit</th>
+            </tr></thead><tbody>`;
+        lines.forEach((l, i) => {
+            h += `<tr>
+                <td class="mono text-muted">${i+1}</td>
+                <td><div class="fw-bold mono">${l.code}</div><div class="text-muted small">${l.name || ''}</div></td>
+                <td class="text-end mono">${fmtId(l.sisa)}</td>
+                <td class="text-end mono fw-bold">${fmtId(l.rec)}</td>
+                <td class="text-end mono">${fmtId(l.rej)}</td>
+                <td class="text-center mono text-muted">${l.unit || '-'}</td>
+            </tr>`;
+        });
+        h += '</tbody></table></div>';
+        return h;
+    }
 
-            function applyRealtimeFilter() {
-                const keyword = normalizeText(document.getElementById('grn-realtime-search')?.value);
-                const supplierId = String(document.getElementById('grn-realtime-supplier')?.value || '');
+    /* ── submit flow ── */
+    function openConfirm() {
+        const { lines, allValid } = collectLines();
+        if (!allValid) { alert('Ada qty yang tidak valid. Mohon periksa kembali.'); return; }
+        if (!lines.length) { alert('Belum ada item yang diisi qty-nya.'); return; }
+        try { lockPoOrThrow(); } catch (e) { alert(e.message); return; }
 
-                rows().forEach(function(row) {
-                    const haystack = row.getAttribute('data-search') || '';
-                    const rowSupplierId = String(row.getAttribute('data-supplier-id') || '');
-                    const matchKeyword = !keyword || haystack.includes(keyword);
-                    const matchSupplier = !supplierId || rowSupplierId === supplierId;
+        document.getElementById('confirmSummary').innerHTML = buildConfirmTable(lines);
+        new bootstrap.Modal(document.getElementById('confirmModal')).show();
+    }
 
-                    row.classList.toggle('row-hidden-by-filter', !(matchKeyword && matchSupplier));
-                });
+    /* ── "Terima Semua" ── */
+    function receiveAll() {
+        const unchecked = visibleRows().filter(r => {
+            const cb = r.querySelector('.line-check');
+            return cb && !cb.checked && !cb.disabled;
+        });
+        unchecked.forEach(row => {
+            const cb = row.querySelector('.line-check');
+            if (cb) { cb.checked = true; onCheckboxChange(cb); }
+        });
+        // open confirm directly
+        openConfirm();
+    }
 
-                const checkAll = document.getElementById('checkAll');
-                if (checkAll) checkAll.checked = false;
+    /* ── DOM wired ── */
+    document.addEventListener('DOMContentLoaded', () => {
+        // filter
+        document.getElementById('grn-search')?.addEventListener('input', applyFilter);
+        document.getElementById('grn-supplier')?.addEventListener('change', applyFilter);
 
-                updateVisibleNumbers();
-                updateSelectionSummary();
-            }
-
-            function setInvalid(input) {
-                if (input) input.classList.add('is-invalid');
-            }
-
-            function clearInvalid(input) {
-                if (input) input.classList.remove('is-invalid');
-            }
-
-            function validateRow(row) {
-                const qtyPo = parseNumber(row.getAttribute('data-qty-po'));
-                const inputRec = row.querySelector('.qty-received-input');
-                const inputRej = row.querySelector('.qty-reject-input');
-                if (!inputRec || !inputRej) return true;
-
-                let rec = parseNumber(inputRec.value);
-                let rej = parseNumber(inputRej.value);
-                if (!inputRec.value) rec = 0;
-                if (!inputRej.value) rej = 0;
-
-                let ok = true;
-                clearInvalid(inputRec);
-                clearInvalid(inputRej);
-
-                if (rec < 0 || rec > qtyPo) {
-                    setInvalid(inputRec);
-                    ok = false;
-                }
-                if (rej < 0 || rej > qtyPo) {
-                    setInvalid(inputRej);
-                    ok = false;
-                }
-                if (rec + rej > qtyPo) {
-                    setInvalid(inputRec);
-                    setInvalid(inputRej);
-                    ok = false;
-                }
-
-                return ok;
-            }
-
-            function recalcTotalReceived() {
-                const rows = document.querySelectorAll('#grnLinesBody tr[data-line-index]');
-                let total = 0;
-
-                rows.forEach(function(row) {
-                    const checkbox = row.querySelector('.line-check');
-                    const inputRec = row.querySelector('.qty-received-input');
-                    const inputRej = row.querySelector('.qty-reject-input');
-                    if (!checkbox || !inputRec || !inputRej) return;
-
-                    if (!checkbox.checked) return;
-                    if (!validateRow(row)) return;
-
-                    const rec = parseNumber(inputRec.value || 0);
-                    const rej = parseNumber(inputRej.value || 0);
-                    const net = rec - rej;
-                    if (net > 0) total += net;
-                });
-
-                const span = document.getElementById('totalReceivedDisplay');
-                if (span) span.textContent = formatIdNumber(total);
-                updateSelectionSummary();
-            }
-
-            function handleLineCheckboxChange(checkbox) {
-                const row = checkbox.closest('tr');
-                if (!row) return;
-
-                const qtyPo = parseNumber(row.getAttribute('data-qty-po'));
-                const inputRec = row.querySelector('.qty-received-input');
-                const inputRej = row.querySelector('.qty-reject-input');
-
-                if (checkbox.checked) {
-                    const recEmpty = !inputRec.value;
-                    const rejEmpty = !inputRej.value;
-                    if (recEmpty && rejEmpty && qtyPo > 0) {
-                        inputRec.value = qtyPo.toFixed(2);
-                        inputRej.value = '0.00';
-                    }
-                } else {
-                    if (inputRec) {
-                        inputRec.value = '';
-                        clearInvalid(inputRec);
-                    }
-                    if (inputRej) {
-                        inputRej.value = '';
-                        clearInvalid(inputRej);
-                    }
-                }
-
-                validateRow(row);
-                recalcTotalReceived();
-            }
-
-            function ensureRowChecked(row) {
-                const checkbox = row.querySelector('.line-check');
-                if (!checkbox) return;
-
-                if (!checkbox.checked) {
-                    checkbox.checked = true;
-                    handleLineCheckboxChange(checkbox);
-                }
-            }
-
-            function onQtyReceivedInput(input) {
-                const row = input.closest('tr');
-                if (!row) return;
-
-                ensureRowChecked(row);
-
-                const qtyPo = parseNumber(row.getAttribute('data-qty-po'));
-                const inputRej = row.querySelector('.qty-reject-input');
-
-                let rec = parseNumber(input.value);
-                if (!input.value) rec = 0;
-
-                if (rec >= 0 && rec <= qtyPo) {
-                    const rej = qtyPo - rec;
-                    if (inputRej) inputRej.value = rej.toFixed(2);
-                }
-
-                validateRow(row);
-                recalcTotalReceived();
-            }
-
-            function onQtyRejectInput(input) {
-                const row = input.closest('tr');
-                if (!row) return;
-
-                ensureRowChecked(row);
-
-                const qtyPo = parseNumber(row.getAttribute('data-qty-po'));
-                const inputRec = row.querySelector('.qty-received-input');
-
-                let rej = parseNumber(input.value);
-                if (!input.value) rej = 0;
-
-                if (rej >= 0 && rej <= qtyPo) {
-                    const rec = qtyPo - rej;
-                    if (inputRec) inputRec.value = rec.toFixed(2);
-                }
-
-                validateRow(row);
-                recalcTotalReceived();
-            }
-
-            function toggleRowCheckbox(row) {
+        // checkAll
+        document.getElementById('checkAll')?.addEventListener('change', e => {
+            visibleRows().forEach(row => {
                 const cb = row.querySelector('.line-check');
-                if (!cb) return;
-                cb.checked = !cb.checked;
-                handleLineCheckboxChange(cb);
-            }
-
-            function collectSelectedLines() {
-                const rows = document.querySelectorAll('#grnLinesBody tr[data-line-index]');
-                const result = [];
-                let allValid = true;
-
-                rows.forEach(function(row) {
-                    const checkbox = row.querySelector('.line-check');
-                    const inputRec = row.querySelector('.qty-received-input');
-                    const inputRej = row.querySelector('.qty-reject-input');
-                    const unitCell = row.querySelector('td[data-label="Unit"]');
-
-                    if (!checkbox || !inputRec || !inputRej) return;
-                    if (!checkbox.checked) return;
-
-                    if (!validateRow(row)) {
-                        allValid = false;
-                        return;
-                    }
-
-                    const qtyPo = parseNumber(row.getAttribute('data-qty-po'));
-                    const rec = parseNumber(inputRec.value || 0);
-                    const rej = parseNumber(inputRej.value || 0);
-                    if (rec <= 0 && rej <= 0) return;
-
-                    const itemMain = row.querySelector('.item-main')?.textContent?.trim() ?? '-';
-                    const itemSub = row.querySelector('.item-sub')?.childNodes?.[0]?.textContent?.trim() ?? '';
-                    const unit = unitCell ? unitCell.textContent.trim() : '';
-
-                    result.push({
-                        item: itemMain,
-                        name: itemSub,
-                        qtyPo,
-                        qtyRec: rec,
-                        qtyRej: rej,
-                        unit
-                    });
-                });
-
-                return {
-                    lines: result,
-                    allValid
-                };
-            }
-
-            function buildConfirmationTable(lines) {
-                if (!lines.length) {
-                    return '<div class="alert alert-warning small mb-0">Tidak ada item yang dicentang dengan Qty Diterima / Reject.</div>';
-                }
-
-                let html = '<div class="table-responsive"><table class="table table-sm align-middle mb-0"><thead><tr>' +
-                    '<th style="width:40px;">#</th><th>Item</th>' +
-                    '<th class="text-end">Qty PO</th><th class="text-end">Diterima</th><th class="text-end">Reject</th>' +
-                    '<th class="text-center">Unit</th></tr></thead><tbody>';
-
-                lines.forEach(function(line, idx) {
-                    html += '<tr><td class="mono">' + (idx + 1) + '</td>' +
-                        '<td><div class="mono">' + line.item + '</div><div class="text-muted small">' + (line
-                            .name || '') + '</div></td>' +
-                        '<td class="text-end mono">' + formatIdNumber(line.qtyPo) + '</td>' +
-                        '<td class="text-end mono">' + formatIdNumber(line.qtyRec) + '</td>' +
-                        '<td class="text-end mono">' + formatIdNumber(line.qtyRej) + '</td>' +
-                        '<td class="text-center mono">' + (line.unit || '-') + '</td></tr>';
-                });
-
-                html += '</tbody></table></div>';
-                return html;
-            }
-
-            // ==========================================================
-            // IMPORTANT: derive purchase_order_id from selected rows (list mode)
-            // - prevent mixing multiple PO in one GRN
-            // ==========================================================
-            function deriveAndLockPurchaseOrderIdOrThrow() {
-                if (HAS_ORDER) return true;
-
-                const poIdInput = document.getElementById('purchase_order_id');
-                const rows = document.querySelectorAll('#grnLinesBody tr[data-line-index]');
-                const selectedPoIds = [];
-
-                rows.forEach(row => {
-                    const cb = row.querySelector('.line-check');
-                    if (!cb || !cb.checked) return;
-                    const poId = row.getAttribute('data-po-id');
-                    if (poId) selectedPoIds.push(String(poId));
-                });
-
-                const uniq = Array.from(new Set(selectedPoIds)).filter(Boolean);
-
-                if (uniq.length === 0) {
-                    throw new Error('Belum ada item yang dicentang.');
-                }
-
-                if (uniq.length > 1) {
-                    // cari kode PO untuk membantu user
-                    const codes = new Set();
-                    rows.forEach(row => {
-                        const cb = row.querySelector('.line-check');
-                        if (!cb || !cb.checked) return;
-                        const code = row.getAttribute('data-po-code');
-                        if (code) codes.add(code);
-                    });
-
-                    const hint = codes.size ? `\nPO terpilih: ${Array.from(codes).join(', ')}` : '';
-                    throw new Error('GRN tidak boleh campur item dari beberapa PO. Pilih item dari 1 PO saja.' + hint);
-                }
-
-                poIdInput.value = uniq[0];
-                return true;
-            }
-
-            document.addEventListener('input', function(e) {
-                if (e.target.classList.contains('qty-received-input')) onQtyReceivedInput(e.target);
-                if (e.target.classList.contains('qty-reject-input')) onQtyRejectInput(e.target);
+                if (!cb || cb.disabled) return;
+                cb.checked = e.target.checked;
+                onCheckboxChange(cb);
             });
+        });
 
-            document.addEventListener('change', function(e) {
-                if (e.target.classList.contains('line-check')) handleLineCheckboxChange(e.target);
+        // submit button
+        document.getElementById('btnSubmitGrn')?.addEventListener('click', e => {
+            e.preventDefault();
+            openConfirm();
+        });
 
-                if (e.target.id === 'checkAll') {
-                    const all = rows()
-                        .filter(isRowVisible)
-                        .map(row => row.querySelector('.line-check'))
-                        .filter(Boolean);
-                    all.forEach(function(cb) {
-                        cb.checked = e.target.checked;
-                        handleLineCheckboxChange(cb);
-                    });
-                }
-            });
+        // confirm button
+        document.getElementById('btnConfirm')?.addEventListener('click', () => {
+            bootstrap.Modal.getInstance(document.getElementById('confirmModal'))?.hide();
+            document.getElementById('grnForm').submit();
+        });
 
-            document.addEventListener('click', function(e) {
-                const row = e.target.closest('#grnLinesBody tr[data-line-index]');
-                if (!row) return;
+        // Terima Semua
+        document.getElementById('btnReceiveAll')?.addEventListener('click', receiveAll);
 
-                if (e.target.tagName === 'INPUT' || e.target.tagName === 'SELECT' || e.target.tagName ===
-                    'TEXTAREA' || e.target.closest('input')) {
-                    return;
-                }
+        // delegate input events
+        document.addEventListener('input', e => {
+            if (e.target.classList.contains('qty-received-input')) onRecInput(e.target);
+            if (e.target.classList.contains('qty-reject-input'))   onRejInput(e.target);
+        });
 
-                const checkbox = row.querySelector('.line-check');
-                if (!checkbox || checkbox.disabled) return;
+        document.addEventListener('change', e => {
+            if (e.target.classList.contains('line-check')) onCheckboxChange(e.target);
+        });
 
-                toggleRowCheckbox(row);
-            });
+        // click row to toggle checkbox
+        document.addEventListener('click', e => {
+            const row = e.target.closest('#grnLinesBody tr[data-line-index]');
+            if (!row) return;
+            const tag = e.target.tagName;
+            if (tag === 'INPUT' || tag === 'LABEL' || e.target.closest('input')) return;
+            const cb = row.querySelector('.line-check');
+            if (!cb || cb.disabled) return;
+            cb.checked = !cb.checked;
+            onCheckboxChange(cb);
+        });
 
-            document.addEventListener('focus', function(e) {
-                if (e.target.classList.contains('qty-received-input') || e.target.classList.contains(
-                        'qty-reject-input')) {
-                    if (e.target.value) setTimeout(() => e.target.select(), 0);
-                }
-            }, true);
+        // focus: select all in qty field
+        document.addEventListener('focus', e => {
+            if (e.target.classList.contains('qty-received-input') ||
+                e.target.classList.contains('qty-reject-input')) {
+                if (e.target.value) setTimeout(() => e.target.select(), 0);
+            }
+        }, true);
 
-            document.addEventListener('blur', function(e) {
-                if (e.target.classList.contains('qty-received-input') || e.target.classList.contains(
-                        'qty-reject-input')) {
-                    const v = e.target.value;
-                    if (v === '' || v === null) return;
-                    const n = parseNumber(v);
-                    if (!isNaN(n)) e.target.value = n.toFixed(2);
-                }
-            }, true);
+        // blur: normalize format
+        document.addEventListener('blur', e => {
+            if (e.target.classList.contains('qty-received-input') ||
+                e.target.classList.contains('qty-reject-input')) {
+                const v = e.target.value;
+                if (v === '' || v === null) return;
+                const n = parseNum(v);
+                if (!isNaN(n)) e.target.value = n.toFixed(2);
+            }
+        }, true);
 
-            document.addEventListener('DOMContentLoaded', function() {
-                const btnSubmit = document.getElementById('btnSubmitGrn');
-                const btnConfirmSubmit = document.getElementById('btnConfirmSubmit');
-                const form = document.getElementById('grnForm');
-                const summaryEl = document.getElementById('confirmGrnSummary');
-                const modalEl = document.getElementById('confirmGrnModal');
-                const realtimeSearch = document.getElementById('grn-realtime-search');
-                const realtimeSupplier = document.getElementById('grn-realtime-supplier');
+        // init
+        rows().forEach(row => {
+            const cb = row.querySelector('.line-check');
+            if (cb?.checked) onCheckboxChange(cb);
+        });
+        applyFilter();
+        recalcTotal();
+    });
 
-                if (realtimeSearch) realtimeSearch.addEventListener('input', applyRealtimeFilter);
-                if (realtimeSupplier) realtimeSupplier.addEventListener('change', applyRealtimeFilter);
-
-                if (btnSubmit && summaryEl && modalEl && form && btnConfirmSubmit) {
-                    btnSubmit.addEventListener('click', function(e) {
-                        e.preventDefault();
-
-                        const {
-                            lines,
-                            allValid
-                        } = collectSelectedLines();
-
-                        if (!allValid) {
-                            alert(
-                                'Masih ada input Qty Diterima / Reject yang tidak valid. Mohon periksa kembali.'
-                                );
-                            return;
-                        }
-
-                        if (!lines.length) {
-                            alert('Belum ada item yang dicentang dengan Qty Diterima / Reject.');
-                            return;
-                        }
-
-                        // derive purchase_order_id + prevent mixing PO
-                        try {
-                            deriveAndLockPurchaseOrderIdOrThrow();
-                        } catch (err) {
-                            alert(err.message || 'Gagal menyiapkan GRN.');
-                            return;
-                        }
-
-                        summaryEl.innerHTML = buildConfirmationTable(lines);
-
-                        const modal = new bootstrap.Modal(modalEl);
-                        modal.show();
-
-                        btnConfirmSubmit.onclick = function() {
-                            modal.hide();
-                            form.submit();
-                        };
-                    });
-                }
-
-                document.querySelectorAll('.line-check').forEach(cb => handleLineCheckboxChange(cb));
-                applyRealtimeFilter();
-                recalcTotalReceived();
-            });
-        })();
-    </script>
+})();
+</script>
 @endpush

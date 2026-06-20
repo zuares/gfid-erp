@@ -289,6 +289,7 @@ class CuttingService
                         lotId: $plan->lot_id,
                         unitCostOverride: null,
                         affectLotCost: true,
+                        strictNonNegative: true,
                     );
 
                     $plan->used_fabric_qty = $qtyOut;
@@ -338,6 +339,7 @@ class CuttingService
                     lotId: $plan->lot_id,
                     unitCostOverride: null,
                     affectLotCost: true,
+                    strictNonNegative: true,
                 );
 
                 $plan->used_fabric_qty = $portion;
@@ -389,6 +391,7 @@ class CuttingService
                 lotId: $lotId,
                 unitCostOverride: null,
                 affectLotCost: true,
+                strictNonNegative: true,
             );
         }
     }

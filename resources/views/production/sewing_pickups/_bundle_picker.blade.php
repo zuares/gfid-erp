@@ -370,6 +370,93 @@
             font-weight: 600;
         }
 
+        .sewing-supply-summary {
+            border: 1px solid rgba(148, 163, 184, .28);
+            border-radius: 10px;
+            background: #ffffff;
+            padding: .5rem .58rem;
+            display: flex;
+            flex-direction: column;
+            gap: .38rem;
+        }
+
+        body[data-theme="dark"] .sewing-supply-summary {
+            background: rgba(15, 23, 42, .96);
+            border-color: rgba(71, 85, 105, .82);
+        }
+
+        .sewing-supply-head {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            gap: .5rem;
+            flex-wrap: wrap;
+            font-size: .72rem;
+            font-weight: 900;
+        }
+
+        .sewing-supply-title {
+            color: #0f172a;
+        }
+
+        body[data-theme="dark"] .sewing-supply-title {
+            color: #e5e7eb;
+        }
+
+        .sewing-supply-status {
+            border-radius: 999px;
+            padding: .12rem .48rem;
+            font-size: .64rem;
+            font-weight: 900;
+            background: rgba(22, 163, 74, .10);
+            color: #15803d;
+        }
+
+        .sewing-supply-status.is-danger {
+            background: rgba(220, 38, 38, .10);
+            color: #dc2626;
+        }
+
+        .sewing-supply-table {
+            width: 100%;
+            border-collapse: collapse;
+            font-size: .68rem;
+        }
+
+        .sewing-supply-table th,
+        .sewing-supply-table td {
+            padding: .28rem .35rem;
+            border-bottom: 1px solid rgba(148, 163, 184, .14);
+            vertical-align: middle;
+        }
+
+        .sewing-supply-table th {
+            color: var(--muted);
+            font-size: .56rem;
+            font-weight: 900;
+            text-transform: uppercase;
+            letter-spacing: .06em;
+            background: rgba(248, 250, 252, .88);
+        }
+
+        body[data-theme="dark"] .sewing-supply-table th {
+            background: rgba(30, 41, 59, .72);
+        }
+
+        .sewing-supply-table tr:last-child td {
+            border-bottom: none;
+        }
+
+        .supply-ok {
+            color: #15803d;
+            font-weight: 900;
+        }
+
+        .supply-short {
+            color: #dc2626;
+            font-weight: 900;
+        }
+
         /* ========== TABLE / BUNDLE ROW ========== */
         .bundle-row {
             transition:
@@ -907,6 +994,27 @@
                         Belum ada item yang diambil.
                     </div>
                 </div>
+
+                <div class="sewing-supply-summary d-none" id="sewing-supply-summary">
+                    <div class="sewing-supply-head">
+                        <span class="sewing-supply-title">Kelengkapan jahit dari RM</span>
+                        <span class="sewing-supply-status" id="sewing-supply-status">Cukup</span>
+                    </div>
+                    <div class="table-responsive">
+                        <table class="sewing-supply-table">
+                            <thead>
+                                <tr>
+                                    <th>Material</th>
+                                    <th class="text-end">Butuh</th>
+                                    <th class="text-end">PCS</th>
+                                    <th class="text-end">Stok RM</th>
+                                    <th class="text-end">Status</th>
+                                </tr>
+                            </thead>
+                            <tbody id="sewing-supply-body"></tbody>
+                        </table>
+                    </div>
+                </div>
             </div>
             @error('lines')
                 <div class="alert alert-danger py-1 small mb-2">
@@ -1120,10 +1228,16 @@
             const selectedSummaryClear = document.getElementById('selected-summary-clear');
             const selectedSummaryTotalItems = document.getElementById('selected-summary-total-items');
             const selectedSummaryTotalQty = document.getElementById('selected-summary-total-qty');
+            const suppliesPayload = document.getElementById('supplies_checklist_payload');
+            const sewingSupplySummary = document.getElementById('sewing-supply-summary');
+            const sewingSupplyBody = document.getElementById('sewing-supply-body');
+            const sewingSupplyStatus = document.getElementById('sewing-supply-status');
 
             const submitBtn = document.getElementById('btn-submit-main');
             const submitLabel = document.getElementById('btn-submit-label');
             const submitShortcutBtn = document.getElementById('bundle-submit-shortcut');
+            const bomSuppliesByItem = @json($bomSuppliesByItem ?? []);
+            let supplyShortageCount = 0;
 
             let state = {
                 activeItemCode: '',
@@ -1290,15 +1404,28 @@
             }
 
             function updateSubmitButtons(pickedBundles, totalPickupQty) {
+                const hasShortage = supplyShortageCount > 0;
+                // Boleh submit walau shortage — stok boleh minus (allow_negative=true)
+                // Shortage tetap ditampilkan sebagai warning, bukan blocker
                 const canSubmit = pickedBundles > 0 && totalPickupQty > 0;
 
                 if (submitBtn && submitLabel) {
                     submitBtn.disabled = !canSubmit;
-                    submitLabel.textContent = canSubmit ? 'Pilih Penjahit' : 'Belum Ambil';
+                    submitBtn.classList.toggle('btn-warning', hasShortage && canSubmit);
+                    submitBtn.classList.toggle('btn-primary', !hasShortage && canSubmit);
+                    submitLabel.textContent = !canSubmit ? 'Belum Ambil'
+                        : hasShortage ? 'Pilih Penjahit ⚠'
+                        : 'Pilih Penjahit';
                 }
 
                 if (submitShortcutBtn) {
                     submitShortcutBtn.disabled = !canSubmit;
+                    submitShortcutBtn.classList.toggle('btn-warning', hasShortage && canSubmit);
+                    submitShortcutBtn.classList.toggle('btn-primary', !hasShortage && canSubmit);
+                    const shortcutText = submitShortcutBtn.querySelector('span:last-child');
+                    if (shortcutText) {
+                        shortcutText.textContent = hasShortage ? 'Pilih Penjahit ⚠' : 'Pilih Penjahit';
+                    }
                 }
 
                 const printBtn = document.getElementById('btn-submit-print');
@@ -1351,6 +1478,108 @@
 
             }
 
+            function buildSewingSupplyItems(selectedItems) {
+                const byMaterial = {};
+
+                selectedItems.forEach(item => {
+                    const supplies = bomSuppliesByItem[item.finishedItemId] || [];
+                    supplies.forEach(supply => {
+                        const materialId = parseInt(supply.id || 0, 10);
+                        if (!materialId) return;
+
+                        const need = (parseFloat(supply.qty || '0') || 0) * (item.qtyValue || 0);
+                        if (need <= 0) return;
+
+                        if (!byMaterial[materialId]) {
+                            byMaterial[materialId] = {
+                                id: materialId,
+                                code: supply.code || '',
+                                name: supply.name || '',
+                                uom: supply.uom || '',
+                                qty: 0,
+                                issued_qty: 0,
+                                totalPieces: 0,
+                                issued_pcs: 0,
+                                stock_available: parseFloat(supply.stock_available || '0') || 0,
+                            };
+                        }
+
+                        byMaterial[materialId].qty += need;
+                        byMaterial[materialId].issued_qty += need;
+                        byMaterial[materialId].totalPieces += item.qtyValue || 0;
+                        byMaterial[materialId].issued_pcs += item.qtyValue || 0;
+                    });
+                });
+
+                return Object.values(byMaterial).map(item => ({
+                    ...item,
+                    shortage_qty: Math.max((item.qty || 0) - (item.stock_available || 0), 0),
+                }));
+            }
+
+            function renderSewingSupplySummary(items) {
+                supplyShortageCount = items.filter(item => item.shortage_qty > 0.000001).length;
+
+                if (suppliesPayload) {
+                    suppliesPayload.value = JSON.stringify({
+                        items
+                    });
+                }
+
+                if (!sewingSupplySummary || !sewingSupplyBody || !sewingSupplyStatus) return;
+
+                sewingSupplySummary.classList.toggle('d-none', items.length === 0);
+                sewingSupplyBody.innerHTML = '';
+
+                sewingSupplyStatus.classList.toggle('is-danger', supplyShortageCount > 0);
+                sewingSupplyStatus.textContent = supplyShortageCount > 0 ?
+                    `${supplyShortageCount} kurang` :
+                    'Cukup';
+
+                items.forEach(item => {
+                    const tr = document.createElement('tr');
+
+                    const materialTd = document.createElement('td');
+                    const codeEl = document.createElement('strong');
+                    codeEl.className = 'mono';
+                    codeEl.textContent = item.code || 'Material';
+                    materialTd.appendChild(codeEl);
+                    if (item.name) {
+                        const nameEl = document.createElement('div');
+                        nameEl.className = 'text-muted';
+                        nameEl.textContent = item.name;
+                        materialTd.appendChild(nameEl);
+                    }
+
+                    const needTd = document.createElement('td');
+                    needTd.className = 'text-end mono fw-bold';
+                    needTd.textContent = `${nf.format(item.qty || 0)} ${item.uom || ''}`.trim();
+
+                    const stockTd = document.createElement('td');
+                    stockTd.className = 'text-end mono';
+                    stockTd.textContent = `${nf.format(item.stock_available || 0)} ${item.uom || ''}`.trim();
+
+                    const pcsTd = document.createElement('td');
+                    pcsTd.className = 'text-end mono fw-bold';
+                    pcsTd.textContent = `${nf.format(item.totalPieces || 0)} pcs`;
+
+                    const statusTd = document.createElement('td');
+                    statusTd.className = 'text-end mono';
+                    const statusSpan = document.createElement('span');
+                    if (item.shortage_qty > 0.000001) {
+                        statusSpan.className = 'supply-short';
+                        statusSpan.textContent = `Kurang ${nf.format(item.shortage_qty)} ${item.uom || ''}`.trim();
+                    } else {
+                        statusSpan.className = 'supply-ok';
+                        statusSpan.textContent = 'Cukup';
+                    }
+                    statusTd.appendChild(statusSpan);
+
+                    tr.append(materialTd, needTd, pcsTd, stockTd, statusTd);
+                    sewingSupplyBody.appendChild(tr);
+                });
+            }
+
             function recalcSummaryAndUI() {
                 let pickedBundles = 0;
                 let totalPickupQty = 0;
@@ -1367,6 +1596,7 @@
                             rowIndex: row.dataset.rowIndex || '',
                             bundleCode: row.dataset.bundleCode || '',
                             itemCode: row.dataset.itemCode || '',
+                            finishedItemId: row.dataset.finishedItemId || '',
                             qtyValue: current,
                             qtyLabel: nf.format(current),
                         });
@@ -1374,6 +1604,7 @@
                 });
 
                 renderSelectedSummary(selectedItems);
+                renderSewingSupplySummary(buildSewingSupplyItems(selectedItems));
 
                 updateSubmitButtons(pickedBundles, totalPickupQty);
                 savePickupDraft();

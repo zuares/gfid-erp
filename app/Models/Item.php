@@ -142,7 +142,7 @@ class Item extends Model
     public function suppliers(): BelongsToMany
     {
         return $this->belongsToMany(Supplier::class, 'supplier_items')
-            ->withPivot(['last_price'])
+            ->withPivot(['last_price', 'is_primary', 'minimum_order_qty', 'lead_time_days', 'active'])
             ->withTimestamps();
     }
 

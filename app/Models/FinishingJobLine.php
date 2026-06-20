@@ -21,15 +21,17 @@ class FinishingJobLine extends Model
         'reject_cause',
         'reject_notes',
         'processed_at',
-        'sewing_operator_id', // new
-        'sewing_operator_name', // new
+        'sewing_operator_id',
+        'sewing_operator_name',
+        'bom_has_gaps',
     ];
 
     protected $casts = [
-        'qty_in' => 'integer',
-        'qty_ok' => 'integer',
-        'qty_reject' => 'integer',
+        'qty_in'       => 'integer',
+        'qty_ok'       => 'integer',
+        'qty_reject'   => 'integer',
         'processed_at' => 'datetime',
+        'bom_has_gaps' => 'boolean',
     ];
 
     // ====== RELATIONSHIPS ======

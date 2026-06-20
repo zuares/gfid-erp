@@ -6,6 +6,7 @@ use App\Helpers\CodeGenerator;
 use App\Http\Controllers\Controller;
 use App\Models\Account;
 use App\Models\Item;
+use App\Models\InventoryStock;
 use App\Models\PurchaseOrder;
 use App\Models\PurchaseReceipt;
 use App\Models\PurchaseReturn;
@@ -120,9 +121,84 @@ class PurchaseReturnController extends Controller
         $purchase_return->loadMissing(['grn.warehouse', 'grn.lines.item', 'lines.item', 'lines.grnLine', 'supplier', 'order']);
         $remainingMap = $this->remainingByGrnLine($purchase_return->grn, excludeReturnId: (int) $purchase_return->id);
 
+        $warehouseId = (int) ($purchase_return->grn?->warehouse_id ?? 0);
+        $stockByItem = $warehouseId > 0
+            ? InventoryStock::query()
+                ->where('warehouse_id', $warehouseId)
+                ->whereIn('item_id', $purchase_return->lines->pluck('item_id')->filter()->unique())
+                ->pluck('qty', 'item_id')
+            : collect();
+
+        $stockByLot = DB::table('lots')
+            ->whereIn('id', $purchase_return->lines->pluck('lot_id')->filter()->unique())
+            ->pluck('qty_onhand', 'id')
+            ->map(fn($qty) => max(0, (float) $qty));
+        $lineStockMap = [];
+        $lineMaxMap = [];
+        $lineInventoryMap = [];
+
+        foreach ($purchase_return->lines as $line) {
+            $isInventory = $this->isHppLine($purchase_return, $line);
+            $itemId = (int) $line->item_id;
+            $returnable = (float) ($remainingMap[(int) $line->purchase_receipt_line_id] ?? 0);
+            $stock = (float) ($stockByItem[$itemId] ?? 0);
+
+            $lineInventoryMap[$line->id] = $isInventory;
+            $lineStockMap[$line->id] = $stock;
+
+            if (!$isInventory) {
+                $lineMaxMap[$line->id] = $returnable;
+                continue;
+            }
+
+            $available = max(0, $stock);
+            $lotId = (int) ($line->lot_id ?? 0);
+            $lotAvailable = $lotId > 0 ? (float) ($stockByLot[$lotId] ?? 0) : $available;
+            $max = max(0, min($returnable, $available, $lotAvailable));
+            $lineMaxMap[$line->id] = $max;
+        }
+
+        $inventoryLines = $purchase_return->lines
+            ->filter(fn($line) => (bool) ($lineInventoryMap[$line->id] ?? false)
+                && (float) $line->qty > 0.0001);
+
+        $stockReady = $purchase_return->lines
+            ->every(fn($line) => (float) $line->qty
+                <= (float) ($lineMaxMap[$line->id] ?? 0) + 0.0001);
+
+        if ($stockReady) {
+            $stockReady = $inventoryLines
+                ->groupBy('item_id')
+                ->every(fn($lines, $itemId) => (float) $lines->sum('qty')
+                    <= (float) ($stockByItem[$itemId] ?? 0) + 0.0001);
+        }
+
+        if ($stockReady) {
+            $stockReady = $inventoryLines
+                ->filter(fn($line) => (int) ($line->lot_id ?? 0) > 0)
+                ->groupBy('lot_id')
+                ->every(fn($lines, $lotId) => (float) $lines->sum('qty')
+                    <= (float) ($stockByLot[$lotId] ?? 0) + 0.0001);
+        }
+
+        $mutationCount = DB::table('inventory_mutations')
+            ->where('source_type', 'purchase_return')
+            ->where('source_id', (int) $purchase_return->id)
+            ->count();
+        $journalCount = DB::table('journals')
+            ->whereIn('source_type', [JournalService::SRC_PURCHASE_RETURN_INV, JournalService::SRC_PURCHASE_RETURN_EXP])
+            ->where('source_id', (int) $purchase_return->id)
+            ->count();
+
         return view('purchasing.purchase_returns.show', [
             'ret' => $purchase_return,
             'remainingMap' => $remainingMap,
+            'lineStockMap' => $lineStockMap,
+            'lineMaxMap' => $lineMaxMap,
+            'lineInventoryMap' => $lineInventoryMap,
+            'stockReady' => $stockReady,
+            'mutationCount' => $mutationCount,
+            'journalCount' => $journalCount,
         ]);
     }
 
@@ -130,6 +206,10 @@ class PurchaseReturnController extends Controller
     {
         if ($purchase_return->status !== 'draft' || $purchase_return->voided_at) {
             return back()->with('error', 'Return tidak bisa diubah (sudah posted/void).');
+        }
+
+        if (!$request->filled('date')) {
+            $request->merge(['date' => (string) $purchase_return->date]);
         }
 
         $data = $request->validate([
@@ -225,7 +305,76 @@ class PurchaseReturnController extends Controller
             return back()->with('error', 'Total return harus > 0.');
         }
 
+        $warehouseId = (int) ($purchase_return->grn?->warehouse_id ?? 0);
+        if ($warehouseId <= 0) {
+            throw ValidationException::withMessages(['return' => 'Gudang penerimaan tidak ditemukan.']);
+        }
+
+        $stockRequired = [];
+        foreach ($purchase_return->lines as $ln) {
+            $qty = (float) $ln->qty;
+            if ($qty <= 0.0001 || !$this->isHppLine($purchase_return, $ln)) {
+                continue;
+            }
+
+            $itemId = (int) $ln->item_id;
+            $stockRequired[$itemId] = (float) ($stockRequired[$itemId] ?? 0) + $qty;
+        }
+
+        if ($stockRequired) {
+            $stocks = InventoryStock::query()
+                ->where('warehouse_id', $warehouseId)
+                ->whereIn('item_id', array_keys($stockRequired))
+                ->pluck('qty', 'item_id');
+
+            foreach ($stockRequired as $itemId => $requiredQty) {
+                $available = (float) ($stocks[$itemId] ?? 0);
+                if ($available + 0.0000001 < $requiredQty) {
+                    $itemCode = (string) ($purchase_return->lines->firstWhere('item_id', $itemId)?->item?->code ?? ('Item #' . $itemId));
+                    throw ValidationException::withMessages([
+                        'stock' => "Stok {$itemCode} tidak cukup. Tersedia "
+                            . number_format($available, 4, ',', '.')
+                            . ', akan diretur ' . number_format($requiredQty, 4, ',', '.') . '.',
+                    ]);
+                }
+            }
+        }
+
+        $lotRequired = $purchase_return->lines
+            ->filter(fn($line) => (float) $line->qty > 0.0001
+                && (int) ($line->lot_id ?? 0) > 0
+                && $this->isHppLine($purchase_return, $line))
+            ->groupBy('lot_id')
+            ->map(fn($lines) => (float) $lines->sum('qty'));
+
+        if ($lotRequired->isNotEmpty()) {
+            $lotStocks = DB::table('lots')
+                ->whereIn('id', $lotRequired->keys())
+                ->pluck('qty_onhand', 'id');
+
+            foreach ($lotRequired as $lotId => $requiredQty) {
+                $available = (float) ($lotStocks[$lotId] ?? 0);
+                if ($available + 0.0000001 < $requiredQty) {
+                    throw ValidationException::withMessages([
+                        'stock' => 'Saldo lot asal tidak cukup. Tersedia '
+                            . number_format($available, 4, ',', '.')
+                            . ', akan diretur ' . number_format($requiredQty, 4, ',', '.') . '.',
+                    ]);
+                }
+            }
+        }
+
         DB::transaction(function () use ($purchase_return) {
+            $lockedReturn = PurchaseReturn::query()
+                ->whereKey($purchase_return->id)
+                ->lockForUpdate()
+                ->firstOrFail();
+
+            if ($lockedReturn->status !== 'draft' || $lockedReturn->voided_at) {
+                throw ValidationException::withMessages([
+                    'return' => 'Return sudah diproses. Muat ulang halaman.',
+                ]);
+            }
 
             $warehouseId = (int) $purchase_return->grn->warehouse_id;
             if ($warehouseId <= 0) {
@@ -299,7 +448,8 @@ class PurchaseReturnController extends Controller
                     allowNegative: false,
                     lotId: $ln->lot_id ? (int) $ln->lot_id : null,
                     unitCostOverride: $ln->unit_price !== null ? (float) $ln->unit_price : null,
-                    affectLotCost: false,
+                    affectLotCost: true,
+                    strictNonNegative: true,
                 );
             }
 
@@ -443,6 +593,16 @@ class PurchaseReturnController extends Controller
         $purchase_return->loadMissing(['grn', 'lines.grnLine', 'lines.item']);
 
         DB::transaction(function () use ($purchase_return) {
+            $lockedReturn = PurchaseReturn::query()
+                ->whereKey($purchase_return->id)
+                ->lockForUpdate()
+                ->firstOrFail();
+
+            if ($lockedReturn->status !== 'posted' || $lockedReturn->voided_at) {
+                throw ValidationException::withMessages([
+                    'return' => 'Return sudah berubah status. Muat ulang halaman.',
+                ]);
+            }
 
             $warehouseId = (int) $purchase_return->grn->warehouse_id;
 
@@ -633,7 +793,15 @@ class PurchaseReturnController extends Controller
             ->selectRaw("COALESCE(SUM(CASE WHEN type='dp_apply' THEN amount ELSE 0 END),0) as n")
             ->value('n');
 
-        return max(0, round($debt - $paid - $dpApplied, 2));
+        // Kurangi return yang sudah posted (bukan void) agar return ke-2, ke-3 dst
+        // tidak salah alokasi ke AP — seharusnya masuk Piutang Supplier (1305).
+        $returned = (float) PurchaseReturn::query()
+            ->where('purchase_order_id', $order->id)
+            ->where('status', 'posted')
+            ->whereNull('voided_at')
+            ->sum('total');
+
+        return max(0, round($debt - $paid - $dpApplied - $returned, 2));
     }
 
     protected function toNumber($value): float

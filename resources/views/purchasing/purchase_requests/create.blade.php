@@ -3,12 +3,14 @@
 @section('title', 'PR Baru')
 
 @section('content')
-<div style="max-width:960px; margin-inline:auto; padding-bottom:3rem;">
+<div style="max-width:1080px; margin-inline:auto; padding-bottom:3rem;" class="py-3 px-2 px-md-0">
 
-    <div class="d-flex align-items-center gap-2 mb-3">
-        <a href="{{ route('purchasing.purchase_requests.index') }}"
-            class="btn btn-sm btn-outline-secondary" style="border-radius:8px;">← Kembali</a>
-        <h1 class="h5 mb-0 fw-bold">Purchase Request Baru</h1>
+    <div class="d-flex justify-content-between align-items-start gap-3 mb-3">
+        <div>
+            <h2 class="mb-0">Purchase Request Baru</h2>
+            <div class="text-muted small">Catat kebutuhan barang. Supplier dapat ditentukan otomatis saat membuat PO.</div>
+        </div>
+        <a href="{{ route('purchasing.purchase_requests.index') }}" class="btn btn-sm btn-outline-secondary">Kembali</a>
     </div>
 
     @if ($errors->any())
@@ -32,10 +34,10 @@
             'linesData'   => $linesData,
         ])
 
-        <div class="d-flex gap-2 justify-content-end mt-2">
+        <div class="d-flex gap-2 justify-content-end mt-3">
             <a href="{{ route('purchasing.purchase_requests.index') }}"
                 class="btn btn-outline-secondary">Batal</a>
-            <button type="submit" class="btn btn-primary">Simpan PR</button>
+            <button type="submit" class="btn btn-primary px-4">Simpan PR</button>
         </div>
     </form>
 

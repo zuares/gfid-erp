@@ -111,6 +111,9 @@ class PurchaseReceiptController extends Controller
         $lines = PurchaseOrderLine::query()
             ->with(['item', 'purchaseOrder.supplier'])
             ->withCount('draftReceiptLines')
+            ->withSum(['receiptLines as qty_received_posted' => function ($q) {
+                $q->whereHas('receipt', fn($r) => $r->where('status', 'posted'));
+            }], 'qty_received')
             ->whereHas('purchaseOrder', function ($q) use ($selectedSupplierId, $selectedOrderType) {
                 $q->where('status', 'approved')
                   ->where('order_type', '!=', 'packing'); // packing skip GRN
@@ -134,7 +137,11 @@ class PurchaseReceiptController extends Controller
             ->get();
 
         $lines->each(function (PurchaseOrderLine $line) {
-            $line->has_draft_grn = ((int) ($line->draft_receipt_lines_count ?? 0)) > 0;
+            $line->has_draft_grn    = ((int) ($line->draft_receipt_lines_count ?? 0)) > 0;
+            $qtyReceived            = (float) ($line->qty_received_posted ?? 0);
+            $line->qty_remaining    = max(0.0, (float) $line->qty - $qtyReceived);
+            $line->fully_received   = $qtyReceived >= (float) $line->qty;
+            $line->partially_received = !$line->fully_received && $qtyReceived > 0;
         });
 
         // ✅ Default warehouse (controller side)
@@ -177,7 +184,11 @@ class PurchaseReceiptController extends Controller
         $purchase_order->load([
             'supplier',
             'lines' => function ($q) {
-                $q->with('item')->withCount('draftReceiptLines');
+                $q->with('item')
+                  ->withCount('draftReceiptLines')
+                  ->withSum(['receiptLines as qty_received_posted' => function ($q) {
+                      $q->whereHas('receipt', fn($r) => $r->where('status', 'posted'));
+                  }], 'qty_received');
             },
         ]);
 
@@ -186,7 +197,11 @@ class PurchaseReceiptController extends Controller
 
         $lines = $purchase_order->lines;
         $lines->each(function (PurchaseOrderLine $line) {
-            $line->has_draft_grn = ((int) ($line->draft_receipt_lines_count ?? 0)) > 0;
+            $line->has_draft_grn      = ((int) ($line->draft_receipt_lines_count ?? 0)) > 0;
+            $qtyReceived              = (float) ($line->qty_received_posted ?? 0);
+            $line->qty_remaining      = max(0.0, (float) $line->qty - $qtyReceived);
+            $line->fully_received     = $qtyReceived >= (float) $line->qty;
+            $line->partially_received = !$line->fully_received && $qtyReceived > 0;
         });
 
         $selectedSupplierId = $purchase_order->supplier_id;

@@ -10,6 +10,9 @@ use Illuminate\Http\Request;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Validation\ValidationException;
 
+// item_role → account code mapping for inventory auto-fill
+// raw_material → 1201, wip → 1202, finished_good → 1203
+
 class OpeningBalanceBatchController extends Controller
 {
     public function index(Request $request)
@@ -52,7 +55,71 @@ class OpeningBalanceBatchController extends Controller
             ->orderBy('code')
             ->get(['id', 'code', 'name', 'type', 'is_cash']);
 
-        return view('accounting.opening_balances_batch.create', compact('accounts'));
+        // Auto-fill persediaan dari stok sistem — split by warehouse
+        // RM warehouses  → 1201, WIP warehouses → 1202, FG warehouses → 1203
+        $rmCodes     = ['RM'];
+        $wipCodes    = ['WIP-CUT', 'WIP-SEW', 'WIP-FIN', 'WIP-PACK', 'WH-TRANSIT'];
+        $fgCodes     = ['WH-RTS', 'FG', 'WH-PRD'];
+        $rejectCodes = ['REJ-CUT', 'REJ-SEW', 'REJ-FIN', 'REJECT'];
+
+        // Cost source untuk WIP/FG/Reject: item_cost_snapshots (dari closing produksi)
+        $latestCost = DB::table('item_cost_snapshots')
+            ->selectRaw('item_id, unit_cost')
+            ->whereIn('id', function ($q) {
+                $q->selectRaw('MAX(id)')->from('item_cost_snapshots')->groupBy('item_id');
+            });
+
+        $nonRmCodes = array_merge($wipCodes, $fgCodes, $rejectCodes);
+
+        $inventoryByWarehouse = DB::table('inventory_stocks as s')
+            ->join('warehouses as w', 'w.id', '=', 's.warehouse_id')
+            ->joinSub($latestCost, 'cs', 'cs.item_id', '=', 's.item_id')
+            ->where('s.qty', '>', 0)
+            ->whereNotNull('cs.unit_cost')
+            ->whereIn('w.code', $nonRmCodes)
+            ->selectRaw('w.code as wh_code, ROUND(SUM(s.qty * cs.unit_cost), 0) as total_value')
+            ->groupBy('w.code')
+            ->pluck('total_value', 'wh_code');
+
+        // Cost source untuk RM: avg cost dari GRN (inventory_mutations direction=in),
+        // fallback ke last_purchase_price dari master item.
+        $rmAvgCost = DB::table('inventory_mutations as m')
+            ->join('warehouses as w', 'w.id', '=', 'm.warehouse_id')
+            ->where('w.code', 'RM')
+            ->where('m.direction', 'in')
+            ->where('m.unit_cost', '>', 0)
+            ->groupBy('m.item_id')
+            ->selectRaw('m.item_id, ROUND(SUM(m.total_cost) / NULLIF(SUM(m.qty_change), 0), 4) as avg_unit_cost')
+            ->pluck('avg_unit_cost', 'item_id');
+
+        $rmTotal = (float) DB::table('inventory_stocks as s')
+            ->join('warehouses as w', 'w.id', '=', 's.warehouse_id')
+            ->join('items as i', 'i.id', '=', 's.item_id')
+            ->where('w.code', 'RM')
+            ->where('s.qty', '>', 0)
+            ->get(['s.item_id', 's.qty', 'i.last_purchase_price'])
+            ->sum(function ($row) use ($rmAvgCost) {
+                $cost = (float) ($rmAvgCost[$row->item_id] ?? $row->last_purchase_price ?? 0);
+                return $row->qty * $cost;
+            });
+        $rmTotal = round($rmTotal, 0);
+
+        $wipTotal    = collect($wipCodes)->sum(fn($c) => (float) ($inventoryByWarehouse[$c] ?? 0));
+        $fgTotal     = collect($fgCodes)->sum(fn($c) => (float) ($inventoryByWarehouse[$c] ?? 0));
+        $rejectTotal = collect($rejectCodes)->sum(fn($c) => (float) ($inventoryByWarehouse[$c] ?? 0));
+
+        // Prefill HANYA untuk WIP/FG/Reject — dari item_cost_snapshots.
+        // 1201 (RM) TIDAK di-prefill karena sudah otomatis terjurnal via Stock Opname
+        // (inventory_adjustment journal). Jika di-input ulang di sini akan double-count.
+        $prefill = [];
+        foreach ([['1202', $wipTotal], ['1203', $fgTotal], ['1204', $rejectTotal]] as [$code, $val]) {
+            $account = $accounts->firstWhere('code', $code);
+            if ($account && $val > 0) {
+                $prefill[$account->id] = $val;
+            }
+        }
+
+        return view('accounting.opening_balances_batch.create', compact('accounts', 'prefill'));
     }
 
     public function store(Request $request)

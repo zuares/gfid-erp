@@ -338,6 +338,15 @@
             // overproduction: source adalah CuttingJob
             $sourceLabel = 'Cutting Job • ' . ($adjustment->source->code ?? '#' . $adjustment->source_id);
             $sourceUrl = route('production.cutting_jobs.show', $adjustment->source);
+        } elseif (
+            $adjustment->reference_type === \App\Models\SewingPickup::class
+            && $adjustment->reference_id
+        ) {
+            $sourcePickup = \App\Models\SewingPickup::find($adjustment->reference_id);
+            if ($sourcePickup) {
+                $sourceLabel = 'Pickup Jahit • ' . $sourcePickup->code;
+                $sourceUrl = route('production.sewing.pickups.show', $sourcePickup);
+            }
         }
 
         $canApprove = $isOwnerAdmin && method_exists($adjustment, 'canApprove') && $adjustment->canApprove();

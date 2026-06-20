@@ -415,7 +415,7 @@
             <div id="mapHint" style="font-size:.75rem; color:#94a3b8; font-weight:700;"></div>
         </div>
         <div class="gf-card-body">
-            <div class="gf-form-row gf-form-row-items mb-3">
+            <div class="gf-form-row gf-form-row-items mb-3" style="grid-template-columns:{{ $canSeeMoney ? '1fr 160px 100px' : '1fr 100px' }};">
                 <div>
                     <label class="gf-label">Cari Item</label>
                     <x-item-suggest
@@ -427,10 +427,12 @@
                         :max-results="8"
                     />
                 </div>
-                <div>
-                    <label class="gf-label">Last Price (Rp)</label>
-                    <input id="map_last_price" class="form-control form-control-sm" inputmode="decimal" placeholder="0">
-                </div>
+                @if ($canSeeMoney)
+                    <div>
+                        <label class="gf-label">Harga Terakhir (Rp)</label>
+                        <input id="map_last_price" class="form-control form-control-sm" inputmode="decimal" placeholder="0">
+                    </div>
+                @endif
                 <div style="padding-top:1.4rem;">
                     <button id="btnAttach" class="btn btn-sm gf-btn gf-btn-primary w-100" type="button" disabled>
                         Tambah
@@ -455,6 +457,7 @@
 <script>
 (function () {
     const csrf = @json($csrf);
+    const canSeeMoney = @json($canSeeMoney);
 
     const urlJson      = @json(route('master.suppliers.items.json',   $supplier));
     const urlAttach    = @json(route('master.suppliers.items.attach',  $supplier));
@@ -519,7 +522,7 @@
                     <thead><tr>
                       <th style="width:22%">Kode</th>
                       <th>Nama Item</th>
-                      <th style="width:18%">Harga (Rp)</th>
+                      ${canSeeMoney ? '<th style="width:18%">Harga (Rp)</th>' : ''}
                       <th style="width:8%">Satuan</th>
                       <th style="width:8%"></th>
                     </tr></thead>
@@ -532,14 +535,14 @@
                     <tr>
                       <td><span class="gf-code">${escapeHtml(it.code)}</span></td>
                       <td style="font-weight:700; color:#0f172a;">${escapeHtml(it.name)}</td>
-                      <td>
+                      ${canSeeMoney ? `<td>
                         <input class="form-control form-control-sm js-price"
                                style="border-radius:10px; font-weight:700; font-size:.82rem;"
                                inputmode="decimal"
                                value="${escapeHtml(it.last_price??0)}"
                                data-update-url="${escapeHtml(updateUrl)}"
                                placeholder="0"/>
-                      </td>
+                      </td>` : ''}
                       <td style="color:#64748b; font-size:.78rem;">${escapeHtml(it.unit||'pcs')}</td>
                       <td class="text-end">
                         <button class="btn btn-sm js-detach"
@@ -605,7 +608,9 @@
     btnAttach.addEventListener('click', async () => {
         const itemId = elHiddenId?.value;
         if (!itemId) return alert('Pilih item dari hasil suggest.');
-        const num = Number(String(elMapPrice.value||'0').replaceAll('.','').replaceAll(',','.'));
+        const num = canSeeMoney
+            ? Number(String(elMapPrice?.value||'0').replaceAll('.','').replaceAll(',','.'))
+            : 0;
         if (Number.isNaN(num) || num < 0) return alert('Harga tidak valid.');
 
         btnAttach.disabled = true;
@@ -619,7 +624,7 @@
             if (!r.ok) throw new Error();
             if (elHiddenId)   elHiddenId.value   = '';
             if (elSuggestTxt) elSuggestTxt.value = '';
-            elMapPrice.value = '';
+            if (elMapPrice) elMapPrice.value = '';
             await reload();
         } catch {
             alert('Gagal tambah mapping.');

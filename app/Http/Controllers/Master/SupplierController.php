@@ -91,7 +91,9 @@ class SupplierController extends Controller
             ->limit(3000) // aman untuk awal; kalau item kamu banyak banget, nanti kita ganti suggest endpoint
             ->get();
 
-        return view('master.suppliers.show', compact('supplier', 'itemsForPicker'));
+        $canSeeMoney = request()->user()?->isOwner() ?? false;
+
+        return view('master.suppliers.show', compact('supplier', 'itemsForPicker', 'canSeeMoney'));
     }
 
     public function edit(Supplier $supplier): RedirectResponse
@@ -137,6 +139,7 @@ class SupplierController extends Controller
 
     public function itemsJson(Supplier $supplier): JsonResponse
     {
+        $canSeeMoney = request()->user()?->isOwner() ?? false;
         $items = $supplier->items()
             ->select(['items.id', 'items.code', 'items.name', 'items.unit', 'items.type', 'items.last_purchase_price'])
             ->withPivot(['last_price'])
@@ -154,10 +157,10 @@ class SupplierController extends Controller
         $groups = $items->groupBy(function ($it) {
             $t = strtolower((string) ($it->type ?? ''));
             return $t !== '' ? $t : 'other';
-        })->map(function ($rows) {
-            return $rows->map(function ($it) {
-                $lp = (float) ($it->pivot?->last_price ?? 0);
-                $fp = (float) ($it->last_purchase_price ?? 0);
+        })->map(function ($rows) use ($canSeeMoney) {
+            return $rows->map(function ($it) use ($canSeeMoney) {
+                $lp = $canSeeMoney ? (float) ($it->pivot?->last_price ?? 0) : null;
+                $fp = $canSeeMoney ? (float) ($it->last_purchase_price ?? 0) : null;
                 $price = $lp > 0 ? $lp : $fp;
 
                 return [
@@ -188,13 +191,20 @@ class SupplierController extends Controller
             'last_price' => ['nullable', 'numeric', 'min:0'],
         ]);
 
+        $lastPrice = $request->user()?->isOwner()
+            ? (float) ($data['last_price'] ?? 0)
+            : (float) (DB::table('supplier_items')
+                ->where('supplier_id', $supplier->id)
+                ->where('item_id', $data['item_id'])
+                ->value('last_price') ?? 0);
+
         DB::table('supplier_items')->updateOrInsert(
             [
                 'supplier_id' => (int) $supplier->id,
                 'item_id' => (int) $data['item_id'],
             ],
             [
-                'last_price' => (float) ($data['last_price'] ?? 0),
+                'last_price' => $lastPrice,
                 'updated_at' => now(),
                 'created_at' => now(),
             ]
@@ -205,6 +215,8 @@ class SupplierController extends Controller
 
     public function updateItem(Request $request, Supplier $supplier, Item $item): JsonResponse
     {
+        abort_unless($request->user()?->isOwner(), 403, 'Hanya owner yang dapat mengubah harga.');
+
         $data = $request->validate([
             'last_price' => ['required', 'numeric', 'min:0'],
         ]);
@@ -264,7 +276,7 @@ class SupplierController extends Controller
         ]);
 
         $raw = (string) $data['codes'];
-        $defaultPrice = (float) ($data['last_price'] ?? 0);
+        $defaultPrice = $request->user()?->isOwner() ? (float) ($data['last_price'] ?? 0) : 0;
 
         // ambil codes unik, trim, uppercase
         $codes = collect(preg_split('/[\s,;]+/', $raw))

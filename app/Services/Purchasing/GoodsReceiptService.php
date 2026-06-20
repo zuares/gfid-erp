@@ -13,6 +13,7 @@ use App\Models\SupplierPrice;
 use App\Services\Accounting\JournalService;
 use App\Services\Inventory\InventoryService;
 use Illuminate\Support\Facades\DB;
+use Illuminate\Support\Facades\Log;
 use Illuminate\Support\Facades\Schema;
 use Illuminate\Validation\ValidationException;
 
@@ -145,6 +146,23 @@ class GoodsReceiptService
                 throw ValidationException::withMessages(['grn' => 'Total GRN harus > 0. Pastikan harga sudah diisi pada PO.']);
             }
 
+            // Deteksi harga mencurigakan: grand_total sangat kecil (< Rp 100)
+            // kemungkinan harga di PO belum diisi dengan benar (contoh: Rp 1 dari data test).
+            // Hard block di Rp 0 sudah ada di atas; ini soft warning di log + error agar user sadar.
+            if ($grandTotal < 100) {
+                Log::warning('[GRN] grand_total sangat kecil — kemungkinan harga PO belum diisi.', [
+                    'grn_id'      => $grn->id,
+                    'grn_code'    => $grn->code,
+                    'grand_total' => $grandTotal,
+                    'supplier'    => $grn->supplier?->name,
+                ]);
+
+                throw ValidationException::withMessages([
+                    'grn' => "Total GRN terlalu kecil (Rp " . number_format($grandTotal, 0, ',', '.') . "). "
+                           . "Pastikan harga sudah diisi dengan benar pada PO sebelum posting GRN.",
+                ]);
+            }
+
             // Map allocation + expense account (sumber dari PO line + master item)
             $maps = $this->buildLineMetaMapsForGrn($grn);
 
@@ -228,6 +246,23 @@ class GoodsReceiptService
                     'grn' => "Akun tidak lengkap. Pastikan ada COA: Inventory {$inventoryCode}, AP {$apCode}, Uang Muka {$advanceCode}.",
                 ]);
             }
+
+            // item_role → inventory account code mapping
+            // finished_good → 1203, wip → 1202, raw_material → 1201 (fallback)
+            $itemRoleToInvCode = [
+                'finished_good' => '1203',
+                'wip'           => '1202',
+                'raw_material'  => '1201',
+            ];
+            // Pre-load account ids by code (cache)
+            $invCodeToId = [];
+            foreach (array_unique(array_values($itemRoleToInvCode)) as $code) {
+                $id = (int) (Account::where('code', $code)->value('id') ?? 0);
+                if ($id > 0) {
+                    $invCodeToId[$code] = $id;
+                }
+            }
+            $invCodeToId[$inventoryCode] = $invCodeToId[$inventoryCode] ?? $inventoryAccountId;
 
             // akun tambahan
             $shippingExpenseCode = '6102'; // Biaya Transport/Ongkir
@@ -317,18 +352,67 @@ class GoodsReceiptService
                 ]);
             }
 
-            // (A) JURNAL INVENTORY: Dr Inventory / Cr AP
+            // (A) JURNAL INVENTORY: Dr Persediaan (per item_role) / Cr AP
             if ($invDebit > 0.0001) {
-                $this->journal->post(
+                // Split debit per item_role → account, prorated from hppAfterDiscount
+                $hppByRole   = $totals['hpp_by_item_role'] ?? [];
+                $hppOriginal = $totals['hpp_total'];
+                $invLines    = [];
+                $invRunning  = 0.0;
+                $roles       = array_keys($hppByRole);
+                $lastRole    = end($roles) ?: null;
+
+                foreach ($hppByRole as $role => $roleAmt) {
+                    $roleCode = $itemRoleToInvCode[$role] ?? $inventoryCode;
+                    $roleAccId = $invCodeToId[$roleCode] ?? $inventoryAccountId;
+
+                    // Prorate: roleAmt / hppOriginal * invDebit
+                    if ($role === $lastRole) {
+                        $roleDebit = round($invDebit - $invRunning, 2);
+                    } else {
+                        $roleDebit = $hppOriginal > 0
+                            ? round(($roleAmt / $hppOriginal) * $invDebit, 2)
+                            : 0.0;
+                    }
+
+                    if ($roleDebit > 0.0001) {
+                        // Merge if same account
+                        $found = false;
+                        foreach ($invLines as &$il) {
+                            if ($il['account_id'] === $roleAccId) {
+                                $il['debit'] = round($il['debit'] + $roleDebit, 2);
+                                $found = true;
+                                break;
+                            }
+                        }
+                        unset($il);
+                        if (!$found) {
+                            $invLines[] = ['account_id' => $roleAccId, 'debit' => $roleDebit, 'credit' => 0];
+                        }
+                        $invRunning = round($invRunning + $roleDebit, 2);
+                    }
+                }
+
+                // Fallback: jika hpp_by_item_role kosong, pakai single account
+                if (empty($invLines)) {
+                    $invLines[] = ['account_id' => $inventoryAccountId, 'debit' => $invDebit, 'credit' => 0];
+                }
+
+                $invLines[] = ['account_id' => $apAccountId, 'debit' => 0, 'credit' => $invDebit];
+
+                $invJournal = $this->journal->post(
                     date: is_string($grn->date) ? $grn->date : $grn->date->format('Y-m-d'),
                     sourceType: 'grn_inv',
                     sourceId: (int) $grn->id,
                     description: "GRN {$grn->code} - Inventory - {$grn->supplier?->name}",
-                    lines: [
-                        ['account_id' => $inventoryAccountId, 'debit' => $invDebit, 'credit' => 0],
-                        ['account_id' => $apAccountId, 'debit' => 0, 'credit' => $invDebit],
-                    ]
+                    lines: $invLines
                 );
+
+                // Simpan journal_id ke GRN agar mudah di-trace
+                if ($invJournal && empty($grn->journal_id)) {
+                    $grn->journal_id = (int) $invJournal->id;
+                    $grn->save();
+                }
             }
 
             // (B) JURNAL EXPENSE: Dr Expense/Tax/Shipping / Cr AP (sisa)
@@ -588,6 +672,7 @@ class GoodsReceiptService
         $expenseAccByPoLineId = $maps['expenseAccByPoLineId'] ?? collect();
 
         $hppTotal = 0.0;
+        $hppByItemRole = []; // item_role → total hpp amount
         $expenseByAcc = [];
 
         foreach ($grn->lines as $line) {
@@ -600,6 +685,9 @@ class GoodsReceiptService
 
             if ($isHpp) {
                 $hppTotal = round($hppTotal + $amt, 2);
+                // Track by item_role for account split
+                $role = (string) ($line->item?->item_role ?? 'raw_material');
+                $hppByItemRole[$role] = round((float) ($hppByItemRole[$role] ?? 0) + $amt, 2);
                 continue;
             }
 
@@ -619,9 +707,10 @@ class GoodsReceiptService
         }
 
         return [
-            'hpp_total' => round($hppTotal, 2),
+            'hpp_total'          => round($hppTotal, 2),
+            'hpp_by_item_role'   => $hppByItemRole,
             'expense_by_account' => $expenseByAcc,
-            'expense_total' => round($expenseTotal, 2),
+            'expense_total'      => round($expenseTotal, 2),
         ];
     }
 

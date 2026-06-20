@@ -107,6 +107,7 @@ class InventoryService
         float | int | string | null $unitCostOverride = null, // untuk WIP, bisa pakai unit_cost custom
         bool $affectLotCost = true, // hanya true untuk pemakaian kain mentah
         ?int $cuttingJobBundleId = null, // FASE 1: tag dimensi produksi (per bundle) di ledger
+        bool $strictNonNegative = false,
     ): ?InventoryMutation {
 
         $qty = $this->num($qty);
@@ -129,7 +130,7 @@ class InventoryService
 
         // Kalau caller tidak eksplisit allow, cek flag allow_negative di master item
         // (bahan baku & bahan pendukung produksi boleh minus)
-        if (!$allowNegative) {
+        if (!$allowNegative && !$strictNonNegative) {
             $allowNegative = (bool) \DB::table('items')
                 ->where('id', $itemId)
                 ->value('allow_negative');

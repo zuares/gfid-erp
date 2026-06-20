@@ -6,6 +6,7 @@ use App\Http\Controllers\Controller;
 use App\Models\InventoryMutation;
 use App\Models\Item;
 use App\Models\Lot;
+use App\Models\SystemSetting;
 use App\Models\Warehouse;
 use Illuminate\Http\Request;
 use Symfony\Component\HttpFoundation\StreamedResponse;
@@ -20,7 +21,13 @@ class StockCardController extends Controller
         $qItem = trim((string) $request->input('q_item', '')); // keyword item (code/name)
         $warehouseId = $request->input('warehouse_id');
         $lotId = $request->input('lot_id');
-        $fromDate = $request->input('from_date');
+
+        // Default from_date = cut-off date (jika belum diisi user dan cut-off sudah di-set)
+        // Tambahkan ?show_legacy=1 di URL untuk melihat semua data historis
+        $cutoffDate   = SystemSetting::cutoffDateString();
+        $showLegacy   = $request->boolean('show_legacy');
+        $cutoffActive = $cutoffDate && !$request->has('from_date') && !$showLegacy;
+        $fromDate = $request->input('from_date', $cutoffActive ? $cutoffDate : null);
         $toDate = $request->input('to_date');
         $hasCost = $request->boolean('has_cost');
         $sortDir = $request->input('sort', 'desc');
@@ -47,7 +54,14 @@ class StockCardController extends Controller
         ];
 
         // helper response
-        $respond = function (array $payload) use ($isAjax) {
+        $respond = function (array $payload) use ($isAjax, $cutoffDate, $cutoffActive, $showLegacy) {
+            // Tambahkan info cut-off ke semua view
+            $payload['cutoff'] = [
+                'date'   => $cutoffDate,
+                'active' => $cutoffActive,
+                'legacy' => $showLegacy,
+            ];
+
             if ($isAjax) {
                 return response()->json([
                     'kpi' => view('inventory.stock_card._kpi', $payload)->render(),

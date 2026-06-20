@@ -10,10 +10,12 @@ use App\Models\ItemRole;
 use App\Models\Lot;
 use App\Models\QcResult;
 use App\Models\Warehouse;
+use App\Services\Accounting\JournalService;
 use App\Services\Inventory\InventoryService;
 use App\Services\Production\CuttingService;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\DB;
+use Illuminate\Support\Facades\Log;
 
 // <-- sesuaikan nama model saldo stok kamu
 
@@ -22,6 +24,7 @@ class CuttingJobController extends Controller
     public function __construct(
         protected InventoryService $inventory,
         protected CuttingService $cutting,
+        protected JournalService $journal,
     ) {}
 
     /**
@@ -706,6 +709,15 @@ class CuttingJobController extends Controller
                 ->with('success', 'Mode Developer: simulasi cutting berhasil dan sudah di-rollback. Tidak ada data/stok yang berubah.');
         }
 
+        try {
+            $this->journal->postCuttingJob($job);
+        } catch (\Throwable $e) {
+            Log::warning('Gagal membuat jurnal cutting_job', [
+                'cutting_job_id' => $job->id,
+                'message' => $e->getMessage(),
+            ]);
+        }
+
         return redirect()
             ->route('production.cutting_jobs.show', $job)
             ->with('success', 'Cutting job berhasil dibuat.');
@@ -1074,6 +1086,15 @@ class CuttingJobController extends Controller
             // 7) Set status job → voided
             $cuttingJob->update(['status' => 'voided']);
         });
+
+        try {
+            $this->journal->voidBySource(JournalService::SRC_CUTTING_JOB, (int) $cuttingJob->id, "VOID Cutting Job {$cuttingJob->code}");
+        } catch (\Throwable $e) {
+            Log::warning('Gagal void jurnal cutting_job', [
+                'cutting_job_id' => $cuttingJob->id,
+                'message' => $e->getMessage(),
+            ]);
+        }
 
         return redirect()
             ->route('production.cutting_jobs.show', $cuttingJob)

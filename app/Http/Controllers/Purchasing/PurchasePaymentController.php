@@ -7,6 +7,7 @@ use App\Models\Account;
 use App\Models\PaymentMethod;
 use App\Models\PurchaseOrder;
 use App\Models\PurchasePayment;
+use App\Models\Supplier;
 use App\Models\SupplierInvoice;
 use App\Services\Accounting\JournalService;
 use Illuminate\Http\Request;
@@ -17,6 +18,72 @@ class PurchasePaymentController extends Controller
 {
     // Bank/ewallet yang boleh untuk TRANSFER
     private const TRANSFER_BANK_CODES = ['1111', '1112', '1113', '1114'];
+
+    // ======================================================================
+    // STANDALONE INDEX & CREATE
+    // ======================================================================
+
+    public function index(Request $request)
+    {
+        $this->ensureOwner($request);
+
+        $q = PurchasePayment::query()
+            ->with(['purchaseOrder.supplier', 'paymentMethod', 'cashAccount'])
+            ->orderByDesc('date')
+            ->orderByDesc('id');
+
+        if ($request->filled('supplier_id')) {
+            $q->whereHas('purchaseOrder', fn($s) => $s->where('supplier_id', $request->integer('supplier_id')));
+        }
+
+        if ($request->filled('from')) {
+            $q->whereDate('date', '>=', $request->date('from'));
+        }
+
+        if ($request->filled('to')) {
+            $q->whereDate('date', '<=', $request->date('to'));
+        }
+
+        if ($request->filled('type')) {
+            $q->where('type', $request->string('type')->toString());
+        }
+
+        if ($request->filled('voided')) {
+            $request->string('voided') === 'yes'
+                ? $q->whereNotNull('voided_at')
+                : $q->whereNull('voided_at');
+        } else {
+            $q->whereNull('voided_at'); // default: hanya aktif
+        }
+
+        $summaryRows = (clone $q)->withoutEagerLoads()
+            ->selectRaw('type, COUNT(*) as cnt, COALESCE(SUM(amount),0) as total')
+            ->groupBy('type')
+            ->get()->keyBy('type');
+
+        $summary = [
+            'total_payment' => (float) ($summaryRows->get('payment')?->total ?? 0),
+            'total_dp'      => (float) ($summaryRows->get('dp')?->total ?? 0),
+            'count'         => (int)   $summaryRows->sum('cnt'),
+        ];
+
+        $payments  = $q->paginate(30)->withQueryString();
+        $suppliers = Supplier::orderBy('name')->get(['id', 'name']);
+        $paymentMethods = PaymentMethod::where('is_active', true)->orderBy('sort_order')->get();
+        $cashAccounts   = Account::where('is_cash', true)->where('is_active', true)->orderBy('code')->get();
+
+        // POs with outstanding debt for create form
+        $openPos = PurchaseOrder::query()
+            ->with('supplier')
+            ->whereIn('payment_status', ['unpaid', 'partial'])
+            ->whereHas('purchaseReceipts', fn($s) => $s->where('status', 'posted'))
+            ->orderByDesc('date')
+            ->get(['id', 'code', 'date', 'supplier_id', 'grand_total', 'paid_amount', 'payment_status']);
+
+        return view('purchasing.purchase_payments.index', compact(
+            'payments', 'summary', 'suppliers', 'paymentMethods', 'cashAccounts', 'openPos'
+        ));
+    }
 
     public function __construct(
         protected JournalService $journalService
@@ -135,7 +202,13 @@ class PurchasePaymentController extends Controller
             }
         }
 
-        $supplierInvoiceId = !empty($data['supplier_invoice_id']) ? (int) $data['supplier_invoice_id'] : null;
+        // Auto-link ke Supplier Invoice aktif milik PO ini (jika tidak dipilih manual)
+        $supplierInvoiceId = !empty($data['supplier_invoice_id'])
+            ? (int) $data['supplier_invoice_id']
+            : SupplierInvoice::where('purchase_order_id', $purchase_order->id)
+                ->whereIn('status', ['posted', 'partial_paid'])
+                ->orderBy('invoice_date')
+                ->value('id');
 
         DB::transaction(function () use ($purchase_order, $data, $amount, $request, $cashAccountId, $supplierInvoiceId) {
             $payment = PurchasePayment::create([

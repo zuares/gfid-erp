@@ -9,6 +9,7 @@ use App\Models\Item;
 use App\Models\ItemCostSnapshot;
 use App\Models\StockOpname;
 use App\Models\StockOpnameLine;
+use App\Services\Accounting\JournalService;
 use Carbon\Carbon;
 use Illuminate\Support\Facades\Auth;
 use Illuminate\Support\Facades\DB;
@@ -17,6 +18,7 @@ class StockOpnameService
 {
     public function __construct(
         protected InventoryService $inventory,
+        protected JournalService $journal,
     ) {}
 
     /**
@@ -159,7 +161,7 @@ class StockOpnameService
             throw new \RuntimeException('Stock Opname sudah difinalkan.');
         }
 
-        return DB::transaction(function () use ($opname, $reason, $notes) {
+        $adjustment = DB::transaction(function () use ($opname, $reason, $notes) {
             $user = Auth::user();
             $isOwner = $user && (($user->role ?? null) === 'owner');
 
@@ -478,6 +480,12 @@ class StockOpnameService
 
             return $adjustment;
         });
+
+        if ($adjustment?->status === InventoryAdjustment::STATUS_APPROVED) {
+            $this->journal->postInventoryAdjustment($adjustment);
+        }
+
+        return $adjustment;
     }
 
     // ==========================================================

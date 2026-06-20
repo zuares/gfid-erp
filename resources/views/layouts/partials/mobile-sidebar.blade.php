@@ -272,9 +272,12 @@
     $hasPoCreate             = $router->has('purchasing.purchase_orders.create');
     $hasGrnIndex             = $router->has('purchasing.purchase_receipts.index');
     $hasGrnCreate            = $router->has('purchasing.purchase_receipts.create');
-    $hasPurchaseReturnIndex  = $router->has('purchasing.purchase_returns.index');
-    $hasSupplierInvoiceIndex = $router->has('purchasing.supplier_invoices.index');
-    $hasPrIndex              = $router->has('purchasing.purchase_requests.index');
+    $hasPurchaseReturnIndex    = $router->has('purchasing.purchase_returns.index');
+    $hasSupplierInvoiceIndex   = $router->has('purchasing.supplier_invoices.index');
+    $hasPurchasePaymentsIndex  = $router->has('purchasing.purchase_payments.index');
+    $hasPrIndex                = $router->has('purchasing.purchase_requests.index');
+    $hasMaterialShortageIndex  = $router->has('purchasing.material_shortages.index');
+    $hasSupplierItemsIndex     = $router->has('purchasing.supplier_items.index');
 
     // Toko Online
     $hasMarketplaceCreate = $router->has('marketplace.orders.create');
@@ -345,10 +348,18 @@
     // Produksi dashboard (konsolidasi semua report)
     $hasProdDashboard = $router->has('production.dashboard');
 
+    // Rekonsiliasi gap cost (owner only)
+    $hasProdReconcile = $router->has('production.reconcile.index');
+
     // Keuangan (Akuntansi)
     $hasCashExpensesIndex = $router->has('accounting.cash-expenses.index');
     $hasCashBasisReportIndex = $router->has('accounting.cash-basis-report.index');
     $hasCashReceiptsIndex = $router->has('accounting.cash-receipts.index');
+    $hasMarketplacePayoutsIndex = $router->has('accounting.marketplace-payouts.index');
+    $hasApReportIndex           = $router->has('accounting.ap-report.index');
+    $hasTrialBalanceIndex       = $router->has('accounting.trial-balance.index');
+    $hasProfitLossIndex         = $router->has('accounting.profit-loss.index');
+    $hasBukuBesarIndex          = $router->has('accounting.buku-besar.index');
     $hasJournalsIndex = $router->has('accounting.journals.index');
     $hasAccountsIndex = $router->has('accounting.accounts.index');
     $hasOpeningBalancesIndex = $router->has('accounting.opening-balances.index');
@@ -374,6 +385,7 @@
 
     if (!$canModule('purchasing')) {
         $hasPoIndex = $hasPoCreate = $hasGrnIndex = $hasGrnCreate = false;
+        $hasSupplierItemsIndex = false;
     }
 
     if (!$canModule('marketplace')) {
@@ -478,6 +490,7 @@
         request()->routeIs('accounting.cash-basis-report.*') ||
         request()->routeIs('accounting.cash-expenses.*') ||
         request()->routeIs('accounting.cash-receipts.*') ||
+        request()->routeIs('accounting.marketplace-payouts.*') ||
         request()->routeIs('accounting.opening-balances.*') ||
         request()->routeIs('accounting.journals.*') ||
         request()->routeIs('accounting.accounts.*');
@@ -908,6 +921,24 @@
                         </li>
                     @endif
 
+                    @if ($hasMaterialShortageIndex ?? false)
+                        <li class="mb-1">
+                            <a href="{{ route('purchasing.material_shortages.index') }}"
+                               class="mobile-sidebar-link {{ request()->routeIs('purchasing.material_shortages.*') ? 'active' : '' }}">
+                                <span class="icon">!</span><span>Kekurangan Material</span>
+                            </a>
+                        </li>
+                    @endif
+
+                    @if ($hasSupplierItemsIndex ?? false)
+                        <li class="mb-1">
+                            <a href="{{ route('purchasing.supplier_items.index') }}"
+                               class="mobile-sidebar-link {{ request()->routeIs('purchasing.supplier_items.*') ? 'active' : '' }}">
+                                <span class="icon">≡</span><span>Pemasok Barang</span>
+                            </a>
+                        </li>
+                    @endif
+
                     <li class="mb-1">
                         <button class="mobile-sidebar-link mobile-sidebar-toggle {{ $poOpen ? 'is-open' : '' }}"
                                 type="button"
@@ -965,6 +996,12 @@
                                 <a href="{{ route('purchasing.supplier_invoices.index') }}"
                                    class="mobile-sidebar-link mobile-sidebar-link-sub {{ request()->routeIs('purchasing.supplier_invoices.*') ? 'active' : '' }}">
                                     <span class="icon">🧾</span><span>Faktur Supplier</span>
+                                </a>
+                            @endif
+                            @if (($hasPurchasePaymentsIndex ?? false) && $isOwner)
+                                <a href="{{ route('purchasing.purchase_payments.index') }}"
+                                   class="mobile-sidebar-link mobile-sidebar-link-sub {{ request()->routeIs('purchasing.purchase_payments.*') ? 'active' : '' }}">
+                                    <span class="icon">💸</span><span>Bayar Supplier</span>
                                 </a>
                             @endif
                         </div>
@@ -1345,6 +1382,13 @@
                                 </a>
                             @endif
 
+                            @if ($hasProdReconcile && $isOwner)
+                                <a href="{{ route('production.reconcile.index') }}"
+                                   class="mobile-sidebar-link mobile-sidebar-link-sub {{ request()->routeIs('production.reconcile.*') ? 'active' : '' }}">
+                                    <span class="icon">🔍</span><span>Rekonsiliasi Gap Cost</span>
+                                </a>
+                            @endif
+
                             <div class="mobile-sidebar-section-label" style="margin-top:.55rem;">Alur Produksi</div>
 
                             @if ($hasProdCuttingJobsIndex)
@@ -1449,6 +1493,13 @@
                                 </a>
                             @endif
 
+                            @if ($hasMarketplacePayoutsIndex)
+                                <a href="{{ route('accounting.marketplace-payouts.index') }}"
+                                   class="mobile-sidebar-link mobile-sidebar-link-sub {{ request()->routeIs('accounting.marketplace-payouts.*') ? 'active' : '' }}">
+                                    <span class="icon">🛒</span><span>Penerimaan Marketplace</span>
+                                </a>
+                            @endif
+
                             @if ($hasJournalsIndex)
                                 <a href="{{ route('accounting.journals.index') }}"
                                    class="mobile-sidebar-link mobile-sidebar-link-sub {{ request()->routeIs('accounting.journals.*') ? 'active' : '' }}">
@@ -1458,8 +1509,32 @@
 
                             @if ($hasAccountsIndex)
                                 <a href="{{ route('accounting.accounts.index') }}"
-                                   class="mobile-sidebar-link mobile-sidebar-link-sub {{ request()->routeIs('accounting.accounts.*') ? 'active' : '' }}">
+                                   class="mobile-sidebar-link mobile-sidebar-link-sub {{ request()->routeIs('accounting.accounts.index') ? 'active' : '' }}">
                                     <span class="icon">🗂️</span><span>Akun (COA)</span>
+                                </a>
+                            @endif
+                            @if ($hasBukuBesarIndex ?? false)
+                                <a href="{{ route('accounting.buku-besar.index') }}"
+                                   class="mobile-sidebar-link mobile-sidebar-link-sub {{ request()->routeIs('accounting.buku-besar.*') || request()->routeIs('accounting.accounts.ledger') ? 'active' : '' }}">
+                                    <span class="icon">📒</span><span>Buku Besar</span>
+                                </a>
+                            @endif
+                            @if ($hasTrialBalanceIndex ?? false)
+                                <a href="{{ route('accounting.trial-balance.index') }}"
+                                   class="mobile-sidebar-link mobile-sidebar-link-sub {{ request()->routeIs('accounting.trial-balance.*') ? 'active' : '' }}">
+                                    <span class="icon">⚖️</span><span>Neraca Saldo</span>
+                                </a>
+                            @endif
+                            @if ($hasProfitLossIndex ?? false)
+                                <a href="{{ route('accounting.profit-loss.index') }}"
+                                   class="mobile-sidebar-link mobile-sidebar-link-sub {{ request()->routeIs('accounting.profit-loss.*') ? 'active' : '' }}">
+                                    <span class="icon">📈</span><span>Laba Rugi</span>
+                                </a>
+                            @endif
+                            @if ($hasApReportIndex ?? false)
+                                <a href="{{ route('accounting.ap-report.index') }}"
+                                   class="mobile-sidebar-link mobile-sidebar-link-sub {{ request()->routeIs('accounting.ap-report.*') ? 'active' : '' }}">
+                                    <span class="icon">🧾</span><span>Hutang Dagang</span>
                                 </a>
                             @endif
                         </div>

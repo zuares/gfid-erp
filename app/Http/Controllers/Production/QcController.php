@@ -9,18 +9,23 @@ use App\Models\InventoryAdjustment;
 use App\Models\InventoryAdjustmentLine;
 use App\Models\QcResult;
 use App\Models\SewingReturn;
+use App\Services\Accounting\JournalService;
 use App\Services\Production\CuttingService;
 use App\Services\Production\QcService;
+use App\Services\Purchasing\MaterialShortageService;
 use Illuminate\Http\RedirectResponse;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Auth;
 use Illuminate\Support\Facades\DB;
+use Illuminate\Support\Facades\Log;
 
 class QcController extends Controller
 {
     public function __construct(
         protected QcService $qc,
         protected CuttingService $cutting,
+        protected JournalService $journal,
+        protected MaterialShortageService $materialShortages,
     ) {}
 
     /**
@@ -171,6 +176,15 @@ class QcController extends Controller
                 qcDate: $validated['qc_date'],
             );
 
+            try {
+                $this->journal->postCuttingWip($cuttingJob->fresh(), $validated['qc_date']);
+            } catch (\Throwable $journalError) {
+                Log::warning('Gagal membuat jurnal cutting_wip', [
+                    'cutting_job_id' => $cuttingJob->id,
+                    'message' => $journalError->getMessage(),
+                ]);
+            }
+
         } catch (\Throwable $e) {
             return back()
                 ->withInput()
@@ -183,9 +197,12 @@ class QcController extends Controller
             'updated_by' => \Illuminate\Support\Facades\Auth::id(),
         ]);
 
+        $shortageCount = $this->materialShortages->rows()->where('has_shortage', true)->count();
+
         return redirect()
             ->route('production.cutting_jobs.show', $cuttingJob)
-            ->with('success', 'QC Cutting berhasil disimpan & WIP-CUT sudah dibuat.');
+            ->with('success', 'QC Cutting berhasil disimpan & WIP-CUT sudah dibuat.')
+            ->with('material_shortage_count', $shortageCount);
     }
 
     public function quickOkCutting(CuttingJob $cuttingJob): RedirectResponse
@@ -232,6 +249,15 @@ class QcController extends Controller
                 job: $cuttingJob->fresh('bundles'),
                 qcDate: $qcDate,
             );
+
+            try {
+                $this->journal->postCuttingWip($cuttingJob->fresh(), $qcDate);
+            } catch (\Throwable $journalError) {
+                Log::warning('Gagal membuat jurnal cutting_wip', [
+                    'cutting_job_id' => $cuttingJob->id,
+                    'message' => $journalError->getMessage(),
+                ]);
+            }
         } catch (\Throwable $e) {
             return back()
                 ->with('error', 'Selesai Cutting gagal: ' . $e->getMessage());
@@ -242,9 +268,12 @@ class QcController extends Controller
             'updated_by' => Auth::id(),
         ]);
 
+        $shortageCount = $this->materialShortages->rows()->where('has_shortage', true)->count();
+
         return redirect()
             ->route('production.cutting_jobs.show', $cuttingJob)
-            ->with('success', 'Cutting selesai. Semua bundle otomatis OK dan sudah masuk WIP-CUT / siap jahit.');
+            ->with('success', 'Cutting selesai. Semua bundle otomatis OK dan sudah masuk WIP-CUT / siap jahit.')
+            ->with('material_shortage_count', $shortageCount);
     }
 
     public function cancelCutting(CuttingJob $cuttingJob): RedirectResponse
@@ -256,6 +285,15 @@ class QcController extends Controller
 
         try {
             $this->qc->cancelCuttingQc($cuttingJob);
+
+            try {
+                $this->journal->voidBySource(JournalService::SRC_CUTTING_WIP, (int) $cuttingJob->id, "VOID QC Cutting {$cuttingJob->code}");
+            } catch (\Throwable $journalError) {
+                Log::warning('Gagal void jurnal cutting_wip', [
+                    'cutting_job_id' => $cuttingJob->id,
+                    'message' => $journalError->getMessage(),
+                ]);
+            }
         } catch (\Throwable $e) {
             $payload = $this->buildCancelQcUiPayload($e, $cuttingJob);
 

@@ -599,6 +599,135 @@
                             {{ number_format($totalProcessed, 2, ',', '.') }}</span>
                     </div>
                 @endif
+
+                @php
+                    $adj         = $pickup->physicalAdjustment ?? null;
+                    $adjStatus   = $adj?->status;
+                    $adjResolved = $adjResolved ?? false;
+                    $allStockNow = $allStockNowAvailable ?? false;
+                    $canEdit     = $canEditSupplies ?? false;
+                    $shortages   = $supplyShortages ?? collect();
+                @endphp
+
+                {{-- ── ADJUSTMENT SUDAH APPROVED → shortage resolved ── --}}
+                @if ($adjResolved)
+                <div class="mt-3" style="background:rgba(22,163,74,.08);border:1px solid rgba(22,163,74,.35);border-radius:10px;padding:.65rem .9rem;">
+                    <div class="d-flex justify-content-between align-items-center gap-2 flex-wrap">
+                        <div style="font-size:.82rem;">
+                            ✅ <strong>Kelengkapan sudah diselesaikan</strong>
+                            <div style="font-size:.75rem;color:var(--muted-foreground,#6b7280);margin-top:.1rem;">
+                                Adjustment <strong>{{ $adj->code }}</strong> sudah disetujui — stok masuk dan kelengkapan tercatat.
+                            </div>
+                        </div>
+                        <a href="{{ route('inventory.adjustments.show', $adj) }}"
+                           class="btn btn-sm btn-success" style="white-space:nowrap;">
+                            Lihat Adjustment →
+                        </a>
+                    </div>
+                </div>
+
+                {{-- ── ADA SHORTAGE ── --}}
+                @elseif ($shortages->isNotEmpty())
+                <div class="mt-3">
+
+                    {{-- Stok sudah ada di RM → hint update kelengkapan --}}
+                    @if ($allStockNow)
+                    <div style="background:rgba(59,130,246,.08);border:1px solid rgba(59,130,246,.35);border-radius:10px;padding:.65rem .9rem;">
+                        <div class="d-flex justify-content-between align-items-start gap-2 flex-wrap">
+                            <div>
+                                <div style="font-weight:700;font-size:.85rem;margin-bottom:.2rem;">
+                                    📦 Stok sudah tersedia di gudang RM
+                                </div>
+                                <div style="font-size:.78rem;color:var(--muted-foreground,#6b7280);">
+                                    @foreach ($shortages as $sh)
+                                        <span class="me-2">
+                                            <strong>{{ $sh->material?->code ?? '-' }}</strong>
+                                            kurang {{ number_format($sh->shortage_qty, 2, ',', '.') }} {{ $sh->uom }}
+                                            · stok RM: <strong>{{ number_format($sh->rm_stock_qty ?? 0, 2, ',', '.') }}</strong>
+                                        </span>
+                                    @endforeach
+                                </div>
+                                <div style="font-size:.75rem;color:var(--muted-foreground,#6b7280);margin-top:.25rem;">
+                                    GRN sudah masuk — perbarui kelengkapan untuk menyelesaikan.
+                                </div>
+                            </div>
+                            <div class="d-flex gap-2 flex-wrap">
+                                @if ($canEdit)
+                                    <a href="{{ route('production.sewing.pickups.supplies.edit', $pickup) }}"
+                                       class="btn btn-sm btn-primary" style="white-space:nowrap;">
+                                        ✏️ Perbarui Kelengkapan
+                                    </a>
+                                @endif
+                            </div>
+                        </div>
+                    </div>
+
+                    {{-- Stok belum ada → shortage biasa --}}
+                    @else
+                    <div style="background:rgba(234,179,8,.1);border:1px solid rgba(234,179,8,.4);border-radius:10px;padding:.65rem .9rem;">
+                        <div class="d-flex justify-content-between align-items-start gap-2 flex-wrap">
+                            <div>
+                                <div style="font-weight:700;font-size:.85rem;margin-bottom:.25rem;">
+                                    ⚠️ Kelengkapan kurang
+                                </div>
+                                <div style="font-size:.8rem;color:var(--muted-foreground,#6b7280);">
+                                    @foreach ($shortages as $sh)
+                                        <span class="me-2">
+                                            <strong>{{ $sh->material?->code ?? 'Material' }}</strong>
+                                            kurang <strong>{{ number_format($sh->shortage_qty, 2, ',', '.') }} {{ $sh->uom }}</strong>
+                                            @if(isset($sh->rm_stock_qty) && $sh->rm_stock_qty > 0)
+                                                <span style="color:#92400e;">(RM: {{ number_format($sh->rm_stock_qty, 2, ',', '.') }})</span>
+                                            @endif
+                                        </span>
+                                    @endforeach
+                                </div>
+                            </div>
+                            @if (Route::has('purchasing.material_shortages.index'))
+                                <a href="{{ route('purchasing.material_shortages.index') }}"
+                                    class="btn btn-sm btn-outline-warning" style="white-space:nowrap;">
+                                    📋 Cek PR/PO Material
+                                </a>
+                            @endif
+                        </div>
+                    </div>
+
+                    {{-- Status adjustment --}}
+                    @if ($adj)
+                    @php
+                        $adjConfig = match($adjStatus) {
+                            'pending' => ['bg'=>'rgba(59,130,246,.08)', 'border'=>'rgba(59,130,246,.3)', 'icon'=>'⏳', 'label'=>'Menunggu persetujuan Owner', 'btnClass'=>'btn-outline-primary'],
+                            default   => ['bg'=>'rgba(239,68,68,.08)', 'border'=>'rgba(239,68,68,.3)', 'icon'=>'❌', 'label'=>'Ditolak', 'btnClass'=>'btn-outline-danger'],
+                        };
+                    @endphp
+                    <div style="background:{{ $adjConfig['bg'] }};border:1px solid {{ $adjConfig['border'] }};border-radius:10px;padding:.6rem .9rem;margin-top:.5rem;">
+                        <div class="d-flex justify-content-between align-items-center gap-2 flex-wrap">
+                            <div style="font-size:.82rem;">
+                                {{ $adjConfig['icon'] }}
+                                <strong>Adjustment {{ $adj->code }}</strong> — {{ $adjConfig['label'] }}
+                                @if($adjStatus === 'pending')
+                                    <div style="font-size:.75rem;color:var(--muted-foreground,#6b7280);margin-top:.1rem;">
+                                        Material fisik ada tapi belum GRN. Owner approve → stok masuk.
+                                    </div>
+                                @endif
+                            </div>
+                            <a href="{{ route('inventory.adjustments.show', $adj) }}"
+                               class="btn btn-sm {{ $adjConfig['btnClass'] }}" style="white-space:nowrap;">
+                                Lihat Adjustment →
+                            </a>
+                        </div>
+                    </div>
+                    @else
+                    <div style="background:rgba(148,163,184,.08);border:1px solid rgba(148,163,184,.25);border-radius:10px;padding:.6rem .9rem;margin-top:.5rem;font-size:.78rem;color:var(--muted-foreground,#6b7280);">
+                        💡 Jika material sudah ada fisik tapi belum GRN — edit kelengkapan dan input qty tersedia, sistem akan buat adjustment pending untuk disetujui Owner.
+                        @if ($canEdit)
+                            <a href="{{ route('production.sewing.pickups.supplies.edit', $pickup) }}" class="ms-2">Edit Kelengkapan →</a>
+                        @endif
+                    </div>
+                    @endif
+                    @endif {{-- /allStockNow --}}
+
+                </div>
+                @endif {{-- /shortage/resolved --}}
             </div>
         </div>
 
@@ -688,6 +817,7 @@
                                 <th class="text-end" style="width:90px;">DP</th>
                                 <th class="text-end" style="width:90px;">Adj</th>
                                 <th class="text-end" style="width:120px;">Sisa</th>
+                                <th class="text-end" style="width:100px;">Upah/pcs</th>
                                 <th style="width:110px;">Status</th>
                                 <th style="width:90px;">Aksi</th>
                             </tr>
@@ -784,6 +914,15 @@
                                                     style="width: {{ $percentLine }}%;"></div>
                                             </div>
                                         </div>
+                                    </td>
+
+                                    <td class="td-desktop-only text-end">
+                                        @php $wageVal = (float) ($line->wage_per_pcs ?? 0); @endphp
+                                        @if ($wageVal > 0)
+                                            {{ number_format($wageVal, 0, ',', '.') }}
+                                        @else
+                                            <span class="text-muted">—</span>
+                                        @endif
                                     </td>
 
                                     <td class="td-desktop-only">

@@ -13,20 +13,27 @@
 <style>
     .pr-card {
         background: var(--card);
-        border-radius: 14px;
+        border-radius: 18px;
         border: 1px solid var(--line);
-        margin-bottom: .85rem;
+        margin-bottom: 1rem;
+        overflow: visible;
+    }
+    .pr-card .card-body {
+        padding: 1.25rem 1.5rem 1.35rem;
+    }
+    .pr-card .card-header {
+        padding: .9rem 1.5rem;
     }
     .pr-label {
         font-size: .75rem;
-        font-weight: 600;
+        font-weight: 700;
         text-transform: uppercase;
         letter-spacing: .06em;
         color: var(--muted);
         margin-bottom: .25rem;
     }
     .pr-field {
-        border-radius: 8px;
+        border-radius: 12px;
         font-size: .9rem;
     }
     .pr-lines-table thead th {
@@ -39,7 +46,7 @@
     }
     .pr-lines-table tbody td {
         vertical-align: middle;
-        padding: .45rem .5rem;
+        padding: .65rem 1rem;
     }
     .pr-col-no { width: 4%; min-width: 32px; }
     .pr-col-qty { width: 12%; min-width: 90px; }
@@ -48,6 +55,8 @@
     .pr-col-action { width: 5%; min-width: 48px; }
 
     @media (max-width: 768px) {
+        .pr-card .card-body { padding: 1rem; }
+        .pr-card .card-header { padding: .8rem 1rem; }
         .pr-lines-table thead { display: none; }
         .pr-lines-table tbody tr {
             display: grid;
@@ -59,7 +68,7 @@
                 "linenotes linenotes"
                 "action action";
             border: 1px solid var(--line);
-            border-radius: 10px;
+            border-radius: 14px;
             margin-bottom: .6rem;
             padding: .5rem;
         }
@@ -90,9 +99,9 @@
             </div>
 
             <div class="col-12 col-md-9">
-                <div class="pr-label">Supplier <span class="fw-normal text-muted">(opsional)</span></div>
+                <div class="pr-label">Supplier Awal</div>
                 <select name="supplier_id" class="form-select pr-field @error('supplier_id') is-invalid @enderror">
-                    <option value="">— Belum ditentukan —</option>
+                    <option value="">Otomatis per barang / kategori</option>
                     @foreach ($suppliers as $sup)
                         <option value="{{ $sup->id }}"
                             @selected(old('supplier_id', $pr?->supplier_id ?? null) == $sup->id)>
@@ -104,6 +113,14 @@
                     <div class="invalid-feedback">{{ $message }}</div>
                 @enderror
             </div>
+
+            <div class="col-12">
+                <div class="pr-label">Catatan <span class="fw-normal text-muted">(opsional)</span></div>
+                <textarea name="notes" rows="2"
+                    class="form-control pr-field @error('notes') is-invalid @enderror"
+                    placeholder="Kebutuhan khusus atau informasi tambahan">{{ old('notes', $pr?->notes ?? '') }}</textarea>
+                @error('notes')<div class="invalid-feedback">{{ $message }}</div>@enderror
+            </div>
         </div>
     </div>
 </div>
@@ -112,7 +129,7 @@
 <div class="pr-card">
     <div class="card-header d-flex justify-content-between align-items-center"
         style="background:transparent; border-bottom:1px solid var(--line); padding:.85rem 1rem;">
-        <div class="fw-semibold" style="font-size:.95rem;">Detail Item yang Diminta</div>
+        <div class="fw-semibold" style="font-size:.95rem;">Detail Barang</div>
         <button type="button" id="btn-add-pr-line" class="btn btn-sm btn-outline-primary" style="border-radius:12px;">
             + Tambah Baris
         </button>
@@ -139,7 +156,7 @@
                         $lineItemId   = $line['item_id'] ?? null;
                         $lineItemCode = $line['item']['code'] ?? null;
                         $lineItemName = $line['item']['name'] ?? null;
-                        $lineItemDisp = trim(($lineItemCode ?? '') . ($lineItemName ? ' — ' . $lineItemName : ''));
+                        $lineItemDisp = $lineItemName ?: $lineItemCode;
 
                         $qtyRaw     = $line['qty'] ?? '';
                         $qtyDisplay = ($qtyRaw !== '' && $qtyRaw !== null)
@@ -159,7 +176,7 @@
                                 :idValue="$lineItemId"
                                 :displayValue="$lineItemDisp"
                                 variant="mini"
-                                displayMode="code-name"
+                                displayMode="name"
                                 :minChars="1" />
                             @error("lines.$i.item_id")
                                 <div class="text-danger small">{{ $message }}</div>
@@ -215,8 +232,9 @@
                                 :items="$items"
                                 idName="lines[0][item_id]"
                                 variant="mini"
-                                displayMode="code-name"
-                                placeholder="Kode / nama barang"
+                                displayMode="name"
+                                placeholder="Cari nama barang"
+                                :autofocus="true"
                                 :minChars="1" />
                         </td>
 
@@ -256,19 +274,6 @@
     <div class="text-center py-2 d-md-none">
         <button type="button" id="btn-add-pr-line-bottom" class="btn btn-sm btn-outline-primary"
             style="border-radius:12px;">+ Tambah Baris</button>
-    </div>
-</div>
-
-{{-- NOTES --}}
-<div class="pr-card">
-    <div class="card-body">
-        <div class="pr-label">Catatan PR <span class="fw-normal text-muted">(opsional)</span></div>
-        <textarea name="notes" rows="3"
-            class="form-control pr-field @error('notes') is-invalid @enderror"
-            placeholder="Keterangan kebutuhan, urgensi, dsb.">{{ old('notes', $pr?->notes ?? '') }}</textarea>
-        @error('notes')
-            <div class="invalid-feedback">{{ $message }}</div>
-        @enderror
     </div>
 </div>
 

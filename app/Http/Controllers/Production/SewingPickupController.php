@@ -10,14 +10,19 @@ use App\Models\Item;
 use App\Models\ItemBom;
 use App\Models\ItemBomLine;
 use App\Models\ItemRole;
+use App\Models\InventoryAdjustment;
 use App\Models\SewingPickup;
 use App\Models\SewingPickupLine;
 use App\Models\SewingPickupLineSupplyLine;
 use App\Models\SewingPickupSupplyLine;
 use App\Models\Warehouse;
+use App\Services\Accounting\JournalService;
 use App\Services\Inventory\InventoryService;
+use App\Services\Payroll\PieceRateService;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\DB;
+use Illuminate\Support\Facades\Log;
+use Illuminate\Support\Facades\Route;
 use Illuminate\Support\Facades\Schema;
 use Illuminate\Validation\ValidationException;
 use Illuminate\View\View;
@@ -26,6 +31,7 @@ class SewingPickupController extends Controller
 {
     public function __construct(
         protected InventoryService $inventory,
+        protected JournalService $journal,
     ) {}
 
     public function index(Request $request)
@@ -68,6 +74,8 @@ class SewingPickupController extends Controller
             'operator',
             'lines.bundle.finishedItem',
             'lines.bundle.cuttingJob.lot.item',
+            'supplyLines.material',
+            'physicalAdjustment.lines.item',
         ]);
 
         $epsilon = 0.000001;
@@ -107,19 +115,57 @@ class SewingPickupController extends Controller
 
         $partialReturnedCount = $totalBundles - $notReturnedCount - $fullReturnedCount;
 
+        $supplyShortages = $pickup->supplyLines
+            ->filter(fn($line) => (float) $line->issued_qty + $epsilon < (float) $line->required_qty)
+            ->values();
+
+        // Cek stok RM real-time untuk setiap shortage — supaya view bisa tahu apakah
+        // stok sudah ada tapi belum di-issue, atau memang belum ada sama sekali.
+        $adj = $pickup->physicalAdjustment;
+        $adjResolved = $adj && $adj->status === 'approved';
+
+        if ($supplyShortages->isNotEmpty() && !$adjResolved) {
+            $rmWarehouseId = Warehouse::where('code', 'RM')->value('id');
+            if ($rmWarehouseId) {
+                $supplyShortages->each(function ($line) use ($rmWarehouseId) {
+                    $matId = (int) ($line->material_item_id ?? 0);
+                    if (!$matId) { $line->rm_stock_qty = 0; return; }
+                    $line->rm_stock_qty = \App\Models\InventoryStock::query()
+                        ->where('warehouse_id', $rmWarehouseId)
+                        ->where('item_id', $matId)
+                        ->value('qty') ?? 0;
+                    $line->rm_stock_qty = (float) $line->rm_stock_qty;
+                    $line->rm_stock_ok  = $line->rm_stock_qty >= (float) $line->shortage_qty;
+                });
+            }
+        }
+
+        // Apakah semua shortage sebenarnya sudah ada stoknya di RM?
+        $allStockNowAvailable = !$adjResolved
+            && $supplyShortages->isNotEmpty()
+            && $supplyShortages->every(fn($l) => (bool) ($l->rm_stock_ok ?? false));
+
+        // Edit kelengkapan route tersedia?
+        $canEditSupplies = in_array($pickup->status ?? '', ['draft', 'posted'])
+            && Route::has('production.sewing.pickups.supplies.edit');
+
         return view('production.sewing_pickups.show', [
-            'pickup' => $pickup,
-            'totalBundles' => $totalBundles,
-            'totalQtyPickup' => $totalQtyPickup,
-            'totalReturnOk' => $totalReturnOk,
-            'totalReturnReject' => $totalReturnReject,
-            'totalDirectPick' => $totalDirectPick,
-            'totalProgressAdjusted' => $totalProgressAdjusted,
-            'totalProgressAll' => $totalProgressAll,
-            'overallProgress' => $overallProgress,
-            'notReturnedCount' => $notReturnedCount,
+            'pickup'               => $pickup,
+            'totalBundles'         => $totalBundles,
+            'totalQtyPickup'       => $totalQtyPickup,
+            'totalReturnOk'        => $totalReturnOk,
+            'totalReturnReject'    => $totalReturnReject,
+            'totalDirectPick'      => $totalDirectPick,
+            'totalProgressAdjusted'=> $totalProgressAdjusted,
+            'totalProgressAll'     => $totalProgressAll,
+            'overallProgress'      => $overallProgress,
+            'notReturnedCount'     => $notReturnedCount,
             'partialReturnedCount' => $partialReturnedCount,
-            'fullReturnedCount' => $fullReturnedCount,
+            'fullReturnedCount'    => $fullReturnedCount,
+            'supplyShortages'      => $supplyShortages,
+            'adjResolved'          => $adjResolved,
+            'allStockNowAvailable' => $allStockNowAvailable,
+            'canEditSupplies'      => $canEditSupplies,
         ]);
     }
 
@@ -203,7 +249,7 @@ class SewingPickupController extends Controller
             'lines.*.qty_bundle.required' => 'Qty pickup wajib diisi.',
         ]);
 
-        $pickup = DB::transaction(function () use ($validated) {
+        $pickup = DB::transaction(function () use ($validated, $request) {
 
             $wipCutWarehouseId = Warehouse::where('code', 'WIP-CUT')->value('id');
             if (!$wipCutWarehouseId) {
@@ -322,16 +368,50 @@ class SewingPickupController extends Controller
                     itemId: $bundle->finished_item_id,
                 );
                 if ($unitCostPerPiece <= 0) {
-                    $unitCostPerPiece = 0;
+                    $itemCode = Item::query()->whereKey($bundle->finished_item_id)->value('code');
+                    throw ValidationException::withMessages([
+                        'lines' => 'Harga pokok WIP ' . ($itemCode ?: "item #{$bundle->finished_item_id}")
+                            . ' belum tersedia. Perbaiki cost hasil cutting sebelum pickup jahit.',
+                    ]);
                 }
 
-                // 🔹 Simpan detail sewing pickup (simpan unit_cost)
+                // 🔹 Ambil upah jahit per pcs dari PieceRateService — WAJIB diset sebelum pickup.
+                // Kalau rate belum diisi, lempar ValidationException supaya user tahu harus setup dulu.
+                $itemCode = Item::query()->whereKey($bundle->finished_item_id)->value('code') ?? "item #{$bundle->finished_item_id}";
+                try {
+                    $wagePerPcs = (float) app(PieceRateService::class)->requireRatePerPcs(
+                        module: 'sewing',
+                        employeeId: (int) $validated['operator_id'],
+                        itemId: (int) $bundle->finished_item_id,
+                        date: $date,
+                    );
+                } catch (ValidationException $e) {
+                    // Rate belum diset — blokir pickup & informasikan ke user.
+                    $operator = Employee::query()->whereKey($validated['operator_id'])->value('name') ?? "operator #{$validated['operator_id']}";
+                    throw ValidationException::withMessages([
+                        'lines' => "Upah jahit untuk {$operator} — {$itemCode} belum diset. "
+                            . "Isi dulu di menu Payroll → Piece Rate sebelum membuat Ambil Jahit.",
+                    ]);
+                } catch (\Throwable $e) {
+                    // Error tak terduga — log tapi jangan blokir produksi.
+                    Log::error("SWP {$code}: gagal lookup wage rate untuk {$itemCode} — upah=0.", [
+                        'error' => $e->getMessage(),
+                    ]);
+                    $wagePerPcs = 0.0;
+                }
+
+                // unit_cost WIP-SEW = material cost SAJA (upah dicatat saat Setor Jahit OK)
+                // wage_per_pcs disimpan di pickup line untuk dipakai di SewingReturnController
+                $unitCostMaterial = $unitCostPerPiece;
+
+                // 🔹 Simpan detail sewing pickup (simpan unit_cost + wage_per_pcs)
                 $pickupLine = SewingPickupLine::create([
                     'sewing_pickup_id' => $pickup->id,
                     'cutting_job_bundle_id' => $bundle->id,
                     'finished_item_id' => $bundle->finished_item_id,
                     'qty_bundle' => $qty,
-                    'unit_cost' => $unitCostPerPiece, // ✅ simpan cost
+                    'unit_cost' => $unitCostMaterial, // ✅ material only; upah di wage_per_pcs
+                    'wage_per_pcs' => $wagePerPcs,    // ✅ dipakai saat setor untuk nilai WIP-FIN
                     'status' => 'in_progress',
                 ]);
 
@@ -377,7 +457,8 @@ class SewingPickupController extends Controller
                     cuttingJobBundleId: $bundle->id,
                 );
 
-                // 2️⃣ IN ke gudang sewing (WIP-SEW)
+                // 2️⃣ IN ke gudang sewing (WIP-SEW) — material cost SAJA
+                // Upah jahit (wage_per_pcs) akan ditambahkan ke WIP-FIN saat Setor Jahit OK
                 $this->inventory->stockIn(
                     warehouseId: $sewingWarehouseId,
                     itemId: $bundle->finished_item_id,
@@ -385,9 +466,9 @@ class SewingPickupController extends Controller
                     date: $date,
                     sourceType: SewingPickup::class,
                     sourceId: $pickup->id,
-                    notes: $notes,
+                    notes: $notes . ($wagePerPcs > 0 ? " [upah @{$wagePerPcs}/pcs diakui saat setor]" : ''),
                     lotId: null,
-                    unitCost: $unitCostPerPiece,
+                    unitCost: $unitCostMaterial,
                     affectLotCost: false,
                     cuttingJobBundleId: $bundle->id,
                 );
@@ -412,9 +493,36 @@ class SewingPickupController extends Controller
                 pickupLines: $createdPickupLines,
                 submittedPayload: $validated['supplies_checklist'] ?? null,
             );
+            $this->syncLineSupplyIssuedFromAggregate($pickup);
+            $this->createSupplyPhysicalAdjustment(
+                $pickup,
+                $validated['supplies_checklist'] ?? null,
+                (int) $request->user()->id,
+            );
+
+            $this->issueSewingPickupSupplies($pickup);
+            $this->allocateSewingSupplyCostToPickupWip($pickup);
 
             return $pickup;
         });
+
+        try {
+            $this->journal->postSewingPickup($pickup);
+        } catch (\Throwable $e) {
+            Log::warning('Gagal membuat jurnal sewing pickup', [
+                'sewing_pickup_id' => $pickup->id,
+                'message' => $e->getMessage(),
+            ]);
+        }
+
+        try {
+            $this->journal->postSewingPickupSupply($pickup);
+        } catch (\Throwable $e) {
+            Log::warning('Gagal membuat jurnal kelengkapan sewing pickup', [
+                'sewing_pickup_id' => $pickup->id,
+                'message' => $e->getMessage(),
+            ]);
+        }
 
         if ($request->input('print_after_save') === '1') {
             $paperWidth = in_array($request->input('paper_width'), ['50mm','58mm','80mm','100mm'])
@@ -425,9 +533,123 @@ class SewingPickupController extends Controller
                 ->with('paper_width', $paperWidth);
         }
 
+        $adjustment = InventoryAdjustment::query()
+            ->where('reference_type', SewingPickup::class)
+            ->where('reference_id', $pickup->id)
+            ->where('status', InventoryAdjustment::STATUS_PENDING)
+            ->first();
+
+        $message = $adjustment
+            ? "Pickup berhasil dibuat. Kelengkapan menyusul tercatat di {$adjustment->code} dan menunggu approval gudang."
+            : 'Sewing pickup berhasil dibuat. Stok sudah dipindahkan dari WIP-CUT ke gudang sewing.';
+
         return redirect()
             ->route('production.sewing.returns.create')
-            ->with('success', 'Sewing pickup berhasil dibuat. Stok sudah dipindahkan dari WIP-CUT ke gudang sewing.');
+            ->with('success', $message);
+    }
+
+    private function issueSewingPickupSupplies(SewingPickup $pickup): void
+    {
+        $rmWarehouseId = Warehouse::where('code', 'RM')->value('id');
+        if (!$rmWarehouseId) {
+            throw ValidationException::withMessages([
+                'supplies' => 'Gudang RM belum dikonfigurasi. Bahan pendukung jahit belum bisa dicek.',
+            ]);
+        }
+
+        $pickup->loadMissing('supplyLines.material');
+
+        $lines = $pickup->supplyLines
+            ->filter(fn($line) => (float) ($line->issued_qty ?? 0) > 0)
+            ->values();
+
+        if ($lines->isEmpty()) {
+            return;
+        }
+
+        foreach ($lines as $line) {
+            $issuedQty = (float) ($line->issued_qty ?? 0);
+            $material  = $line->material;
+            $unitCost  = $this->inventory->getItemIncomingUnitCost(
+                warehouseId: (int) $rmWarehouseId,
+                itemId: (int) $line->material_item_id,
+            );
+
+            $pendingCost = $unitCost <= 0;
+
+            if ($pendingCost) {
+                // GRN belum masuk — catat stok keluar dengan cost 0, tandai pending_cost.
+                // Operator TIDAK diblokir. Admin rekonsiliasi via dashboard setelah GRN masuk.
+                Log::warning("SWP {$pickup->code}: kelengkapan {$material?->code} belum ada GRN/cost — dicatat pending.", [
+                    'sewing_pickup_id'  => $pickup->id,
+                    'material_item_id'  => $line->material_item_id,
+                ]);
+            }
+
+            // Tandai line sebagai pending_cost agar muncul di dashboard rekonsiliasi
+            $line->forceFill([
+                'pending_cost'    => $pendingCost,
+                'issued_unit_cost'=> $pendingCost ? null : $unitCost,
+            ])->save();
+
+            $this->inventory->stockOut(
+                warehouseId: (int) $rmWarehouseId,
+                itemId: (int) $line->material_item_id,
+                qty: $issuedQty,
+                date: $pickup->date,
+                sourceType: JournalService::SRC_SEWING_PICKUP_SUPPLY,
+                sourceId: (int) $pickup->id,
+                notes: "Kelengkapan jahit {$pickup->code} - " . ($material?->code ?: 'material')
+                    . ($pendingCost ? ' [pending GRN]' : ''),
+                allowNegative: true,   // izinkan minus — muncul di dashboard
+                lotId: null,
+                unitCostOverride: $pendingCost ? null : $unitCost,
+                affectLotCost: false,
+            );
+        }
+    }
+
+    private function allocateSewingSupplyCostToPickupWip(SewingPickup $pickup): void
+    {
+        $supplyMutations = DB::table('inventory_mutations')
+            ->where('source_type', JournalService::SRC_SEWING_PICKUP_SUPPLY)
+            ->where('source_id', $pickup->id)
+            ->where('qty_change', '<', 0)
+            ->get()
+            ->keyBy('item_id');
+        if ($supplyMutations->isEmpty()) return;
+
+        $incoming = DB::table('inventory_mutations')
+            ->where('source_type', SewingPickup::class)
+            ->where('source_id', $pickup->id)
+            ->where('warehouse_id', $pickup->warehouse_id)
+            ->where('qty_change', '>', 0)
+            ->lockForUpdate()
+            ->get();
+        foreach ($incoming as $mutation) {
+            $pickupLine = SewingPickupLine::query()
+                ->where('sewing_pickup_id', $pickup->id)
+                ->where('cutting_job_bundle_id', $mutation->cutting_job_bundle_id)
+                ->first();
+            if (!$pickupLine || (float) $pickupLine->qty_bundle <= 0) continue;
+
+            $lineSupplyCost = SewingPickupLineSupplyLine::query()
+                ->where('sewing_pickup_line_id', $pickupLine->id)
+                ->get()
+                ->sum(function ($supply) use ($supplyMutations) {
+                    $source = $supplyMutations->get((int) $supply->material_item_id);
+                    return (float) $supply->issued_qty * (float) ($source?->unit_cost ?? 0);
+                });
+            if ($lineSupplyCost <= 0) continue;
+
+            $supplyUnitCost = $lineSupplyCost / (float) $pickupLine->qty_bundle;
+            $baseUnitCost = (float) ($mutation->unit_cost ?? 0);
+            $newUnitCost = $baseUnitCost + $supplyUnitCost;
+            DB::table('inventory_mutations')->where('id', $mutation->id)->update([
+                'unit_cost' => $newUnitCost,
+                'total_cost' => $newUnitCost * (float) $mutation->qty_change,
+            ]);
+        }
     }
 
     private function buildSewingSupplyChecklist($bundles): array
@@ -536,7 +758,7 @@ class SewingPickupController extends Controller
                 foreach ($bom->lines as $bomLine) {
                     if (!$this->isSewingSupplyBomLine($bomLine)) continue;
                     $materials[] = [
-                        'material_item_id' => (int) $bomLine->material_id,
+                        'material_item_id' => (int) $bomLine->material_item_id,
                         'code'             => (string) ($bomLine->material?->code ?? '-'),
                         'name'             => (string) ($bomLine->material?->name ?? ''),
                         'qty_per_pcs'      => (float) $bomLine->qty,
@@ -563,17 +785,59 @@ class SewingPickupController extends Controller
                 ->values();
         }
 
+        // Stok RM real-time per material → untuk guard input
+        $rmWarehouseId = Warehouse::where('code', 'RM')->value('id');
+        $allMaterialIds = $bundleRequirements
+            ->flatMap(fn($b) => collect($b['materials'])->pluck('material_item_id'))
+            ->unique()->values()->all();
+
+        $rmStockByMaterial = [];
+        if ($rmWarehouseId && !empty($allMaterialIds)) {
+            $rmStockByMaterial = \App\Models\InventoryStock::query()
+                ->where('warehouse_id', $rmWarehouseId)
+                ->whereIn('item_id', $allMaterialIds)
+                ->pluck('qty', 'item_id')
+                ->map(fn($v) => (float) $v)
+                ->toArray();
+        }
+
+        // Hitung max_pcs per material (berdasarkan stok RM ÷ qty_per_pcs)
+        // Disimpan sebagai: material_item_id → max_pcs (int)
+        $maxPcsByMaterial = [];
+        foreach ($bundleRequirements as $bundle) {
+            foreach ($bundle['materials'] as $mat) {
+                $mid = (int) $mat['material_item_id'];
+                if (isset($maxPcsByMaterial[$mid])) continue; // sudah dihitung
+                $stockQty   = (float) ($rmStockByMaterial[$mid] ?? 0);
+                $qtyPerPcs  = (float) ($mat['qty_per_pcs'] ?? 0);
+                $maxPcsByMaterial[$mid] = $qtyPerPcs > 0
+                    ? (int) floor($stockQty / $qtyPerPcs)
+                    : ($stockQty > 0 ? PHP_INT_MAX : 0);
+            }
+        }
+
         return view('production.sewing_pickups.supplies', [
             'pickup'                 => $pickup,
             'bundleRequirements'     => $bundleRequirements,
             'supplyLineIdByMaterial' => $supplyLineIdByMaterial,
             'issuedPcsBySupplyLine'  => $issuedPcsBySupplyLine,
             'filterLineId'           => $filterLineId,
+            'rmStockByMaterial'      => $rmStockByMaterial,
+            'maxPcsByMaterial'       => $maxPcsByMaterial,
         ]);
     }
 
     public function updateSupplies(Request $request, SewingPickup $pickup)
     {
+        if (DB::table('inventory_mutations')
+            ->where('source_type', JournalService::SRC_SEWING_PICKUP_SUPPLY)
+            ->where('source_id', $pickup->id)
+            ->exists()) {
+            throw ValidationException::withMessages([
+                'supplies' => 'Kelengkapan sudah mengurangi stok RM dan tidak boleh diedit. Void pickup lalu buat ulang jika qty salah.',
+            ]);
+        }
+
         $validated = $request->validate([
             'supplies' => ['nullable', 'array'],
             'supplies.*.issued_pcs' => ['nullable', 'numeric', 'min:0'],
@@ -584,18 +848,36 @@ class SewingPickupController extends Controller
             'line_supplies.*.*.qty_per_pcs' => ['nullable', 'numeric', 'min:0'],
         ]);
 
-        DB::transaction(function () use ($pickup, $validated) {
+        // Stok RM real-time untuk validasi server-side
+        $rmWarehouseId = Warehouse::where('code', 'RM')->value('id');
+
+        DB::transaction(function () use ($pickup, $validated, $rmWarehouseId) {
             $pickup->load('supplyLines');
 
             foreach ($pickup->supplyLines as $line) {
                 // Hanya update baris yang explicitly di-submit (skip jika tidak ada di request)
                 if (!isset($validated['supplies'][$line->id])) continue;
 
-                $input = $validated['supplies'][$line->id]['issued_pcs'] ?? 0;
-                $issuedPcs = max((float) $input, 0);
+                $input       = $validated['supplies'][$line->id]['issued_pcs'] ?? 0;
+                $issuedPcs   = max((float) $input, 0);
                 $requiredPcs = (float) ($line->required_pcs ?? 0);
                 $requiredQty = (float) ($line->required_qty ?? 0);
                 $qtyPerPiece = $requiredPcs > 0 ? ($requiredQty / $requiredPcs) : 0;
+
+                // Guard: issued tidak boleh melebihi stok RM yang tersedia
+                if ($rmWarehouseId && $qtyPerPiece > 0) {
+                    $rmStock = (float) (\App\Models\InventoryStock::query()
+                        ->where('warehouse_id', $rmWarehouseId)
+                        ->where('item_id', (int) $line->material_item_id)
+                        ->value('qty') ?? 0);
+                    $maxPcs = $rmStock > 0 ? (int) floor($rmStock / $qtyPerPiece) : 0;
+                    if ($issuedPcs > $maxPcs) {
+                        $matCode = $line->material?->code ?? "material #{$line->material_item_id}";
+                        throw \Illuminate\Validation\ValidationException::withMessages([
+                            "supplies.{$line->id}" => "Qty untuk {$matCode} melebihi stok RM yang tersedia ({$maxPcs} pcs dari stok {$rmStock}).",
+                        ]);
+                    }
+                }
 
                 $line->issued_pcs = $issuedPcs;
                 $line->issued_qty = $qtyPerPiece > 0 ? ($issuedPcs * $qtyPerPiece) : $issuedPcs;
@@ -635,7 +917,55 @@ class SewingPickupController extends Controller
                     );
                 }
             }
+
+            // Sync per-bundle line supply records from aggregate supply lines.
+            // Diperlukan ketika visible inputs (disabled) tidak ter-submit — issued_qty
+            // dihitung proporsional dari aggregate issued_qty per bundle.
+            $pickup->loadMissing('lines');
+            $activeLines   = $pickup->lines->whereNull('voided_at');
+            $totalBundleQty = (float) $activeLines->sum('qty_bundle');
+            $updatedSupplyLines = $pickup->supplyLines->keyBy('material_item_id');
+
+            foreach ($activeLines as $pickupLine) {
+                $bundleQty = (float) ($pickupLine->qty_bundle ?? 0);
+                $share     = $totalBundleQty > 0.0001 ? $bundleQty / $totalBundleQty : 1.0;
+
+                foreach ($updatedSupplyLines as $sl) {
+                    if ((float) ($sl->issued_qty ?? 0) <= 0 && (float) ($sl->required_qty ?? 0) <= 0) {
+                        continue;
+                    }
+                    $issuedQtyForLine   = round((float) ($sl->issued_qty ?? 0) * $share, 6);
+                    $requiredQtyForLine = round((float) ($sl->required_qty ?? 0) * $share, 6);
+
+                    SewingPickupLineSupplyLine::updateOrCreate(
+                        [
+                            'sewing_pickup_line_id' => (int) $pickupLine->id,
+                            'material_item_id'      => (int) $sl->material_item_id,
+                        ],
+                        [
+                            'sewing_pickup_id' => $pickup->id,
+                            'required_qty'     => $requiredQtyForLine,
+                            'issued_qty'       => $issuedQtyForLine,
+                        ]
+                    );
+                }
+            }
         });
+
+        // Deduct RM stock (sama seperti store()) — hanya jalan sekali karena guard di atas
+        // memblokir edit setelah mutasi ada.
+        $pickup->load('supplyLines.material');
+        $this->issueSewingPickupSupplies($pickup);
+        $this->allocateSewingSupplyCostToPickupWip($pickup);
+
+        try {
+            $this->journal->postSewingPickupSupply($pickup);
+        } catch (\Throwable $e) {
+            Log::warning('Gagal membuat jurnal kelengkapan sewing pickup (updateSupplies)', [
+                'sewing_pickup_id' => $pickup->id,
+                'message'          => $e->getMessage(),
+            ]);
+        }
 
         // AJAX request → return JSON
         if ($request->expectsJson() || $request->header('X-Requested-With') === 'XMLHttpRequest') {
@@ -655,6 +985,15 @@ class SewingPickupController extends Controller
 
     public function updateLineSupplies(Request $request, SewingPickupLine $line)
     {
+        if (DB::table('inventory_mutations')
+            ->where('source_type', JournalService::SRC_SEWING_PICKUP_SUPPLY)
+            ->where('source_id', $line->sewing_pickup_id)
+            ->exists()) {
+            throw ValidationException::withMessages([
+                'supplies' => 'Kelengkapan sudah mengurangi stok RM dan tidak boleh diedit. Void baris pickup jika perlu dikoreksi.',
+            ]);
+        }
+
         $validated = $request->validate([
             'supplies' => ['nullable', 'array'],
             'supplies.*.issued_pcs' => ['nullable', 'numeric', 'min:0'],
@@ -734,6 +1073,7 @@ class SewingPickupController extends Controller
 
         $submittedItems = [];
         $decoded = $submittedPayload ? json_decode($submittedPayload, true) : null;
+        $hasSubmittedPayload = is_array($decoded);
         if (is_array($decoded)) {
             foreach (($decoded['items'] ?? []) as $item) {
                 if (!is_array($item)) {
@@ -753,21 +1093,112 @@ class SewingPickupController extends Controller
         }
 
         foreach ($requirements as $materialId => $row) {
+            $need = (float) $row['need'];
+            $requiredPcs = (float) ($row['total_pieces'] ?? 0);
+            $requestedQty = $hasSubmittedPayload
+                ? min((float) ($submittedItems[$materialId]['issued_qty'] ?? 0), $need)
+                : $need;
+            $requestedPcs = $hasSubmittedPayload
+                ? min((float) ($submittedItems[$materialId]['issued_pcs'] ?? 0), $requiredPcs)
+                : $requiredPcs;
+            $available = max((float) ($row['stock_available'] ?? 0), 0);
+            $issuedQty = min($requestedQty, $available);
+            $issuedPcs = $requestedQty > 0
+                ? min($requestedPcs * ($issuedQty / $requestedQty), $requiredPcs)
+                : 0;
+
             SewingPickupSupplyLine::updateOrCreate(
                 [
                     'sewing_pickup_id' => $pickup->id,
                     'material_item_id' => (int) $materialId,
                 ],
                 [
-                    'required_qty' => (float) $row['need'],
-                    'issued_qty' => (float) ($submittedItems[$materialId]['issued_qty'] ?? 0),
-                    'required_pcs' => (float) ($row['total_pieces'] ?? 0),
-                    'issued_pcs' => (float) ($submittedItems[$materialId]['issued_pcs'] ?? 0),
+                    'required_qty' => $need,
+                    'issued_qty' => $issuedQty,
+                    'required_pcs' => $requiredPcs,
+                    'issued_pcs' => $issuedPcs,
                     'uom' => $row['uom'] ?: null,
                     'stock_available_snapshot' => (float) ($row['stock_available'] ?? 0),
                 ]
             );
         }
+    }
+
+    private function syncLineSupplyIssuedFromAggregate(SewingPickup $pickup): void
+    {
+        $remainingByMaterial = $pickup->supplyLines()
+            ->pluck('issued_qty', 'material_item_id')
+            ->map(fn($qty) => (float) $qty)
+            ->all();
+
+        $lines = SewingPickupLineSupplyLine::query()
+            ->where('sewing_pickup_id', $pickup->id)
+            ->orderBy('id')
+            ->get();
+
+        foreach ($lines as $line) {
+            $materialId = (int) $line->material_item_id;
+            $available = max((float) ($remainingByMaterial[$materialId] ?? 0), 0);
+            $issued = min($available, (float) $line->required_qty);
+            $line->issued_qty = $issued;
+            $line->save();
+            $remainingByMaterial[$materialId] = max($available - $issued, 0);
+        }
+    }
+
+    private function createSupplyPhysicalAdjustment(
+        SewingPickup $pickup,
+        ?string $submittedPayload,
+        int $userId
+    ): ?InventoryAdjustment {
+        $requested = $this->parseSubmittedSewingSupplies($submittedPayload);
+        if (empty($requested)) {
+            return null;
+        }
+
+        $lines = [];
+        foreach ($pickup->supplyLines()->get() as $supply) {
+            $target = min(
+                (float) ($requested[(int) $supply->material_item_id]['issued_qty'] ?? 0),
+                (float) $supply->required_qty
+            );
+            $missingPhysical = max($target - (float) $supply->issued_qty, 0);
+            if ($missingPhysical <= 0.000001) continue;
+
+            $lines[] = [
+                'item_id' => (int) $supply->material_item_id,
+                'qty_change' => $missingPhysical,
+                'direction' => 'in',
+                'notes' => "Ditemukan fisik untuk kelengkapan pickup {$pickup->code}",
+            ];
+        }
+        if (empty($lines)) {
+            return null;
+        }
+
+        $date = $pickup->date?->toDateString() ?? now()->toDateString();
+        $prefix = 'ADJ-' . str_replace('-', '', $date) . '-';
+        $lastCode = InventoryAdjustment::query()
+            ->where('code', 'like', $prefix . '%')
+            ->lockForUpdate()
+            ->orderByDesc('code')
+            ->value('code');
+        $sequence = $lastCode ? ((int) substr($lastCode, -3)) + 1 : 1;
+
+        $adjustment = InventoryAdjustment::create([
+            'code' => $prefix . str_pad((string) $sequence, 3, '0', STR_PAD_LEFT),
+            'date' => $date,
+            'warehouse_id' => (int) Warehouse::query()->where('code', 'RM')->value('id'),
+            'reason' => 'Stok fisik kelengkapan jahit ditemukan',
+            'notes' => "Dibuat otomatis dari pickup {$pickup->code}. Wajib cek fisik sebelum approve.",
+            'status' => InventoryAdjustment::STATUS_PENDING,
+            'created_by' => $userId,
+            'reference_type' => SewingPickup::class,
+            'reference_id' => (int) $pickup->id,
+        ]);
+        $adjustment->lines()->createMany($lines);
+
+        return $adjustment;
     }
 
     private function storeSewingPickupLineSupplies(SewingPickup $pickup, $pickupLines, ?string $submittedPayload): void
@@ -806,7 +1237,7 @@ class SewingPickupController extends Controller
                     continue;
                 }
 
-                $materialId = (int) ($bomLine->material_id ?? 0);
+                $materialId = (int) ($bomLine->material_item_id ?? 0);
                 if ($materialId <= 0) {
                     continue;
                 }
@@ -816,9 +1247,11 @@ class SewingPickupController extends Controller
 
                 if ($submittedBundleSupply) {
                     $issuedQty = min((float) ($submittedBundleSupply['issued_qty'] ?? 0), $requiredQty);
-                } else {
+                } elseif (array_key_exists($materialId, $remainingIssuedByMaterial)) {
                     $issuedQty = min((float) ($remainingIssuedByMaterial[$materialId] ?? 0), $requiredQty);
                     $remainingIssuedByMaterial[$materialId] = max((float) ($remainingIssuedByMaterial[$materialId] ?? 0) - $issuedQty, 0);
+                } else {
+                    $issuedQty = $requiredQty;
                 }
 
                 SewingPickupLineSupplyLine::updateOrCreate(
@@ -986,6 +1419,10 @@ class SewingPickupController extends Controller
     private function isSewingSupplyBomLine($line): bool
     {
         if (!$line || !$line->material) {
+            return false;
+        }
+
+        if ((bool) ($line->is_optional ?? false)) {
             return false;
         }
 
@@ -1241,12 +1678,46 @@ class SewingPickupController extends Controller
                 $bundle->save();
             }
 
+            $hasSupplyMutations = DB::table('inventory_mutations')
+                ->where('source_type', JournalService::SRC_SEWING_PICKUP_SUPPLY)
+                ->where('source_id', $pickup->id)
+                ->exists();
+
+            if ($hasSupplyMutations) {
+                $this->inventory->reverseBySource(
+                    originalSourceTypes: [JournalService::SRC_SEWING_PICKUP_SUPPLY],
+                    originalSourceId: (int) $pickup->id,
+                    voidSourceType: JournalService::SRC_SEWING_PICKUP_SUPPLY . '_void',
+                    voidSourceId: (int) $pickup->id,
+                    notesPrefix: "VOID kelengkapan jahit {$pickup->code}",
+                    date: $date,
+                );
+            }
+
             $pickup->status = 'void';
             $pickup->void_reason = $validated['reason'];
             $pickup->voided_at = now();
             $pickup->voided_by = auth()->id();
             $pickup->save();
         });
+
+        try {
+            $this->journal->voidBySource(JournalService::SRC_SEWING_PICKUP, $pickupId, 'VOID Sewing Pickup');
+        } catch (\Throwable $e) {
+            Log::warning('Gagal void jurnal sewing pickup', [
+                'sewing_pickup_id' => $pickupId,
+                'message' => $e->getMessage(),
+            ]);
+        }
+
+        try {
+            $this->journal->voidBySource(JournalService::SRC_SEWING_PICKUP_SUPPLY, $pickupId, 'VOID Kelengkapan Sewing Pickup');
+        } catch (\Throwable $e) {
+            Log::warning('Gagal void jurnal kelengkapan sewing pickup', [
+                'sewing_pickup_id' => $pickupId,
+                'message' => $e->getMessage(),
+            ]);
+        }
 
         return redirect()
             ->route('production.sewing.pickups.show', $pickupId)
@@ -1365,6 +1836,49 @@ class SewingPickupController extends Controller
             $line->voided_by = auth()->id();
             $line->save();
 
+            $rmWarehouseId = (int) Warehouse::where('code', 'RM')->value('id');
+            $lineSupplies = SewingPickupLineSupplyLine::query()
+                ->where('sewing_pickup_line_id', $line->id)
+                ->where('issued_qty', '>', 0)
+                ->lockForUpdate()
+                ->get();
+
+            foreach ($lineSupplies as $supply) {
+                $unitCost = DB::table('inventory_mutations')
+                    ->where('source_type', JournalService::SRC_SEWING_PICKUP_SUPPLY)
+                    ->where('source_id', $pickup->id)
+                    ->where('item_id', $supply->material_item_id)
+                    ->where('qty_change', '<', 0)
+                    ->value('unit_cost');
+
+                $this->inventory->stockIn(
+                    warehouseId: $rmWarehouseId,
+                    itemId: (int) $supply->material_item_id,
+                    qty: (float) $supply->issued_qty,
+                    date: now(),
+                    sourceType: JournalService::SRC_SEWING_PICKUP_SUPPLY_VOID_LINE,
+                    sourceId: (int) $line->id,
+                    notes: "VOID kelengkapan pickup {$pickup->code} line {$line->id}",
+                    lotId: null,
+                    unitCost: $unitCost !== null ? (float) $unitCost : null,
+                    affectLotCost: false,
+                );
+
+                $aggregate = SewingPickupSupplyLine::query()
+                    ->where('sewing_pickup_id', $pickup->id)
+                    ->where('material_item_id', $supply->material_item_id)
+                    ->lockForUpdate()
+                    ->first();
+                if ($aggregate) {
+                    $aggregate->issued_qty = max((float) $aggregate->issued_qty - (float) $supply->issued_qty, 0);
+                    $aggregate->issued_pcs = max((float) $aggregate->issued_pcs - (float) $line->qty_bundle, 0);
+                    $aggregate->save();
+                }
+
+                $supply->issued_qty = 0;
+                $supply->save();
+            }
+
             // ✅ FIX: recalculate sewing_picked_qty dari SUM(non-void pickup lines).
             // Ini membenahi data korup sekaligus menjamin invariant ke depan.
             $newPicked = (float) SewingPickupLine::query()
@@ -1390,6 +1904,26 @@ class SewingPickupController extends Controller
                 $pickup->save();
             }
         });
+
+        // Reversal jurnal WIP material (unit_cost material only) untuk line yang di-void
+        try {
+            $this->journal->postSewingPickupLineVoid($line->fresh());
+        } catch (\Throwable $e) {
+            Log::warning('Gagal membuat jurnal void pickup line (WIP)', [
+                'sewing_pickup_line_id' => $lineId,
+                'message' => $e->getMessage(),
+            ]);
+        }
+
+        // Reversal jurnal kelengkapan (supply) untuk line yang di-void
+        try {
+            $this->journal->postSewingPickupSupplyVoidLine($line->fresh());
+        } catch (\Throwable $e) {
+            Log::warning('Gagal membuat jurnal void kelengkapan pickup line', [
+                'sewing_pickup_line_id' => $lineId,
+                'message' => $e->getMessage(),
+            ]);
+        }
 
         return redirect()
             ->route('production.sewing.pickups.show', $pickup)

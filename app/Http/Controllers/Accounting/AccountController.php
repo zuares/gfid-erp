@@ -51,22 +51,9 @@ class AccountController extends Controller
     public function index(Request $request)
     {
         $q = Account::query()->orderBy('code');
-        $mode = $request->string('mode')->toString() ?: 'cash_basis';
-
-        if ($mode === 'cash_basis') {
-            $q->whereIn('code', self::CASH_BASIS_CODES);
-            if (!$request->filled('active')) {
-                $q->where('is_active', true);
-            }
-        } elseif ($mode === 'technical') {
-            $q->whereIn('code', self::TECHNICAL_CODES);
-        }
 
         if ($request->filled('type')) {
             $q->where('type', $request->string('type')->toString());
-        }
-        if ($request->filled('active')) {
-            $q->where('is_active', (bool) $request->boolean('active'));
         }
 
         $accounts = $q->withSum(['journalLines as balance' => function ($qq) {
@@ -76,45 +63,16 @@ class AccountController extends Controller
         }], DB::raw('journal_lines.debit - journal_lines.credit'))
             ->get();
 
-        $accountIds = $accounts->pluck('id')->all();
-        $journalSourceRows = empty($accountIds)
-            ? collect()
-            : DB::table('journal_lines as jl')
-                ->join('journals as j', 'j.id', '=', 'jl.journal_id')
-                ->whereIn('jl.account_id', $accountIds)
-                ->whereNull('j.voided_at')
-                ->whereNotIn('j.source_type', self::EXCLUDED_BALANCE_SOURCES)
-                ->groupBy('jl.account_id', 'j.source_type')
-                ->selectRaw('jl.account_id, j.source_type, COUNT(*) as line_count, COALESCE(SUM(jl.debit - jl.credit), 0) as balance')
-                ->orderByDesc('line_count')
-                ->get();
+        $journalLineCounts = DB::table('journal_lines as jl')
+            ->join('journals as j', 'j.id', '=', 'jl.journal_id')
+            ->whereNull('j.voided_at')
+            ->whereNotIn('j.source_type', self::EXCLUDED_BALANCE_SOURCES)
+            ->groupBy('jl.account_id')
+            ->selectRaw('jl.account_id, COUNT(*) as line_count')
+            ->get()
+            ->pluck('line_count', 'account_id');
 
-        $journalSources = $journalSourceRows
-            ->groupBy('account_id')
-            ->map(fn($rows) => $rows->values());
-
-        $journalLineCounts = $journalSourceRows
-            ->groupBy('account_id')
-            ->map(fn($rows) => (int) $rows->sum('line_count'));
-
-        $allAccountsCount = Account::query()->count();
-        $cashBasisCount = Account::query()
-            ->whereIn('code', self::CASH_BASIS_CODES)
-            ->where('is_active', true)
-            ->count();
-        $technicalCount = Account::query()
-            ->whereIn('code', self::TECHNICAL_CODES)
-            ->count();
-
-        return view('accounting.accounts.index', compact(
-            'accounts',
-            'mode',
-            'allAccountsCount',
-            'cashBasisCount',
-            'technicalCount',
-            'journalSources',
-            'journalLineCounts',
-        ));
+        return view('accounting.accounts.index', compact('accounts', 'journalLineCounts'));
     }
 
     public function create()
@@ -181,6 +139,48 @@ class AccountController extends Controller
             ->with('status', 'ok')->with('message', 'Account dinonaktifkan.');
     }
 
+    public function bukuBesar(Request $request)
+    {
+        $from = $request->filled('from')
+            ? \Carbon\Carbon::parse($request->date('from'))->toDateString()
+            : now()->startOfMonth()->toDateString();
+
+        $to = $request->filled('to')
+            ? \Carbon\Carbon::parse($request->date('to'))->toDateString()
+            : now()->toDateString();
+
+        $accounts = Account::where('is_active', true)->orderBy('code')->get();
+
+        // Balance per account in date range
+        $inRange = DB::table('journal_lines as jl')
+            ->join('journals as j', 'j.id', '=', 'jl.journal_id')
+            ->whereNull('j.voided_at')
+            ->whereNotIn('j.source_type', self::EXCLUDED_BALANCE_SOURCES)
+            ->whereDate('j.date', '>=', $from)
+            ->whereDate('j.date', '<=', $to)
+            ->groupBy('jl.account_id')
+            ->selectRaw('jl.account_id,
+                COALESCE(SUM(jl.debit),0) as period_debit,
+                COALESCE(SUM(jl.credit),0) as period_credit,
+                COUNT(*) as tx_count')
+            ->get()->keyBy('account_id');
+
+        $rows = $accounts->map(function ($acc) use ($inRange) {
+            $b = $inRange[$acc->id] ?? null;
+            return (object) [
+                'id'           => $acc->id,
+                'code'         => $acc->code,
+                'name'         => $acc->name,
+                'type'         => $acc->type,
+                'period_debit' => $b ? (float) $b->period_debit  : 0.0,
+                'period_credit'=> $b ? (float) $b->period_credit : 0.0,
+                'tx_count'     => $b ? (int)   $b->tx_count      : 0,
+            ];
+        })->filter(fn($r) => $r->tx_count > 0);
+
+        return view('accounting.accounts.buku_besar', compact('from', 'to', 'rows'));
+    }
+
     public function ledger(Request $request, Account $account)
     {
         // Lines (filter by date, exclude void)
@@ -192,6 +192,7 @@ class AccountController extends Controller
             ->select([
                 'journal_lines.id',
                 'journals.date as date',
+                'journals.created_at as posted_at',
                 'journals.description as journal_description',
                 'journals.source_type',
                 'journals.source_id',
@@ -199,6 +200,7 @@ class AccountController extends Controller
                 'journal_lines.credit',
             ])
             ->orderBy('journals.date')
+            ->orderBy('journals.created_at')
             ->orderBy('journal_lines.id');
 
         if ($request->filled('from')) {

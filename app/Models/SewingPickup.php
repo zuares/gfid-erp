@@ -45,6 +45,13 @@ class SewingPickup extends Model
         return $this->hasMany(SewingPickupLineSupplyLine::class, 'sewing_pickup_id');
     }
 
+    public function physicalAdjustment()
+    {
+        return $this->hasOne(InventoryAdjustment::class, 'reference_id')
+            ->where('reference_type', self::class)
+            ->latestOfMany();
+    }
+
     /**
      * Hitung status berdasarkan sisa qty di semua line.
      * Status:

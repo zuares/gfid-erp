@@ -24,44 +24,44 @@
     }
 
     .panel{ background:var(--card); border:1px solid var(--b); border-radius:var(--r); box-shadow:var(--shadow); }
-    .panel-h{ padding:12px 14px; border-bottom:1px solid rgba(148,163,184,.12); }
-    .panel-b{ padding:12px 14px; }
+    .panel-h{ padding:9px 12px; border-bottom:1px solid rgba(148,163,184,.12); }
+    .panel-b{ padding:10px 12px; }
 
-    .h-title{ font-weight:900; font-size:1.05rem; margin:0; }
+    .h-title{ font-weight:900; font-size:.95rem; margin:0; }
 
     .meta{
         border: 1px solid rgba(148,163,184,.18);
         border-radius: var(--r);
-        padding: 10px;
+        padding: 8px;
         background: var(--soft2);
     }
     body[data-theme="dark"] .meta{ background: rgba(15,23,42,.35); }
 
-    .form-label-sm{ font-size:.75rem; font-weight:800; color:var(--muted); }
-    .form-control-sm, .form-select-sm{ font-size:.88rem; padding:.42rem .55rem; border-radius:12px; }
+    .form-label-sm{ font-size:.68rem; font-weight:800; color:var(--muted); }
+    .form-control-sm, .form-select-sm{ font-size:.82rem; padding:.28rem .45rem; border-radius:10px; }
 
     .mono{ font-variant-numeric: tabular-nums; font-family: ui-monospace,SFMono-Regular,Menlo,Consolas; }
 
-    .list{ display:grid; gap:.6rem; margin-top:12px; }
+    .list{ display:grid; gap:.45rem; margin-top:10px; }
 
     .cardx{
         border:1px solid rgba(148,163,184,.22);
-        border-radius:16px;
+        border-radius:12px;
         background:var(--card);
         overflow:hidden;
     }
     .cardx-h{
-        padding:10px 12px;
+        padding:7px 10px 2px;
         border-bottom:1px solid rgba(148,163,184,.12);
         display:flex; justify-content:space-between; gap:10px; align-items:flex-start;
     }
     .cardx-left{ display:flex; gap:10px; align-items:flex-start; min-width:0; }
     .cardx-left>div{ min-width:0; }
 
-    .chk{ width:18px; height:18px; border-radius:6px; cursor:pointer; margin-top:2px; flex:0 0 auto; }
+    .chk{ width:16px; height:16px; border-radius:6px; cursor:pointer; margin-top:2px; flex:0 0 auto; }
     .code{
         font-weight:900; letter-spacing:.08em; color:var(--accent);
-        font-size:.98rem; white-space:nowrap; overflow:hidden; text-overflow:ellipsis; max-width:100%;
+        font-size:.92rem; white-space:nowrap; overflow:hidden; text-overflow:ellipsis; max-width:100%;
     }
     .op-chip{
         display:inline-flex; align-items:center; gap:.35rem; margin-top:.35rem;
@@ -74,14 +74,42 @@
 
     .wip{ font-size:.78rem; color:var(--muted); font-weight:900; white-space:nowrap; text-align:right; flex:0 0 auto; }
 
-    .cardx-b{ padding:10px 12px; display:grid; gap:.55rem; }
-    .grid2{ display:grid; grid-template-columns:1fr 1fr; gap:.55rem; }
+    .meta-inline{ margin-top:.18rem; font-size:.68rem; color:var(--muted); font-weight:900; display:flex; align-items:center; gap:.35rem; flex-wrap:wrap; }
+    .meta-inline .dot{ opacity:.5; }
+
+    .mini-kpi-row{
+        display:grid; grid-template-columns:repeat(4,minmax(0,1fr));
+        margin-top:.4rem; border:1px solid rgba(148,163,184,.15);
+        border-radius:10px; overflow:hidden; background:rgba(255,255,255,.42);
+    }
+    body[data-theme="dark"] .mini-kpi-row{ background:rgba(15,23,42,.20); }
+    .mini-kpi{
+        border-right:1px solid rgba(148,163,184,.16);
+        padding:.25rem .38rem; min-width:0; text-align:center;
+    }
+    .mini-kpi:last-child{ border-right:0; }
+    .mini-kpi .lbl{
+        display:block; color:var(--muted); font-size:.52rem; font-weight:900;
+        text-transform:uppercase; letter-spacing:.06em; white-space:nowrap;
+        overflow:hidden; text-overflow:ellipsis;
+    }
+    .mini-kpi .val{
+        display:flex; align-items:baseline; justify-content:center; gap:.12rem;
+        font-size:.82rem; font-weight:900; margin-top:.08rem;
+        white-space:nowrap; overflow:hidden; text-overflow:ellipsis;
+    }
+    .mini-kpi .unit{ color:var(--muted); font-size:.65em; font-weight:900; }
+    .mini-kpi.is-main{ background:rgba(37,99,235,.06); }
+    .mini-kpi.is-main .val{ color:#2563eb; }
+
+    .cardx-b{ padding:5px 10px 8px; display:grid; gap:.38rem; }
+    .grid2{ display:grid; grid-template-columns:1fr 1fr; gap:.4rem; }
     .field label{
-        display:block; font-size:.7rem; font-weight:900; color:var(--muted);
+        display:block; font-size:.65rem; font-weight:900; color:var(--muted);
         text-transform:uppercase; letter-spacing:.08em; margin-bottom:.25rem;
     }
 
-    .qty{ text-align:center !important; font-weight:900; padding:.55rem .55rem !important; border-radius:999px; }
+    .qty{ text-align:center !important; font-weight:900; padding:.32rem .4rem !important; border-radius:10px; }
     .qty.ok{ border:1px solid rgba(22,163,74,.22); background: rgba(22,163,74,.05); }
     .qty.rj{ border:1px solid rgba(185,28,28,.22); background: rgba(185,28,28,.05); }
     .qty:focus{ box-shadow:none; }
@@ -147,17 +175,36 @@
     }
     .sum-pill .val{ display:block; margin-top:.12rem; }
 
-    /* accordion clean */
-    .acc-op-btn{ font-weight:900; padding:.7rem .85rem; }
+    /* accordion — override Bootstrap supaya mirip cardx */
+    .accordion-item.all-item {
+        border: 1px solid rgba(148,163,184,.18) !important;
+        background: var(--card) !important;
+    }
+    .acc-op-btn {
+        background: var(--card) !important;
+        color: inherit !important;
+        padding: 7px 10px 5px !important;
+        box-shadow: none !important;
+        font-size: .88rem;
+        font-weight: 900;
+    }
+    .acc-op-btn:not(.collapsed) {
+        color: inherit !important;
+        background: var(--card) !important;
+        border-bottom: 1px solid rgba(148,163,184,.12);
+    }
+    /* sembunyikan chevron Bootstrap */
+    .acc-op-btn::after { display: none !important; }
+
     .acc-pill{
-        display:inline-flex; align-items:center; gap:.35rem;
-        padding:.18rem .55rem; border-radius:999px;
-        border:1px solid rgba(148,163,184,.18);
+        display:inline-flex; align-items:center; gap:.3rem;
+        padding:.1rem .4rem; border-radius:999px;
+        border:1px solid rgba(148,163,184,.15);
         background: rgba(148,163,184,.06);
-        font-weight:900; font-size:.78rem;
+        font-weight:900; font-size:.72rem; color:var(--muted);
     }
     body[data-theme="dark"] .acc-pill{ background: rgba(15,23,42,.22); }
-    .acc-op-sub{ font-size:.78rem; font-weight:900; color:var(--muted); }
+    .acc-op-sub{ font-size:.72rem; font-weight:900; color:var(--muted); }
 </style>
 @endpush
 
@@ -195,6 +242,10 @@
 
     $hasAnyWipAll = collect($linesAll)->sum(fn($l)=>(int)($l['total_wip'] ?? 0)) > 0;
     $hasAnyWipByOp = collect($linesByOp)->sum(fn($l)=>(int)($l['total_wip'] ?? 0)) > 0;
+
+    $summaryRows = collect($linesAll)->filter(fn($l)=>(int)($l['total_wip'] ?? 0) > 0)->count();
+    $summaryQty  = collect($linesAll)->sum(fn($l)=> (int)($l['total_wip'] ?? 0));
+    $summaryOps  = collect($linesByOp)->filter(fn($l)=>(int)($l['total_wip'] ?? 0) > 0)->pluck('operator_id')->filter(fn($id)=>(int)$id>0)->unique()->count();
 @endphp
 
     <div class="panel mb-2">
@@ -206,6 +257,69 @@
                class="btn btn-sm btn-outline-primary" style="border-radius:999px;">Riwayat</a>
         </div>
     </div>
+
+    {{-- ── KELENGKAPAN PACKING ── --}}
+    @php
+        $ps         = $packingSupplies ?? collect();
+        $psShortage = $ps->where('has_shortage', true)->count();
+        $psTotal    = $ps->count();
+    @endphp
+    @if($psTotal > 0)
+    <div class="panel mb-2">
+        <div class="panel-h d-flex align-items-center justify-content-between gap-2 flex-wrap">
+            <div class="d-flex align-items-center gap-2">
+                <span class="h-title" style="font-size:.85rem;">📦 Kelengkapan Packing</span>
+                @if($psShortage > 0)
+                    <span style="background:rgba(220,38,38,.12);color:#b91c1c;border:1px solid rgba(220,38,38,.3);border-radius:999px;padding:.1rem .55rem;font-size:.68rem;font-weight:900;">
+                        {{ $psShortage }} KURANG
+                    </span>
+                @else
+                    <span style="background:rgba(22,163,74,.1);color:#15803d;border:1px solid rgba(22,163,74,.3);border-radius:999px;padding:.1rem .55rem;font-size:.68rem;font-weight:900;">
+                        ✓ STOK CUKUP
+                    </span>
+                @endif
+            </div>
+            @if($psShortage > 0 && Route::has('purchasing.material_shortages.index'))
+            <a href="{{ route('purchasing.material_shortages.index') }}"
+               class="btn btn-sm btn-warning" style="border-radius:999px;font-size:.75rem;font-weight:800;">
+                📋 Lihat Kekurangan Material
+            </a>
+            @endif
+        </div>
+        <div class="panel-b" style="padding-top:.5rem;padding-bottom:.5rem;">
+            <div style="display:grid;grid-template-columns:1fr 72px 72px 72px;gap:.25rem .5rem;font-size:.72rem;font-weight:700;color:var(--muted);text-transform:uppercase;letter-spacing:.05em;padding:.1rem .1rem .35rem;border-bottom:1px solid rgba(148,163,184,.15);">
+                <span>Material</span>
+                <span style="text-align:right;">Butuh</span>
+                <span style="text-align:right;">Stok RM</span>
+                <span style="text-align:right;">Status</span>
+            </div>
+            @foreach($ps as $sup)
+            <div style="display:grid;grid-template-columns:1fr 72px 72px 72px;gap:.2rem .5rem;padding:.35rem .1rem;border-bottom:1px solid rgba(148,163,184,.08);align-items:center;">
+                <div>
+                    <span style="font-weight:700;font-size:.8rem;">{{ $sup->name }}</span>
+                    <span style="color:var(--muted);font-size:.68rem;margin-left:.3rem;">[{{ $sup->code }}]</span>
+                </div>
+                <div style="text-align:right;font-size:.78rem;font-weight:700;">
+                    {{ number_format($sup->required_qty, 2, ',', '.') }}
+                    <span style="color:var(--muted);font-size:.65em;">{{ $sup->unit }}</span>
+                </div>
+                <div style="text-align:right;font-size:.78rem;font-weight:700;color:{{ $sup->stock_qty < $sup->required_qty ? '#b91c1c' : '#15803d' }};">
+                    {{ number_format($sup->stock_qty, 2, ',', '.') }}
+                </div>
+                <div style="text-align:right;">
+                    @if($sup->has_shortage)
+                        <span style="background:rgba(220,38,38,.1);color:#b91c1c;border:1px solid rgba(220,38,38,.25);border-radius:6px;padding:.1rem .4rem;font-size:.65rem;font-weight:900;white-space:nowrap;">
+                            -{{ number_format($sup->shortage_qty, 2, ',', '.') }}
+                        </span>
+                    @else
+                        <span style="color:#15803d;font-size:.72rem;font-weight:900;">✓</span>
+                    @endif
+                </div>
+            </div>
+            @endforeach
+        </div>
+    </div>
+    @endif
 
     <div class="panel">
         <form id="finishing-form" action="{{ route('production.finishing_jobs.store') }}" method="POST" novalidate>
@@ -225,6 +339,7 @@
                             @error('date')<div class="invalid-feedback">{{ $message }}</div>@enderror
                         </div>
 
+                        @if(strtolower(auth()->user()?->role ?? '') !== 'operating')
                         <div class="col-6 col-md-3">
                             <label class="form-label form-label-sm">Tujuan Gudang</label>
                             <select name="destination_warehouse_id"
@@ -238,6 +353,9 @@
                             </select>
                             @error('destination_warehouse_id')<div class="invalid-feedback">{{ $message }}</div>@enderror
                         </div>
+                        @else
+                        <input type="hidden" name="destination_warehouse_id" value="{{ $defaultDestinationId ?? '' }}">
+                        @endif
 
                         <div class="col-6 col-md-3">
                             <label class="form-label form-label-sm">Filter operator</label>
@@ -250,8 +368,10 @@
                                     </option>
                                 @endforeach
                             </select>
+                            <div id="op-mode-hint" style="font-size:.68rem; margin-top:.25rem; line-height:1.3;"></div>
                         </div>
 
+                        @if(strtolower(auth()->user()?->role ?? '') !== 'operating')
                         <div class="col-12 col-md-3">
                             <label class="form-label form-label-sm">Filter item</label>
                             <select id="item-filter" class="form-select form-select-sm">
@@ -261,24 +381,38 @@
                                 @endforeach
                             </select>
                         </div>
+                        @else
+                        <select id="item-filter" class="d-none">
+                            <option value="">Semua</option>
+                            @foreach($itemOptionsBase as $opt)
+                                <option value="{{ $opt['id'] }}">{{ $opt['code'] }}</option>
+                            @endforeach
+                        </select>
+                        @endif
 
                         <div class="col-12 col-md-3">
                             <label class="form-label form-label-sm">Cari kode</label>
                             <input type="text" id="q" class="form-control form-control-sm mono"
                                    placeholder="Cari item..." autocomplete="off">
                         </div>
+                    </div>
 
-                        {{-- info baris operator (BYOP) --}}
-                        <div class="col-12 col-md-3">
-                            <div class="mini-box">
-                                <div class="mini-top">
-                                    <div class="ttl">Baris OP</div>
-                                    <div class="val mono" id="op-row-count">-</div>
-                                </div>
-                                <div class="text-muted" style="font-size:.78rem;font-weight:800;margin-top:.25rem;">
-                                    Terlihat (setelah filter)
-                                </div>
-                            </div>
+                    <div class="mini-kpi-row">
+                        <div class="mini-kpi">
+                            <span class="lbl">Item</span>
+                            <span class="val mono">{{ number_format($summaryRows,0,',','.') }}</span>
+                        </div>
+                        <div class="mini-kpi is-main">
+                            <span class="lbl">Total WIP</span>
+                            <span class="val mono">{{ number_format($summaryQty,0,',','.') }}<span class="unit">pcs</span></span>
+                        </div>
+                        <div class="mini-kpi">
+                            <span class="lbl">Operator</span>
+                            <span class="val mono">{{ number_format($summaryOps,0,',','.') }}</span>
+                        </div>
+                        <div class="mini-kpi">
+                            <span class="lbl">Baris OP</span>
+                            <span class="val mono" id="op-row-count">-</span>
                         </div>
                     </div>
                 </div>
@@ -307,27 +441,7 @@
                                     ->sortBy('operator_label')
                                     ->values();
                                 });
-
-                            $summaryRows = collect($linesAll)->filter(fn($l)=>(int)($l['total_wip'] ?? 0) > 0)->count();
-                            $summaryQty  = collect($linesAll)->sum(fn($l)=> (int)($l['total_wip'] ?? 0));
-                            $summaryOps  = collect($linesByOp)
-                                ->filter(fn($l)=>(int)($l['total_wip'] ?? 0) > 0)
-                                ->pluck('operator_id')->filter(fn($id)=>(int)$id>0)->unique()->count();
                         @endphp
-
-                        <div class="sum-box mb-2">
-                            <div class="sum-top">
-                                <div><div class="ttl">Summary (Belum Packing)</div></div>
-                                <div class="text-end">
-                                    <div class="sub">Update: <span class="mono">{{ now()->format('H:i') }}</span></div>
-                                </div>
-                            </div>
-                            <div class="sum-pillrow">
-                                <div class="sum-pill"><span class="lbl">Baris</span><span class="val mono">{{ number_format($summaryRows,0,',','.') }}</span></div>
-                                <div class="sum-pill"><span class="lbl">Total Qty</span><span class="val mono">{{ number_format($summaryQty,0,',','.') }}</span></div>
-                                <div class="sum-pill"><span class="lbl">Operator</span><span class="val mono">{{ number_format($summaryOps,0,',','.') }}</span></div>
-                            </div>
-                        </div>
 
                         <div class="accordion" id="all-items-accordion">
                             @php $no = 0; @endphp
@@ -348,29 +462,26 @@
                                 <div class="accordion-item all-item"
                                      data-code="{{ $code }}"
                                      data-item-id="{{ $itemId }}"
-                                     style="border-radius:16px; overflow:hidden; border:1px solid rgba(148,163,184,.18); background:var(--card); margin-bottom:.55rem;">
+                                     style="border-radius:12px; overflow:hidden; border:1px solid rgba(148,163,184,.18); background:var(--card); margin-bottom:.38rem;">
                                     <h2 class="accordion-header" id="{{ $headingId }}">
-                                        <button class="accordion-button collapsed acc-op-btn" type="button"
+                                        <button class="accordion-button collapsed acc-op-btn d-flex justify-content-between align-items-start w-100" type="button"
                                                 data-bs-toggle="collapse" data-bs-target="#{{ $collapseId }}"
                                                 aria-expanded="false" aria-controls="{{ $collapseId }}">
-                                            <div class="d-flex w-100 justify-content-between align-items-center gap-2 flex-wrap">
-                                                <div class="d-flex align-items-center gap-2 min-w-0">
-                                                    <span class="acc-pill"><span class="mono">{{ $no }}</span></span>
-                                                    <div class="mono text-truncate" style="font-weight:900; max-width: 62vw;">
-                                                        {{ $code }}
-                                                    </div>
-                                                </div>
-                                                <div class="d-flex align-items-center gap-2">
-                                                    <span class="acc-pill">OP <span class="mono">{{ number_format($opCount,0,',','.') }}</span></span>
-                                                    <span class="acc-pill">WIP <span class="mono">{{ number_format($wip,0,',','.') }}</span></span>
+                                            <div class="min-w-0">
+                                                <div class="code">{{ $code }}</div>
+                                                <div class="meta-inline">
+                                                    <span>{{ $opCount }} operator</span>
+                                                    <span class="dot">·</span>
+                                                    <span>WIP <span class="mono">{{ number_format($wip,0,',','.') }}</span></span>
                                                 </div>
                                             </div>
+                                            <div class="wip ms-2">SISA {{ number_format($wip,0,',','.') }}</div>
                                         </button>
                                     </h2>
 
                                     <div id="{{ $collapseId }}" class="accordion-collapse collapse"
                                          aria-labelledby="{{ $headingId }}" data-bs-parent="#all-items-accordion">
-                                        <div class="accordion-body" style="padding:.7rem .85rem;">
+                                        <div class="accordion-body" style="padding:.45rem .65rem;">
                                             @if($opCount === 0)
                                                 <div class="text-muted text-center py-2">Tidak ada detail operator.</div>
                                             @else
@@ -838,10 +949,22 @@ document.addEventListener('DOMContentLoaded', () => {
         computeSubmitEnabled();
     }
 
+    // ===== MODE HINT =====
+    const opModeHint = document.getElementById('op-mode-hint');
+    function updateModeHint(mode){
+        if(!opModeHint) return;
+        if(mode === 'byop'){
+            opModeHint.innerHTML = '<span style="color:#16a34a;font-weight:700;">✏ Mode input aktif</span> — isi qty setor di bawah';
+        } else {
+            opModeHint.innerHTML = '<span style="color:#94a3b8;">👁 Ringkasan saja</span> — pilih operator untuk input setor';
+        }
+    }
+
     // ===== MODE SWITCH =====
     function setMode(mode){
         mode = (mode === 'byop') ? 'byop' : 'all';
         operatorModeHidden.value = mode;
+        updateModeHint(mode);
 
         const fab = document.querySelector('.fab-wrap');
 

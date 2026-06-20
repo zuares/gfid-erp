@@ -17,6 +17,12 @@ class SewingPickupLine extends Model
         'qty_returned_reject',
         'status',
         'notes',
+        'unit_cost',
+        'wage_per_pcs',
+        'void_reason',
+        'voided_at',
+        'voided_by',
+        'qty_direct_picked',
     ];
 
     // 🔹 Header Sewing Pickup

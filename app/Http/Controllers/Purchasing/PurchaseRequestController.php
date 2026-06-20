@@ -8,8 +8,10 @@ use App\Models\Item;
 use App\Models\PurchaseRequest;
 use App\Models\PurchaseRequestLine;
 use App\Models\Supplier;
+use App\Services\Purchasing\PurchaseOrderService;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\DB;
+use Illuminate\Validation\Rule;
 
 class PurchaseRequestController extends Controller
 {
@@ -24,7 +26,10 @@ class PurchaseRequestController extends Controller
                 'supplier:id,code,name',
                 'requestedBy:id,name',
                 'convertedToPo:id,code',           // PR-E: link PO di tabel
-                'lines:purchase_request_id,qty,unit_price', // PR-E: estimasi total
+                'purchaseOrders:id,code,purchase_request_id',
+                'lines:id,purchase_request_id,item_id,supplier_id,qty,unit_price,notes',
+                'lines.item:id,code,name,unit',
+                'lines.supplier:id,code,name',
             ])
             ->withCount('lines')
             ->orderByDesc('date')
@@ -48,7 +53,10 @@ class PurchaseRequestController extends Controller
                   ->orWhereHas('supplier', fn($sq) => $sq
                       ->where('name', 'like', "%{$s}%")
                       ->orWhere('code', 'like', "%{$s}%")
-                  );
+                  )
+                  ->orWhereHas('lines.item', fn ($itemQuery) => $itemQuery
+                      ->where('name', 'like', "%{$s}%")
+                      ->orWhere('code', 'like', "%{$s}%"));
             });
         }
 
@@ -152,7 +160,11 @@ class PurchaseRequestController extends Controller
             'approvedBy',
             'rejectedBy',
             'lines.item',
+            'lines.supplier:id,code,name',
+            'lines.purchaseOrder:id,code,status',
             'convertedToPo:id,code', // PR-E: tampilkan link PO di show
+            'purchaseOrders:id,code,status,supplier_id,purchase_request_id',
+            'purchaseOrders.supplier:id,code,name',
         ]);
 
         $canSeeMoney = $this->canSeeMoney($request);
@@ -261,44 +273,160 @@ class PurchaseRequestController extends Controller
     // CONVERT → PO (PR-D)
     // =========================================================
 
-    /**
-     * Redirect ke PO create dengan pre-fill dari data PR.
-     * Hanya untuk owner/admin. PR harus berstatus approved dan belum pernah diconvert.
-     * PO TIDAK langsung dibuat di sini — user masih review + submit manual.
-     */
-    public function convert(Request $request, PurchaseRequest $purchase_request)
+    public function allocateSuppliers(Request $request, PurchaseRequest $purchase_request)
     {
-        abort_unless(
-            $request->user()->isOwner()
-                || in_array($request->user()->role, ['admin'], true)
-                || $request->user()->isDeveloper(),
-            403,
-            'Hanya owner atau admin yang bisa convert PR ke PO.'
-        );
-
-        if (!$purchase_request->isApproved()) {
+        if (!$purchase_request->isConvertible()) {
             return redirect()
                 ->route('purchasing.purchase_requests.show', $purchase_request->id)
-                ->with('error', 'Hanya PR berstatus approved yang bisa diconvert ke PO.');
+                ->with('error', 'PR ini tidak dapat dibagi ke PO karena belum disetujui atau sudah pernah diproses.');
         }
 
-        if (!is_null($purchase_request->converted_to_po_id)) {
+        $purchase_request->load(['lines.item:id,code,name,unit,item_category_id', 'supplier:id,code,name']);
+        $suppliers = Supplier::query()
+            ->where('active', true)
+            ->orderBy('name')
+            ->get(['id', 'code', 'name']);
+        $itemRecommendations = DB::table('supplier_items')
+            ->join('suppliers', 'suppliers.id', '=', 'supplier_items.supplier_id')
+            ->whereIn('supplier_items.item_id', $purchase_request->lines->pluck('item_id'))
+            ->where('supplier_items.active', true)
+            ->where('suppliers.active', true)
+            ->orderByDesc('supplier_items.is_primary')
+            ->orderByDesc('supplier_items.updated_at')
+            ->get(['supplier_items.item_id', 'supplier_items.supplier_id', 'supplier_items.is_primary'])
+            ->groupBy('item_id')
+            ->map(fn ($rows) => $rows->first());
+        $categoryRecommendations = DB::table('supplier_category_mappings')
+            ->join('suppliers', 'suppliers.id', '=', 'supplier_category_mappings.supplier_id')
+            ->join('item_categories', 'item_categories.id', '=', 'supplier_category_mappings.item_category_id')
+            ->whereIn('supplier_category_mappings.item_category_id', $purchase_request->lines->pluck('item.item_category_id')->filter())
+            ->where('supplier_category_mappings.active', true)
+            ->where('suppliers.active', true)
+            ->orderByDesc('supplier_category_mappings.is_primary')
+            ->orderByDesc('supplier_category_mappings.updated_at')
+            ->get([
+                'supplier_category_mappings.item_category_id',
+                'supplier_category_mappings.supplier_id',
+                'supplier_category_mappings.is_primary',
+                'item_categories.name as category_name',
+            ])
+            ->groupBy('item_category_id')
+            ->map(fn ($rows) => $rows->first());
+        $recommendedSuppliers = $purchase_request->lines->mapWithKeys(function ($line) use (
+            $itemRecommendations,
+            $categoryRecommendations
+        ) {
+            if ($itemRecommendation = $itemRecommendations->get($line->item_id)) {
+                $itemRecommendation->source = 'item';
+                return [$line->item_id => $itemRecommendation];
+            }
+
+            if ($categoryRecommendation = $categoryRecommendations->get($line->item?->item_category_id)) {
+                $categoryRecommendation->source = 'category';
+                return [$line->item_id => $categoryRecommendation];
+            }
+
+            return [];
+        });
+
+        return view('purchasing.purchase_requests.allocate-suppliers', compact(
+            'purchase_request',
+            'suppliers',
+            'recommendedSuppliers',
+        ));
+    }
+
+    public function convert(
+        Request $request,
+        PurchaseRequest $purchase_request,
+        PurchaseOrderService $purchaseOrderService
+    ) {
+        if (!$purchase_request->isConvertible()) {
             return redirect()
                 ->route('purchasing.purchase_requests.show', $purchase_request->id)
-                ->with('error', 'PR ini sudah pernah diconvert ke PO.');
+                ->with('error', 'PR ini tidak dapat diproses karena belum disetujui atau sudah pernah dibuatkan PO.');
         }
 
-        // Redirect ke PO create dengan from_pr + prefill params
-        $params = [
-            'from_pr'    => $purchase_request->id,
-            'order_type' => 'material', // default; user bisa ganti di form
-        ];
+        $lineIds = $purchase_request->lines()->pluck('id')->all();
+        $data = $request->validate([
+            'suppliers' => ['required', 'array', 'size:' . count($lineIds)],
+            'suppliers.*' => ['required', 'integer', Rule::exists('suppliers', 'id')->where('active', true)],
+        ]);
 
-        if ($purchase_request->supplier_id) {
-            $params['supplier_id'] = $purchase_request->supplier_id;
+        $submittedIds = array_map('intval', array_keys($data['suppliers']));
+        sort($submittedIds);
+        $expectedIds = array_map('intval', $lineIds);
+        sort($expectedIds);
+
+        if ($submittedIds !== $expectedIds) {
+            return back()->withInput()->withErrors([
+                'suppliers' => 'Semua item PR harus memiliki supplier sebelum PO dibuat.',
+            ]);
         }
 
-        return redirect()->route('purchasing.purchase_orders.create', $params);
+        $createdOrders = DB::transaction(function () use (
+            $data,
+            $purchase_request,
+            $purchaseOrderService,
+            $request
+        ) {
+            $lockedRequest = PurchaseRequest::query()
+                ->whereKey($purchase_request->id)
+                ->lockForUpdate()
+                ->firstOrFail();
+            $lines = $purchase_request->lines()->with('item')->lockForUpdate()->get();
+
+            if ($lockedRequest->status !== 'approved' || $lines->contains(fn ($line) => $line->purchase_order_id !== null)) {
+                abort(409, 'PR sudah diproses oleh pengguna lain. Muat ulang halaman.');
+            }
+
+            $orders = collect();
+            $grouped = $lines->groupBy(fn ($line) => (int) $data['suppliers'][$line->id]);
+
+            foreach ($grouped as $supplierId => $supplierLines) {
+                $order = $purchaseOrderService->create([
+                    'date' => now()->toDateString(),
+                    'supplier_id' => (int) $supplierId,
+                    'discount' => 0,
+                    'tax_percent' => 0,
+                    'shipping_cost' => 0,
+                    'notes' => "Dibuat dari {$purchase_request->code}. Harga dilengkapi owner sebelum approval.",
+                    'created_by' => (int) $request->user()->id,
+                    'status' => 'draft',
+                    'order_type' => 'material',
+                    'purchase_request_id' => $purchase_request->id,
+                    'lines' => $supplierLines->map(fn ($line) => [
+                        'item_id' => $line->item_id,
+                        'qty' => $line->qty,
+                        'unit_price' => $line->unit_price ?? 0,
+                        'discount' => 0,
+                        'notes' => $line->notes,
+                    ])->all(),
+                ]);
+
+                $purchase_request->lines()
+                    ->whereIn('id', $supplierLines->pluck('id'))
+                    ->update([
+                        'supplier_id' => (int) $supplierId,
+                        'purchase_order_id' => $order->id,
+                        'converted_at' => now(),
+                    ]);
+
+                $orders->push($order);
+            }
+
+            $purchase_request->update([
+                'status' => 'converted',
+                'converted_to_po_id' => $orders->first()->id,
+                'converted_at' => now(),
+            ]);
+
+            return $orders;
+        });
+
+        return redirect()
+            ->route('purchasing.purchase_requests.show', $purchase_request->id)
+            ->with('success', $createdOrders->count() . ' PO draft berhasil dibuat: ' . $createdOrders->pluck('code')->join(', ') . '.');
     }
 
     // =========================================================
@@ -368,9 +496,6 @@ class PurchaseRequestController extends Controller
     protected function canSeeMoney(?Request $request = null): bool
     {
         $user = $request?->user() ?: auth()->user();
-        if (!$user) return false;
-        // PR-E: owner + admin + accounting boleh lihat estimasi harga
-        if (method_exists($user, 'isOwner') && $user->isOwner()) return true;
-        return in_array($user->role ?? '', ['admin', 'accounting'], true);
+        return $user && method_exists($user, 'isOwner') && $user->isOwner();
     }
 }

@@ -23,12 +23,24 @@ return new class extends Migration
     public function up(): void
     {
         Schema::table('sales_invoices', function (Blueprint $table) {
-            $table->string('channel', 30)->nullable()->index();
-            $table->string('channel_order_no', 120)->nullable()->index();
-            $table->dateTime('paid_at')->nullable()->index();
-            $table->dateTime('completed_at')->nullable()->index();
-            $table->string('marketplace_status', 30)->nullable()->index();
-            $table->string('awb', 80)->nullable()->index();
+            if (! Schema::hasColumn('sales_invoices', 'channel')) {
+                $table->string('channel', 30)->nullable()->index();
+            }
+            if (! Schema::hasColumn('sales_invoices', 'channel_order_no')) {
+                $table->string('channel_order_no', 120)->nullable()->index();
+            }
+            if (! Schema::hasColumn('sales_invoices', 'paid_at')) {
+                $table->dateTime('paid_at')->nullable()->index();
+            }
+            if (! Schema::hasColumn('sales_invoices', 'completed_at')) {
+                $table->dateTime('completed_at')->nullable()->index();
+            }
+            if (! Schema::hasColumn('sales_invoices', 'marketplace_status')) {
+                $table->string('marketplace_status', 30)->nullable()->index();
+            }
+            if (! Schema::hasColumn('sales_invoices', 'awb')) {
+                $table->string('awb', 80)->nullable()->index();
+            }
 
             if (! $this->sqliteIndexExists('sales_invoices', 'si_store_order_lookup')) {
                 $table->index(['store_id', 'channel_order_no'], 'si_store_order_lookup');

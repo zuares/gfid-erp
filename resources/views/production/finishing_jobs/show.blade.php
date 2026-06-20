@@ -87,6 +87,7 @@
   $isPosted = $status === 'posted';
 
   $lines = $job->lines ?? collect();
+  $bomGapCount = $lines->filter(fn($l) => (bool) ($l->bom_has_gaps ?? false))->count();
   $rejectLines = $lines->filter(fn($line) => (float) $line->qty_reject > 0.0001);
   $totalIn = (float) $lines->sum('qty_in');
   $totalOk = (float) $lines->sum('qty_ok');
@@ -217,10 +218,36 @@
               </button>
             </form>
           @endif
+
+          @if($isPosted && $isOwner && $bomGapCount > 0 && Route::has('production.finishing_jobs.reapply_bom'))
+            <form method="POST" action="{{ route('production.finishing_jobs.reapply_bom', $job->id) }}"
+              onsubmit="return confirm('Apply ulang BOM untuk {{ $bomGapCount }} baris yang belum lengkap?\n\nPastikan GRN sudah diinput terlebih dahulu.');">
+              @csrf
+              <button type="submit" class="btn btn-warning btn-sm btn-pill">
+                <i class="bi bi-arrow-repeat"></i><span>Apply BOM Ulang</span>
+              </button>
+            </form>
+          @endif
+
         </div>
       </div>
     </div>
   </div>
+
+  {{-- BOM GAP BANNER --}}
+  @if($isPosted && $bomGapCount > 0)
+  <div style="background:#fefce8;border:1px solid #fde047;border-radius:12px;padding:.75rem 1rem;margin-bottom:.75rem;display:flex;align-items:flex-start;gap:.6rem;font-size:.85rem;color:#854d0e;">
+    <span style="font-size:1rem;flex-shrink:0;">⚠️</span>
+    <div>
+      <strong>BOM tidak lengkap:</strong> {{ $bomGapCount }} baris SKU belum semua materialnya ter-cover karena belum ada GRN saat posting.
+      @if($isOwner && Route::has('production.finishing_jobs.reapply_bom'))
+        Setelah GRN diinput, klik tombol <strong>Apply BOM Ulang</strong> di atas untuk menyelesaikan rekonsiliasi.
+      @else
+        Hubungi Owner untuk apply ulang BOM setelah GRN diinput.
+      @endif
+    </div>
+  </div>
+  @endif
 
   {{-- SUMMARY --}}
   <div class="card mb-2">

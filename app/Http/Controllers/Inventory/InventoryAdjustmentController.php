@@ -13,18 +13,23 @@ use App\Models\ItemCostSnapshot;
 use App\Models\ItemRole;
 use App\Models\StockOpname;
 use App\Models\Warehouse;
+use App\Services\Accounting\JournalService;
 use App\Services\Inventory\InventoryService;
+use App\Services\Production\SewingSupplyFulfillmentService;
 use Carbon\Carbon;
 use Illuminate\Contracts\View\View;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\RedirectResponse;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\DB;
+use Illuminate\Support\Facades\Log;
 
 class InventoryAdjustmentController extends Controller
 {
     public function __construct(
-        protected InventoryService $inventory
+        protected InventoryService $inventory,
+        protected JournalService $journal,
+        protected SewingSupplyFulfillmentService $sewingSupplyFulfillment,
     ) {}
 
     /**
@@ -544,8 +549,24 @@ class InventoryAdjustmentController extends Controller
                 ]);
             }
 
+            if ($isOwner) {
+                $this->journal->postInventoryAdjustment($adjustment);
+            }
+
             return $adjustment;
         });
+
+        // Post jurnal jika langsung approved (owner path)
+        if ($adjustment->status === InventoryAdjustment::STATUS_APPROVED) {
+            try {
+                $this->journal->postInventoryAdjustment($adjustment);
+            } catch (\Throwable $e) {
+                Log::warning('[InventoryAdjustment] Gagal post jurnal setelah store (owner).', [
+                    'adjustment_id' => $adjustment->id,
+                    'error' => $e->getMessage(),
+                ]);
+            }
+        }
 
         return redirect()
             ->route('inventory.adjustments.show', $adjustment)
@@ -605,7 +626,20 @@ class InventoryAdjustmentController extends Controller
             $inventoryAdjustment->approved_by = $user->id;
             $inventoryAdjustment->approved_at = now();
             $inventoryAdjustment->save();
+
+            $this->journal->postInventoryAdjustment($inventoryAdjustment);
+            $this->sewingSupplyFulfillment->fulfillApprovedAdjustment($inventoryAdjustment);
         });
+
+        // Post jurnal setelah transaksi inventory committed
+        try {
+            $this->journal->postInventoryAdjustment($inventoryAdjustment);
+        } catch (\Throwable $e) {
+            Log::warning('[InventoryAdjustment] Gagal post jurnal setelah approve.', [
+                'adjustment_id' => $inventoryAdjustment->id,
+                'error' => $e->getMessage(),
+            ]);
+        }
 
         return redirect()
             ->route('inventory.adjustments.show', $inventoryAdjustment)
@@ -1021,7 +1055,7 @@ class InventoryAdjustmentController extends Controller
 
         $adjustment->loadMissing(['lines']);
 
-        return DB::transaction(function () use ($adjustment) {
+        DB::transaction(function () use ($adjustment) {
 
             // lock header biar gak double post
             $adjustment = InventoryAdjustment::whereKey($adjustment->id)->lockForUpdate()->first();
@@ -1052,7 +1086,7 @@ class InventoryAdjustmentController extends Controller
                         itemId: $itemId,
                         qty: $qty,
                         date: $adjustment->date ?? now()->toDateString(),
-                        sourceType: 'inventory_adjustment_in',
+                        sourceType: InventoryAdjustment::class,
                         sourceId: $adjustment->id,
                         notes: $line->notes ?? "Inventory Adjustment IN #{$adjustment->id}",
                         lotId: $line->lot_id,
@@ -1067,7 +1101,7 @@ class InventoryAdjustmentController extends Controller
                         itemId: $itemId,
                         qty: $qty,
                         date: $adjustment->date ?? now()->toDateString(),
-                        sourceType: 'inventory_adjustment_out',
+                        sourceType: InventoryAdjustment::class,
                         sourceId: $adjustment->id,
                         notes: $line->notes ?? "Inventory Adjustment OUT #{$adjustment->id}",
                         allowNegative: false,
@@ -1088,9 +1122,19 @@ class InventoryAdjustmentController extends Controller
                 'approved_by' => auth()->id(),
                 'approved_at' => now(),
             ]);
-
-            return back()->with('success', 'Adjustment berhasil diposting (audit trail tercatat).');
         });
+
+        // Post jurnal SETELAH transaksi inventory committed (idempotent, try/catch agar tidak crash flow)
+        try {
+            $this->journal->postInventoryAdjustment($adjustment->fresh());
+        } catch (\Throwable $e) {
+            Log::warning('[InventoryAdjustment] Gagal post jurnal setelah post().', [
+                'adjustment_id' => $adjustment->id,
+                'error' => $e->getMessage(),
+            ]);
+        }
+
+        return back()->with('success', 'Adjustment berhasil diposting (audit trail tercatat).');
     }
     public function cuttingOverproductionCreate(Request $request): View
     {

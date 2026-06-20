@@ -4,6 +4,7 @@ namespace App\Http\Controllers\Accounting;
 
 use App\Http\Controllers\Controller;
 use App\Models\Journal;
+use App\Models\SystemSetting;
 use Illuminate\Http\Request;
 use Illuminate\Routing\Exceptions\UrlGenerationException;
 
@@ -55,6 +56,12 @@ class JournalController extends Controller
 
     public function index(Request $request)
     {
+        // Cut-off filter: default from = cut-off date jika user belum mengisi
+        // Tambahkan ?show_legacy=1 untuk tampilkan semua data termasuk sebelum cut-off
+        $cutoffDate   = SystemSetting::cutoffDateString();
+        $showLegacy   = $request->boolean('show_legacy');
+        $cutoffActive = $cutoffDate && !$request->has('from') && !$showLegacy;
+
         $q = Journal::query()
             ->with(['lines.account'])
             ->orderByDesc('date')
@@ -64,8 +71,9 @@ class JournalController extends Controller
             $q->where('source_type', $request->string('source_type')->toString());
         }
 
-        if ($request->filled('from')) {
-            $q->whereDate('date', '>=', $request->date('from'));
+        $fromFilter = $request->input('from', $cutoffActive ? $cutoffDate : null);
+        if ($fromFilter) {
+            $q->whereDate('date', '>=', $fromFilter);
         }
 
         if ($request->filled('to')) {
@@ -111,9 +119,15 @@ class JournalController extends Controller
         $journals = $q->paginate(30)->withQueryString();
 
         return view('accounting.journals.index', [
-            'journals' => $journals,
-            'sourceTypes' => $rawSourceTypes,
+            'journals'          => $journals,
+            'sourceTypes'       => $rawSourceTypes,
             'sourceTypeOptions' => $sourceTypeOptions,
+            'cutoff'            => [
+                'date'   => $cutoffDate,
+                'active' => $cutoffActive,
+                'legacy' => $showLegacy,
+                'from'   => $fromFilter,
+            ],
         ]);
     }
 

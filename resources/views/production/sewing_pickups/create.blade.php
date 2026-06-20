@@ -226,15 +226,19 @@
             @endif
 
             @if ($errors->any())
-                <div class="alert alert-danger alert-dismissible fade show mb-3" role="alert">
-                    <strong>Periksa lagi isian ambil jahit.</strong>
-                    <ul class="mb-0 small">
-                        @foreach ($errors->all() as $error)
-                            <li>{{ $error }}</li>
-                        @endforeach
-                    </ul>
-                    <button type="button" class="btn-close" data-bs-dismiss="alert" aria-label="Close"></button>
-                </div>
+            <script>
+                document.addEventListener('DOMContentLoaded', function () {
+                    Swal.fire({
+                        icon: 'error',
+                        title: 'Tidak bisa disimpan',
+                        html: '<ul style="text-align:left;padding-left:1.2rem;margin:0">'
+                            + @json(collect($errors->all())->map(fn($e) => '<li>'.$e.'</li>')->implode(''))
+                            + '</ul>',
+                        confirmButtonText: 'OK, perbaiki',
+                        confirmButtonColor: '#0f172a',
+                    });
+                });
+            </script>
             @endif
 
             @php

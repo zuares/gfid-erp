@@ -14,12 +14,13 @@ use App\Models\SewingPickupSupplyLine;
 use App\Models\SewingReturn;
 use App\Models\SewingReturnLine;
 use App\Models\Warehouse;
+use App\Services\Accounting\JournalService;
 use App\Services\Inventory\InventoryService;
-use App\Services\Payroll\PieceRateService;
 use Carbon\Carbon;
 use Illuminate\Http\RedirectResponse;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\DB;
+use Illuminate\Support\Facades\Log;
 use Illuminate\Validation\ValidationException;
 use Illuminate\View\View;
 
@@ -27,6 +28,7 @@ class SewingReturnController extends Controller
 {
     public function __construct(
         protected InventoryService $inventory,
+        protected JournalService $journal,
     ) {}
 
     /* ============================================================
@@ -939,8 +941,10 @@ class SewingReturnController extends Controller
             && auth()->check()
             && auth()->user()->isDeveloper();
 
+        $postedSewingReturn = null;
+
         try {
-        return DB::transaction(function () use ($validated, $date, $operatorId, $isDryRun): RedirectResponse {
+        $response = DB::transaction(function () use ($validated, $date, $operatorId, $isDryRun, &$postedSewingReturn): RedirectResponse {
 
             $wipSewWarehouse = Warehouse::query()
                 ->whereIn('code', ['WIP-SEW', 'WH-SEWING'])
@@ -1227,6 +1231,11 @@ class SewingReturnController extends Controller
                         ]);
                     }
 
+                    $rejectUnitCost = (float) $this->inventory->getItemIncomingUnitCost(
+                        warehouseId: $wipSewWarehouse->id,
+                        itemId: $itemId,
+                    );
+
                     $this->inventory->stockOut(
                         warehouseId: $wipSewWarehouse->id,
                         itemId: $itemId,
@@ -1237,7 +1246,7 @@ class SewingReturnController extends Controller
                         notes: "Sewing Return {$sewingReturn->code} (RJ)",
                         allowNegative: false,
                         lotId: null,
-                        unitCostOverride: null,
+                        unitCostOverride: $rejectUnitCost > 0 ? $rejectUnitCost : null,
                         affectLotCost: false,
                         cuttingJobBundleId: $bundleId,
                     );
@@ -1251,26 +1260,21 @@ class SewingReturnController extends Controller
                         sourceId: $sewingReturn->id,
                         notes: "Sewing Return {$sewingReturn->code} (RJ) → REJ-SEW",
                         lotId: null,
-                        unitCost: null,
+                        unitCost: $rejectUnitCost > 0 ? $rejectUnitCost : null,
                         affectLotCost: false,
                         cuttingJobBundleId: $bundleId,
                     );
                 }
 
                 if (($sourceRejectLineId > 0 || $sourceFinishingLineId > 0) && $qtyOk > 0.000001) {
+                    // WIP-SEW dan REJ-SEW keduanya hanya mengandung material cost (tanpa upah).
+                    // Upah jahit ditambahkan ke WIP-FIN di sini saat rework berhasil (OK).
                     $unitCostRejSew = (float) $this->inventory->getItemIncomingUnitCost(
                         warehouseId: $rejectWarehouse->id,
                         itemId: $itemId
                     );
-
-                    $rate = (float) app(PieceRateService::class)->requireRatePerPcs(
-                        module: 'sewing',
-                        employeeId: $operatorId,
-                        itemId: $itemId,
-                        date: $date
-                    );
-
-                    $unitCostWithLabor = $unitCostRejSew + $rate;
+                    $wagePerPcsLine = (float) ($pl->wage_per_pcs ?? 0);
+                    $unitCostFinRework = round($unitCostRejSew + $wagePerPcsLine, 10);
 
                     $this->inventory->stockOut(
                         warehouseId: $rejectWarehouse->id,
@@ -1278,7 +1282,7 @@ class SewingReturnController extends Controller
                         qty: $qtyOk,
                         date: $date,
                         sourceType: 'sewing_reject_rework_ok',
-                        sourceId: $sourceFinishingLineId > 0 ? $sourceFinishingLineId : $sourceRejectLineId,
+                        sourceId: $sewingReturn->id,
                         notes: "Setor ulang reject {$sewingReturn->code} OUT REJ-SEW",
                         allowNegative: false,
                         lotId: null,
@@ -1293,10 +1297,10 @@ class SewingReturnController extends Controller
                         qty: $qtyOk,
                         date: $date,
                         sourceType: 'sewing_reject_rework_ok',
-                        sourceId: $sourceFinishingLineId > 0 ? $sourceFinishingLineId : $sourceRejectLineId,
-                        notes: "Setor ulang reject {$sewingReturn->code} IN {$destWarehouse->code} + labor @{$rate}/pcs",
+                        sourceId: $sewingReturn->id,
+                        notes: "Setor ulang reject {$sewingReturn->code} IN {$destWarehouse->code}" . ($wagePerPcsLine > 0 ? " + upah @{$wagePerPcsLine}/pcs" : ''),
                         lotId: null,
-                        unitCost: $unitCostWithLabor,
+                        unitCost: $unitCostFinRework,
                         affectLotCost: false,
                         cuttingJobBundleId: $bundleId,
                     );
@@ -1305,21 +1309,15 @@ class SewingReturnController extends Controller
                     continue;
                 }
 
-                // OK: OUT WIP-SEW, IN WIP-FIN + labor
+                // OK: OUT WIP-SEW (material) → IN WIP-FIN (material + upah jahit).
+                // WIP-SEW hanya mengandung material cost; upah ditambahkan di sini saat setor OK.
                 if ($qtyOk > 0.000001) {
                     $unitCostWipSew = (float) $this->inventory->getItemIncomingUnitCost(
                         warehouseId: $wipSewWarehouse->id,
                         itemId: $itemId
                     );
-
-                    $rate = (float) app(PieceRateService::class)->requireRatePerPcs(
-                        module: 'sewing',
-                        employeeId: $operatorId,
-                        itemId: $itemId,
-                        date: $date
-                    );
-
-                    $unitCostWithLabor = $unitCostWipSew + $rate;
+                    $wagePerPcsLine = (float) ($pl->wage_per_pcs ?? 0);
+                    $unitCostFin = round($unitCostWipSew + $wagePerPcsLine, 10);
 
                     $this->inventory->stockOut(
                         warehouseId: $wipSewWarehouse->id,
@@ -1343,9 +1341,9 @@ class SewingReturnController extends Controller
                         date: $date,
                         sourceType: 'sewing_return_ok',
                         sourceId: $sewingReturn->id,
-                        notes: "Sewing Return {$sewingReturn->code} (OK) IN {$destWarehouse->code} + labor @{$rate}/pcs",
+                        notes: "Sewing Return {$sewingReturn->code} (OK) IN {$destWarehouse->code}" . ($wagePerPcsLine > 0 ? " + upah @{$wagePerPcsLine}/pcs" : ''),
                         lotId: null,
-                        unitCost: $unitCostWithLabor,
+                        unitCost: $unitCostFin,
                         affectLotCost: false,
                         cuttingJobBundleId: $bundleId,
                     );
@@ -1420,10 +1418,31 @@ class SewingReturnController extends Controller
                 throw new \App\Exceptions\DryRunRollbackException($sewingReturn);
             }
 
+            $postedSewingReturn = $sewingReturn;
+
             return redirect()
                 ->route('production.sewing.returns.show', $sewingReturn)
                 ->with('success', 'Sewing Return berhasil disimpan.');
         });
+
+        if ($postedSewingReturn) {
+            foreach ([
+                'postSewingReturnOk',
+                'postSewingReturnReject',
+                'postSewingReworkOk',
+            ] as $method) {
+                try {
+                    $this->journal->{$method}($postedSewingReturn);
+                } catch (\Throwable $journalError) {
+                    Log::warning("Gagal membuat jurnal {$method}", [
+                        'sewing_return_id' => $postedSewingReturn->id,
+                        'message' => $journalError->getMessage(),
+                    ]);
+                }
+            }
+        }
+
+        return $response;
         } catch (\App\Exceptions\DryRunRollbackException $e) {
             // Transaction sudah di-rollback otomatis. Tampilkan hasil dry run.
             $sr = $e->sewingReturn;
@@ -1457,7 +1476,9 @@ class SewingReturnController extends Controller
             'reason' => ['nullable', 'string', 'max:255'],
         ]);
 
-        return DB::transaction(function () use ($return, $validated): RedirectResponse {
+        $returnId = (int) $return->id;
+
+        $response = DB::transaction(function () use ($return, $validated): RedirectResponse {
 
             $return = SewingReturn::query()
                 ->whereKey($return->id)
@@ -1737,5 +1758,23 @@ class SewingReturnController extends Controller
                 ->route('production.sewing.returns.show', $return)
                 ->with('success', 'Sewing Return berhasil di-VOID dan stok/counter sudah dibalik.');
         });
+
+        // Void jurnal di LUAR transaction supaya tidak rollback kalau journal gagal.
+        // Tiap source dihandle terpisah supaya 1 gagal tidak batalkan yang lain.
+        foreach ([
+            JournalService::SRC_SEWING_RETURN_OK     => "VOID Setor Jahit OK",
+            JournalService::SRC_SEWING_RETURN_REJECT => "VOID Setor Jahit Reject",
+            JournalService::SRC_SEWING_REWORK_OK     => "VOID Setor Ulang Rework",
+        ] as $srcType => $reason) {
+            try {
+                $this->journal->voidBySource($srcType, $returnId, $reason);
+            } catch (\Throwable $e) {
+                Log::warning("Gagal void jurnal [{$srcType}] sewing_return #{$returnId}", [
+                    'message' => $e->getMessage(),
+                ]);
+            }
+        }
+
+        return $response;
     }
 }

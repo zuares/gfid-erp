@@ -61,6 +61,11 @@ class PurchaseRequest extends Model
         return $this->belongsTo(PurchaseOrder::class, 'converted_to_po_id');
     }
 
+    public function purchaseOrders(): HasMany
+    {
+        return $this->hasMany(PurchaseOrder::class, 'purchase_request_id');
+    }
+
     // =========================================================
     // STATUS HELPERS
     // =========================================================
@@ -104,6 +109,7 @@ class PurchaseRequest extends Model
      */
     public function isConvertible(): bool
     {
-        return $this->status === 'approved' && is_null($this->converted_to_po_id);
+        return $this->status === 'approved'
+            && !$this->lines()->whereNotNull('purchase_order_id')->exists();
     }
 }

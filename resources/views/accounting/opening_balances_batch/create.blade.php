@@ -1,338 +1,400 @@
 @extends('layouts.app')
 
-@section('title', 'Accounting • Batch Input Saldo Awal')
-
-@php
-    $oldAcc = old('account_id', []);
-    $oldDebit = old('debit', []);
-    $oldCredit = old('credit', []);
-    $oldNote = old('line_note', []);
-    $useOld = is_array($oldAcc) && count($oldAcc);
-@endphp
+@section('title', 'Accounting • Saldo Awal')
 
 @push('head')
-    @include('production.dashboard.partials._gf-styles')
-    <style>
-        .obb-form-page { display: grid; gap: 1rem; }
-        .obb-actions { display: flex; justify-content: flex-end; gap: .5rem; flex-wrap: wrap; }
-        .obb-btn {
-            display: inline-flex; align-items: center; justify-content: center; gap: .45rem;
-            min-height: 40px; padding: .55rem .95rem; border-radius: 999px;
-            border: 1px solid rgba(15, 23, 42, .10); background: #fff;
-            color: #0f172a; text-decoration: none; font-size: .84rem; font-weight: 850;
-        }
-        .obb-btn:hover { color: #0f172a; background: #f8fafc; }
-        .obb-btn-primary { color: #fff; background: #0f172a; border-color: #0f172a; }
-        .obb-btn-primary:hover { color: #fff; background: #1e293b; }
-        .obb-btn-danger { color: #b91c1c; border-color: #fecaca; background: #fff5f5; }
-        .obb-btn-danger:hover { color: #991b1b; background: #fee2e2; }
-        .obb-top-grid { display: grid; grid-template-columns: 220px minmax(0, 1fr) 280px; gap: .75rem; align-items: end; }
-        .obb-field .form-control,
-        .obb-field .form-select,
-        .obb-lines-table .form-control {
-            min-height: 40px; border-radius: 12px; border-color: rgba(15, 23, 42, .12);
-            box-shadow: none; font-size: .88rem;
-        }
-        .obb-label {
-            display: block; margin-bottom: .32rem; color: #475569;
-            font-size: .76rem; font-weight: 900;
-        }
-        .obb-balance-card {
-            border: 1px solid #e2e8f0; border-radius: 12px; background: #f8fafc;
-            padding: .68rem .78rem;
-        }
-        .obb-balance-label {
-            color: #64748b; font-size: .66rem; font-weight: 900;
-            text-transform: uppercase; letter-spacing: .06em;
-        }
-        .obb-balance-value {
-            color: #0f172a; font-size: 1rem; font-weight: 950;
-            font-variant-numeric: tabular-nums; line-height: 1.15;
-        }
-        .obb-balance-state {
-            display: inline-flex; align-items: center; gap: .35rem; margin-top: .3rem;
-            border-radius: 999px; padding: .2rem .55rem; font-size: .72rem; font-weight: 880;
-            color: #b45309; background: #fef3c7; border: 1px solid #fde68a;
-        }
-        .obb-balance-state.is-ok { color: #166534; background: #dcfce7; border-color: #bbf7d0; }
-        .obb-error {
-            border: 1px solid #fecaca; background: #fef2f2; color: #991b1b;
-            border-radius: 12px; padding: .85rem .95rem; font-size: .86rem;
-        }
-        .obb-table-wrap { overflow: auto; -webkit-overflow-scrolling: touch; }
-        .obb-lines-table { min-width: 900px; }
-        .obb-lines-table th {
-            color: #64748b; font-size: .68rem; font-weight: 950;
-            text-transform: uppercase; letter-spacing: .06em;
-        }
-        .obb-lines-table td { vertical-align: middle; }
-        .obb-lines-table .js-debit,
-        .obb-lines-table .js-credit { font-weight: 850; font-variant-numeric: tabular-nums; }
-        .obb-add-row { display: flex; justify-content: flex-end; }
-        .obb-note {
-            color: #1e3a8a; background: #eff6ff; border: 1px solid rgba(37, 99, 235, .14);
-            border-radius: 12px; padding: .75rem .85rem; font-size: .84rem; font-weight: 720;
-        }
-        @media (max-width: 768px) {
-            .gf-master-header { padding: 12px 14px; border-radius: 14px; }
-            .gf-master-title { font-size: 18px; }
-            .gf-master-desc { font-size: 11.5px; }
-            .gf-master-actions { flex: 1 1 100%; }
-            .obb-actions { justify-content: stretch; }
-            .obb-actions .obb-btn { flex: 1 1 auto; }
-            .obb-top-grid { grid-template-columns: 1fr; }
-            .obb-add-row { justify-content: stretch; }
-            .obb-add-row .obb-btn { flex: 1 1 auto; }
-        }
-    </style>
+@include('production.dashboard.partials._gf-styles')
+<style>
+    :root {
+        --r: 14px;
+        --b: rgba(148,163,184,.22);
+        --muted: #6b7280;
+        --shadow: 0 10px 26px rgba(15,23,42,.08), 0 0 0 1px rgba(15,23,42,.03);
+    }
+    .page-wrap { max-width: 680px; margin: 0 auto; padding: 14px 12px 96px; display: grid; gap: 1rem; }
+
+    /* Panel */
+    .panel { background: var(--card); border: 1px solid var(--b); border-radius: var(--r); box-shadow: var(--shadow); }
+    .panel-h { padding: 10px 14px; border-bottom: 1px solid rgba(148,163,184,.12); display: flex; justify-content: space-between; align-items: center; gap: 10px; }
+    .panel-b { padding: 12px 14px; }
+    .panel-title { font-weight: 900; font-size: .95rem; margin: 0; }
+    .panel-sub { font-size: .72rem; color: var(--muted); font-weight: 700; }
+
+    /* Top info */
+    .top-grid { display: grid; grid-template-columns: 1fr 1fr; gap: .65rem; }
+    .field label { display: block; font-size: .68rem; font-weight: 900; color: var(--muted); text-transform: uppercase; letter-spacing: .06em; margin-bottom: .22rem; }
+    .field .form-control, .field .form-select { font-size: .88rem; border-radius: 10px; padding: .38rem .52rem; }
+
+    /* Balance indicator */
+    .balance-bar {
+        display: flex; justify-content: space-between; align-items: center;
+        border: 1px solid rgba(148,163,184,.18); border-radius: 12px;
+        padding: .65rem .85rem; background: rgba(148,163,184,.04);
+    }
+    .balance-col { text-align: center; }
+    .balance-lbl { font-size: .58rem; font-weight: 900; color: var(--muted); text-transform: uppercase; letter-spacing: .06em; display: block; }
+    .balance-val { font-size: 1rem; font-weight: 950; font-variant-numeric: tabular-nums; }
+    .balance-state {
+        display: inline-flex; align-items: center; gap: .3rem;
+        border-radius: 999px; padding: .22rem .65rem;
+        font-size: .72rem; font-weight: 900;
+        background: #fef3c7; border: 1px solid #fde68a; color: #92400e;
+    }
+    .balance-state.ok { background: #dcfce7; border-color: #86efac; color: #166534; }
+
+    /* Group header */
+    .group-header {
+        display: flex; align-items: center; gap: .5rem;
+        padding: .35rem 0 .18rem;
+        font-size: .68rem; font-weight: 900; color: var(--muted);
+        text-transform: uppercase; letter-spacing: .08em;
+        border-bottom: 1px solid rgba(148,163,184,.12);
+        margin-bottom: .35rem;
+    }
+    .group-header .dot { width: 7px; height: 7px; border-radius: 50%; flex: 0 0 auto; }
+    .dot-asset { background: #2563eb; }
+    .dot-liability { background: #dc2626; }
+    .dot-equity { background: #16a34a; }
+
+    /* Account row */
+    .acc-row {
+        display: flex; align-items: center; gap: .6rem;
+        padding: .45rem .52rem;
+        border: 1px solid rgba(148,163,184,.15);
+        border-radius: 10px; margin-bottom: .32rem;
+        background: var(--card);
+        transition: border-color .15s, background .15s;
+    }
+    .acc-row:has(.saldo-input:not([value="0"]):not([value=""])):has(.saldo-input[value]) {
+        border-color: rgba(37,99,235,.25);
+        background: rgba(37,99,235,.02);
+    }
+    .acc-info { flex: 1; min-width: 0; }
+    .acc-code { font-size: .65rem; font-weight: 900; color: var(--muted); font-variant-numeric: tabular-nums; }
+    .acc-name { font-size: .84rem; font-weight: 900; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+    .acc-type-badge {
+        font-size: .58rem; font-weight: 900; padding: .08rem .38rem;
+        border-radius: 999px; white-space: nowrap; flex: 0 0 auto;
+    }
+    .badge-asset { background: rgba(37,99,235,.08); color: #2563eb; }
+    .badge-liability { background: rgba(220,38,38,.08); color: #dc2626; }
+    .badge-equity { background: rgba(22,163,74,.08); color: #16a34a; }
+
+    .saldo-wrap { flex: 0 0 140px; }
+    .saldo-input {
+        width: 100%; text-align: right; font-weight: 900; font-size: .9rem;
+        font-variant-numeric: tabular-nums;
+        border: 1px solid rgba(148,163,184,.25); border-radius: 9px;
+        padding: .32rem .5rem; background: var(--card); color: var(--text);
+    }
+    .saldo-input:focus { outline: none; border-color: #2563eb; box-shadow: 0 0 0 2px rgba(37,99,235,.12); }
+    .saldo-hint { font-size: .58rem; color: var(--muted); font-weight: 700; text-align: right; margin-top: .12rem; }
+    .auto-badge { font-size: .52rem; font-weight: 900; background: #dbeafe; color: #1d4ed8; border-radius: 999px; padding: .05rem .3rem; margin-left: .25rem; vertical-align: middle; }
+    .acc-row.is-auto { border-color: rgba(37,99,235,.22); background: rgba(37,99,235,.025); }
+
+    /* Note */
+    .info-note {
+        background: #eff6ff; border: 1px solid rgba(37,99,235,.14);
+        border-radius: 12px; padding: .72rem .85rem;
+        font-size: .82rem; font-weight: 700; color: #1e3a8a; line-height: 1.5;
+    }
+
+    /* FAB */
+    .fab-wrap {
+        position: fixed; right: 14px; bottom: calc(72px + 12px + env(safe-area-inset-bottom));
+        z-index: 1090; display: flex; gap: 10px; align-items: center; pointer-events: none;
+    }
+    .fab-wrap .btn { pointer-events: auto; border-radius: 999px; font-weight: 900;
+        box-shadow: 0 12px 26px rgba(15,23,42,.22), 0 4px 10px rgba(15,23,42,.14); }
+    .fab-save { padding: .62rem 1.4rem; }
+
+    @media(max-width:600px) {
+        .top-grid { grid-template-columns: 1fr; }
+        .saldo-wrap { flex: 0 0 120px; }
+        .acc-name { font-size: .8rem; }
+    }
+</style>
 @endpush
 
 @section('content')
-    <x-gf.page
-        eyebrow="Accounting"
-        title="Batch Input Saldo Awal"
-        description="Isi banyak akun sekaligus. Total debit dan kredit harus sama sebelum bisa diposting.">
-        <x-slot:actions>
-            <div class="obb-actions">
-                <a href="{{ route('accounting.opening-balances-batch.index') }}" class="obb-btn">Daftar Batch</a>
-                <a href="{{ route('accounting.accounts.index') }}" class="obb-btn">Accounts</a>
+@php
+    $assetAccounts     = $accounts->where('type', 'asset')->values();
+    $liabilityAccounts = $accounts->where('type', 'liability')->values();
+    $equityAccounts    = $accounts->where('type', 'equity')->values();
+    $prefill           = $prefill ?? [];
+    $hasPrefill        = collect($prefill)->sum() > 0;
+@endphp
+
+<div class="page-wrap">
+    {{-- Header --}}
+    <div class="panel">
+        <div class="panel-h">
+            <div>
+                <div class="panel-title">Saldo Awal</div>
+                <div class="panel-sub">Input saldo awal akun — balance otomatis dicek</div>
             </div>
-        </x-slot:actions>
-
-        <div class="obb-form-page">
-            @if ($errors->any())
-                <div class="obb-error">
-                    <div class="fw-semibold mb-1">Ada data yang perlu dicek:</div>
-                    <ul class="mb-0">
-                        @foreach ($errors->all() as $error)
-                            <li>{{ $error }}</li>
-                        @endforeach
-                    </ul>
-                </div>
-            @endif
-
-            <form method="POST"
-                action="{{ route('accounting.opening-balances-batch.store') }}"
-                id="ob-form"
-                data-gf-confirm
-                data-gf-confirm-title="Posting saldo awal batch?"
-                data-gf-confirm-text="Sistem akan membuat jurnal posted untuk semua baris yang terisi."
-                data-gf-confirm-ok="Ya, posting">
-                @csrf
-
-                <x-gf.panel title="Informasi Batch" subtitle="Tanggal ini akan dipakai untuk seluruh baris saldo awal.">
-                    <div class="obb-top-grid">
-                        <div class="obb-field">
-                            <label class="obb-label" for="date">Tanggal</label>
-                            <input id="date" type="text" name="date" class="form-control"
-                                value="{{ old('date', now()->toDateString()) }}" required data-gf-date>
-                        </div>
-                        <div class="obb-field">
-                            <label class="obb-label" for="description">Deskripsi</label>
-                            <input id="description" type="text" name="description" class="form-control"
-                                value="{{ old('description', 'Opening Balance (Batch)') }}"
-                                placeholder="Opening balance awal sistem">
-                        </div>
-                        <div class="obb-balance-card">
-                            <div class="d-flex justify-content-between gap-2">
-                                <div>
-                                    <div class="obb-balance-label">Debit</div>
-                                    <div class="obb-balance-value" id="sum-debit">0</div>
-                                </div>
-                                <div class="text-end">
-                                    <div class="obb-balance-label">Kredit</div>
-                                    <div class="obb-balance-value" id="sum-credit">0</div>
-                                </div>
-                            </div>
-                            <div class="obb-balance-state" id="balance-indicator">Belum balance</div>
-                        </div>
-                    </div>
-                </x-gf.panel>
-
-                <x-gf.panel title="Detail Akun" subtitle="Isi debit atau kredit saja di tiap baris. Baris kosong akan dilewati.">
-                    <x-slot:actions>
-                        <div class="obb-add-row">
-                            <button type="button" class="obb-btn" id="btn-add">+ Tambah Baris</button>
-                        </div>
-                    </x-slot:actions>
-
-                    <div class="obb-note mb-3">
-                        Contoh umum: kas/bank di debit, modal atau hutang pembuka di kredit. Untuk cash basis, cukup isi akun yang benar-benar punya saldo awal.
-                    </div>
-
-                    <div class="obb-table-wrap">
-                        <table class="table table-hover align-middle mb-0 gf-clean-table obb-lines-table">
-                            <thead>
-                                <tr>
-                                    <th style="width: 42%">Akun</th>
-                                    <th class="text-end" style="width: 18%">Debit</th>
-                                    <th class="text-end" style="width: 18%">Kredit</th>
-                                    <th style="width: 17%">Catatan</th>
-                                    <th class="text-center" style="width: 5%"></th>
-                                </tr>
-                            </thead>
-                            <tbody id="lines-body">
-                                @if ($useOld)
-                                    @foreach ($oldAcc as $i => $accountId)
-                                        @php
-                                            $selectedAccount = $accounts->firstWhere('id', (int) $accountId);
-                                        @endphp
-                                        <tr>
-                                            <td>
-                                                <x-account-suggest
-                                                    name="account_id[]"
-                                                    :value="$accountId"
-                                                    :display="$selectedAccount ? $selectedAccount->code . ' - ' . $selectedAccount->name : ''"
-                                                    :required="false" />
-                                            </td>
-                                            <td>
-                                                <input name="debit[]" class="form-control text-end js-debit" value="{{ $oldDebit[$i] ?? 0 }}" inputmode="decimal">
-                                            </td>
-                                            <td>
-                                                <input name="credit[]" class="form-control text-end js-credit" value="{{ $oldCredit[$i] ?? 0 }}" inputmode="decimal">
-                                            </td>
-                                            <td>
-                                                <input name="line_note[]" class="form-control" value="{{ $oldNote[$i] ?? '' }}" placeholder="-">
-                                            </td>
-                                            <td class="text-center">
-                                                <button type="button" class="obb-btn obb-btn-danger js-del" aria-label="Hapus baris">x</button>
-                                            </td>
-                                        </tr>
-                                    @endforeach
-                                @else
-                                    @for ($i = 0; $i < 4; $i++)
-                                        <tr>
-                                            <td>
-                                                <x-account-suggest name="account_id[]" :required="false" />
-                                            </td>
-                                            <td>
-                                                <input name="debit[]" class="form-control text-end js-debit" value="0" inputmode="decimal">
-                                            </td>
-                                            <td>
-                                                <input name="credit[]" class="form-control text-end js-credit" value="0" inputmode="decimal">
-                                            </td>
-                                            <td>
-                                                <input name="line_note[]" class="form-control" placeholder="-">
-                                            </td>
-                                            <td class="text-center">
-                                                <button type="button" class="obb-btn obb-btn-danger js-del" aria-label="Hapus baris">x</button>
-                                            </td>
-                                        </tr>
-                                    @endfor
-                                @endif
-                            </tbody>
-                        </table>
-                    </div>
-                </x-gf.panel>
-
-                <div class="d-flex justify-content-end gap-2 flex-wrap">
-                    <a href="{{ route('accounting.opening-balances-batch.index') }}" class="obb-btn">Batal</a>
-                    <button class="obb-btn obb-btn-primary" type="submit">Posting Batch</button>
-                </div>
-            </form>
+            <a href="{{ route('accounting.opening-balances-batch.index') }}"
+               class="btn btn-sm btn-outline-secondary" style="border-radius:999px;">Riwayat</a>
         </div>
-    </x-gf.page>
+    </div>
+
+    @if($errors->any())
+    <div style="background:#fef2f2;border:1px solid #fecaca;border-radius:12px;padding:.85rem .95rem;font-size:.86rem;color:#991b1b;">
+        <div style="font-weight:900;margin-bottom:.35rem;">Ada masalah:</div>
+        <ul class="mb-0">
+            @foreach($errors->all() as $e)<li>{{ $e }}</li>@endforeach
+        </ul>
+    </div>
+    @endif
+
+    <form method="POST" action="{{ route('accounting.opening-balances-batch.store') }}" id="ob-form">
+        @csrf
+
+        {{-- Info tanggal & deskripsi --}}
+        <div class="panel">
+            <div class="panel-b">
+                <div class="top-grid">
+                    <div class="field">
+                        <label>Tanggal Saldo Awal</label>
+                        <input type="date" name="date" class="form-control"
+                               value="{{ old('date', now()->toDateString()) }}" required>
+                    </div>
+                    <div class="field">
+                        <label>Keterangan</label>
+                        <input type="text" name="description" class="form-control"
+                               value="{{ old('description', 'Opening Balance') }}"
+                               placeholder="Saldo awal pembukaan">
+                    </div>
+                </div>
+
+                {{-- Balance indicator --}}
+                <div class="balance-bar mt-3">
+                    <div class="balance-col">
+                        <span class="balance-lbl">Total Aset</span>
+                        <div class="balance-val" id="sum-debit">0</div>
+                    </div>
+                    <div class="text-center">
+                        <div class="balance-state" id="balance-state">Belum balance</div>
+                        <div id="selisih-info" class="mt-1" style="font-size:.65rem;color:var(--muted);font-weight:900;"></div>
+                    </div>
+                    <div class="balance-col text-end">
+                        <span class="balance-lbl">Total Hutang + Modal</span>
+                        <div class="balance-val" id="sum-credit">0</div>
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        {{-- Info note --}}
+        <div class="info-note">
+            💡 Isi <strong>Saldo Awal</strong> masing-masing akun. Aset di kiri = Hutang + Modal di kanan.
+            Kosongkan atau isi <strong>0</strong> untuk akun yang tidak punya saldo awal.
+            @if($hasPrefill)
+            <br><span style="color:#1d4ed8;">✦ Persediaan sudah terisi otomatis dari data stok sistem.</span>
+            @endif
+        </div>
+
+        {{-- ASET --}}
+        <div class="panel">
+            <div class="panel-h">
+                <div class="panel-title">💰 Aset</div>
+                <span class="panel-sub">Kas, bank, persediaan, piutang</span>
+            </div>
+            <div class="panel-b">
+                @foreach($assetAccounts as $acc)
+                @php
+                    $pval = $prefill[$acc->id] ?? 0;
+                    $pdisp = $pval > 0 ? number_format($pval, 0, ',', '.') : '0';
+                    $isAuto = $pval > 0;
+                @endphp
+                <div class="acc-row {{ $isAuto ? 'is-auto' : '' }}">
+                    <input type="hidden" name="account_id[]" value="{{ $acc->id }}">
+                    <input type="hidden" class="js-debit" name="debit[]" value="{{ $pval }}">
+                    <input type="hidden" class="js-credit" name="credit[]" value="0">
+                    <div class="acc-info">
+                        <div class="acc-code">{{ $acc->code }}
+                            @if($isAuto)<span class="auto-badge">auto</span>@endif
+                        </div>
+                        <div class="acc-name">{{ $acc->name }}</div>
+                    </div>
+                    <div class="saldo-wrap">
+                        <input type="text" inputmode="numeric"
+                               class="saldo-input" value="{{ $pdisp }}"
+                               data-type="asset"
+                               placeholder="0">
+                        <div class="saldo-hint">Debit</div>
+                    </div>
+                </div>
+                @endforeach
+            </div>
+        </div>
+
+        {{-- KEWAJIBAN --}}
+        <div class="panel">
+            <div class="panel-h">
+                <div class="panel-title">📋 Kewajiban</div>
+                <span class="panel-sub">Hutang dagang, pinjaman</span>
+            </div>
+            <div class="panel-b">
+                @foreach($liabilityAccounts as $acc)
+                <div class="acc-row">
+                    <input type="hidden" name="account_id[]" value="{{ $acc->id }}">
+                    <input type="hidden" class="js-debit" name="debit[]" value="0">
+                    <input type="hidden" class="js-credit" name="credit[]" value="0">
+                    <div class="acc-info">
+                        <div class="acc-code">{{ $acc->code }}</div>
+                        <div class="acc-name">{{ $acc->name }}</div>
+                    </div>
+                    <div class="saldo-wrap">
+                        <input type="text" inputmode="numeric"
+                               class="saldo-input" value="0"
+                               data-type="liability"
+                               placeholder="0">
+                        <div class="saldo-hint">Kredit</div>
+                    </div>
+                </div>
+                @endforeach
+            </div>
+        </div>
+
+        {{-- EKUITAS --}}
+        <div class="panel">
+            <div class="panel-h">
+                <div class="panel-title">🏛️ Ekuitas / Modal</div>
+                <span class="panel-sub">Modal pemilik</span>
+            </div>
+            <div class="panel-b">
+                @foreach($equityAccounts as $acc)
+                @php $isModalAuto = $acc->code === '3101'; @endphp
+                <div class="acc-row {{ $isModalAuto ? 'is-auto' : '' }}">
+                    <input type="hidden" name="account_id[]" value="{{ $acc->id }}">
+                    <input type="hidden" class="js-debit" name="debit[]" value="0">
+                    <input type="hidden" class="js-credit" name="credit[]" value="0">
+                    <div class="acc-info">
+                        <div class="acc-code">{{ $acc->code }}
+                            @if($isModalAuto)<span class="auto-badge">auto</span>@endif
+                        </div>
+                        <div class="acc-name">{{ $acc->name }}</div>
+                    </div>
+                    <div class="saldo-wrap">
+                        <input type="text" inputmode="numeric"
+                               class="saldo-input" value="0"
+                               data-type="equity"
+                               @if($isModalAuto) data-modal-auto="true" readonly
+                                   style="background:rgba(37,99,235,.06);color:#2563eb;cursor:default;" @endif
+                               placeholder="0">
+                        <div class="saldo-hint">{{ $isModalAuto ? 'Auto (Aset − Hutang)' : 'Kredit' }}</div>
+                    </div>
+                </div>
+                @endforeach
+            </div>
+        </div>
+
+        {{-- FAB --}}
+        <div class="fab-wrap">
+            <button type="submit" class="btn btn-primary fab-save" id="btn-submit">
+                Posting Saldo Awal
+            </button>
+        </div>
+    </form>
+</div>
 @endsection
 
 @push('scripts')
-    <script>
-        (function() {
-            const body = document.getElementById('lines-body');
-            const btnAdd = document.getElementById('btn-add');
-            const sumDebitEl = document.getElementById('sum-debit');
-            const sumCreditEl = document.getElementById('sum-credit');
-            const balanceEl = document.getElementById('balance-indicator');
-            const form = document.getElementById('ob-form');
+<script>
+(function () {
+    const form = document.getElementById('ob-form');
+    const sumDebitEl  = document.getElementById('sum-debit');
+    const sumCreditEl = document.getElementById('sum-credit');
+    const stateEl     = document.getElementById('balance-state');
+    const selisihEl   = document.getElementById('selisih-info');
 
-            if (!body || !btnAdd || !form) return;
+    const fmt = n => new Intl.NumberFormat('id-ID').format(Math.round(n));
+    const toNum = v => {
+        const n = parseFloat((v ?? '').toString().replace(/\./g, '').replace(',', '.').replace(/[^\d.]/g, ''));
+        return isFinite(n) ? n : 0;
+    };
 
-            const toNum = (value) => {
-                const clean = (value ?? '').toString().replace(/,/g, '.').replace(/[^\d.\-]/g, '');
-                const number = parseFloat(clean || '0');
-                return Number.isFinite(number) ? number : 0;
-            };
-            const fmt = (number) => new Intl.NumberFormat('id-ID').format(number);
+    function recalc() {
+        let totalAsset = 0, totalLiability = 0, totalEquityManual = 0;
+        const modalAutoRow = document.querySelector('.saldo-input[data-modal-auto="true"]');
 
-            function recalc() {
-                let debit = 0;
-                let credit = 0;
+        // Pass 1: sum asset + liability + manual equity (skip modal-auto)
+        document.querySelectorAll('.acc-row').forEach(row => {
+            const saldoInput = row.querySelector('.saldo-input');
+            if (saldoInput === modalAutoRow) return;
+            const type = saldoInput.dataset.type;
+            const val  = toNum(saldoInput.value);
+            if (type === 'asset')    totalAsset += val;
+            else if (type === 'liability') totalLiability += val;
+            else totalEquityManual += val; // prive, etc.
+        });
 
-                body.querySelectorAll('tr').forEach((row) => {
-                    debit += toNum(row.querySelector('.js-debit')?.value);
-                    credit += toNum(row.querySelector('.js-credit')?.value);
-                });
+        // Auto-set Modal Pemilik = Aset − Hutang − Ekuitas manual lainnya
+        const modalVal = Math.max(0, totalAsset - totalLiability - totalEquityManual);
+        if (modalAutoRow) {
+            modalAutoRow.value = modalVal > 0 ? fmt(modalVal) : '0';
+        }
 
-                sumDebitEl.textContent = fmt(debit);
-                sumCreditEl.textContent = fmt(credit);
+        // Pass 2: write hidden inputs + compute totals
+        let totalDebit = 0, totalCredit = 0;
+        document.querySelectorAll('.acc-row').forEach(row => {
+            const saldoInput   = row.querySelector('.saldo-input');
+            const debitHidden  = row.querySelector('.js-debit');
+            const creditHidden = row.querySelector('.js-credit');
+            const type = saldoInput.dataset.type;
+            const val  = saldoInput === modalAutoRow ? modalVal : toNum(saldoInput.value);
 
-                const ok = debit > 0 && Math.round(debit * 100) === Math.round(credit * 100);
-                balanceEl.textContent = ok ? 'Balance OK' : 'Belum balance';
-                balanceEl.classList.toggle('is-ok', ok);
-
-                return ok;
+            if (type === 'asset') {
+                debitHidden.value  = val > 0 ? val : 0;
+                creditHidden.value = 0;
+                totalDebit += val;
+            } else {
+                creditHidden.value = val > 0 ? val : 0;
+                debitHidden.value  = 0;
+                totalCredit += val;
             }
+        });
 
-            function bindRow(row) {
-                row.querySelectorAll('.js-debit,.js-credit').forEach((input) => {
-                    input.addEventListener('input', () => {
-                        if (input.classList.contains('js-debit') && toNum(input.value) > 0) {
-                            row.querySelector('.js-credit').value = '0';
-                        }
-                        if (input.classList.contains('js-credit') && toNum(input.value) > 0) {
-                            row.querySelector('.js-debit').value = '0';
-                        }
-                        recalc();
-                    });
-                });
+        sumDebitEl.textContent  = fmt(totalDebit);
+        sumCreditEl.textContent = fmt(totalCredit);
 
-                row.querySelector('.js-del')?.addEventListener('click', () => {
-                    const rows = body.querySelectorAll('tr');
-                    if (rows.length > 2) {
-                        row.remove();
-                    } else {
-                        row.querySelectorAll('input').forEach((input) => {
-                            input.value = input.classList.contains('js-debit') || input.classList.contains('js-credit') ? '0' : '';
-                        });
-                    }
-                    recalc();
-                });
-            }
+        const ok = totalDebit > 0 && Math.round(totalDebit * 100) === Math.round(totalCredit * 100);
+        stateEl.textContent = ok ? '✓ Balance' : 'Belum balance';
+        stateEl.classList.toggle('ok', ok);
 
-            body.querySelectorAll('tr').forEach(bindRow);
+        const diff = Math.abs(totalDebit - totalCredit);
+        selisihEl.textContent = diff > 0 ? 'Selisih: Rp ' + fmt(diff) : '';
+    }
 
-            btnAdd.addEventListener('click', () => {
-                const first = body.querySelector('tr');
-                if (!first) return;
-
-                const clone = first.cloneNode(true);
-                clone.querySelectorAll('input').forEach((input) => {
-                    input.value = input.classList.contains('js-debit') || input.classList.contains('js-credit') ? '0' : '';
-                });
-                clone.querySelectorAll('.acc-suggest-wrap').forEach((wrap) => wrap.removeAttribute('data-init'));
-
-                body.appendChild(clone);
-                bindRow(clone);
-                window.initAccountSuggest?.(clone);
-                recalc();
-            });
-
-            form.addEventListener('submit', (event) => {
-                if (recalc()) return;
-
-                event.preventDefault();
-                if (window.Swal) {
-                    Swal.fire({
-                        icon: 'warning',
-                        title: 'Belum balance',
-                        text: 'Total debit harus sama dengan total kredit dan tidak boleh 0.',
-                        confirmButtonText: 'Cek lagi'
-                    });
-                } else {
-                    alert('Total debit harus sama dengan total kredit dan tidak boleh 0.');
-                }
-            }, true);
-
+    // Format on blur, allow raw typing (skip modal-auto — readonly)
+    document.querySelectorAll('.saldo-input:not([data-modal-auto])').forEach(input => {
+        input.addEventListener('focus', () => {
+            if (input.value === '0') input.value = '';
+        });
+        input.addEventListener('blur', () => {
+            const n = toNum(input.value);
+            input.value = n > 0 ? fmt(n) : '0';
             recalc();
-        })();
-    </script>
+        });
+        input.addEventListener('input', recalc);
+    });
+
+    form.addEventListener('submit', e => {
+        // Recalc final before submit
+        recalc();
+
+        let d = 0, c = 0;
+        document.querySelectorAll('.js-debit').forEach(el => d += toNum(el.value));
+        document.querySelectorAll('.js-credit').forEach(el => c += toNum(el.value));
+
+        if (d <= 0 || Math.round(d * 100) !== Math.round(c * 100)) {
+            e.preventDefault();
+            alert('Total Aset harus sama dengan Total Hutang + Modal dan tidak boleh 0.\nSelisih: Rp ' + fmt(Math.abs(d - c)));
+        }
+    });
+
+    recalc();
+})();
+</script>
 @endpush

@@ -9,6 +9,7 @@ use App\Http\Controllers\Production\ProductionDashboardController;
 use App\Http\Controllers\Production\ProductionPriorityController;
 use App\Http\Controllers\Production\ProductionReportController;
 use App\Http\Controllers\Production\QcController;
+use App\Http\Controllers\Production\ReconcileController;
 use App\Http\Controllers\Production\SewingPickupController;
 use App\Http\Controllers\Production\SewingRejectReturnController;
 use App\Http\Controllers\Production\SewingReturnController;
@@ -238,6 +239,21 @@ Route::middleware(['web', 'auth', 'access:production'])
             });
         });
 
+    });
+
+/*
+|--------------------------------------------------------------------------
+| PRODUCTION (Owner) — REKONSILIASI GAP COST
+|--------------------------------------------------------------------------
+ */
+Route::middleware(['web', 'auth', 'access:production', 'role:owner'])
+    ->prefix('production')
+    ->name('production.')
+    ->group(function () {
+        Route::get('/reconcile', [ReconcileController::class, 'index'])->name('reconcile.index');
+
+        Route::post('finishing_jobs/{finishingJob}/reapply-bom', [FinishingJobController::class, 'reapplyBom'])
+            ->name('finishing_jobs.reapply_bom');
     });
 
 /*

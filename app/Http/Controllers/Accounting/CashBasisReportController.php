@@ -6,6 +6,7 @@ use App\Http\Controllers\Controller;
 use App\Models\Account;
 use App\Models\CashExpense;
 use App\Models\CashReceipt;
+use App\Models\MarketplacePayout;
 use Carbon\Carbon;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\DB;
@@ -121,6 +122,36 @@ class CashBasisReportController extends Controller
             ->selectRaw('a.id, a.code, a.name, COUNT(*) as total_docs, COALESCE(SUM(cash_receipts.amount), 0) as total_amount')
             ->get();
 
+        // Marketplace Payouts
+        $postedPayoutBase = MarketplacePayout::query()
+            ->with(['bankAccount'])
+            ->where('status', 'posted')
+            ->whereDate('date', '>=', $from)
+            ->whereDate('date', '<=', $to);
+
+        $postedPayoutTotal = (float) (clone $postedPayoutBase)->sum('amount');
+        $postedPayoutCount = (int) (clone $postedPayoutBase)->count();
+
+        $draftPayoutTotal  = (float) MarketplacePayout::query()
+            ->where('status', 'draft')
+            ->whereDate('date', '>=', $from)
+            ->whereDate('date', '<=', $to)
+            ->sum('amount');
+
+        $draftPayoutCount  = (int) MarketplacePayout::query()
+            ->where('status', 'draft')
+            ->whereDate('date', '>=', $from)
+            ->whereDate('date', '<=', $to)
+            ->count();
+
+        // Grouped by marketplace_name for breakdown panel
+        $payoutByMarketplace = (clone $postedPayoutBase)
+            ->withoutEagerLoads()
+            ->groupBy('marketplace_name')
+            ->orderByDesc(DB::raw('SUM(amount)'))
+            ->selectRaw('marketplace_name, COUNT(*) as total_docs, COALESCE(SUM(amount), 0) as total_amount')
+            ->get();
+
         $recentExpenses = CashExpense::query()
             ->with(['expenseAccount', 'cashAccount'])
             ->whereDate('date', '>=', $from)
@@ -130,34 +161,75 @@ class CashBasisReportController extends Controller
             ->limit(8)
             ->get();
 
-        $recentReceipts = CashReceipt::query()
+        // Merge CashReceipts + MarketplacePayouts, sorted by date desc, limit 10
+        $recentCashReceipts = CashReceipt::query()
             ->with(['sourceAccount', 'cashAccount'])
             ->whereDate('date', '>=', $from)
             ->whereDate('date', '<=', $to)
             ->orderByDesc('date')
             ->orderByDesc('id')
-            ->limit(8)
-            ->get();
+            ->limit(10)
+            ->get()
+            ->map(fn($r) => (object) [
+                '_type'       => 'cash_receipt',
+                '_route'      => route('accounting.cash-receipts.show', $r),
+                'date'        => $r->date,
+                'id'          => $r->id,
+                'description' => $r->description,
+                'reference'   => $r->reference,
+                'source_name' => $r->sourceAccount?->name ?? '-',
+                'bank_name'   => $r->cashAccount?->name ?? '-',
+                'status'      => $r->status,
+                'amount'      => $r->amount,
+            ]);
+
+        $recentPayouts = MarketplacePayout::query()
+            ->with(['bankAccount'])
+            ->whereDate('date', '>=', $from)
+            ->whereDate('date', '<=', $to)
+            ->orderByDesc('date')
+            ->orderByDesc('id')
+            ->limit(10)
+            ->get()
+            ->map(fn($p) => (object) [
+                '_type'       => 'marketplace_payout',
+                '_route'      => route('accounting.marketplace-payouts.show', $p),
+                'date'        => $p->date,
+                'id'          => $p->id,
+                'description' => $p->description ?: $p->marketplace_name,
+                'reference'   => $p->reference,
+                'source_name' => '🛒 ' . $p->marketplace_name,
+                'bank_name'   => $p->bankAccount?->name ?? '-',
+                'status'      => $p->status,
+                'amount'      => $p->amount,
+            ]);
+
+        $recentReceipts = $recentCashReceipts
+            ->concat($recentPayouts)
+            ->sortByDesc(fn($r) => $r->date . str_pad($r->id, 8, '0', STR_PAD_LEFT))
+            ->take(10)
+            ->values();
 
         return view('accounting.cash_basis_report.index', [
-            'from' => $from,
-            'to' => $to,
-            'cashAccounts' => $cashAccounts,
-            'cashTotal' => (float) $cashAccounts->sum('balance'),
-            'postedReceiptTotal' => $postedReceiptTotal,
-            'postedReceiptCount' => $postedReceiptCount,
-            'draftReceiptTotal' => $draftReceiptTotal,
-            'draftReceiptCount' => $draftReceiptCount,
-            'postedExpenseTotal' => $postedExpenseTotal,
-            'postedExpenseCount' => $postedExpenseCount,
-            'draftExpenseTotal' => $draftExpenseTotal,
-            'draftExpenseCount' => $draftExpenseCount,
-            'voidExpenseCount' => $voidExpenseCount,
-            'expenseByCategory' => $expenseByCategory,
-            'expenseByCash' => $expenseByCash,
-            'receiptBySource' => $receiptBySource,
-            'recentExpenses' => $recentExpenses,
-            'recentReceipts' => $recentReceipts,
+            'from'                => $from,
+            'to'                  => $to,
+            'cashAccounts'        => $cashAccounts,
+            'cashTotal'           => (float) $cashAccounts->sum('balance'),
+            'postedReceiptTotal'  => $postedReceiptTotal + $postedPayoutTotal,
+            'postedReceiptCount'  => $postedReceiptCount + $postedPayoutCount,
+            'draftReceiptTotal'   => $draftReceiptTotal + $draftPayoutTotal,
+            'draftReceiptCount'   => $draftReceiptCount + $draftPayoutCount,
+            'postedExpenseTotal'  => $postedExpenseTotal,
+            'postedExpenseCount'  => $postedExpenseCount,
+            'draftExpenseTotal'   => $draftExpenseTotal,
+            'draftExpenseCount'   => $draftExpenseCount,
+            'voidExpenseCount'    => $voidExpenseCount,
+            'expenseByCategory'   => $expenseByCategory,
+            'expenseByCash'       => $expenseByCash,
+            'receiptBySource'     => $receiptBySource,
+            'payoutByMarketplace' => $payoutByMarketplace,
+            'recentExpenses'      => $recentExpenses,
+            'recentReceipts'      => $recentReceipts,
         ]);
     }
 }

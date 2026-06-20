@@ -73,13 +73,15 @@ class FinishingBomService
             $excludeFLC = (int) ($line->bundle?->cuttingJob?->fabric_item_id ?? 0);
 
             $bomLines = ItemBomLine::where('item_bom_id', $bom->id)
+                ->where('usage_stage', ItemBomLine::STAGE_PACKING_SUPPLY)
+                ->where('is_optional', false)
                 ->orderBy('sort_order')
                 ->get();
 
             if ($bomLines->isEmpty()) {
-                throw ValidationException::withMessages([
-                    'bom' => "BOM item_id={$fgItemId} tidak punya lines (FIN {$job->code}, line {$line->id}).",
-                ]);
+                $line->bom_applied_at = now();
+                $line->save();
+                continue;
             }
 
             foreach ($bomLines as $bl) {
@@ -104,22 +106,37 @@ class FinishingBomService
                     continue;
                 }
 
+                $unitCost = (float) $this->inventory->getItemIncomingUnitCost(
+                    $rmWarehouseId,
+                    (int) $bl->material_item_id,
+                );
+                if ($unitCost <= 0) {
+                    // Skip BOM line ini — material belum di-GRN atau cost belum tersedia.
+                    // Produksi tetap jalan; tandai line bom_has_gaps=true agar muncul di dashboard rekonsiliasi.
+                    \Illuminate\Support\Facades\Log::warning(
+                        "FIN {$job->code} line {$line->id}: skip BOM material #{$bl->material_item_id} ({$bl->code}) — unitCost=0, belum ada cost di RM."
+                    );
+                    $line->bom_has_gaps = true;
+                    continue;
+                }
+
                 $this->inventory->stockOut(
                     warehouseId: $rmWarehouseId,
                     itemId: (int) $bl->material_item_id,
                     qty: (float) $needStr,
                     date: $movementDate,
-                    sourceType: 'finishing_bom', // ✅ audit khusus BOM
-                    sourceId: (int) $line->id, // ✅ per line
+                    sourceType: 'finishing_bom',
+                    sourceId: (int) $line->id,
                     notes: "FIN {$job->code} • BOM SUP • line {$line->id}",
                     allowNegative: true,
                     lotId: null,
-                    unitCostOverride: null,
+                    unitCostOverride: $unitCost,
                     affectLotCost: false,
+                    strictNonNegative: false,
                 );
             }
 
-            // ✅ mark applied
+            // ✅ mark applied (bom_has_gaps tetap tersimpan jika di-set true di atas)
             $line->bom_applied_at = now();
             $line->save();
         }

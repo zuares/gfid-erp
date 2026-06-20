@@ -436,6 +436,17 @@
     @endphp
 
     <div class="page-wrap">
+        @if (session('material_shortage_count', 0) > 0)
+            <div class="alert alert-warning d-flex justify-content-between align-items-center gap-2 flex-wrap">
+                <div>
+                    <strong>{{ session('material_shortage_count') }} material produksi masih kurang.</strong>
+                    Kebutuhan dari hasil QC ini sudah otomatis masuk perhitungan Material Shortage.
+                </div>
+                <a href="{{ route('purchasing.material_shortages.index') }}" class="btn btn-sm btn-warning">
+                    Lihat Kekurangan Material
+                </a>
+            </div>
+        @endif
 
         {{-- ====== ACTIONS SNIPPET (dipakai desktop & mobile) ====== --}}
         @php

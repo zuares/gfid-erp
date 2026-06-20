@@ -37,6 +37,7 @@ class AccountSeeder extends Seeder
             ['code' => '1201', 'name' => 'Persediaan Bahan Baku', 'type' => 'asset'],
             ['code' => '1202', 'name' => 'Persediaan WIP', 'type' => 'asset'],
             ['code' => '1203', 'name' => 'Persediaan Barang Jadi', 'type' => 'asset'],
+            ['code' => '1204', 'name' => 'Persediaan Barang Cacat', 'type' => 'asset'],
 
             // ------------------
             // Receivable
@@ -63,6 +64,7 @@ class AccountSeeder extends Seeder
             // 2xxx LIABILITY
             // ==================================================
             ['code' => '2101', 'name' => 'Hutang Dagang', 'type' => 'liability'],
+            ['code' => '2102', 'name' => 'Hutang Upah Borongan', 'type' => 'liability'],
 
             // ==================================================
             // 3xxx EQUITY

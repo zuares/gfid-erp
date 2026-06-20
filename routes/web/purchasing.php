@@ -1,5 +1,6 @@
 <?php
 
+use App\Http\Controllers\Purchasing\MaterialShortageController;
 use App\Http\Controllers\Purchasing\PurchaseOrderController;
 use App\Http\Controllers\Purchasing\PurchasePaymentController;
 use App\Http\Controllers\Purchasing\PurchaseReceiptController;
@@ -7,6 +8,7 @@ use App\Http\Controllers\Purchasing\PurchaseRequestController;
 use App\Http\Controllers\Purchasing\PurchaseReturnController;
 use App\Http\Controllers\Purchasing\PurchasingDashboardController;
 use App\Http\Controllers\Purchasing\SupplierInvoiceController;
+use App\Http\Controllers\Purchasing\SupplierItemMappingController;
 use Illuminate\Support\Facades\Route;
 
 Route::middleware(['web', 'auth', 'access:purchasing'])
@@ -17,6 +19,28 @@ Route::middleware(['web', 'auth', 'access:purchasing'])
         // DASHBOARD — owner + admin + accounting
         Route::get('dashboard', [PurchasingDashboardController::class, 'index'])
             ->name('dashboard');  // full name: purchasing.dashboard
+
+        Route::get('material-shortages', [MaterialShortageController::class, 'index'])
+            ->name('material_shortages.index');
+        Route::post('material-shortages/purchase-request', [MaterialShortageController::class, 'createPurchaseRequest'])
+            ->name('material_shortages.purchase_request');
+
+        Route::get('supplier-items', [SupplierItemMappingController::class, 'index'])
+            ->name('supplier_items.index');
+        Route::post('supplier-items', [SupplierItemMappingController::class, 'store'])
+            ->name('supplier_items.store');
+        Route::put('supplier-items/{supplierItem}', [SupplierItemMappingController::class, 'update'])
+            ->name('supplier_items.update');
+        Route::delete('supplier-items/{supplierItem}', [SupplierItemMappingController::class, 'destroy'])
+            ->name('supplier_items.destroy');
+        Route::post('supplier-category-mappings', [SupplierItemMappingController::class, 'storeCategory'])
+            ->name('supplier_category_mappings.store');
+        Route::put('supplier-category-mappings/{supplierCategoryMapping}', [SupplierItemMappingController::class, 'updateCategory'])
+            ->name('supplier_category_mappings.update');
+        Route::delete('supplier-category-mappings/{supplierCategoryMapping}', [SupplierItemMappingController::class, 'destroyCategory'])
+            ->name('supplier_category_mappings.destroy');
+        Route::post('supplier-category-mappings/sync', [SupplierItemMappingController::class, 'syncCategorySupplier'])
+            ->name('supplier_category_mappings.sync');
 
         // PURCHASE REQUEST — semua yang punya access:purchasing
         // CRUD resource (index, create, store, show, edit, update)
@@ -30,7 +54,8 @@ Route::middleware(['web', 'auth', 'access:purchasing'])
                 ->name('purchase_requests.approve');
             Route::post('purchase-requests/{purchase_request}/reject', [PurchaseRequestController::class, 'reject'])
                 ->name('purchase_requests.reject');
-            // PR-D: Convert PR → PO (redirect, bukan langsung buat PO)
+            Route::get('purchase-requests/{purchase_request}/allocate-suppliers', [PurchaseRequestController::class, 'allocateSuppliers'])
+                ->name('purchase_requests.allocate_suppliers');
             Route::post('purchase-requests/{purchase_request}/convert', [PurchaseRequestController::class, 'convert'])
                 ->name('purchase_requests.convert');
         });
@@ -45,7 +70,11 @@ Route::middleware(['web', 'auth', 'access:purchasing'])
             Route::get('supplier-price', [PurchaseOrderController::class, 'getSupplierLastPrice'])
                 ->name('supplier_price');
 
-            // PAYMENTS
+            // PAYMENTS — standalone module
+            Route::get('purchase-payments', [PurchasePaymentController::class, 'index'])
+                ->name('purchase_payments.index');
+
+            // PAYMENTS — sub-routes per PO (tetap ada)
             Route::post('purchase-orders/{purchase_order}/payments', [PurchasePaymentController::class, 'store'])
                 ->name('purchase_orders.payments.store');
 

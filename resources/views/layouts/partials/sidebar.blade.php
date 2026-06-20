@@ -78,9 +78,12 @@
     $hasPoCreate  = $router->has('purchasing.purchase_orders.create');
     $hasGrnIndex  = $router->has('purchasing.purchase_receipts.index');
     $hasGrnCreate = $router->has('purchasing.purchase_receipts.create');
-    $hasPurchaseReturnIndex  = $router->has('purchasing.purchase_returns.index');
-    $hasSupplierInvoiceIndex = $router->has('purchasing.supplier_invoices.index');
-    $hasPrIndex              = $router->has('purchasing.purchase_requests.index');
+    $hasPurchaseReturnIndex    = $router->has('purchasing.purchase_returns.index');
+    $hasSupplierInvoiceIndex   = $router->has('purchasing.supplier_invoices.index');
+    $hasPurchasePaymentsIndex  = $router->has('purchasing.purchase_payments.index');
+    $hasPrIndex                = $router->has('purchasing.purchase_requests.index');
+    $hasMaterialShortageIndex  = $router->has('purchasing.material_shortages.index');
+    $hasSupplierItemsIndex     = $router->has('purchasing.supplier_items.index');
 
     // =========================================================
     // Toko Online
@@ -157,7 +160,8 @@
     $hasProdPriorityIndex = $router->has('production.priority.index');
     $hasProdReportsIndex = $router->has('production.reports.index');
 
-    $hasProdDashboard = $router->has('production.dashboard');
+    $hasProdDashboard  = $router->has('production.dashboard');
+    $hasProdReconcile  = $router->has('production.reconcile.index');
 
     // Akuntansi
     $hasAccountsIndex = $router->has('accounting.accounts.index');
@@ -167,6 +171,11 @@
     $hasJournalsIndex = $router->has('accounting.journals.index');
     $hasOpeningBalancesIndex = $router->has('accounting.opening-balances.index');
     $hasOpeningBalancesBatchIndex = $router->has('accounting.opening-balances-batch.index');
+    $hasMarketplacePayoutsIndex = $router->has('accounting.marketplace-payouts.index');
+    $hasApReportIndex           = $router->has('accounting.ap-report.index');
+    $hasTrialBalanceIndex       = $router->has('accounting.trial-balance.index');
+    $hasProfitLossIndex         = $router->has('accounting.profit-loss.index');
+    $hasBukuBesarIndex          = $router->has('accounting.buku-besar.index');
 
     // Penggajian (owner)
     $hasPayrollDashboard = $router->has('payroll.dashboard');
@@ -204,6 +213,7 @@
 
     if (!$canModule('purchasing')) {
         $hasPoIndex = $hasPoCreate = $hasGrnIndex = $hasGrnCreate = false;
+        $hasSupplierItemsIndex = false;
     }
 
     if (!$canModule('marketplace')) {
@@ -323,6 +333,11 @@
         $open('accounting.cash-basis-report.*') ||
         $open('accounting.cash-expenses.*') ||
         $open('accounting.cash-receipts.*') ||
+        $open('accounting.marketplace-payouts.*') ||
+        $open('accounting.ap-report.*') ||
+        $open('accounting.trial-balance.*') ||
+        $open('accounting.profit-loss.*') ||
+        $open('accounting.buku-besar.*') ||
         $open('accounting.opening-balances.*') ||
         $open('accounting.opening-balances-batch.*') ||
         $open('accounting.journals.*') ||
@@ -645,6 +660,13 @@
                     </x-sidebar.simple-link>
                 </li>
             @endif
+            @if ($isOwner && $router->has('settings.system.index'))
+                <li>
+                    <x-sidebar.simple-link href="{{ route('settings.system.index') }}" icon="⚙️" :active="request()->routeIs('settings.*')">
+                        Pengaturan Sistem
+                    </x-sidebar.simple-link>
+                </li>
+            @endif
             <div class="sidebar-divider"></div>
         @endif
 
@@ -959,6 +981,13 @@
                         </x-sidebar.simple-link>
                     @endif
 
+                    @if ($hasProdReconcile && auth()->user()?->hasRole('owner'))
+                        <x-sidebar.simple-link href="{{ route('production.reconcile.index') }}" icon="🔍"
+                            :active="request()->routeIs('production.reconcile.*')">
+                            Rekonsiliasi Gap Cost
+                        </x-sidebar.simple-link>
+                    @endif
+
                 </li>
             @endif
 
@@ -992,6 +1021,13 @@
                         <x-sidebar.simple-link href="{{ route('accounting.cash-receipts.index') }}" icon="💰"
                             :active="request()->routeIs('accounting.cash-receipts.*')">
                             Penerimaan Kas
+                        </x-sidebar.simple-link>
+                    @endif
+
+                    @if ($hasMarketplacePayoutsIndex)
+                        <x-sidebar.simple-link href="{{ route('accounting.marketplace-payouts.index') }}" icon="🛒"
+                            :active="request()->routeIs('accounting.marketplace-payouts.*')">
+                            Penerimaan Marketplace
                         </x-sidebar.simple-link>
                     @endif
 
@@ -1087,7 +1123,7 @@
             </li>
 
             {{-- PURCHASING --}}
-            @if ($canShow($hasPoIndex, $hasPoCreate, $hasGrnIndex, $hasGrnCreate, $hasPurchaseReturnIndex, $hasPrIndex))
+            @if ($canShow($hasPoIndex, $hasPoCreate, $hasGrnIndex, $hasGrnCreate, $hasPurchaseReturnIndex, $hasPrIndex, $hasMaterialShortageIndex, $hasSupplierItemsIndex))
                 <x-sidebar.label text="Pengadaan" />
                 <li class="mb-1">
                     <button class="sidebar-link sidebar-toggle {{ $openPembelian ? 'is-open' : '' }}" type="button"
@@ -1106,11 +1142,23 @@
                             </x-sidebar.sub-link>
                         @endif
 
+                        @php $subhead('Permintaan Pembelian'); @endphp
+                        @if ($hasMaterialShortageIndex)
+                            <x-sidebar.sub-link href="{{ route('purchasing.material_shortages.index') }}" icon="!"
+                                :active="request()->routeIs('purchasing.material_shortages.*')">
+                                Kekurangan Material
+                            </x-sidebar.sub-link>
+                        @endif
                         @if ($hasPrIndex)
-                            @php $subhead('Purchase Request'); @endphp
                             <x-sidebar.sub-link href="{{ route('purchasing.purchase_requests.index') }}" icon="📋"
                                 :active="request()->routeIs('purchasing.purchase_requests.*')">
                                 Purchase Request
+                            </x-sidebar.sub-link>
+                        @endif
+                        @if ($hasSupplierItemsIndex)
+                            <x-sidebar.sub-link href="{{ route('purchasing.supplier_items.index') }}" icon="≡"
+                                :active="request()->routeIs('purchasing.supplier_items.*')">
+                                Pemasok Barang
                             </x-sidebar.sub-link>
                         @endif
 
@@ -1153,6 +1201,14 @@
                             <x-sidebar.sub-link href="{{ route('purchasing.supplier_invoices.index') }}" icon="🧾"
                                 :active="request()->routeIs('purchasing.supplier_invoices.*')">
                                 Faktur Supplier
+                            </x-sidebar.sub-link>
+                        @endif
+
+                        @if ($hasPurchasePaymentsIndex && $isOwner)
+                            @php $subhead('Pembayaran Supplier'); @endphp
+                            <x-sidebar.sub-link href="{{ route('purchasing.purchase_payments.index') }}" icon="💸"
+                                :active="request()->routeIs('purchasing.purchase_payments.*')">
+                                Bayar Supplier
                             </x-sidebar.sub-link>
                         @endif
                     </div>
@@ -1547,6 +1603,13 @@
                             </x-sidebar.sub-link>
                         @endif
 
+                        @if ($hasProdReconcile)
+                            <x-sidebar.sub-link href="{{ route('production.reconcile.index') }}" icon="🔍"
+                                :active="request()->routeIs('production.reconcile.*')">
+                                Rekonsiliasi Gap Cost
+                            </x-sidebar.sub-link>
+                        @endif
+
                         @php $subhead('Alur Produksi'); @endphp
                         @if ($hasProdCuttingJobsIndex)
                             <x-sidebar.sub-link href="{{ route('production.cutting_jobs.index') }}" icon="✂️"
@@ -1648,6 +1711,13 @@
                             </x-sidebar.sub-link>
                         @endif
 
+                        @if ($hasMarketplacePayoutsIndex)
+                            <x-sidebar.sub-link href="{{ route('accounting.marketplace-payouts.index') }}" icon="🛒"
+                                :active="request()->routeIs('accounting.marketplace-payouts.*')">
+                                Penerimaan Marketplace
+                            </x-sidebar.sub-link>
+                        @endif
+
                         @if ($hasJournalsIndex)
                             <x-sidebar.sub-link href="{{ route('accounting.journals.index') }}" icon="📓"
                                 :active="request()->routeIs('accounting.journals.*')">
@@ -1657,8 +1727,36 @@
 
                         @if ($hasAccountsIndex)
                             <x-sidebar.sub-link href="{{ route('accounting.accounts.index') }}" icon="🗂️"
-                                :active="request()->routeIs('accounting.accounts.*')">
+                                :active="request()->routeIs('accounting.accounts.index') || request()->routeIs('accounting.accounts.create') || request()->routeIs('accounting.accounts.edit') || request()->routeIs('accounting.accounts.show')">
                                 Akun (COA)
+                            </x-sidebar.sub-link>
+                        @endif
+
+                        @if ($hasBukuBesarIndex)
+                            <x-sidebar.sub-link href="{{ route('accounting.buku-besar.index') }}" icon="📒"
+                                :active="request()->routeIs('accounting.buku-besar.*') || request()->routeIs('accounting.accounts.ledger')">
+                                Buku Besar
+                            </x-sidebar.sub-link>
+                        @endif
+
+                        @if ($hasTrialBalanceIndex)
+                            <x-sidebar.sub-link href="{{ route('accounting.trial-balance.index') }}" icon="⚖️"
+                                :active="request()->routeIs('accounting.trial-balance.*')">
+                                Neraca Saldo
+                            </x-sidebar.sub-link>
+                        @endif
+
+                        @if ($hasProfitLossIndex)
+                            <x-sidebar.sub-link href="{{ route('accounting.profit-loss.index') }}" icon="📈"
+                                :active="request()->routeIs('accounting.profit-loss.*')">
+                                Laba Rugi
+                            </x-sidebar.sub-link>
+                        @endif
+
+                        @if ($hasApReportIndex)
+                            <x-sidebar.sub-link href="{{ route('accounting.ap-report.index') }}" icon="🧾"
+                                :active="request()->routeIs('accounting.ap-report.*')">
+                                Hutang Dagang
                             </x-sidebar.sub-link>
                         @endif
                     </div>

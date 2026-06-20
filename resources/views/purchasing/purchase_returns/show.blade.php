@@ -16,13 +16,13 @@
 
   .card-main{
     background: var(--card);
-    border-radius: 16px;
+    border-radius: 10px;
     border: 1px solid rgba(148,163,184,.35);
     box-shadow: 0 10px 30px rgba(15,23,42,.10), 0 0 0 1px rgba(148,163,184,.08);
   }
   .card-soft{
     background: color-mix(in srgb, var(--card) 94%, var(--bg) 6%);
-    border-radius: 16px;
+    border-radius: 10px;
     border: 1px solid var(--line);
   }
 
@@ -93,12 +93,30 @@
   }
   .summary-box{
     border:1px solid var(--line);
-    border-radius:12px;
+    border-radius:8px;
     padding:.7rem .8rem;
     background:rgba(148,163,184,.07);
   }
   .summary-box .lbl{ display:block; font-size:.72rem; color:var(--muted); line-height:1.15; }
   .summary-box .val{ display:block; font-weight:850; line-height:1.25; }
+  .summary-box.is-main{
+    border-color:rgba(37,99,235,.22);
+    background:rgba(37,99,235,.06);
+  }
+  .summary-box.is-main .val{ color:#2563eb; }
+  .summary-box.is-danger{
+    border-color:rgba(220,38,38,.25);
+    background:rgba(220,38,38,.06);
+  }
+  .summary-box.is-danger .val{ color:#dc2626; }
+  .return-meta{
+    display:grid;
+    grid-template-columns:repeat(4,minmax(0,1fr));
+    gap:.5rem;
+  }
+  .line-stock-short{ color:#dc2626; font-weight:900; }
+  .line-stock-ok{ color:#15803d; font-weight:900; }
+  .qty-return-input{ min-height:38px; border-radius:10px; font-weight:900; }
 
   @media (max-width: 767.98px){
     html, body{ max-width:100%; overflow-x:hidden; }
@@ -142,7 +160,7 @@
       margin-right: .75rem;
       text-align:left;
     }
-    .summary-grid{ grid-template-columns: repeat(2, minmax(0, 1fr)); }
+    .summary-grid,.return-meta{ grid-template-columns: repeat(2, minmax(0, 1fr)); }
   }
 </style>
 @endpush
@@ -165,6 +183,7 @@
   $totalLines = (int) ($ret->lines?->count() ?? 0);
   $totalQty = (float) ($ret->lines?->sum('qty') ?? 0);
   $grnHref = route('purchasing.purchase_receipts.show', $ret->purchase_receipt_id ?? $ret->grn_id ?? ($ret->grn?->id ?? 0));
+  $dateValue = old('date', $ret->date ? \Illuminate\Support\Carbon::parse($ret->date)->format('Y-m-d') : now()->toDateString());
 @endphp
 
 <div class="pr-show-page">
@@ -237,34 +256,26 @@
       </div>
     @endif
 
-    <div class="card-soft mb-3">
+    <div class="card-soft mb-2">
       <div class="p-3">
-        <div class="d-flex justify-content-between align-items-start flex-wrap gap-2 mb-2">
-          <div>
-            <div class="section-title mb-1">Ringkasan</div>
-            <div class="small text-muted">
-              Draft belum mengurangi stok. Setelah POST, stok di gudang GRN akan berkurang.
-            </div>
-          </div>
-          <a href="{{ $grnHref }}" class="btn btn-outline-primary btn-sm btn-pill">Lihat GRN</a>
-        </div>
-
         <div class="summary-grid">
           <div class="summary-box">
-            <span class="lbl">Item Return</span>
+            <span class="lbl">Item</span>
             <span class="val mono">{{ angka($totalLines) }}</span>
           </div>
-          <div class="summary-box">
-            <span class="lbl">Total Qty</span>
+          <div class="summary-box is-main">
+            <span class="lbl">Qty Return</span>
             <span class="val mono">{{ decimal_id($totalQty, 2) }}</span>
           </div>
           <div class="summary-box">
-            <span class="lbl">GRN Asal</span>
-            <span class="val mono">{{ $ret->grn?->code ?? '-' }}</span>
+            <span class="lbl">Stok</span>
+            <span class="val {{ $stockReady ? 'line-stock-ok' : 'line-stock-short' }}">
+              {{ $isDraft ? ($stockReady ? 'Siap' : 'Kurang') : ($mutationCount > 0 ? 'Sudah Keluar' : '-') }}
+            </span>
           </div>
           <div class="summary-box">
-            <span class="lbl">Gudang</span>
-            <span class="val">{{ $ret->grn?->warehouse?->code ?? '-' }}</span>
+            <span class="lbl">Jurnal</span>
+            <span class="val">{{ $journalCount > 0 ? $journalCount . ' jurnal' : 'Belum' }}</span>
           </div>
         </div>
       </div>
@@ -313,21 +324,22 @@
 
               <div class="row g-2 align-items-end">
                 <div class="col-12 col-md-5">
-                  <label class="form-label small text-uppercase">Tanggal</label>
+                  <label class="form-label small fw-semibold">Tanggal Return</label>
                   <input type="text"
                     name="date"
                     class="form-control form-control-sm gf-date-input"
-                    value="{{ old('date', $ret->date) }}"
+                    value="{{ $dateValue }}"
                     data-gf-date autocomplete="off"
+                    required
                     {{ (!$isDraft || $isVoided) ? 'disabled' : '' }}>
                 </div>
                 <div class="col-12 col-md-7">
-                  <label class="form-label small text-uppercase">Catatan</label>
+                  <label class="form-label small fw-semibold">Catatan</label>
                   <input type="text"
                     name="notes"
                     class="form-control form-control-sm"
                     value="{{ old('notes', $ret->notes) }}"
-                    placeholder="optional"
+                    placeholder="Opsional"
                     {{ (!$isDraft || $isVoided) ? 'disabled' : '' }}>
                 </div>
 
@@ -344,10 +356,6 @@
                 </div>
               </div>
             </form>
-
-            <div class="text-muted small mt-2">
-              * Draft bisa dicek dulu. Setelah POST, stok di gudang GRN akan berkurang.
-            </div>
           </div>
         </div>
       </div>
@@ -369,6 +377,7 @@
             <form method="POST" action="{{ route('purchasing.purchase_returns.update', $ret->id) }}">
               @csrf
               @method('PUT')
+              <input type="hidden" name="date" value="{{ $dateValue }}">
 
               <div class="table-wrap">
                 <table class="table table-sm align-middle mb-0">
@@ -377,7 +386,8 @@
                       <th>#</th>
                       <th>Item</th>
                       <th class="text-end">Diterima</th>
-                      <th class="text-end">Sisa Bisa Return</th>
+                      <th class="text-end">Stok Gudang</th>
+                      <th class="text-end">Maks Return</th>
                       <th class="text-end" style="width: 180px;">Qty Return</th>
                       @if ($canSeeMoney)
                         <th class="text-end">Harga</th>
@@ -391,6 +401,9 @@
                         $grnLine = $ln->grnLine;
                         $received = (float)($grnLine?->qty_received ?? 0);
                         $rem = (float)($remainingMap[(int)$ln->purchase_receipt_line_id] ?? 0);
+                        $stock = (float)($lineStockMap[$ln->id] ?? 0);
+                        $maxReturn = (float)($lineMaxMap[$ln->id] ?? $rem);
+                        $isInventoryLine = (bool)($lineInventoryMap[$ln->id] ?? true);
 
                         $qty = (float)($ln->qty ?? 0);
                         $unitPrice = (float)($ln->unit_price ?? 0);
@@ -420,18 +433,28 @@
                           {{ rtrim(rtrim(number_format($received, 4, ',', '.'), '0'), ',') }}
                         </td>
 
-                        <td class="text-end mono" data-label="Sisa Bisa Return">
-                          {{ rtrim(rtrim(number_format($rem, 4, ',', '.'), '0'), ',') }}
+                        <td class="text-end mono" data-label="Stok Gudang">
+                          @if($isInventoryLine)
+                            <span class="{{ $stock + .0001 >= $qty ? 'line-stock-ok' : 'line-stock-short' }}">
+                              {{ rtrim(rtrim(number_format($stock, 4, ',', '.'), '0'), ',') }}
+                            </span>
+                          @else
+                            <span class="text-muted">Tidak dikelola</span>
+                          @endif
+                        </td>
+
+                        <td class="text-end mono" data-label="Maks Return">
+                          {{ rtrim(rtrim(number_format($maxReturn, 4, ',', '.'), '0'), ',') }}
                         </td>
 
                         <td class="text-end" data-label="Qty Return">
                           @if($isDraft && !$isVoided)
-                            <input type="text"
+                            <input type="number"
                               name="lines[{{ $i }}][qty]"
-                              class="form-control form-control-sm text-end mono"
+                              class="form-control form-control-sm text-end mono qty-return-input"
                               value="{{ old("lines.$i.qty", $ln->qty) }}"
-                              placeholder="0">
-                            <div class="text-muted small mt-1">max {{ rtrim(rtrim(number_format($rem, 4, ',', '.'), '0'), ',') }}</div>
+                              step="0.0001" min="0" max="{{ $maxReturn }}"
+                              inputmode="decimal" placeholder="0">
                           @else
                             <span class="mono">
                               {{ rtrim(rtrim(number_format($qty, 4, ',', '.'), '0'), ',') }}
@@ -466,28 +489,30 @@
             <hr class="my-3" style="border-color: var(--line); opacity: 1;">
 
             <div class="d-flex justify-content-between align-items-center flex-wrap gap-2">
-              <div class="text-muted small">
-                * POST akan mengurangi stok dan mengunci return. VOID akan membalik stok dan jurnal return.
+              <div>
+                @if($isDraft && !$stockReady)
+                  <span class="status-badge bg-danger-subtle text-danger border border-danger-subtle">Stok kurang</span>
+                @elseif($isDraft)
+                  <span class="status-badge bg-success-subtle text-success border border-success-subtle">Siap diposting</span>
+                @endif
               </div>
 
               <div class="d-flex gap-2">
                 @if($isDraft && !$isVoided)
-                  <form method="POST" action="{{ route('purchasing.purchase_returns.post', $ret->id) }}">
+                  <form method="POST" action="{{ route('purchasing.purchase_returns.post', $ret->id) }}" class="js-post-return">
                     @csrf
-                    <button class="btn btn-success btn-sm btn-pill"
-                      type="submit"
-                      onclick="return confirm('POST return? Stok akan berkurang.');">
-                      <i class="bi bi-check2-circle me-1"></i> POST Return
+                    <button class="btn {{ $stockReady ? 'btn-success' : 'btn-outline-danger' }} btn-sm btn-pill"
+                      type="submit" {{ $stockReady ? '' : 'disabled' }}>
+                      <i class="bi bi-check2-circle me-1"></i> {{ $stockReady ? 'POST Return' : 'Kurangi Qty Dulu' }}
                     </button>
                   </form>
                 @endif
 
                 @if($isPosted && !$isVoided)
-                  <form method="POST" action="{{ route('purchasing.purchase_returns.void', $ret->id) }}">
+                  <form method="POST" action="{{ route('purchasing.purchase_returns.void', $ret->id) }}" class="js-void-return">
                     @csrf
                     <button class="btn btn-outline-danger btn-sm btn-pill"
-                      type="submit"
-                      onclick="return confirm('VOID return? Stok & jurnal akan direverse.');">
+                      type="submit">
                       <i class="bi bi-x-circle me-1"></i> VOID
                     </button>
                   </form>
@@ -503,3 +528,57 @@
   </div>
 </div>
 @endsection
+
+@push('scripts')
+<script>
+document.addEventListener('DOMContentLoaded', function () {
+  document.querySelectorAll('.qty-return-input').forEach(function (input) {
+    input.addEventListener('focus', function () {
+      setTimeout(function () { input.select(); }, 0);
+    });
+  });
+
+  function confirmSubmit(form, options) {
+    form.addEventListener('submit', function (event) {
+      if (form.dataset.confirmed === '1' || !window.Swal) return;
+      event.preventDefault();
+
+      Swal.fire({
+        icon: options.icon,
+        title: options.title,
+        text: options.text,
+        showCancelButton: true,
+        confirmButtonText: options.confirmText,
+        cancelButtonText: 'Batal',
+        confirmButtonColor: options.color,
+        reverseButtons: true
+      }).then(function (result) {
+        if (!result.isConfirmed) return;
+        form.dataset.confirmed = '1';
+        form.submit();
+      });
+    });
+  }
+
+  document.querySelectorAll('.js-post-return').forEach(function (form) {
+    confirmSubmit(form, {
+      icon: 'question',
+      title: 'Posting return?',
+      text: 'Stok gudang akan berkurang dan jurnal return akan dibuat.',
+      confirmText: 'Ya, Posting',
+      color: '#16a34a'
+    });
+  });
+
+  document.querySelectorAll('.js-void-return').forEach(function (form) {
+    confirmSubmit(form, {
+      icon: 'warning',
+      title: 'Void return?',
+      text: 'Stok akan dikembalikan dan jurnal return akan dibalik.',
+      confirmText: 'Ya, Void',
+      color: '#dc2626'
+    });
+  });
+});
+</script>
+@endpush

@@ -35,16 +35,16 @@
         }
 
         .panel { background: var(--card); border: 1px solid var(--b); border-radius: var(--r); box-shadow: var(--shadow); }
-        .panel-h { padding: 12px 14px; border-bottom: 1px solid rgba(148, 163, 184, .12); }
-        .panel-b { padding: 12px 14px; }
+        .panel-h { padding: 9px 12px; border-bottom: 1px solid rgba(148, 163, 184, .12); }
+        .panel-b { padding: 10px 12px; }
 
-        .h-title { font-weight: 900; font-size: 1.05rem; margin: 0; }
+        .h-title { font-weight: 900; font-size: .95rem; margin: 0; }
 
-        .meta { border: 1px solid rgba(148, 163, 184, .18); border-radius: var(--r); padding: 10px; background: var(--soft2); }
+        .meta { border: 1px solid rgba(148, 163, 184, .18); border-radius: var(--r); padding: 8px; background: var(--soft2); }
         body[data-theme="dark"] .meta { background: rgba(15, 23, 42, .35); }
 
-        .form-label-sm { font-size: .75rem; font-weight: 800; color: var(--muted); }
-        .form-control-sm, .form-select-sm { font-size: .88rem; padding: .42rem .55rem; border-radius: 12px; }
+        .form-label-sm { font-size: .68rem; font-weight: 800; color: var(--muted); }
+        .form-control-sm, .form-select-sm { font-size: .82rem; padding: .28rem .45rem; border-radius: 10px; }
 
         .return-filter-row { --bs-gutter-x: .5rem; --bs-gutter-y: .45rem; }
         .return-filter-row .form-label-sm {
@@ -106,35 +106,33 @@
 
         .list { display: grid; gap: .6rem; margin-top: 12px; }
 
-        .cardx { border: 1px solid rgba(148, 163, 184, .18); border-radius: 14px; background: var(--card); overflow: hidden; }
-        .cardx-h { padding: 10px 12px 4px; display: flex; justify-content: space-between; gap: 10px; align-items: flex-start; }
+        .cardx { border: 1px solid rgba(148, 163, 184, .18); border-radius: 12px; background: var(--card); overflow: hidden; }
+        .cardx-h { padding: 7px 10px 2px; display: flex; justify-content: space-between; gap: 8px; align-items: flex-start; }
 
-        .cardx-left { display: flex; gap: 10px; align-items: flex-start; min-width: 0; }
+        .cardx-left { display: flex; gap: 8px; align-items: flex-start; min-width: 0; }
         .cardx-left>div { min-width: 0; }
 
-        .chk { width: 18px; height: 18px; border-radius: 6px; cursor: pointer; margin-top: 2px; flex: 0 0 auto; }
+        .chk { width: 16px; height: 16px; border-radius: 5px; cursor: pointer; margin-top: 2px; flex: 0 0 auto; }
 
-        .code { font-weight: 900; letter-spacing: .08em; color: var(--accent); font-size: .98rem; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; max-width: 100%; }
+        .code { font-weight: 900; letter-spacing: .07em; color: var(--accent); font-size: .92rem; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; max-width: 100%; }
 
-        .meta-inline { margin-top: .28rem; font-size: .72rem; color: var(--muted); font-weight: 900; display: flex; align-items: center; gap: .4rem; flex-wrap: wrap; }
+        .meta-inline { margin-top: .18rem; font-size: .68rem; color: var(--muted); font-weight: 900; display: flex; align-items: center; gap: .35rem; flex-wrap: wrap; }
         .meta-inline .dot { opacity: .6; }
         .meta-inline .truncate { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; max-width: 260px; display: inline-block; vertical-align: bottom; }
 
         @media(max-width:991.98px) { .meta-inline .truncate { max-width: 170px; } }
 
-        .right-metrics { font-size: .78rem; color: var(--muted); font-weight: 900; white-space: nowrap; text-align: right; flex: 0 0 auto; }
-        .card-metrics { display: grid; gap: .18rem; min-width: 92px; }
+        .right-metrics { font-size: .75rem; color: var(--muted); font-weight: 900; white-space: nowrap; text-align: right; flex: 0 0 auto; }
+        .card-metrics { display: grid; gap: .1rem; min-width: 80px; }
         .metric-main {
-            border: 1px solid rgba(37, 99, 235, .20);
-            background: rgba(37, 99, 235, .06);
-            border-radius: 12px;
-            padding: .34rem .5rem;
+            display: inline-flex;
+            align-items: baseline;
+            gap: .2rem;
             color: #2563eb;
         }
-        .metric-main .lbl,
-        .metric-sub .lbl { display: block; font-size: .58rem; line-height: 1; color: var(--muted); letter-spacing: .06em; text-transform: uppercase; }
-        .metric-main .val { display: block; margin-top: .08rem; font-size: 1rem; line-height: 1; font-weight: 950; color: #2563eb; }
-        .metric-sub { font-size: .7rem; line-height: 1.15; color: var(--muted); }
+        .metric-main .lbl { font-size: .56rem; line-height: 1; color: var(--muted); letter-spacing: .05em; text-transform: uppercase; }
+        .metric-main .val { font-size: .92rem; line-height: 1; font-weight: 950; color: #2563eb; }
+        .metric-sub { font-size: .66rem; line-height: 1.1; color: var(--muted); }
         .metric-sub.is-returned { color: #16a34a; }
         .supply-mini-btn {
             display: inline-flex;
@@ -153,14 +151,14 @@
         .supply-mini-hint { font-size: .66rem; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; min-width: 0; }
         .supply-mini-action { font-size: .66rem; font-weight: 900; color: #2563eb; flex-shrink: 0; }
 
-        .cardx-b { padding: 10px 12px; display: grid; gap: .55rem; }
-        .grid2 { display: grid; grid-template-columns: 1fr 1fr; gap: .55rem; }
+        .cardx-b { padding: 5px 10px 8px; display: grid; gap: .38rem; }
+        .grid2 { display: grid; grid-template-columns: 1fr 1fr; gap: .4rem; }
 
-        .field label { display: block; font-size: .7rem; font-weight: 900; color: var(--muted); text-transform: uppercase; letter-spacing: .08em; margin-bottom: .25rem; }
+        .field label { display: block; font-size: .65rem; font-weight: 900; color: var(--muted); text-transform: uppercase; letter-spacing: .07em; margin-bottom: .18rem; }
 
-        .qty { text-align: center !important; font-weight: 900; padding: .55rem .55rem !important; border-radius: 999px; }
-        .qty.ok { border: 1px solid rgba(22, 163, 74, .22); background: rgba(22, 163, 74, .05); }
-        .qty.rj { border: 1px solid rgba(185, 28, 28, .22); background: rgba(185, 28, 28, .05); }
+        .qty { text-align: center !important; font-weight: 900; padding: .32rem .4rem !important; border-radius: 10px; }
+        .qty.ok { border: 1px solid rgba(22, 163, 74, .25); background: rgba(22, 163, 74, .04); }
+        .qty.rj { border: 1px solid rgba(185, 28, 28, .22); background: rgba(185, 28, 28, .04); }
         .qty:focus { box-shadow: none; }
 
         .sc-step-hdr { display:flex; justify-content:space-between; align-items:center; gap:.75rem; margin-bottom:.75rem; }
@@ -320,9 +318,9 @@
         .mini-kpi-row {
             display: grid;
             grid-template-columns: repeat(4, minmax(0, 1fr));
-            margin-top: .55rem;
+            margin-top: .4rem;
             border: 1px solid rgba(148, 163, 184, .18);
-            border-radius: 12px;
+            border-radius: 10px;
             overflow: hidden;
             background: rgba(255, 255, 255, .42);
         }
@@ -331,7 +329,7 @@
         body[data-theme="dark"] .mini-kpi-row { background: rgba(15, 23, 42, .20); }
         .mini-kpi {
             border-right: 1px solid rgba(148, 163, 184, .16);
-            padding: .42rem .5rem;
+            padding: .25rem .38rem;
             min-width: 0;
             text-align: center;
         }
@@ -339,7 +337,7 @@
         .mini-kpi .lbl {
             display: block;
             color: var(--muted);
-            font-size: .58rem;
+            font-size: .52rem;
             font-weight: 900;
             line-height: 1;
             letter-spacing: .04em;
@@ -352,9 +350,9 @@
             display: flex;
             align-items: baseline;
             justify-content: center;
-            gap: .18rem;
-            margin-top: .14rem;
-            font-size: .9rem;
+            gap: .14rem;
+            margin-top: .1rem;
+            font-size: .76rem;
             line-height: 1;
             font-weight: 950;
             color: var(--text);
@@ -364,7 +362,7 @@
         }
         .mini-kpi .unit {
             color: var(--muted);
-            font-size: .68em;
+            font-size: .65em;
             font-weight: 900;
         }
         .mini-kpi.is-main {
@@ -1115,27 +1113,29 @@
                                 <div class="cardx-b">
                                     <div class="grid2">
                                         <div class="field">
+                                            <label>{{ $isRejectLine ? 'Setor Ulang' : 'OK' }}</label>
                                             <input type="number" step="1" min="0"
                                                    inputmode="numeric"
                                                    class="form-control form-control-sm qty ok num-input select-all-on-focus {{ $supplyPartial ? 'border-warning' : '' }}"
                                                    name="results[{{ $idx }}][qty_ok]"
-                                                   value="{{ $okVal }}" placeholder="{{ $isRejectLine ? 'Setor ulang' : 'Disetor' }}" {{ $isBlocked ? 'disabled' : '' }}>
+                                                   value="{{ $okVal }}" placeholder="0" {{ $isBlocked ? 'disabled' : '' }}>
                                         </div>
 
                                         @if ($isRejectLine)
                                             <input type="hidden" name="results[{{ $idx }}][qty_reject]" value="0">
                                             <div class="field">
                                                 <label>Sumber</label>
-                                                <div class="form-control form-control-sm mono" style="border-radius:999px; font-weight:900; text-align:center;">
+                                                <div class="form-control form-control-sm mono" style="border-radius:8px; font-weight:900; text-align:center;">
                                                     {{ $line->reject_code ?? 'REJ-SEW' }}
                                                 </div>
                                             </div>
                                         @else
                                             <div class="field">
+                                                <label>Reject</label>
                                                 <input type="number" step="0.01" min="0" inputmode="decimal"
                                                        class="form-control form-control-sm qty rj num-input select-all-on-focus"
                                                        name="results[{{ $idx }}][qty_reject]"
-                                                       value="{{ $rjVal }}" placeholder="Reject" {{ $isBlocked ? 'disabled' : '' }}>
+                                                       value="{{ $rjVal }}" placeholder="0" {{ $isBlocked ? 'disabled' : '' }}>
                                             </div>
                                         @endif
                                     </div>

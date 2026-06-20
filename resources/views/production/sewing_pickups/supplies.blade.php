@@ -36,6 +36,12 @@
     .sup-input:disabled { opacity:.45; cursor:not-allowed; }
     .sup-row.is-locked  { opacity:.6; }
     .sup-row.is-locked .js-row-tap { cursor:default; }
+    .sup-input.is-exceed { border-color:rgba(239,68,68,.7) !important; box-shadow:0 0 0 2px rgba(239,68,68,.15); }
+    .sup-row.is-exceed  { background:rgba(239,68,68,.05); }
+    .stock-info { font-size:.65rem; margin-top:.06rem; }
+    .stock-ok   { color:#15803d; }
+    .stock-low  { color:#b45309; }
+    .stock-zero { color:#b91c1c; }
 
     /* Footer */
     .sp-footer { position:sticky; bottom:.75rem; display:flex; justify-content:space-between;
@@ -132,15 +138,30 @@
                 {{-- Materials (hanya yang belum lengkap) --}}
                 @foreach ($incompleteMaterials as $mat)
                     @php
-                        $slId   = $supplyLineIdByMaterial[$mat['material_item_id']] ?? null;
-                        $reqPcs = (int) $mat['required_pcs'];
+                        $slId      = $supplyLineIdByMaterial[$mat['material_item_id']] ?? null;
+                        $reqPcs    = (int) $mat['required_pcs'];
+                        $mid       = (int) $mat['material_item_id'];
+                        $maxPcs    = (int) ($maxPcsByMaterial[$mid] ?? 0);
+                        $rmStock   = (float) ($rmStockByMaterial[$mid] ?? 0);
+                        $inputMax  = min($reqPcs, $maxPcs);   // tidak boleh melebihi stok
+                        $noStock   = $rmStock <= 0;
+                        $stockClass= $noStock ? 'stock-zero' : ($maxPcs < $reqPcs ? 'stock-low' : 'stock-ok');
+                        $stockIcon = $noStock ? '✗' : ($maxPcs < $reqPcs ? '⚠' : '✓');
                     @endphp
                     <div class="sup-row js-sup-row"
                          data-sl-id="{{ $slId }}"
-                         data-req="{{ $reqPcs }}">
+                         data-req="{{ $reqPcs }}"
+                         data-max-pcs="{{ $inputMax }}">
                         <div class="js-row-tap" style="cursor:pointer; min-width:0;">
                             <div class="sup-name">{{ $mat['name'] }}</div>
-                            <div class="sup-need mono">{{ number_format($reqPcs, 0, ',', '.') }} pcs</div>
+                            <div class="sup-need mono">Butuh {{ number_format($reqPcs, 0, ',', '.') }} pcs</div>
+                            <div class="stock-info {{ $stockClass }}">
+                                {{ $stockIcon }}
+                                Stok RM: {{ number_format($rmStock, 2, ',', '.') }} {{ $mat['uom'] ?? '' }}
+                                @if($rmStock > 0)
+                                    = maks {{ number_format($inputMax, 0, ',', '.') }} pcs
+                                @endif
+                            </div>
                         </div>
                         <div style="display:flex; align-items:center; gap:.35rem; flex-shrink:0;">
                             <button type="button" class="js-unlock-btn"
@@ -148,13 +169,15 @@
                                            border:1px solid rgba(148,163,184,.35); border-radius:999px;
                                            padding:.1rem .4rem; cursor:pointer; white-space:nowrap;"
                                     title="Ubah nilai">✎</button>
-                            <input type="number" step="1" min="0" max="{{ $reqPcs }}" inputmode="numeric"
+                            <input type="number" step="1" min="0" max="{{ $inputMax }}" inputmode="numeric"
                                    class="sup-input js-sup-input"
                                    name="line_supplies[{{ $bundle['id'] }}][{{ $mat['material_item_id'] }}][issued_pcs]"
                                    data-sl-id="{{ $slId }}"
                                    data-req="{{ $reqPcs }}"
+                                   data-max-pcs="{{ $inputMax }}"
                                    value="0"
-                                   placeholder="{{ $reqPcs }}">
+                                   placeholder="{{ $inputMax }}"
+                                   @if($noStock) disabled title="Stok RM habis" @endif>
                             <input type="hidden"
                                    name="line_supplies[{{ $bundle['id'] }}][{{ $mat['material_item_id'] }}][required_qty]"
                                    value="{{ (float) ($mat['required_qty'] ?? 0) }}">
@@ -209,12 +232,13 @@ document.addEventListener('DOMContentLoaded', function () {
         const inputs = inputsBySlId[slId] || [];
         let remaining = Math.round(totalIssued);
         inputs.forEach(inp => {
-            const req = parseInt(inp.dataset.req || '0');
-            const fill = Math.min(remaining, req);
+            const req    = parseInt(inp.dataset.req    || '0');
+            const maxPcs = parseInt(inp.dataset.maxPcs || inp.dataset.req || '0');
+            const fill   = Math.min(remaining, maxPcs);
             inp.value = fill;
             remaining -= fill;
             const row = inp.closest('.js-sup-row');
-            syncRow(row, fill, req);
+            syncRow(row, fill, req, maxPcs);
             if (fill >= req && req > 0) lockRow(row, inp);
         });
         // Sisa = kontribusi bundle lain yang tidak ditampilkan
@@ -222,28 +246,35 @@ document.addEventListener('DOMContentLoaded', function () {
         aggregateSlId(slId);
     });
 
-    // ── Input manual → clamp + sync + aggregate
+    // ── Input manual → clamp ke max_pcs (stok), bukan req
     document.querySelectorAll('.js-sup-input').forEach(inp => {
         inp.addEventListener('input', function () {
-            const req = parseInt(this.dataset.req || '0');
-            const val = Math.max(0, Math.min(parseInt(this.value || '0') || 0, req));
-            if (parseInt(this.value) !== val) this.value = val;
-            syncRow(this.closest('.js-sup-row'), val, req);
+            const req    = parseInt(this.dataset.req    || '0');
+            const maxPcs = parseInt(this.dataset.maxPcs || req);
+            let val = parseInt(this.value || '0') || 0;
+            if (val < 0) val = 0;
+            if (val > maxPcs) {
+                val = maxPcs;
+                this.value = val;
+            }
+            syncRow(this.closest('.js-sup-row'), val, req, maxPcs);
             aggregateSlId(this.dataset.slId);
         });
     });
 
-    // ── Klik area teks → toggle 0 / penuh (skip jika terkunci)
+    // ── Klik area teks → toggle 0 / maks yang tersedia
     document.querySelectorAll('.js-row-tap').forEach(tap => {
         tap.addEventListener('click', function (e) {
             e.stopPropagation();
             const row = this.closest('.js-sup-row');
             const inp = row?.querySelector('.js-sup-input');
-            if (!inp || inp.disabled) return;   // skip baris terkunci
-            const req = parseInt(inp.dataset.req || '0');
-            const cur = parseInt(inp.value || '0') || 0;
-            inp.value = cur >= req ? 0 : req;
-            syncRow(row, parseInt(inp.value), req);
+            if (!inp || inp.disabled) return;
+            const req    = parseInt(inp.dataset.req    || '0');
+            const maxPcs = parseInt(inp.dataset.maxPcs || req);
+            const cur    = parseInt(inp.value || '0') || 0;
+            // toggle: jika sudah di max → reset ke 0, jika belum → isi max
+            inp.value = cur >= maxPcs ? 0 : maxPcs;
+            syncRow(row, parseInt(inp.value), req, maxPcs);
             aggregateSlId(inp.dataset.slId);
         });
     });
@@ -272,16 +303,20 @@ document.addEventListener('DOMContentLoaded', function () {
         if (btn) btn.style.display = '';
     }
 
-    function syncRow(row, val, req) {
+    function syncRow(row, val, req, maxPcs) {
         if (!row) return;
-        const isOk    = val >= req && req > 0;
-        const isShort = val > 0 && !isOk;
-        row.classList.toggle('is-ok',    isOk);
-        row.classList.toggle('is-short', isShort);
+        maxPcs = maxPcs !== undefined ? maxPcs : req;
+        const isExceed = val > maxPcs;           // melebihi stok — tidak boleh terjadi (clamp di input handler)
+        const isOk     = !isExceed && val >= req && req > 0;
+        const isShort  = !isExceed && val > 0 && !isOk;
+        row.classList.toggle('is-ok',     isOk);
+        row.classList.toggle('is-short',  isShort);
+        row.classList.toggle('is-exceed', isExceed);
         const inp = row.querySelector('.js-sup-input');
         if (inp) {
-            inp.classList.toggle('is-ok',    isOk);
-            inp.classList.toggle('is-short', isShort);
+            inp.classList.toggle('is-ok',     isOk);
+            inp.classList.toggle('is-short',  isShort);
+            inp.classList.toggle('is-exceed', isExceed);
         }
     }
 

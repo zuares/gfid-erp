@@ -257,7 +257,6 @@ class CashExpenseController extends Controller
         $expenseAccounts = Account::query()
             ->where('type', 'expense')
             ->where('is_active', true)
-            ->whereIn('code', ['6101', '6105'])
             ->orderBy('code')
             ->get();
 

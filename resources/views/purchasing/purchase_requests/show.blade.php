@@ -1,430 +1,147 @@
 @extends('layouts.app')
 
-@section('title', 'PR — ' . $purchase_request->code)
+@section('title', $purchase_request->code)
 
 @php
     $pr = $purchase_request;
-    $estTotal    = $pr->lines->sum(fn($l) => ($l->qty ?? 0) * ($l->unit_price ?? 0));
-    $hasEstimate = $pr->lines->whereNotNull('unit_price')->count() > 0;
+    $estTotal = $pr->lines->sum(fn ($line) => ($line->qty ?? 0) * ($line->unit_price ?? 0));
+    $hasEstimate = $pr->lines->whereNotNull('unit_price')->isNotEmpty();
+    $actualSuppliers = $pr->lines->pluck('supplier')->filter()->unique('id');
+    $firstPo = $pr->purchaseOrders->first();
 @endphp
 
 @push('head')
 <style>
-    .pr-show-wrap { max-width: 960px; margin-inline: auto; padding-bottom: 3rem; }
-
-    /* ── Info cards ── */
-    .pr-info-card {
-        background: var(--card);
-        border-radius: 14px;
-        border: 1px solid var(--line);
-        margin-bottom: .85rem;
+    .pr-detail-wrap { max-width: 1080px; margin-inline: auto; padding-bottom: 3rem; }
+    .pr-detail-card { background: var(--card); border: 1px solid var(--line); border-radius: 14px; margin-bottom: .85rem; overflow: hidden; }
+    .pr-detail-head { padding: .85rem 1rem; border-bottom: 1px solid var(--line); }
+    .pr-detail-body { padding: 1rem; }
+    .pr-badge { display: inline-flex; border-radius: 999px; font-size: .72rem; padding: .15rem .58rem; border: 1px solid transparent; white-space: nowrap; font-weight: 700; }
+    .pr-draft { background:rgba(148,163,184,.12); color:#64748b; border-color:rgba(148,163,184,.5); }
+    .pr-approved { background:rgba(22,163,74,.1); color:#15803d; border-color:rgba(22,163,74,.45); }
+    .pr-rejected { background:rgba(220,38,38,.08); color:#b91c1c; border-color:rgba(220,38,38,.45); }
+    .pr-converted { background:rgba(59,130,246,.1); color:#1d4ed8; border-color:rgba(59,130,246,.45); }
+    .pr-cancelled { background:rgba(100,116,139,.08); color:#475569; border-color:rgba(100,116,139,.4); }
+    .pr-action { border-radius: 8px; font-size: .78rem; padding: .26rem .65rem; }
+    .pr-info-grid { display: grid; grid-template-columns: repeat(5, minmax(0, 1fr)); }
+    .pr-info-cell { padding: .85rem 1rem; border-right: 1px solid var(--line); }
+    .pr-info-cell:last-child { border-right: 0; }
+    .pr-info-label { color: var(--muted); font-size: .68rem; font-weight: 700; text-transform: uppercase; letter-spacing: .06em; margin-bottom: .15rem; }
+    .pr-info-value { font-size: .88rem; font-weight: 750; line-height: 1.35; }
+    .pr-note { padding: .75rem 1rem; border-top: 1px solid var(--line); color: var(--muted); font-size: .84rem; white-space: pre-line; }
+    .pr-lines-table th { padding: .7rem 1rem; color: var(--muted); font-size: .7rem; text-transform: uppercase; letter-spacing: .06em; white-space: nowrap; }
+    .pr-lines-table td { padding: .7rem 1rem; vertical-align: middle; }
+    .pr-item-name { font-weight: 750; line-height: 1.2; }
+    .pr-item-code { color: var(--muted); font-size: .74rem; margin-top: .12rem; }
+    .pr-mono { font-variant-numeric: tabular-nums; }
+    .pr-history { display: flex; gap: 0; overflow-x: auto; }
+    .pr-history-step { min-width: 180px; flex: 1 0 0; padding: .8rem 1rem; border-right: 1px solid var(--line); }
+    .pr-history-step:last-child { border-right: 0; }
+    .pr-history-title { font-size: .8rem; font-weight: 750; }
+    .pr-history-meta { color: var(--muted); font-size: .72rem; margin-top: .15rem; }
+    @media (max-width: 767.98px) {
+        .pr-detail-wrap { padding-inline: .75rem; }
+        .pr-info-grid { grid-template-columns: repeat(2, minmax(0, 1fr)); }
+        .pr-info-cell { border-bottom: 1px solid var(--line); }
+        .pr-info-cell:nth-child(2n) { border-right: 0; }
+        .pr-info-cell:last-child { grid-column: 1 / -1; border-bottom: 0; }
+        .pr-lines-table thead { display: none; }
+        .pr-lines-table, .pr-lines-table tbody, .pr-lines-table tr, .pr-lines-table td { display: block; width: 100%; }
+        .pr-lines-table tr { padding: .7rem .85rem; border-bottom: 1px solid var(--line); }
+        .pr-lines-table td { border: 0; padding: .18rem 0; text-align: left !important; }
+        .pr-lines-table td[data-label]::before { content: attr(data-label); display: block; color: var(--muted); font-size: .66rem; font-weight: 700; text-transform: uppercase; margin-top: .25rem; }
     }
-    .pr-info-label {
-        font-size: .72rem;
-        font-weight: 600;
-        text-transform: uppercase;
-        letter-spacing: .06em;
-        color: var(--muted);
-        margin-bottom: .15rem;
-    }
-    .pr-info-value { font-size: .92rem; font-weight: 500; }
-
-    /* ── Status badge ── */
-    .pr-badge {
-        border-radius: 999px;
-        font-size: .75rem;
-        padding: .18rem .75rem;
-        border: 1px solid transparent;
-        white-space: nowrap;
-        font-weight: 600;
-    }
-    .pr-draft     { background: rgba(148,163,184,.14); color: #64748b;  border-color: rgba(148,163,184,.5); }
-    .pr-approved  { background: rgba(22,163,74,.12);   color: #15803d;  border-color: rgba(22,163,74,.5); }
-    .pr-rejected  { background: rgba(220,38,38,.08);   color: #b91c1c;  border-color: rgba(220,38,38,.5); }
-    .pr-converted { background: rgba(59,130,246,.10);  color: #1d4ed8;  border-color: rgba(59,130,246,.5); }
-    .pr-cancelled { background: rgba(100,116,139,.08); color: #475569;  border-color: rgba(100,116,139,.4); }
-
-    /* ── Summary row ── */
-    .pr-summary-grid {
-        display: grid;
-        grid-template-columns: repeat(auto-fill, minmax(130px, 1fr));
-        gap: .6rem;
-        padding: .85rem 1rem;
-        border-bottom: 1px solid var(--line);
-    }
-    .pr-sum-cell { }
-    .pr-sum-label { font-size: .68rem; font-weight: 600; text-transform: uppercase; letter-spacing: .06em; color: var(--muted); }
-    .pr-sum-value { font-size: .95rem; font-weight: 700; line-height: 1.2; }
-
-    /* ── Lines table ── */
-    .table thead th {
-        font-size: .75rem;
-        text-transform: uppercase;
-        letter-spacing: .06em;
-        color: var(--muted);
-        border-bottom-width: 1px;
-        white-space: nowrap;
-    }
-    .mono { font-variant-numeric: tabular-nums; }
-    .btn-action { border-radius: 10px; font-size: .82rem; padding: .3rem .85rem; }
-
-    /* ── Timeline ── */
-    .pr-timeline {
-        display: flex;
-        flex-direction: column;
-        gap: 0;
-        position: relative;
-    }
-    .pr-timeline-item {
-        display: flex;
-        gap: .85rem;
-        align-items: flex-start;
-        position: relative;
-        padding-bottom: .9rem;
-    }
-    .pr-timeline-item:last-child { padding-bottom: 0; }
-    .pr-timeline-left {
-        display: flex;
-        flex-direction: column;
-        align-items: center;
-        flex-shrink: 0;
-        width: 20px;
-    }
-    .pr-timeline-dot {
-        width: 10px;
-        height: 10px;
-        border-radius: 50%;
-        background: var(--muted);
-        border: 2px solid var(--card);
-        box-shadow: 0 0 0 1px var(--muted);
-        flex-shrink: 0;
-        margin-top: .2rem;
-    }
-    .pr-timeline-dot.dot-blue   { background: #2563eb; box-shadow: 0 0 0 1px #2563eb; }
-    .pr-timeline-dot.dot-green  { background: #16a34a; box-shadow: 0 0 0 1px #16a34a; }
-    .pr-timeline-dot.dot-red    { background: #dc2626; box-shadow: 0 0 0 1px #dc2626; }
-    .pr-timeline-dot.dot-indigo { background: #4f46e5; box-shadow: 0 0 0 1px #4f46e5; }
-    .pr-timeline-dot.dot-gray   { background: #94a3b8; box-shadow: 0 0 0 1px #94a3b8; }
-    .pr-timeline-line {
-        width: 1px;
-        flex: 1;
-        background: var(--line);
-        min-height: 20px;
-        margin-top: .2rem;
-    }
-    .pr-timeline-content { flex: 1; min-width: 0; }
-    .pr-timeline-action  { font-size: .85rem; font-weight: 600; }
-    .pr-timeline-meta    { font-size: .78rem; color: var(--muted); margin-top: .1rem; }
 </style>
 @endpush
 
 @section('content')
-<div class="pr-show-wrap">
-
-    {{-- ── Top action bar ── --}}
-    <div class="d-flex align-items-center justify-content-between mb-3 gap-2 flex-wrap">
-        <div class="d-flex align-items-center gap-2 flex-wrap">
-            <a href="{{ route('purchasing.purchase_requests.index') }}"
-                class="btn btn-sm btn-outline-secondary btn-action">← Daftar PR</a>
-            <h1 class="h5 mb-0 fw-bold">{{ $pr->code }}</h1>
-            <span class="pr-badge pr-{{ $pr->status }}">{{ pr_status_label($pr->status) }}</span>
+<div class="pr-detail-wrap py-3">
+    <div class="d-flex justify-content-between align-items-start gap-3 mb-3 flex-wrap">
+        <div>
+            <a href="{{ route('purchasing.purchase_requests.index') }}" class="small text-decoration-none">Purchase Requests</a>
+            <div class="d-flex align-items-center gap-2 mt-1 flex-wrap">
+                <h2 class="mb-0">{{ $pr->code }}</h2>
+                <span class="pr-badge pr-{{ $pr->status }}">{{ pr_status_label($pr->status) }}</span>
+            </div>
+            <div class="text-muted small mt-1">{{ $pr->date?->format('d/m/Y') }} · {{ $pr->requestedBy?->name ?? '-' }} · {{ $pr->lines->count() }} barang</div>
         </div>
-
-        <div class="d-flex gap-2 flex-wrap">
+        <div class="d-flex gap-1 flex-wrap">
             @if ($pr->isDraft())
-                <a href="{{ route('purchasing.purchase_requests.edit', $pr->id) }}"
-                    class="btn btn-sm btn-outline-secondary btn-action">✏ Edit</a>
+                <a href="{{ route('purchasing.purchase_requests.edit', $pr) }}" class="btn btn-sm btn-outline-primary pr-action">Edit</a>
             @endif
-
             @if ($canApproveReject)
-                <form method="POST"
-                    action="{{ route('purchasing.purchase_requests.approve', $pr->id) }}"
-                    onsubmit="return confirm('Approve PR {{ $pr->code }}?')">
-                    @csrf
-                    <button type="submit" class="btn btn-sm btn-success btn-action">✔ Approve</button>
-                </form>
-                <form method="POST"
-                    action="{{ route('purchasing.purchase_requests.reject', $pr->id) }}"
-                    onsubmit="return confirm('Tolak PR {{ $pr->code }}?')">
-                    @csrf
-                    <button type="submit" class="btn btn-sm btn-danger btn-action">✖ Tolak</button>
-                </form>
+                <form method="POST" action="{{ route('purchasing.purchase_requests.approve', $pr) }}" onsubmit="return confirm('Setujui {{ $pr->code }}?')">@csrf<button class="btn btn-sm btn-success pr-action">Approve</button></form>
+                <form method="POST" action="{{ route('purchasing.purchase_requests.reject', $pr) }}" onsubmit="return confirm('Tolak {{ $pr->code }}?')">@csrf<button class="btn btn-sm btn-outline-danger pr-action">Tolak</button></form>
             @endif
-
             @if ($pr->isConvertible() && ($user->isOwner() || in_array($user->role, ['admin'], true) || $user->isDeveloper()))
-                <form method="POST"
-                    action="{{ route('purchasing.purchase_requests.convert', $pr->id) }}"
-                    onsubmit="return confirm('Convert PR {{ $pr->code }} ke Purchase Order?\n\nAnda akan diarahkan ke form PO yang sudah terisi.')">
-                    @csrf
-                    <button type="submit" class="btn btn-sm btn-primary btn-action">🔄 Convert ke PO</button>
-                </form>
+                <a href="{{ route('purchasing.purchase_requests.allocate_suppliers', $pr) }}" class="btn btn-sm btn-primary pr-action">Pilih Supplier</a>
+            @elseif ($firstPo)
+                <a href="{{ route('purchasing.purchase_orders.show', $firstPo) }}" class="btn btn-sm btn-primary pr-action">Buka PO</a>
             @endif
         </div>
     </div>
 
-    {{-- Flash --}}
-    @if (session('success'))
-        <div class="alert alert-success alert-dismissible fade show py-2">
-            {{ session('success') }}
-            <button type="button" class="btn-close py-2" data-bs-dismiss="alert"></button>
-        </div>
-    @endif
-    @if (session('error'))
-        <div class="alert alert-danger alert-dismissible fade show py-2">
-            {{ session('error') }}
-            <button type="button" class="btn-close py-2" data-bs-dismiss="alert"></button>
-        </div>
-    @endif
+    @if (session('success'))<div class="alert alert-success py-2 small">{{ session('success') }}</div>@endif
+    @if (session('error'))<div class="alert alert-danger py-2 small">{{ session('error') }}</div>@endif
 
-    {{-- ── Ringkasan Card ── --}}
-    <div class="pr-info-card">
-        {{-- Summary strip --}}
-        <div class="pr-summary-grid">
-            <div class="pr-sum-cell">
-                <div class="pr-sum-label">Status</div>
-                <div class="pr-sum-value mt-1">
-                    <span class="pr-badge pr-{{ $pr->status }}">{{ pr_status_label($pr->status) }}</span>
-                </div>
-            </div>
-            <div class="pr-sum-cell">
-                <div class="pr-sum-label">Jumlah Item</div>
-                <div class="pr-sum-value">{{ $pr->lines->count() }} item</div>
-            </div>
-            @if ($canSeeMoney)
-                <div class="pr-sum-cell">
-                    <div class="pr-sum-label">Est. Total</div>
-                    <div class="pr-sum-value">
-                        @if ($hasEstimate)
-                            Rp {{ number_format($estTotal, 0, ',', '.') }}
-                        @else
-                            <span class="text-muted fw-normal" style="font-size:.82rem;">Tanpa harga</span>
-                        @endif
-                    </div>
-                </div>
-            @endif
-            @if ($pr->convertedToPo)
-                <div class="pr-sum-cell">
-                    <div class="pr-sum-label">PO Hasil Convert</div>
-                    <div class="pr-sum-value" style="font-size:.85rem;">
-                        <a href="{{ route('purchasing.purchase_orders.show', $pr->converted_to_po_id) }}"
-                            class="fw-semibold">
-                            {{ $pr->convertedToPo->code }} →
-                        </a>
-                    </div>
-                </div>
-            @elseif ($pr->isConvertible())
-                <div class="pr-sum-cell">
-                    <div class="pr-sum-label">Convert</div>
-                    <div class="pr-sum-value" style="font-size:.78rem; color:#15803d;">
-                        Siap diconvert
-                    </div>
-                </div>
-            @endif
+    <div class="pr-detail-card">
+        <div class="pr-info-grid">
+            <div class="pr-info-cell"><div class="pr-info-label">Tanggal</div><div class="pr-info-value">{{ $pr->date?->format('d/m/Y') ?? '-' }}</div></div>
+            <div class="pr-info-cell"><div class="pr-info-label">Peminta</div><div class="pr-info-value">{{ $pr->requestedBy?->name ?? '-' }}</div></div>
+            <div class="pr-info-cell"><div class="pr-info-label">Supplier</div><div class="pr-info-value">
+                @if ($actualSuppliers->isNotEmpty()){{ $actualSuppliers->pluck('code')->join(', ') }}
+                @elseif ($pr->supplier){{ $pr->supplier->code }}
+                @else Otomatis saat PO @endif
+            </div></div>
+            <div class="pr-info-cell"><div class="pr-info-label">Purchase Order</div><div class="pr-info-value">
+                @forelse ($pr->purchaseOrders as $order)<a href="{{ route('purchasing.purchase_orders.show', $order) }}" class="d-block text-decoration-none">{{ $order->code }}</a>@empty Belum dibuat @endforelse
+            </div></div>
+            <div class="pr-info-cell"><div class="pr-info-label">{{ $canSeeMoney ? 'Estimasi' : 'Jumlah Barang' }}</div><div class="pr-info-value">
+                @if ($canSeeMoney){{ $hasEstimate ? 'Rp ' . number_format($estTotal, 0, ',', '.') : 'Belum diisi' }}@else{{ $pr->lines->count() }} barang @endif
+            </div></div>
         </div>
-
-        {{-- Detail info --}}
-        <div class="card-body">
-            <div class="row g-3">
-                <div class="col-6 col-md-3">
-                    <div class="pr-info-label">Tanggal</div>
-                    <div class="pr-info-value">{{ $pr->date?->format('d/m/Y') ?? '—' }}</div>
-                </div>
-                <div class="col-6 col-md-3">
-                    <div class="pr-info-label">Diminta Oleh</div>
-                    <div class="pr-info-value">{{ $pr->requestedBy?->name ?? '—' }}</div>
-                </div>
-                <div class="col-6 col-md-3">
-                    <div class="pr-info-label">Dibuat</div>
-                    <div class="pr-info-value" style="font-size:.82rem;">
-                        {{ $pr->created_at?->format('d/m/Y H:i') ?? '—' }}
-                    </div>
-                </div>
-                <div class="col-12 col-md-6">
-                    <div class="pr-info-label">Supplier</div>
-                    <div class="pr-info-value">
-                        {{ $pr->supplier ? $pr->supplier->code . ' — ' . $pr->supplier->name : '—' }}
-                    </div>
-                </div>
-                @if ($pr->notes)
-                    <div class="col-12">
-                        <div class="pr-info-label">Catatan</div>
-                        <div class="pr-info-value" style="white-space:pre-line;">{{ $pr->notes }}</div>
-                    </div>
-                @endif
-            </div>
-        </div>
+        @if ($pr->notes)<div class="pr-note"><strong>Catatan:</strong> {{ $pr->notes }}</div>@endif
     </div>
 
-    {{-- ── Lines table ── --}}
-    <div class="pr-info-card">
-        <div class="card-header d-flex align-items-center"
-            style="background:transparent; border-bottom:1px solid var(--line); padding:.85rem 1rem;">
-            <div class="fw-semibold" style="font-size:.95rem;">
-                Detail Item yang Diminta
-                <span class="text-muted fw-normal ms-1">({{ $pr->lines->count() }} item)</span>
-            </div>
+    <div class="pr-detail-card">
+        <div class="pr-detail-head d-flex justify-content-between align-items-center">
+            <div class="fw-semibold">Kebutuhan Barang</div>
+            <span class="text-muted small">{{ $pr->lines->count() }} barang</span>
         </div>
-
         <div class="table-responsive">
-            <table class="table table-sm mb-0">
-                <thead class="table-light">
-                    <tr>
-                        <th width="4%" class="text-center">No</th>
-                        <th>Item</th>
-                        <th>Unit</th>
-                        <th class="text-end" style="min-width:90px;">Qty</th>
-                        @if ($canSeeMoney)
-                            <th class="text-end" style="min-width:110px;">Harga Est.</th>
-                            <th class="text-end" style="min-width:120px;">Total Est.</th>
-                        @endif
-                        <th>Catatan</th>
-                    </tr>
-                </thead>
+            <table class="table table-sm mb-0 pr-lines-table">
+                <thead class="table-light"><tr><th>Barang</th><th class="text-end">Qty</th>@if ($canSeeMoney)<th class="text-end">Harga</th><th class="text-end">Total</th>@endif<th>Catatan</th>@if ($pr->isConverted())<th>Supplier / PO</th>@endif</tr></thead>
                 <tbody>
-                    @forelse ($pr->lines as $i => $line)
+                    @forelse ($pr->lines as $line)
                         <tr>
-                            <td class="text-center text-muted">{{ $i + 1 }}</td>
-                            <td>
-                                @if ($line->item)
-                                    <span class="fw-semibold mono">{{ $line->item->code }}</span>
-                                    <span class="text-muted ms-1">{{ $line->item->name }}</span>
-                                @else
-                                    <span class="text-muted fst-italic">Item tidak ditemukan</span>
-                                @endif
-                            </td>
-                            <td class="text-muted">{{ $line->item?->unit ?? '—' }}</td>
-                            <td class="text-end mono">{{ number_format($line->qty, 2, ',', '.') }}</td>
+                            <td><div class="pr-item-name">{{ $line->item?->name ?? 'Barang tidak ditemukan' }}</div><div class="pr-item-code">{{ $line->item?->code }}</div></td>
+                            <td class="text-end pr-mono" data-label="Qty">{{ number_format($line->qty, 2, ',', '.') }} {{ $line->item?->unit }}</td>
                             @if ($canSeeMoney)
-                                <td class="text-end mono">
-                                    {{ $line->unit_price !== null
-                                        ? 'Rp ' . number_format($line->unit_price, 0, ',', '.')
-                                        : '—' }}
-                                </td>
-                                <td class="text-end mono">
-                                    @if ($line->unit_price !== null)
-                                        Rp {{ number_format($line->qty * $line->unit_price, 0, ',', '.') }}
-                                    @else
-                                        —
-                                    @endif
-                                </td>
+                                <td class="text-end pr-mono" data-label="Harga">{{ $line->unit_price !== null ? 'Rp ' . number_format($line->unit_price, 0, ',', '.') : '-' }}</td>
+                                <td class="text-end pr-mono" data-label="Total">{{ $line->unit_price !== null ? 'Rp ' . number_format($line->qty * $line->unit_price, 0, ',', '.') : '-' }}</td>
                             @endif
-                            <td class="text-muted" style="font-size:.85rem;">{{ $line->notes ?? '—' }}</td>
+                            <td data-label="Catatan" class="text-muted">{{ $line->notes ?? '-' }}</td>
+                            @if ($pr->isConverted())
+                                <td data-label="Supplier / PO"><strong>{{ $line->supplier?->code ?? '-' }}</strong>@if ($line->purchaseOrder)<a href="{{ route('purchasing.purchase_orders.show', $line->purchaseOrder) }}" class="d-block small">{{ $line->purchaseOrder->code }}</a>@endif</td>
+                            @endif
                         </tr>
                     @empty
-                        <tr>
-                            <td colspan="{{ $canSeeMoney ? 7 : 4 }}" class="text-center text-muted py-3">
-                                Tidak ada item.
-                            </td>
-                        </tr>
+                        <tr><td colspan="{{ 3 + ($canSeeMoney ? 2 : 0) + ($pr->isConverted() ? 1 : 0) }}" class="text-center text-muted py-4">Belum ada barang.</td></tr>
                     @endforelse
                 </tbody>
-                @if ($canSeeMoney && $hasEstimate)
-                    <tfoot class="table-light">
-                        <tr>
-                            <th colspan="5" class="text-end">Total Estimasi</th>
-                            <th class="text-end mono">
-                                Rp {{ number_format($estTotal, 0, ',', '.') }}
-                            </th>
-                            <th></th>
-                        </tr>
-                    </tfoot>
-                @endif
             </table>
         </div>
     </div>
 
-    {{-- ── Timeline Riwayat Status ── --}}
-    <div class="pr-info-card">
-        <div class="card-body">
-            <div class="pr-info-label mb-3">Timeline</div>
-            <div class="pr-timeline">
-
-                {{-- Dibuat --}}
-                <div class="pr-timeline-item">
-                    <div class="pr-timeline-left">
-                        <div class="pr-timeline-dot dot-blue"></div>
-                        <div class="pr-timeline-line"></div>
-                    </div>
-                    <div class="pr-timeline-content">
-                        <div class="pr-timeline-action">Dibuat</div>
-                        <div class="pr-timeline-meta">
-                            oleh <strong>{{ $pr->requestedBy?->name ?? '—' }}</strong>
-                            @if ($pr->created_at)
-                                · {{ $pr->created_at->format('d/m/Y H:i') }}
-                            @endif
-                        </div>
-                    </div>
-                </div>
-
-                {{-- Approved --}}
-                @if ($pr->approved_by || $pr->isApproved() || $pr->isConverted())
-                    <div class="pr-timeline-item">
-                        <div class="pr-timeline-left">
-                            <div class="pr-timeline-dot dot-green"></div>
-                            @if ($pr->isConverted() || $pr->isRejected())
-                                <div class="pr-timeline-line"></div>
-                            @endif
-                        </div>
-                        <div class="pr-timeline-content">
-                            <div class="pr-timeline-action" style="color:#15803d;">✔ Di-approve</div>
-                            <div class="pr-timeline-meta">
-                                oleh <strong>{{ $pr->approvedBy?->name ?? '—' }}</strong>
-                            </div>
-                        </div>
-                    </div>
-                @elseif ($pr->isDraft())
-                    <div class="pr-timeline-item">
-                        <div class="pr-timeline-left">
-                            <div class="pr-timeline-dot dot-gray"></div>
-                        </div>
-                        <div class="pr-timeline-content">
-                            <div class="pr-timeline-action" style="color:var(--muted);">Menunggu approval</div>
-                        </div>
-                    </div>
-                @endif
-
-                {{-- Rejected --}}
-                @if ($pr->isRejected())
-                    <div class="pr-timeline-item">
-                        <div class="pr-timeline-left">
-                            <div class="pr-timeline-dot dot-red"></div>
-                        </div>
-                        <div class="pr-timeline-content">
-                            <div class="pr-timeline-action" style="color:#b91c1c;">✖ Ditolak</div>
-                            <div class="pr-timeline-meta">
-                                oleh <strong>{{ $pr->rejectedBy?->name ?? '—' }}</strong>
-                                @if ($pr->updated_at)
-                                    · {{ $pr->updated_at->format('d/m/Y H:i') }}
-                                @endif
-                            </div>
-                        </div>
-                    </div>
-                @endif
-
-                {{-- Converted --}}
-                @if ($pr->isConverted())
-                    <div class="pr-timeline-item">
-                        <div class="pr-timeline-left">
-                            <div class="pr-timeline-dot dot-indigo"></div>
-                        </div>
-                        <div class="pr-timeline-content">
-                            <div class="pr-timeline-action" style="color:#4f46e5;">🔄 Diconvert ke PO</div>
-                            <div class="pr-timeline-meta">
-                                @if ($pr->convertedToPo)
-                                    <a href="{{ route('purchasing.purchase_orders.show', $pr->converted_to_po_id) }}"
-                                        class="fw-semibold">{{ $pr->convertedToPo->code }}</a>
-                                @endif
-                                @if ($pr->converted_at)
-                                    · {{ $pr->converted_at->format('d/m/Y H:i') }}
-                                @endif
-                            </div>
-                        </div>
-                    </div>
-                @endif
-
-            </div>
+    <div class="pr-detail-card">
+        <div class="pr-detail-head fw-semibold">Riwayat</div>
+        <div class="pr-history">
+            <div class="pr-history-step"><div class="pr-history-title">Dibuat</div><div class="pr-history-meta">{{ $pr->requestedBy?->name ?? '-' }} · {{ $pr->created_at?->format('d/m/Y H:i') }}</div></div>
+            @if ($pr->approved_by || $pr->isApproved() || $pr->isConverted())<div class="pr-history-step"><div class="pr-history-title text-success">Disetujui</div><div class="pr-history-meta">{{ $pr->approvedBy?->name ?? '-' }}</div></div>@endif
+            @if ($pr->isRejected())<div class="pr-history-step"><div class="pr-history-title text-danger">Ditolak</div><div class="pr-history-meta">{{ $pr->rejectedBy?->name ?? '-' }} · {{ $pr->updated_at?->format('d/m/Y H:i') }}</div></div>@endif
+            @if ($pr->isConverted())<div class="pr-history-step"><div class="pr-history-title text-primary">Dibuatkan PO</div><div class="pr-history-meta">{{ $pr->purchaseOrders->pluck('code')->join(', ') }} · {{ $pr->converted_at?->format('d/m/Y H:i') }}</div></div>@endif
+            @if ($pr->isDraft())<div class="pr-history-step"><div class="pr-history-title text-muted">Menunggu persetujuan</div><div class="pr-history-meta">Belum diproses</div></div>@endif
         </div>
     </div>
-
 </div>
 @endsection
