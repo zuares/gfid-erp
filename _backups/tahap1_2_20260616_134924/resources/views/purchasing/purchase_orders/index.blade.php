@@ -115,46 +115,6 @@
             white-space: nowrap;
         }
 
-        /* PR-E: badge "Dari PR" di PO index */
-        .badge-pr-ref {
-            border-radius: 999px;
-            font-size: .62rem;
-            padding: .04rem .42rem;
-            margin-left: .2rem;
-            background: rgba(99,102,241,.08);
-            color: #4f46e5;
-            border: 1px solid rgba(99,102,241,.4);
-            white-space: nowrap;
-            text-decoration: none;
-            display: inline-block;
-        }
-        .badge-pr-ref:hover { background: rgba(99,102,241,.16); color: #4f46e5; }
-
-        /* received_status badge */
-        .badge-rcv {
-            border-radius: 999px;
-            font-size: .65rem;
-            padding: .05rem .45rem;
-            border: 1px solid transparent;
-            white-space: nowrap;
-            display: inline-block;
-        }
-        .badge-rcv-none {
-            background: rgba(148,163,184,.08);
-            color: #94a3b8;
-            border-color: rgba(148,163,184,.4);
-        }
-        .badge-rcv-partial {
-            background: rgba(234,179,8,.10);
-            color: #a16207;
-            border-color: rgba(234,179,8,.5);
-        }
-        .badge-rcv-full {
-            background: rgba(22,163,74,.10);
-            color: #15803d;
-            border-color: rgba(22,163,74,.5);
-        }
-
         .row-draft {
             background: rgba(248, 250, 252, 0.9);
         }
@@ -407,17 +367,16 @@
                     <thead>
                         <tr>
                             <th class="text-center" style="width: 4%;">#</th>
-                            <th style="width: 11%;">Tanggal</th>
-                            <th style="width: 13%;">Kode</th>
+                            <th style="width: 12%;">Tanggal</th>
+                            <th style="width: 14%;">Kode</th>
                             <th>Supplier</th>
-                            <th style="width: 10%;">Jenis</th>
                             @if ($canSeeMoney)
-                                <th style="width: 13%;">Bayar</th>
-                                <th style="width: 13%;" class="text-end">Grand Total</th>
+                                <th style="width: 14%;">Bayar</th>
+                                <th style="width: 14%;" class="text-end">Grand Total</th>
                             @endif
                             <th style="width: 12%;">Status</th>
-                            <th style="width: 10%;">Approved by</th>
-                            <th style="width: 10%;" class="text-end">Aksi</th>
+                            <th style="width: 12%;">Approved by</th>
+                            <th style="width: 12%;" class="text-end">Aksi</th>
                         </tr>
                     </thead>
                     <tbody>
@@ -455,10 +414,6 @@
 
                                 <td>{{ optional($order->supplier)->name ?? '—' }}</td>
 
-                                <td>
-                                    <span class="small text-muted">{{ po_order_type_label($order->order_type) }}</span>
-                                </td>
-
                                 @if ($canSeeMoney)
                                     <td>
                                         <div class="d-flex flex-column gap-1">
@@ -480,27 +435,9 @@
 
                                 <td>
                                     <span class="{{ $poBadgeClass }}">{{ strtoupper($order->status) }}</span>
-                                    @if (!empty($order->purchase_request_id))
-                                        @if (\Illuminate\Support\Facades\Route::has('purchasing.purchase_requests.show'))
-                                            <a href="{{ route('purchasing.purchase_requests.show', $order->purchase_request_id) }}"
-                                                class="badge-pr-ref" title="Dibuat dari Purchase Request">Dari PR</a>
-                                        @else
-                                            <span class="badge-pr-ref">Dari PR</span>
-                                        @endif
-                                    @endif
                                     @if ($grnCount > 0)
-                                        <span class="badge-grn" title="{{ $grnCount }} GRN untuk PO ini">GRN x{{ $grnCount }}</span>
-                                    @endif
-                                    @php
-                                        $rcv = $order->received_status ?? 'not_received';
-                                        $rcvClass = match($rcv) {
-                                            'fully_received' => 'badge-rcv badge-rcv-full',
-                                            'partial'        => 'badge-rcv badge-rcv-partial',
-                                            default          => 'badge-rcv badge-rcv-none',
-                                        };
-                                    @endphp
-                                    @if ($rcv !== 'not_received')
-                                        <br><span class="{{ $rcvClass }} mt-1">{{ received_status_label($rcv) }}</span>
+                                        <span class="badge-grn" title="{{ $grnCount }} GRN untuk PO ini">GRN
+                                            x{{ $grnCount }}</span>
                                     @endif
                                 </td>
 
@@ -524,7 +461,7 @@
                             </tr>
                         @empty
                             <tr>
-                                <td colspan="{{ $canSeeMoney ? 10 : 8 }}" class="text-center text-muted py-3">Belum ada Purchase Order.</td>
+                                <td colspan="{{ $canSeeMoney ? 9 : 7 }}" class="text-center text-muted py-3">Belum ada Purchase Order.</td>
                             </tr>
                         @endforelse
                     </tbody>
@@ -570,35 +507,13 @@
                                 @if ($order->supplier)
                                     <span>{{ $order->supplier->name }}</span>
                                 @endif
-                                <span class="text-muted">· {{ po_order_type_label($order->order_type) }}</span>
                             </div>
                         </div>
 
                         <div class="text-end">
                             <span class="{{ $poBadgeClass }}">{{ strtoupper($order->status) }}</span>
-                            @if (!empty($order->purchase_request_id))
-                                <div class="mt-1">
-                                    @if (\Illuminate\Support\Facades\Route::has('purchasing.purchase_requests.show'))
-                                        <a href="{{ route('purchasing.purchase_requests.show', $order->purchase_request_id) }}"
-                                            class="badge-pr-ref">Dari PR</a>
-                                    @else
-                                        <span class="badge-pr-ref">Dari PR</span>
-                                    @endif
-                                </div>
-                            @endif
                             @if ($grnCount > 0)
                                 <div class="mt-1"><span class="badge-grn">GRN x{{ $grnCount }}</span></div>
-                            @endif
-                            @php
-                                $rcv = $order->received_status ?? 'not_received';
-                                $rcvClass = match($rcv) {
-                                    'fully_received' => 'badge-rcv badge-rcv-full',
-                                    'partial'        => 'badge-rcv badge-rcv-partial',
-                                    default          => 'badge-rcv badge-rcv-none',
-                                };
-                            @endphp
-                            @if ($rcv !== 'not_received')
-                                <div class="mt-1"><span class="{{ $rcvClass }}">{{ received_status_label($rcv) }}</span></div>
                             @endif
                         </div>
                     </div>

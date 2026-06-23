@@ -365,31 +365,6 @@
                         </button>
                     </form>
                 @endif
-
-                {{-- Buat Faktur Supplier — owner + accounting, hanya jika PO approved --}}
-                @if ($status === 'approved' && $user && ($user->isOwner() || in_array($user->role ?? '', ['accounting', 'developer'])))
-                    @php
-                        $hasSupplierInvoiceRoute = \Illuminate\Support\Facades\Route::has('purchasing.supplier_invoices.create');
-                    @endphp
-                    @if ($hasSupplierInvoiceRoute)
-                        <a href="{{ route('purchasing.supplier_invoices.create', ['purchase_order_id' => $order->id]) }}"
-                           class="btn btn-sm btn-outline-success btn-action">
-                            🧾 Faktur Supplier
-                        </a>
-                    @endif
-                @endif
-
-                {{-- Close PO — owner only, syarat lengkap --}}
-                @if ($user && $user->isOwner() && !($order->isClosed()) && ($canClose ?? false))
-                    @php $hasCloseRoute = \Illuminate\Support\Facades\Route::has('purchasing.purchase_orders.close'); @endphp
-                    @if ($hasCloseRoute)
-                        <form action="{{ route('purchasing.purchase_orders.close', $order->id) }}" method="POST"
-                              onsubmit="return confirm('Close PO ini? Pastikan semua sudah lunas dan diterima.');">
-                            @csrf
-                            <button type="submit" class="btn btn-sm btn-dark btn-action">✔ Close PO</button>
-                        </form>
-                    @endif
-                @endif
             </div>
         </div>
 
@@ -400,95 +375,6 @@
         @if (session('error'))
             <div class="alert alert-danger py-2 small">{{ session('error') }}</div>
         @endif
-
-        {{-- ============================================================
-        RINGKASAN PO — Status + Nominal (Tahap 4)
-        ============================================================ --}}
-        @php
-            $isClosed    = $order->isClosed();
-            $rcvStatus   = $order->received_status ?? 'not_received';
-            $closeBlks   = $closeBlockers ?? [];
-            $canClosePO  = ($canClose ?? false) && !$isClosed;
-            $invTotal    = (float) ($invoiceTotalAmount ?? 0);
-            $invPaid     = (float) ($invoiceTotalPaid ?? 0);
-            $invOutstand = (float) ($invoiceOutstanding ?? 0);
-            $poInvoiceList = $poInvoices ?? collect();
-        @endphp
-        <div class="card mb-3">
-            <div class="card-body py-3 px-3">
-                <div class="row g-2 align-items-center">
-                    {{-- Status kolom --}}
-                    <div class="col-6 col-md-3">
-                        <div class="text-muted small mb-1">Status PO</div>
-                        <span class="{{ $statusClass }} mono">
-                            @if ($isClosed) 🔒 CLOSED
-                            @else {{ strtoupper($status) }}
-                            @endif
-                        </span>
-                    </div>
-                    <div class="col-6 col-md-3">
-                        <div class="text-muted small mb-1">Terima Barang</div>
-                        <span>{{ received_status_label($rcvStatus) }}</span>
-                    </div>
-                    <div class="col-6 col-md-3">
-                        <div class="text-muted small mb-1">Status Bayar</div>
-                        <span class="{{ $payBadgeClass }}">
-                            {{ match($payStatus) { 'paid' => '✅ Lunas', 'partial' => '🟡 Sebagian', default => '❌ Belum Bayar' } }}
-                        </span>
-                    </div>
-                    @if ($canSeeMoney)
-                    <div class="col-6 col-md-3">
-                        <div class="text-muted small mb-1">Outstanding Hutang</div>
-                        <span class="mono fw-semibold {{ $apOutstanding > 0 ? 'text-danger' : 'text-success' }}">
-                            {{ rupiah($apOutstanding) }}
-                        </span>
-                    </div>
-                    @endif
-
-                    @if ($canSeeMoney)
-                    {{-- Baris 2: nominal --}}
-                    <div class="col-12"><hr class="my-1"></div>
-                    <div class="col-6 col-md-3">
-                        <div class="text-muted small mb-1">Total PO</div>
-                        <div class="mono">{{ rupiah($order->grand_total) }}</div>
-                    </div>
-                    <div class="col-6 col-md-3">
-                        <div class="text-muted small mb-1">Total Invoice ({{ $poInvoiceList->count() }})</div>
-                        <div class="mono">{{ rupiah($invTotal) }}</div>
-                    </div>
-                    <div class="col-6 col-md-3">
-                        <div class="text-muted small mb-1">Invoice Dibayar</div>
-                        <div class="mono text-success">{{ rupiah($invPaid) }}</div>
-                    </div>
-                    <div class="col-6 col-md-3">
-                        <div class="text-muted small mb-1">Invoice Outstanding</div>
-                        <div class="mono {{ $invOutstand > 0 ? 'text-danger fw-semibold' : 'text-success' }}">
-                            {{ rupiah($invOutstand) }}
-                        </div>
-                    </div>
-                    @endif
-
-                    {{-- Baris 3: status close --}}
-                    <div class="col-12"><hr class="my-1"></div>
-                    <div class="col-12">
-                        @if ($isClosed)
-                            <span class="text-success small fw-semibold">🔒 PO sudah di-Close
-                                @if ($order->closed_at) pada {{ id_date($order->closed_at) }} @endif
-                            </span>
-                        @elseif ($canClosePO)
-                            <span class="text-success small">✅ PO siap di-Close — semua syarat terpenuhi.</span>
-                        @else
-                            <span class="text-muted small">
-                                ⛔ Belum bisa Close PO:
-                                @foreach ($closeBlks as $blk)
-                                    <span class="badge bg-warning text-dark ms-1">{{ $blk }}</span>
-                                @endforeach
-                            </span>
-                        @endif
-                    </div>
-                </div>
-            </div>
-        </div>
 
         {{-- WARNING: PO draft, harga belum diisi --}}
         @if ($status === 'draft' && !$poHasPrice)
@@ -620,26 +506,6 @@
                     <div class="text-muted small">Catatan</div>
                     <div>{{ $order->notes ?: '—' }}</div>
                 </div>
-
-                {{-- PR-D: referensi Purchase Request asal --}}
-                @if (!empty($purchaseRequest))
-                    <div class="col-12">
-                        <div class="text-muted small">Dari Purchase Request</div>
-                        <div>
-                            @if (\Illuminate\Support\Facades\Route::has('purchasing.purchase_requests.show'))
-                                <a href="{{ route('purchasing.purchase_requests.show', $purchaseRequest->id) }}"
-                                    class="fw-semibold">
-                                    {{ $purchaseRequest->code }}
-                                </a>
-                                <span class="text-muted ms-1" style="font-size:.82rem;">
-                                    ({{ $purchaseRequest->date?->format('d/m/Y') }})
-                                </span>
-                            @else
-                                <span class="fw-semibold">{{ $purchaseRequest->code }}</span>
-                            @endif
-                        </div>
-                    </div>
-                @endif
             </div>
         </div>
 
@@ -1184,31 +1050,6 @@
                                 <input type="text" name="notes" class="form-control" placeholder="Opsional"
                                     value="{{ old('notes') }}">
                             </div>
-
-                            {{-- Tahap 4: Link ke Supplier Invoice (opsional) --}}
-                            @php $unpaidInvList = $unpaidInvoices ?? collect(); @endphp
-                            @if ($unpaidInvList->isNotEmpty())
-                            <div class="col-12">
-                                <label class="form-label small text-muted mb-1">
-                                    Faktur Supplier <span class="text-muted">(opsional — untuk melunasi faktur)</span>
-                                </label>
-                                <select name="supplier_invoice_id" class="form-select form-select-sm">
-                                    <option value="">— Tidak dikaitkan ke faktur —</option>
-                                    @foreach ($unpaidInvList as $inv)
-                                        <option value="{{ $inv->id }}"
-                                            {{ old('supplier_invoice_id') == $inv->id ? 'selected' : '' }}>
-                                            {{ $inv->invoice_no }}
-                                            @if ($inv->supplier_invoice_ref) [{{ $inv->supplier_invoice_ref }}] @endif
-                                            — {{ rupiah($inv->total_amount - $inv->paid_amount) }} outstanding
-                                            ({{ strtoupper($inv->status) }})
-                                        </option>
-                                    @endforeach
-                                </select>
-                                <div class="text-muted small mt-1">
-                                    Jika dipilih, paid_amount faktur akan diupdate otomatis.
-                                </div>
-                            </div>
-                            @endif
                         </div>
 
                         @if ($errors->any())

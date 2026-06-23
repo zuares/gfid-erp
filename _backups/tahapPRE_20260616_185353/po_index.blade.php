@@ -115,21 +115,6 @@
             white-space: nowrap;
         }
 
-        /* PR-E: badge "Dari PR" di PO index */
-        .badge-pr-ref {
-            border-radius: 999px;
-            font-size: .62rem;
-            padding: .04rem .42rem;
-            margin-left: .2rem;
-            background: rgba(99,102,241,.08);
-            color: #4f46e5;
-            border: 1px solid rgba(99,102,241,.4);
-            white-space: nowrap;
-            text-decoration: none;
-            display: inline-block;
-        }
-        .badge-pr-ref:hover { background: rgba(99,102,241,.16); color: #4f46e5; }
-
         /* received_status badge */
         .badge-rcv {
             border-radius: 999px;
@@ -480,14 +465,6 @@
 
                                 <td>
                                     <span class="{{ $poBadgeClass }}">{{ strtoupper($order->status) }}</span>
-                                    @if (!empty($order->purchase_request_id))
-                                        @if (\Illuminate\Support\Facades\Route::has('purchasing.purchase_requests.show'))
-                                            <a href="{{ route('purchasing.purchase_requests.show', $order->purchase_request_id) }}"
-                                                class="badge-pr-ref" title="Dibuat dari Purchase Request">Dari PR</a>
-                                        @else
-                                            <span class="badge-pr-ref">Dari PR</span>
-                                        @endif
-                                    @endif
                                     @if ($grnCount > 0)
                                         <span class="badge-grn" title="{{ $grnCount }} GRN untuk PO ini">GRN x{{ $grnCount }}</span>
                                     @endif
@@ -576,16 +553,6 @@
 
                         <div class="text-end">
                             <span class="{{ $poBadgeClass }}">{{ strtoupper($order->status) }}</span>
-                            @if (!empty($order->purchase_request_id))
-                                <div class="mt-1">
-                                    @if (\Illuminate\Support\Facades\Route::has('purchasing.purchase_requests.show'))
-                                        <a href="{{ route('purchasing.purchase_requests.show', $order->purchase_request_id) }}"
-                                            class="badge-pr-ref">Dari PR</a>
-                                    @else
-                                        <span class="badge-pr-ref">Dari PR</span>
-                                    @endif
-                                </div>
-                            @endif
                             @if ($grnCount > 0)
                                 <div class="mt-1"><span class="badge-grn">GRN x{{ $grnCount }}</span></div>
                             @endif

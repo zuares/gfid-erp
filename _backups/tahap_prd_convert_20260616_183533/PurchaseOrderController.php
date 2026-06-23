@@ -142,63 +142,16 @@ class PurchaseOrderController extends Controller
             ->orderBy('code')
             ->get();
 
-        $lines  = collect();
-        $fromPr = null; // PR-D: null by default
-
-        // PR-D: Pre-fill dari Purchase Request jika from_pr dikirim
-        if ($request->filled('from_pr') && \Illuminate\Support\Facades\Schema::hasTable('purchase_requests')) {
-            $pr = \App\Models\PurchaseRequest::with('lines.item')->find((int) $request->from_pr);
-
-            if ($pr && $pr->isApproved() && is_null($pr->converted_to_po_id)) {
-                $fromPr = $pr;
-
-                // Pre-fill supplier
-                if ($pr->supplier_id && !$request->filled('supplier_id')) {
-                    $order->supplier_id = $pr->supplier_id;
-                }
-
-                // Build lines dari PR (format compatible dengan _form.blade.php)
-                $prLinesMapped = $pr->lines->map(function ($prLine) {
-                    $item = $prLine->item;
-                    return [
-                        'item_id'             => $prLine->item_id,
-                        'item'                => $item ? [
-                            'id'                         => $item->id,
-                            'code'                       => $item->code,
-                            'name'                       => $item->name,
-                            'default_allocation'         => $item->default_allocation ?? 'hpp',
-                            'default_expense_account_id' => $item->default_expense_account_id ?? null,
-                        ] : null,
-                        'qty'                 => $prLine->qty,
-                        'unit_price'          => $prLine->unit_price ?? 0,
-                        'discount'            => 0,
-                        'allocation'          => $item->default_allocation ?? 'hpp',
-                        'expense_account_id'  => $item->default_expense_account_id ?? '',
-                    ];
-                });
-
-                if ($prLinesMapped->isNotEmpty()) {
-                    $lines = $prLinesMapped;
-                }
-
-                // PR notes sebagai referensi di PO notes
-                if (!empty($pr->notes)) {
-                    $order->notes = '[PR: ' . $pr->code . '] ' . $pr->notes;
-                } else {
-                    $order->notes = '[PR: ' . $pr->code . ']';
-                }
-            }
-        }
+        $lines = collect();
 
         return view('purchasing.purchase_orders.create', [
-            'order'          => $order,
-            'suppliers'      => $suppliers,
+            'order' => $order,
+            'suppliers' => $suppliers,
             'paymentMethods' => $paymentMethods,
-            'items'          => $items,
-            'lines'          => $lines,
-            'cashAccounts'   => $cashAccounts,
-            'orderType'      => $orderType,
-            'fromPr'         => $fromPr, // PR-D: null atau PurchaseRequest model
+            'items' => $items,
+            'lines' => $lines,
+            'cashAccounts' => $cashAccounts,
+            'orderType' => $orderType,
         ]);
     }
 
@@ -222,30 +175,9 @@ class PurchaseOrderController extends Controller
         // auto-create payment from form (pay_now)
         $this->maybeCreatePayNowPayment($request, $order, allowIfHasExistingPayments: true);
 
-        // PR-D: Jika PO dibuat dari Purchase Request, simpan relasi + update status PR
-        $successMsg = 'Purchase Order berhasil dibuat.';
-        $prId = (int) $request->input('purchase_request_id', 0);
-        if ($prId > 0 && \Illuminate\Support\Facades\Schema::hasTable('purchase_requests')) {
-            $pr = \App\Models\PurchaseRequest::find($prId);
-            if ($pr && $pr->isApproved() && is_null($pr->converted_to_po_id)) {
-                // Simpan reference di PO
-                $order->purchase_request_id = $prId;
-                $order->save();
-
-                // Update status PR → converted
-                $pr->update([
-                    'status'           => 'converted',
-                    'converted_to_po_id' => $order->id,
-                    'converted_at'     => now(),
-                ]);
-
-                $successMsg = "PO {$order->code} berhasil dibuat dari PR {$pr->code}.";
-            }
-        }
-
         return redirect()
             ->route('purchasing.purchase_orders.show', $order->id)
-            ->with('success', $successMsg);
+            ->with('success', 'Purchase Order berhasil dibuat.');
     }
 
     /**
@@ -262,7 +194,6 @@ class PurchaseOrderController extends Controller
             'cancelledBy',
             'purchaseReceipts.warehouse',
             'purchaseReceipts',
-            'purchaseRequest', // PR-D: relasi ke PR asal (nullable)
             'payments' => function ($q) {
                 $q->with(['paymentMethod', 'cashAccount'])
                     ->orderByDesc('date')

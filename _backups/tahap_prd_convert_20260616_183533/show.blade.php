@@ -620,26 +620,6 @@
                     <div class="text-muted small">Catatan</div>
                     <div>{{ $order->notes ?: '—' }}</div>
                 </div>
-
-                {{-- PR-D: referensi Purchase Request asal --}}
-                @if (!empty($purchaseRequest))
-                    <div class="col-12">
-                        <div class="text-muted small">Dari Purchase Request</div>
-                        <div>
-                            @if (\Illuminate\Support\Facades\Route::has('purchasing.purchase_requests.show'))
-                                <a href="{{ route('purchasing.purchase_requests.show', $purchaseRequest->id) }}"
-                                    class="fw-semibold">
-                                    {{ $purchaseRequest->code }}
-                                </a>
-                                <span class="text-muted ms-1" style="font-size:.82rem;">
-                                    ({{ $purchaseRequest->date?->format('d/m/Y') }})
-                                </span>
-                            @else
-                                <span class="fw-semibold">{{ $purchaseRequest->code }}</span>
-                            @endif
-                        </div>
-                    </div>
-                @endif
             </div>
         </div>
 

@@ -1,0 +1,1232 @@
+{{-- resources/views/master/items/index.blade.php --}}
+@extends('layouts.app')
+
+@section('title', 'Master Item')
+
+@php
+    $fmt = fn($n) => number_format((float) $n, 0, ',', '.');
+
+    $typeLabels = $types ?? [
+        'raw_material' => 'Raw Material',
+        'production_supply' => 'Supply Produksi',
+        'shipping_supply' => 'Supply Packing',
+        'finished_good' => 'Finished Good',
+    ];
+
+    $hasFilters = request()->hasAny(['q', 'type', 'category_kind', 'item_category_id']);
+
+    $totalItems = method_exists($items, 'total') ? $items->total() : $items->count();
+
+    $pageCollection = method_exists($items, 'getCollection') ? $items->getCollection() : collect($items);
+
+    $activeCount = $pageCollection->where('active', 1)->count();
+    $withBarcodeCount = $pageCollection->filter(fn($item) => (int) ($item->barcodes_count ?? optional($item->barcodes ?? null)->count() ?? 0) > 0)->count();
+    $missingHppCount = $pageCollection->filter(fn($item) => (float) ($item->active_unit_cost ?? $item->effective_unit_cost ?? $item->hpp ?? 0) <= 0)->count();
+
+    $buildUrl = function (array $params = []) {
+        return route('master.items.index', array_filter(array_merge(request()->query(), $params), fn($v) => $v !== null && $v !== ''));
+    };
+
+    $activeType = (string) request('type', '');
+@endphp
+
+@push('head')
+<style>
+    .gf-category-page {
+        max-width: 1480px;
+        margin: 0 auto;
+        padding: 18px 14px 30px;
+        color: #0f172a;
+        font-family: Inter, ui-sans-serif, system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
+    }
+
+    .gf-category-head {
+        display: flex;
+        justify-content: space-between;
+        align-items: stretch;
+        gap: 14px;
+        margin-bottom: 14px;
+        padding: 18px;
+        border: 1px solid #e2e8f0;
+        border-radius: 24px;
+        background:
+            radial-gradient(circle at top left, rgba(37, 99, 235, .12), transparent 34%),
+            radial-gradient(circle at bottom right, rgba(79, 70, 229, .10), transparent 36%),
+            linear-gradient(135deg, #ffffff 0%, #f8fafc 54%, #eef2ff 100%);
+        box-shadow: 0 16px 42px rgba(15, 23, 42, .07);
+        overflow: hidden;
+    }
+
+    .gf-items-head-left {
+        display: flex;
+        align-items: center;
+        gap: 13px;
+        min-width: 0;
+    }
+
+    .gf-items-head-icon {
+        width: 48px;
+        height: 48px;
+        flex: 0 0 48px;
+        border-radius: 17px;
+        display: inline-flex;
+        align-items: center;
+        justify-content: center;
+        color: #ffffff;
+        background: linear-gradient(135deg, #2563eb, #4f46e5);
+        box-shadow: 0 14px 28px rgba(37, 99, 235, .24);
+        font-size: 1.28rem;
+    }
+
+    .gf-category-eyebrow {
+        display: inline-flex;
+        align-items: center;
+        gap: 7px;
+        padding: 5px 10px;
+        border-radius: 999px;
+        background: #eef2ff;
+        border: 1px solid #e0e7ff;
+        color: #4338ca;
+        font-size: .72rem;
+        font-weight: 900;
+        margin-bottom: 7px;
+    }
+
+    .gf-category-title {
+        color: #0f172a;
+        font-size: 1.34rem;
+        font-weight: 950;
+        letter-spacing: -.05em;
+        line-height: 1.1;
+        margin: 0;
+    }
+
+    .gf-category-subtitle {
+        color: #64748b;
+        font-size: .86rem;
+        font-weight: 600;
+        margin-top: 4px;
+    }
+
+    .gf-items-head-right {
+        display: flex;
+        align-items: center;
+        gap: 10px;
+        flex-wrap: wrap;
+        justify-content: flex-end;
+    }
+
+    .gf-items-head-stat {
+        min-width: 112px;
+        padding: 10px 12px;
+        border-radius: 18px;
+        border: 1px solid rgba(226, 232, 240, .9);
+        background: rgba(255,255,255,.72);
+        backdrop-filter: blur(10px);
+        box-shadow: 0 10px 24px rgba(15, 23, 42, .05);
+    }
+
+    .gf-items-head-stat-label {
+        color: #64748b;
+        font-size: .68rem;
+        font-weight: 900;
+        text-transform: uppercase;
+        letter-spacing: .045em;
+    }
+
+    .gf-items-head-stat-value {
+        color: #0f172a;
+        font-size: 1.08rem;
+        font-weight: 950;
+        letter-spacing: -.04em;
+        margin-top: 2px;
+    }
+
+    .gf-category-actions {
+        display: flex;
+        flex-wrap: wrap;
+        gap: 8px;
+        justify-content: flex-end;
+    }
+
+    .gf-category-actions .btn,
+    .gf-category-filter .btn,
+    .gf-category-row-actions .btn {
+        border-radius: 999px;
+        font-weight: 850;
+        letter-spacing: -.01em;
+    }
+
+    .gf-category-actions .btn-primary,
+    .modal-footer .btn-primary {
+        color: #fff;
+        background: linear-gradient(135deg, #2563eb, #4f46e5);
+        border-color: transparent;
+        box-shadow: 0 12px 24px rgba(37, 99, 235, .18);
+    }
+
+    .gf-category-actions .btn-outline-secondary {
+        background: rgba(255,255,255,.75);
+        border-color: #cbd5e1;
+        color: #475569;
+    }
+
+    .gf-category-kpi-grid {
+        display: grid;
+        grid-template-columns: repeat(4, minmax(0, 1fr));
+        gap: 10px;
+        margin-bottom: 12px;
+    }
+
+    .gf-category-kpi-card {
+        border: 1px solid #e2e8f0;
+        border-radius: 20px;
+        padding: 14px;
+        background:
+            radial-gradient(circle at top right, rgba(79, 70, 229, .08), transparent 38%),
+            linear-gradient(180deg, #ffffff 0%, #fbfdff 100%);
+        box-shadow: 0 14px 34px rgba(15, 23, 42, .06);
+    }
+
+    .gf-category-kpi-label {
+        font-size: .7rem;
+        font-weight: 900;
+        color: #64748b;
+        text-transform: uppercase;
+        letter-spacing: .045em;
+    }
+
+    .gf-category-kpi-value {
+        font-size: 1.28rem;
+        font-weight: 900;
+        color: #0f172a;
+        letter-spacing: -.04em;
+        margin-top: 5px;
+    }
+
+    .gf-category-kpi-note {
+        font-size: .74rem;
+        color: #94a3b8;
+        margin-top: 2px;
+    }
+
+    .gf-panel {
+        border: 1px solid #e2e8f0;
+        border-radius: 24px;
+        background: #ffffff;
+        box-shadow: 0 16px 42px rgba(15, 23, 42, .07);
+        overflow: hidden;
+    }
+
+    .gf-panel-body {
+        padding: 14px;
+    }
+
+    .gf-category-filter {
+        display: grid;
+        grid-template-columns: minmax(220px, 1.4fr) minmax(150px, .8fr) minmax(170px, .9fr) minmax(190px, 1fr) auto;
+        gap: 10px;
+        align-items: end;
+        margin-bottom: 12px;
+    }
+
+    .gf-category-filter .form-label {
+        font-size: .72rem;
+        font-weight: 900;
+        color: #334155;
+        margin-bottom: 4px;
+    }
+
+    .gf-category-filter .form-control,
+    .gf-category-filter .form-select,
+    .modal-content .form-control,
+    .modal-content .form-select {
+        border-radius: 14px;
+        border-color: #e2e8f0;
+        font-size: .84rem;
+        min-height: 38px;
+        color: #0f172a;
+        font-weight: 600;
+    }
+
+    .gf-category-filter .form-control::placeholder {
+        color: #94a3b8;
+        font-weight: 500;
+    }
+
+    .gf-category-filter .form-control:focus,
+    .gf-category-filter .form-select:focus,
+    .modal-content .form-control:focus,
+    .modal-content .form-select:focus {
+        border-color: rgba(37, 99, 235, .55);
+        box-shadow: 0 0 0 .22rem rgba(37, 99, 235, .1);
+    }
+
+    .gf-filter-live-wrap {
+        position: relative;
+    }
+
+    .gf-filter-live-indicator {
+        position: absolute;
+        right: 12px;
+        top: 50%;
+        transform: translateY(-50%);
+        display: none;
+        align-items: center;
+        gap: 6px;
+        color: #2563eb;
+        font-size: .72rem;
+        font-weight: 850;
+        pointer-events: none;
+        background: rgba(255,255,255,.88);
+        padding-left: 8px;
+    }
+
+    .gf-filter-live-indicator.is-show {
+        display: inline-flex;
+    }
+
+    .gf-filter-live-dot {
+        width: 7px;
+        height: 7px;
+        border-radius: 999px;
+        background: #2563eb;
+        animation: gfPulse .8s ease-in-out infinite alternate;
+    }
+
+    @keyframes gfPulse {
+        from { opacity: .35; transform: scale(.86); }
+        to { opacity: 1; transform: scale(1.12); }
+    }
+
+    .gf-filter-hint {
+        display: flex;
+        align-items: center;
+        gap: 6px;
+        color: #64748b;
+        font-size: .72rem;
+        font-weight: 700;
+        margin: -4px 0 10px;
+    }
+
+    .gf-filter-hint i {
+        color: #2563eb;
+    }
+
+    .gf-marketplace-tabs {
+        display: flex;
+        gap: 8px;
+        overflow-x: auto;
+        padding: 2px 0 12px;
+    }
+
+    .gf-marketplace-tab {
+        flex: 0 0 auto;
+        border: 1px solid #e2e8f0;
+        border-radius: 999px;
+        padding: 7px 12px;
+        color: #64748b;
+        background: #ffffff;
+        font-size: .78rem;
+        font-weight: 850;
+        transition: .15s ease;
+    }
+
+    .gf-marketplace-tab:hover {
+        color: #2563eb;
+        background: #eff6ff;
+        border-color: #bfdbfe;
+    }
+
+    .gf-marketplace-tab.is-active {
+        color: #ffffff;
+        background: linear-gradient(135deg, #2563eb, #4f46e5);
+        border-color: transparent;
+        box-shadow: 0 12px 22px rgba(37, 99, 235, .16);
+    }
+
+    #bulkToolbar {
+        border: 1px solid #dbeafe;
+        border-radius: 16px;
+        background: #eff6ff;
+        padding: 10px 12px;
+        margin-bottom: 12px;
+        box-shadow: 0 12px 26px rgba(37, 99, 235, .08);
+    }
+
+    .gf-table-scroll {
+        max-height: 68vh;
+        overflow: auto;
+        border: 1px solid #e2e8f0;
+        border-radius: 18px;
+    }
+
+    .gf-clean-table {
+        font-size: .82rem;
+        color: #0f172a;
+    }
+
+    .gf-clean-table thead th {
+        background: #f8fafc;
+        color: #64748b;
+        font-size: .7rem;
+        text-transform: uppercase;
+        letter-spacing: .045em;
+        font-weight: 900;
+        border-bottom: 1px solid #e2e8f0;
+        padding: 12px 10px;
+        white-space: nowrap;
+    }
+
+    .gf-sticky-table thead th {
+        position: sticky;
+        top: 0;
+        z-index: 8;
+    }
+
+    .gf-clean-table tbody td {
+        border-color: #eef2f7;
+        padding: 12px 10px;
+        vertical-align: middle;
+    }
+
+    .gf-clean-table tbody tr {
+        transition: .14s ease;
+    }
+
+    .gf-clean-table tbody tr:hover {
+        background: #f8fbff;
+    }
+
+    .gf-category-code {
+        display: inline-flex;
+        align-items: center;
+        border-radius: 999px;
+        padding: 5px 9px;
+        background: #eef2ff;
+        color: #4338ca;
+        border: 1px solid #e0e7ff;
+        font-size: .73rem;
+        font-weight: 900;
+    }
+
+    .gf-category-name {
+        font-weight: 850;
+        color: #0f172a;
+        letter-spacing: -.02em;
+    }
+
+    .gf-category-sub {
+        color: #64748b;
+        font-size: .74rem;
+        margin-top: 2px;
+    }
+
+    .gf-category-type,
+    .gf-category-count {
+        display: inline-flex;
+        align-items: center;
+        justify-content: center;
+        gap: 5px;
+        border-radius: 999px;
+        padding: 5px 9px;
+        background: #f8fafc;
+        border: 1px solid #e2e8f0;
+        color: #334155;
+        font-size: .73rem;
+        font-weight: 850;
+    }
+
+    .gf-category-count {
+        min-width: 34px;
+    }
+
+    .gf-badge {
+        display: inline-flex;
+        align-items: center;
+        justify-content: center;
+        border-radius: 999px;
+        padding: 5px 10px;
+        font-size: .72rem;
+        font-weight: 850;
+        letter-spacing: -.01em;
+        border: 1px solid transparent;
+    }
+
+    .gf-badge-green {
+        background: #dcfce7;
+        color: #166534;
+        border-color: #bbf7d0;
+    }
+
+    .gf-badge-red {
+        background: #fee2e2;
+        color: #991b1b;
+        border-color: #fecaca;
+    }
+
+    .gf-badge-yellow {
+        background: #fef3c7;
+        color: #92400e;
+        border-color: #fde68a;
+    }
+
+    .gf-category-row-actions {
+        display: inline-flex;
+        gap: 6px;
+        justify-content: flex-end;
+        flex-wrap: wrap;
+    }
+
+    .gf-category-row-actions .btn {
+        min-width: 58px;
+    }
+
+    .gf-category-empty {
+        text-align: center;
+        color: #64748b;
+        padding: 40px 16px;
+        border: 1px dashed #cbd5e1;
+        border-radius: 18px;
+        background: #f8fafc;
+    }
+
+    .gf-category-empty-title {
+        color: #0f172a;
+        font-weight: 900;
+        letter-spacing: -.02em;
+        margin-bottom: 4px;
+    }
+
+    .gf-category-foot {
+        display: flex;
+        justify-content: space-between;
+        align-items: center;
+        gap: 12px;
+        padding-top: 12px;
+        color: #64748b;
+        font-size: .78rem;
+        font-weight: 700;
+    }
+
+    .pagination {
+        margin: 0;
+        gap: 4px;
+    }
+
+    .pagination .page-link {
+        border-radius: 11px;
+        border-color: #e2e8f0;
+        color: #475569;
+        font-size: .78rem;
+        font-weight: 700;
+    }
+
+    .pagination .active .page-link,
+    .pagination .page-item.active .page-link {
+        color: #fff;
+        background: #2563eb;
+        border-color: #2563eb;
+    }
+
+    .modal-content {
+        border: 0;
+        border-radius: 22px;
+        box-shadow: 0 24px 70px rgba(15, 23, 42, .2);
+        overflow: hidden;
+    }
+
+    .modal-header {
+        background: linear-gradient(135deg, #f8fafc, #eef2ff);
+        border-bottom: 1px solid #e2e8f0;
+    }
+
+    .modal-title {
+        font-weight: 900;
+        color: #0f172a;
+        letter-spacing: -.02em;
+    }
+
+    .modal-footer {
+        background: #f8fafc;
+        border-top: 1px solid #e2e8f0;
+    }
+
+    @media (max-width: 992px) {
+        .gf-category-head {
+            flex-direction: column;
+        }
+
+        .gf-items-head-right {
+            justify-content: flex-start;
+        }
+
+        .gf-category-kpi-grid {
+            grid-template-columns: repeat(2, minmax(0, 1fr));
+        }
+
+        .gf-category-filter {
+            grid-template-columns: 1fr 1fr;
+        }
+    }
+
+    @media (max-width: 768px) {
+        .gf-category-page {
+            padding: 12px 10px 24px;
+        }
+
+        .gf-category-head {
+            padding: 15px;
+            border-radius: 20px;
+        }
+
+        .gf-items-head-left {
+            align-items: flex-start;
+        }
+
+        .gf-items-head-icon {
+            width: 42px;
+            height: 42px;
+            flex-basis: 42px;
+            border-radius: 15px;
+            font-size: 1.08rem;
+        }
+
+        .gf-items-head-right,
+        .gf-category-actions {
+            width: 100%;
+        }
+
+        .gf-items-head-stat {
+            flex: 1;
+            min-width: 0;
+        }
+
+        .gf-category-actions .btn {
+            flex: 1;
+            justify-content: center;
+        }
+
+        .gf-category-kpi-grid,
+        .gf-category-filter {
+            grid-template-columns: 1fr;
+        }
+
+        .gf-category-foot {
+            flex-direction: column;
+            align-items: flex-start;
+        }
+    }
+</style>
+@endpush
+
+@section('content')
+    <div class="gf-category-page">
+        <div class="gf-category-head">
+            <div class="gf-items-head-left">
+                <div class="gf-items-head-icon">
+                    <i class="bi bi-box-seam"></i>
+                </div>
+
+                <div>
+                    <div class="gf-category-eyebrow">
+                        <i class="bi bi-stars"></i>
+                        Master Data
+                    </div>
+
+                    <h1 class="gf-category-title">Master Item</h1>
+
+                    <div class="gf-category-subtitle">
+                        Kelola SKU, kategori, barcode, status, dan HPP aktif produk.
+                    </div>
+                </div>
+            </div>
+
+            <div class="gf-items-head-right">
+                <div class="gf-items-head-stat">
+                    <div class="gf-items-head-stat-label">Total</div>
+                    <div class="gf-items-head-stat-value">{{ $fmt($totalItems) }}</div>
+                </div>
+
+                <div class="gf-items-head-stat">
+                    <div class="gf-items-head-stat-label">Aktif</div>
+                    <div class="gf-items-head-stat-value">{{ $fmt($activeCount) }}</div>
+                </div>
+
+                <div class="gf-category-actions">
+                    <a href="{{ route('master.item_categories.index') }}" class="btn btn-outline-secondary btn-sm">
+                        <i class="bi bi-tags"></i>
+                        Kategori
+                    </a>
+
+                    <a href="{{ route('master.items.create') }}" class="btn btn-primary btn-sm text-white">
+                        <i class="bi bi-plus-lg"></i>
+                        Tambah Item
+                    </a>
+                </div>
+            </div>
+        </div>
+
+        @if (session('success'))
+            <div class="alert alert-success py-2 px-3 mb-3" style="font-size:.82rem;">{{ session('success') }}</div>
+        @endif
+
+        @if (session('error'))
+            <div class="alert alert-danger py-2 px-3 mb-3" style="font-size:.82rem;">{{ session('error') }}</div>
+        @endif
+
+        @if ($errors->any())
+            <div class="alert alert-danger py-2 px-3 mb-3" style="font-size:.82rem;">
+                {{ $errors->first() }}
+            </div>
+        @endif
+
+        <div class="gf-category-kpi-grid">
+            <div class="gf-category-kpi-card">
+                <div class="gf-category-kpi-label">Total Item</div>
+                <div class="gf-category-kpi-value">{{ $fmt($totalItems) }}</div>
+                <div class="gf-category-kpi-note">berdasarkan filter aktif</div>
+            </div>
+
+            <div class="gf-category-kpi-card">
+                <div class="gf-category-kpi-label">Aktif</div>
+                <div class="gf-category-kpi-value">{{ $fmt($activeCount) }}</div>
+                <div class="gf-category-kpi-note">di halaman saat ini</div>
+            </div>
+
+            <div class="gf-category-kpi-card">
+                <div class="gf-category-kpi-label">Ada Barcode</div>
+                <div class="gf-category-kpi-value">{{ $fmt($withBarcodeCount) }}</div>
+                <div class="gf-category-kpi-note">siap untuk scan</div>
+            </div>
+
+            <div class="gf-category-kpi-card">
+                <div class="gf-category-kpi-label">HPP Kosong</div>
+                <div class="gf-category-kpi-value">{{ $fmt($missingHppCount) }}</div>
+                <div class="gf-category-kpi-note">perlu dilengkapi</div>
+            </div>
+        </div>
+
+        <div class="gf-panel">
+            <div class="gf-panel-body">
+                <form method="GET" action="{{ route('master.items.index') }}" class="gf-category-filter">
+                    <div>
+                        <label class="form-label">Cari</label>
+                        <input type="search" name="q" class="form-control"
+                            value="{{ request('q') }}"
+                            placeholder="Kode, nama, SKU...">
+                    </div>
+
+                    <div>
+                        <label class="form-label">Tipe</label>
+                        <select name="type" class="form-select">
+                            <option value="">Semua tipe</option>
+                            @foreach ($typeLabels as $key => $label)
+                                <option value="{{ $key }}" @selected(request('type') == $key)>
+                                    {{ $label }}
+                                </option>
+                            @endforeach
+                        </select>
+                    </div>
+
+                    <div>
+                        <label class="form-label">Kelompok</label>
+                        <select name="category_kind" class="form-select">
+                            <option value="">Semua kelompok</option>
+                            @foreach ($categoryKinds as $key => $label)
+                                <option value="{{ $key }}" @selected(request('category_kind') == $key)>
+                                    {{ $label }}
+                                </option>
+                            @endforeach
+                        </select>
+                    </div>
+
+                    <div>
+                        <label class="form-label">Kategori</label>
+                        <select name="item_category_id" class="form-select">
+                            <option value="">Semua kategori</option>
+                            @foreach ($categories as $cat)
+                                <option value="{{ $cat->id }}" @selected((string) request('item_category_id') === (string) $cat->id)>
+                                    {{ $cat->code }} — {{ $cat->name }}
+                                </option>
+                            @endforeach
+                        </select>
+                    </div>
+
+                    <div class="d-flex gap-2">
+                        <button class="btn btn-outline-secondary w-100">
+                            <i class="bi bi-funnel me-1"></i>
+                            Filter
+                        </button>
+
+                        @if ($hasFilters)
+                            <a href="{{ route('master.items.index') }}" class="btn btn-outline-light border">
+                                Reset
+                            </a>
+                        @endif
+                    </div>
+                </form>
+
+                <div class="gf-marketplace-tabs" aria-label="Filter tipe item">
+                    <a href="{{ $buildUrl(['type' => null]) }}"
+                        class="gf-marketplace-tab text-decoration-none {{ $activeType === '' ? 'is-active' : '' }}">
+                        Semua
+                    </a>
+
+                    @foreach ($typeLabels as $key => $label)
+                        <a href="{{ $buildUrl(['type' => $key]) }}"
+                            class="gf-marketplace-tab text-decoration-none {{ $activeType === (string) $key ? 'is-active' : '' }}">
+                            {{ $label }}
+                        </a>
+                    @endforeach
+                </div>
+
+                <div id="bulkToolbar" class="d-none">
+                    <div class="d-flex flex-wrap align-items-center gap-2">
+                        <span class="fw-bold" style="font-size:.82rem;">
+                            <span id="selectedCount">0</span> item dipilih
+                        </span>
+
+                        <span class="text-muted" style="font-size:.78rem;">— pilih aksi:</span>
+
+                        <button type="button" class="btn btn-outline-primary btn-sm" data-bs-toggle="modal"
+                            data-bs-target="#bulkCategoryModal">
+                            Ubah Kategori
+                        </button>
+
+                        <button type="button" class="btn btn-outline-primary btn-sm" data-bs-toggle="modal"
+                            data-bs-target="#bulkTypeModal">
+                            Ubah Tipe
+                        </button>
+
+                        <button type="button" class="btn btn-outline-success btn-sm" data-bs-toggle="modal"
+                            data-bs-target="#bulkHppModal">
+                            Set HPP
+                        </button>
+
+                        <button type="button" class="btn btn-link btn-sm text-muted ms-auto" id="bulkClear">
+                            Batal pilih
+                        </button>
+                    </div>
+                </div>
+
+                @if ($items->count())
+                    <div class="gf-table-scroll">
+                        <table class="table table-hover align-middle mb-0 gf-clean-table gf-sticky-table">
+                            <thead>
+                                <tr>
+                                    <th style="width: 44px;" class="text-center">
+                                        <input type="checkbox" class="form-check-input" id="checkAll">
+                                    </th>
+                                    <th style="width: 68px;" class="text-center">No.</th>
+                                    <th style="width: 125px;">Kode</th>
+                                    <th>Item</th>
+                                    <th style="width: 170px;">Kategori</th>
+                                    <th style="width: 140px;">Tipe</th>
+                                    <th style="width: 100px;" class="text-center">Satuan</th>
+                                    <th style="width: 92px;" class="text-center">Barcode</th>
+                                    <th style="width: 130px;" class="text-end">HPP</th>
+                                    <th style="width: 105px;" class="text-center">Status</th>
+                                    <th style="width: 150px;" class="text-end">Aksi</th>
+                                </tr>
+                            </thead>
+
+                            <tbody>
+                                @foreach ($items as $item)
+                                    @php
+                                        $hpp = (float) ($item->active_unit_cost ?? $item->effective_unit_cost ?? $item->hpp ?? 0);
+                                        $barcodeCount = (int) ($item->barcodes_count ?? optional($item->barcodes ?? null)->count() ?? 0);
+                                    @endphp
+
+                                    <tr>
+                                        <td class="text-center">
+                                            <input type="checkbox" class="form-check-input row-check" value="{{ $item->id }}">
+                                        </td>
+
+                                        <td class="text-center text-muted">
+                                            {{ method_exists($items, 'firstItem') ? $items->firstItem() + $loop->index : $loop->iteration }}
+                                        </td>
+
+                                        <td>
+                                            <span class="gf-category-code">{{ $item->code }}</span>
+                                        </td>
+
+                                        <td>
+                                            <div class="gf-category-name">{{ $item->name }}</div>
+                                            <div class="gf-category-sub">
+                                                @if (!empty($item->sku))
+                                                    SKU: {{ $item->sku }}
+                                                @else
+                                                    {{ $item->active ? 'Aktif di master item' : 'Nonaktif di master item' }}
+                                                @endif
+                                            </div>
+                                        </td>
+
+                                        <td>
+                                            @if ($item->category)
+                                                <div class="gf-category-name">{{ $item->category->code }}</div>
+                                                <div class="gf-category-sub">{{ $item->category->name }}</div>
+                                            @else
+                                                <span class="text-muted small">Tanpa kategori</span>
+                                            @endif
+                                        </td>
+
+                                        <td>
+                                            <span class="gf-category-type">
+                                                {{ $typeLabels[$item->type] ?? $item->type }}
+                                            </span>
+
+                                            @if (!empty($item->production_source_label))
+                                                <div class="gf-category-sub mt-1">{{ $item->production_source_label }}</div>
+                                            @endif
+                                        </td>
+
+                                        <td class="text-center">
+                                            <span class="gf-category-type">{{ $item->unit ?: '-' }}</span>
+                                        </td>
+
+                                        <td class="text-center">
+                                            @if ($barcodeCount > 0)
+                                                <span class="gf-category-count">{{ $fmt($barcodeCount) }}</span>
+                                            @else
+                                                <span class="gf-badge gf-badge-yellow">Kosong</span>
+                                            @endif
+                                        </td>
+
+                                        <td class="text-end">
+                                            @if ($hpp > 0)
+                                                <strong>Rp {{ number_format($hpp, 0, ',', '.') }}</strong>
+                                            @else
+                                                <span class="text-muted small">Belum di-set</span>
+                                            @endif
+                                        </td>
+
+                                        <td class="text-center">
+                                            @if ($item->active)
+                                                <span class="gf-badge gf-badge-green">Aktif</span>
+                                            @else
+                                                <span class="gf-badge gf-badge-red">Nonaktif</span>
+                                            @endif
+                                        </td>
+
+                                        <td class="text-end">
+                                            <div class="gf-category-row-actions">
+                                                <a href="{{ route('master.items.hpp_temp.edit', $item) }}"
+                                                    class="btn btn-outline-success btn-sm">
+                                                    HPP
+                                                </a>
+
+                                                <a href="{{ route('master.items.edit', $item) }}"
+                                                    class="btn btn-outline-primary btn-sm">
+                                                    Edit
+                                                </a>
+                                            </div>
+                                        </td>
+                                    </tr>
+                                @endforeach
+                            </tbody>
+                        </table>
+                    </div>
+                @else
+                    <div class="gf-category-empty">
+                        <div class="gf-category-empty-title">Tidak ada item yang cocok.</div>
+                        <div>Ubah filter atau tambah item baru untuk mulai mengisi master item.</div>
+
+                        <a href="{{ route('master.items.create') }}" class="btn btn-primary btn-sm text-white mt-3">
+                            Tambah Item
+                        </a>
+                    </div>
+                @endif
+
+                <div class="gf-category-foot">
+                    <div>
+                        @if (method_exists($items, 'firstItem') && $items->total())
+                            Menampilkan {{ $items->firstItem() }}–{{ $items->lastItem() }} dari {{ $fmt($items->total()) }} item
+                        @else
+                            Total {{ $fmt($items->count()) }} item
+                        @endif
+                    </div>
+
+                    <div class="ms-auto">
+                        {{ $items->links() }}
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    {{-- MODAL BULK: KATEGORI --}}
+    <div class="modal fade" id="bulkCategoryModal" tabindex="-1" aria-hidden="true">
+        <div class="modal-dialog modal-dialog-centered">
+            <form method="POST" action="{{ route('master.items.bulk_update') }}" class="modal-content bulk-form">
+                @csrf
+                <input type="hidden" name="action" value="category">
+
+                <div class="modal-header">
+                    <h6 class="modal-title">Ubah Kategori (<span class="sel-count">0</span> item)</h6>
+                    <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
+                </div>
+
+                <div class="modal-body">
+                    <label class="form-label mb-1" style="font-size:.8rem;">Kategori baru</label>
+                    <select name="item_category_id" class="form-select form-select-sm">
+                        <option value="">Tanpa kategori</option>
+                        @foreach ($categories as $cat)
+                            <option value="{{ $cat->id }}">{{ $cat->code }} — {{ $cat->name }}</option>
+                        @endforeach
+                    </select>
+
+                    <div class="ids-container"></div>
+                </div>
+
+                <div class="modal-footer">
+                    <button type="button" class="btn btn-outline-secondary btn-sm" data-bs-dismiss="modal">Batal</button>
+                    <button type="submit" class="btn btn-primary btn-sm text-white">Terapkan</button>
+                </div>
+            </form>
+        </div>
+    </div>
+
+    {{-- MODAL BULK: TIPE --}}
+    <div class="modal fade" id="bulkTypeModal" tabindex="-1" aria-hidden="true">
+        <div class="modal-dialog modal-dialog-centered">
+            <form method="POST" action="{{ route('master.items.bulk_update') }}" class="modal-content bulk-form">
+                @csrf
+                <input type="hidden" name="action" value="type">
+
+                <div class="modal-header">
+                    <h6 class="modal-title">Ubah Tipe (<span class="sel-count">0</span> item)</h6>
+                    <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
+                </div>
+
+                <div class="modal-body">
+                    <label class="form-label mb-1" style="font-size:.8rem;">Tipe baru</label>
+                    <select name="type" class="form-select form-select-sm" required>
+                        @foreach ($typeLabels as $key => $label)
+                            <option value="{{ $key }}">{{ $label }}</option>
+                        @endforeach
+                    </select>
+
+                    <div class="ids-container"></div>
+                </div>
+
+                <div class="modal-footer">
+                    <button type="button" class="btn btn-outline-secondary btn-sm" data-bs-dismiss="modal">Batal</button>
+                    <button type="submit" class="btn btn-primary btn-sm text-white">Terapkan</button>
+                </div>
+            </form>
+        </div>
+    </div>
+
+    {{-- MODAL BULK: HPP --}}
+    <div class="modal fade" id="bulkHppModal" tabindex="-1" aria-hidden="true">
+        <div class="modal-dialog modal-dialog-centered">
+            <form method="POST" action="{{ route('master.items.bulk_update') }}" class="modal-content bulk-form">
+                @csrf
+                <input type="hidden" name="action" value="hpp">
+
+                <div class="modal-header">
+                    <h6 class="modal-title">Set HPP Sementara (<span class="sel-count">0</span> item)</h6>
+                    <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
+                </div>
+
+                <div class="modal-body">
+                    <div class="alert alert-warning py-2 px-3 mb-3" style="font-size:.78rem;">
+                        <strong class="sel-count">0</strong> item terpilih. Snapshot lama akan dinonaktifkan.
+                    </div>
+
+                    <label class="form-label mb-1" style="font-size:.8rem;">HPP per unit (Rp)</label>
+                    <input type="number" step="0.01" min="0" name="unit_cost" class="form-control form-control-sm" required>
+
+                    <label class="form-label mb-1 mt-2" style="font-size:.8rem;">Catatan (opsional)</label>
+                    <input type="text" name="notes" class="form-control form-control-sm" maxlength="255"
+                        placeholder="Contoh: update manual dari master item">
+
+                    <div class="ids-container"></div>
+                </div>
+
+                <div class="modal-footer">
+                    <button type="button" class="btn btn-outline-secondary btn-sm" data-bs-dismiss="modal">Batal</button>
+                    <button type="submit" class="btn btn-success btn-sm">Terapkan HPP</button>
+                </div>
+            </form>
+        </div>
+    </div>
+@endsection
+
+@push('scripts')
+<script>
+    document.addEventListener('DOMContentLoaded', function () {
+        const checkAll = document.getElementById('checkAll');
+        const toolbar = document.getElementById('bulkToolbar');
+        const selectedCount = document.getElementById('selectedCount');
+        const clearBtn = document.getElementById('bulkClear');
+
+        function rowChecks() {
+            return Array.from(document.querySelectorAll('.row-check'));
+        }
+
+        function selectedChecks() {
+            return rowChecks().filter(c => c.checked);
+        }
+
+        function refreshBulkUi() {
+            const selected = selectedChecks();
+            const count = selected.length;
+
+            if (toolbar) {
+                toolbar.classList.toggle('d-none', count === 0);
+            }
+
+            if (selectedCount) {
+                selectedCount.textContent = count;
+            }
+
+            document.querySelectorAll('.sel-count').forEach(el => {
+                el.textContent = count;
+            });
+
+            if (checkAll) {
+                const rows = rowChecks();
+                checkAll.checked = rows.length > 0 && rows.every(c => c.checked);
+                checkAll.indeterminate = count > 0 && count < rows.length;
+            }
+        }
+
+        if (checkAll) {
+            checkAll.addEventListener('change', function () {
+                rowChecks().forEach(c => c.checked = checkAll.checked);
+                refreshBulkUi();
+            });
+        }
+
+        rowChecks().forEach(c => c.addEventListener('change', refreshBulkUi));
+
+        if (clearBtn) {
+            clearBtn.addEventListener('click', function () {
+                rowChecks().forEach(c => c.checked = false);
+                refreshBulkUi();
+            });
+        }
+
+        document.querySelectorAll('.bulk-form').forEach(form => {
+            form.addEventListener('submit', function (e) {
+                const selected = selectedChecks();
+
+                if (!selected.length) {
+                    e.preventDefault();
+                    alert('Pilih minimal 1 item dulu.');
+                    return;
+                }
+
+                const container = form.querySelector('.ids-container');
+                if (!container) return;
+
+                container.innerHTML = '';
+
+                selected.forEach(c => {
+                    const input = document.createElement('input');
+                    input.type = 'hidden';
+                    input.name = 'item_ids[]';
+                    input.value = c.value;
+                    container.appendChild(input);
+                });
+            });
+        });
+
+        const filterForm = document.querySelector('form.gf-category-filter');
+
+        if (filterForm) {
+            const searchInput = filterForm.querySelector('input[name="q"]');
+            const selects = Array.from(filterForm.querySelectorAll('select'));
+            const filterButton = filterForm.querySelector('button[type="submit"], button:not([type])');
+            let timer = null;
+            let isSubmitting = false;
+
+            function ensureIndicator() {
+                if (!searchInput) return null;
+
+                let wrap = searchInput.closest('.gf-filter-live-wrap');
+
+                if (!wrap) {
+                    wrap = document.createElement('div');
+                    wrap.className = 'gf-filter-live-wrap';
+                    searchInput.parentNode.insertBefore(wrap, searchInput);
+                    wrap.appendChild(searchInput);
+                }
+
+                let indicator = wrap.querySelector('.gf-filter-live-indicator');
+
+                if (!indicator) {
+                    indicator = document.createElement('span');
+                    indicator.className = 'gf-filter-live-indicator';
+                    indicator.innerHTML = '<span class="gf-filter-live-dot"></span><span>filter...</span>';
+                    wrap.appendChild(indicator);
+                }
+
+                return indicator;
+            }
+
+            function showLoading() {
+                const indicator = ensureIndicator();
+                if (indicator) indicator.classList.add('is-show');
+
+                if (filterButton) {
+                    filterButton.disabled = true;
+                    filterButton.dataset.originalText = filterButton.dataset.originalText || filterButton.innerHTML;
+                    filterButton.innerHTML = '<span class="spinner-border spinner-border-sm me-1" aria-hidden="true"></span>Filter';
+                }
+            }
+
+            function submitRealtime(delay = 350) {
+                clearTimeout(timer);
+
+                timer = setTimeout(function () {
+                    if (isSubmitting) return;
+                    isSubmitting = true;
+                    showLoading();
+
+                    Array.from(filterForm.elements).forEach(function (el) {
+                        if (!el.name || el.type === 'hidden') return;
+                        if ((el.tagName === 'INPUT' || el.tagName === 'SELECT') && String(el.value || '').trim() === '') {
+                            el.disabled = true;
+                        }
+                    });
+
+                    filterForm.requestSubmit ? filterForm.requestSubmit() : filterForm.submit();
+                }, delay);
+            }
+
+            if (searchInput) {
+                searchInput.setAttribute('autocomplete', 'off');
+
+                searchInput.addEventListener('input', function () {
+                    submitRealtime(450);
+                });
+
+                searchInput.addEventListener('keydown', function (event) {
+                    if (event.key === 'Enter') {
+                        event.preventDefault();
+                        submitRealtime(0);
+                    }
+                });
+            }
+
+            selects.forEach(function (select) {
+                select.addEventListener('change', function () {
+                    submitRealtime(80);
+                });
+            });
+
+            if (!filterForm.querySelector('.gf-filter-hint')) {
+                const hint = document.createElement('div');
+                hint.className = 'gf-filter-hint';
+                hint.innerHTML = '<i class="bi bi-lightning-charge-fill"></i><span>Filter realtime aktif — ketik atau ubah pilihan, data otomatis diperbarui.</span>';
+                filterForm.insertAdjacentElement('afterend', hint);
+            }
+        }
+
+        refreshBulkUi();
+    });
+</script>
+@endpush
