@@ -1,771 +1,691 @@
 @extends('layouts.app')
 
-@section('title', 'Dashboard Purchasing')
+@section('title', 'Dashboard Pengadaan')
 
 @push('head')
 <style>
-    .dash-wrap { max-width: 1100px; margin-inline: auto; padding-bottom: 3rem; }
+  /* ── Layout ──────────────────────────────────────────────── */
+  .page-wrap { max-width:1080px; margin-inline:auto; padding-bottom:3rem; }
+  .mono { font-variant-numeric:tabular-nums; font-family:ui-monospace,SFMono-Regular,Menlo,Consolas,"Liberation Mono"; }
 
-    /* KPI Cards */
-    .kpi-grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(150px, 1fr)); gap: .65rem; }
-    @media (max-width: 576px) { .kpi-grid { grid-template-columns: repeat(2, 1fr); } }
+  /* ── KPI Strip ───────────────────────────────────────────── */
+  .kpi-strip { display:grid; grid-template-columns:repeat(auto-fill,minmax(148px,1fr)); gap:.65rem; }
+  @media(max-width:575.98px){ .kpi-strip { grid-template-columns:repeat(2,1fr); } }
 
-    .kpi-card {
-        border-radius: 12px;
-        padding: .9rem .85rem;
-        background: var(--card-bg, #fff);
-        border: 1px solid var(--line, #e5e7eb);
-        cursor: pointer;
-        transition: box-shadow .15s, transform .1s;
-        text-decoration: none;
-        color: inherit;
-        display: block;
-    }
-    .kpi-card:hover { box-shadow: 0 4px 18px rgba(0,0,0,.10); transform: translateY(-1px); }
-    .kpi-card .kpi-num   { font-size: 1.85rem; font-weight: 700; line-height: 1.1; }
-    .kpi-card .kpi-label { font-size: .73rem; color: var(--muted, #64748b); margin-top: .2rem; line-height: 1.3; }
-    .kpi-card .kpi-sub   { font-size: .68rem; color: var(--muted); margin-top: .15rem; }
+  .kpi-card {
+    background:var(--card); border:1px solid var(--line); border-radius:14px;
+    padding:.9rem 1rem; display:block; text-decoration:none; color:inherit;
+    transition:box-shadow .15s, transform .1s;
+  }
+  a.kpi-card:hover { box-shadow:0 4px 20px rgba(0,0,0,.09); transform:translateY(-1px); color:inherit; }
+  .kpi-num   { font-size:1.85rem; font-weight:750; line-height:1; letter-spacing:-.02em; }
+  .kpi-rp    { font-size:1.05rem; font-weight:700; line-height:1.2; }
+  .kpi-label { font-size:.72rem; color:var(--muted); margin-top:.3rem; line-height:1.3; font-weight:500; }
+  .kpi-sub   { font-size:.68rem; color:var(--muted); margin-top:.1rem; }
 
-    .kpi-danger  { border-left: 4px solid #ef4444; }
-    .kpi-warn    { border-left: 4px solid #f59e0b; }
-    .kpi-info    { border-left: 4px solid #3b82f6; }
-    .kpi-success { border-left: 4px solid #22c55e; }
-    .kpi-neutral { border-left: 4px solid #94a3b8; }
-    .kpi-purple  { border-left: 4px solid #8b5cf6; }
+  .kpi-red    { border-left:4px solid #ef4444; }
+  .kpi-yellow { border-left:4px solid #f59e0b; }
+  .kpi-blue   { border-left:4px solid #3b82f6; }
+  .kpi-green  { border-left:4px solid #22c55e; }
+  .kpi-purple { border-left:4px solid #8b5cf6; }
+  .kpi-slate  { border-left:4px solid #94a3b8; }
 
-    /* Section */
-    .dash-section { margin-top: 1.5rem; }
-    .dash-section-title {
-        font-size: .72rem;
-        font-weight: 600;
-        text-transform: uppercase;
-        letter-spacing: .07em;
-        color: var(--muted, #64748b);
-        margin-bottom: .6rem;
-        display: flex;
-        align-items: center;
-        gap: .4rem;
-    }
+  /* ── Pipeline ────────────────────────────────────────────── */
+  .pipeline {
+    background:var(--card); border:1px solid var(--line); border-radius:14px;
+    display:flex; overflow:hidden; min-width:520px;
+  }
+  .pipeline-stage {
+    flex:1; padding:.85rem .9rem; border-right:1px solid var(--line); position:relative;
+  }
+  .pipeline-stage:last-child { border-right:none; }
+  .pipeline-num   { font-size:1.5rem; font-weight:750; line-height:1; }
+  .pipeline-label {
+    font-size:.68rem; text-transform:uppercase; letter-spacing:.06em;
+    color:var(--muted); font-weight:600; margin-top:.3rem;
+  }
+  .pipeline-sub { font-size:.67rem; color:var(--muted); margin-top:.08rem; }
+  .pipeline-arrow {
+    position:absolute; right:-9px; top:50%; transform:translateY(-50%);
+    width:18px; height:18px; background:var(--card); border:1px solid var(--line);
+    border-radius:50%; display:flex; align-items:center; justify-content:center;
+    font-size:.55rem; color:var(--muted); z-index:1;
+  }
+  @media(max-width:767.98px){
+    .pipeline { flex-direction:column; min-width:unset; }
+    .pipeline-stage { border-right:none; border-bottom:1px solid var(--line); }
+    .pipeline-stage:last-child { border-bottom:none; }
+    .pipeline-arrow { display:none; }
+  }
 
-    /* Tables */
-    .dash-card { background: var(--card-bg,#fff); border: 1px solid var(--line,#e5e7eb); border-radius: 12px; overflow: hidden; margin-bottom: .75rem; }
-    .dash-card-body { padding: 0; overflow-x: auto; }
-    .dash-table { width: 100%; font-size: .82rem; border-collapse: collapse; min-width: 500px; }
-    .dash-table th { font-weight: 600; font-size: .70rem; text-transform: uppercase; color: var(--muted); padding: .5rem .6rem; border-bottom: 2px solid var(--line, #e5e7eb); white-space: nowrap; }
-    .dash-table td { padding: .45rem .6rem; border-bottom: 1px solid var(--line, #e5e7eb); vertical-align: middle; }
-    .dash-table tr:last-child td { border-bottom: none; }
-    .dash-table tr:hover td { background: rgba(59,130,246,.04); }
+  /* ── Cards (same as PR/GRN show pages) ──────────────────── */
+  .card-section { background:var(--card); border:1px solid var(--line); border-radius:14px; overflow:hidden; }
+  .card-section-header {
+    padding:.6rem 1rem; border-bottom:1px solid var(--line);
+    font-size:.72rem; text-transform:uppercase; letter-spacing:.07em;
+    color:var(--muted); font-weight:600;
+    display:flex; align-items:center; justify-content:space-between;
+  }
+  .card-section-header .hcount {
+    font-weight:700; color:var(--body); font-size:.78rem;
+    text-transform:none; letter-spacing:0;
+  }
 
-    .mono { font-variant-numeric: tabular-nums; font-family: ui-monospace, SFMono-Regular, Menlo, Consolas, "Liberation Mono", monospace; }
+  /* ── Table (same pattern as PO/PR index) ─────────────────── */
+  .table thead th {
+    border-bottom:1px solid var(--line);
+    font-size:.72rem; text-transform:uppercase; letter-spacing:.07em;
+    color:var(--muted); padding:.5rem .75rem; white-space:nowrap; font-weight:600;
+  }
+  .table tbody td {
+    vertical-align:middle; font-size:.83rem; padding:.45rem .75rem;
+    border-bottom:1px solid var(--line);
+  }
+  .table tbody tr:last-child td { border-bottom:none; }
+  .dash-row:hover td { background:rgba(59,130,246,.035); }
 
-    /* Badges */
-    .pill { border-radius: 999px; font-size: .67rem; padding: .1rem .5rem; border: 1px solid transparent; display: inline-block; white-space: nowrap; }
-    .pill-draft     { background: rgba(148,163,184,.12); color: #64748b; border-color: rgba(148,163,184,.4); }
-    .pill-approved  { background: rgba(59,130,246,.10);  color: #1d4ed8; border-color: rgba(59,130,246,.4); }
-    .pill-converted { background: rgba(99,102,241,.10);  color: #4338ca; border-color: rgba(99,102,241,.4); }
-    .pill-partial   { background: rgba(234,179,8,.12);   color: #a16207; border-color: rgba(234,179,8,.4); }
-    .pill-full      { background: rgba(22,163,74,.12);   color: #15803d; border-color: rgba(22,163,74,.4); }
-    .pill-danger    { background: rgba(220,38,38,.10);   color: #b91c1c; border-color: rgba(220,38,38,.4); }
-    .pill-paid      { background: rgba(22,163,74,.12);   color: #15803d; border-color: rgba(22,163,74,.4); }
-    .pill-unpaid    { background: rgba(220,38,38,.10);   color: #b91c1c; border-color: rgba(220,38,38,.4); }
+  /* ── Badges ──────────────────────────────────────────────── */
+  .badge-status {
+    border-radius:999px; font-size:.7rem; padding:.1rem .6rem;
+    border:1px solid transparent; white-space:nowrap; display:inline-block;
+  }
+  .badge-draft    { background:rgba(148,163,184,.12); color:#64748b; border-color:rgba(148,163,184,.5); }
+  .badge-approved { background:rgba(22,163,74,.12);  color:#15803d; border-color:rgba(22,163,74,.6); }
+  .badge-partial  { background:rgba(234,179,8,.12);  color:#a16207; border-color:rgba(234,179,8,.5); }
+  .badge-danger   { background:rgba(220,38,38,.08);  color:#b91c1c; border-color:rgba(220,38,38,.5); }
+  .badge-paid     { background:rgba(22,163,74,.12);  color:#15803d; border-color:rgba(22,163,74,.5); }
+  .badge-blue     { background:rgba(59,130,246,.10); color:#1d4ed8; border-color:rgba(59,130,246,.5); }
 
-    /* Blocker tags */
-    .blocker-list { display: flex; flex-wrap: wrap; gap: .25rem; }
-    .blocker-tag  { font-size: .64rem; background: rgba(234,179,8,.15); color: #92400e; border: 1px solid rgba(234,179,8,.4); border-radius: 4px; padding: .1rem .4rem; }
+  /* ── Blocker tags ────────────────────────────────────────── */
+  .blocker {
+    font-size:.64rem; background:rgba(234,179,8,.12); color:#92400e;
+    border:1px solid rgba(234,179,8,.4); border-radius:4px;
+    padding:.1rem .4rem; display:inline-block;
+  }
 
-    /* Link */
-    .tbl-link { color: inherit; text-decoration: none; font-weight: 500; }
-    .tbl-link:hover { text-decoration: underline; color: #2563eb; }
+  /* ── Activity grid ───────────────────────────────────────── */
+  .activity-grid { display:grid; grid-template-columns:repeat(auto-fill,minmax(240px,1fr)); gap:.75rem; }
+  .act-row {
+    display:flex; justify-content:space-between; align-items:center;
+    padding:.45rem 1rem; border-bottom:1px solid var(--line);
+    font-size:.82rem; gap:.5rem;
+  }
+  .act-row:last-child { border-bottom:none; }
+  .act-code { font-weight:600; white-space:nowrap; color:inherit; text-decoration:none; }
+  .act-code:hover { text-decoration:underline; color:#2563eb; }
+  .act-meta { font-size:.7rem; color:var(--muted); margin-top:.05rem; }
 
-    /* Recent activity */
-    .activity-grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(260px,1fr)); gap: .75rem; }
-    .activity-card { background: var(--card-bg,#fff); border: 1px solid var(--line,#e5e7eb); border-radius: 12px; overflow: hidden; }
-    .activity-card-header { padding: .55rem .8rem; font-size: .72rem; font-weight: 600; text-transform: uppercase; letter-spacing: .06em; color: var(--muted); border-bottom: 1px solid var(--line,#e5e7eb); }
-    .activity-row { display: flex; justify-content: space-between; align-items: center; padding: .4rem .8rem; border-bottom: 1px solid var(--line,#e5e7eb); font-size: .8rem; gap: .5rem; }
-    .activity-row:last-child { border-bottom: none; }
-    .activity-code { font-weight: 500; white-space: nowrap; }
-    .activity-meta { font-size: .72rem; color: var(--muted); white-space: nowrap; }
+  /* ── Section divider ─────────────────────────────────────── */
+  .sec-divider {
+    font-size:.7rem; font-weight:700; text-transform:uppercase; letter-spacing:.07em;
+    color:var(--muted); margin-top:1.75rem; margin-bottom:.65rem;
+    display:flex; align-items:center; gap:.5rem;
+  }
+  .sec-divider::after { content:''; flex:1; height:1px; background:var(--line); }
+
+  /* ── Link ────────────────────────────────────────────────── */
+  .tbl-link { color:inherit; text-decoration:none; font-weight:600; }
+  .tbl-link:hover { text-decoration:underline; color:#2563eb; }
+
+  @media(max-width:767.98px){
+    .page-wrap { padding-inline:.75rem; }
+    .kpi-strip { grid-template-columns:repeat(2,1fr); }
+    .table-responsive .table tbody td { font-size:.78rem; }
+  }
 </style>
 @endpush
 
 @section('content')
-<div class="dash-wrap px-3 py-4">
+<div class="page-wrap py-3">
 
-    {{-- HEADER --}}
-    <div class="d-flex justify-content-between align-items-center mb-4 flex-wrap gap-2">
-        <div>
-            <h1 class="h5 fw-bold mb-0">Dashboard Purchasing</h1>
-            <div class="text-muted small">{{ now()->isoFormat('dddd, D MMMM Y') }}</div>
-        </div>
-        <div class="d-flex gap-2 flex-wrap">
-            @if (Route::has('purchasing.purchase_requests.index') && $hasPrTable)
-            <a href="{{ route('purchasing.purchase_requests.index') }}" class="btn btn-sm btn-outline-secondary">
-                📋 PR
-            </a>
-            @endif
-            <a href="{{ route('purchasing.purchase_orders.index') }}" class="btn btn-sm btn-outline-secondary">
-                🧾 PO
-            </a>
-        </div>
+  {{-- ── HEADER ──────────────────────────────────────────────── --}}
+  <div class="d-flex align-items-center justify-content-between gap-3 mb-3 flex-wrap">
+    <div>
+      <h2 class="mb-0">Dashboard Pengadaan</h2>
+      <div class="text-muted small">{{ now()->isoFormat('dddd, D MMMM Y') }}</div>
+    </div>
+    <div class="d-flex gap-2 flex-wrap">
+      @if ($hasPrTable && Route::has('purchasing.purchase_requests.create'))
+        <a href="{{ route('purchasing.purchase_requests.create') }}" class="btn btn-sm btn-outline-secondary">
+          <i class="bi bi-plus me-1"></i>PR
+        </a>
+      @endif
+      @if (Route::has('purchasing.purchase_orders.create') && ($isOwner || $isAdmin))
+        <a href="{{ route('purchasing.purchase_orders.create') }}" class="btn btn-sm btn-outline-secondary">
+          <i class="bi bi-plus me-1"></i>PO
+        </a>
+      @endif
+      @if (Route::has('purchasing.purchase_receipts.create'))
+        <a href="{{ route('purchasing.purchase_receipts.create') }}" class="btn btn-sm btn-outline-secondary">
+          <i class="bi bi-plus me-1"></i>GRN
+        </a>
+      @endif
+      @if ($hasInvoiceTable && Route::has('purchasing.supplier_invoices.create') && ($isOwner || $isAdmin))
+        <a href="{{ route('purchasing.supplier_invoices.create') }}" class="btn btn-sm btn-primary">
+          <i class="bi bi-plus me-1"></i>Faktur
+        </a>
+      @endif
+    </div>
+  </div>
+
+  {{-- ── KPI STRIP ────────────────────────────────────────────── --}}
+  <div class="kpi-strip mb-3">
+
+    <a href="{{ route('purchasing.material_shortages.index') }}"
+       class="kpi-card {{ $shortageCount > 0 ? 'kpi-red' : 'kpi-slate' }}">
+      <div class="kpi-num {{ $shortageCount > 0 ? 'text-danger' : '' }}">{{ $shortageCount }}</div>
+      <div class="kpi-label">Material Kurang</div>
+      <div class="kpi-sub">dari {{ $shortageItemCount }} material</div>
+    </a>
+
+    @if ($hasPrTable)
+    <a href="{{ route('purchasing.purchase_requests.index', ['status' => 'draft']) }}"
+       class="kpi-card {{ $prDraftCount > 0 ? 'kpi-yellow' : 'kpi-slate' }}">
+      <div class="kpi-num">{{ $prDraftCount }}</div>
+      <div class="kpi-label">PR Draft</div>
+      <div class="kpi-sub">menunggu approval</div>
+    </a>
+    @endif
+
+    @if ($hasPrTable)
+    <a href="{{ route('purchasing.purchase_requests.index', ['status' => 'approved']) }}"
+       class="kpi-card {{ $prApprovedNotConvertedCount > 0 ? 'kpi-purple' : 'kpi-slate' }}">
+      <div class="kpi-num">{{ $prApprovedNotConvertedCount }}</div>
+      <div class="kpi-label">PR Belum Jadi PO</div>
+      <div class="kpi-sub">sudah disetujui</div>
+    </a>
+    @endif
+
+    <a href="{{ route('purchasing.purchase_orders.index') }}"
+       class="kpi-card {{ ($poApprovedNotReceivedCount + $poPartialCount) > 0 ? 'kpi-yellow' : 'kpi-slate' }}">
+      <div class="kpi-num">{{ $poApprovedNotReceivedCount + $poPartialCount }}</div>
+      <div class="kpi-label">PO Belum Diterima</div>
+      <div class="kpi-sub">{{ $poApprovedNotReceivedCount }} belum · {{ $poPartialCount }} sebagian</div>
+    </a>
+
+    @if ($hasInvoiceTable)
+    <a href="{{ route('purchasing.supplier_invoices.index') }}"
+       class="kpi-card {{ $invOverdueCount > 0 ? 'kpi-red' : ($invOutstandingCount > 0 ? 'kpi-yellow' : 'kpi-slate') }}">
+      <div class="kpi-num {{ $invOverdueCount > 0 ? 'text-danger' : '' }}">{{ $invOverdueCount }}</div>
+      <div class="kpi-label">Invoice Overdue</div>
+      @if ($canSeeMoney && $invOverdueTotal > 0)
+        <div class="kpi-sub mono">{{ rupiah($invOverdueTotal) }}</div>
+      @else
+        <div class="kpi-sub">{{ $invOutstandingCount }} outstanding</div>
+      @endif
+    </a>
+    @endif
+
+    @if ($canSeeMoney)
+    <div class="kpi-card kpi-green" style="cursor:default;">
+      <div class="kpi-rp mono">{{ rupiah($payThisMonthTotal) }}</div>
+      <div class="kpi-label">Bayar Bulan Ini</div>
+      <div class="kpi-sub">{{ now()->isoFormat('MMMM') }}</div>
+    </div>
+    @endif
+
+    <div class="kpi-card kpi-slate" style="cursor:default;">
+      <div class="kpi-num">{{ $poClosedMonthCount }}</div>
+      <div class="kpi-label">PO Closed</div>
+      <div class="kpi-sub">{{ now()->isoFormat('MMMM') }}</div>
     </div>
 
-    {{-- ════════════════════════════════════════════════════════════
-    KPI CARDS — 10 kartu
-    ════════════════════════════════════════════════════════════ --}}
-    <div class="kpi-grid mb-3">
+  </div>
 
-        {{-- KPI 1: PR Draft --}}
-        @if ($hasPrTable)
-        <a href="{{ route('purchasing.purchase_requests.index', ['status' => 'draft']) }}"
-           class="kpi-card kpi-neutral">
-            <div class="kpi-num">{{ $prDraftCount }}</div>
-            <div class="kpi-label">PR Draft</div>
-            <div class="kpi-sub">menunggu submit</div>
-        </a>
+  {{-- ── PIPELINE ─────────────────────────────────────────────── --}}
+  <div class="sec-divider">Pipeline Pengadaan</div>
+  <div style="overflow-x:auto;" class="mb-4">
+    <div class="pipeline">
+
+      @if ($hasPrTable)
+      <div class="pipeline-stage">
+        <div class="pipeline-num">{{ $prDraftCount + $prApprovedNotConvertedCount }}</div>
+        <div class="pipeline-label">Purchase Request</div>
+        <div class="pipeline-sub">{{ $prDraftCount }} draft · {{ $prApprovedNotConvertedCount }} approved</div>
+        <div class="pipeline-arrow"><i class="bi bi-chevron-right"></i></div>
+      </div>
+      @endif
+
+      <div class="pipeline-stage">
+        <div class="pipeline-num">{{ $poDraftCount + $poApprovedNotReceivedCount + $poPartialCount }}</div>
+        <div class="pipeline-label">Purchase Order</div>
+        <div class="pipeline-sub">{{ $poDraftCount }} draft · {{ $poApprovedNotReceivedCount + $poPartialCount }} belum terima</div>
+        <div class="pipeline-arrow"><i class="bi bi-chevron-right"></i></div>
+      </div>
+
+      <div class="pipeline-stage">
+        <div class="pipeline-num">{{ $grnThisMonth }}</div>
+        <div class="pipeline-label">Penerimaan Barang</div>
+        <div class="pipeline-sub">GRN bulan ini</div>
+        @if ($hasInvoiceTable)<div class="pipeline-arrow"><i class="bi bi-chevron-right"></i></div>@endif
+      </div>
+
+      @if ($hasInvoiceTable)
+      <div class="pipeline-stage">
+        <div class="pipeline-num {{ $poFullyNoInvoiceCount > 0 ? 'text-warning' : '' }}">{{ $poFullyNoInvoiceCount }}</div>
+        <div class="pipeline-label">Perlu Faktur</div>
+        <div class="pipeline-sub">terima penuh, belum invoice</div>
+        <div class="pipeline-arrow"><i class="bi bi-chevron-right"></i></div>
+      </div>
+
+      <div class="pipeline-stage">
+        <div class="pipeline-num {{ $invOutstandingCount > 0 ? 'text-danger' : '' }}">{{ $invOutstandingCount }}</div>
+        <div class="pipeline-label">Invoice Belum Bayar</div>
+        @if ($canSeeMoney && $invOutstandingTotal > 0)
+          <div class="pipeline-sub mono">{{ rupiah($invOutstandingTotal) }}</div>
+        @else
+          <div class="pipeline-sub">outstanding</div>
         @endif
-
-        {{-- KPI 2: PR Approved belum convert --}}
-        @if ($hasPrTable)
-        <a href="{{ route('purchasing.purchase_requests.index', ['status' => 'approved']) }}"
-           class="kpi-card {{ $prApprovedNotConvertedCount > 0 ? 'kpi-purple' : 'kpi-neutral' }}">
-            <div class="kpi-num">{{ $prApprovedNotConvertedCount }}</div>
-            <div class="kpi-label">PR Belum Convert</div>
-            <div class="kpi-sub">approved → PO</div>
-        </a>
-        @endif
-
-        {{-- KPI 3: PO Approved belum diterima --}}
-        <a href="{{ route('purchasing.purchase_orders.index', ['received_status' => 'not_received']) }}"
-           class="kpi-card {{ $poApprovedNotReceivedCount > 0 ? 'kpi-warn' : 'kpi-neutral' }}">
-            <div class="kpi-num">{{ $poApprovedNotReceivedCount }}</div>
-            <div class="kpi-label">PO Belum Diterima</div>
-            <div class="kpi-sub">approved, 0 GRN</div>
-        </a>
-
-        {{-- KPI 4: PO Partial --}}
-        <a href="{{ route('purchasing.purchase_orders.index', ['received_status' => 'partial']) }}"
-           class="kpi-card {{ $poPartialCount > 0 ? 'kpi-warn' : 'kpi-neutral' }}">
-            <div class="kpi-num">{{ $poPartialCount }}</div>
-            <div class="kpi-label">Terima Sebagian</div>
-            <div class="kpi-sub">masih ada sisa</div>
-        </a>
-
-        {{-- KPI 5: Fully received belum invoice --}}
-        @if ($hasInvoiceTable)
-        <a href="#sectionFullyNoInv" class="kpi-card {{ $poFullyNoInvoiceCount > 0 ? 'kpi-info' : 'kpi-neutral' }}">
-            <div class="kpi-num">{{ $poFullyNoInvoiceCount }}</div>
-            <div class="kpi-label">Belum Ada Invoice</div>
-            <div class="kpi-sub">sudah fully received</div>
-        </a>
-        @endif
-
-        {{-- KPI 6: Invoice outstanding --}}
-        @if ($hasInvoiceTable)
-        <a href="{{ route('purchasing.supplier_invoices.index') }}"
-           class="kpi-card {{ $invOutstandingCount > 0 ? 'kpi-danger' : 'kpi-neutral' }}">
-            <div class="kpi-num">{{ $invOutstandingCount }}</div>
-            <div class="kpi-label">Invoice Outstanding</div>
-            @if ($canSeeMoney && $invOutstandingTotal > 0)
-                <div class="kpi-sub mono">{{ rupiah($invOutstandingTotal) }}</div>
-            @endif
-        </a>
-        @endif
-
-        {{-- KPI 7: Invoice jatuh tempo --}}
-        @if ($hasInvoiceTable)
-        <a href="{{ route('purchasing.supplier_invoices.index') }}"
-           class="kpi-card {{ $invOverdueCount > 0 ? 'kpi-danger' : 'kpi-neutral' }}">
-            <div class="kpi-num {{ $invOverdueCount > 0 ? 'text-danger' : '' }}">{{ $invOverdueCount }}</div>
-            <div class="kpi-label">Invoice Jatuh Tempo</div>
-            <div class="kpi-sub">overdue</div>
-        </a>
-        @endif
-
-        {{-- KPI 8: PO Siap Close --}}
-        <a href="#sectionReadyClose"
-           class="kpi-card {{ $poReadyCloseCount > 0 ? 'kpi-success' : 'kpi-neutral' }}">
-            <div class="kpi-num">{{ $poReadyCloseCount }}</div>
-            <div class="kpi-label">Siap Close</div>
-            <div class="kpi-sub">semua syarat terpenuhi</div>
-        </a>
-
-        {{-- KPI 9: PO belum bisa close --}}
-        <a href="#sectionNotReadyClose"
-           class="kpi-card {{ $poNotReadyCloseCount > 0 ? 'kpi-warn' : 'kpi-neutral' }}">
-            <div class="kpi-num">{{ $poNotReadyCloseCount }}</div>
-            <div class="kpi-label">Belum Bisa Close</div>
-            <div class="kpi-sub">ada blocker</div>
-        </a>
-
-        {{-- KPI 10: Closed bulan ini --}}
-        <div class="kpi-card kpi-neutral" style="cursor:default;">
-            <div class="kpi-num">{{ $poClosedMonthCount }}</div>
-            <div class="kpi-label">Closed Bulan Ini</div>
-            <div class="kpi-sub">{{ now()->isoFormat('MMMM Y') }}</div>
-        </div>
+      </div>
+      @endif
 
     </div>
+  </div>
 
-    {{-- ════════════════════════════════════════════════════════════
-    SECTION A — Purchase Request Action Needed
-    PR Approved belum convert ke PO
-    ════════════════════════════════════════════════════════════ --}}
-    @if ($hasPrTable && $prApprovedNotConvertedList->isNotEmpty())
-    <div class="dash-section">
-        <div class="dash-section-title">
-            <span>📋</span>
-            <span>Purchase Request — perlu diconvert ke PO</span>
-            <span class="ms-auto text-muted fw-normal" style="font-size:.68rem;">{{ $prApprovedNotConvertedList->count() }} item</span>
-        </div>
-        <div class="dash-card">
-            <div class="dash-card-body">
-                <table class="dash-table">
-                    <thead>
-                        <tr>
-                            <th>No PR</th>
-                            <th>Tanggal</th>
-                            <th>Supplier</th>
-                            <th>Requester</th>
-                            <th class="text-center">Item</th>
-                            @if ($canSeeMoney)<th class="text-end">Est. Total</th>@endif
-                            <th></th>
-                        </tr>
-                    </thead>
-                    <tbody>
-                        @foreach ($prApprovedNotConvertedList as $pr)
-                        @php
-                            $estTotal = $pr->lines->sum(fn($l) => ($l->qty ?? 0) * ($l->unit_price ?? 0));
-                        @endphp
-                        <tr>
-                            <td>
-                                <a href="{{ route('purchasing.purchase_requests.show', $pr->id) }}" class="tbl-link mono">
-                                    {{ $pr->code }}
-                                </a>
-                            </td>
-                            <td class="mono text-muted">
-                                {{ $pr->created_at ? $pr->created_at->format('d/m/Y') : '—' }}
-                            </td>
-                            <td>{{ $pr->supplier?->name ?? '—' }}</td>
-                            <td>{{ $pr->requestedBy?->name ?? '—' }}</td>
-                            <td class="text-center">{{ $pr->lines->count() }}</td>
-                            @if ($canSeeMoney)
-                            <td class="text-end mono">
-                                {{ $estTotal > 0 ? rupiah($estTotal) : '—' }}
-                            </td>
-                            @endif
-                            <td class="text-end" style="white-space:nowrap;">
-                                <a href="{{ route('purchasing.purchase_requests.show', $pr->id) }}"
-                                   class="btn btn-xs btn-outline-secondary me-1"
-                                   style="font-size:.72rem;padding:.15rem .5rem;">
-                                    Lihat
-                                </a>
-                                @if (($isOwner || $isAdmin) && Route::has('purchasing.purchase_requests.convert'))
-                                <a href="{{ route('purchasing.purchase_requests.show', $pr->id) }}"
-                                   class="btn btn-xs btn-outline-primary"
-                                   style="font-size:.72rem;padding:.15rem .5rem;">
-                                    Convert →PO
-                                </a>
-                                @endif
-                            </td>
-                        </tr>
-                        @endforeach
-                    </tbody>
-                </table>
-            </div>
-        </div>
-    </div>
-    @endif
+  {{-- ── ACTION ITEMS ─────────────────────────────────────────── --}}
+  @php
+    $hasActions = $prApprovedNotConvertedList->isNotEmpty()
+               || $poBelumTerimaList->isNotEmpty()
+               || $poFullyNoInvoiceList->isNotEmpty()
+               || $invOutstandingList->isNotEmpty();
+  @endphp
 
-    {{-- ════════════════════════════════════════════════════════════
-    SECTION B — PO Butuh Penerimaan (not_received + partial)
-    ════════════════════════════════════════════════════════════ --}}
-    @if ($poBelumTerimaList->isNotEmpty())
-    <div class="dash-section">
-        <div class="dash-section-title">
-            <span>📦</span>
-            <span>PO Butuh Penerimaan Barang</span>
-            <span class="ms-auto text-muted fw-normal" style="font-size:.68rem;">{{ $poBelumTerimaList->count() }} item</span>
-        </div>
-        <div class="dash-card">
-            <div class="dash-card-body">
-                <table class="dash-table">
-                    <thead>
-                        <tr>
-                            <th>No PO</th>
-                            <th>Supplier</th>
-                            <th>Jenis PO</th>
-                            <th>Status Terima</th>
-                            <th class="text-center">Item</th>
-                            @if ($canSeeMoney)<th class="text-end">Total</th>@endif
-                            <th></th>
-                        </tr>
-                    </thead>
-                    <tbody>
-                        @foreach ($poBelumTerimaList as $po)
-                        <tr>
-                            <td>
-                                <a href="{{ route('purchasing.purchase_orders.show', $po->id) }}" class="tbl-link mono">
-                                    {{ $po->code }}
-                                </a>
-                            </td>
-                            <td>{{ $po->supplier?->name ?? '—' }}</td>
-                            <td>
-                                @if (function_exists('po_order_type_label'))
-                                    {!! po_order_type_label($po->order_type, true) !!}
-                                @else
-                                    {{ $po->order_type ?? '—' }}
-                                @endif
-                            </td>
-                            <td>
-                                @php
-                                    $rs = $po->received_status ?? 'not_received';
-                                    $rsBadge = match($rs) {
-                                        'partial' => 'pill-partial',
-                                        'fully_received' => 'pill-full',
-                                        default => 'pill-draft',
-                                    };
-                                @endphp
-                                <span class="pill {{ $rsBadge }}">
-                                    @if (function_exists('received_status_label'))
-                                        {{ received_status_label($rs) }}
-                                    @else
-                                        {{ $rs }}
-                                    @endif
-                                </span>
-                            </td>
-                            <td class="text-center">{{ $po->lines->count() }}</td>
-                            @if ($canSeeMoney)
-                            <td class="text-end mono">{{ rupiah($po->grand_total) }}</td>
-                            @endif
-                            <td>
-                                <a href="{{ route('purchasing.purchase_orders.show', $po->id) }}"
-                                   class="btn btn-xs btn-outline-secondary"
-                                   style="font-size:.72rem;padding:.15rem .5rem;">
-                                    Lihat
-                                </a>
-                            </td>
-                        </tr>
-                        @endforeach
-                    </tbody>
-                </table>
-            </div>
-        </div>
-    </div>
-    @endif
+  <div class="sec-divider">Perlu Tindakan</div>
 
-    {{-- ════════════════════════════════════════════════════════════
-    SECTION: PO Fully Received belum ada Invoice
-    ════════════════════════════════════════════════════════════ --}}
-    @if ($hasInvoiceTable && $poFullyNoInvoiceList->isNotEmpty())
-    <div class="dash-section" id="sectionFullyNoInv">
-        <div class="dash-section-title">
-            <span>🧾</span>
-            <span>Sudah Diterima Penuh — belum ada Faktur Supplier</span>
-        </div>
-        <div class="dash-card">
-            <div class="dash-card-body">
-                <table class="dash-table">
-                    <thead>
-                        <tr>
-                            <th>No PO</th>
-                            <th>Supplier</th>
-                            <th>Tanggal</th>
-                            @if ($canSeeMoney)<th class="text-end">Total PO</th>@endif
-                            <th></th>
-                        </tr>
-                    </thead>
-                    <tbody>
-                        @foreach ($poFullyNoInvoiceList as $po)
-                        <tr>
-                            <td>
-                                <a href="{{ route('purchasing.purchase_orders.show', $po->id) }}" class="tbl-link mono">
-                                    {{ $po->code }}
-                                </a>
-                            </td>
-                            <td>{{ $po->supplier?->name ?? '—' }}</td>
-                            <td class="mono text-muted">{{ id_date($po->date) }}</td>
-                            @if ($canSeeMoney)
-                            <td class="text-end mono">{{ rupiah($po->grand_total) }}</td>
-                            @endif
-                            <td>
-                                <a href="{{ route('purchasing.purchase_orders.show', $po->id) }}"
-                                   class="btn btn-xs btn-outline-secondary me-1"
-                                   style="font-size:.72rem;padding:.15rem .5rem;">
-                                    Lihat
-                                </a>
-                                @if (($isOwner || $isAdmin || in_array(auth()->user()?->role ?? '', ['accounting','developer'])) && Route::has('purchasing.supplier_invoices.create'))
-                                <a href="{{ route('purchasing.supplier_invoices.create', ['purchase_order_id' => $po->id]) }}"
-                                   class="btn btn-xs btn-outline-success"
-                                   style="font-size:.72rem;padding:.15rem .5rem;">
-                                    + Faktur
-                                </a>
-                                @endif
-                            </td>
-                        </tr>
-                        @endforeach
-                    </tbody>
-                </table>
-            </div>
-        </div>
-    </div>
-    @endif
-
-    {{-- ════════════════════════════════════════════════════════════
-    SECTION C — Invoice Outstanding
-    ════════════════════════════════════════════════════════════ --}}
-    @if ($hasInvoiceTable && $invOutstandingList->isNotEmpty())
-    <div class="dash-section">
-        <div class="dash-section-title">
-            <span>💳</span>
-            <span>Invoice Outstanding</span>
-            @if ($canSeeMoney && $invOutstandingTotal > 0)
-                <span class="ms-2 text-danger fw-semibold mono" style="font-size:.75rem;text-transform:none;letter-spacing:0;">
-                    {{ rupiah($invOutstandingTotal) }}
-                </span>
-            @endif
-        </div>
-        <div class="dash-card">
-            <div class="dash-card-body">
-                <table class="dash-table">
-                    <thead>
-                        <tr>
-                            <th>No Invoice</th>
-                            <th>Supplier</th>
-                            <th>No PO</th>
-                            <th>Jatuh Tempo</th>
-                            <th>Status</th>
-                            @if ($canSeeMoney)
-                            <th class="text-end">Total</th>
-                            <th class="text-end">Dibayar</th>
-                            <th class="text-end">Outstanding</th>
-                            @endif
-                            <th></th>
-                        </tr>
-                    </thead>
-                    <tbody>
-                        @foreach ($invOutstandingList as $inv)
-                        @php
-                            $isOverdue = $inv->due_date && $inv->due_date < now()->startOfDay();
-                            $outstanding = max(0, ($inv->total_amount ?? 0) - ($inv->paid_amount ?? 0));
-                        @endphp
-                        <tr>
-                            <td>
-                                <a href="{{ route('purchasing.supplier_invoices.show', $inv->id) }}" class="tbl-link mono">
-                                    {{ $inv->invoice_no }}
-                                </a>
-                            </td>
-                            <td>{{ $inv->supplier?->name ?? '—' }}</td>
-                            <td class="mono">
-                                @if ($inv->purchaseOrder)
-                                <a href="{{ route('purchasing.purchase_orders.show', $inv->purchaseOrder->id) }}" class="tbl-link">
-                                    {{ $inv->purchaseOrder->code }}
-                                </a>
-                                @else —
-                                @endif
-                            </td>
-                            <td class="mono {{ $isOverdue ? 'text-danger fw-semibold' : 'text-muted' }}">
-                                {{ $inv->due_date ? $inv->due_date->format('d/m/Y') : '—' }}
-                                @if ($isOverdue) <span class="pill pill-danger ms-1">Lewat</span> @endif
-                            </td>
-                            <td>
-                                <span class="pill {{ $inv->status === 'partial_paid' ? 'pill-partial' : 'pill-approved' }}">
-                                    {{ $inv->status === 'partial_paid' ? 'Sebagian' : 'Belum Bayar' }}
-                                </span>
-                            </td>
-                            @if ($canSeeMoney)
-                            <td class="text-end mono">{{ rupiah($inv->total_amount ?? 0) }}</td>
-                            <td class="text-end mono">{{ rupiah($inv->paid_amount ?? 0) }}</td>
-                            <td class="text-end mono {{ $isOverdue ? 'text-danger' : '' }}">
-                                {{ rupiah($outstanding) }}
-                            </td>
-                            @endif
-                            <td>
-                                <a href="{{ route('purchasing.supplier_invoices.show', $inv->id) }}"
-                                   class="btn btn-xs btn-outline-secondary"
-                                   style="font-size:.72rem;padding:.15rem .5rem;">
-                                    Lihat
-                                </a>
-                            </td>
-                        </tr>
-                        @endforeach
-                    </tbody>
-                </table>
-            </div>
-        </div>
-    </div>
-    @endif
-
-    {{-- ════════════════════════════════════════════════════════════
-    SECTION D — PO Siap Close
-    ════════════════════════════════════════════════════════════ --}}
-    @if ($poReadyCloseList->isNotEmpty())
-    <div class="dash-section" id="sectionReadyClose">
-        <div class="dash-section-title">
-            <span>✅</span>
-            <span>PO Siap Close — semua syarat terpenuhi</span>
-        </div>
-        <div class="dash-card">
-            <div class="dash-card-body">
-                <table class="dash-table">
-                    <thead>
-                        <tr>
-                            <th>No PO</th>
-                            <th>Supplier</th>
-                            <th>Tanggal</th>
-                            @if ($canSeeMoney)
-                            <th class="text-end">Total Invoice</th>
-                            <th class="text-end">Dibayar</th>
-                            @endif
-                            <th></th>
-                        </tr>
-                    </thead>
-                    <tbody>
-                        @foreach ($poReadyCloseList as $po)
-                        @php
-                            $totalInv  = $po->supplierInvoices->sum('total_amount');
-                            $totalPaid = $po->supplierInvoices->sum('paid_amount');
-                        @endphp
-                        <tr>
-                            <td>
-                                <a href="{{ route('purchasing.purchase_orders.show', $po->id) }}" class="tbl-link mono">
-                                    {{ $po->code }}
-                                </a>
-                            </td>
-                            <td>{{ $po->supplier?->name ?? '—' }}</td>
-                            <td class="mono text-muted">{{ id_date($po->date) }}</td>
-                            @if ($canSeeMoney)
-                            <td class="text-end mono">{{ $totalInv > 0 ? rupiah($totalInv) : rupiah($po->grand_total) }}</td>
-                            <td class="text-end mono" style="color:#15803d;">{{ rupiah($totalPaid) }}</td>
-                            @endif
-                            <td style="white-space:nowrap;">
-                                <a href="{{ route('purchasing.purchase_orders.show', $po->id) }}"
-                                   class="btn btn-xs btn-outline-secondary me-1"
-                                   style="font-size:.72rem;padding:.15rem .5rem;">
-                                    Lihat
-                                </a>
-                                @if ($isOwner && Route::has('purchasing.purchase_orders.close'))
-                                <form method="POST"
-                                      action="{{ route('purchasing.purchase_orders.close', $po->id) }}"
-                                      style="display:inline;"
-                                      onsubmit="return confirm('Close PO {{ $po->code }}?\nTindakan ini tidak bisa dibatalkan.')">
-                                    @csrf
-                                    <button type="submit" class="btn btn-xs btn-dark"
-                                            style="font-size:.72rem;padding:.15rem .5rem;">
-                                        ✔ Close
-                                    </button>
-                                </form>
-                                @endif
-                            </td>
-                        </tr>
-                        @endforeach
-                    </tbody>
-                </table>
-            </div>
-        </div>
-    </div>
-    @endif
-
-    {{-- ════════════════════════════════════════════════════════════
-    SECTION: PO Belum Bisa Close (dengan alasan)
-    ════════════════════════════════════════════════════════════ --}}
-    @if ($poNotReadyCloseList->isNotEmpty())
-    <div class="dash-section" id="sectionNotReadyClose">
-        <div class="dash-section-title">
-            <span>⛔</span>
-            <span>PO Belum Bisa Close</span>
-        </div>
-        <div class="dash-card">
-            <div class="dash-card-body">
-                <table class="dash-table">
-                    <thead>
-                        <tr>
-                            <th>No PO</th>
-                            <th>Supplier</th>
-                            <th>Tanggal</th>
-                            <th>Alasan</th>
-                        </tr>
-                    </thead>
-                    <tbody>
-                        @foreach ($poNotReadyCloseList as $po)
-                        <tr>
-                            <td>
-                                <a href="{{ route('purchasing.purchase_orders.show', $po->id) }}" class="tbl-link mono">
-                                    {{ $po->code }}
-                                </a>
-                            </td>
-                            <td>{{ $po->supplier?->name ?? '—' }}</td>
-                            <td class="mono text-muted">{{ id_date($po->date) }}</td>
-                            <td>
-                                <div class="blocker-list">
-                                    @forelse ($po->_blockers as $blk)
-                                        <span class="blocker-tag">{{ $blk }}</span>
-                                    @empty
-                                        <span class="text-muted small">—</span>
-                                    @endforelse
-                                </div>
-                            </td>
-                        </tr>
-                        @endforeach
-                    </tbody>
-                </table>
-            </div>
-        </div>
-    </div>
-    @endif
-
-    {{-- ════════════════════════════════════════════════════════════
-    SECTION E — Recent Activity
-    ════════════════════════════════════════════════════════════ --}}
-    @php
-        $hasAnyActivity = $recentPr->isNotEmpty()
-            || $recentPo->isNotEmpty()
-            || $recentInvoices->isNotEmpty()
-            || $recentPayments->isNotEmpty();
-    @endphp
-    @if ($hasAnyActivity)
-    <div class="dash-section">
-        <div class="dash-section-title"><span>🕐</span><span>Aktivitas Terbaru</span></div>
-        <div class="activity-grid">
-
-            {{-- PR Terbaru --}}
-            @if ($hasPrTable && $recentPr->isNotEmpty())
-            <div class="activity-card">
-                <div class="activity-card-header">📋 Purchase Request</div>
-                @foreach ($recentPr as $pr)
-                <div class="activity-row">
-                    <div>
-                        <a href="{{ route('purchasing.purchase_requests.show', $pr->id) }}" class="tbl-link activity-code">
-                            {{ $pr->code }}
-                        </a>
-                        <div class="activity-meta">{{ $pr->supplier?->name ?? '—' }} · {{ $pr->requestedBy?->name ?? '—' }}</div>
-                    </div>
-                    <div class="text-end">
-                        @php
-                            $prBadge = match($pr->status) {
-                                'approved'  => 'pill-approved',
-                                'converted' => 'pill-converted',
-                                'rejected'  => 'pill-danger',
-                                default     => 'pill-draft',
-                            };
-                        @endphp
-                        <span class="pill {{ $prBadge }}">
-                            @if (function_exists('pr_status_label'))
-                                {{ pr_status_label($pr->status) }}
-                            @else
-                                {{ $pr->status }}
-                            @endif
-                        </span>
-                        <div class="activity-meta mt-1">{{ $pr->created_at?->diffForHumans() }}</div>
-                    </div>
-                </div>
-                @endforeach
-            </div>
-            @endif
-
-            {{-- PO Terbaru --}}
-            @if ($recentPo->isNotEmpty())
-            <div class="activity-card">
-                <div class="activity-card-header">🧾 Purchase Order</div>
-                @foreach ($recentPo as $po)
-                <div class="activity-row">
-                    <div>
-                        <a href="{{ route('purchasing.purchase_orders.show', $po->id) }}" class="tbl-link activity-code">
-                            {{ $po->code }}
-                        </a>
-                        <div class="activity-meta">{{ $po->supplier?->name ?? '—' }}</div>
-                    </div>
-                    <div class="text-end">
-                        @php
-                            $poBadge = match($po->status) {
-                                'approved'  => 'pill-approved',
-                                'cancelled' => 'pill-danger',
-                                default     => 'pill-draft',
-                            };
-                        @endphp
-                        <span class="pill {{ $poBadge }}">{{ ucfirst($po->status) }}</span>
-                        <div class="activity-meta mt-1">{{ $po->created_at?->diffForHumans() }}</div>
-                    </div>
-                </div>
-                @endforeach
-            </div>
-            @endif
-
-            {{-- Invoice Terbaru --}}
-            @if ($hasInvoiceTable && $recentInvoices->isNotEmpty())
-            <div class="activity-card">
-                <div class="activity-card-header">🧾 Faktur Supplier</div>
-                @foreach ($recentInvoices as $inv)
-                <div class="activity-row">
-                    <div>
-                        <a href="{{ route('purchasing.supplier_invoices.show', $inv->id) }}" class="tbl-link activity-code">
-                            {{ $inv->invoice_no }}
-                        </a>
-                        <div class="activity-meta">{{ $inv->supplier?->name ?? '—' }}</div>
-                    </div>
-                    <div class="text-end">
-                        @php
-                            $invBadge = match($inv->status) {
-                                'paid'         => 'pill-paid',
-                                'partial_paid' => 'pill-partial',
-                                'void'         => 'pill-danger',
-                                'posted'       => 'pill-approved',
-                                default        => 'pill-draft',
-                            };
-                            $invLabel = match($inv->status) {
-                                'paid'         => 'Lunas',
-                                'partial_paid' => 'Sebagian',
-                                'void'         => 'Void',
-                                'posted'       => 'Belum Bayar',
-                                default        => 'Draft',
-                            };
-                        @endphp
-                        <span class="pill {{ $invBadge }}">{{ $invLabel }}</span>
-                        <div class="activity-meta mt-1">{{ $inv->created_at?->diffForHumans() }}</div>
-                    </div>
-                </div>
-                @endforeach
-            </div>
-            @endif
-
-            {{-- Payment Terbaru --}}
-            @if ($hasPaymentTable && $recentPayments->isNotEmpty())
-            <div class="activity-card">
-                <div class="activity-card-header">💳 Pembayaran</div>
-                @foreach ($recentPayments as $pay)
-                <div class="activity-row">
-                    <div>
-                        <a href="{{ route('purchasing.purchase_orders.show', $pay->purchase_order_id) }}" class="tbl-link activity-code">
-                            {{ $pay->purchaseOrder?->code ?? '—' }}
-                        </a>
-                        <div class="activity-meta">{{ $pay->purchaseOrder?->supplier?->name ?? '—' }}</div>
-                    </div>
-                    <div class="text-end">
-                        @if ($canSeeMoney)
-                        <div class="mono" style="font-size:.78rem;font-weight:600;">{{ rupiah($pay->amount) }}</div>
-                        @endif
-                        <div class="activity-meta mt-1">{{ $pay->created_at?->diffForHumans() }}</div>
-                    </div>
-                </div>
-                @endforeach
-            </div>
-            @endif
-
-        </div>
-    </div>
-    @endif
-
-    {{-- Empty state --}}
-    @php
-        $totalAlert = $prApprovedNotConvertedCount + $poApprovedNotReceivedCount
-            + $poPartialCount + $invOutstandingCount + $invOverdueCount;
-    @endphp
-    @if ($totalAlert === 0 && $poBelumTerimaList->isEmpty() && $invOutstandingList->isEmpty())
-    <div class="text-center py-5 text-muted">
-        <div style="font-size:2.5rem;">✅</div>
-        <div class="fw-semibold mt-2">Semua bersih!</div>
+  @if (!$hasActions)
+    <div class="card-section mb-3">
+      <div class="py-5 text-center text-muted">
+        <i class="bi bi-check-circle" style="font-size:2rem;color:#22c55e;display:block;margin-bottom:.5rem;"></i>
+        <div class="fw-semibold">Semua bersih!</div>
         <div class="small">Tidak ada item yang perlu perhatian saat ini.</div>
+      </div>
+    </div>
+  @endif
+
+  {{-- A: PR approved → buat PO --}}
+  @if ($hasPrTable && $prApprovedNotConvertedList->isNotEmpty())
+  <div class="card-section mb-3">
+    <div class="card-section-header">
+      <span>PR Disetujui — Belum Dibuat PO</span>
+      <span class="hcount">{{ $prApprovedNotConvertedList->count() }}</span>
+    </div>
+    <div class="table-responsive">
+      <table class="table table-sm mb-0">
+        <thead>
+          <tr>
+            <th>No PR</th>
+            <th>Tanggal</th>
+            <th>Peminta</th>
+            <th class="text-center">Item</th>
+            @if ($canSeeMoney)<th class="text-end">Est. Total</th>@endif
+            <th></th>
+          </tr>
+        </thead>
+        <tbody>
+          @foreach ($prApprovedNotConvertedList as $pr)
+          @php $estTotal = $pr->lines->sum(fn($l) => ($l->qty ?? 0) * ($l->unit_price ?? 0)); @endphp
+          <tr class="dash-row">
+            <td><a href="{{ route('purchasing.purchase_requests.show', $pr->id) }}" class="tbl-link mono">{{ $pr->code }}</a></td>
+            <td class="mono text-muted">{{ $pr->created_at?->format('d/m/Y') ?? '—' }}</td>
+            <td>{{ $pr->requestedBy?->name ?? '—' }}</td>
+            <td class="text-center">{{ $pr->lines->count() }}</td>
+            @if ($canSeeMoney)
+            <td class="text-end mono">{{ $estTotal > 0 ? rupiah($estTotal) : '—' }}</td>
+            @endif
+            <td class="text-end">
+              <a href="{{ route('purchasing.purchase_requests.show', $pr->id) }}"
+                 class="btn btn-sm btn-outline-secondary" style="font-size:.72rem;padding:.2rem .6rem;">
+                Lihat
+              </a>
+            </td>
+          </tr>
+          @endforeach
+        </tbody>
+      </table>
+    </div>
+  </div>
+  @endif
+
+  {{-- B: PO belum diterima --}}
+  @if ($poBelumTerimaList->isNotEmpty())
+  <div class="card-section mb-3">
+    <div class="card-section-header">
+      <span>PO Approved — Belum Diterima Barang</span>
+      <span class="hcount">{{ $poBelumTerimaList->count() }}</span>
+    </div>
+    <div class="table-responsive">
+      <table class="table table-sm mb-0">
+        <thead>
+          <tr>
+            <th>No PO</th>
+            <th>Supplier</th>
+            <th>Tanggal PO</th>
+            <th>Status Terima</th>
+            @if ($canSeeMoney)<th class="text-end">Total</th>@endif
+            <th></th>
+          </tr>
+        </thead>
+        <tbody>
+          @foreach ($poBelumTerimaList as $po)
+          @php
+            $rs      = $po->received_status ?? 'not_received';
+            $rsCls   = match($rs) { 'partial' => 'badge-partial', 'fully_received' => 'badge-approved', default => 'badge-draft' };
+            $rsLabel = match($rs) { 'partial' => 'Sebagian', 'fully_received' => 'Lengkap', default => 'Belum ada GRN' };
+          @endphp
+          <tr class="dash-row">
+            <td><a href="{{ route('purchasing.purchase_orders.show', $po->id) }}" class="tbl-link mono">{{ $po->code }}</a></td>
+            <td>{{ $po->supplier?->name ?? '—' }}</td>
+            <td class="mono text-muted">{{ $po->date?->format('d/m/Y') ?? '—' }}</td>
+            <td><span class="badge-status {{ $rsCls }}">{{ $rsLabel }}</span></td>
+            @if ($canSeeMoney)<td class="text-end mono">{{ rupiah($po->grand_total) }}</td>@endif
+            <td class="text-end">
+              <a href="{{ route('purchasing.purchase_orders.show', $po->id) }}"
+                 class="btn btn-sm btn-outline-secondary" style="font-size:.72rem;padding:.2rem .6rem;">
+                Lihat
+              </a>
+            </td>
+          </tr>
+          @endforeach
+        </tbody>
+      </table>
+    </div>
+  </div>
+  @endif
+
+  {{-- C: Sudah terima penuh, belum ada faktur --}}
+  @if ($hasInvoiceTable && $poFullyNoInvoiceList->isNotEmpty())
+  <div class="card-section mb-3">
+    <div class="card-section-header">
+      <span>Barang Diterima Penuh — Belum Ada Faktur Supplier</span>
+      <span class="hcount">{{ $poFullyNoInvoiceList->count() }}</span>
+    </div>
+    <div class="table-responsive">
+      <table class="table table-sm mb-0">
+        <thead>
+          <tr>
+            <th>No PO</th>
+            <th>Supplier</th>
+            <th>Tanggal PO</th>
+            @if ($canSeeMoney)<th class="text-end">Total PO</th>@endif
+            <th></th>
+          </tr>
+        </thead>
+        <tbody>
+          @foreach ($poFullyNoInvoiceList as $po)
+          <tr class="dash-row">
+            <td><a href="{{ route('purchasing.purchase_orders.show', $po->id) }}" class="tbl-link mono">{{ $po->code }}</a></td>
+            <td>{{ $po->supplier?->name ?? '—' }}</td>
+            <td class="mono text-muted">{{ $po->date?->format('d/m/Y') ?? '—' }}</td>
+            @if ($canSeeMoney)<td class="text-end mono">{{ rupiah($po->grand_total) }}</td>@endif
+            <td class="text-end" style="white-space:nowrap;">
+              <a href="{{ route('purchasing.purchase_orders.show', $po->id) }}"
+                 class="btn btn-sm btn-outline-secondary me-1" style="font-size:.72rem;padding:.2rem .6rem;">
+                Lihat
+              </a>
+              @if (($isOwner || $isAdmin) && Route::has('purchasing.supplier_invoices.create'))
+              <a href="{{ route('purchasing.supplier_invoices.create', ['purchase_order_id' => $po->id]) }}"
+                 class="btn btn-sm btn-outline-primary" style="font-size:.72rem;padding:.2rem .6rem;">
+                <i class="bi bi-plus me-1"></i>Faktur
+              </a>
+              @endif
+            </td>
+          </tr>
+          @endforeach
+        </tbody>
+      </table>
+    </div>
+  </div>
+  @endif
+
+  {{-- D: Invoice outstanding --}}
+  @if ($hasInvoiceTable && $invOutstandingList->isNotEmpty())
+  <div class="card-section mb-3">
+    <div class="card-section-header">
+      <span>Invoice Outstanding</span>
+      <span class="hcount d-flex align-items-center gap-2">
+        {{ $invOutstandingList->count() }}
+        @if ($canSeeMoney && $invOutstandingTotal > 0)
+          <span class="text-danger mono fw-bold" style="font-size:.82rem;">{{ rupiah($invOutstandingTotal) }}</span>
+        @endif
+      </span>
+    </div>
+    <div class="table-responsive">
+      <table class="table table-sm mb-0">
+        <thead>
+          <tr>
+            <th>No Faktur</th>
+            <th>Supplier</th>
+            <th>No PO</th>
+            <th>Jatuh Tempo</th>
+            <th>Status</th>
+            @if ($canSeeMoney)
+            <th class="text-end">Total</th>
+            <th class="text-end">Sisa</th>
+            @endif
+            <th></th>
+          </tr>
+        </thead>
+        <tbody>
+          @foreach ($invOutstandingList as $inv)
+          @php
+            $overdue     = $inv->due_date && $inv->due_date < now()->startOfDay();
+            $outstanding = max(0, ($inv->total_amount ?? 0) - ($inv->paid_amount ?? 0));
+          @endphp
+          <tr class="dash-row">
+            <td>
+              <a href="{{ route('purchasing.supplier_invoices.show', $inv->id) }}" class="tbl-link mono">
+                {{ $inv->invoice_no }}
+              </a>
+            </td>
+            <td>{{ $inv->supplier?->name ?? '—' }}</td>
+            <td class="mono">
+              @if ($inv->purchaseOrder)
+                <a href="{{ route('purchasing.purchase_orders.show', $inv->purchaseOrder->id) }}" class="tbl-link">
+                  {{ $inv->purchaseOrder->code }}
+                </a>
+              @else —
+              @endif
+            </td>
+            <td class="mono {{ $overdue ? 'text-danger fw-semibold' : 'text-muted' }}">
+              {{ $inv->due_date ? $inv->due_date->format('d/m/Y') : '—' }}
+              @if ($overdue)<span class="badge-status badge-danger ms-1">Overdue</span>@endif
+            </td>
+            <td>
+              <span class="badge-status {{ $inv->status === 'partial_paid' ? 'badge-partial' : 'badge-blue' }}">
+                {{ $inv->status === 'partial_paid' ? 'Sebagian' : 'Belum Bayar' }}
+              </span>
+            </td>
+            @if ($canSeeMoney)
+            <td class="text-end mono">{{ rupiah($inv->total_amount ?? 0) }}</td>
+            <td class="text-end mono {{ $overdue ? 'text-danger' : '' }}">{{ rupiah($outstanding) }}</td>
+            @endif
+            <td>
+              <a href="{{ route('purchasing.supplier_invoices.show', $inv->id) }}"
+                 class="btn btn-sm btn-outline-secondary" style="font-size:.72rem;padding:.2rem .6rem;">
+                Lihat
+              </a>
+            </td>
+          </tr>
+          @endforeach
+        </tbody>
+      </table>
+    </div>
+  </div>
+  @endif
+
+  {{-- PO siap close --}}
+  @if ($poReadyCloseList->isNotEmpty())
+  <div class="card-section mb-3">
+    <div class="card-section-header">
+      <span>PO Siap Close</span>
+      <span class="hcount">{{ $poReadyCloseList->count() }}</span>
+    </div>
+    <div class="table-responsive">
+      <table class="table table-sm mb-0">
+        <thead>
+          <tr>
+            <th>No PO</th>
+            <th>Supplier</th>
+            <th>Tanggal</th>
+            @if ($canSeeMoney)<th class="text-end">Nilai</th>@endif
+            <th></th>
+          </tr>
+        </thead>
+        <tbody>
+          @foreach ($poReadyCloseList as $po)
+          <tr class="dash-row">
+            <td><a href="{{ route('purchasing.purchase_orders.show', $po->id) }}" class="tbl-link mono">{{ $po->code }}</a></td>
+            <td>{{ $po->supplier?->name ?? '—' }}</td>
+            <td class="mono text-muted">{{ $po->date?->format('d/m/Y') ?? '—' }}</td>
+            @if ($canSeeMoney)<td class="text-end mono">{{ rupiah($po->grand_total) }}</td>@endif
+            <td class="text-end" style="white-space:nowrap;">
+              <a href="{{ route('purchasing.purchase_orders.show', $po->id) }}"
+                 class="btn btn-sm btn-outline-secondary me-1" style="font-size:.72rem;padding:.2rem .6rem;">
+                Lihat
+              </a>
+              @if ($isOwner && Route::has('purchasing.purchase_orders.close'))
+              <form method="POST" action="{{ route('purchasing.purchase_orders.close', $po->id) }}"
+                    style="display:inline;" onsubmit="return confirm('Close PO {{ $po->code }}?')">
+                @csrf
+                <button type="submit" class="btn btn-sm btn-dark" style="font-size:.72rem;padding:.2rem .6rem;">
+                  Close
+                </button>
+              </form>
+              @endif
+            </td>
+          </tr>
+          @endforeach
+        </tbody>
+      </table>
+    </div>
+  </div>
+  @endif
+
+  {{-- PO belum bisa close --}}
+  @if ($poNotReadyCloseList->isNotEmpty())
+  <div class="card-section mb-3">
+    <div class="card-section-header">
+      <span>PO Belum Bisa Close</span>
+      <span class="hcount">{{ $poNotReadyCloseList->count() }}</span>
+    </div>
+    <div class="table-responsive">
+      <table class="table table-sm mb-0">
+        <thead>
+          <tr>
+            <th>No PO</th>
+            <th>Supplier</th>
+            <th>Tanggal</th>
+            <th>Alasan</th>
+          </tr>
+        </thead>
+        <tbody>
+          @foreach ($poNotReadyCloseList as $po)
+          <tr class="dash-row">
+            <td><a href="{{ route('purchasing.purchase_orders.show', $po->id) }}" class="tbl-link mono">{{ $po->code }}</a></td>
+            <td>{{ $po->supplier?->name ?? '—' }}</td>
+            <td class="mono text-muted">{{ $po->date?->format('d/m/Y') ?? '—' }}</td>
+            <td>
+              @foreach ($po->_blockers as $blk)
+                <span class="blocker me-1">{{ $blk }}</span>
+              @endforeach
+            </td>
+          </tr>
+          @endforeach
+        </tbody>
+      </table>
+    </div>
+  </div>
+  @endif
+
+  {{-- ── RECENT ACTIVITY ──────────────────────────────────────── --}}
+  @php
+    $hasActivity = $recentPr->isNotEmpty() || $recentPo->isNotEmpty()
+                || $recentGrn->isNotEmpty() || $recentPayments->isNotEmpty();
+  @endphp
+  @if ($hasActivity)
+  <div class="sec-divider">Aktivitas Terbaru</div>
+  <div class="activity-grid">
+
+    @if ($hasPrTable && $recentPr->isNotEmpty())
+    <div class="card-section">
+      <div class="card-section-header"><span>Purchase Request</span></div>
+      @foreach ($recentPr as $pr)
+      <div class="act-row">
+        <div>
+          <a href="{{ route('purchasing.purchase_requests.show', $pr->id) }}" class="act-code mono">{{ $pr->code }}</a>
+          <div class="act-meta">{{ $pr->requestedBy?->name ?? '—' }}</div>
+        </div>
+        <div class="text-end">
+          @php $cls = match($pr->status) { 'approved'=>'badge-approved','converted'=>'badge-blue','rejected'=>'badge-danger',default=>'badge-draft' }; @endphp
+          <span class="badge-status {{ $cls }}">{{ function_exists('pr_status_label') ? pr_status_label($pr->status) : $pr->status }}</span>
+          <div class="act-meta">{{ $pr->created_at?->diffForHumans() }}</div>
+        </div>
+      </div>
+      @endforeach
     </div>
     @endif
+
+    @if ($recentPo->isNotEmpty())
+    <div class="card-section">
+      <div class="card-section-header"><span>Purchase Order</span></div>
+      @foreach ($recentPo as $po)
+      <div class="act-row">
+        <div>
+          <a href="{{ route('purchasing.purchase_orders.show', $po->id) }}" class="act-code mono">{{ $po->code }}</a>
+          <div class="act-meta">{{ $po->supplier?->name ?? '—' }}</div>
+        </div>
+        <div class="text-end">
+          @php $cls = match($po->status) { 'approved'=>'badge-approved','cancelled'=>'badge-danger',default=>'badge-draft' }; @endphp
+          <span class="badge-status {{ $cls }}">{{ ucfirst($po->status) }}</span>
+          <div class="act-meta">{{ $po->created_at?->diffForHumans() }}</div>
+        </div>
+      </div>
+      @endforeach
+    </div>
+    @endif
+
+    @if ($recentGrn->isNotEmpty())
+    <div class="card-section">
+      <div class="card-section-header"><span>Penerimaan Barang</span></div>
+      @foreach ($recentGrn as $grn)
+      <div class="act-row">
+        <div>
+          <a href="{{ route('purchasing.purchase_receipts.show', $grn->id) }}" class="act-code mono">{{ $grn->code ?? 'GRN-'.$grn->id }}</a>
+          <div class="act-meta">{{ $grn->supplier?->name ?? '—' }}</div>
+        </div>
+        <div class="text-end">
+          <div class="act-meta mono">{{ $grn->date?->format('d/m/Y') ?? '—' }}</div>
+          <div class="act-meta">{{ $grn->created_at?->diffForHumans() }}</div>
+        </div>
+      </div>
+      @endforeach
+    </div>
+    @endif
+
+    @if ($hasPaymentTable && $recentPayments->isNotEmpty())
+    <div class="card-section">
+      <div class="card-section-header"><span>Pembayaran</span></div>
+      @foreach ($recentPayments as $pay)
+      <div class="act-row">
+        <div>
+          <a href="{{ route('purchasing.purchase_orders.show', $pay->purchase_order_id) }}" class="act-code mono">
+            {{ $pay->purchaseOrder?->code ?? '—' }}
+          </a>
+          <div class="act-meta">{{ $pay->purchaseOrder?->supplier?->name ?? '—' }}</div>
+        </div>
+        <div class="text-end">
+          @if ($canSeeMoney)
+          <div class="mono fw-semibold" style="font-size:.8rem;">{{ rupiah($pay->amount) }}</div>
+          @endif
+          <div class="act-meta">{{ $pay->created_at?->diffForHumans() }}</div>
+        </div>
+      </div>
+      @endforeach
+    </div>
+    @endif
+
+  </div>
+  @endif
 
 </div>
 @endsection
