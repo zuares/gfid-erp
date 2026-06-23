@@ -3,364 +3,432 @@
 @section('title', 'Pembayaran Supplier')
 
 @php
-    $fmt = fn($n) => number_format((float) $n, 0, ',', '.');
-    $typeLabels = ['dp' => 'DP', 'payment' => 'Pelunasan', 'dp_apply' => 'Offset DP'];
+  $fmt       = fn($n) => number_format((float) $n, 0, ',', '.');
+  $typeLabel = ['dp' => 'DP', 'payment' => 'Pelunasan', 'dp_apply' => 'Offset DP'];
 @endphp
 
 @push('head')
-    @include('production.dashboard.partials._gf-styles')
-    <style>
-        .pp-page { display: grid; gap: 1rem; }
-        .pp-btn {
-            display: inline-flex; align-items: center; gap: .45rem;
-            min-height: 40px; padding: .55rem .95rem; border-radius: 999px;
-            border: 1px solid rgba(15,23,42,.10); background: #fff;
-            color: #0f172a; text-decoration: none; font-size: .84rem; font-weight: 850;
-            cursor: pointer;
-        }
-        .pp-btn:hover { background: #f8fafc; color: #0f172a; }
-        .pp-btn-primary { background: #0f172a; border-color: #0f172a; color: #fff; }
-        .pp-btn-primary:hover { background: #1e293b; color: #fff; }
-        .pp-kpi-grid { display: grid; grid-template-columns: repeat(3, minmax(0,1fr)); gap: .75rem; }
-        .pp-kpi { border: 1px solid rgba(15,23,42,.08); border-radius: 12px; background: #fff; padding: .85rem .95rem; }
-        .pp-kpi-label { color: #64748b; font-size: .68rem; font-weight: 900; text-transform: uppercase; letter-spacing: .06em; }
-        .pp-kpi-value { margin-top: .18rem; color: #0f172a; font-size: 1.25rem; font-weight: 950; line-height: 1.15; }
-        .pp-kpi-note { margin-top: .2rem; color: #94a3b8; font-size: .74rem; }
-        .pp-filter {
-            display: grid;
-            grid-template-columns: minmax(160px,1.2fr) minmax(110px,.7fr) minmax(130px,.8fr) minmax(130px,.8fr) minmax(110px,.7fr) auto;
-            gap: .55rem; align-items: end;
-        }
-        .pp-filter .form-control, .pp-filter .form-select {
-            min-height: 40px; border-radius: 999px; border-color: rgba(15,23,42,.12);
-            font-size: .84rem; font-weight: 700; box-shadow: none;
-        }
-        .pp-table-wrap { max-height: calc(100vh - 340px); overflow: auto; }
-        .pp-table th, .pp-table td { vertical-align: middle; }
-        .pp-click-row { cursor: pointer; }
-        .pp-click-row:hover td { background: #f8fafc; }
-        .pp-badge {
-            display: inline-flex; align-items: center; border-radius: 999px;
-            padding: .18rem .55rem; font-size: .73rem; font-weight: 850; white-space: nowrap;
-        }
-        .pp-badge-dp       { background: #eff6ff; color: #1d4ed8; }
-        .pp-badge-payment  { background: #dcfce7; color: #166534; }
-        .pp-badge-dp_apply { background: #f3e8ff; color: #7e22ce; }
-        .pp-badge-voided   { background: #fee2e2; color: #b91c1c; }
-        .pp-num { text-align: right; font-variant-numeric: tabular-nums; font-weight: 900; }
-        .pp-empty { text-align: center; color: #64748b; padding: 2.4rem 1rem; }
+<style>
+  .page-wrap { max-width:1080px; margin-inline:auto; padding-bottom:3rem; }
+  .mono { font-variant-numeric:tabular-nums; font-family:ui-monospace,SFMono-Regular,Menlo,Consolas,"Liberation Mono"; }
 
-        /* Modal */
-        .pp-modal-label { font-size: .8rem; font-weight: 850; color: #334155; margin-bottom: .3rem; }
-        .pp-modal .form-control, .pp-modal .form-select { border-radius: 8px; font-size: .88rem; }
-        .pp-po-card {
-            border: 1px solid rgba(15,23,42,.10); border-radius: 10px; padding: .75rem 1rem;
-            cursor: pointer; transition: border-color .15s, background .15s;
-        }
-        .pp-po-card:hover, .pp-po-card.selected { border-color: #0f172a; background: #f8fafc; }
-        .pp-po-card.selected { border-color: #2563eb; background: #eff6ff; }
-        .pp-po-outstanding { font-variant-numeric: tabular-nums; font-weight: 900; color: #dc2626; }
+  /* Summary row */
+  .card-info    { background:var(--card); border:1px solid var(--line); border-radius:14px; padding:1rem 1.15rem; }
+  .summary-col  { padding:.8rem 1rem; border-right:1px solid var(--line); }
+  .summary-col:last-child { border-right:none; }
+  .summary-col-label { font-size:.68rem; text-transform:uppercase; letter-spacing:.07em; color:var(--muted); font-weight:600; margin-bottom:.25rem; }
+  .summary-col-value { font-size:.9rem; font-weight:700; }
 
-        @media (max-width: 768px) {
-            .pp-kpi-grid { grid-template-columns: repeat(2, 1fr); }
-            .pp-filter { grid-template-columns: 1fr 1fr; }
-        }
-    </style>
+  /* Filter */
+  .card-filter { background:var(--card); border:1px solid var(--line); border-radius:14px; padding:.75rem .95rem; }
+
+  /* Table */
+  .card-section { background:var(--card); border:1px solid var(--line); border-radius:14px; overflow:hidden; }
+  .card-section-header {
+    padding:.6rem 1rem; border-bottom:1px solid var(--line);
+    font-size:.72rem; text-transform:uppercase; letter-spacing:.07em;
+    color:var(--muted); font-weight:600;
+    display:flex; align-items:center; justify-content:space-between;
+  }
+  .table thead th {
+    border-bottom:1px solid var(--line);
+    font-size:.72rem; text-transform:uppercase; letter-spacing:.07em;
+    color:var(--muted); padding:.5rem .75rem; white-space:nowrap; font-weight:600;
+  }
+  .table tbody td { vertical-align:middle; font-size:.83rem; padding:.48rem .75rem; border-bottom:1px solid var(--line); }
+  .table tbody tr:last-child td { border-bottom:none; }
+  .pay-row:hover td { background:rgba(59,130,246,.035); }
+  .pay-row.voided td { opacity:.55; }
+
+  /* Badges */
+  .badge-status {
+    border-radius:999px; font-size:.7rem; padding:.1rem .55rem;
+    border:1px solid transparent; white-space:nowrap; display:inline-block;
+  }
+  .badge-dp       { background:rgba(59,130,246,.1);  color:#1d4ed8; border-color:rgba(59,130,246,.4); }
+  .badge-payment  { background:rgba(22,163,74,.1);   color:#15803d; border-color:rgba(22,163,74,.4); }
+  .badge-dp_apply { background:rgba(139,92,246,.1);  color:#7c3aed; border-color:rgba(139,92,246,.4); }
+  .badge-voided   { background:rgba(220,38,38,.08);  color:#b91c1c; border-color:rgba(220,38,38,.4); }
+
+  /* PO cards in modal */
+  .po-card {
+    border:1px solid var(--line); border-radius:10px; padding:.7rem .9rem;
+    cursor:pointer; transition:border-color .12s, background .12s;
+  }
+  .po-card:hover    { border-color:#94a3b8; background:rgba(59,130,246,.03); }
+  .po-card.selected { border-color:#2563eb; background:rgba(59,130,246,.05); }
+
+  /* Tbl link */
+  .tbl-link { color:inherit; text-decoration:none; font-weight:600; }
+  .tbl-link:hover { text-decoration:underline; color:#2563eb; }
+
+  @media(max-width:767.98px){
+    .page-wrap { padding-inline:.75rem; }
+    .summary-col { border-right:none; border-bottom:1px solid var(--line); }
+    .summary-col:last-child { border-bottom:none; }
+  }
+</style>
 @endpush
 
 @section('content')
-<div class="pp-page">
+<div class="page-wrap py-3">
 
-    {{-- Header --}}
-    <div class="d-flex align-items-center justify-content-between flex-wrap gap-2">
-        <div>
-            <h5 class="mb-0 fw-black">Pembayaran Supplier</h5>
-            <div class="text-muted" style="font-size:.8rem">Jurnal: Dr 2101 Hutang Dagang / Cr Bank</div>
-        </div>
-        <button class="pp-btn pp-btn-primary" data-bs-toggle="modal" data-bs-target="#modalBayar">
-            <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><path d="M12 5v14M5 12h14"/></svg>
-            Bayar Supplier
-        </button>
+  {{-- HEADER --}}
+  <div class="d-flex align-items-center justify-content-between gap-3 mb-3 flex-wrap">
+    <div>
+      <h2 class="mb-0">Pembayaran Supplier</h2>
+      <div class="text-muted small">Jurnal: Dr 2101 Hutang Dagang / Cr Bank</div>
     </div>
+    <button class="btn btn-primary btn-sm" data-bs-toggle="modal" data-bs-target="#modalBayar">
+      <i class="bi bi-plus me-1"></i>Bayar Supplier
+    </button>
+  </div>
 
-    {{-- Flash --}}
-    @if(session('success'))
-        <div class="alert alert-success py-2 mb-0">{{ session('success') }}</div>
-    @endif
-    @if(session('error'))
-        <div class="alert alert-danger py-2 mb-0">{{ session('error') }}</div>
-    @endif
+  {{-- FLASH --}}
+  @if (session('success'))
+    <div class="alert alert-success py-2 small mb-3">{{ session('success') }}</div>
+  @endif
+  @if (session('error'))
+    <div class="alert alert-danger py-2 small mb-3">{{ session('error') }}</div>
+  @endif
 
-    {{-- KPI --}}
-    <div class="pp-kpi-grid">
-        <div class="pp-kpi">
-            <div class="pp-kpi-label">Total Transaksi</div>
-            <div class="pp-kpi-value">{{ $summary['count'] }}</div>
-            <div class="pp-kpi-note">periode filter aktif</div>
-        </div>
-        <div class="pp-kpi">
-            <div class="pp-kpi-label">Total Pelunasan</div>
-            <div class="pp-kpi-value">Rp {{ $fmt($summary['total_payment']) }}</div>
-        </div>
-        <div class="pp-kpi">
-            <div class="pp-kpi-label">Total DP</div>
-            <div class="pp-kpi-value">Rp {{ $fmt($summary['total_dp']) }}</div>
-        </div>
+  {{-- SUMMARY ROW --}}
+  <div class="card-info mb-3">
+    <div class="row g-0">
+      <div class="col-6 col-md-4 summary-col">
+        <div class="summary-col-label">Total Transaksi</div>
+        <div class="summary-col-value">{{ $summary['count'] }}</div>
+      </div>
+      <div class="col-6 col-md-4 summary-col">
+        <div class="summary-col-label">Total Pelunasan</div>
+        <div class="summary-col-value mono">Rp {{ $fmt($summary['total_payment']) }}</div>
+      </div>
+      <div class="col-6 col-md-4 summary-col">
+        <div class="summary-col-label">Total DP</div>
+        <div class="summary-col-value mono">Rp {{ $fmt($summary['total_dp']) }}</div>
+      </div>
     </div>
+  </div>
 
-    {{-- Filter --}}
-    <form method="GET" class="pp-filter">
-        <div>
-            <label class="form-label fw-bold" style="font-size:.75rem">Supplier</label>
-            <select name="supplier_id" class="form-select">
-                <option value="">Semua</option>
-                @foreach($suppliers as $s)
-                    <option value="{{ $s->id }}" @selected(request('supplier_id') == $s->id)>{{ $s->name }}</option>
-                @endforeach
-            </select>
-        </div>
-        <div>
-            <label class="form-label fw-bold" style="font-size:.75rem">Tipe</label>
-            <select name="type" class="form-select">
-                <option value="">Semua</option>
-                <option value="payment" @selected(request('type') === 'payment')>Pelunasan</option>
-                <option value="dp"      @selected(request('type') === 'dp')>DP</option>
-                <option value="dp_apply" @selected(request('type') === 'dp_apply')>Offset DP</option>
-            </select>
-        </div>
-        <div>
-            <label class="form-label fw-bold" style="font-size:.75rem">Dari</label>
-            <input type="date" name="from" class="form-control" value="{{ request('from') }}">
-        </div>
-        <div>
-            <label class="form-label fw-bold" style="font-size:.75rem">Sampai</label>
-            <input type="date" name="to" class="form-control" value="{{ request('to') }}">
-        </div>
-        <div>
-            <label class="form-label fw-bold" style="font-size:.75rem">Status</label>
-            <select name="voided" class="form-select">
-                <option value="no" @selected(request('voided','no') === 'no')>Aktif</option>
-                <option value="yes" @selected(request('voided') === 'yes')>Void</option>
-            </select>
-        </div>
-        <div class="d-flex gap-2 align-items-end">
-            <button type="submit" class="pp-btn pp-btn-primary">Filter</button>
-            @if(request()->hasAny(['supplier_id','type','from','to','voided']))
-                <a href="{{ route('purchasing.purchase_payments.index') }}" class="pp-btn">Reset</a>
-            @endif
-        </div>
+  {{-- FILTER --}}
+  @php
+    $idMonths = ['Jan','Feb','Mar','Apr','Mei','Jun','Jul','Agu','Sep','Okt','Nov','Des'];
+    $rangeDisplay = '';
+    if (request('from') && request('to')) {
+        try {
+            $f = \Carbon\Carbon::parse(request('from'));
+            $t = \Carbon\Carbon::parse(request('to'));
+            $rangeDisplay = $f->day . ' ' . $idMonths[$f->month-1]
+                . ' – ' . $t->day . ' ' . $idMonths[$t->month-1] . ' ' . $t->year;
+        } catch (\Exception $e) { $rangeDisplay = request('from') . ' – ' . request('to'); }
+    } elseif (request('from')) {
+        try {
+            $f = \Carbon\Carbon::parse(request('from'));
+            $rangeDisplay = $f->day . ' ' . $idMonths[$f->month-1] . ' ' . $f->year;
+        } catch (\Exception $e) { $rangeDisplay = request('from'); }
+    }
+  @endphp
+  <div class="card-filter mb-3">
+    <form method="GET" action="{{ route('purchasing.purchase_payments.index') }}" id="pay-filter-form">
+      <input type="hidden" name="from" id="pay-from" value="{{ request('from') }}" data-gf-date="off">
+      <input type="hidden" name="to"   id="pay-to"   value="{{ request('to') }}"   data-gf-date="off">
+
+      <div class="d-flex flex-wrap gap-2 align-items-center">
+
+        <select name="supplier_id" class="form-select form-select-sm pay-filter-auto" style="max-width:195px;">
+          <option value="">Semua supplier</option>
+          @foreach ($suppliers as $s)
+            <option value="{{ $s->id }}" @selected(request('supplier_id') == $s->id)>{{ $s->name }}</option>
+          @endforeach
+        </select>
+
+        <select name="type" class="form-select form-select-sm pay-filter-auto" style="max-width:140px;">
+          <option value="">Semua tipe</option>
+          <option value="payment"  @selected(request('type') === 'payment')>Pelunasan</option>
+          <option value="dp"       @selected(request('type') === 'dp')>DP</option>
+          <option value="dp_apply" @selected(request('type') === 'dp_apply')>Offset DP</option>
+        </select>
+
+        <select name="voided" class="form-select form-select-sm pay-filter-auto" style="max-width:120px;">
+          <option value="no"  @selected(request('voided', 'no') === 'no')>Aktif</option>
+          <option value="yes" @selected(request('voided') === 'yes')>Void</option>
+          <option value=""    @selected(request('voided') === '')>Semua</option>
+        </select>
+
+        <input type="text" id="pay-date-range" value="{{ $rangeDisplay }}"
+               placeholder="Pilih tanggal…" autocomplete="off" readonly
+               class="form-control form-control-sm" style="max-width:195px;cursor:pointer;"
+               data-gf-date="off">
+
+        <a href="{{ route('purchasing.purchase_payments.index') }}"
+           class="btn btn-sm btn-outline-secondary" style="font-size:.78rem;padding:.25rem .65rem;">
+          <i class="bi bi-x me-1"></i>Reset
+        </a>
+      </div>
     </form>
+  </div>
 
-    {{-- Table --}}
-    <div class="card border-0 shadow-sm p-0">
-        <div class="pp-table-wrap">
-            <table class="table table-sm pp-table mb-0">
-                <thead class="table-light">
-                    <tr>
-                        <th>Tanggal</th>
-                        <th>Supplier</th>
-                        <th>PO</th>
-                        <th>Tipe</th>
-                        <th>Metode</th>
-                        <th>Akun</th>
-                        <th class="text-end">Jumlah</th>
-                        <th></th>
-                    </tr>
-                </thead>
-                <tbody>
-                    @forelse($payments as $pay)
-                        <tr class="{{ $pay->voided_at ? 'text-muted' : '' }}">
-                            <td style="font-weight:800; font-variant-numeric:tabular-nums; white-space:nowrap">
-                                {{ \Carbon\Carbon::parse($pay->date)->format('d M Y') }}
-                            </td>
-                            <td style="font-weight:760">
-                                {{ $pay->purchaseOrder?->supplier?->name ?? '-' }}
-                            </td>
-                            <td>
-                                <a href="{{ route('purchasing.purchase_orders.show', $pay->purchaseOrder) }}"
-                                   style="font-size:.82rem; color:#2563eb; text-decoration:none; font-weight:700">
-                                    {{ $pay->purchaseOrder?->code ?? '-' }}
-                                </a>
-                            </td>
-                            <td>
-                                <span class="pp-badge pp-badge-{{ $pay->voided_at ? 'voided' : $pay->type }}">
-                                    {{ $pay->voided_at ? 'VOID' : ($typeLabels[$pay->type] ?? $pay->type) }}
-                                </span>
-                            </td>
-                            <td style="font-size:.82rem">{{ $pay->paymentMethod?->name ?? '-' }}</td>
-                            <td style="font-size:.82rem; color:#64748b">{{ $pay->cashAccount?->name ?? '-' }}</td>
-                            <td class="pp-num {{ $pay->voided_at ? '' : 'text-dark' }}">
-                                Rp {{ $fmt($pay->amount) }}
-                            </td>
-                            <td>
-                                @if(!$pay->voided_at)
-                                    <form method="POST"
-                                          action="{{ route('purchasing.purchase_orders.payments.void', [$pay->purchaseOrder, $pay]) }}"
-                                          onsubmit="return confirm('VOID pembayaran ini?')">
-                                        @csrf
-                                        <button type="submit" class="pp-btn"
-                                            style="min-height:30px; padding:.2rem .6rem; font-size:.75rem; color:#dc2626; border-color:#fca5a5">
-                                            Void
-                                        </button>
-                                    </form>
-                                @endif
-                            </td>
-                        </tr>
-                    @empty
-                        <tr><td colspan="8" class="pp-empty">Belum ada pembayaran.</td></tr>
-                    @endforelse
-                </tbody>
-            </table>
-        </div>
+  {{-- TABLE --}}
+  <div class="card-section">
+    <div class="card-section-header">
+      <span>Riwayat Pembayaran</span>
+      <span style="font-weight:700;color:var(--body);font-size:.78rem;">{{ $payments->total() }} transaksi</span>
     </div>
-
-    {{ $payments->withQueryString()->links() }}
-
-</div>
-
-{{-- Modal Bayar --}}
-<div class="modal fade pp-modal" id="modalBayar" tabindex="-1">
-    <div class="modal-dialog modal-lg">
-        <div class="modal-content">
-            <div class="modal-header">
-                <h6 class="modal-title fw-black">Bayar Supplier</h6>
-                <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
-            </div>
-            <div class="modal-body" style="display:grid; gap:1rem">
-
-                {{-- Step 1: Pilih PO --}}
-                <div>
-                    <label class="pp-modal-label">Pilih PO yang akan dibayar</label>
-                    <input type="text" id="poSearch" class="form-control mb-2" placeholder="Cari kode PO atau nama supplier...">
-                    <div id="poList" style="display:grid; gap:.5rem; max-height:240px; overflow:auto">
-                        @forelse($openPos as $po)
-                            @php
-                                $outstanding = max(0, (float)$po->grand_total - (float)$po->paid_amount);
-                            @endphp
-                            <div class="pp-po-card" data-po-id="{{ $po->id }}"
-                                 data-po-code="{{ $po->code }}"
-                                 data-supplier="{{ $po->supplier?->name }}"
-                                 data-outstanding="{{ $outstanding }}"
-                                 onclick="selectPo(this)">
-                                <div class="d-flex justify-content-between align-items-start">
-                                    <div>
-                                        <div style="font-weight:850; font-size:.88rem">{{ $po->code }}</div>
-                                        <div style="font-size:.78rem; color:#64748b">{{ $po->supplier?->name }} · {{ \Carbon\Carbon::parse($po->date)->format('d M Y') }}</div>
-                                    </div>
-                                    <div class="text-end">
-                                        <div class="pp-po-outstanding" style="font-size:.9rem">Rp {{ $fmt($outstanding) }}</div>
-                                        <div style="font-size:.72rem; color:#94a3b8">outstanding</div>
-                                    </div>
-                                </div>
-                            </div>
-                        @empty
-                            <div class="pp-empty" style="padding:1rem">Tidak ada PO dengan hutang outstanding.</div>
-                        @endforelse
-                    </div>
-                </div>
-
-                {{-- Step 2: Form Bayar --}}
-                <form id="payForm" method="POST" action="" style="display:none">
-                    @csrf
-                    <input type="hidden" name="type" value="payment">
-                    <div style="background:#f8fafc; border-radius:10px; padding:.85rem 1rem; margin-bottom:.75rem">
-                        <div id="selectedPoInfo" style="font-size:.85rem; font-weight:760; color:#0f172a"></div>
-                    </div>
-                    <div style="display:grid; grid-template-columns:1fr 1fr; gap:.75rem">
-                        <div>
-                            <label class="pp-modal-label">Tanggal <span class="text-danger">*</span></label>
-                            <input type="date" name="date" class="form-control" value="{{ date('Y-m-d') }}" required>
-                        </div>
-                        <div>
-                            <label class="pp-modal-label">Jumlah <span class="text-danger">*</span></label>
-                            <div class="input-group">
-                                <span class="input-group-text" style="border-radius:8px 0 0 8px; font-size:.82rem; font-weight:700">Rp</span>
-                                <input type="text" name="amount" id="payAmount" class="form-control" placeholder="0"
-                                       style="border-radius:0 8px 8px 0" required>
-                            </div>
-                        </div>
-                        <div>
-                            <label class="pp-modal-label">Metode Bayar <span class="text-danger">*</span></label>
-                            <select name="payment_method_id" id="payMethod" class="form-select" required onchange="updateCashAccount(this)">
-                                <option value="">-- Pilih --</option>
-                                @foreach($paymentMethods->whereIn('mode', ['cash','transfer']) as $pm)
-                                    <option value="{{ $pm->id }}" data-mode="{{ $pm->mode }}"
-                                            data-default-account="{{ $pm->default_cash_account_id }}">
-                                        {{ $pm->name }}
-                                    </option>
-                                @endforeach
-                            </select>
-                        </div>
-                        <div>
-                            <label class="pp-modal-label">Bayar dari Akun <span class="text-danger">*</span></label>
-                            <select name="cash_account_id" id="payCashAccount" class="form-select" required>
-                                <option value="">-- Pilih akun --</option>
-                                @foreach($cashAccounts as $acc)
-                                    <option value="{{ $acc->id }}" data-code="{{ $acc->code }}">
-                                        {{ $acc->code }} – {{ $acc->name }}
-                                    </option>
-                                @endforeach
-                            </select>
-                        </div>
-                        <div>
-                            <label class="pp-modal-label">No. Referensi</label>
-                            <input type="text" name="ref_no" class="form-control" placeholder="opsional">
-                        </div>
-                        <div>
-                            <label class="pp-modal-label">Catatan</label>
-                            <input type="text" name="notes" class="form-control" placeholder="opsional">
-                        </div>
-                    </div>
-                    <div class="d-flex gap-2 justify-content-end mt-3 pt-3 border-top">
-                        <button type="button" class="pp-btn" data-bs-dismiss="modal">Batal</button>
-                        <button type="submit" class="pp-btn pp-btn-primary">Simpan Pembayaran</button>
-                    </div>
+    <div class="table-responsive">
+      <table class="table table-sm mb-0">
+        <thead>
+          <tr>
+            <th>Tanggal</th>
+            <th>Supplier</th>
+            <th>No PO</th>
+            <th>Tipe</th>
+            <th>Metode</th>
+            <th>Akun</th>
+            <th class="text-end">Jumlah</th>
+            <th></th>
+          </tr>
+        </thead>
+        <tbody>
+          @forelse ($payments as $pay)
+          <tr class="pay-row {{ $pay->voided_at ? 'voided' : '' }}">
+            <td class="mono text-muted" style="white-space:nowrap;">
+              {{ \Carbon\Carbon::parse($pay->date)->format('d/m/Y') }}
+            </td>
+            <td>{{ $pay->purchaseOrder?->supplier?->name ?? '—' }}</td>
+            <td>
+              @if ($pay->purchaseOrder)
+                <a href="{{ route('purchasing.purchase_orders.show', $pay->purchaseOrder) }}" class="tbl-link mono">
+                  {{ $pay->purchaseOrder->code }}
+                </a>
+              @else —
+              @endif
+            </td>
+            <td>
+              <span class="badge-status {{ $pay->voided_at ? 'badge-voided' : 'badge-' . $pay->type }}">
+                {{ $pay->voided_at ? 'Void' : ($typeLabel[$pay->type] ?? $pay->type) }}
+              </span>
+            </td>
+            <td class="text-muted">{{ $pay->paymentMethod?->name ?? '—' }}</td>
+            <td class="text-muted">{{ $pay->cashAccount?->name ?? '—' }}</td>
+            <td class="text-end mono fw-semibold">Rp {{ $fmt($pay->amount) }}</td>
+            <td>
+              @if (!$pay->voided_at)
+                <form method="POST"
+                      action="{{ route('purchasing.purchase_orders.payments.void', [$pay->purchaseOrder, $pay]) }}"
+                      onsubmit="return confirm('VOID pembayaran ini?\nTindakan ini tidak bisa dibatalkan.')">
+                  @csrf
+                  <button type="submit" class="btn btn-sm btn-outline-danger"
+                          style="font-size:.7rem;padding:.15rem .55rem;">
+                    Void
+                  </button>
                 </form>
-
-            </div>
-        </div>
+              @endif
+            </td>
+          </tr>
+          @empty
+          <tr>
+            <td colspan="8" class="text-center text-muted py-4">Belum ada pembayaran.</td>
+          </tr>
+          @endforelse
+        </tbody>
+      </table>
     </div>
+
+    {{-- Pagination --}}
+    @if ($payments->hasPages())
+    <div class="px-3 py-2 border-top" style="font-size:.8rem;">
+      {{ $payments->withQueryString()->links() }}
+    </div>
+    @endif
+  </div>
+
 </div>
+
+{{-- ── MODAL BAYAR SUPPLIER ──────────────────────────────────────── --}}
+<div class="modal fade" id="modalBayar" tabindex="-1">
+  <div class="modal-dialog modal-lg">
+    <div class="modal-content">
+      <div class="modal-header" style="border-bottom:1px solid var(--line);padding:.85rem 1.15rem;">
+        <h6 class="modal-title fw-semibold mb-0">Bayar Supplier</h6>
+        <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
+      </div>
+      <div class="modal-body" style="padding:1.1rem 1.15rem;">
+
+        {{-- Step 1: Pilih PO --}}
+        <div class="mb-3">
+          <label class="form-label small fw-semibold">Pilih PO yang akan dibayar</label>
+          <input type="search" id="poSearch" class="form-control form-control-sm mb-2"
+                 placeholder="Cari kode PO atau nama supplier…" autocomplete="off">
+          <div id="poList" style="display:grid;gap:.45rem;max-height:220px;overflow-y:auto;">
+            @forelse ($openPos as $po)
+            @php $outstanding = max(0, (float) $po->grand_total - (float) $po->paid_amount); @endphp
+            <div class="po-card" data-po-id="{{ $po->id }}" data-po-code="{{ $po->code }}"
+                 data-supplier="{{ $po->supplier?->name }}" data-outstanding="{{ $outstanding }}"
+                 onclick="selectPo(this)">
+              <div class="d-flex justify-content-between align-items-start">
+                <div>
+                  <div class="fw-semibold mono" style="font-size:.88rem;">{{ $po->code }}</div>
+                  <div class="text-muted" style="font-size:.76rem;">
+                    {{ $po->supplier?->name }} · {{ \Carbon\Carbon::parse($po->date)->format('d/m/Y') }}
+                  </div>
+                </div>
+                <div class="text-end">
+                  <div class="mono fw-bold text-danger" style="font-size:.88rem;">
+                    Rp {{ number_format($outstanding, 0, ',', '.') }}
+                  </div>
+                  <div class="text-muted" style="font-size:.7rem;">outstanding</div>
+                </div>
+              </div>
+            </div>
+            @empty
+            <div class="text-muted text-center py-3 small">Tidak ada PO dengan hutang outstanding.</div>
+            @endforelse
+          </div>
+        </div>
+
+        {{-- Step 2: Form Bayar --}}
+        <form id="payForm" method="POST" action="" style="display:none;">
+          @csrf
+          <input type="hidden" name="type" value="payment">
+
+          <div id="selectedPoInfo" class="mb-3 p-2 rounded"
+               style="background:rgba(59,130,246,.05);border:1px solid rgba(59,130,246,.2);font-size:.85rem;"></div>
+
+          <div class="row g-3">
+            <div class="col-sm-6">
+              <label class="form-label small fw-semibold">Tanggal <span class="text-danger">*</span></label>
+              <input type="date" name="date" class="form-control form-control-sm"
+                     value="{{ date('Y-m-d') }}" required>
+            </div>
+            <div class="col-sm-6">
+              <label class="form-label small fw-semibold">Jumlah <span class="text-danger">*</span></label>
+              <div class="input-group input-group-sm">
+                <span class="input-group-text">Rp</span>
+                <input type="text" name="amount" id="payAmount" class="form-control"
+                       placeholder="0" required>
+              </div>
+            </div>
+            <div class="col-sm-6">
+              <label class="form-label small fw-semibold">Metode Bayar <span class="text-danger">*</span></label>
+              <select name="payment_method_id" id="payMethod" class="form-select form-select-sm"
+                      required onchange="updateCashAccount(this)">
+                <option value="">— Pilih —</option>
+                @foreach ($paymentMethods->whereIn('mode', ['cash','transfer']) as $pm)
+                  <option value="{{ $pm->id }}" data-mode="{{ $pm->mode }}"
+                          data-default-account="{{ $pm->default_cash_account_id }}">
+                    {{ $pm->name }}
+                  </option>
+                @endforeach
+              </select>
+            </div>
+            <div class="col-sm-6">
+              <label class="form-label small fw-semibold">Bayar dari Akun <span class="text-danger">*</span></label>
+              <select name="cash_account_id" id="payCashAccount" class="form-select form-select-sm" required>
+                <option value="">— Pilih akun —</option>
+                @foreach ($cashAccounts as $acc)
+                  <option value="{{ $acc->id }}" data-code="{{ $acc->code }}">
+                    {{ $acc->code }} – {{ $acc->name }}
+                  </option>
+                @endforeach
+              </select>
+            </div>
+            <div class="col-sm-6">
+              <label class="form-label small fw-semibold">No. Referensi</label>
+              <input type="text" name="ref_no" class="form-control form-control-sm" placeholder="opsional">
+            </div>
+            <div class="col-sm-6">
+              <label class="form-label small fw-semibold">Catatan</label>
+              <input type="text" name="notes" class="form-control form-control-sm" placeholder="opsional">
+            </div>
+          </div>
+
+          <div class="d-flex justify-content-end gap-2 mt-3 pt-3" style="border-top:1px solid var(--line);">
+            <button type="button" class="btn btn-sm btn-outline-secondary" data-bs-dismiss="modal">Batal</button>
+            <button type="submit" class="btn btn-sm btn-primary">Simpan Pembayaran</button>
+          </div>
+        </form>
+
+      </div>
+    </div>
+  </div>
+</div>
+@endsection
 
 @push('scripts')
 <script>
-let selectedPoId = null;
-const fmt = n => 'Rp ' + Math.round(n).toLocaleString('id-ID');
+const fmt = n => Math.round(n).toLocaleString('id-ID');
 
 function selectPo(el) {
-    document.querySelectorAll('.pp-po-card').forEach(c => c.classList.remove('selected'));
+    document.querySelectorAll('.po-card').forEach(c => c.classList.remove('selected'));
     el.classList.add('selected');
-    selectedPoId = el.dataset.poId;
 
-    const route = '{{ url("/purchasing/purchase-orders") }}/' + selectedPoId + '/payments';
+    const route = '{{ url("/purchasing/purchase-orders") }}/' + el.dataset.poId + '/payments';
     document.getElementById('payForm').action = route;
 
-    const outstanding = parseFloat(el.dataset.outstanding);
-    document.getElementById('payAmount').value = Math.round(outstanding);
+    const out = parseFloat(el.dataset.outstanding);
+    document.getElementById('payAmount').value = Math.round(out);
     document.getElementById('selectedPoInfo').innerHTML =
         '<strong>' + el.dataset.poCode + '</strong> — ' + el.dataset.supplier +
-        ' &nbsp;|&nbsp; Outstanding: <span style="color:#dc2626;font-weight:900">' + fmt(outstanding) + '</span>';
+        ' &nbsp;·&nbsp; Outstanding: <strong class="text-danger">Rp ' + fmt(out) + '</strong>';
 
     document.getElementById('payForm').style.display = 'block';
 }
 
 function updateCashAccount(sel) {
-    const opt = sel.selectedOptions[0];
-    const defaultId = opt?.dataset.defaultAccount;
-    if (defaultId) {
-        document.getElementById('payCashAccount').value = defaultId;
-    }
+    const defaultId = sel.selectedOptions[0]?.dataset.defaultAccount;
+    if (defaultId) document.getElementById('payCashAccount').value = defaultId;
 }
 
-// Search PO
-document.getElementById('poSearch').addEventListener('input', function() {
+document.getElementById('poSearch').addEventListener('input', function () {
     const q = this.value.toLowerCase();
-    document.querySelectorAll('.pp-po-card').forEach(card => {
+    document.querySelectorAll('.po-card').forEach(card => {
         const text = (card.dataset.poCode + ' ' + card.dataset.supplier).toLowerCase();
         card.style.display = text.includes(q) ? '' : 'none';
     });
 });
+
+// auto-submit selects
+document.querySelectorAll('.pay-filter-auto').forEach(el =>
+    el.addEventListener('change', () => document.getElementById('pay-filter-form').submit())
+);
+
+// Flatpickr range
+const ID_MONTHS = ['Jan','Feb','Mar','Apr','Mei','Jun','Jul','Agu','Sep','Okt','Nov','Des'];
+function fmtDate(d, withYear) {
+    return d.getDate() + ' ' + ID_MONTHS[d.getMonth()] + (withYear ? ' ' + d.getFullYear() : '');
+}
+function fmtRange(dates) {
+    if (dates.length === 2) {
+        const sameYear = dates[0].getFullYear() === dates[1].getFullYear();
+        return fmtDate(dates[0], !sameYear) + ' – ' + fmtDate(dates[1], true);
+    }
+    if (dates.length === 1) return fmtDate(dates[0], true) + ' …';
+    return '';
+}
+const payForm      = document.getElementById('pay-filter-form');
+const payFromHidden = document.getElementById('pay-from');
+const payToHidden   = document.getElementById('pay-to');
+const payRangeInput = document.getElementById('pay-date-range');
+if (payRangeInput) {
+    flatpickr(payRangeInput, {
+        mode: 'range', dateFormat: 'Y-m-d', locale: { firstDayOfWeek: 1 }, allowInput: false,
+        defaultDate: [payFromHidden.value, payToHidden.value].filter(Boolean),
+        onChange: function (selectedDates, dateStr, fp) {
+            fp.input.value = fmtRange(selectedDates);
+            if (selectedDates.length === 1) {
+                payFromHidden.value = flatpickr.formatDate(selectedDates[0], 'Y-m-d');
+                payToHidden.value = '';
+            } else if (selectedDates.length === 2) {
+                payFromHidden.value = flatpickr.formatDate(selectedDates[0], 'Y-m-d');
+                payToHidden.value   = flatpickr.formatDate(selectedDates[1], 'Y-m-d');
+                payForm.submit();
+            }
+        },
+        onReady: function (selectedDates, dateStr, fp) {
+            fp.input.classList.add('gf-date-input');
+            if (selectedDates.length) fp.input.value = fmtRange(selectedDates);
+        },
+    });
+}
 </script>
 @endpush
-
-@endsection
