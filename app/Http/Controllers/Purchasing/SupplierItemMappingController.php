@@ -53,6 +53,12 @@ class SupplierItemMappingController extends Controller
             ->orderByDesc('updated_at')
             ->get();
         $canSeeMoney = $request->user()?->isOwner() ?? false;
+        $mappingStats = [
+            'total' => SupplierItem::query()->count(),
+            'active' => SupplierItem::query()->where('active', true)->count(),
+            'primary' => SupplierItem::query()->where('is_primary', true)->where('active', true)->count(),
+            'category' => $categoryMappings->where('active', true)->count(),
+        ];
 
         return view('purchasing.supplier_items.index', compact(
             'mappings',
@@ -64,6 +70,7 @@ class SupplierItemMappingController extends Controller
             'categories',
             'categoryMappings',
             'canSeeMoney',
+            'mappingStats',
         ));
     }
 
