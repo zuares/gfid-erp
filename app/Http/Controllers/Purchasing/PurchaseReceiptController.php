@@ -37,6 +37,10 @@ class PurchaseReceiptController extends Controller
             $q->where('supplier_id', (int) $request->supplier_id);
         }
 
+        if ($request->filled('supplier_search')) {
+            $q->whereHas('supplier', fn($s) => $s->where('name', 'like', '%' . $request->supplier_search . '%'));
+        }
+
         if ($request->filled('warehouse_id')) {
             $q->where('warehouse_id', (int) $request->warehouse_id);
         }

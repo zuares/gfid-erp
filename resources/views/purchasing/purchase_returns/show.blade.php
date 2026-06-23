@@ -4,241 +4,115 @@
 
 @push('head')
 <style>
-  .pr-show-page{ min-height:100vh; }
-  .pr-show-page .page-wrap{ max-width: 1150px; margin-inline:auto; padding: 1rem 1rem 4.5rem; }
+  /* ── shared layout ── */
+  .page-wrap { max-width:1080px; margin-inline:auto; padding-bottom:3rem; }
+  .mono { font-variant-numeric:tabular-nums; font-family:ui-monospace,SFMono-Regular,Menlo,Consolas,"Liberation Mono"; }
 
-  body[data-theme="light"] .pr-show-page .page-wrap{
-    background: radial-gradient(circle at top left,
-        rgba(59,130,246,.12) 0,
-        rgba(45,212,191,.10) 26%,
-        #f9fafb 60%);
-  }
-
-  .return-hero{
-    background: var(--card);
-    border:1px solid var(--line);
-    border-radius:16px;
-    padding:.9rem;
-    box-shadow:0 10px 24px rgba(15,23,42,.06);
-  }
-  .return-hero-main{ display:flex; justify-content:space-between; align-items:flex-start; gap:1rem; }
-  .return-title{ font-size:1.22rem; font-weight:900; margin:0; letter-spacing:-.01em; }
-  .return-code{ font-weight:900; color:#2563eb; }
-  .return-meta-row{ display:flex; gap:.35rem; flex-wrap:wrap; margin-top:.45rem; }
-  .return-chip{
-    display:inline-flex;
-    align-items:center;
-    gap:.3rem;
-    border:1px solid var(--line);
-    background:rgba(148,163,184,.07);
-    border-radius:999px;
-    padding:.2rem .6rem;
-    font-size:.74rem;
-    color:var(--muted);
-    min-height:26px;
-  }
-  .return-chip strong{ color:var(--text); }
-  .return-actions{ display:flex; gap:.4rem; flex-wrap:wrap; justify-content:flex-end; }
-  .card-main{
-    background: var(--card);
-    border-radius: 10px;
-    border: 1px solid rgba(148,163,184,.35);
-    box-shadow: 0 10px 30px rgba(15,23,42,.10), 0 0 0 1px rgba(148,163,184,.08);
-  }
-  .card-soft{
-    background: color-mix(in srgb, var(--card) 94%, var(--bg) 6%);
-    border-radius: 10px;
-    border: 1px solid var(--line);
+  /* Cards */
+  .card-info  { background:var(--card); border-radius:14px; border:1px solid var(--line); padding:1.1rem 1.2rem; }
+  .card-section { background:var(--card); border-radius:14px; border:1px solid var(--line); overflow:hidden; }
+  .card-section-header {
+    padding:.6rem 1rem;
+    border-bottom:1px solid var(--line);
+    font-size:.72rem; text-transform:uppercase; letter-spacing:.07em;
+    color:var(--muted); font-weight:600;
   }
 
-  .mono{
-    font-variant-numeric: tabular-nums;
-    font-family: ui-monospace, SFMono-Regular, Menlo, Consolas, "Liberation Mono";
-  }
+  /* Summary 4-col */
+  .summary-col { padding:.85rem 1rem; border-right:1px solid var(--line); }
+  .summary-col:last-child { border-right:none; }
+  .summary-col-label { font-size:.7rem; text-transform:uppercase; letter-spacing:.06em; color:var(--muted); font-weight:600; margin-bottom:.3rem; }
+  .summary-col-value { font-size:.95rem; font-weight:600; }
 
-  /* header */
-  .page-header-title{ font-size: 1.35rem; font-weight: 650; }
-  .page-header-subtitle{ font-size: .82rem; color: var(--muted); }
-  .pill{
-    font-size: .75rem;
-    border-radius: 999px;
-    padding: .16rem .7rem;
-    border: 1px solid rgba(148,163,184,.55);
-    background: color-mix(in srgb, var(--card) 80%, var(--bg) 20%);
-  }
-  .status-badge{
-    font-size: .78rem;
-    border-radius: 999px;
-    padding: .14rem .7rem;
-    border: 1px solid var(--line);
-    background: rgba(148,163,184,.10);
-  }
-  .primary-label,.state-pill{
-    display:inline-flex;
-    align-items:center;
-    border-radius:999px;
-    padding:.12rem .5rem;
-    font-size:.68rem;
-    font-weight:850;
-    border:1px solid transparent;
-    white-space:nowrap;
-  }
-  .primary-label{ color:#1d4ed8; background:rgba(37,99,235,.08); border-color:rgba(37,99,235,.32); }
-  .state-pill.is-muted{ color:#64748b; background:rgba(148,163,184,.1); border-color:rgba(148,163,184,.35); }
-  .btn-pill{ border-radius: 999px; padding-inline: 1rem; }
-  .btn-soft{
-    border-radius: 999px;
-    padding-inline: 1rem;
-    border: 1px solid var(--line);
-    background: color-mix(in srgb, var(--card) 90%, var(--bg) 10%);
-  }
+  /* Info label */
+  .info-label { font-size:.72rem; text-transform:uppercase; letter-spacing:.06em; color:var(--muted); font-weight:600; margin-bottom:.2rem; }
+  .info-value  { font-size:.88rem; }
 
-  /* section */
-  .section-title{
-    font-size: .86rem;
-    text-transform: uppercase;
-    letter-spacing: .08em;
-    color: var(--muted);
-  }
+  /* Status badges */
+  .badge-status { border-radius:999px; font-size:.7rem; padding:.1rem .6rem; border:1px solid transparent; white-space:nowrap; }
+  .badge-draft   { background:rgba(148,163,184,.12);color:#64748b;border-color:rgba(148,163,184,.5); }
+  .badge-posted  { background:rgba(22,163,74,.12);color:#15803d;border-color:rgba(22,163,74,.6); }
+  .badge-voided  { background:rgba(220,38,38,.08);color:#b91c1c;border-color:rgba(220,38,38,.4); }
 
-  /* table */
-  .table-wrap{ overflow-x:auto; }
-  .return-table{ --bs-table-bg: transparent; }
-  .return-table thead th{
-    background: color-mix(in srgb, var(--card) 90%, var(--bg) 10%);
-    border-bottom-color: var(--line);
-    font-size: .68rem;
-    text-transform: uppercase;
-    letter-spacing: .06em;
-    padding:.58rem .65rem;
-    white-space: nowrap;
+  /* Row labels in table */
+  .primary-label,.state-pill {
+    display:inline-flex; align-items:center; border-radius:999px;
+    padding:.12rem .5rem; font-size:.68rem; font-weight:700;
+    border:1px solid transparent; white-space:nowrap;
   }
-  .return-table tbody td{
-    border-bottom-color: var(--line);
-    vertical-align: middle;
-    padding:.62rem .65rem;
-    font-size: .82rem;
-  }
+  .primary-label { color:#1d4ed8; background:rgba(37,99,235,.08); border-color:rgba(37,99,235,.32); }
+  .state-pill.is-muted { color:#64748b; background:rgba(148,163,184,.1); border-color:rgba(148,163,184,.35); }
 
-  .item-main{ font-weight: 850; line-height:1.15; }
-  .item-sub{ font-size: .74rem; color: var(--muted); margin-top:.08rem; }
-  .return-metrics{ display:flex; gap:.35rem; flex-wrap:wrap; justify-content:flex-end; }
-  .metric-pill{ display:inline-flex; align-items:center; gap:.28rem; border:1px solid var(--line); border-radius:999px; padding:.12rem .48rem; font-size:.7rem; color:var(--muted); background:rgba(148,163,184,.06); }
-  .metric-pill strong{ color:var(--text); font-weight:900; }
-  .metric-pill.is-blue{ color:#2563eb; border-color:rgba(37,99,235,.25); background:rgba(37,99,235,.06); }
-  .metric-pill.is-red{ color:#dc2626; border-color:rgba(220,38,38,.25); background:rgba(220,38,38,.06); }
-  .metric-pill.is-green{ color:#15803d; border-color:rgba(22,163,74,.25); background:rgba(22,163,74,.06); }
-  .summary-grid{
-    display:grid;
-    grid-template-columns: repeat(4, minmax(0, 1fr));
-    gap:.65rem;
+  /* Table */
+  .table-wrap { overflow-x:auto; }
+  .return-table { --bs-table-bg:transparent; }
+  .return-table thead th {
+    background:color-mix(in srgb,var(--card) 90%,var(--bg) 10%);
+    border-bottom-color:var(--line);
+    font-size:.68rem; text-transform:uppercase; letter-spacing:.06em;
+    padding:.5rem .65rem; white-space:nowrap;
   }
-  .summary-box{
-    border:1px solid var(--line);
-    border-radius:8px;
-    padding:.7rem .8rem;
-    background:rgba(148,163,184,.07);
-  }
-  .summary-box .lbl{ display:block; font-size:.72rem; color:var(--muted); line-height:1.15; }
-  .summary-box .val{ display:block; font-weight:850; line-height:1.25; }
-  .summary-box.is-main{
-    border-color:rgba(37,99,235,.22);
-    background:rgba(37,99,235,.06);
-  }
-  .summary-box.is-main .val{ color:#2563eb; }
-  .summary-box.is-danger{
-    border-color:rgba(220,38,38,.25);
-    background:rgba(220,38,38,.06);
-  }
-  .summary-box.is-danger .val{ color:#dc2626; }
-  .return-meta{
-    display:grid;
-    grid-template-columns:repeat(4,minmax(0,1fr));
-    gap:.5rem;
-  }
-  .line-stock-short{ color:#dc2626; font-weight:900; }
-  .line-stock-ok{ color:#15803d; font-weight:900; }
-  .qty-return-input{ min-height:38px; border-radius:10px; font-weight:900; font-size:.95rem; }
-  .return-tools{ display:flex; gap:.35rem; flex-wrap:wrap; align-items:center; }
-  .return-tools .btn{ border-radius:999px; font-weight:800; padding:.22rem .65rem; }
-  .return-tools-summary{ margin-left:auto; color:var(--muted); font-size:.78rem; font-weight:750; }
-  .return-formbar{ display:grid; grid-template-columns:150px minmax(180px, 1fr) auto; gap:.5rem; align-items:end; margin-bottom:.55rem; }
-  .return-formbar .form-label{ font-size:.68rem; color:var(--muted); font-weight:850; text-transform:uppercase; letter-spacing:.04em; margin-bottom:.15rem; }
-  .return-formbar-summary{ display:flex; justify-content:flex-end; align-items:center; gap:.45rem; color:var(--muted); font-size:.76rem; font-weight:800; padding-bottom:.32rem; }
-  .return-dot::before{ content:"•"; opacity:.45; margin-right:.45rem; }
-  .return-row.is-empty{ opacity:.74; }
-  .return-row.has-qty{ background:rgba(37,99,235,.045); box-shadow:inset 3px 0 0 rgba(37,99,235,.45); }
-  .quick-btn{ border-radius:999px; padding:.15rem .5rem; font-size:.7rem; font-weight:800; }
-  .row-main-action{ display:flex; gap:.3rem; justify-content:flex-end; flex-wrap:wrap; margin-top:.35rem; }
-  .return-input-wrap{ display:flex; flex-direction:column; align-items:flex-end; }
-  .return-mobile-head{ display:none; }
-  .return-total-live{ color:#2563eb; font-weight:900; }
+  .return-table tbody td { border-bottom-color:var(--line); vertical-align:middle; padding:.55rem .65rem; font-size:.82rem; }
 
-  @media (max-width: 767.98px){
-    html, body{ max-width:100%; overflow-x:hidden; }
-    .pr-show-page{ overflow-x:hidden; }
-    .pr-show-page .page-wrap{ padding-inline: .85rem; }
+  .item-main { font-weight:650; line-height:1.15; }
+  .item-sub  { font-size:.74rem; color:var(--muted); margin-top:.08rem; }
 
-    .page-header{
-      flex-direction: column;
-      align-items: flex-start;
-      gap: .45rem;
+  /* metric pills */
+  .return-metrics { display:flex; gap:.3rem; flex-wrap:wrap; justify-content:flex-end; }
+  .metric-pill { display:inline-flex; align-items:center; gap:.25rem; border:1px solid var(--line); border-radius:999px; padding:.1rem .45rem; font-size:.7rem; color:var(--muted); background:rgba(148,163,184,.06); }
+  .metric-pill strong { color:var(--text); }
+  .metric-pill.is-blue  { color:#2563eb; border-color:rgba(37,99,235,.25); background:rgba(37,99,235,.06); }
+  .metric-pill.is-red   { color:#dc2626; border-color:rgba(220,38,38,.25); background:rgba(220,38,38,.06); }
+  .metric-pill.is-green { color:#15803d; border-color:rgba(22,163,74,.25); background:rgba(22,163,74,.06); }
+
+  /* Return-specific */
+  .line-stock-short { color:#dc2626; font-weight:700; }
+  .line-stock-ok    { color:#15803d; font-weight:700; }
+  .qty-return-input { min-height:36px; border-radius:8px; font-weight:700; font-size:.92rem; }
+  .return-tools { display:flex; gap:.35rem; flex-wrap:wrap; align-items:center; }
+  .return-tools-summary { margin-left:auto; color:var(--muted); font-size:.78rem; }
+  .return-total-live { color:#2563eb; font-weight:700; }
+  .return-formbar { display:grid; grid-template-columns:150px minmax(180px,1fr) auto; gap:.5rem; align-items:end; margin-bottom:.55rem; }
+  .return-formbar .form-label { font-size:.68rem; color:var(--muted); font-weight:600; text-transform:uppercase; letter-spacing:.04em; margin-bottom:.15rem; }
+  .return-formbar-summary { display:flex; justify-content:flex-end; align-items:center; gap:.45rem; color:var(--muted); font-size:.76rem; padding-bottom:.32rem; }
+  .return-dot::before { content:"•"; opacity:.4; margin-right:.4rem; }
+  .return-row.is-empty { opacity:.7; }
+  .return-row.has-qty { background:rgba(37,99,235,.04); box-shadow:inset 3px 0 0 rgba(37,99,235,.4); }
+  .quick-btn { border-radius:999px; padding:.15rem .5rem; font-size:.7rem; }
+  .row-main-action { display:flex; gap:.3rem; justify-content:flex-end; flex-wrap:wrap; margin-top:.3rem; }
+  .return-input-wrap { display:flex; flex-direction:column; align-items:flex-end; }
+  .return-mobile-head { display:none; }
+
+  @media (max-width:767.98px){
+    .page-wrap { padding-inline:.75rem; }
+    .summary-col { border-right:none; border-bottom:1px solid var(--line); }
+    .summary-col:last-child { border-bottom:none; }
+    .return-table thead { display:none; }
+    .return-table tbody tr {
+      display:block; border:1px solid var(--line); border-radius:12px;
+      margin-bottom:.6rem; padding:.55rem .65rem; background:rgba(15,23,42,.02);
     }
-    .page-header-actions{
-      width: 100%;
-      display:flex;
-      flex-wrap:wrap;
-      gap: .35rem;
+    .return-table tbody td {
+      display:flex; justify-content:space-between; align-items:flex-start;
+      gap:.75rem; border:0; padding-block:.2rem;
     }
-    .page-header-actions .btn{ flex: 1 1 auto; }
-    .return-hero{ padding:.75rem; }
-    .return-hero-main{ display:block; }
-    .return-title{ font-size:1.08rem; }
-    .return-actions{ margin-top:.7rem; justify-content:stretch; }
-    .return-actions .btn{ flex:1 1 auto; }
-    .return-meta-row{ flex-wrap:nowrap; overflow-x:auto; padding-bottom:.1rem; }
-    .return-chip{ flex:0 0 auto; }
-
-    /* mobile table -> card rows */
-    .return-table thead{ display:none; }
-    .return-table tbody tr{
-      display:block;
-      border: 1px solid var(--line);
-      border-radius: 12px;
-      margin-bottom: .6rem;
-      padding: .55rem .65rem;
-      background: rgba(15,23,42,.02);
+    .return-table tbody td[data-label]::before {
+      content:attr(data-label); font-size:.75rem; color:var(--muted);
+      margin-right:.75rem; flex:0 0 auto;
     }
-    .return-table tbody td{
-      display:flex;
-      justify-content:space-between;
-      align-items:flex-start;
-      gap:.75rem;
-      border: 0;
-      padding-block: .2rem;
-    }
-    .return-table tbody td[data-label]::before{
-      content: attr(data-label);
-      font-size: .75rem;
-      color: var(--muted);
-      margin-right: .75rem;
-      text-align:left;
-      flex:0 0 auto;
-    }
-    .return-table .td-item{ display:block; }
-    .return-table .td-item::before{ display:none; }
-    .return-metrics{ justify-content:flex-start; }
-    .return-input-wrap{ width:100%; align-items:flex-end; }
-    .qty-return-input{ max-width:150px; margin-left:auto; }
-    .summary-grid,.return-meta{ grid-template-columns: repeat(2, minmax(0, 1fr)); }
-    .return-tools{ width:100%; }
-    .return-tools .btn{ flex:1 1 auto; }
-    .return-tools-summary{ width:100%; margin-left:0; text-align:center; }
-    .return-formbar{ grid-template-columns:1fr 1fr; gap:.45rem; }
-    .return-formbar-summary{ grid-column:1 / -1; justify-content:center; padding-bottom:0; }
-    .return-mobile-head{ display:block; }
-    .row-main-action{ justify-content:stretch; }
-    .row-main-action .btn{ flex:1; }
+    .return-table .td-item { display:block; }
+    .return-table .td-item::before { display:none; }
+    .return-metrics { justify-content:flex-start; }
+    .return-input-wrap { width:100%; align-items:flex-end; }
+    .qty-return-input { max-width:150px; margin-left:auto; }
+    .return-tools { width:100%; }
+    .return-tools .btn { flex:1 1 auto; }
+    .return-tools-summary { width:100%; margin-left:0; text-align:center; }
+    .return-formbar { grid-template-columns:1fr 1fr; gap:.45rem; }
+    .return-formbar-summary { grid-column:1 / -1; justify-content:center; padding-bottom:0; }
+    .return-mobile-head { display:block; }
+    .row-main-action { justify-content:stretch; }
+    .row-main-action .btn { flex:1; }
   }
 </style>
 @endpush
@@ -265,31 +139,24 @@
   $dateValue = old('date', $ret->date ? \Illuminate\Support\Carbon::parse($ret->date)->format('Y-m-d') : now()->toDateString());
 @endphp
 
-<div class="pr-show-page">
-  <div class="page-wrap">
+<div class="page-wrap py-4">
 
     {{-- HEADER --}}
-    <div class="return-hero mb-3">
-      <div class="return-hero-main">
-        <div class="min-w-0">
-          <div class="d-flex align-items-center gap-2 flex-wrap">
-            <h1 class="return-title">Return Pembelian</h1>
-            <span class="status-badge {{ $statusClass }}">{{ $statusLabel }}@if($isVoided) • VOID @endif</span>
-          </div>
-          <div class="return-meta-row">
-            <span class="return-chip">Kode <strong class="mono return-code">{{ $ret->code }}</strong></span>
-            <span class="return-chip">Tanggal <strong>{{ $ret->date ? \Illuminate\Support\Carbon::parse($ret->date)->format('d/m/Y') : '-' }}</strong></span>
-            <span class="return-chip">GRN <strong class="mono">{{ $ret->grn?->code ?? '-' }}</strong></span>
-            <span class="return-chip">Supplier <strong>{{ $ret->grn?->supplier?->name ?? '-' }}</strong></span>
-            <span class="return-chip">Gudang <strong>{{ $ret->grn?->warehouse?->code ?? $ret->grn?->warehouse?->name ?? '-' }}</strong></span>
-            <span class="return-chip">Item <strong class="mono">{{ $totalReturnLines }}/{{ $totalLines }}</strong></span>
-          </div>
-        </div>
+    <div class="d-flex align-items-center justify-content-between gap-3 mb-3 flex-wrap">
+      {{-- Kiri --}}
+      <div style="min-width:0;">
+        <h2 class="mb-0 lh-1" style="font-size:1.35rem;">Return Pembelian</h2>
+        <div class="text-muted mono mt-1" style="font-size:.8rem;">Kode: {{ $ret->code }}</div>
+      </div>
 
-        <div class="return-actions">
-          <a href="{{ $grnHref }}" class="btn btn-soft btn-sm btn-pill">GRN</a>
-          <a href="{{ route('purchasing.purchase_returns.index') }}" class="btn btn-outline-secondary btn-sm btn-pill">Daftar</a>
-        </div>
+      {{-- Kanan --}}
+      <div class="d-flex align-items-center gap-2 flex-wrap">
+        <a href="{{ route('purchasing.purchase_returns.index') }}" class="btn btn-outline-secondary btn-sm">
+          <i class="bi bi-arrow-left me-1"></i>Kembali
+        </a>
+        <a href="{{ $grnHref }}" class="btn btn-outline-secondary btn-sm">
+          <i class="bi bi-box-arrow-up-right me-1"></i>GRN
+        </a>
       </div>
     </div>
 
@@ -311,42 +178,111 @@
       </div>
     @endif
 
-    <div class="card-soft mb-2">
-      <div class="p-3">
-        <div class="summary-grid">
-          <div class="summary-box">
-            <span class="lbl">Item</span>
-            <span class="val mono">{{ angka($totalReturnLines) }} / {{ angka($totalLines) }}</span>
+    {{-- SUMMARY ROW --}}
+    <div class="card-info mb-3">
+      <div class="row g-0">
+        <div class="col-6 col-md-3 summary-col">
+          <div class="summary-col-label">Status</div>
+          <div class="summary-col-value">
+            @if($isVoided)
+              <span class="badge-status badge-voided">VOID</span>
+            @elseif($isPosted)
+              <span class="badge-status badge-posted">Posted</span>
+            @else
+              <span class="badge-status badge-draft">Draft</span>
+            @endif
           </div>
-          <div class="summary-box is-main">
-            <span class="lbl">Qty Return</span>
-            <span class="val mono">{{ decimal_id($totalQty, 2) }}</span>
-          </div>
-          <div class="summary-box">
-            <span class="lbl">Stok</span>
-            <span class="val {{ $stockReady ? 'line-stock-ok' : 'line-stock-short' }}">
-              {{ $isDraft ? ($stockReady ? 'Siap' : 'Kurang') : ($mutationCount > 0 ? 'Sudah Keluar' : '-') }}
-            </span>
-          </div>
-          <div class="summary-box">
-            <span class="lbl">Jurnal</span>
-            <span class="val">{{ $journalCount > 0 ? $journalCount . ' jurnal' : 'Belum' }}</span>
+        </div>
+        <div class="col-6 col-md-3 summary-col">
+          <div class="summary-col-label">Item Return</div>
+          <div class="summary-col-value mono">{{ $totalReturnLines }} / {{ $totalLines }}</div>
+        </div>
+        <div class="col-6 col-md-3 summary-col">
+          <div class="summary-col-label">Qty Return</div>
+          <div class="summary-col-value mono">{{ decimal_id($totalQty, 2) }}</div>
+        </div>
+        <div class="col-6 col-md-3 summary-col">
+          <div class="summary-col-label">{{ $isDraft ? 'Stok' : 'Jurnal' }}</div>
+          <div class="summary-col-value">
+            @if($isDraft)
+              <span class="{{ $stockReady ? 'line-stock-ok' : 'line-stock-short' }}" style="font-size:.9rem;">
+                {{ $stockReady ? 'Siap' : 'Kurang' }}
+              </span>
+            @else
+              {{ $journalCount > 0 ? $journalCount . ' jurnal' : 'Belum' }}
+            @endif
           </div>
         </div>
       </div>
     </div>
 
+    {{-- INFO CARD: metadata dokumen --}}
+    <div class="row g-3 mb-3">
+      <div class="col-12 col-lg-6">
+        <div class="card-info h-100">
+          <div class="info-label mb-3" style="font-size:.75rem;">Informasi Dokumen</div>
+          <dl class="row mb-0 small">
+            <dt class="col-sm-4 info-label mb-1">Tanggal</dt>
+            <dd class="col-sm-8 mb-1 mono">{{ $ret->date ? \Illuminate\Support\Carbon::parse($ret->date)->format('d/m/Y') : '-' }}</dd>
+
+            <dt class="col-sm-4 info-label mb-1">Dari GRN</dt>
+            <dd class="col-sm-8 mb-1">
+              <a href="{{ $grnHref }}" class="text-decoration-none mono fw-semibold">
+                {{ $ret->grn?->code ?? '-' }}
+              </a>
+            </dd>
+
+            <dt class="col-sm-4 info-label mb-1">Supplier</dt>
+            <dd class="col-sm-8 mb-1">
+              <div class="fw-semibold">{{ $ret->grn?->supplier?->name ?? '-' }}</div>
+              @if($ret->grn?->supplier?->code)
+                <div class="text-muted mono" style="font-size:.75rem;">{{ $ret->grn->supplier->code }}</div>
+              @endif
+            </dd>
+
+            <dt class="col-sm-4 info-label mb-1">Gudang</dt>
+            <dd class="col-sm-8 mb-1">
+              <div class="fw-semibold">{{ $ret->grn?->warehouse?->name ?? '-' }}</div>
+              @if($ret->grn?->warehouse?->code)
+                <div class="text-muted mono" style="font-size:.75rem;">{{ $ret->grn->warehouse->code }}</div>
+              @endif
+            </dd>
+
+            @if($ret->notes)
+              <dt class="col-sm-4 info-label mb-1">Catatan</dt>
+              <dd class="col-sm-8 mb-1">{{ $ret->notes }}</dd>
+            @endif
+          </dl>
+        </div>
+      </div>
+
+      @if($canSeeMoney)
+      <div class="col-12 col-lg-6">
+        <div class="card-info h-100">
+          <div class="info-label mb-3" style="font-size:.75rem;">Ringkasan Nilai</div>
+          <div class="d-flex justify-content-between align-items-center">
+            <span class="info-label mb-0">Total Return</span>
+            <span class="mono fw-bold" style="font-size:1.05rem;">{{ rupiah($grand) }}</span>
+          </div>
+          @if($isVoided)
+            <div class="mt-3 text-muted" style="font-size:.78rem;">Return ini sudah di-VOID. Stok dan jurnal telah dibalik.</div>
+          @elseif($isPosted)
+            <div class="mt-3 text-muted" style="font-size:.78rem;">Stok sudah keluar & jurnal return tercatat.</div>
+          @endif
+        </div>
+      </div>
+      @endif
+    </div>
+
     <div class="row g-3 mb-3">
       {{-- DETAIL LINES --}}
       <div class="col-12">
-        <div class="card-main">
-          <div class="p-3 p-sm-3 border-bottom" style="border-color: var(--line) !important;">
-            <div class="d-flex justify-content-between align-items-center flex-wrap gap-2">
-              <div class="fw-semibold small text-uppercase">Detail Return</div>
-              <div class="small text-muted d-none d-md-block">
-                Semua baris dari GRN ditampilkan. Isi qty hanya pada barang yang diretur.
-              </div>
-            </div>
+        <div class="card-section">
+          <div class="card-section-header d-flex justify-content-between align-items-center">
+            <span>Detail Return</span>
+            <span class="d-none d-md-inline" style="text-transform:none;letter-spacing:0;font-size:.75rem;">
+              {{ $totalReturnLines }} / {{ $totalLines }} item diretur
+            </span>
           </div>
 
           <div class="p-2 p-sm-3">
@@ -354,7 +290,9 @@
               @csrf
               @method('PUT')
 
-              <div class="return-formbar">
+              {{-- Formbar hanya untuk draft --}}
+              @if($isDraft && !$isVoided)
+              <div class="return-formbar mb-3">
                 <div>
                   <label class="form-label">Tanggal</label>
                   <input type="text"
@@ -362,8 +300,7 @@
                     class="form-control form-control-sm gf-date-input mono"
                     value="{{ $dateValue }}"
                     data-gf-date autocomplete="off"
-                    required
-                    {{ (!$isDraft || $isVoided) ? 'disabled' : '' }}>
+                    required>
                 </div>
                 <div>
                   <label class="form-label">Catatan</label>
@@ -371,19 +308,19 @@
                     name="notes"
                     class="form-control form-control-sm"
                     value="{{ old('notes', $ret->notes) }}"
-                    placeholder="Opsional"
-                    {{ (!$isDraft || $isVoided) ? 'disabled' : '' }}>
+                    placeholder="Opsional">
                 </div>
                 <div class="return-formbar-summary">
-                  <span>{{ $statusLabel }}@if($isVoided) / VOID @endif</span>
                   @if ($canSeeMoney)
-                    <span class="return-dot mono">Rp {{ number_format($grand, 0, ',', '.') }}</span>
-                  @endif
-                  @if(!$isDraft || $isVoided)
-                    <span class="return-dot">Terkunci</span>
+                    <span class="mono">Rp {{ number_format($grand, 0, ',', '.') }}</span>
                   @endif
                 </div>
               </div>
+              @else
+              {{-- Hidden inputs agar form tetap valid --}}
+              <input type="hidden" name="date" value="{{ $dateValue }}">
+              <input type="hidden" name="notes" value="{{ $ret->notes }}">
+              @endif
 
               @if($isDraft && !$isVoided)
                 <div class="return-tools mb-2">
@@ -552,8 +489,7 @@
       </div>
     </div>
 
-  </div>
-</div>
+</div>{{-- /page-wrap --}}
 @endsection
 
 @push('scripts')

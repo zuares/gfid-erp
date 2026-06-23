@@ -5,149 +5,142 @@
 
 @push('head')
 <style>
-  .grn-show-page{ min-height:100vh; }
-  .grn-show-page .page-wrap{ max-width:1150px; margin-inline:auto; padding:1rem 1rem 4rem; }
+  .page-wrap { max-width:1080px; margin-inline:auto; padding-bottom:3rem; }
 
-  body[data-theme="light"] .grn-show-page .page-wrap{
-    background: radial-gradient(circle at top left,
-      rgba(59,130,246,.12) 0,
-      rgba(45,212,191,.10) 26%,
-      #f9fafb 60%);
-  }
-
-  .grn-show-page .card-main{
-    background: var(--card);
-    border-radius: 16px;
-    border: 1px solid rgba(148,163,184,.35);
-    box-shadow: 0 10px 30px rgba(15,23,42,.10), 0 0 0 1px rgba(148,163,184,.08);
-  }
-  .grn-show-page .card-soft{
-    background: color-mix(in srgb, var(--card) 94%, var(--bg) 6%);
-    border-radius: 16px;
-    border: 1px solid var(--line);
-  }
-
-  .mono{
+  .mono {
     font-variant-numeric: tabular-nums;
     font-family: ui-monospace,SFMono-Regular,Menlo,Consolas,"Liberation Mono";
   }
 
-  .grn-show-page .show-header-title{ font-size:1.35rem; font-weight:600; }
-  .grn-show-page .show-header-subtitle{ font-size:.8rem; color:var(--muted); }
-  .grn-show-page .show-header-pill{
-    font-size:.75rem; border-radius:999px; padding:.16rem .7rem;
-    border:1px solid rgba(148,163,184,.55);
-    background: color-mix(in srgb, var(--card) 80%, var(--bg) 20%);
+  /* Cards */
+  .card-info {
+    background: var(--card);
+    border-radius: 14px;
+    border: 1px solid var(--line);
+    padding: 1.1rem 1.2rem;
   }
-  .grn-show-page .show-header-status{ font-size:.78rem; border-radius:999px; padding:.14rem .7rem; }
-
-  .grn-show-page .section-title{
-    font-size:.86rem; text-transform:uppercase; letter-spacing:.08em; color:var(--muted);
+  .card-section {
+    background: var(--card);
+    border-radius: 14px;
+    border: 1px solid var(--line);
+    overflow: hidden;
   }
-  .grn-show-page dl.small dt{ color:var(--muted); }
-  .grn-show-page .card-soft .card-body{ padding:1rem 1.2rem 1.15rem; }
-  .grn-show-page .card-main .card-header{ padding:.6rem 1.2rem; background:transparent; border-bottom-color:var(--line); }
-  .grn-show-page .card-main .card-body{ padding:.5rem .6rem .7rem; }
-  .grn-show-page .summary-hr{ border-top-color:var(--line); opacity:1; }
-
-  /* DETAIL TABLE */
-  @media (min-width: 992px){
-    .grn-detail-wrapper{ max-height:60vh; overflow-y:auto; overflow-x:hidden; }
-    .grn-detail-wrapper::-webkit-scrollbar{ width:6px; height:6px; }
-    .grn-detail-wrapper::-webkit-scrollbar-thumb{ background: color-mix(in srgb, var(--muted) 60%, transparent); border-radius:999px; }
-    .grn-detail-wrapper::-webkit-scrollbar-track{ background:transparent; }
-  }
-  @media (max-width: 991.98px){
-    .grn-detail-wrapper{ max-height:none; overflow-x:auto; overflow-y:auto; }
+  .card-section-header {
+    padding: .6rem 1rem;
+    border-bottom: 1px solid var(--line);
+    font-size: .72rem;
+    text-transform: uppercase;
+    letter-spacing: .07em;
+    color: var(--muted);
+    font-weight: 600;
   }
 
-  .grn-show-page .table thead th{
-    background: color-mix(in srgb, var(--card) 90%, var(--bg) 10%);
-    border-bottom-color: var(--line);
-    font-size:.78rem; text-transform:uppercase; letter-spacing:.04em;
-    padding-top:.55rem; padding-bottom:.55rem; white-space:nowrap;
-  }
-  .grn-show-page tbody.small td{
-    border-bottom-color: var(--line);
-    vertical-align: middle;
-    padding-top:.5rem; padding-bottom:.5rem;
-    font-size:.8rem;
-  }
-  .grn-show-page tfoot.table-light td{
-    border-top-color: var(--line);
-    padding-top:.55rem; padding-bottom:.55rem;
-  }
-  .grn-show-page .lot-badge{ border-radius:999px; font-size:.75rem; }
-  .grn-show-page .cell-item-name{ font-size:.84rem; }
-  .grn-show-page .cell-item-code{ font-size:.78rem; }
-  .grn-show-page .lot-extra{ font-size:.75rem; }
-
-  .grn-show-page .th-full{ display:inline; }
-  .grn-show-page .th-abbr{ display:none; }
-  .grn-show-page .val-full{ display:inline; }
-  .grn-show-page .val-mobile{ display:none; }
-
-  @media (max-width: 767.98px){
-    html,body{ max-width:100%; overflow-x:hidden; }
-    .grn-show-page{ overflow-x:hidden; }
-    .grn-show-page .page-wrap{ padding-inline:.85rem; }
-
-    .grn-show-page .show-header{ flex-direction:column; align-items:flex-start; gap:.4rem; }
-    .grn-show-page .show-header-title{ font-size:1.15rem; }
-    .grn-show-page .show-header-actions{
-      width:100%; display:flex; flex-wrap:wrap; gap:.35rem;
-    }
-    .grn-show-page .show-header-actions .btn{ flex:1 1 auto; }
-
-    .grn-show-page .table thead th{ font-size:.7rem; padding-top:.4rem; padding-bottom:.4rem; }
-    .grn-show-page tbody.small td{ font-size:.76rem; padding-top:.4rem; padding-bottom:.4rem; }
-
-    .grn-show-page .cell-item-name{ display:none; }
-    .grn-show-page .cell-item-code{ font-size:.8rem; color:var(--text); font-weight:600; }
-    .grn-show-page .lot-extra{ display:none; }
-
-    .grn-show-page .th-full{ display:none; }
-    .grn-show-page .th-abbr{ display:inline; }
-    .grn-show-page .val-full{ display:none; }
-    .grn-show-page .val-mobile{ display:inline; }
-  }
-
-  /* RETURN button */
-  .btn-return{
-    border-radius:999px;
-    border:1px solid rgba(245,158,11,.35);
-    background: color-mix(in srgb, rgba(245,158,11,.18) 70%, var(--card) 30%);
-    color: color-mix(in srgb, #92400e 80%, var(--text) 20%);
-  }
-  body[data-theme="dark"] .btn-return{
-    color: color-mix(in srgb, #fbbf24 80%, var(--text) 20%);
-    border-color: rgba(245,158,11,.35);
-    background: rgba(245,158,11,.14);
-  }
-  .btn-return:hover{ filter:brightness(1.02); }
-
-  /* GRAND TOTAL highlight */
-  .grand-card{
-    border-radius: 16px;
-    border: 1px solid rgba(59,130,246,.22);
-    background: color-mix(in srgb, rgba(59,130,246,.10) 55%, var(--card) 45%);
-  }
-  .grand-amt{ font-size: 1.35rem; font-weight: 800; letter-spacing: .2px; }
-  .grand-pill{
-    border-radius:999px;
-    border:1px solid rgba(148,163,184,.35);
-    background: color-mix(in srgb, var(--card) 82%, var(--bg) 18%);
-    padding: .22rem .6rem;
-    font-size: .75rem;
-  }
-
-  /* Return list pills */
-  .ret-pill{
+  /* Status badges */
+  .badge-status {
     border-radius: 999px;
-    padding: .18rem .6rem;
-    border: 1px solid rgba(148,163,184,.35);
-    background: color-mix(in srgb, var(--card) 88%, var(--bg) 12%);
-    font-size: .74rem;
+    font-size: .7rem;
+    padding: .1rem .6rem;
+    border: 1px solid transparent;
+    white-space: nowrap;
+  }
+  .badge-draft   { background:rgba(148,163,184,.12);color:#64748b;border-color:rgba(148,163,184,.5); }
+  .badge-posted  { background:rgba(22,163,74,.12);color:#15803d;border-color:rgba(22,163,74,.6); }
+  .badge-closed  { background:rgba(15,23,42,.10);color:#334155;border-color:rgba(15,23,42,.25); }
+  [data-theme="dark"] .badge-closed { color:#cbd5e1;border-color:rgba(203,213,225,.3); }
+
+  /* Info label/value */
+  .info-label {
+    font-size:.72rem;
+    text-transform:uppercase;
+    letter-spacing:.06em;
+    color:var(--muted);
+    font-weight:600;
+    margin-bottom:.2rem;
+  }
+  .info-value { font-size:.88rem; }
+
+  /* Summary row (like PO 4-col) */
+  .summary-col {
+    padding: .85rem 1rem;
+    border-right: 1px solid var(--line);
+  }
+  .summary-col:last-child { border-right: none; }
+  .summary-col-label {
+    font-size:.7rem;
+    text-transform:uppercase;
+    letter-spacing:.06em;
+    color:var(--muted);
+    font-weight:600;
+    margin-bottom:.3rem;
+  }
+  .summary-col-value { font-size:.95rem; font-weight:600; }
+
+  /* Return button */
+  .btn-return {
+    border:1px solid rgba(245,158,11,.4);
+    background:rgba(245,158,11,.1);
+    color:#92400e;
+  }
+  [data-theme="dark"] .btn-return { color:#fbbf24; background:rgba(245,158,11,.14); }
+  .btn-return:hover { filter:brightness(1.03); }
+
+  /* Detail table */
+  .grn-detail-wrapper { overflow-x:auto; }
+  @media (min-width:992px){
+    .grn-detail-wrapper { max-height:55vh; overflow-y:auto; }
+    .grn-detail-wrapper::-webkit-scrollbar { width:5px; }
+    .grn-detail-wrapper::-webkit-scrollbar-thumb { background:color-mix(in srgb,var(--muted) 50%,transparent); border-radius:999px; }
+  }
+
+  .grn-detail-wrapper table thead th {
+    background:color-mix(in srgb,var(--card) 90%,var(--bg) 10%);
+    border-bottom-color:var(--line);
+    font-size:.72rem;
+    text-transform:uppercase;
+    letter-spacing:.05em;
+    padding:.5rem .75rem;
+    white-space:nowrap;
+  }
+  .grn-detail-wrapper table tbody td {
+    border-bottom-color:var(--line);
+    vertical-align:middle;
+    padding:.45rem .75rem;
+    font-size:.82rem;
+  }
+  .grn-detail-wrapper table tfoot td {
+    border-top:2px solid var(--line);
+    padding:.5rem .75rem;
+    font-size:.83rem;
+  }
+  .lot-badge  { border-radius:999px; font-size:.72rem; }
+  .lot-extra  { font-size:.72rem; }
+  .th-full    { display:inline; }
+  .th-abbr    { display:none; }
+  .val-full   { display:inline; }
+  .val-mobile { display:none; }
+
+  /* Return list */
+  .ret-pill {
+    border-radius:999px;
+    padding:.15rem .55rem;
+    border:1px solid var(--line);
+    font-size:.72rem;
+    background:color-mix(in srgb,var(--card) 88%,var(--bg) 12%);
+  }
+
+  @media (max-width:767.98px){
+    .page-wrap { padding-inline:.75rem; }
+    .summary-col { border-right:none; border-bottom:1px solid var(--line); }
+    .summary-col:last-child { border-bottom:none; }
+    .grn-detail-wrapper table thead th { font-size:.67rem; }
+    .grn-detail-wrapper table tbody td { font-size:.76rem; }
+    .th-full { display:none; }
+    .th-abbr { display:inline; }
+    .val-full { display:none; }
+    .val-mobile { display:inline; }
+    .cell-item-name { display:none; }
+    .cell-item-code { font-size:.8rem; color:var(--text); font-weight:600; }
+    .lot-extra { display:none; }
   }
 </style>
 @endpush
@@ -213,113 +206,74 @@
   $primaryAnyReturn = $activeReturns->sortByDesc('id')->first(); // hanya non-voided
 @endphp
 
-<div class="grn-show-page">
-  <div class="page-wrap">
+<div class="page-wrap py-4">
 
     {{-- HEADER --}}
-    <div class="show-header d-flex justify-content-between align-items-start mb-3 gap-2">
-      <div class="d-flex flex-column gap-1">
-        <div class="d-flex flex-wrap align-items-center gap-2">
-          <h1 class="mb-0 show-header-title">Goods Receipt</h1>
-
-          {{-- STATUS BADGE --}}
-          @if ($isPosted)
-            <span class="show-header-status bg-success-subtle text-success border border-success-subtle">Posted</span>
-          @elseif ($isDraft)
-            <span class="show-header-status bg-warning-subtle text-warning border border-warning-subtle">Draft</span>
-          @else
-            <span class="show-header-status bg-secondary-subtle text-secondary border border-secondary-subtle">
-              {{ ucfirst($receipt->status) }}
-            </span>
-          @endif
-
-          <span class="show-header-pill d-none d-sm-inline">
-            {{ $receipt->lines->count() }} baris barang diterima
-          </span>
-
-          {{-- badge return --}}
-          @if($isPosted && $hasAnyReturn)
-            <span class="grand-pill">
-              Return: {{ $draftReturns->count() }} draft • {{ $postedReturns->count() }} posted
-            </span>
-          @endif
-        </div>
-
-        <div class="show-header-subtitle">
-          <span>Kode: <span class="fw-semibold mono">{{ $receipt->code }}</span></span>
-
-          @if ($receipt->date)
-            <span class="mx-2">•</span><span>Tanggal: {{ $receipt->date->format('Y-m-d') }}</span>
-          @endif
-
-          @if ($receipt->updated_at)
-            <span class="mx-2 d-none d-sm-inline">•</span>
-            <span class="d-none d-sm-inline">Update: {{ $receipt->updated_at->format('Y-m-d H:i') }}</span>
-          @endif
-        </div>
+    <div class="d-flex align-items-center justify-content-between gap-3 mb-3 flex-wrap">
+      {{-- Kiri --}}
+      <div style="min-width:0;">
+        <h2 class="mb-0 lh-1" style="font-size:1.35rem;">Goods Receipt</h2>
+        <div class="text-muted mono mt-1" style="font-size:.8rem;">Kode: {{ $receipt->code }}</div>
       </div>
 
-      {{-- ACTIONS --}}
-      <div class="show-header-actions d-flex align-items-center gap-2">
+      {{-- Kanan: semua aksi sejajar --}}
+      <div class="d-flex align-items-center gap-2 flex-wrap">
         <a href="{{ route('purchasing.purchase_receipts.index') }}" class="btn btn-outline-secondary btn-sm">
-          &larr; Kembali
+          <i class="bi bi-arrow-left me-1"></i>Kembali
         </a>
 
-        {{-- POSTED: RETURN CTA --}}
-        @if ($isPosted && $canManage)
-
-          {{-- Kalau ada draft return -> tombolnya jadi "Lanjutkan Return" --}}
-          @if ($primaryDraftReturn && $returnShowRouteName)
-            <a href="{{ route($returnShowRouteName, $primaryDraftReturn->id) }}"
-               class="btn btn-return btn-sm"
-               onclick="return confirm('Sudah ada RETURN draft untuk GRN ini.\n\nBuka draft return untuk dilanjutkan?');">
-              Lanjutkan Return
-            </a>
-
-          {{-- Kalau belum ada draft, tapi ada return aktif (non-void) -> tombol "Lihat Return" --}}
-          @elseif ($primaryAnyReturn && $returnShowRouteName)
-            <a href="{{ route($returnShowRouteName, $primaryAnyReturn->id) }}"
-               class="btn btn-outline-secondary btn-sm">
-              Lihat Return
-            </a>
-
-          {{-- Kalau semua return sudah di-void / belum pernah return -> bisa buat return baru --}}
-          @elseif ($returnCreateRouteName)
-            <form action="{{ route($returnCreateRouteName, $receipt->id) }}" method="POST"
-                  onsubmit="return confirm('Buat draft RETURN dari GRN ini?\n\n• Membuat dokumen return (draft)\n• Isi qty lalu POST return untuk mengurangi stok');">
-              @csrf
-              <button type="submit" class="btn btn-return btn-sm">
-                Return
-              </button>
-            </form>
-          @endif
-        @endif
-
-        {{-- DRAFT actions --}}
         @if ($isDraft && $canManage)
-          <a href="{{ route('purchasing.purchase_receipts.edit', $receipt->id) }}" class="btn btn-primary btn-sm">Edit</a>
+          <a href="{{ route('purchasing.purchase_receipts.edit', $receipt->id) }}"
+             class="btn btn-outline-primary btn-sm">
+            <i class="bi bi-pencil me-1"></i>Edit
+          </a>
           @if ($isAdmin && !$grnHasPrice)
-            {{-- Admin: harga belum ada di PO → tombol disabled + tooltip --}}
             <button type="button" class="btn btn-success btn-sm disabled"
                     title="Harga belum diisi di PO. Hubungi owner."
-                    style="opacity:.55; cursor:not-allowed;">
-                Post GRN
+                    style="opacity:.5;cursor:not-allowed;">
+              <i class="bi bi-check-lg me-1"></i>Post GRN
             </button>
           @else
             <form action="{{ route('purchasing.purchase_receipts.post', $receipt->id) }}" method="POST"
                   onsubmit="return confirm('Post GRN ini?\n\n• Stok akan bertambah\n• Jurnal akan tercatat');">
               @csrf
-              <button type="submit" class="btn btn-success btn-sm">Post GRN</button>
+              <button type="submit" class="btn btn-success btn-sm">
+                <i class="bi bi-check-lg me-1"></i>Post GRN
+              </button>
             </form>
           @endif
         @endif
 
-        {{-- UNPOST only if safe --}}
+        @if ($isPosted && $canManage)
+          @if ($primaryDraftReturn && $returnShowRouteName)
+            <a href="{{ route($returnShowRouteName, $primaryDraftReturn->id) }}"
+               class="btn btn-return btn-sm"
+               onclick="return confirm('Sudah ada RETURN draft untuk GRN ini. Buka draft return?');">
+              <i class="bi bi-arrow-return-left me-1"></i>Lanjut Return
+            </a>
+          @elseif ($primaryAnyReturn && $returnShowRouteName)
+            <a href="{{ route($returnShowRouteName, $primaryAnyReturn->id) }}"
+               class="btn btn-outline-secondary btn-sm">
+              <i class="bi bi-eye me-1"></i>Lihat Return
+            </a>
+          @elseif ($returnCreateRouteName)
+            <form action="{{ route($returnCreateRouteName, $receipt->id) }}" method="POST"
+                  onsubmit="return confirm('Buat draft RETURN dari GRN ini?');">
+              @csrf
+              <button type="submit" class="btn btn-return btn-sm">
+                <i class="bi bi-arrow-return-left me-1"></i>Return
+              </button>
+            </form>
+          @endif
+        @endif
+
         @if ($canUnpostSafely)
           <form action="{{ route('purchasing.purchase_receipts.unpost', $receipt->id) }}" method="POST"
-                onsubmit="return confirm('UNPOST GRN ini?\n\n• Stok akan dibalik (stock-out)\n• Jurnal GRN akan di-void\n\nLanjutkan?');">
+                onsubmit="return confirm('UNPOST GRN ini? Stok akan dibalik dan jurnal di-void.');">
             @csrf
-            <button type="submit" class="btn btn-danger btn-sm">Unpost</button>
+            <button type="submit" class="btn btn-outline-danger btn-sm">
+              <i class="bi bi-x me-1"></i>Unpost
+            </button>
           </form>
         @endif
       </div>
@@ -357,13 +311,59 @@
       </div>
     @endif
 
+    {{-- SUMMARY ROW (4-col like PO show) --}}
+    <div class="card-info mb-3">
+      <div class="row g-0">
+        <div class="col-6 col-md-3 summary-col">
+          <div class="summary-col-label">Status</div>
+          <div class="summary-col-value">
+            @if ($isPosted)
+              <span class="badge-status badge-posted">Posted</span>
+            @elseif ($isDraft)
+              <span class="badge-status badge-draft">Draft</span>
+            @else
+              <span class="badge-status badge-draft">{{ ucfirst($receipt->status) }}</span>
+            @endif
+            @if ($hasAnyReturn)
+              <div class="text-muted" style="font-size:.72rem;margin-top:.15rem;">
+                {{ $draftReturns->count() }} draft · {{ $postedReturns->count() }} posted return
+              </div>
+            @endif
+          </div>
+        </div>
+        <div class="col-6 col-md-3 summary-col">
+          <div class="summary-col-label">Supplier</div>
+          <div class="summary-col-value" style="font-size:.88rem;">{{ $receipt->supplier->name ?? '—' }}</div>
+          @if ($receipt->supplier?->code)
+            <div class="text-muted mono" style="font-size:.72rem;">{{ $receipt->supplier->code }}</div>
+          @endif
+        </div>
+        <div class="col-6 col-md-3 summary-col">
+          <div class="summary-col-label">Gudang</div>
+          <div class="summary-col-value" style="font-size:.88rem;">{{ $receipt->warehouse->name ?? '—' }}</div>
+          @if ($receipt->warehouse?->code)
+            <div class="text-muted mono" style="font-size:.72rem;">{{ $receipt->warehouse->code }}</div>
+          @endif
+        </div>
+        <div class="col-6 col-md-3 summary-col">
+          <div class="summary-col-label">{{ $canSeeMoney ? 'Grand Total' : 'Tanggal' }}</div>
+          <div class="summary-col-value mono">
+            @if ($canSeeMoney)
+              {{ rupiah($receipt->grand_total ?? 0) }}
+            @else
+              {{ $receipt->date?->format('Y-m-d') ?? '-' }}
+            @endif
+          </div>
+        </div>
+      </div>
+    </div>
+
     <div class="row g-3 mb-3">
 
       {{-- 1) INFORMASI DOKUMEN --}}
       <div class="col-12 col-lg-6 order-1 order-lg-1">
-        <div class="card-soft h-100">
-          <div class="card-body">
-            <h6 class="section-title mb-3">Informasi Dokumen</h6>
+        <div class="card-info h-100">
+            <div class="info-label mb-3" style="font-size:.75rem;">Informasi Dokumen</div>
 
             <dl class="row mb-0 small">
               <dt class="col-sm-4">Kode</dt>
@@ -412,11 +412,11 @@
 
             {{-- RETURNS RELATED --}}
             @if($isPosted)
-              <hr class="my-3">
+              <hr class="my-3" style="border-color:var(--line);">
 
               <div class="small">
                 <div class="d-flex justify-content-between align-items-center gap-2 mb-2">
-                  <div class="fw-semibold">Return Terkait GRN</div>
+                  <div class="info-label mb-0">Return Terkait GRN</div>
 
                   @if($hasAnyReturn)
                     <span class="ret-pill">
@@ -463,71 +463,54 @@
                 @endif
               </div>
             @endif
-          </div>
-        </div>
-      </div>
+        </div>{{-- /card-info doc --}}
+      </div>{{-- /col --}}
 
       @if ($canSeeMoney)
-        {{-- 2) RINGKASAN NILAI + GRAND TOTAL --}}
+        {{-- 2) RINGKASAN NILAI --}}
         <div class="col-12 col-lg-6 order-2 order-lg-2">
-          <div class="card-soft h-100">
-            <div class="card-body">
-              <h6 class="section-title mb-3">Ringkasan Nilai</h6>
+          <div class="card-info h-100">
+            <div class="info-label mb-3" style="font-size:.75rem;">Ringkasan Nilai</div>
 
-              <div class="grand-card p-3 mb-3">
-                <div class="d-flex justify-content-between align-items-start gap-2">
-                  <div>
-                    <div class="text-muted small">Grand Total</div>
-                    <div class="grand-amt mono">{{ rupiah($receipt->grand_total ?? 0) }}</div>
-                  </div>
-                  <div class="text-end">
-                    <div class="grand-pill d-inline-flex align-items-center gap-2">
-                      <span class="text-muted">Subtotal</span>
-                      <span class="mono fw-semibold">{{ rupiah($receipt->subtotal ?? 0) }}</span>
-                    </div>
-                  </div>
-                </div>
+            <dl class="row mb-0" style="font-size:.84rem;">
+              <dt class="col-sm-5 info-label mb-1">Subtotal</dt>
+              <dd class="col-sm-7 text-end mono mb-1">{{ rupiah($receipt->subtotal ?? 0) }}</dd>
+
+              <dt class="col-sm-5 info-label mb-1">Diskon</dt>
+              <dd class="col-sm-7 text-end mono mb-1">{{ rupiah($receipt->discount ?? 0) }}</dd>
+
+              <dt class="col-sm-5 info-label mb-1">PPN ({{ decimal_id($receipt->tax_percent ?? 0, 2) }}%)</dt>
+              <dd class="col-sm-7 text-end mono mb-1">{{ rupiah($receipt->tax_amount ?? 0) }}</dd>
+
+              <dt class="col-sm-5 info-label mb-2">Ongkir</dt>
+              <dd class="col-sm-7 text-end mono mb-2">{{ rupiah($receipt->shipping_cost ?? 0) }}</dd>
+            </dl>
+
+            <div class="pt-2" style="border-top:1px solid var(--line);">
+              <div class="d-flex justify-content-between align-items-center">
+                <span class="info-label mb-0">Grand Total</span>
+                <span class="mono fw-bold" style="font-size:1.05rem;">{{ rupiah($receipt->grand_total ?? 0) }}</span>
               </div>
-
-              <dl class="row mb-0 small mono">
-                <dt class="col-sm-5">Subtotal</dt>
-                <dd class="col-sm-7 text-end">{{ rupiah($receipt->subtotal ?? 0) }}</dd>
-
-                <dt class="col-sm-5">Diskon</dt>
-                <dd class="col-sm-7 text-end">{{ rupiah($receipt->discount ?? 0) }}</dd>
-
-                <dt class="col-sm-5">PPN ({{ decimal_id($receipt->tax_percent ?? 0, 2) }}%)</dt>
-                <dd class="col-sm-7 text-end">{{ rupiah($receipt->tax_amount ?? 0) }}</dd>
-
-                <dt class="col-sm-5">Ongkir</dt>
-                <dd class="col-sm-7 text-end">{{ rupiah($receipt->shipping_cost ?? 0) }}</dd>
-
-                <hr class="my-2 summary-hr">
-
-                <dt class="col-sm-5 fw-semibold">Grand Total</dt>
-                <dd class="col-sm-7 text-end fw-semibold fs-6">{{ rupiah($receipt->grand_total ?? 0) }}</dd>
-              </dl>
-
-              @if($isPosted)
-                <div class="mt-3 small text-muted">
-                  • GRN sudah posted → stok sudah masuk & jurnal tercatat. <br>
-                  • Pembatalan setelah posted: gunakan <b>Return</b>.
-                </div>
-              @endif
             </div>
+
+            @if($isPosted)
+              <div class="mt-3 text-muted" style="font-size:.78rem;">
+                Stok sudah masuk & jurnal tercatat. Pembatalan: gunakan Return.
+              </div>
+            @endif
           </div>
         </div>
       @endif
 
       {{-- 3) DETAIL BARANG DITERIMA --}}
       <div class="col-12 order-3">
-        <div class="card-main">
-          <div class="card-header d-flex justify-content-between align-items-center gap-2">
-            <span class="fw-semibold small text-uppercase">Detail Barang Diterima</span>
-            <span class="small text-muted">Total baris: {{ $receipt->lines->count() }}</span>
+        <div class="card-section">
+          <div class="card-section-header d-flex justify-content-between align-items-center">
+            <span>Detail Barang Diterima</span>
+            <span>{{ $receipt->lines->count() }} baris</span>
           </div>
 
-          <div class="card-body">
+          <div style="padding:.5rem 0;">
             <div class="grn-detail-wrapper">
               <table class="table table-sm mb-0 align-middle">
                 <thead class="table-light sticky-top">
@@ -630,12 +613,12 @@
                   </tfoot>
                 @endif
               </table>
-            </div>
-          </div>
-        </div>
-      </div>
+            </div>{{-- /grn-detail-wrapper --}}
+          </div>{{-- /padding wrapper --}}
+        </div>{{-- /card-section --}}
+      </div>{{-- /col --}}
 
-    </div>
+    </div>{{-- /row --}}
 
     {{-- ══════════════════════════════════════════════
          Tahap 6: QC / Pemeriksaan Barang
@@ -656,10 +639,9 @@
 
       @if ($hasQcRoutes)
       <div class="mt-3">
-        <div class="card-soft">
-          <div class="card-body">
-
-            <h6 class="section-title mb-3">QC / Pemeriksaan Barang</h6>
+        <div class="card-section">
+          <div class="card-section-header">QC / Pemeriksaan Barang</div>
+          <div style="padding:1rem 1.2rem;">
 
             @if (!$qc || $qc->isCancelled())
               {{-- Belum ada QC atau sudah dibatalkan --}}
@@ -900,12 +882,11 @@
               @endif
             @endif
 
-          </div>
-        </div>
-      </div>
+          </div>{{-- /padding --}}
+        </div>{{-- /card-section qc --}}
+      </div>{{-- /mt-3 --}}
       @endif
     @endif
 
-  </div>
-</div>
+</div>{{-- /page-wrap --}}
 @endsection

@@ -327,11 +327,24 @@
 
                     {{-- Single flatpickr range input --}}
                     @php
+                        $idMonths = ['Jan','Feb','Mar','Apr','Mei','Jun','Jul','Agu','Sep','Okt','Nov','Des'];
                         $rangeDisplay = '';
                         if (request('from_date') && request('to_date')) {
-                            $rangeDisplay = request('from_date') . ' to ' . request('to_date');
+                            try {
+                                $f = \Carbon\Carbon::parse(request('from_date'));
+                                $t = \Carbon\Carbon::parse(request('to_date'));
+                                $rangeDisplay = $f->day . ' ' . $idMonths[$f->month-1]
+                                    . ' – ' . $t->day . ' ' . $idMonths[$t->month-1] . ' ' . $t->year;
+                            } catch (\Exception $e) {
+                                $rangeDisplay = request('from_date') . ' – ' . request('to_date');
+                            }
                         } elseif (request('from_date')) {
-                            $rangeDisplay = request('from_date');
+                            try {
+                                $f = \Carbon\Carbon::parse(request('from_date'));
+                                $rangeDisplay = $f->day . ' ' . $idMonths[$f->month-1] . ' ' . $f->year;
+                            } catch (\Exception $e) {
+                                $rangeDisplay = request('from_date');
+                            }
                         }
                     @endphp
                     <input type="text" id="po-date-range" value="{{ $rangeDisplay }}"
@@ -626,14 +639,28 @@ document.addEventListener('DOMContentLoaded', function () {
     const toHidden   = document.getElementById('po-to-date');
 
     if (rangeInput && window.flatpickr) {
+        const ID_MONTHS = ['Jan','Feb','Mar','Apr','Mei','Jun','Jul','Agu','Sep','Okt','Nov','Des'];
+        function fmtDate(d, withYear) {
+            return d.getDate() + ' ' + ID_MONTHS[d.getMonth()] + (withYear ? ' ' + d.getFullYear() : '');
+        }
+        function fmtRange(dates) {
+            if (dates.length === 2) {
+                const sameYear = dates[0].getFullYear() === dates[1].getFullYear();
+                return fmtDate(dates[0], !sameYear) + ' – ' + fmtDate(dates[1], true);
+            }
+            if (dates.length === 1) return fmtDate(dates[0], true) + ' …';
+            return '';
+        }
+
         flatpickr(rangeInput, {
             mode: 'range',
             dateFormat: 'Y-m-d',
             locale: { firstDayOfWeek: 1 },
             allowInput: false,
-            onChange: function (selectedDates) {
+            defaultDate: [fromHidden.value, toHidden.value].filter(Boolean),
+            onChange: function (selectedDates, dateStr, fp) {
+                fp.input.value = fmtRange(selectedDates);
                 if (selectedDates.length === 1) {
-                    // user picked start, wait for end
                     fromHidden.value = flatpickr.formatDate(selectedDates[0], 'Y-m-d');
                     toHidden.value   = '';
                 } else if (selectedDates.length === 2) {
@@ -642,12 +669,9 @@ document.addEventListener('DOMContentLoaded', function () {
                     form.submit();
                 }
             },
-            onReady: function (_, __, fp) {
+            onReady: function (selectedDates, dateStr, fp) {
                 fp.input.classList.add('gf-date-input');
-                // Tombol clear jika sudah ada nilai
-                if (fromHidden.value || toHidden.value) {
-                    fp.input.style.paddingRight = '2rem';
-                }
+                if (selectedDates.length) fp.input.value = fmtRange(selectedDates);
             },
         });
     }
