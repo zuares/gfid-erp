@@ -33,7 +33,9 @@
     // === PAYMENT METHOD ===
     // Filter: exclude DP_APPLY (internal only)
     $visiblePaymentMethods = ($paymentMethods ?? collect())->filter(fn($pm) => $pm->code !== 'DP_APPLY')->values();
-    $defaultPaymentMethodId = $visiblePaymentMethods->first()->id ?? null;
+    $defaultPaymentMethodId = $visiblePaymentMethods->firstWhere('mode', 'transfer')?->id
+        ?? $visiblePaymentMethods->first()?->id
+        ?? null;
     $selectedPaymentMethodId = old('payment_method_id', $order?->payment_method_id ?? $defaultPaymentMethodId);
     // Label singkat untuk tiap mode
     $pmModeLabel = ['cash' => 'Tunai', 'transfer' => 'Transfer (TF)', 'credit' => 'Hutang / Tempo'];
@@ -169,6 +171,7 @@
         .item-suggest-dropdown {
             z-index: 5000;
         }
+
 
         .po-meta-wrap {
             display: flex;
@@ -1004,36 +1007,48 @@
                 recalcAll();
             });
 
-            // Enter: item -> qty -> price -> new row
+            // Tab: item -> qty -> price (navigasi dalam baris)
+            // Enter: tambah baris baru dari manapun
             tableBody.addEventListener('keydown', function(e) {
-                if (e.key !== 'Enter') return;
-
                 const el = e.target;
                 const tr = el.closest('tr');
                 if (!tr) return;
 
-                const isItem = el.classList.contains('js-item-suggest-input');
-                const isQty = el.classList.contains('line-qty-display');
+                const isItem  = el.classList.contains('js-item-suggest-input');
+                const isQty   = el.classList.contains('line-qty-display');
                 const isPrice = el.classList.contains('line-price-display');
 
-                if (isItem) {
+                if (!isItem && !isQty && !isPrice) return;
+
+                if (e.key === 'Tab') {
                     e.preventDefault();
-                    tr.querySelector('.line-qty-display')?.focus();
-                    return;
-                }
-                if (isQty) {
-                    e.preventDefault();
-                    if (canSeeMoney) {
-                        tr.querySelector('.line-price-display')?.focus();
-                    } else {
-                        addNewRow();
+                    if (isItem) {
+                        tr.querySelector('.line-qty-display')?.focus();
+                    } else if (isQty) {
+                        if (canSeeMoney) {
+                            tr.querySelector('.line-price-display')?.focus();
+                        } else {
+                            // tidak ada price, lompat ke item baris berikutnya
+                            const nextTr = tr.nextElementSibling;
+                            if (nextTr) focusRowItem(nextTr);
+                            else addNewRow();
+                        }
+                    } else if (isPrice) {
+                        // price = field terakhir, lompat ke item baris berikutnya
+                        const nextTr = tr.nextElementSibling;
+                        if (nextTr) focusRowItem(nextTr);
+                        else addNewRow();
                     }
                     return;
                 }
-                if (isPrice) {
+
+                if (e.key === 'Enter') {
+                    // Jika item suggest sedang terbuka, biarkan dropdown handle dulu
+                    const dropdown = tr.querySelector('.item-suggest-dropdown');
+                    if (isItem && dropdown && dropdown.children.length > 0) return;
+
                     e.preventDefault();
                     addNewRow();
-                    return;
                 }
             }, true);
 

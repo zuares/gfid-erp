@@ -32,16 +32,23 @@
 
         .table thead th {
             border-bottom-width: 1px;
-            font-size: .8rem;
+            font-size: .72rem;
             text-transform: uppercase;
-            letter-spacing: .08em;
+            letter-spacing: .07em;
             color: var(--muted);
             white-space: nowrap;
+            padding: .5rem .75rem;
         }
 
         .table tbody td {
             vertical-align: middle;
+            font-size: .83rem;
+            padding: .45rem .75rem;
         }
+
+        .table tbody tr:last-child td { border-bottom: none; }
+
+        .po-row:hover { background: rgba(59,130,246,.04); }
 
         .mono {
             font-variant-numeric: tabular-nums;
@@ -292,110 +299,71 @@
 
         {{-- FILTER + SUMMARY --}}
         <div class="card-filter mb-3">
-            <form method="GET" action="{{ route('purchasing.purchase_orders.index') }}">
-                <div class="row g-2 align-items-end">
+            <form id="po-filter-form" method="GET" action="{{ route('purchasing.purchase_orders.index') }}">
+                <input type="hidden" name="from_date" id="po-from-date" value="{{ request('from_date') }}">
+                <input type="hidden" name="to_date"   id="po-to-date"   value="{{ request('to_date') }}">
 
-                    <div class="col-md-3 col-12">
-                        <label class="form-label small">Supplier</label>
-                        <select name="supplier_id" class="form-select form-select-sm">
-                            <option value="">Semua Supplier</option>
-                            @foreach ($suppliers as $supplier)
-                                <option value="{{ $supplier->id }}" @selected(request('supplier_id') == $supplier->id)>
-                                    {{ $supplier->name }}
-                                </option>
-                            @endforeach
-                        </select>
-                    </div>
+                <div class="d-flex flex-wrap gap-2 align-items-center">
+                    <input type="text" name="supplier_search"
+                        value="{{ request('supplier_search') }}"
+                        placeholder="Cari supplier…"
+                        class="form-control form-control-sm"
+                        style="max-width:180px;"
+                        autocomplete="off" />
 
-                    <div class="col-md-2 col-6">
-                        <label class="form-label small">Status PO</label>
-                        <select name="status" class="form-select form-select-sm">
-                            @foreach ($statusOptions as $value => $label)
-                                <option value="{{ $value }}" @selected(request('status') === $value)>{{ $label }}
-                                </option>
-                            @endforeach
-                        </select>
-                    </div>
+                    <select name="status" class="form-select form-select-sm po-filter-auto" style="max-width:130px;">
+                        @foreach ($statusOptions as $value => $label)
+                            <option value="{{ $value }}" @selected(request('status') === $value)>{{ $label }}</option>
+                        @endforeach
+                    </select>
 
                     @if ($canSeeMoney)
-                        <div class="col-md-2 col-6">
-                            <label class="form-label small">Status Bayar</label>
-                            <select name="pay_status" class="form-select form-select-sm">
-                                @foreach ($payStatusOptions as $value => $label)
-                                    <option value="{{ $value }}" @selected(request('pay_status') === $value)>{{ $label }}
-                                    </option>
-                                @endforeach
-                            </select>
-                        </div>
+                        <select name="pay_status" class="form-select form-select-sm po-filter-auto" style="max-width:130px;">
+                            @foreach ($payStatusOptions as $value => $label)
+                                <option value="{{ $value }}" @selected(request('pay_status') === $value)>{{ $label }}</option>
+                            @endforeach
+                        </select>
                     @endif
 
-                    <div class="col-md-2 col-6">
-                        <label class="form-label small">Dari</label>
-                        <input type="text" name="from_date" value="{{ request('from_date') }}"
-                            class="form-control form-control-sm gf-date-input" data-gf-date autocomplete="off" />
-                    </div>
+                    {{-- Single flatpickr range input --}}
+                    @php
+                        $rangeDisplay = '';
+                        if (request('from_date') && request('to_date')) {
+                            $rangeDisplay = request('from_date') . ' to ' . request('to_date');
+                        } elseif (request('from_date')) {
+                            $rangeDisplay = request('from_date');
+                        }
+                    @endphp
+                    <input type="text" id="po-date-range" value="{{ $rangeDisplay }}"
+                        placeholder="Pilih tanggal…" autocomplete="off"
+                        class="form-control form-control-sm" style="max-width:190px; cursor:pointer;"
+                        data-gf-date="off" readonly />
 
-                    <div class="col-md-2 col-6">
-                        <label class="form-label small">Sampai</label>
-                        <input type="text" name="to_date" value="{{ request('to_date') }}"
-                            class="form-control form-control-sm gf-date-input" data-gf-date autocomplete="off" />
-                    </div>
-
-                    <div class="col-md-1 col-12">
-                        <div class="d-grid gap-2 d-md-flex justify-content-md-end mt-3 mt-md-0">
-                            <button type="submit" class="btn btn-sm btn-primary">Filter</button>
-                            <a href="{{ route('purchasing.purchase_orders.index') }}"
-                                class="btn btn-sm btn-outline-secondary">
-                                Reset
-                            </a>
-                        </div>
-                    </div>
+                    @if (request()->filled('supplier_search') || request()->filled('supplier_id') || request()->filled('status') || request()->filled('pay_status') || request()->filled('from_date') || request()->filled('to_date'))
+                        <a href="{{ route('purchasing.purchase_orders.index') }}"
+                           class="btn btn-sm btn-outline-secondary" style="font-size:.78rem;padding:.25rem .65rem;">
+                            <i class="bi bi-x me-1"></i>Reset
+                        </a>
+                    @endif
                 </div>
             </form>
 
             {{-- SUMMARY --}}
             @if (isset($summary))
-                <div class="mini-summary mt-2">
-                    <div class="summary-pills d-none d-md-flex flex-wrap gap-2">
-                        <div class="summary-pill">
-                            <span class="summary-pill-label">Total PO:</span>
-                            <span class="summary-pill-value mono">{{ $summary->total_orders }}</span>
-                        </div>
-
-                        <div class="summary-pill">
-                            <span class="summary-pill-label">Draft / Approved / Cancelled:</span>
-                            <span class="summary-pill-value mono">
-                                {{ $summary->draft_count }} / {{ $summary->approved_count }} /
-                                {{ $summary->cancelled_count ?? 0 }}
-                            </span>
-                        </div>
-
-                        <div class="summary-pill">
-                            <span class="summary-pill-label">PO terakhir:</span>
-                            <span class="summary-pill-value mono">
-                                {{ $summary->last_date ? id_date($summary->last_date) : '-' }}
-                            </span>
-                        </div>
-                    </div>
-
-                    <div class="d-md-none text-muted">
-                        <div class="d-flex justify-content-between">
-                            <span>Total PO:</span>
-                            <span class="mono"><strong>{{ $summary->total_orders }}</strong></span>
-                        </div>
-                        <div class="d-flex justify-content-between">
-                            <span>Draft / Approved / Cancelled:</span>
-                            <span class="mono">
-                                <strong>{{ $summary->draft_count }} / {{ $summary->approved_count }} /
-                                    {{ $summary->cancelled_count ?? 0 }}</strong>
-                            </span>
-                        </div>
-                        <div class="d-flex justify-content-between">
-                            <span>PO terakhir:</span>
-                            <span
-                                class="mono"><strong>{{ $summary->last_date ? id_date($summary->last_date) : '-' }}</strong></span>
-                        </div>
-                    </div>
+                <div class="d-flex flex-wrap gap-1 mt-2" style="font-size:.78rem;color:var(--muted);">
+                    <span><strong class="text-body mono">{{ $summary->total_orders }}</strong> PO</span>
+                    <span>·</span>
+                    <span>Draft <strong class="text-body mono">{{ $summary->draft_count }}</strong></span>
+                    <span>·</span>
+                    <span>Approved <strong class="text-body mono">{{ $summary->approved_count }}</strong></span>
+                    @if (($summary->cancelled_count ?? 0) > 0)
+                        <span>·</span>
+                        <span>Cancelled <strong class="text-body mono">{{ $summary->cancelled_count }}</strong></span>
+                    @endif
+                    @if ($summary->last_date)
+                        <span>·</span>
+                        <span>Terakhir <strong class="text-body mono">{{ id_date($summary->last_date) }}</strong></span>
+                    @endif
                 </div>
             @endif
         </div>
@@ -406,18 +374,14 @@
                 <table class="table table-sm align-middle mb-0">
                     <thead>
                         <tr>
-                            <th class="text-center" style="width: 4%;">#</th>
-                            <th style="width: 11%;">Tanggal</th>
-                            <th style="width: 13%;">Kode</th>
+                            <th style="width:22%;">PO</th>
                             <th>Supplier</th>
-                            <th style="width: 10%;">Jenis</th>
                             @if ($canSeeMoney)
-                                <th style="width: 13%;">Bayar</th>
-                                <th style="width: 13%;" class="text-end">Grand Total</th>
+                                <th class="d-none d-lg-table-cell" style="width:9%;">Bayar</th>
+                                <th style="width:13%;" class="text-end">Total</th>
                             @endif
-                            <th style="width: 12%;">Status</th>
-                            <th style="width: 10%;">Approved by</th>
-                            <th style="width: 10%;" class="text-end">Aksi</th>
+                            <th style="width:18%;">Status</th>
+                            <th style="width:4%;"></th>
                         </tr>
                     </thead>
                     <tbody>
@@ -430,101 +394,72 @@
                                 };
                                 $rowClass = $order->status === 'draft' ? 'row-draft' : '';
                                 $grnCount = $order->purchaseReceipts?->count() ?? 0;
-
                                 $ps = (string) ($order->payment_status ?? 'unpaid');
                                 $payBadgeClass = $payBadge($ps);
-
-                                $paid = (float) ($order->paid_amount ?? 0);
-                                $grand = (float) ($order->grand_total ?? 0);
-                                $bal = max(0, $grand - $paid);
+                                $rcv = $order->received_status ?? 'not_received';
+                                $rcvClass = match($rcv) {
+                                    'fully_received' => 'badge-rcv badge-rcv-full',
+                                    'partial'        => 'badge-rcv badge-rcv-partial',
+                                    default          => 'badge-rcv badge-rcv-none',
+                                };
                             @endphp
 
-                            <tr class="{{ $rowClass }}">
-                                <td class="text-center">
-                                    {{ $loop->iteration + ($orders->currentPage() - 1) * $orders->perPage() }}
-                                </td>
-
-                                <td class="mono">{{ id_date($order->date) }}</td>
-
-                                <td class="mono">
-                                    <a href="{{ route('purchasing.purchase_orders.show', $order->id) }}"
-                                        class="text-decoration-none">
-                                        {{ $order->code }}
-                                    </a>
-                                </td>
-
-                                <td>{{ optional($order->supplier)->name ?? '—' }}</td>
-
+                            <tr class="{{ $rowClass }} po-row" style="cursor:pointer;"
+                                data-href="{{ route('purchasing.purchase_orders.show', $order->id) }}">
+                                {{-- PO: kode + tanggal --}}
                                 <td>
-                                    <span class="small text-muted">{{ po_order_type_label($order->order_type) }}</span>
+                                    <span class="fw-semibold mono" style="font-size:.82rem;white-space:nowrap;">
+                                        {{ $order->code }}
+                                    </span>
+                                    <div class="text-muted mono" style="font-size:.72rem;white-space:nowrap;">{{ id_date($order->date) }}</div>
+                                </td>
+
+                                {{-- Supplier + Jenis --}}
+                                <td style="max-width:220px;">
+                                    <div style="font-size:.83rem;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;">{{ optional($order->supplier)->name ?? '—' }}</div>
+                                    <div class="text-muted" style="font-size:.71rem;">{{ po_order_type_label($order->order_type) }}</div>
                                 </td>
 
                                 @if ($canSeeMoney)
-                                    <td>
-                                        <div class="d-flex flex-column gap-1">
-                                            <div>
-                                                <span class="{{ $payBadgeClass }}">{{ strtoupper($ps) }}</span>
-                                                @if (!empty($order->due_date))
-                                                    <span class="text-muted small mono ms-1">JT:
-                                                        {{ id_date($order->due_date) }}</span>
-                                                @endif
-                                            </div>
-                                            <div class="text-muted small mono">
-                                                Paid {{ rupiah($paid) }} • Sisa {{ rupiah($bal) }}
-                                            </div>
-                                        </div>
+                                    <td class="d-none d-lg-table-cell">
+                                        <span class="{{ $payBadgeClass }}">{{ strtoupper($ps) }}</span>
+                                        @if (!empty($order->due_date))
+                                            <div class="text-muted mono" style="font-size:.7rem;">JT: {{ id_date($order->due_date) }}</div>
+                                        @endif
                                     </td>
-
-                                    <td class="text-end mono">{{ rupiah($order->grand_total) }}</td>
+                                    <td class="text-end mono fw-semibold" style="white-space:nowrap;">{{ rupiah($order->grand_total) }}</td>
                                 @endif
 
+                                {{-- Status: main badge + info baris kedua --}}
                                 <td>
                                     <span class="{{ $poBadgeClass }}">{{ strtoupper($order->status) }}</span>
-                                    @if (!empty($order->purchase_request_id))
-                                        @if (\Illuminate\Support\Facades\Route::has('purchasing.purchase_requests.show'))
-                                            <a href="{{ route('purchasing.purchase_requests.show', $order->purchase_request_id) }}"
-                                                class="badge-pr-ref" title="Dibuat dari Purchase Request">Dari PR</a>
-                                        @else
-                                            <span class="badge-pr-ref">Dari PR</span>
-                                        @endif
-                                    @endif
-                                    @if ($grnCount > 0)
-                                        <span class="badge-grn" title="{{ $grnCount }} GRN untuk PO ini">GRN x{{ $grnCount }}</span>
-                                    @endif
                                     @php
-                                        $rcv = $order->received_status ?? 'not_received';
-                                        $rcvClass = match($rcv) {
-                                            'fully_received' => 'badge-rcv badge-rcv-full',
-                                            'partial'        => 'badge-rcv badge-rcv-partial',
-                                            default          => 'badge-rcv badge-rcv-none',
-                                        };
+                                        $subParts = [];
+                                        if ($grnCount > 0) $subParts[] = 'GRN ' . $grnCount;
+                                        if ($rcv === 'fully_received') $subParts[] = 'Lengkap';
+                                        elseif ($rcv === 'partial') $subParts[] = 'Sebagian';
+                                        if (!empty($order->purchase_request_id)) $subParts[] = 'PR';
                                     @endphp
-                                    @if ($rcv !== 'not_received')
-                                        <br><span class="{{ $rcvClass }} mt-1">{{ received_status_label($rcv) }}</span>
+                                    @if ($subParts)
+                                        <div class="text-muted" style="font-size:.72rem;margin-top:.15rem;">{{ implode(' · ', $subParts) }}</div>
                                     @endif
-                                </td>
-
-                                <td>
-                                    <span class="small">{{ optional($order->approvedBy)->name ?? '—' }}</span>
                                 </td>
 
                                 <td class="text-end">
-                                    <a href="{{ route('purchasing.purchase_orders.show', $order->id) }}"
-                                        class="btn btn-xs btn-outline-secondary btn-sm">
-                                        Detail
-                                    </a>
-
                                     @if ($order->status === 'draft')
                                         <a href="{{ route('purchasing.purchase_orders.edit', $order->id) }}"
-                                            class="btn btn-xs btn-outline-primary btn-sm">
-                                            Edit
+                                            class="text-muted" title="Edit"
+                                            style="font-size:.85rem;line-height:1;">
+                                            <i class="bi bi-pencil-square"></i>
                                         </a>
+                                    @else
+                                        <i class="bi bi-chevron-right text-muted" style="font-size:.8rem;opacity:.4;"></i>
                                     @endif
                                 </td>
                             </tr>
                         @empty
                             <tr>
-                                <td colspan="{{ $canSeeMoney ? 10 : 8 }}" class="text-center text-muted py-3">Belum ada Purchase Order.</td>
+                                <td colspan="{{ $canSeeMoney ? 6 : 4 }}" class="text-center text-muted py-4">Belum ada Purchase Order.</td>
                             </tr>
                         @endforelse
                     </tbody>
@@ -628,10 +563,14 @@
 
                     <div class="d-flex justify-content-end gap-1 mt-2 actions">
                         <a href="{{ route('purchasing.purchase_orders.show', $order->id) }}"
-                            class="btn btn-outline-secondary btn-sm">Detail</a>
+                            class="btn btn-outline-secondary btn-sm px-2" title="Detail">
+                            <i class="bi bi-eye"></i>
+                        </a>
                         @if ($order->status === 'draft')
                             <a href="{{ route('purchasing.purchase_orders.edit', $order->id) }}"
-                                class="btn btn-outline-primary btn-sm">Edit</a>
+                                class="btn btn-outline-primary btn-sm px-2" title="Edit">
+                                <i class="bi bi-pencil"></i>
+                            </a>
                         @endif
                     </div>
                 </div>
@@ -644,4 +583,75 @@
             </div>
         </div>
     </div>
+
+@push('scripts')
+<script>
+document.addEventListener('DOMContentLoaded', function () {
+    // Row click via data-href (safer than inline onclick)
+    document.querySelectorAll('tr.po-row').forEach(function (row) {
+        row.addEventListener('click', function (e) {
+            if (e.target.closest('a, button, form')) return;
+            const href = row.dataset.href;
+            if (href) window.location = href;
+        });
+    });
+
+    const form = document.getElementById('po-filter-form');
+    if (!form) return;
+
+    // Realtime: selects auto-submit
+    form.querySelectorAll('select.po-filter-auto').forEach(function (el) {
+        el.addEventListener('change', function () { form.submit(); });
+    });
+
+    // Supplier text input: debounce 500ms + auto-focus
+    const supplierInput = form.querySelector('input[name="supplier_search"]');
+    if (supplierInput) {
+        let debounceTimer;
+        supplierInput.addEventListener('input', function () {
+            clearTimeout(debounceTimer);
+            debounceTimer = setTimeout(function () { form.submit(); }, 500);
+        });
+        // Auto-focus dengan delay agar tidak konflik dengan event lain
+        setTimeout(function () {
+            supplierInput.focus();
+            const len = supplierInput.value.length;
+            supplierInput.setSelectionRange(len, len);
+        }, 100);
+    }
+
+    // Single flatpickr range input
+    const rangeInput = document.getElementById('po-date-range');
+    const fromHidden = document.getElementById('po-from-date');
+    const toHidden   = document.getElementById('po-to-date');
+
+    if (rangeInput && window.flatpickr) {
+        flatpickr(rangeInput, {
+            mode: 'range',
+            dateFormat: 'Y-m-d',
+            locale: { firstDayOfWeek: 1 },
+            allowInput: false,
+            onChange: function (selectedDates) {
+                if (selectedDates.length === 1) {
+                    // user picked start, wait for end
+                    fromHidden.value = flatpickr.formatDate(selectedDates[0], 'Y-m-d');
+                    toHidden.value   = '';
+                } else if (selectedDates.length === 2) {
+                    fromHidden.value = flatpickr.formatDate(selectedDates[0], 'Y-m-d');
+                    toHidden.value   = flatpickr.formatDate(selectedDates[1], 'Y-m-d');
+                    form.submit();
+                }
+            },
+            onReady: function (_, __, fp) {
+                fp.input.classList.add('gf-date-input');
+                // Tombol clear jika sudah ada nilai
+                if (fromHidden.value || toHidden.value) {
+                    fp.input.style.paddingRight = '2rem';
+                }
+            },
+        });
+    }
+});
+</script>
+@endpush
 @endsection

@@ -6,7 +6,7 @@
 
 {{-- ── STEP 1: Pilih Jenis PO + Supplier (muncul jika belum ada params) ── --}}
 @php
-    $stepDone = request()->filled('order_type') && request()->filled('supplier_id');
+    $stepDone = true; // skip step pilih jenis PO, langsung ke form
 @endphp
 
 @if (!$stepDone)
