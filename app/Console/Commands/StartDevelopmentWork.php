@@ -15,6 +15,7 @@ class StartDevelopmentWork extends Command
         {type : Tipe kerja: fix atau feat}
         {name* : Nama pekerjaan}
         {--branch= : Nama branch custom}
+        {--prefix=codex : Prefix branch, contoh: codex, claude}
         {--no-branch : Jangan buat/switch branch git}
         {--copy-db : Copy database kerja, berguna untuk fix yang agak riskan}
         {--no-db-copy : Jangan copy database, bahkan untuk mode feat:}
@@ -59,7 +60,8 @@ class StartDevelopmentWork extends Command
             return self::FAILURE;
         }
 
-        $branch = (string) ($this->option('branch') ?: "codex/{$type}-{$slug}");
+        $prefix = rtrim((string) $this->option('prefix') ?: 'codex', '/');
+        $branch = (string) ($this->option('branch') ?: "{$prefix}/{$type}-{$slug}");
         if (! $this->option('no-branch')) {
             $this->newLine();
             $this->info('2. Menyiapkan branch git...');

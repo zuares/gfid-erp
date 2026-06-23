@@ -42,6 +42,10 @@ class PurchaseOrderController extends Controller
             $q->where('supplier_id', (int) $request->supplier_id);
         }
 
+        if ($request->filled('supplier_search')) {
+            $q->whereHas('supplier', fn($s) => $s->where('name', 'like', '%' . $request->supplier_search . '%'));
+        }
+
         if ($request->filled('status')) {
             $q->where('status', (string) $request->status);
         }
@@ -108,7 +112,8 @@ class PurchaseOrderController extends Controller
             ->orderBy('name')
             ->get();
 
-        $order->payment_method_id = $paymentMethods->first()?->id;
+        $order->payment_method_id = $paymentMethods->firstWhere('mode', 'transfer')?->id
+            ?? $paymentMethods->first()?->id;
 
         $suppliers = Supplier::query()->orderBy('name')->get(['id', 'name', 'po_types']);
 
@@ -942,31 +947,28 @@ class PurchaseOrderController extends Controller
         $blockers = [];
 
         if ($order->status !== 'approved') {
-            $blockers[] = 'Status PO harus APPROVED (saat ini: ' . strtoupper($order->status ?? 'draft') . ')';
+            $blockers[] = 'PO ' . strtoupper($order->status ?? 'draft') . ', belum approved';
         }
 
         $rcvStatus = $order->received_status ?? 'not_received';
         if ($rcvStatus !== 'fully_received') {
-            $label = match ($rcvStatus) {
-                'partial' => 'baru sebagian diterima',
-                default   => 'belum ada barang diterima',
+            $blockers[] = match ($rcvStatus) {
+                'partial' => 'Barang baru sebagian diterima',
+                default   => 'Barang belum diterima',
             };
-            $blockers[] = 'Status terima barang ' . $label . ' (harus Lunas Terima)';
         }
 
         $payStatus = $order->payment_status ?? 'unpaid';
         if ($payStatus !== 'paid') {
-            $label = match ($payStatus) {
-                'partial' => 'baru dibayar sebagian',
-                default   => 'belum dibayar',
+            $blockers[] = match ($payStatus) {
+                'partial' => 'Pembayaran baru sebagian',
+                default   => 'Belum ada pembayaran',
             };
-            $blockers[] = 'Status pembayaran ' . $label . ' (harus Lunas)';
         }
 
-        // Cek invoice outstanding
         $outstandingInvoices = $poInvoices->whereIn('status', ['posted', 'partial_paid', 'draft']);
         if ($outstandingInvoices->isNotEmpty()) {
-            $blockers[] = 'Ada ' . $outstandingInvoices->count() . ' Faktur Supplier yang belum lunas/dibayar';
+            $blockers[] = $outstandingInvoices->count() . ' faktur belum lunas';
         }
 
         return $blockers;
