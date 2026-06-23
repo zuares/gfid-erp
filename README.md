@@ -1,4 +1,53 @@
 ============================================================
+ GFID – ALUR KERJA DEVELOPMENT & OPERASIONAL
+============================================================
+
+MULAI DEVELOPMENT
+------------------------------------------------------------
+php artisan dev:start fix nama-pekerjaan
+php artisan dev:start feat nama-fitur-baru
+
+Otomatis: health check → buat branch git → (feat) copy DB.
+
+Opsi tambahan:
+  --copy-db        paksa copy DB meski mode fix
+  --activate-db    langsung arahkan .env ke DB copy
+  --no-branch      jangan buat branch baru
+  --force          lanjut walau health check ada masalah
+
+Contoh:
+  php artisan dev:start fix filter-payments
+  php artisan dev:start feat purchasing-dashboard --activate-db
+
+
+SELESAI DEVELOPMENT / KEMBALI KE OPERASIONAL
+------------------------------------------------------------
+php artisan system:check
+
+Alias: ops:stabil  |  app:check  |  app:stabil
+
+Ini: backup DB → snapshot → cek kesehatan sistem.
+
+Kalau mau cepat (skip backup):
+  php artisan system:check --no-backup --no-snapshot
+
+Yang dicek otomatis:
+  - Stok minus
+  - Lot minus
+  - Jurnal tidak balance (debit ≠ kredit)
+  - Dokumen draft > 7 hari
+  - Bundle ambil jahit belum selesai
+  - Bundle cutting masih WIP
+
+
+SETELAH CODING (sebelum merge):
+------------------------------------------------------------
+php artisan migrate
+php artisan optimize:clear
+php artisan system:check --no-backup --no-snapshot
+
+
+============================================================
  GFID – DATABASE BACKUP & RESTORE ARTISAN COMMANDS
 ============================================================
 

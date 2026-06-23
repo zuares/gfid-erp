@@ -991,10 +991,10 @@
     <div class="modal fade" id="modalAddPayment" tabindex="-1" aria-hidden="true">
         <div class="modal-dialog modal-dialog-centered modal-lg">
             <div class="modal-content">
-                <div class="modal-header">
+                <div class="modal-header" style="border-bottom:1px solid var(--line);padding:.85rem 1.15rem;">
                     <div>
-                        <div class="fw-semibold">Tambah Pembayaran</div>
-                        <div class="text-muted small mono">
+                        <h6 class="modal-title fw-semibold mb-0">Tambah Pembayaran</h6>
+                        <div class="text-muted small mono mt-1">
                             GRN Posted: {{ rupiah($grnPostedTotal) }} • Sisa hutang: {{ rupiah($apOutstanding) }}
                         </div>
                     </div>
@@ -1005,54 +1005,46 @@
                     id="paymentForm">
                     @csrf
 
-                    <div class="modal-body">
-                        <div class="row g-2">
+                    <div class="modal-body" style="padding:1.1rem 1.15rem;">
+                        <div class="row g-3">
                             <div class="col-6 col-md-3">
-                                <label class="form-label small text-muted mb-1">Tanggal</label>
-                                <input type="text" name="date" class="form-control gf-date-input"
+                                <label class="form-label small fw-semibold">Tanggal</label>
+                                <input type="text" name="date" class="form-control form-control-sm gf-date-input"
                                     value="{{ old('date', now()->toDateString()) }}" data-gf-date
                                     autocomplete="off" required>
                             </div>
 
                             <div class="col-6 col-md-3">
-                                <label class="form-label small text-muted mb-1">Jenis</label>
-                                <select name="type" class="form-select" required id="typeSelectModal">
-                                    <option value="payment" @selected(old('type', 'payment') === 'payment')>Pembayaran (Pelunasan)</option>
+                                <label class="form-label small fw-semibold">Jenis</label>
+                                <select name="type" class="form-select form-select-sm" required id="typeSelectModal">
+                                    <option value="payment" @selected(old('type', 'payment') === 'payment')>Pelunasan</option>
                                     <option value="dp" @selected(old('type') === 'dp')>DP (Uang Muka)</option>
                                 </select>
-                              <div class="text-muted small mt-1">
-    Pembayaran hanya bisa dibuat setelah GRN <b>POSTED</b>.
-</div>
-
                             </div>
 
                             <div class="col-12 col-md-6">
-                                <label class="form-label small text-muted mb-1">Metode Bayar</label>
-                                <select name="payment_method_id" class="form-select" required id="pmSelectModal">
+                                <label class="form-label small fw-semibold">Metode Bayar <span class="text-danger">*</span></label>
+                                <select name="payment_method_id" class="form-select form-select-sm" required id="pmSelectModal">
                                     @foreach ($paymentMethods ?? [] as $pmOpt)
                                         <option value="{{ $pmOpt->id }}"
                                             data-mode="{{ strtolower($pmOpt->mode ?? '') }}"
-                                            data-code="{{ strtoupper($pmOpt->code ?? '') }}" @selected(old('payment_method_id', $order->payment_method_id) == $pmOpt->id)>
+                                            data-code="{{ strtoupper($pmOpt->code ?? '') }}"
+                                            @selected(old('payment_method_id', $order->payment_method_id) == $pmOpt->id)>
                                             {{ $pmOpt->name }}
-                                            @if (!empty($pmOpt->mode))
-                                                — {{ strtoupper($pmOpt->mode) }}
-                                            @endif
+                                            @if (!empty($pmOpt->mode))— {{ strtoupper($pmOpt->mode) }}@endif
                                         </option>
                                     @endforeach
                                 </select>
-                                <div class="text-muted small mt-1">
-                                    Pilih <b>lewat apa</b> bayarnya (Cash / Transfer / Tempo).
-                                </div>
                                 <div class="text-danger small mt-1 d-none" id="creditPayErrModal">
-                                    Metode TEMPO/CREDIT hanya untuk DP. Untuk pelunasan, pilih CASH / TRANSFER.
+                                    TEMPO/CREDIT hanya untuk DP, bukan pelunasan.
                                 </div>
                             </div>
 
                             <div class="col-12 col-md-6">
-                                <label class="form-label small text-muted mb-1">Akun Kas/Bank</label>
+                                <label class="form-label small fw-semibold">Akun Kas/Bank <span class="text-danger">*</span></label>
 
                                 <div id="cashWrap" class="d-none">
-                                    <select name="cash_account_id" class="form-select" id="cashSelectCash">
+                                    <select name="cash_account_id" class="form-select form-select-sm" id="cashSelectCash">
                                         <option value="">— Pilih Kas —</option>
                                         @if ($cash1101)
                                             <option value="{{ $cash1101->id }}" data-code="1101"
@@ -1061,12 +1053,11 @@
                                             </option>
                                         @endif
                                     </select>
-                                    <div class="text-danger small mt-1 d-none" id="cashErrModal">Untuk CASH, wajib pilih
-                                        akun 1101 (Kas).</div>
+                                    <div class="text-danger small mt-1 d-none" id="cashErrModal">Wajib pilih akun 1101 (Kas).</div>
                                 </div>
 
                                 <div id="bankWrap" class="d-none">
-                                    <select name="cash_account_id" class="form-select" id="cashSelectBank">
+                                    <select name="cash_account_id" class="form-select form-select-sm" id="cashSelectBank">
                                         <option value="">— Pilih Bank/E-Wallet —</option>
                                         @foreach ($transferBanks as $acc)
                                             <option value="{{ $acc->id }}" data-code="{{ $acc->code }}"
@@ -1075,49 +1066,41 @@
                                             </option>
                                         @endforeach
                                     </select>
-                                    <div class="text-danger small mt-1 d-none" id="bankErrModal">Untuk TRANSFER, wajib
-                                        pilih 1111/1112/1113/1114.</div>
+                                    <div class="text-danger small mt-1 d-none" id="bankErrModal">Wajib pilih akun 1111–1114.</div>
                                 </div>
 
                                 <div id="creditWrap" class="d-none">
-                                    <input type="text" class="form-control"
+                                    <input type="text" class="form-control form-control-sm"
                                         value="Tidak perlu kas/bank (TEMPO/CREDIT)" disabled>
                                 </div>
                             </div>
 
                             <div class="col-12 col-md-6">
-                                <label class="form-label small text-muted mb-1">Nominal</label>
-                                <div class="input-group">
+                                <label class="form-label small fw-semibold">Nominal <span class="text-danger">*</span></label>
+                                <div class="input-group input-group-sm">
                                     <span class="input-group-text">Rp</span>
                                     <input type="text" name="amount" class="form-control mono" id="amountInput"
                                         placeholder="0" value="{{ old('amount') }}" required>
-                                    <button type="button" class="btn btn-outline-secondary" id="btnFillRemaining">Isi
-                                        sisa</button>
-                                </div>
-                                <div class="text-muted small mt-1">
-                                    Tombol <b>Isi sisa</b> mengisi sesuai <b>sisa hutang</b> (GRN posted - paid - offset).
+                                    <button type="button" class="btn btn-outline-secondary btn-sm" id="btnFillRemaining">Isi sisa</button>
                                 </div>
                             </div>
 
-                            <div class="col-12 col-md-6">
-                                <label class="form-label small text-muted mb-1">Ref</label>
-                                <input type="text" name="ref_no" class="form-control mono" placeholder="Opsional"
+                            <div class="col-6 col-md-3">
+                                <label class="form-label small fw-semibold">No. Ref</label>
+                                <input type="text" name="ref_no" class="form-control form-control-sm mono" placeholder="Opsional"
                                     value="{{ old('ref_no') }}">
                             </div>
 
-                            <div class="col-12">
-                                <label class="form-label small text-muted mb-1">Catatan</label>
-                                <input type="text" name="notes" class="form-control" placeholder="Opsional"
+                            <div class="col-6 col-md-3">
+                                <label class="form-label small fw-semibold">Catatan</label>
+                                <input type="text" name="notes" class="form-control form-control-sm" placeholder="Opsional"
                                     value="{{ old('notes') }}">
                             </div>
 
-                            {{-- Tahap 4: Link ke Supplier Invoice (opsional) --}}
                             @php $unpaidInvList = $unpaidInvoices ?? collect(); @endphp
                             @if ($unpaidInvList->isNotEmpty())
                             <div class="col-12">
-                                <label class="form-label small text-muted mb-1">
-                                    Faktur Supplier <span class="text-muted">(opsional — untuk melunasi faktur)</span>
-                                </label>
+                                <label class="form-label small fw-semibold">Faktur Supplier <span class="text-muted fw-normal">(opsional)</span></label>
                                 <select name="supplier_invoice_id" class="form-select form-select-sm">
                                     <option value="">— Tidak dikaitkan ke faktur —</option>
                                     @foreach ($unpaidInvList as $inv)
@@ -1130,9 +1113,6 @@
                                         </option>
                                     @endforeach
                                 </select>
-                                <div class="text-muted small mt-1">
-                                    Jika dipilih, paid_amount faktur akan diupdate otomatis.
-                                </div>
                             </div>
                             @endif
                         </div>
@@ -1149,9 +1129,9 @@
                         @endif
                     </div>
 
-                    <div class="modal-footer">
-                        <button type="button" class="btn btn-outline-secondary" data-bs-dismiss="modal">Tutup</button>
-                        <button class="btn btn-primary" id="btnSavePayment">Simpan</button>
+                    <div class="modal-footer" style="padding:.75rem 1.15rem;">
+                        <button type="button" class="btn btn-sm btn-outline-secondary" data-bs-dismiss="modal">Batal</button>
+                        <button class="btn btn-sm btn-primary" id="btnSavePayment">Simpan</button>
                     </div>
                 </form>
             </div>
@@ -1167,31 +1147,28 @@
                 class="modal-content" id="applyDpForm">
                 @csrf
 
-                <div class="modal-header">
+                <div class="modal-header" style="border-bottom:1px solid var(--line);padding:.85rem 1.15rem;">
                     <div>
-                        <div class="fw-semibold">Offset DP ke Hutang</div>
-                        <div class="text-muted small mono">
+                        <h6 class="modal-title fw-semibold mb-0">Offset DP ke Hutang</h6>
+                        <div class="text-muted small mono mt-1">
                             DP Available: {{ rupiah($dpAvailable) }} • AP Outstanding: {{ rupiah($apOutstanding) }}
                         </div>
                     </div>
                     <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
                 </div>
 
-                <div class="modal-body">
+                <div class="modal-body" style="padding:1.1rem 1.15rem;">
                     <div class="alert alert-info py-2 small mb-3">
                         <div class="d-flex justify-content-between">
                             <span>Max Offset</span>
                             <span class="mono fw-semibold">{{ rupiah($maxApplyDp) }}</span>
                         </div>
-                        <div class="text-muted mt-1">
-                            Nominal akan otomatis diambil minimum dari: input, DP available, AP outstanding.
-                        </div>
                     </div>
 
-                    <div class="row g-2">
+                    <div class="row g-3">
                         <div class="col-6">
-                            <label class="form-label small text-muted mb-1">Tanggal</label>
-                            <input type="text" name="date" class="form-control gf-date-input"
+                            <label class="form-label small fw-semibold">Tanggal</label>
+                            <input type="text" name="date" class="form-control form-control-sm gf-date-input"
                                 value="{{ old('date', now()->toDateString()) }}" data-gf-date
                                 autocomplete="off" required>
                             @error('date')
@@ -1200,12 +1177,12 @@
                         </div>
 
                         <div class="col-6">
-                            <label class="form-label small text-muted mb-1">Nominal Offset</label>
-                            <div class="input-group">
+                            <label class="form-label small fw-semibold">Nominal Offset</label>
+                            <div class="input-group input-group-sm">
                                 <span class="input-group-text">Rp</span>
                                 <input type="text" name="amount" class="form-control mono" id="applyDpAmount"
                                     placeholder="0" value="{{ old('amount') }}" required>
-                                <button type="button" class="btn btn-outline-secondary"
+                                <button type="button" class="btn btn-outline-secondary btn-sm"
                                     id="btnFillMaxApplyDp">Max</button>
                             </div>
                             @error('amount')
@@ -1214,26 +1191,19 @@
                         </div>
 
                         <div class="col-12">
-                            <label class="form-label small text-muted mb-1">Catatan (optional)</label>
-                            <input type="text" name="notes" class="form-control" maxlength="255"
+                            <label class="form-label small fw-semibold">Catatan <span class="text-muted fw-normal">(opsional)</span></label>
+                            <input type="text" name="notes" class="form-control form-control-sm" maxlength="255"
                                 value="{{ old('notes') }}">
                             @error('notes')
                                 <div class="text-danger small mt-1">{{ $message }}</div>
                             @enderror
                         </div>
                     </div>
-
-                    @if ($errors->any())
-                        {{-- NOTE: error bag kamu masih global. Ini tetap tampil. --}}
-                        <div class="text-muted small mt-3">
-                            Tips: kalau error-nya terkait Offset DP, modal ini akan kebuka otomatis.
-                        </div>
-                    @endif
                 </div>
 
-                <div class="modal-footer">
-                    <button type="button" class="btn btn-outline-secondary" data-bs-dismiss="modal">Tutup</button>
-                    <button type="submit" class="btn btn-primary"
+                <div class="modal-footer" style="padding:.75rem 1.15rem;">
+                    <button type="button" class="btn btn-sm btn-outline-secondary" data-bs-dismiss="modal">Batal</button>
+                    <button type="submit" class="btn btn-sm btn-primary"
                         @if (!$canApplyDp) disabled @endif>Proses Offset</button>
                 </div>
             </form>
@@ -1248,21 +1218,21 @@
             <form method="POST" action="" class="modal-content" id="voidPaymentForm">
                 @csrf
 
-                <div class="modal-header">
+                <div class="modal-header" style="border-bottom:1px solid var(--line);padding:.85rem 1.15rem;">
                     <div>
-                        <div class="fw-semibold">Void Pembayaran</div>
-                        <div class="text-muted small mono" id="voidInfo">—</div>
+                        <h6 class="modal-title fw-semibold mb-0">Void Pembayaran</h6>
+                        <div class="text-muted small mono mt-1" id="voidInfo">—</div>
                     </div>
                     <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
                 </div>
 
-                <div class="modal-body">
+                <div class="modal-body" style="padding:1.1rem 1.15rem;">
                     <div class="alert alert-warning py-2 small">
-                        Ini akan membuat jurnal <b>reversal</b> otomatis. Pastikan kamu yakin.
+                        Ini akan membuat jurnal <b>reversal</b> otomatis. Pastikan sudah yakin.
                     </div>
 
-                    <label class="form-label small text-muted mb-1">Alasan Void</label>
-                    <input type="text" name="reason" class="form-control" maxlength="255"
+                    <label class="form-label small fw-semibold">Alasan Void</label>
+                    <input type="text" name="reason" class="form-control form-control-sm" maxlength="255"
                         placeholder="contoh: salah nominal / duplikat / salah metode" value="{{ old('reason') }}"
                         required>
                     @error('reason')
@@ -1270,9 +1240,9 @@
                     @enderror
                 </div>
 
-                <div class="modal-footer">
-                    <button type="button" class="btn btn-outline-secondary" data-bs-dismiss="modal">Batal</button>
-                    <button type="submit" class="btn btn-danger">VOID</button>
+                <div class="modal-footer" style="padding:.75rem 1.15rem;">
+                    <button type="button" class="btn btn-sm btn-outline-secondary" data-bs-dismiss="modal">Batal</button>
+                    <button type="submit" class="btn btn-sm btn-danger">Void</button>
                 </div>
             </form>
         </div>
