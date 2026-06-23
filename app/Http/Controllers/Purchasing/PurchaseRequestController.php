@@ -60,6 +60,13 @@ class PurchaseRequestController extends Controller
             });
         }
 
+        if ($request->filled('from_date')) {
+            $query->whereDate('date', '>=', $request->from_date);
+        }
+        if ($request->filled('to_date')) {
+            $query->whereDate('date', '<=', $request->to_date);
+        }
+
         $prs = $query->paginate(20)->withQueryString();
 
         // PR-E: summary + converted count
