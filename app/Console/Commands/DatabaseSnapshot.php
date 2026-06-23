@@ -32,7 +32,8 @@ class DatabaseSnapshot extends Command
         }
 
         $target = $backupDir . '/snapshot_dev.sqlite';
-        $temporary = $backupDir . '/.snapshot_dev_' . now()->format('Ymd_His_u') . '.sqlite';
+        $temporary = $backupDir . '/.snapshot_dev_' . now()->format('Ymd_His_u') . '_' . bin2hex(random_bytes(3)) . '.sqlite';
+        File::delete($temporary);
 
         try {
             $quotedTarget = DB::connection()->getPdo()->quote($temporary);

@@ -26,7 +26,7 @@ class BackupDatabase extends Command
         }
 
         // 1️⃣ Buat backup baru
-        $filename = 'backup_' . now()->format('Ymd_His') . '.sqlite';
+        $filename = 'backup_' . now()->format('Ymd_His_u') . '.sqlite';
         $target = $backupDir . '/' . $filename;
 
         File::copy($dbPath, $target);
