@@ -1,6 +1,7 @@
 <?php
 
 use App\Http\Controllers\Owner\AccessControlController;
+use App\Http\Controllers\Owner\DatabaseModeController;
 use App\Http\Controllers\Owner\WorkLogController;
 use App\Http\Controllers\Api\ItemController as ApiItemController;
 
@@ -39,6 +40,8 @@ Route::middleware(['auth'])
             Route::get('access-control', [AccessControlController::class, 'index'])->name('access-control.index');
             Route::put('access-control', [AccessControlController::class, 'update'])->name('access-control.update');
         });
+
+        Route::post('database-mode', [DatabaseModeController::class, 'switch'])->name('database-mode.switch');
 
         Route::post('work-logs/{workLog}/done', [WorkLogController::class, 'markDone'])->name('work-logs.mark-done');
         Route::post('work-logs/{workLog}/reopen', [WorkLogController::class, 'reopen'])->name('work-logs.reopen');

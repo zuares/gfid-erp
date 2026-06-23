@@ -130,12 +130,19 @@
   @stack('head')
 
 <style>
-    /* OWNER WORK LOG GLOBAL NAV */
-    .gf-owner-worklog-nav {
+    /* OWNER FLOATING TOOLS */
+    .gf-owner-floating-tools {
         position: fixed;
         right: 18px;
         bottom: 86px;
         z-index: 1040;
+        display: inline-flex;
+        align-items: center;
+        gap: 8px;
+    }
+
+    .gf-owner-mode-trigger,
+    .gf-owner-worklog-nav {
         display: inline-flex;
         align-items: center;
         justify-content: center;
@@ -156,6 +163,7 @@
         transition: .16s ease;
     }
 
+    .gf-owner-mode-trigger:hover,
     .gf-owner-worklog-nav:hover {
         color: #0f172a;
         transform: translateY(-1px);
@@ -182,12 +190,73 @@
         box-shadow: 0 0 0 4px rgba(34,197,94,.16);
     }
 
+    .gf-owner-mode-trigger.is-dev {
+        color: #075985;
+        background: #e0f2fe;
+        border-color: #bae6fd;
+    }
+
+    .gf-owner-mode-trigger.is-ops {
+        color: #166534;
+        background: #dcfce7;
+        border-color: #bbf7d0;
+    }
+
+    .gf-owner-mode-trigger.is-unknown {
+        color: #92400e;
+        background: #fef3c7;
+        border-color: #fde68a;
+    }
+
+    .gf-owner-mode-menu {
+        min-width: 245px;
+        border-radius: 14px;
+        border: 1px solid rgba(15,23,42,.10);
+        box-shadow: 0 18px 44px rgba(15,23,42,.18);
+        padding: .45rem;
+        font-size: 12px;
+    }
+
+    .gf-owner-mode-menu .dropdown-header {
+        font-size: 11px;
+        font-weight: 900;
+        color: #64748b;
+        padding: .35rem .55rem;
+    }
+
+    .gf-owner-mode-menu .dropdown-item {
+        border-radius: 10px;
+        font-weight: 800;
+        padding: .52rem .6rem;
+    }
+
+    .gf-owner-mode-path {
+        font-size: 10px;
+        color: #94a3b8;
+        padding: .2rem .55rem .35rem;
+        overflow: hidden;
+        text-overflow: ellipsis;
+        white-space: nowrap;
+        max-width: 232px;
+    }
+
     @media (max-width: 768px) {
-        .gf-owner-worklog-nav {
+        .gf-owner-floating-tools {
             left: 14px;
             right: 14px;
             bottom: calc(76px + env(safe-area-inset-bottom));
             width: auto;
+            justify-content: stretch;
+        }
+
+        .gf-owner-mode-wrap,
+        .gf-owner-worklog-nav {
+            flex: 1 1 0;
+        }
+
+        .gf-owner-mode-trigger,
+        .gf-owner-worklog-nav {
+            width: 100%;
             min-height: 44px;
         }
     }
@@ -524,7 +593,7 @@
 
   @stack('scripts')
 
-{{-- OWNER WORK LOG NAVBAR --}}
+{{-- OWNER FLOATING TOOLS --}}
 @auth
     @php
         $gfOwnerUser = auth()->user();
@@ -538,11 +607,62 @@
     @endphp
 
     @if ($gfIsOwner)
-        <a href="{{ route('owner.work-logs.index') }}"
-            class="gf-owner-worklog-nav {{ request()->routeIs('owner.work-logs.*') ? 'is-active' : '' }}">
-            <span class="gf-owner-worklog-dot"></span>
-            <span>Owner Log</span>
-        </a>
+        @php
+            $gfDbMode = strtolower((string) env('APP_DB_MODE', ''));
+            $gfDbPath = (string) (config('database.connections.sqlite.database') ?: '');
+            $gfDbMode = in_array($gfDbMode, ['dev', 'ops'], true)
+                ? $gfDbMode
+                : (str_contains($gfDbPath, 'dev') ? 'dev' : 'unknown');
+            $gfDbModeLabel = match ($gfDbMode) {
+                'dev' => 'DEV',
+                'ops' => 'OPS',
+                default => 'DB?',
+            };
+        @endphp
+        <div class="gf-owner-floating-tools">
+            <div class="dropup gf-owner-mode-wrap">
+                <button type="button"
+                    class="gf-owner-mode-trigger is-{{ $gfDbMode }}"
+                    data-bs-toggle="dropdown"
+                    aria-expanded="false">
+                    <span class="gf-owner-worklog-dot"></span>
+                    <span>{{ $gfDbModeLabel }}</span>
+                </button>
+                <div class="dropdown-menu dropdown-menu-end gf-owner-mode-menu">
+                    <div class="dropdown-header">Mode Database</div>
+                    <div class="gf-owner-mode-path" title="{{ $gfDbPath }}">{{ basename($gfDbPath) ?: '-' }}</div>
+
+                    <form action="{{ route('owner.database-mode.switch') }}" method="POST"
+                        data-gf-confirm
+                        data-gf-confirm-title="Pindah ke mode DEV?"
+                        data-gf-confirm-text="Aplikasi akan memakai database development untuk seluruh modul."
+                        data-gf-confirm-ok="Pakai DEV">
+                        @csrf
+                        <input type="hidden" name="mode" value="dev">
+                        <button type="submit" class="dropdown-item" @disabled($gfDbMode === 'dev')>
+                            DEV / Development
+                        </button>
+                    </form>
+
+                    <form action="{{ route('owner.database-mode.switch') }}" method="POST"
+                        data-gf-confirm
+                        data-gf-confirm-title="Pindah ke mode OPERASIONAL?"
+                        data-gf-confirm-text="Pastikan database operasional benar. Command akan menolak jika database kosong."
+                        data-gf-confirm-ok="Pakai OPS">
+                        @csrf
+                        <input type="hidden" name="mode" value="ops">
+                        <button type="submit" class="dropdown-item" @disabled($gfDbMode === 'ops')>
+                            OPS / Operasional
+                        </button>
+                    </form>
+                </div>
+            </div>
+
+            <a href="{{ route('owner.work-logs.index') }}"
+                class="gf-owner-worklog-nav {{ request()->routeIs('owner.work-logs.*') ? 'is-active' : '' }}">
+                <span>Owner Log</span>
+            </a>
+        </div>
     @endif
 @endauth
 
