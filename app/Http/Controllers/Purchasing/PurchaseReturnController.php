@@ -120,64 +120,102 @@ class PurchaseReturnController extends Controller
     {
         $purchase_return->loadMissing(['grn.warehouse', 'grn.lines.item', 'lines.item', 'lines.grnLine', 'supplier', 'order']);
         $remainingMap = $this->remainingByGrnLine($purchase_return->grn, excludeReturnId: (int) $purchase_return->id);
+        $returnLineByGrnLine = $purchase_return->lines->keyBy('purchase_receipt_line_id');
 
         $warehouseId = (int) ($purchase_return->grn?->warehouse_id ?? 0);
+        $grnItemIds = $purchase_return->grn?->lines?->pluck('item_id')->filter()->unique() ?? collect();
         $stockByItem = $warehouseId > 0
             ? InventoryStock::query()
                 ->where('warehouse_id', $warehouseId)
-                ->whereIn('item_id', $purchase_return->lines->pluck('item_id')->filter()->unique())
+                ->whereIn('item_id', $grnItemIds)
                 ->pluck('qty', 'item_id')
             : collect();
 
         $stockByLot = DB::table('lots')
-            ->whereIn('id', $purchase_return->lines->pluck('lot_id')->filter()->unique())
+            ->whereIn('id', $purchase_return->grn?->lines?->pluck('lot_id')->filter()->unique() ?? collect())
             ->pluck('qty_onhand', 'id')
             ->map(fn($qty) => max(0, (float) $qty));
         $lineStockMap = [];
         $lineMaxMap = [];
         $lineInventoryMap = [];
+        $returnRows = collect();
 
-        foreach ($purchase_return->lines as $line) {
-            $isInventory = $this->isHppLine($purchase_return, $line);
-            $itemId = (int) $line->item_id;
-            $returnable = (float) ($remainingMap[(int) $line->purchase_receipt_line_id] ?? 0);
+        $sourceLines = ($purchase_return->status === 'draft' && ! $purchase_return->voided_at)
+            ? ($purchase_return->grn?->lines ?? collect())
+            : $purchase_return->lines
+                ->map(fn ($line) => $line->grnLine)
+                ->filter()
+                ->values();
+
+        foreach ($sourceLines as $grnLine) {
+            $line = $returnLineByGrnLine->get((int) $grnLine->id);
+            $isInventory = $line
+                ? $this->isHppLine($purchase_return, $line)
+                : $this->isHppGrnLine($purchase_return, $grnLine);
+            $itemId = (int) $grnLine->item_id;
+            $returnable = (float) ($remainingMap[(int) $grnLine->id] ?? 0);
             $stock = (float) ($stockByItem[$itemId] ?? 0);
+            $qty = (float) ($line?->qty ?? 0);
 
-            $lineInventoryMap[$line->id] = $isInventory;
-            $lineStockMap[$line->id] = $stock;
-
-            if (!$isInventory) {
-                $lineMaxMap[$line->id] = $returnable;
-                continue;
+            if ($line) {
+                $lineInventoryMap[$line->id] = $isInventory;
+                $lineStockMap[$line->id] = $stock;
             }
 
-            $available = max(0, $stock);
-            $lotId = (int) ($line->lot_id ?? 0);
-            $lotAvailable = $lotId > 0 ? (float) ($stockByLot[$lotId] ?? 0) : $available;
-            $max = max(0, min($returnable, $available, $lotAvailable));
-            $lineMaxMap[$line->id] = $max;
+            if (!$isInventory) {
+                $max = $returnable;
+                $lotAvailable = null;
+            } else {
+                $available = max(0, $stock);
+                $lotId = (int) ($grnLine->lot_id ?? 0);
+                $lotAvailable = $lotId > 0 ? (float) ($stockByLot[$lotId] ?? 0) : $available;
+                $max = max(0, min($returnable, $available, $lotAvailable));
+            }
+
+            if ($line) {
+                $lineMaxMap[$line->id] = $max;
+            }
+
+            $unitPrice = (float) ($line?->unit_price ?? $grnLine->unit_price ?? 0);
+
+            $returnRows->push((object) [
+                'line' => $line,
+                'grnLine' => $grnLine,
+                'item' => $line?->item ?? $grnLine->item,
+                'purchase_receipt_line_id' => (int) $grnLine->id,
+                'item_id' => $itemId,
+                'lot_id' => $grnLine->lot_id ? (int) $grnLine->lot_id : null,
+                'received' => (float) ($grnLine->qty_received ?? 0),
+                'remaining' => $returnable,
+                'stock' => $stock,
+                'lot_stock' => $lotAvailable,
+                'max_return' => $max,
+                'is_inventory' => $isInventory,
+                'qty' => $qty,
+                'unit_price' => $unitPrice,
+                'line_total' => round($qty * $unitPrice, 2),
+                'notes' => $line?->notes,
+            ]);
         }
 
-        $inventoryLines = $purchase_return->lines
-            ->filter(fn($line) => (bool) ($lineInventoryMap[$line->id] ?? false)
-                && (float) $line->qty > 0.0001);
+        $inventoryRows = $returnRows
+            ->filter(fn($row) => (bool) $row->is_inventory && (float) $row->qty > 0.0001);
 
-        $stockReady = $purchase_return->lines
-            ->every(fn($line) => (float) $line->qty
-                <= (float) ($lineMaxMap[$line->id] ?? 0) + 0.0001);
+        $stockReady = $returnRows
+            ->every(fn($row) => (float) $row->qty <= (float) $row->max_return + 0.0001);
 
         if ($stockReady) {
-            $stockReady = $inventoryLines
+            $stockReady = $inventoryRows
                 ->groupBy('item_id')
-                ->every(fn($lines, $itemId) => (float) $lines->sum('qty')
+                ->every(fn($rows, $itemId) => (float) $rows->sum('qty')
                     <= (float) ($stockByItem[$itemId] ?? 0) + 0.0001);
         }
 
         if ($stockReady) {
-            $stockReady = $inventoryLines
-                ->filter(fn($line) => (int) ($line->lot_id ?? 0) > 0)
+            $stockReady = $inventoryRows
+                ->filter(fn($row) => (int) ($row->lot_id ?? 0) > 0)
                 ->groupBy('lot_id')
-                ->every(fn($lines, $lotId) => (float) $lines->sum('qty')
+                ->every(fn($rows, $lotId) => (float) $rows->sum('qty')
                     <= (float) ($stockByLot[$lotId] ?? 0) + 0.0001);
         }
 
@@ -196,6 +234,7 @@ class PurchaseReturnController extends Controller
             'lineStockMap' => $lineStockMap,
             'lineMaxMap' => $lineMaxMap,
             'lineInventoryMap' => $lineInventoryMap,
+            'returnRows' => $returnRows,
             'stockReady' => $stockReady,
             'mutationCount' => $mutationCount,
             'journalCount' => $journalCount,
@@ -216,39 +255,67 @@ class PurchaseReturnController extends Controller
             'date' => ['required', 'date'],
             'notes' => ['nullable', 'string', 'max:500'],
             'lines' => ['array'],
-            'lines.*.id' => ['required', 'integer'],
+            'lines.*.id' => ['nullable', 'integer'],
+            'lines.*.purchase_receipt_line_id' => ['required', 'integer'],
             'lines.*.qty' => ['nullable', 'string'],
             'lines.*.notes' => ['nullable', 'string', 'max:255'],
         ]);
 
         $purchase_return->loadMissing(['grn.lines']);
+        $grnLines = $purchase_return->grn?->lines?->keyBy('id') ?? collect();
 
         $remainingMap = $this->remainingByGrnLine($purchase_return->grn, excludeReturnId: (int) $purchase_return->id);
 
-        DB::transaction(function () use ($purchase_return, $data, $remainingMap) {
+        DB::transaction(function () use ($purchase_return, $data, $remainingMap, $grnLines) {
             $purchase_return->date = $data['date'];
             $purchase_return->notes = $data['notes'] ?? null;
             $purchase_return->save();
 
             foreach (($data['lines'] ?? []) as $row) {
-                $line = $purchase_return->lines()->whereKey((int) $row['id'])->first();
-                if (!$line) {
+                $grnLineId = (int) ($row['purchase_receipt_line_id'] ?? 0);
+                $grnLine = $grnLines->get($grnLineId);
+                if (!$grnLine) {
                     continue;
                 }
 
                 $qty = $this->toNumber($row['qty'] ?? 0);
                 $qty = max(0, round($qty, 4));
 
-                $grnLineId = (int) $line->purchase_receipt_line_id;
                 $max = (float) ($remainingMap[$grnLineId] ?? 0);
 
                 if ($qty > $max + 0.0001) {
                     throw ValidationException::withMessages([
-                        "lines.{$line->id}.qty" => "Qty melebihi remaining returnable ({$max}).",
+                        "lines.{$grnLineId}.qty" => "Qty melebihi sisa yang bisa diretur ({$max}).",
                     ]);
                 }
 
-                $unit = (float) $line->unit_price;
+                $line = $purchase_return->lines()
+                    ->where('purchase_receipt_line_id', $grnLineId)
+                    ->first();
+
+                if ($line && $qty <= 0.0001) {
+                    $line->delete();
+                    continue;
+                }
+
+                if (!$line && $qty <= 0.0001) {
+                    continue;
+                }
+
+                if (!$line) {
+                    $line = new PurchaseReturnLine([
+                        'purchase_receipt_line_id' => $grnLineId,
+                        'item_id' => (int) $grnLine->item_id,
+                        'lot_id' => $grnLine->lot_id ? (int) $grnLine->lot_id : null,
+                        'unit_price' => (float) ($grnLine->unit_price ?? 0),
+                    ]);
+                    $line->purchase_return_id = (int) $purchase_return->id;
+                }
+
+                $unit = (float) ($line->unit_price ?? $grnLine->unit_price ?? 0);
+                $line->item_id = (int) $grnLine->item_id;
+                $line->lot_id = $grnLine->lot_id ? (int) $grnLine->lot_id : null;
+                $line->unit_price = $unit;
                 $line->qty = $qty;
                 $line->line_total = round($qty * $unit, 2);
                 $line->notes = $row['notes'] ?? null;
@@ -666,8 +733,13 @@ class PurchaseReturnController extends Controller
 
     protected function isHppLine(PurchaseReturn $ret, PurchaseReturnLine $ln): bool
     {
+        return $this->isHppGrnLine($ret, $ln->grnLine, (int) $ln->item_id);
+    }
+
+    protected function isHppGrnLine(PurchaseReturn $ret, $grnLine, ?int $fallbackItemId = null): bool
+    {
         // sumber utama: allocation dari purchase_order_lines
-        $poLineId = (int) ($ln->grnLine?->purchase_order_line_id ?? 0);
+        $poLineId = (int) ($grnLine?->purchase_order_line_id ?? 0);
 
         if ($poLineId > 0 && Schema::hasColumn('purchase_order_lines', 'allocation')) {
             $alloc = (string) DB::table('purchase_order_lines')->where('id', $poLineId)->value('allocation');
@@ -678,7 +750,8 @@ class PurchaseReturnController extends Controller
 
         // fallback: items.default_allocation
         if (Schema::hasColumn('items', 'default_allocation')) {
-            $alloc = (string) Item::query()->whereKey((int) $ln->item_id)->value('default_allocation');
+            $itemId = (int) ($grnLine?->item_id ?? $fallbackItemId ?? 0);
+            $alloc = (string) Item::query()->whereKey($itemId)->value('default_allocation');
             if ($alloc !== '') {
                 return $alloc !== 'expense';
             }

@@ -190,6 +190,7 @@
   $hasAnyReturn = $returns->count() > 0;
   $postedReturns = $returns->where('status','posted')->where('voided_at', null);
   $draftReturns  = $returns->where('status','draft')->where('voided_at', null);
+  $activeReturns = $postedReturns->merge($draftReturns); // non-voided only
 
   // ✅ rule aman: unpost hanya jika belum pernah return
   $canUnpostSafely = $isPosted && $canManage && !$hasAnyReturn;
@@ -209,7 +210,7 @@
 
   // Return yang “utama” untuk CTA:
   $primaryDraftReturn = $draftReturns->sortByDesc('id')->first();
-  $primaryAnyReturn = $returns->sortByDesc('id')->first();
+  $primaryAnyReturn = $activeReturns->sortByDesc('id')->first(); // hanya non-voided
 @endphp
 
 <div class="grn-show-page">
@@ -275,14 +276,14 @@
               Lanjutkan Return
             </a>
 
-          {{-- Kalau belum ada draft, tapi ada return lain -> tombol "Lihat Return" --}}
-          @elseif ($hasAnyReturn && $primaryAnyReturn && $returnShowRouteName)
+          {{-- Kalau belum ada draft, tapi ada return aktif (non-void) -> tombol "Lihat Return" --}}
+          @elseif ($primaryAnyReturn && $returnShowRouteName)
             <a href="{{ route($returnShowRouteName, $primaryAnyReturn->id) }}"
                class="btn btn-outline-secondary btn-sm">
               Lihat Return
             </a>
 
-          {{-- Kalau belum pernah return -> baru tampil tombol buat return --}}
+          {{-- Kalau semua return sudah di-void / belum pernah return -> bisa buat return baru --}}
           @elseif ($returnCreateRouteName)
             <form action="{{ route($returnCreateRouteName, $receipt->id) }}" method="POST"
                   onsubmit="return confirm('Buat draft RETURN dari GRN ini?\n\n• Membuat dokumen return (draft)\n• Isi qty lalu POST return untuk mengurangi stok');">

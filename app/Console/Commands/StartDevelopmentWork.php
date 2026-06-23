@@ -13,7 +13,7 @@ class StartDevelopmentWork extends Command
 {
     protected $signature = 'dev:start
         {type : Tipe kerja: fix atau feat}
-        {name : Nama pekerjaan}
+        {name* : Nama pekerjaan}
         {--branch= : Nama branch custom}
         {--no-branch : Jangan buat/switch branch git}
         {--copy-db : Copy database kerja, berguna untuk fix yang agak riskan}
@@ -38,7 +38,7 @@ class StartDevelopmentWork extends Command
             return self::FAILURE;
         }
 
-        $name = trim((string) $this->argument('name'));
+        $name = trim(implode(' ', (array) $this->argument('name')));
         $slug = Str::slug($name);
         if ($slug === '') {
             $this->error('Nama pekerjaan tidak boleh kosong.');

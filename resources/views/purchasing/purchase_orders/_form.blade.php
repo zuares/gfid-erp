@@ -69,21 +69,21 @@
         .po-card {
             background: var(--card);
             border: 1px solid var(--line);
-            border-radius: 18px;
+            border-radius: 16px;
             overflow: visible;
-            margin-bottom: 1rem;
+            margin-bottom: .85rem;
         }
 
         .po-card .card-body {
-            padding: 1.25rem 1.5rem 1.35rem;
+            padding: .9rem 1rem;
         }
 
         .po-card .card-header {
-            padding: .9rem 1.5rem;
+            padding: .75rem .9rem;
         }
 
         .po-section-title {
-            font-weight: 700;
+            font-weight: 900;
             letter-spacing: -.01em;
         }
 
@@ -97,20 +97,49 @@
         }
 
         .po-field {
-            border-radius: 12px;
+            border-radius: 10px;
+        }
+
+        .po-toolbar {
+            display: flex;
+            gap: .35rem;
+            flex-wrap: wrap;
+            align-items: center;
+            padding: .65rem .75rem;
+            border-bottom: 1px solid var(--line);
+            background: rgba(148, 163, 184, .035);
+        }
+        .po-toolbar .btn {
+            border-radius: 999px;
+            font-weight: 800;
+            padding: .22rem .65rem;
+        }
+        .po-toolbar-summary {
+            margin-left: auto;
+            color: var(--muted);
+            font-size: .78rem;
+            font-weight: 750;
+        }
+        .po-total-live { color:#2563eb; font-weight:900; }
+
+        .po-lines-table {
+            --bs-table-bg: transparent;
         }
 
         .po-lines-table thead th {
             text-transform: uppercase;
-            letter-spacing: .08em;
-            font-size: .72rem;
+            letter-spacing: .06em;
+            font-size: .68rem;
             color: var(--muted);
-            padding: .75rem 1rem;
+            padding: .58rem .65rem;
+            background: color-mix(in srgb, var(--card) 90%, var(--bg) 10%);
+            border-bottom-color: var(--line);
         }
 
         .po-lines-table tbody td {
             vertical-align: middle;
-            padding: .65rem 1rem;
+            padding: .62rem .65rem;
+            border-bottom-color: var(--line);
         }
 
         .po-subtotal-label {
@@ -172,6 +201,7 @@
 
         .po-num-display {
             text-align: right;
+            font-weight: 900;
         }
 
         .po-num-display::placeholder {
@@ -204,6 +234,28 @@
             font-weight: 800;
             font-size: .9rem;
         }
+        .po-row.has-qty {
+            background: rgba(37,99,235,.045);
+            box-shadow: inset 3px 0 0 rgba(37,99,235,.45);
+        }
+        .po-row.is-empty {
+            opacity: .76;
+        }
+        .po-row-item-main {
+            font-weight: 850;
+            line-height: 1.15;
+        }
+        .po-row-item-sub {
+            color: var(--muted);
+            font-size: .74rem;
+            margin-top: .08rem;
+        }
+        .po-action-mini {
+            border-radius: 999px !important;
+            padding: .18rem .48rem;
+            font-size: .72rem;
+            font-weight: 800;
+        }
 
         .po-total-val.subtle {
             font-weight: 700;
@@ -223,12 +275,15 @@
 
         @media (max-width: 992px) {
             .po-card .card-body {
-                padding: 1rem 1rem 1.1rem;
+                padding: .75rem;
             }
 
             .po-card .card-header {
-                padding: .8rem 1rem;
+                padding: .7rem .75rem;
             }
+            .po-toolbar { padding: .6rem .7rem; }
+            .po-toolbar .btn { flex: 1 1 auto; }
+            .po-toolbar-summary { width:100%; margin-left:0; text-align:center; }
 
             .po-meta-wrap {
                 justify-content: stretch;
@@ -258,11 +313,10 @@
                 gap: .25rem .5rem;
                 max-width: 620px;
                 margin: 0 auto .7rem auto;
-                padding: .6rem .7rem .55rem;
-                border-radius: 14px;
+                padding: .6rem .7rem;
+                border-radius: 12px;
                 border: 1px solid var(--line);
                 background: color-mix(in srgb, var(--card) 92%, var(--bg) 8%);
-                box-shadow: 0 8px 18px rgba(15, 23, 42, .08), 0 0 0 1px rgba(148, 163, 184, .12);
             }
 
             .po-lines-table tbody td {
@@ -284,7 +338,7 @@
                 grid-area: header;
                 text-align: center;
                 font-weight: 600;
-                font-size: .9rem;
+                font-size: .78rem;
                 color: var(--muted)
             }
 
@@ -388,11 +442,19 @@
 {{-- LINES --}}
 <div class="card po-card mb-3">
     <div class="card-header d-flex justify-content-between align-items-center"
-        style="background: transparent; border-bottom: 1px solid var(--line); padding: .85rem 1rem;">
+        style="background: transparent; border-bottom: 1px solid var(--line);">
         <div class="po-section-title">Detail Barang</div>
-        <button type="button" id="btn-add-line" class="btn btn-sm btn-outline-primary" style="border-radius:12px;">
-            + Tambah Baris
-        </button>
+        <span class="text-muted small d-none d-md-inline">Isi qty barang yang ingin dibeli.</span>
+    </div>
+
+    <div class="po-toolbar">
+        <button type="button" id="btn-add-line" class="btn btn-sm btn-outline-primary">+ Barang</button>
+        <button type="button" id="btn-reset-empty-lines" class="btn btn-sm btn-outline-secondary">Reset Kosong</button>
+        <span class="po-toolbar-summary">
+            <span class="mono po-total-live" id="po-live-lines">0</span> item
+            ·
+            <span class="mono po-total-live" id="po-live-qty">0</span> qty
+        </span>
     </div>
 
     <div class="table-responsive po-table-wrapper">
@@ -439,7 +501,7 @@
                         );
                     @endphp
 
-                    <tr>
+                    <tr class="po-row {{ ((float) ($qtyRaw ?: 0)) > 0 ? 'has-qty' : 'is-empty' }}">
                         <td class="text-center align-middle line-index po-col-no">{{ $loop->iteration }}</td>
 
                         <td class="po-td-item" data-label="Item">
@@ -457,7 +519,7 @@
                                 class="line-expacc-raw" value="{{ $expAcc }}">
                         </td>
 
-                        <td data-label="Qty" class="po-td-qty">
+                        <td data-label="Qty Beli" class="po-td-qty">
                             <input type="text" class="form-control po-field po-num-display line-qty-display"
                                 inputmode="decimal" placeholder="0,00" value="{{ $qtyDisplay }}" autocomplete="off">
                             <input type="hidden" name="lines[{{ $i }}][qty]" class="line-qty-raw"
@@ -468,7 +530,7 @@
                         </td>
 
                         @if ($canSeeMoney)
-                            <td data-label="Harga (Rp)" class="po-td-price">
+                            <td data-label="Harga" class="po-td-price">
                                 <input type="text" class="form-control po-field po-num-display line-price-display"
                                     inputmode="numeric" placeholder="0" value="{{ $priceDisplay }}" autocomplete="off">
                                 <input type="hidden" name="lines[{{ $i }}][unit_price]" class="line-price-raw"
@@ -478,19 +540,19 @@
                                 @enderror
                             </td>
 
-                            <td class="text-end align-middle line-total po-td-total" data-label="Total (Rp)"></td>
+                            <td class="text-end align-middle line-total po-td-total mono" data-label="Nilai"></td>
                         @endif
 
                         <td class="text-center po-td-action">
                             <button type="button" class="btn btn-sm btn-outline-danger btn-remove-line"
                                 style="border-radius:12px;">
-                                <span class="d-inline d-lg-none">Hapus baris</span>
+                                <span class="d-inline d-lg-none">Hapus</span>
                                 <span class="d-none d-lg-inline">&times;</span>
                             </button>
                         </td>
                     </tr>
                 @empty
-                    <tr>
+                    <tr class="po-row is-empty">
                         <td class="text-center align-middle line-index po-col-no">1</td>
 
                         <td class="po-td-item" data-label="Item">
@@ -502,26 +564,26 @@
                                 value="">
                         </td>
 
-                        <td data-label="Qty" class="po-td-qty">
+                        <td data-label="Qty Beli" class="po-td-qty">
                             <input type="text" class="form-control po-field po-num-display line-qty-display"
                                 inputmode="decimal" placeholder="0,00" value="" autocomplete="off">
                             <input type="hidden" name="lines[0][qty]" class="line-qty-raw" value="">
                         </td>
 
                         @if ($canSeeMoney)
-                            <td data-label="Harga (Rp)" class="po-td-price">
+                            <td data-label="Harga" class="po-td-price">
                                 <input type="text" class="form-control po-field po-num-display line-price-display"
                                     inputmode="numeric" placeholder="0" value="" autocomplete="off">
                                 <input type="hidden" name="lines[0][unit_price]" class="line-price-raw" value="">
                             </td>
 
-                            <td class="text-end align-middle line-total po-td-total" data-label="Total (Rp)"></td>
+                            <td class="text-end align-middle line-total po-td-total mono" data-label="Nilai"></td>
                         @endif
 
                         <td class="text-center po-td-action">
                             <button type="button" class="btn btn-sm btn-outline-danger btn-remove-line"
                                 style="border-radius:12px;">
-                                <span class="d-inline d-lg-none">Hapus baris</span>
+                                <span class="d-inline d-lg-none">Hapus</span>
                                 <span class="d-none d-lg-inline">&times;</span>
                             </button>
                         </td>
@@ -529,22 +591,13 @@
                 @endforelse
             </tbody>
 
-            <tfoot class="table-light">
-                @if ($canSeeMoney)
-                    <tr>
-                        <th colspan="4" class="text-end po-subtotal-label">Subtotal</th>
-                        <th class="text-end" id="po-subtotal-cell"></th>
-                        <th></th>
-                    </tr>
-                @endif
-            </tfoot>
         </table>
     </div>
 
     <div class="d-block d-lg-none text-center py-2">
         <button type="button" id="btn-add-line-bottom" class="btn btn-outline-primary btn-sm"
             style="border-radius:12px;">
-            + Tambah Baris
+            + Barang
         </button>
     </div>
 
@@ -622,11 +675,14 @@
             const tableBody = document.querySelector('#po-lines-table tbody');
             const btnAddTop = document.getElementById('btn-add-line');
             const btnAddBottom = document.getElementById('btn-add-line-bottom');
+            const btnResetEmpty = document.getElementById('btn-reset-empty-lines');
 
             const subtotalCell = document.getElementById('po-subtotal-cell');
             const subtotalMeta = document.getElementById('po-subtotal-meta');
             const shippingMeta = document.getElementById('po-shipping-meta');
             const grandMeta = document.getElementById('po-grand-meta');
+            const liveLines = document.getElementById('po-live-lines');
+            const liveQty = document.getElementById('po-live-qty');
 
             const orderTypeSelect = document.getElementById('po-order-type');
             const currentOrderType = @json($orderType);
@@ -713,10 +769,22 @@
 
             function recalcAll() {
                 let subtotal = 0;
+                let filledLines = 0;
+                let totalQty = 0;
 
                 tableBody.querySelectorAll('tr').forEach(tr => {
                     syncRowRaw(tr);
                     subtotal += recalcRow(tr);
+
+                    const qty = parseFloat(tr.querySelector('.line-qty-raw')?.value || '0') || 0;
+                    const itemId = (tr.querySelector('.js-item-suggest-id')?.value || '').toString().trim();
+                    const filled = qty > 0.0001 || itemId !== '';
+                    tr.classList.toggle('has-qty', qty > 0.0001);
+                    tr.classList.toggle('is-empty', !filled);
+                    if (qty > 0.0001) {
+                        filledLines++;
+                        totalQty += qty;
+                    }
                 });
 
                 const ship = parseFloat(shippingRaw?.value || '0') || 0;
@@ -726,6 +794,8 @@
                 if (subtotalMeta) subtotalMeta.textContent = fmtIntId(subtotal);
                 if (shippingMeta) shippingMeta.textContent = fmtIntId(ship);
                 if (grandMeta) grandMeta.textContent = fmtIntId(grand);
+                if (liveLines) liveLines.textContent = fmtIntId(filledLines);
+                if (liveQty) liveQty.textContent = fmtQtyId(totalQty).replace(/,00$/, '');
             }
 
             function renumberLines() {
@@ -884,6 +954,24 @@
 
             btnAddTop?.addEventListener('click', addNewRow);
             btnAddBottom?.addEventListener('click', addNewRow);
+            btnResetEmpty?.addEventListener('click', function () {
+                const rows = Array.from(tableBody.querySelectorAll('tr'));
+                const removable = rows.filter((tr) => {
+                    const qty = parseFloat(tr.querySelector('.line-qty-raw')?.value || '0') || 0;
+                    const itemId = (tr.querySelector('.js-item-suggest-id')?.value || '').toString().trim();
+                    return rows.length > 1 && qty <= 0.0001 && itemId === '';
+                });
+
+                removable.forEach((tr) => tr.remove());
+
+                if (!tableBody.querySelector('tr')) {
+                    addNewRow();
+                    return;
+                }
+
+                renumberLines();
+                recalcAll();
+            });
 
             tableBody.addEventListener('click', function(e) {
                 const btn = e.target.closest('.btn-remove-line');
