@@ -325,7 +325,8 @@
               @if($isDraft && !$isVoided)
                 <div class="return-tools mb-2">
                   <button type="button" class="btn btn-sm btn-outline-secondary" id="btn-zero-all">Reset</button>
-                  <button type="button" class="btn btn-sm btn-outline-primary" id="btn-focus-first">Isi Return</button>
+                  <button type="button" class="btn btn-sm btn-outline-primary" id="btn-max-all">Maks Semua</button>
+                  <button type="button" class="btn btn-sm btn-outline-primary" id="btn-focus-first">Cari Item</button>
                   <span class="return-tools-summary">
                     <span class="mono return-total-live" id="live-return-lines">{{ $totalReturnLines }}</span> item
                     ·
@@ -567,6 +568,15 @@ document.addEventListener('DOMContentLoaded', function () {
 
   document.getElementById('btn-zero-all')?.addEventListener('click', function () {
     qtyInputs.forEach(function (input) { input.value = ''; });
+    qtyInputs[0]?.focus();
+    refreshTotals();
+  });
+
+  document.getElementById('btn-max-all')?.addEventListener('click', function () {
+    qtyInputs.forEach(function (input) {
+      input.value = input.dataset.max || input.max || '';
+      refreshRow(input);
+    });
     qtyInputs[0]?.focus();
     refreshTotals();
   });

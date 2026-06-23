@@ -7,6 +7,7 @@ use App\Models\Account;
 use App\Models\PaymentMethod;
 use App\Models\PurchaseOrder;
 use App\Models\PurchasePayment;
+use App\Models\PurchaseReturn;
 use App\Models\Supplier;
 use App\Models\SupplierInvoice;
 use App\Services\Accounting\JournalService;
@@ -315,11 +316,9 @@ class PurchasePaymentController extends Controller
         $dpApplied = (float) $purchase_order->activePayments()->where('type', 'dp_apply')->sum('amount');
         $dpAvailable = max(0, round($dpTotal - $dpApplied, 2));
 
-        // hitung hutang outstanding (GRN posted - payment - dp_apply)
-        $debt = $this->totalGrnPosted($purchase_order);
-
-        $paid = (float) $purchase_order->activePayments()->where('type', 'payment')->sum('amount');
-        $apOutstanding = max(0, round($debt - $paid - $dpApplied, 2));
+        // hitung hutang outstanding bersih (GRN posted - return posted - payment - dp_apply)
+        $debt = $this->netDebtByGrn($purchase_order);
+        $apOutstanding = $this->calcApOutstandingByGrn($purchase_order);
 
         if ($debt <= 0.0001) {
             throw ValidationException::withMessages([
@@ -389,11 +388,11 @@ class PurchasePaymentController extends Controller
     /**
      * paid_amount & payment_status untuk hutang
      * hanya menghitung type=payment (pelunasan hutang) + dp_apply
-     * basis hutang: total GRN posted
+     * basis hutang: total GRN posted - return posted
      */
     protected function recalcPaymentStatus(PurchaseOrder $order): void
     {
-        $debt = (float) $this->totalGrnPosted($order);
+        $debt = (float) $this->netDebtByGrn($order);
         $eps = 0.01;
 
         // kalau belum ada GRN posted, hutang belum terbentuk
@@ -430,12 +429,12 @@ class PurchasePaymentController extends Controller
     }
 
     /**
-     * Outstanding hutang berbasis GRN posted:
-     * total_grn_posted - total_payment(type=payment) - dp_apply
+     * Outstanding hutang berbasis GRN posted bersih:
+     * total_grn_posted - total_return_posted - total_payment(type=payment) - dp_apply
      */
     protected function calcApOutstandingByGrn(PurchaseOrder $order): float
     {
-        $debt = (float) $this->totalGrnPosted($order);
+        $debt = (float) $this->netDebtByGrn($order);
 
         $agg = $order->activePayments()
             ->selectRaw("
@@ -450,11 +449,25 @@ class PurchasePaymentController extends Controller
         return max(0, round($debt - $paid - $dpApplied, 2));
     }
 
+    protected function netDebtByGrn(PurchaseOrder $order): float
+    {
+        return max(0, round($this->totalGrnPosted($order) - $this->totalPostedReturns($order), 2));
+    }
+
     protected function totalGrnPosted(PurchaseOrder $order): float
     {
         return (float) $order->purchaseReceipts()
             ->where('status', 'posted')
             ->sum('grand_total');
+    }
+
+    protected function totalPostedReturns(PurchaseOrder $order): float
+    {
+        return (float) PurchaseReturn::query()
+            ->where('purchase_order_id', $order->id)
+            ->where('status', 'posted')
+            ->whereNull('voided_at')
+            ->sum('total');
     }
 
     // ======================================================================

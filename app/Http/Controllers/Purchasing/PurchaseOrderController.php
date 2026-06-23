@@ -9,6 +9,7 @@ use App\Models\PaymentMethod;
 use App\Models\PurchaseOrder;
 use App\Models\PurchasePayment;
 use App\Models\PurchaseReceiptLine;
+use App\Models\PurchaseReturn;
 use App\Models\Supplier;
 use App\Services\Purchasing\PurchaseOrderService;
 use Illuminate\Http\Request;
@@ -43,11 +44,19 @@ class PurchaseOrderController extends Controller
         }
 
         if ($request->filled('supplier_search')) {
-            $q->whereHas('supplier', fn($s) => $s->where('name', 'like', '%' . $request->supplier_search . '%'));
+            $term = (string) $request->supplier_search;
+            $q->whereHas('supplier', function ($s) use ($term) {
+                $s->where('name', 'like', '%' . $term . '%')
+                    ->orWhere('code', 'like', '%' . $term . '%');
+            });
         }
 
         if ($request->filled('status')) {
             $q->where('status', (string) $request->status);
+        }
+
+        if ($request->filled('pay_status')) {
+            $q->where('payment_status', (string) $request->pay_status);
         }
 
         if ($request->filled('order_type')) {
@@ -68,6 +77,7 @@ class PurchaseOrderController extends Controller
             'total_grand_total' => (clone $summaryQuery)->sum('grand_total'),
             'draft_count' => (clone $summaryQuery)->where('status', 'draft')->count(),
             'approved_count' => (clone $summaryQuery)->where('status', 'approved')->count(),
+            'cancelled_count' => (clone $summaryQuery)->where('status', 'cancelled')->count(),
             'closed_count' => (clone $summaryQuery)->where('status', 'closed')->count(),
             'last_date' => optional((clone $summaryQuery)->orderByDesc('date')->first())->date,
         ];
@@ -311,6 +321,12 @@ class PurchaseOrderController extends Controller
             ->where('status', 'posted')
             ->sum('grand_total');
 
+        $returnPostedTotal = (float) PurchaseReturn::query()
+            ->where('purchase_order_id', $purchase_order->id)
+            ->where('status', 'posted')
+            ->whereNull('voided_at')
+            ->sum('total');
+
         $paidPaymentTotal = (float) $purchase_order->payments
             ->whereNull('voided_at')
             ->where('type', 'payment')
@@ -329,12 +345,15 @@ class PurchaseOrderController extends Controller
         $dpAvailable = max(0, round($dpTotal - $dpAppliedTotal, 2));
 
         $settled = $paidPaymentTotal + $dpAppliedTotal;
-        $apOutstanding = max(0, round($grnPostedTotal - $settled, 2));
+        $apDebt = max(0, round($grnPostedTotal - $returnPostedTotal, 2));
+        $apOutstanding = max(0, round($apDebt - $settled, 2));
 
         // Cek apakah semua PO line sudah fully received (dari GRN posted)
         // → dipakai untuk disable tombol "+ GRN baru"
         $poLines = $purchase_order->lines;
         $canCreateGrn = true; // default: boleh
+        $receivedByLine = collect();
+        $returnedByLine = collect();
         if ($poLines->isNotEmpty()) {
             $poLineIds = $poLines->pluck('id');
             $receivedByLine = PurchaseReceiptLine::query()
@@ -343,6 +362,16 @@ class PurchaseOrderController extends Controller
                 ->selectRaw('purchase_order_line_id, SUM(qty_received) as total_received')
                 ->groupBy('purchase_order_line_id')
                 ->pluck('total_received', 'purchase_order_line_id');
+
+            $returnedByLine = \App\Models\PurchaseReturnLine::query()
+                ->join('purchase_returns as pr', 'pr.id', '=', 'purchase_return_lines.purchase_return_id')
+                ->join('purchase_receipt_lines as grnl', 'grnl.id', '=', 'purchase_return_lines.purchase_receipt_line_id')
+                ->whereIn('grnl.purchase_order_line_id', $poLineIds)
+                ->where('pr.status', 'posted')
+                ->whereNull('pr.voided_at')
+                ->selectRaw('grnl.purchase_order_line_id, SUM(purchase_return_lines.qty) as total_returned')
+                ->groupBy('grnl.purchase_order_line_id')
+                ->pluck('total_returned', 'purchase_order_line_id');
 
             // Masih bisa GRN kalau ada minimal 1 line yang belum lunas terima
             $canCreateGrn = $poLines->contains(function ($line) use ($receivedByLine) {
@@ -374,12 +403,16 @@ class PurchaseOrderController extends Controller
             'paymentMethods' => $paymentMethods,
             'cashAccounts' => $cashAccounts,
             'grnPostedTotal' => $grnPostedTotal,
+            'returnPostedTotal' => $returnPostedTotal,
+            'apDebt' => $apDebt,
             'paidPaymentTotal' => $paidPaymentTotal,
             'dpTotal' => $dpTotal,
             'dpAppliedTotal' => $dpAppliedTotal,
             'dpAvailable' => $dpAvailable,
             'apOutstanding' => $apOutstanding,
             'canCreateGrn' => $canCreateGrn,
+            'receivedByLine' => $receivedByLine,
+            'returnedByLine' => $returnedByLine,
             // Tahap 4
             'poInvoices' => $poInvoices,
             'unpaidInvoices' => $unpaidInvoices,

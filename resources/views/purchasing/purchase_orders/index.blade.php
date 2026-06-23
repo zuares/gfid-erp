@@ -19,7 +19,7 @@
             background: var(--card);
             border-radius: 14px;
             border: 1px solid var(--line);
-            padding: .85rem .95rem;
+            padding: .8rem .9rem;
             margin-bottom: .85rem;
         }
 
@@ -31,19 +31,21 @@
         }
 
         .table thead th {
-            border-bottom-width: 1px;
-            font-size: .72rem;
+            background: color-mix(in srgb, var(--card) 90%, var(--bg) 10%);
+            border-bottom-color: var(--line);
+            font-size: .68rem;
             text-transform: uppercase;
-            letter-spacing: .07em;
+            letter-spacing: .06em;
             color: var(--muted);
             white-space: nowrap;
-            padding: .5rem .75rem;
+            padding: .52rem .65rem;
         }
 
         .table tbody td {
             vertical-align: middle;
             font-size: .83rem;
-            padding: .45rem .75rem;
+            padding: .58rem .65rem;
+            border-bottom-color: var(--line);
         }
 
         .table tbody tr:last-child td { border-bottom: none; }
@@ -166,32 +168,109 @@
             background: rgba(248, 250, 252, 0.9);
         }
 
-        .mini-summary {
-            font-size: .8rem;
+        .kpi-grid {
+            display: grid;
+            grid-template-columns: repeat(4, minmax(0, 1fr));
+            gap: .6rem;
+            margin-bottom: .85rem;
         }
 
-        /* summary pills */
-        .summary-pills {
-            margin-top: .35rem;
+        .kpi-cell {
+            background: var(--card);
+            border: 1px solid var(--line);
+            border-radius: 12px;
+            padding: .72rem .82rem;
+            min-width: 0;
         }
 
-        .summary-pill {
-            display: inline-flex;
-            align-items: center;
-            gap: .35rem;
-            padding: .25rem .7rem;
-            border-radius: 999px;
-            border: 1px solid rgba(148, 163, 184, 0.45);
-            background: rgba(148, 163, 184, 0.06);
-            font-size: .78rem;
-        }
-
-        .summary-pill-label {
+        .kpi-label {
+            font-size: .68rem;
+            text-transform: uppercase;
+            letter-spacing: .06em;
             color: var(--muted);
+            font-weight: 800;
+            margin-bottom: .18rem;
         }
 
-        .summary-pill-value {
-            font-weight: 600;
+        .kpi-value {
+            font-size: .95rem;
+            font-weight: 850;
+            line-height: 1.2;
+        }
+
+        .kpi-sub {
+            font-size: .72rem;
+            color: var(--muted);
+            margin-top: .08rem;
+            white-space: nowrap;
+            overflow: hidden;
+            text-overflow: ellipsis;
+        }
+
+        .filter-row {
+            display: grid;
+            grid-template-columns: minmax(170px, 1.2fr) 140px 140px 180px auto;
+            gap: .5rem;
+            align-items: center;
+        }
+
+        .po-code {
+            font-weight: 850;
+            font-size: .85rem;
+            white-space: nowrap;
+        }
+
+        .po-sub {
+            font-size: .72rem;
+            color: var(--muted);
+            white-space: nowrap;
+        }
+
+        .supplier-code {
+            font-weight: 850;
+            font-size: .86rem;
+            white-space: nowrap;
+        }
+
+        .table-total {
+            font-size: .86rem;
+            font-weight: 850;
+            white-space: nowrap;
+        }
+
+        .status-stack {
+            display: flex;
+            gap: .3rem;
+            flex-wrap: wrap;
+            align-items: center;
+        }
+
+        .status-main {
+            font-weight: 850;
+            font-size: .78rem;
+            line-height: 1.15;
+        }
+
+        .status-main.is-approved {
+            color: #15803d;
+        }
+
+        .status-main.is-draft {
+            color: #64748b;
+        }
+
+        .status-main.is-cancelled {
+            color: #b91c1c;
+        }
+
+        .status-meta {
+            margin-top: .16rem;
+            color: var(--muted);
+            font-size: .72rem;
+            line-height: 1.2;
+            white-space: nowrap;
+            overflow: hidden;
+            text-overflow: ellipsis;
         }
 
         /* ===== MOBILE ===== */
@@ -202,6 +281,21 @@
 
             .card-filter {
                 padding: .75rem .8rem;
+            }
+
+            .kpi-grid {
+                grid-template-columns: repeat(2, minmax(0, 1fr));
+                gap: .5rem;
+            }
+
+            .filter-row {
+                grid-template-columns: 1fr 1fr;
+            }
+
+            .filter-row .filter-search,
+            .filter-row .filter-date,
+            .filter-row .filter-reset {
+                grid-column: 1 / -1;
             }
 
             .card-po-mobile {
@@ -238,8 +332,8 @@
                 padding-block: .2rem;
             }
 
-            .mini-summary {
-                font-size: .75rem;
+            .kpi-value {
+                font-size: .88rem;
             }
         }
     </style>
@@ -275,15 +369,15 @@
     <div class="page-wrap py-3">
 
         {{-- HEADER --}}
-        <div class="d-flex justify-content-between align-items-center mb-3">
+        <div class="d-flex justify-content-between align-items-center gap-3 mb-3 flex-wrap">
             <div>
-                <h2 class="mb-0">Purchase Orders</h2>
-                <div class="text-muted small">Kelola pembelian bahan sebelum masuk ke GRN.</div>
+                <h2 class="mb-0 lh-1" style="font-size:1.35rem;">Purchase Orders</h2>
+                <div class="text-muted small mt-1">Daftar PO</div>
             </div>
             <div>
                 @if ($user && in_array($user->role, ['owner', 'admin']))
                     <a href="{{ route('purchasing.purchase_orders.create') }}" class="btn btn-primary btn-sm">
-                        + PO Baru
+                        + PO
                     </a>
                 @endif
             </div>
@@ -297,28 +391,64 @@
             <div class="alert alert-danger py-2 small">{{ session('error') }}</div>
         @endif
 
-        {{-- FILTER + SUMMARY --}}
+        {{-- KPI --}}
+        @if (isset($summary))
+            <div class="kpi-grid">
+                <div class="kpi-cell">
+                    <div class="kpi-label">Total PO</div>
+                    <div class="kpi-value mono">{{ $summary->total_orders }}</div>
+                    @if ($summary->last_date)
+                        <div class="kpi-sub">Terakhir {{ id_date($summary->last_date) }}</div>
+                    @endif
+                </div>
+                <div class="kpi-cell">
+                    <div class="kpi-label">Draft</div>
+                    <div class="kpi-value mono">{{ $summary->draft_count }}</div>
+                    <div class="kpi-sub">Belum approve</div>
+                </div>
+                <div class="kpi-cell">
+                    <div class="kpi-label">Approved</div>
+                    <div class="kpi-value mono">{{ $summary->approved_count }}</div>
+                    <div class="kpi-sub">Siap operasional</div>
+                </div>
+                @if ($canSeeMoney)
+                    <div class="kpi-cell">
+                        <div class="kpi-label">Nilai PO</div>
+                        <div class="kpi-value mono" style="font-size:.86rem;">{{ rupiah($summary->total_grand_total) }}</div>
+                        @if (($summary->cancelled_count ?? 0) > 0)
+                            <div class="kpi-sub">Cancel {{ $summary->cancelled_count }}</div>
+                        @endif
+                    </div>
+                @else
+                    <div class="kpi-cell">
+                        <div class="kpi-label">Cancelled</div>
+                        <div class="kpi-value mono">{{ $summary->cancelled_count ?? 0 }}</div>
+                    </div>
+                @endif
+            </div>
+        @endif
+
+        {{-- FILTER --}}
         <div class="card-filter mb-3">
             <form id="po-filter-form" method="GET" action="{{ route('purchasing.purchase_orders.index') }}">
                 <input type="hidden" name="from_date" id="po-from-date" value="{{ request('from_date') }}">
                 <input type="hidden" name="to_date"   id="po-to-date"   value="{{ request('to_date') }}">
 
-                <div class="d-flex flex-wrap gap-2 align-items-center">
+                <div class="filter-row">
                     <input type="text" name="supplier_search"
                         value="{{ request('supplier_search') }}"
-                        placeholder="Cari supplier…"
-                        class="form-control form-control-sm"
-                        style="max-width:180px;"
+                        placeholder="Cari supplier"
+                        class="form-control form-control-sm filter-search"
                         autocomplete="off" />
 
-                    <select name="status" class="form-select form-select-sm po-filter-auto" style="max-width:130px;">
+                    <select name="status" class="form-select form-select-sm po-filter-auto">
                         @foreach ($statusOptions as $value => $label)
                             <option value="{{ $value }}" @selected(request('status') === $value)>{{ $label }}</option>
                         @endforeach
                     </select>
 
                     @if ($canSeeMoney)
-                        <select name="pay_status" class="form-select form-select-sm po-filter-auto" style="max-width:130px;">
+                        <select name="pay_status" class="form-select form-select-sm po-filter-auto">
                             @foreach ($payStatusOptions as $value => $label)
                                 <option value="{{ $value }}" @selected(request('pay_status') === $value)>{{ $label }}</option>
                             @endforeach
@@ -348,37 +478,18 @@
                         }
                     @endphp
                     <input type="text" id="po-date-range" value="{{ $rangeDisplay }}"
-                        placeholder="Pilih tanggal…" autocomplete="off"
-                        class="form-control form-control-sm" style="max-width:190px; cursor:pointer;"
+                        placeholder="Tanggal" autocomplete="off"
+                        class="form-control form-control-sm filter-date" style="cursor:pointer;"
                         data-gf-date="off" readonly />
 
                     @if (request()->filled('supplier_search') || request()->filled('supplier_id') || request()->filled('status') || request()->filled('pay_status') || request()->filled('from_date') || request()->filled('to_date'))
                         <a href="{{ route('purchasing.purchase_orders.index') }}"
-                           class="btn btn-sm btn-outline-secondary" style="font-size:.78rem;padding:.25rem .65rem;">
-                            <i class="bi bi-x me-1"></i>Reset
+                           class="btn btn-sm btn-outline-secondary filter-reset" style="font-size:.78rem;padding:.25rem .65rem;">
+                            Reset
                         </a>
                     @endif
                 </div>
             </form>
-
-            {{-- SUMMARY --}}
-            @if (isset($summary))
-                <div class="d-flex flex-wrap gap-1 mt-2" style="font-size:.78rem;color:var(--muted);">
-                    <span><strong class="text-body mono">{{ $summary->total_orders }}</strong> PO</span>
-                    <span>·</span>
-                    <span>Draft <strong class="text-body mono">{{ $summary->draft_count }}</strong></span>
-                    <span>·</span>
-                    <span>Approved <strong class="text-body mono">{{ $summary->approved_count }}</strong></span>
-                    @if (($summary->cancelled_count ?? 0) > 0)
-                        <span>·</span>
-                        <span>Cancelled <strong class="text-body mono">{{ $summary->cancelled_count }}</strong></span>
-                    @endif
-                    @if ($summary->last_date)
-                        <span>·</span>
-                        <span>Terakhir <strong class="text-body mono">{{ id_date($summary->last_date) }}</strong></span>
-                    @endif
-                </div>
-            @endif
         </div>
 
         {{-- DESKTOP TABLE --}}
@@ -387,13 +498,12 @@
                 <table class="table table-sm align-middle mb-0">
                     <thead>
                         <tr>
-                            <th style="width:22%;">PO</th>
+                            <th style="width:18%;">PO</th>
                             <th>Supplier</th>
                             @if ($canSeeMoney)
-                                <th class="d-none d-lg-table-cell" style="width:9%;">Bayar</th>
-                                <th style="width:13%;" class="text-end">Total</th>
+                                <th style="width:14%;" class="text-end">Total</th>
                             @endif
-                            <th style="width:18%;">Status</th>
+                            <th style="width:25%;">Status</th>
                             <th style="width:4%;"></th>
                         </tr>
                     </thead>
@@ -415,6 +525,27 @@
                                     'partial'        => 'badge-rcv badge-rcv-partial',
                                     default          => 'badge-rcv badge-rcv-none',
                                 };
+                                $statusMainClass = match ($order->status) {
+                                    'approved' => 'status-main is-approved',
+                                    'cancelled' => 'status-main is-cancelled',
+                                    default => 'status-main is-draft',
+                                };
+                                $statusLabel = match ((string) $order->status) {
+                                    'approved' => 'Approved',
+                                    'cancelled' => 'Cancelled',
+                                    'closed' => 'Closed',
+                                    default => 'Draft',
+                                };
+                                $rcvLabel = match($rcv) {
+                                    'fully_received' => 'Terima lengkap',
+                                    'partial' => 'Terima sebagian',
+                                    default => 'Belum terima',
+                                };
+                                $payLabel = match($ps) {
+                                    'paid' => 'Lunas',
+                                    'partial' => 'Bayar sebagian',
+                                    default => 'Belum bayar',
+                                };
                             @endphp
 
                             <tr class="{{ $rowClass }} po-row" style="cursor:pointer;"
@@ -429,33 +560,28 @@
 
                                 {{-- Supplier + Jenis --}}
                                 <td style="max-width:220px;">
-                                    <div style="font-size:.83rem;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;">{{ optional($order->supplier)->name ?? '—' }}</div>
-                                    <div class="text-muted" style="font-size:.71rem;">{{ po_order_type_label($order->order_type) }}</div>
+                                    <div class="supplier-code mono" title="{{ optional($order->supplier)->name ?? '' }}">
+                                        {{ optional($order->supplier)->code ?? '—' }}
+                                    </div>
+                                    <div class="po-sub">{{ po_order_type_label($order->order_type) }}</div>
                                 </td>
 
                                 @if ($canSeeMoney)
-                                    <td class="d-none d-lg-table-cell">
-                                        <span class="{{ $payBadgeClass }}">{{ strtoupper($ps) }}</span>
-                                        @if (!empty($order->due_date))
-                                            <div class="text-muted mono" style="font-size:.7rem;">JT: {{ id_date($order->due_date) }}</div>
-                                        @endif
-                                    </td>
-                                    <td class="text-end mono fw-semibold" style="white-space:nowrap;">{{ rupiah($order->grand_total) }}</td>
+                                    <td class="text-end mono table-total">{{ rupiah($order->grand_total) }}</td>
                                 @endif
 
                                 {{-- Status: main badge + info baris kedua --}}
                                 <td>
-                                    <span class="{{ $poBadgeClass }}">{{ strtoupper($order->status) }}</span>
+                                    <div class="{{ $statusMainClass }}">{{ $statusLabel }}</div>
                                     @php
                                         $subParts = [];
+                                        $subParts[] = $rcvLabel;
+                                        if ($canSeeMoney) $subParts[] = $payLabel;
                                         if ($grnCount > 0) $subParts[] = 'GRN ' . $grnCount;
-                                        if ($rcv === 'fully_received') $subParts[] = 'Lengkap';
-                                        elseif ($rcv === 'partial') $subParts[] = 'Sebagian';
                                         if (!empty($order->purchase_request_id)) $subParts[] = 'PR';
+                                        if (!empty($order->due_date) && $canSeeMoney) $subParts[] = 'JT ' . id_date($order->due_date);
                                     @endphp
-                                    @if ($subParts)
-                                        <div class="text-muted" style="font-size:.72rem;margin-top:.15rem;">{{ implode(' · ', $subParts) }}</div>
-                                    @endif
+                                    <div class="status-meta">{{ implode(' · ', $subParts) }}</div>
                                 </td>
 
                                 <td class="text-end">
@@ -502,6 +628,33 @@
                     $paid = (float) ($order->paid_amount ?? 0);
                     $grand = (float) ($order->grand_total ?? 0);
                     $bal = max(0, $grand - $paid);
+                    $rcv = $order->received_status ?? 'not_received';
+                    $rcvClass = match($rcv) {
+                        'fully_received' => 'badge-rcv badge-rcv-full',
+                        'partial'        => 'badge-rcv badge-rcv-partial',
+                        default          => 'badge-rcv badge-rcv-none',
+                    };
+                    $statusMainClass = match ($order->status) {
+                        'approved' => 'status-main is-approved',
+                        'cancelled' => 'status-main is-cancelled',
+                        default => 'status-main is-draft',
+                    };
+                    $statusLabel = match ((string) $order->status) {
+                        'approved' => 'Approved',
+                        'cancelled' => 'Cancelled',
+                        'closed' => 'Closed',
+                        default => 'Draft',
+                    };
+                    $rcvLabel = match($rcv) {
+                        'fully_received' => 'Terima lengkap',
+                        'partial' => 'Terima sebagian',
+                        default => 'Belum terima',
+                    };
+                    $payLabel = match($ps) {
+                        'paid' => 'Lunas',
+                        'partial' => 'Bayar sebagian',
+                        default => 'Belum bayar',
+                    };
                 @endphp
 
                 <div class="card-po-mobile">
@@ -516,46 +669,29 @@
                             <div class="meta mt-1">
                                 <span class="mono">{{ id_date($order->date) }}</span>
                                 @if ($order->supplier)
-                                    <span>{{ $order->supplier->name }}</span>
+                                    <span class="mono">{{ $order->supplier->code }}</span>
                                 @endif
-                                <span class="text-muted">· {{ po_order_type_label($order->order_type) }}</span>
+                                <span>{{ po_order_type_label($order->order_type) }}</span>
                             </div>
                         </div>
 
                         <div class="text-end">
-                            <span class="{{ $poBadgeClass }}">{{ strtoupper($order->status) }}</span>
-                            @if (!empty($order->purchase_request_id))
-                                <div class="mt-1">
-                                    @if (\Illuminate\Support\Facades\Route::has('purchasing.purchase_requests.show'))
-                                        <a href="{{ route('purchasing.purchase_requests.show', $order->purchase_request_id) }}"
-                                            class="badge-pr-ref">Dari PR</a>
-                                    @else
-                                        <span class="badge-pr-ref">Dari PR</span>
-                                    @endif
-                                </div>
-                            @endif
-                            @if ($grnCount > 0)
-                                <div class="mt-1"><span class="badge-grn">GRN x{{ $grnCount }}</span></div>
-                            @endif
-                            @php
-                                $rcv = $order->received_status ?? 'not_received';
-                                $rcvClass = match($rcv) {
-                                    'fully_received' => 'badge-rcv badge-rcv-full',
-                                    'partial'        => 'badge-rcv badge-rcv-partial',
-                                    default          => 'badge-rcv badge-rcv-none',
-                                };
-                            @endphp
-                            @if ($rcv !== 'not_received')
-                                <div class="mt-1"><span class="{{ $rcvClass }}">{{ received_status_label($rcv) }}</span></div>
-                            @endif
+                            <div class="{{ $statusMainClass }}">{{ $statusLabel }}</div>
                         </div>
                     </div>
+
+                    @php
+                        $mobileStatusParts = [$rcvLabel];
+                        if ($grnCount > 0) $mobileStatusParts[] = 'GRN ' . $grnCount;
+                        if (!empty($order->purchase_request_id)) $mobileStatusParts[] = 'PR';
+                    @endphp
+                    <div class="status-meta mt-2">{{ implode(' · ', $mobileStatusParts) }}</div>
 
                     @if ($canSeeMoney)
                         <div class="d-flex justify-content-between align-items-center mt-2">
                             <div class="text-muted meta">Bayar</div>
                             <div class="text-end">
-                                <span class="{{ $payBadgeClass }}">{{ strtoupper($ps) }}</span>
+                                <span class="{{ $payBadgeClass }}">{{ match($ps) { 'paid' => 'Lunas', 'partial' => 'Sebagian', default => 'Belum' } }}</span>
                                 @if (!empty($order->due_date))
                                     <div class="text-muted meta mono mt-1">JT: {{ id_date($order->due_date) }}</div>
                                 @endif
@@ -564,7 +700,7 @@
 
                         <div class="d-flex justify-content-between align-items-center mt-2">
                             <div>
-                                <div class="text-muted meta mb-1">Grand Total</div>
+                                <div class="text-muted meta mb-1">Total</div>
                                 <div class="amount mono">{{ rupiah($order->grand_total) }}</div>
                             </div>
                             <div class="text-end">
