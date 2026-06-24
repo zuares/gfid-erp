@@ -392,7 +392,7 @@
                     <div class="mt-1">
                         <span class="text-muted">LOT:</span>
                         <span class="fw-semibold mono" id="current-lot-count">0 LOT</span>
-                        <span class="text-muted ms-2">Kain:</span>
+                        <span class="text-muted ms-2">Stok Kain:</span>
                         <span class="fw-semibold mono" id="current-lot-balance">0.00</span>
                         <span class="text-muted">kg</span>
                     </div>
@@ -475,11 +475,12 @@
                                 inputmode="decimal" size="sm" align="end" class="bundle-qty-pcs bundle-qty" />
                         </td>
                         <td>
-                            {{-- qty_used_fabric: auto-fill dari BOM jika tersedia, bisa diisi manual --}}
+                            {{-- qty_used_fabric: auto-fill dari BOM, readonly --}}
                             <input type="text" inputmode="decimal" autocomplete="off"
                                 name="bundles[__INDEX__][qty_used_fabric]"
                                 class="form-control form-control-sm text-end bundle-qty-fabric"
-                                placeholder="auto" />
+                                placeholder="auto" readonly
+                                style="background:var(--bs-secondary-bg,#f8f9fa);color:var(--muted);cursor:default;" />
                         </td>
                         <td class="bundle-notes-cell">
                             <input type="text" class="form-control form-control-sm" name="bundles[__INDEX__][notes]">
@@ -568,6 +569,12 @@
 
             // BOM data dari controller: { finishedItemId: { fabricItemId: { qty, scrap_pct } } }
             const bomData = @json($bomData ?? []);
+            // URL edit BOM per finished item: { finishedItemId: editUrl }
+            const bomEditUrls  = @json($bomEditUrls  ?? []);
+            // URL quick-update BOM line: { finishedItemId: quickUrl }
+            const bomQuickUrls = @json($bomQuickUrls ?? []);
+            // CSRF token untuk PATCH request
+            const csrfToken = document.querySelector('meta[name="csrf-token"]')?.getAttribute('content') ?? '';
 
             function isMobile() {
                 return window.matchMedia('(max-width: 767.98px)').matches;
@@ -778,8 +785,8 @@
                 // Total kain tersedia di LOT
                 const li1 = document.createElement('li');
                 li1.innerHTML = totalBalance > 0
-                    ? `<span>Total kain tersedia (LOT):</span><span class="mono">${totalBalance.toFixed(2)} kg</span>`
-                    : `<span>Total kain tersedia (LOT):</span><span class="mono" style="color:#dc2626">0,00 kg (akan minus di RM)</span>`;
+                    ? `<span>Stok Kain:</span><span class="mono">${totalBalance.toFixed(2)} kg</span>`
+                    : `<span>Stok Kain:</span><span class="mono" style="color:#dc2626">0,00 kg (akan minus di RM)</span>`;
                 lotSummaryList.appendChild(li1);
 
                 const li2 = document.createElement('li');
@@ -808,16 +815,162 @@
                 });
 
                 if (bomRowCount > 0) {
+                    const shortage   = totalBomFabric - totalBalance;
+                    const isShort    = shortage > 0.05; // toleransi 50g — di bawah itu dianggap cukup
+                    const bomColor   = isShort ? '#dc2626' : '#1d4ed8';
+
                     const liBom = document.createElement('li');
                     liBom.innerHTML =
-                        `<span>Estimasi kain pakai (BOM):</span><span class="mono" style="color:#1d4ed8;font-weight:700">${totalBomFabric.toFixed(4)} kg</span>`;
+                        `<span>Estimasi kain pakai (BOM):</span><span class="mono" style="color:${bomColor};font-weight:700">${totalBomFabric.toFixed(4)} kg</span>`;
                     lotSummaryList.appendChild(liBom);
 
-                    const liNote = document.createElement('li');
-                    liNote.classList.add('text-muted');
-                    liNote.style.fontSize = '.72rem';
-                    liNote.innerHTML = `<span>⚡ BOM tersedia — backend akan pakai kalkulasi BOM</span><span></span>`;
-                    lotSummaryList.appendChild(liNote);
+                    if (isShort) {
+                        // Baris warning stok kurang
+                        const liShort = document.createElement('li');
+                        liShort.style.cssText = 'background:#fef2f2;border-radius:6px;padding:4px 6px;margin-top:2px;';
+                        liShort.innerHTML =
+                            `<span style="color:#dc2626;font-weight:600;">⚠️ Stok LOT kurang ${shortage.toFixed(4)} kg</span>`
+                          + `<span style="color:#dc2626;font-size:.75rem;">Tambah LOT atau kurangi qty</span>`;
+                        lotSummaryList.appendChild(liShort);
+
+                        // Tampilkan per-item BOM detail + tombol Edit BOM
+                        const affectedItems = [];
+                        bundleRows.forEach(tr => {
+                            const qtyInput   = tr.querySelector('.bundle-qty-pcs');
+                            const itemIdInp  = tr.querySelector('[name*="finished_item_id"]');
+                            const itemLabel  = getBundleItemLabel(tr);
+                            if (!qtyInput || !itemIdInp) return;
+                            const qty            = parseFloat(qtyInput.value || '0');
+                            const finishedItemId = parseInt(itemIdInp.value || '0', 10);
+                            if (qty <= 0 || !finishedItemId || !fabricItemId) return;
+                            const bom = bomData[finishedItemId];
+                            if (!bom || !bom[fabricItemId]) return;
+                            const { qty: bomQty } = bom[fabricItemId];
+                            // dedupe by finishedItemId
+                            if (!affectedItems.find(x => x.id === finishedItemId)) {
+                                affectedItems.push({ id: finishedItemId, label: itemLabel, bomQty });
+                            }
+                        });
+
+                        if (affectedItems.length > 0) {
+                            const liEditHeader = document.createElement('li');
+                            liEditHeader.style.cssText = 'margin-top:4px;font-size:.75rem;color:#92400e;font-weight:600;';
+                            liEditHeader.innerHTML = `<span>BOM salah? Koreksi standar kain:</span><span></span>`;
+                            lotSummaryList.appendChild(liEditHeader);
+
+                            affectedItems.forEach(item => {
+                                const editUrl  = bomEditUrls[item.id]  ?? null;
+                                const quickUrl = bomQuickUrls[item.id] ?? null;
+                                // Saran BOM: scale down proporsional agar total estimasi = stok tersedia
+                                const suggestedQty = totalBalance > 0
+                                    ? (item.bomQty * totalBalance / totalBomFabric)
+                                    : 0;
+
+                                const liEdit = document.createElement('li');
+                                liEdit.style.cssText = 'background:#fffbeb;border:1px solid #fde68a;border-radius:6px;padding:6px 8px;margin-top:3px;font-size:.77rem;display:flex;flex-direction:column;gap:4px;';
+
+                                // Baris judul + link edit
+                                const rowTitle = document.createElement('div');
+                                rowTitle.style.cssText = 'display:flex;justify-content:space-between;align-items:center;gap:6px;';
+                                rowTitle.innerHTML = `<span style="color:#92400e;font-weight:600;">${item.label}</span>`
+                                    + (editUrl
+                                        ? `<a href="${editUrl}" target="_blank" style="color:#b45309;font-size:.7rem;text-decoration:underline;">Lihat BOM →</a>`
+                                        : '');
+                                liEdit.appendChild(rowTitle);
+
+                                // Baris qty sekarang → saran + tombol Terapkan
+                                const rowQty = document.createElement('div');
+                                rowQty.style.cssText = 'display:flex;align-items:center;gap:8px;flex-wrap:wrap;';
+                                rowQty.innerHTML =
+                                    `<span style="color:#78350f;">Sekarang: <strong>${item.bomQty.toFixed(4)} kg/pcs</strong></span>`
+                                  + `<span style="color:#6b7280;">→</span>`
+                                  + `<span style="color:#15803d;">Saran: <strong>${suggestedQty.toFixed(4)} kg/pcs</strong></span>`;
+
+                                if (quickUrl) {
+                                    const btnApply = document.createElement('button');
+                                    btnApply.type = 'button';
+                                    btnApply.textContent = 'Terapkan';
+                                    btnApply.style.cssText = 'margin-left:auto;padding:2px 10px;border-radius:4px;border:1px solid #d97706;background:#fef3c7;color:#92400e;font-weight:700;font-size:.72rem;cursor:pointer;white-space:nowrap;';
+
+                                    btnApply.addEventListener('click', async () => {
+                                        btnApply.disabled = true;
+                                        btnApply.textContent = '⏳';
+
+                                        try {
+                                            const resp = await fetch(quickUrl, {
+                                                method: 'PATCH',
+                                                headers: {
+                                                    'Content-Type': 'application/json',
+                                                    'X-CSRF-TOKEN': csrfToken,
+                                                    'Accept': 'application/json',
+                                                },
+                                                body: JSON.stringify({
+                                                    material_item_id: fabricItemId,
+                                                    qty: suggestedQty,
+                                                }),
+                                            });
+
+                                            const json = await resp.json();
+                                            if (json.success) {
+                                                // Update bomData in-memory agar estimasi ikut berubah
+                                                if (bomData[item.id] && bomData[item.id][fabricItemId]) {
+                                                    bomData[item.id][fabricItemId].qty = json.new_qty;
+                                                }
+                                                // Update qty_used_fabric di semua bundle row yang pakai item ini
+                                                bundlesTbody.querySelectorAll('.bundle-row').forEach(rowTr => {
+                                                    const rowItemId = parseInt(rowTr.querySelector('[name*="finished_item_id"]')?.value || '0', 10);
+                                                    if (rowItemId === item.id) autofillFabricQtyForRow(rowTr);
+                                                });
+                                                btnApply.textContent = '✓ Diterapkan';
+                                                btnApply.style.cssText = 'margin-left:auto;padding:2px 10px;border-radius:4px;border:1px solid #16a34a;background:#dcfce7;color:#15803d;font-weight:700;font-size:.72rem;cursor:default;white-space:nowrap;';
+                                                // Recalc agar warning hilang jika cukup
+                                                recalcLotSummary();
+                                                debouncedSaveDraft();
+                                            } else {
+                                                btnApply.textContent = '✗ Gagal';
+                                                btnApply.disabled = false;
+                                                btnApply.style.background = '#fee2e2';
+                                                btnApply.style.color = '#dc2626';
+                                            }
+                                        } catch (e) {
+                                            btnApply.textContent = '✗ Error';
+                                            btnApply.disabled = false;
+                                            btnApply.style.background = '#fee2e2';
+                                            btnApply.style.color = '#dc2626';
+                                        }
+                                    });
+
+                                    rowQty.appendChild(btnApply);
+                                }
+
+                                liEdit.appendChild(rowQty);
+                                lotSummaryList.appendChild(liEdit);
+                            });
+                        }
+
+                        // Disable tombol submit
+                        const submitBtn = document.getElementById('btn-save-cutting');
+                        if (submitBtn) {
+                            submitBtn.disabled = true;
+                            submitBtn.title = 'Stok kain tidak cukup';
+                        }
+                    } else {
+                        // Sisa kain setelah pemakaian
+                        const sisa = totalBalance - totalBomFabric;
+                        const liNote = document.createElement('li');
+                        liNote.style.cssText = 'background:#f0fdf4;border-radius:6px;padding:4px 6px;margin-top:2px;';
+                        liNote.innerHTML =
+                            `<span style="color:#16a34a;font-weight:600;">✓ Stok cukup</span>`
+                          + `<span style="color:#16a34a;font-size:.75rem;">Sisa ~${sisa.toFixed(4)} kg</span>`;
+                        lotSummaryList.appendChild(liNote);
+
+                        // Re-enable tombol submit
+                        const submitBtn = document.getElementById('btn-save-cutting');
+                        if (submitBtn) {
+                            submitBtn.disabled = false;
+                            submitBtn.title = '';
+                        }
+                    }
                 } else if (validRowCount > 0 && totalBalance > 0) {
                     const perRow = totalBalance / validRowCount;
                     const li3 = document.createElement('li');
@@ -953,6 +1106,25 @@
                 return true;
             }
 
+            // ── Hitung & isi qty_used_fabric dari BOM untuk baris tertentu ──
+            function autofillFabricQtyForRow(tr) {
+                const hiddenItemId   = tr.querySelector('[name*="finished_item_id"]');
+                const qtyFabricInput = tr.querySelector('.bundle-qty-fabric');
+                if (!hiddenItemId || !qtyFabricInput) return;
+                const finishedItemId = parseInt(hiddenItemId.value || '0', 10);
+                const fabricItemId   = fabricSelect ? parseInt(fabricSelect.value || '0', 10) : 0;
+                const qtyPcs         = parseFloat(tr.querySelector('.bundle-qty-pcs')?.value || '0');
+                if (finishedItemId && fabricItemId) {
+                    const bom = bomData[finishedItemId];
+                    if (bom && bom[fabricItemId]) {
+                        const { qty: bomQty, scrap_pct } = bom[fabricItemId];
+                        qtyFabricInput.value = (qtyPcs * bomQty * (1 + scrap_pct / 100)).toFixed(4);
+                        return;
+                    }
+                }
+                // Tidak ada BOM — biarkan kosong agar user bisa isi manual
+            }
+
             function createBundleRow(autoFocusItem = false) {
                 const frag = bundleTemplate.content.cloneNode(true);
                 const tr = frag.querySelector('tr');
@@ -966,32 +1138,26 @@
                     }
                 });
 
-                // Helper: isi qty_used_fabric dari BOM berdasarkan item & qty_pcs di baris ini
-                function autofillFabricQty() {
-                    const hiddenItemId = tr.querySelector('[name*="finished_item_id"]');
-                    const qtyFabricInput = tr.querySelector('.bundle-qty-fabric');
-                    if (!hiddenItemId || !qtyFabricInput) return;
-
-                    const finishedItemId = parseInt(hiddenItemId.value || '0', 10);
-                    const fabricItemId   = fabricSelect ? parseInt(fabricSelect.value || '0', 10) : 0;
-                    const qtyPcs         = parseFloat(tr.querySelector('.bundle-qty-pcs')?.value || '0');
-
-                    if (finishedItemId && fabricItemId) {
-                        const bom = bomData[finishedItemId];
-                        if (bom && bom[fabricItemId]) {
-                            const { qty: bomQty, scrap_pct } = bom[fabricItemId];
-                            qtyFabricInput.value = (qtyPcs * bomQty * (1 + scrap_pct / 100)).toFixed(4);
-                            return;
-                        }
+                // Helper: pindah ke baris berikutnya atau buat baris baru
+                function goNextRow() {
+                    const allRows = Array.from(bundlesTbody.querySelectorAll('.bundle-row'));
+                    const idx = allRows.indexOf(tr);
+                    if (idx === allRows.length - 1) {
+                        createBundleRow(true);
+                    } else {
+                        allRows[idx + 1]?.querySelector('td:nth-child(3) input[type="text"]')?.focus();
                     }
-                    // Tidak ada BOM — biarkan kosong agar user bisa isi manual
                 }
 
                 const qtyInput = tr.querySelector('.bundle-qty-pcs');
                 if (qtyInput) {
                     qtyInput.addEventListener('input', () => {
-                        autofillFabricQty();
+                        autofillFabricQtyForRow(tr);
                         recalcLotSummary();
+                        debouncedSaveDraft();
+                    });
+                    qtyInput.addEventListener('keydown', (e) => {
+                        if (e.key === 'Enter') { e.preventDefault(); goNextRow(); }
                     });
                     qtyInput.addEventListener('focus', () => {
                         setTimeout(() => {
@@ -1008,6 +1174,7 @@
                     lotSelect.addEventListener('change', () => {
                         recalcLotSummary();
                         updateRowItemSuggestExtraParams(tr);
+                        debouncedSaveDraft();
                     });
                 }
 
@@ -1031,9 +1198,25 @@
                 const hiddenItemId = tr.querySelector('[name*="finished_item_id"]');
                 if (hiddenItemId) {
                     hiddenItemId.addEventListener('change', () => {
-                        autofillFabricQty();
+                        autofillFabricQtyForRow(tr);
                         recalcLotSummary();
+                        debouncedSaveDraft();
                     });
+                }
+
+                // Simpan draft saat notes berubah + Enter → baris berikutnya
+                const notesInput = tr.querySelector('input[name*="[notes]"]');
+                if (notesInput) {
+                    notesInput.addEventListener('input', () => debouncedSaveDraft());
+                    notesInput.addEventListener('keydown', (e) => {
+                        if (e.key === 'Enter') { e.preventDefault(); goNextRow(); }
+                    });
+                }
+
+                // Simpan draft saat qty fabric diisi manual
+                const qtyFabricInp = tr.querySelector('.bundle-qty-fabric');
+                if (qtyFabricInp) {
+                    qtyFabricInp.addEventListener('input', () => debouncedSaveDraft());
                 }
 
                 const itemCell = tr.querySelector('td:nth-child(3)');
@@ -1044,6 +1227,13 @@
                     itemInput.addEventListener('focus', handleItemFocus);
                     itemInput.addEventListener('click', handleItemFocus);
                     itemInput.addEventListener('input', handleItemFocus);
+                    // Enter di item → pindah ke qty pcs
+                    itemInput.addEventListener('keydown', (e) => {
+                        if (e.key === 'Enter') {
+                            e.preventDefault();
+                            tr.querySelector('.bundle-qty-pcs')?.focus();
+                        }
+                    });
                 }
 
                 updateBundleRowIndices();
@@ -1072,6 +1262,7 @@
                     recalcLotBalanceFromCheckedLots();
                     rebuildLotOptionsForAllRows();
                     recalcLotSummary();
+                    debouncedSaveDraft();
                 });
             });
 
@@ -1088,6 +1279,7 @@
                 recalcLotBalanceFromCheckedLots();
                 rebuildLotOptionsForAllRows();
                 recalcLotSummary();
+                debouncedSaveDraft();
             });
 
             btnUnselectAllLots?.addEventListener('click', () => {
@@ -1101,6 +1293,7 @@
                 }
                 updateCurrentLotSummary();
                 rebuildLotOptionsForAllRows();
+                debouncedSaveDraft();
             });
 
             btnConfirmLots?.addEventListener('click', () => {
@@ -1125,21 +1318,136 @@
                 lockLotSelection();
                 updateCurrentLotSummary();
                 showMainContent();
+                debouncedSaveDraft();
             });
 
             btnChangeLots?.addEventListener('click', () => {
                 showPickLotSection();
                 unlockLotSelection();
+                debouncedSaveDraft();
             });
 
             btnAddRow?.addEventListener('click', () => {
                 createBundleRow(true);
+                debouncedSaveDraft();
             });
+
+            // ==============================
+            // DRAFT PERSISTENCE (localStorage)
+            // ==============================
+            const DRAFT_KEY = 'gfid_cutting_draft_v1';
+            let saveDraftTimer = null;
+
+            function debouncedSaveDraft() {
+                clearTimeout(saveDraftTimer);
+                saveDraftTimer = setTimeout(saveDraft, 400);
+            }
+
+            function saveDraft() {
+                const checkedLotIds = getCheckedLots();
+                const bundles = [];
+                bundlesTbody.querySelectorAll('.bundle-row').forEach(tr => {
+                    const lotSel       = tr.querySelector('.bundle-lot-select');
+                    const itemIdInp    = tr.querySelector('[name*="finished_item_id"]');
+                    const itemTextInp  = tr.querySelector('td:nth-child(3) input[type="text"]');
+                    const qtyPcsInp    = tr.querySelector('.bundle-qty-pcs');
+                    const qtyFabricInp = tr.querySelector('.bundle-qty-fabric');
+                    const notesInp     = tr.querySelector('input[name*="[notes]"]');
+                    bundles.push({
+                        lotId:            lotSel?.value       || '',
+                        finishedItemId:   itemIdInp?.value    || '',
+                        finishedItemText: itemTextInp?.value  || '',
+                        qtyPcs:           qtyPcsInp?.value    || '',
+                        qtyFabric:        qtyFabricInp?.value || '',
+                        notes:            notesInp?.value     || '',
+                    });
+                });
+                try {
+                    localStorage.setItem(DRAFT_KEY, JSON.stringify({
+                        checkedLotIds,
+                        wasConfirmed: lotsLocked,
+                        bundles,
+                    }));
+                } catch (e) {}
+            }
+
+            function clearDraft() {
+                localStorage.removeItem(DRAFT_KEY);
+            }
+
+            function restoreDraft() {
+                let draft;
+                try {
+                    const raw = localStorage.getItem(DRAFT_KEY);
+                    if (!raw) return;
+                    draft = JSON.parse(raw);
+                } catch (e) { return; }
+
+                if (!draft || !Array.isArray(draft.checkedLotIds) || draft.checkedLotIds.length === 0) return;
+
+                // Centang kembali lot yang sebelumnya dipilih
+                draft.checkedLotIds.forEach(id => {
+                    const cb = document.querySelector(`.lot-checkbox[value="${id}"]`);
+                    if (cb) cb.checked = true;
+                });
+
+                recalcLotBalanceFromCheckedLots();
+                const ok = enforceSingleFabricForCheckedLots();
+                if (!ok) { clearDraft(); return; }
+                updateCurrentLotSummary();
+
+                if (!draft.wasConfirmed || !Array.isArray(draft.bundles) || draft.bundles.length === 0) return;
+
+                lockLotSelection();
+                rebuildLotOptionsForAllRows();
+                showMainContent();
+
+                // Hapus baris default yang dibuat di INIT, reset counter
+                bundlesTbody.innerHTML = '';
+                bundleIndexCounter = 0;
+
+                draft.bundles.forEach(b => {
+                    createBundleRow(false);
+                    const tr = bundlesTbody.lastElementChild;
+                    if (!tr) return;
+
+                    // LOT
+                    const lotSel = tr.querySelector('.bundle-lot-select');
+                    if (lotSel && b.lotId) lotSel.value = String(b.lotId);
+
+                    // Item jadi — hidden ID
+                    const itemIdInp = tr.querySelector('[name*="finished_item_id"]');
+                    if (itemIdInp && b.finishedItemId) itemIdInp.value = String(b.finishedItemId);
+
+                    // Item jadi — teks tampilan (visible input)
+                    const itemTextInp = tr.querySelector('td:nth-child(3) input[type="text"]');
+                    if (itemTextInp && b.finishedItemText) itemTextInp.value = b.finishedItemText;
+
+                    // Qty pcs
+                    const qtyPcsInp = tr.querySelector('.bundle-qty-pcs');
+                    if (qtyPcsInp) qtyPcsInp.value = b.qtyPcs || '';
+
+                    // Qty fabric (pakai nilai tersimpan, sudah termasuk BOM calculation)
+                    const qtyFabricInp = tr.querySelector('.bundle-qty-fabric');
+                    if (qtyFabricInp) qtyFabricInp.value = b.qtyFabric || '';
+
+                    // Catatan
+                    const notesInp = tr.querySelector('input[name*="[notes]"]');
+                    if (notesInp) notesInp.value = b.notes || '';
+                });
+
+                updateBundleRowIndices();
+                recalcLotSummary();
+            }
+
+            // Hapus draft saat form berhasil di-submit
+            document.getElementById('cutting-form')?.addEventListener('submit', () => clearDraft());
 
             // INIT
             recalcLotBalanceFromCheckedLots();
             updateCurrentLotSummary();
             createBundleRow(false);
+            restoreDraft(); // pulihkan draft jika ada
         });
     </script>
 @endpush

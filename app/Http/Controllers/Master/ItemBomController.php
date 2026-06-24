@@ -299,6 +299,32 @@ class ItemBomController extends Controller
     }
 
     /**
+     * Quick-update satu line BOM (qty saja) via AJAX dari form cutting job.
+     * PATCH /master/item-boms/{bom}/quick-line
+     */
+    public function quickUpdateLine(Request $request, ItemBom $bom)
+    {
+        $data = $request->validate([
+            'material_item_id' => ['required', 'integer', 'exists:items,id'],
+            'qty'              => ['required', 'numeric', 'min:0.0001'],
+        ]);
+
+        $line = ItemBomLine::where('item_bom_id', $bom->id)
+            ->where('material_item_id', $data['material_item_id'])
+            ->where('usage_stage', ItemBomLine::STAGE_MAIN_MATERIAL)
+            ->firstOrFail();
+
+        $newQty = round((float) $data['qty'], 6);
+        $line->update(['qty' => (string) $newQty]);
+
+        return response()->json([
+            'success' => true,
+            'new_qty' => $newQty,
+            'message' => 'BOM berhasil diperbarui.',
+        ]);
+    }
+
+    /**
      * =========================
      * Select2 AJAX
      * =========================

@@ -24,7 +24,7 @@ class AppServiceProvider extends ServiceProvider
                 $files = collect(File::files($snapshotDir))
                     ->filter(fn($f) => str_ends_with($f->getFilename(), '.sqlite'))
                     ->sortByDesc(fn($f) => $f->getMTime())
-                    ->take(5);
+                    ->take(3);
 
                 foreach ($files as $f) {
                     $name = $f->getFilename();

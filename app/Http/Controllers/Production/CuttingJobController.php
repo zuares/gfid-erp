@@ -118,22 +118,40 @@ class CuttingJobController extends Controller
         // 6️⃣ BOM data — untuk estimasi pemakaian kain di frontend & kalkulasi backend
         //    Hanya bahan baku utama (usage_stage=main_material) yang dikirim ke frontend.
         //    Format: { finished_item_id => { fabric_item_id => { qty, scrap_pct } } }
-        $bomData = \App\Models\ItemBomLine::query()
+        $bomLines = \App\Models\ItemBomLine::query()
             ->where('usage_stage', \App\Models\ItemBomLine::STAGE_MAIN_MATERIAL)
             ->whereHas('bom', fn($q) => $q->where('active', true))
             ->with('bom:id,item_id')
-            ->get()
+            ->get();
+
+        $bomData = $bomLines
             ->groupBy(fn($line) => (int) $line->bom->item_id)
             ->map(fn($lines) => $lines->keyBy(fn($l) => (int) $l->material_item_id)
                 ->map(fn($l) => ['qty' => (float) $l->qty, 'scrap_pct' => (float) $l->scrap_pct])
             );
 
+        // URL edit BOM per finished item: { finishedItemId => editUrl }
+        // URL quick-update line BOM: { finishedItemId => quickUrl }
+        $bomEditUrls = $bomLines
+            ->unique(fn($l) => (int) $l->bom->item_id)
+            ->mapWithKeys(fn($l) => [
+                (int) $l->bom->item_id => route('master.item_boms.edit', $l->bom->id),
+            ]);
+
+        $bomQuickUrls = $bomLines
+            ->unique(fn($l) => (int) $l->bom->item_id)
+            ->mapWithKeys(fn($l) => [
+                (int) $l->bom->item_id => route('master.item_boms.quick_line', $l->bom->id),
+            ]);
+
         return view('production.cutting_jobs.create', [
-            'lotStocks'  => $lotStocks,
-            'items'      => $items,
-            'operators'  => $operators,
-            'warehouses' => $warehouses,
-            'bomData'    => $bomData,
+            'lotStocks'    => $lotStocks,
+            'items'        => $items,
+            'operators'    => $operators,
+            'warehouses'   => $warehouses,
+            'bomData'      => $bomData,
+            'bomEditUrls'  => $bomEditUrls,
+            'bomQuickUrls' => $bomQuickUrls,
         ]);
     }
 

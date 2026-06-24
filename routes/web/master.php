@@ -118,6 +118,10 @@ Route::middleware(['web', 'auth', 'access:master'])->group(function () {
         Route::delete('item-boms/{bom}', [ItemBomController::class, 'destroy'])
             ->name('item_boms.destroy');
 
+        // Quick update satu BOM line dari form cutting job (AJAX)
+        Route::patch('item-boms/{bom}/quick-line', [ItemBomController::class, 'quickUpdateLine'])
+            ->name('item_boms.quick_line');
+
         // AJAX search select2
         Route::get('item-boms/ajax/items', [ItemBomController::class, 'ajaxItems'])
             ->name('item_boms.ajax_items');

@@ -639,7 +639,8 @@
                         </div>
                     @endif
 
-                    {{-- Quick Snapshot & Rollback --}}
+                    @if ($gfDbMode !== 'ops')
+                    {{-- Quick Snapshot & Rollback — hanya di mode DEV --}}
                     <div class="dropdown-divider"></div>
                     <div class="dropdown-header d-flex justify-content-between align-items-center pe-2">
                         <span>Snapshot</span>
@@ -686,7 +687,9 @@
                             Kelola snapshot →
                         </a>
                     @endif
+                    @endif {{-- snapshot: hanya DEV --}}
 
+                    {{-- Switch mode — selalu tampil --}}
                     <div class="dropdown-divider"></div>
 
                     <form action="{{ route('owner.database-mode.switch') }}" method="POST"
