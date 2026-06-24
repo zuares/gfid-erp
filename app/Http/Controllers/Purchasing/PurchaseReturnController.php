@@ -228,6 +228,8 @@ class PurchaseReturnController extends Controller
             ->where('source_id', (int) $purchase_return->id)
             ->count();
 
+        $journalEffect = $this->journalEffectPreview($purchase_return, $returnRows);
+
         return view('purchasing.purchase_returns.show', [
             'ret' => $purchase_return,
             'remainingMap' => $remainingMap,
@@ -238,6 +240,7 @@ class PurchaseReturnController extends Controller
             'stockReady' => $stockReady,
             'mutationCount' => $mutationCount,
             'journalCount' => $journalCount,
+            'journalEffect' => $journalEffect,
         ]);
     }
 
@@ -449,11 +452,14 @@ class PurchaseReturnController extends Controller
             }
 
             // COA
-            $invId = (int) Account::where('code', '1201')->value('id');
+            $inventoryAccountIds = Account::query()
+                ->whereIn('code', [JournalService::CODE_INV_RAW, JournalService::CODE_INV_PACKAGING])
+                ->pluck('id', 'code')
+                ->map(fn($id) => (int) $id);
             $apId = (int) Account::where('code', '2101')->value('id');
             $claimId = (int) Account::where('code', '1305')->value('id');
 
-            if ($invId <= 0 || $apId <= 0 || $claimId <= 0) {
+            if (($inventoryAccountIds[JournalService::CODE_INV_RAW] ?? 0) <= 0 || $apId <= 0 || $claimId <= 0) {
                 throw ValidationException::withMessages([
                     'return' => 'COA belum lengkap. Pastikan ada 1201, 2101, dan 1305.',
                 ]);
@@ -466,6 +472,7 @@ class PurchaseReturnController extends Controller
             // split total INV vs EXP
             $invTotal = 0.0;
             $expTotal = 0.0;
+            $invCreditByAcc = [];
 
             // map expense account by po_line
             $expAccMap = $this->expenseAccountMapFromOrderLines($purchase_return);
@@ -485,6 +492,9 @@ class PurchaseReturnController extends Controller
 
                 if ($isHpp) {
                     $invTotal = round($invTotal + $amt, 2);
+                    $invCode = $this->inventoryAccountCodeForReturnLine($ln);
+                    $invAccId = (int) ($inventoryAccountIds[$invCode] ?? $inventoryAccountIds[JournalService::CODE_INV_RAW] ?? 0);
+                    $invCreditByAcc[$invAccId] = round((float) ($invCreditByAcc[$invAccId] ?? 0) + $amt, 2);
                 } else {
                     $expTotal = round($expTotal + $amt, 2);
                 }
@@ -529,7 +539,12 @@ class PurchaseReturnController extends Controller
                 $claimPortion = max(0, round($invTotal - $apPortion, 2));
 
                 $linesInv = [];
-                $linesInv[] = ['account_id' => $invId, 'debit' => 0, 'credit' => round($invTotal, 2)];
+                foreach ($invCreditByAcc as $accId => $amount) {
+                    $amount = round((float) $amount, 2);
+                    if ($amount > 0.0001) {
+                        $linesInv[] = ['account_id' => (int) $accId, 'debit' => 0, 'credit' => $amount];
+                    }
+                }
 
                 if ($apPortion > 0.0001) {
                     $linesInv[] = ['account_id' => $apId, 'debit' => round($apPortion, 2), 'credit' => 0];
@@ -760,6 +775,18 @@ class PurchaseReturnController extends Controller
         return true; // default hpp
     }
 
+    protected function inventoryAccountCodeForReturnLine(PurchaseReturnLine $line): string
+    {
+        $role = strtolower((string) ($line->item?->item_role ?? ''));
+
+        return match ($role) {
+            'shipping_supply' => JournalService::CODE_INV_PACKAGING,
+            'finished_good' => JournalService::CODE_INV_FG,
+            'wip' => JournalService::CODE_INV_WIP,
+            default => JournalService::CODE_INV_RAW,
+        };
+    }
+
     protected function expenseAccountMapFromOrderLines(PurchaseReturn $ret): array
     {
         // 1) ambil po_line_id yang dipakai oleh return lines
@@ -875,6 +902,38 @@ class PurchaseReturnController extends Controller
             ->sum('total');
 
         return max(0, round($debt - $paid - $dpApplied - $returned, 2));
+    }
+
+    protected function journalEffectPreview(PurchaseReturn $ret, $returnRows): array
+    {
+        $rows = collect($returnRows ?? [])->filter(fn($row) => (float) ($row->qty ?? 0) > 0.0001);
+
+        $inventoryTotal = round((float) $rows
+            ->filter(fn($row) => (bool) ($row->is_inventory ?? true))
+            ->sum(fn($row) => (float) ($row->line_total ?? 0)), 2);
+
+        $expenseTotal = round((float) $rows
+            ->reject(fn($row) => (bool) ($row->is_inventory ?? true))
+            ->sum(fn($row) => (float) ($row->line_total ?? 0)), 2);
+
+        $total = round($inventoryTotal + $expenseTotal, 2);
+        $apOutstanding = 0.0;
+
+        if (($ret->status ?? '') === 'draft' && ! $ret->voided_at && $ret->order) {
+            $apOutstanding = $this->calcApOutstandingByGrn($ret->order);
+        }
+
+        $apPortion = min($apOutstanding, $total);
+        $claimPortion = max(0, round($total - $apPortion, 2));
+
+        return [
+            'total' => $total,
+            'inventory_total' => $inventoryTotal,
+            'expense_total' => $expenseTotal,
+            'ap_outstanding' => round($apOutstanding, 2),
+            'ap_portion' => round($apPortion, 2),
+            'claim_portion' => round($claimPortion, 2),
+        ];
     }
 
     protected function toNumber($value): float

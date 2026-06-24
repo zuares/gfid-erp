@@ -4,6 +4,7 @@ namespace App\Services\Purchasing;
 
 use App\Helpers\CodeGenerator;
 use App\Models\Account;
+use App\Models\InventoryStock;
 use App\Models\Item;
 use App\Models\Lot;
 use App\Models\PurchaseOrderLine;
@@ -215,8 +216,8 @@ class GoodsReceiptService
                     unitCost: (float) $line->unit_price,
                 );
 
-                // update last price hanya untuk HPP
-                $this->touchLastPrices($grn, (int) $line->item_id, (float) $line->unit_price);
+                // update last price + moving average HPP
+                $this->touchLastPrices($grn, (int) $line->item_id, (float) $line->unit_price, (float) $line->qty_received);
             }
 
             // ==========================
@@ -253,6 +254,8 @@ class GoodsReceiptService
                 'finished_good' => '1203',
                 'wip'           => '1202',
                 'raw_material'  => '1201',
+                'production_supply' => '1201',
+                'shipping_supply' => '1205',
             ];
             // Pre-load account ids by code (cache)
             $invCodeToId = [];
@@ -535,6 +538,21 @@ class GoodsReceiptService
                 $this->syncReceivedStatus((int) $grn->purchase_order_id);
             }
 
+            // ==========================
+            // 3) RECALC MOVING AVERAGE HPP (hapus kontribusi GRN ini)
+            // ==========================
+            $affectedItemIds = $grn->lines
+                ->pluck('item_id')
+                ->filter()
+                ->map(fn($v) => (int) $v)
+                ->unique()
+                ->values()
+                ->all();
+
+            foreach ($affectedItemIds as $itemId) {
+                $this->recomputeHppFromHistory($itemId, excludeGrnId: (int) $grn->id);
+            }
+
             return $grn->fresh(['lines.item', 'supplier', 'warehouse']);
         });
     }
@@ -618,18 +636,93 @@ class GoodsReceiptService
         $grn->save();
     }
 
-    protected function touchLastPrices(PurchaseReceipt $grn, int $itemId, float $unitPrice): void
+    protected function touchLastPrices(PurchaseReceipt $grn, int $itemId, float $unitPrice, float $qtyReceived = 0): void
     {
         $unitPrice = round($unitPrice, 2);
 
-        Item::where('id', $itemId)->update([
-            'last_purchase_price' => $unitPrice,
-        ]);
+        $item = Item::find($itemId);
+        if (!$item) {
+            return;
+        }
+
+        // ============================================================
+        // MOVING AVERAGE HPP
+        // Formula: new_avg = (old_qty × old_hpp + qty_beli × harga_beli) / (old_qty + qty_beli)
+        // stockIn sudah dijalankan sebelum method ini, jadi total qty di DB
+        // sudah termasuk pembelian baru → old_qty = total_sekarang - qty_beli
+        // ============================================================
+        if ($qtyReceived > 0 && $unitPrice > 0) {
+            $totalQtyAfter = (float) InventoryStock::where('item_id', $itemId)->sum('qty');
+            $oldQty        = max(0.0, $totalQtyAfter - $qtyReceived);
+            $oldHpp        = (float) ($item->hpp ?? 0);
+
+            if ($totalQtyAfter > 0) {
+                $newHpp = ($oldQty * $oldHpp + $qtyReceived * $unitPrice) / $totalQtyAfter;
+            } else {
+                $newHpp = $unitPrice;
+            }
+
+            $item->hpp = round($newHpp, 2);
+        }
+
+        $item->last_purchase_price = $unitPrice;
+        $item->save();
 
         SupplierPrice::updateOrCreate(
             ['supplier_id' => $grn->supplier_id, 'item_id' => $itemId],
             ['last_price' => $unitPrice]
         );
+    }
+
+    /**
+     * Recalculate moving average HPP dari seluruh riwayat GRN posted,
+     * opsional exclude satu GRN (dipakai saat unpost).
+     *
+     * Cara: replay semua GRN stockIn per item secara kronologis,
+     * hitung running average → tulis ke items.hpp.
+     */
+    protected function recomputeHppFromHistory(int $itemId, ?int $excludeGrnId = null): void
+    {
+        // Ambil semua purchase receipt lines yang sudah posted, urut tanggal
+        $query = DB::table('purchase_receipt_lines as prl')
+            ->join('purchase_receipts as pr', 'pr.id', '=', 'prl.purchase_receipt_id')
+            ->where('pr.status', 'posted')
+            ->where('prl.item_id', $itemId)
+            ->whereRaw('CAST(prl.qty_received AS REAL) > 0')
+            ->whereRaw('CAST(prl.unit_price AS REAL) > 0');
+
+        if ($excludeGrnId) {
+            $query->where('pr.id', '!=', $excludeGrnId);
+        }
+
+        $lines = $query
+            ->orderBy('pr.date')
+            ->orderBy('pr.id')
+            ->select('prl.qty_received', 'prl.unit_price')
+            ->get();
+
+        if ($lines->isEmpty()) {
+            // Tidak ada riwayat beli → reset ke 0
+            Item::where('id', $itemId)->update(['hpp' => 0]);
+            return;
+        }
+
+        // Replay moving average
+        $runningQty = 0.0;
+        $runningHpp = 0.0;
+
+        foreach ($lines as $line) {
+            $qty   = (float) $line->qty_received;
+            $price = (float) $line->unit_price;
+
+            $newQty = $runningQty + $qty;
+            $runningHpp = $newQty > 0
+                ? ($runningQty * $runningHpp + $qty * $price) / $newQty
+                : $price;
+            $runningQty = $newQty;
+        }
+
+        Item::where('id', $itemId)->update(['hpp' => round($runningHpp, 2)]);
     }
 
     /**

@@ -155,7 +155,7 @@
       <div class="fw-bold mb-1">Terjadi error:</div>
       <ul class="mb-0">
         @foreach($errors->all() as $err)
-          <li>{{ $err }}</li>
+          <li>{!! nl2br(e($err)) !!}</li>
         @endforeach
       </ul>
     </div>

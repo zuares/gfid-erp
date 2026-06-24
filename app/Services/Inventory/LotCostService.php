@@ -64,26 +64,30 @@ class LotCostService
                 return $lot;
             }
 
-            $oldQty = $this->num($lot->qty_onhand);
+            $oldQty   = $this->num($lot->qty_onhand);
             $oldTotal = $this->num($lot->total_cost);
-            $avg = $this->num($lot->avg_cost);
+            $avg      = $this->num($lot->avg_cost);
 
+            // Izinkan minus — cutting bisa pakai 2+ LOT secara proporsional,
+            // total akan balance. Hard-throw di sini memblokir skenario multi-LOT.
             if ($oldQty < $qty) {
-                throw new \RuntimeException(
-                    "Qty LOT tidak cukup. LOT {$lot->code}, saldo: {$oldQty}, minta: {$qty}"
+                \Illuminate\Support\Facades\Log::warning(
+                    "LotCost: qty_onhand LOT {$lot->code} akan minus ({$oldQty} - {$qty}). " .
+                    "Pastikan total semua LOT mencukupi kebutuhan cutting."
                 );
             }
 
             $costOut = $qty * $avg;
 
-            $newQty = $oldQty - $qty;
+            $newQty   = $oldQty - $qty;
             $newTotal = $oldTotal - $costOut;
 
             $lot->qty_onhand = $newQty;
             $lot->total_cost = $newTotal;
+            // Pertahankan avg_cost jika qty ≤ 0 agar data HPP tidak hilang
             $lot->avg_cost = $newQty > 0 ? round($newTotal / $newQty, 4) : $avg;
 
-            if ($newQty == 0) {
+            if ($newQty <= 0) {
                 $lot->status = 'closed';
             }
 

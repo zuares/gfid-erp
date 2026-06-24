@@ -450,7 +450,6 @@
               showCancelButton: true,
               confirmButtonText: form.dataset.gfConfirmOk || form.dataset.confirmOk || 'Ya, lanjutkan',
               cancelButtonText: form.dataset.gfConfirmCancel || form.dataset.confirmCancel || 'Batal',
-              reverseButtons: true,
             }).then((result) => {
               if (!result.isConfirmed) return;
               form.dataset.confirmed = '1';
@@ -474,7 +473,6 @@
               showCancelButton: true,
               confirmButtonText: el.dataset.gfConfirmOk || 'Ya, lanjutkan',
               cancelButtonText: el.dataset.gfConfirmCancel || 'Batal',
-              reverseButtons: true,
             }).then((result) => {
               if (!result.isConfirmed) return;
               el.dataset.confirmed = '1';
@@ -610,6 +608,10 @@
         @php
             $gfDbMode = strtolower((string) env('APP_DB_MODE', ''));
             $gfDbPath = (string) (config('database.connections.sqlite.database') ?: '');
+            $gfOpsDbPath = (string) (env('GFID_OPS_DB') ?: database_path('database.sqlite'));
+            $gfOpsDbReady =
+                \Illuminate\Support\Facades\File::exists($gfOpsDbPath) &&
+                \Illuminate\Support\Facades\File::size($gfOpsDbPath) > 0;
             $gfDbMode = in_array($gfDbMode, ['dev', 'ops'], true)
                 ? $gfDbMode
                 : (str_contains($gfDbPath, 'dev') ? 'dev' : 'unknown');
@@ -631,6 +633,61 @@
                 <div class="dropdown-menu dropdown-menu-end gf-owner-mode-menu">
                     <div class="dropdown-header">Mode Database</div>
                     <div class="gf-owner-mode-path" title="{{ $gfDbPath }}">{{ basename($gfDbPath) ?: '-' }}</div>
+                    @if (!$gfOpsDbReady)
+                        <div class="gf-owner-mode-path" style="color:#b45309;" title="{{ $gfOpsDbPath }}">
+                            OPS belum disiapkan
+                        </div>
+                    @endif
+
+                    {{-- Quick Snapshot & Rollback --}}
+                    <div class="dropdown-divider"></div>
+                    <div class="dropdown-header d-flex justify-content-between align-items-center pe-2">
+                        <span>Snapshot</span>
+                        <form action="{{ route('owner.snapshots.store') }}" method="POST" class="m-0">
+                            @csrf
+                            <button type="submit" class="btn btn-warning btn-sm py-0 px-2" style="font-size:11px;">
+                                <i class="bi bi-camera"></i> Ambil
+                            </button>
+                        </form>
+                    </div>
+
+                    @if(!empty($gfSnapshots))
+                        @foreach($gfSnapshots as $snap)
+                            <div class="d-flex align-items-center gap-1 px-2 py-1">
+                                <div class="flex-grow-1 overflow-hidden" style="min-width:0;">
+                                    <div class="small fw-medium text-truncate" style="font-size:11px;max-width:140px;">
+                                        {{ $snap['label'] ?? $snap['date']?->format('d/m H:i') ?? $snap['filename'] }}
+                                    </div>
+                                    <div class="text-muted" style="font-size:10px;">
+                                        {{ $snap['date']?->format('d M H:i') }} · {{ $snap['size_mb'] }} MB
+                                    </div>
+                                </div>
+                                <form action="{{ route('owner.snapshots.restore', $snap['filename']) }}"
+                                    method="POST" class="m-0 flex-shrink-0"
+                                    data-gf-confirm
+                                    data-gf-confirm-title="Rollback ke snapshot ini?"
+                                    data-gf-confirm-text="{{ $snap['label'] ?? $snap['date']?->format('d M Y H:i') }} — DB aktif akan ditimpa, backup otomatis dibuat."
+                                    data-gf-confirm-icon="warning"
+                                    data-gf-confirm-ok="Rollback">
+                                    @csrf
+                                    @method('PATCH')
+                                    <button type="submit" class="btn btn-outline-warning btn-sm py-0 px-1" style="font-size:11px;">
+                                        <i class="bi bi-arrow-counterclockwise"></i>
+                                    </button>
+                                </form>
+                            </div>
+                        @endforeach
+                        <a href="{{ route('owner.snapshots.index') }}" class="dropdown-item text-muted" style="font-size:11px;">
+                            Semua snapshot →
+                        </a>
+                    @else
+                        <div class="px-3 py-1 text-muted" style="font-size:11px;">Belum ada snapshot</div>
+                        <a href="{{ route('owner.snapshots.index') }}" class="dropdown-item text-muted" style="font-size:11px;">
+                            Kelola snapshot →
+                        </a>
+                    @endif
+
+                    <div class="dropdown-divider"></div>
 
                     <form action="{{ route('owner.database-mode.switch') }}" method="POST"
                         data-gf-confirm
@@ -644,17 +701,32 @@
                         </button>
                     </form>
 
-                    <form action="{{ route('owner.database-mode.switch') }}" method="POST"
-                        data-gf-confirm
-                        data-gf-confirm-title="Pindah ke mode OPERASIONAL?"
-                        data-gf-confirm-text="Pastikan database operasional benar. Command akan menolak jika database kosong."
-                        data-gf-confirm-ok="Pakai OPS">
-                        @csrf
-                        <input type="hidden" name="mode" value="ops">
-                        <button type="submit" class="dropdown-item" @disabled($gfDbMode === 'ops')>
-                            OPS / Operasional
-                        </button>
-                    </form>
+                    @if ($gfOpsDbReady)
+                        <form action="{{ route('owner.database-mode.switch') }}" method="POST"
+                            data-gf-confirm
+                            data-gf-confirm-title="Pindah ke mode OPERASIONAL?"
+                            data-gf-confirm-text="Aplikasi akan memakai database operasional untuk seluruh modul."
+                            data-gf-confirm-ok="Pakai OPS">
+                            @csrf
+                            <input type="hidden" name="mode" value="ops">
+                            <button type="submit" class="dropdown-item" @disabled($gfDbMode === 'ops')>
+                                OPS / Operasional
+                            </button>
+                        </form>
+                    @else
+                        <form action="{{ route('owner.database-mode.switch') }}" method="POST"
+                            data-gf-confirm
+                            data-gf-confirm-title="Siapkan database OPERASIONAL?"
+                            data-gf-confirm-text="DB aktif sekarang akan disalin menjadi database operasional. Lakukan hanya jika data aktif ini memang data operasional yang benar."
+                            data-gf-confirm-ok="Siapkan OPS">
+                            @csrf
+                            <input type="hidden" name="mode" value="ops">
+                            <input type="hidden" name="action" value="init_from_current">
+                            <button type="submit" class="dropdown-item">
+                                Siapkan OPS dari DB aktif
+                            </button>
+                        </form>
+                    @endif
                 </div>
             </div>
 

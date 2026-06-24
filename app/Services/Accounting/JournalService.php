@@ -21,6 +21,7 @@ class JournalService
     public const CODE_INV_WIP = '1202'; // Persediaan WIP
     public const CODE_INV_FG  = '1203'; // Persediaan Barang Jadi
     public const CODE_INV_DEFECT = '1204'; // Persediaan Barang Cacat
+    public const CODE_INV_PACKAGING = '1205'; // Persediaan Packaging
     public const CODE_PAYABLE = self::CODE_AP;
     public const CODE_PAYROLL_PAYABLE = '2102';
     public const CODE_HPP = '5101'; // Harga Pokok Penjualan
@@ -1090,6 +1091,7 @@ class JournalService
             'wip' => self::CODE_INV_WIP,
             'raw_material' => self::CODE_INV_RAW,
             'production_supply' => self::CODE_INV_RAW,
+            'shipping_supply' => self::CODE_INV_PACKAGING,
         ];
 
         $hppId = $this->accountIdByCode(self::CODE_HPP);
@@ -1563,6 +1565,7 @@ class JournalService
         return match ($role) {
             'finished_good' => self::CODE_INV_FG,
             'wip' => self::CODE_INV_WIP,
+            'shipping_supply' => self::CODE_INV_PACKAGING,
             default => self::CODE_INV_RAW,
         };
     }

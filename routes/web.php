@@ -2,6 +2,7 @@
 
 use App\Http\Controllers\Owner\AccessControlController;
 use App\Http\Controllers\Owner\DatabaseModeController;
+use App\Http\Controllers\Owner\DatabaseSnapshotController;
 use App\Http\Controllers\Owner\WorkLogController;
 use App\Http\Controllers\Api\ItemController as ApiItemController;
 
@@ -42,6 +43,12 @@ Route::middleware(['auth'])
         });
 
         Route::post('database-mode', [DatabaseModeController::class, 'switch'])->name('database-mode.switch');
+
+        // Snapshot & Rollback
+        Route::get('snapshots', [DatabaseSnapshotController::class, 'index'])->name('snapshots.index');
+        Route::post('snapshots', [DatabaseSnapshotController::class, 'store'])->name('snapshots.store');
+        Route::patch('snapshots/{filename}', [DatabaseSnapshotController::class, 'restore'])->name('snapshots.restore');
+        Route::delete('snapshots/{filename}', [DatabaseSnapshotController::class, 'destroy'])->name('snapshots.destroy');
 
         Route::post('work-logs/{workLog}/done', [WorkLogController::class, 'markDone'])->name('work-logs.mark-done');
         Route::post('work-logs/{workLog}/reopen', [WorkLogController::class, 'reopen'])->name('work-logs.reopen');

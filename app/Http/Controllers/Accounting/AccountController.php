@@ -16,6 +16,7 @@ class AccountController extends Controller
         '1112', // Bank BCA
         '1151', // Uang Muka Pembelian
         '1201', // Persediaan Bahan Baku
+        '1205', // Persediaan Packaging
         '1305', // Piutang Supplier / Retur Pembelian
         '2101', // Hutang Dagang
         '3101', // Modal Pemilik
@@ -36,6 +37,7 @@ class AccountController extends Controller
         '1201',
         '1202',
         '1203',
+        '1205',
         '1301',
         '1302',
         '1305',

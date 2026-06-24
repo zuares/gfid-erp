@@ -83,11 +83,11 @@ if (!function_exists('po_order_type_label')) {
     function po_order_type_label(?string $type, bool $withIcon = false): string
     {
         $map = [
-            'material'     => ['label' => 'Bahan Baku',  'icon' => '🧵'],
+            'material'     => ['label' => 'Bahan Produksi',  'icon' => '🧵'],
             'finished_good'=> ['label' => 'Barang Jadi', 'icon' => '👕'],
-            'packing'      => ['label' => 'Packing',     'icon' => '📦'],
+            'packing'      => ['label' => 'Packaging',     'icon' => '📦'],
             'asset'        => ['label' => 'Aset',        'icon' => '🏭'],
-            'service'      => ['label' => 'Service',     'icon' => '🔧'],
+            'service'      => ['label' => 'Operasional',     'icon' => '🔧'],
             'jasa'         => ['label' => 'Jasa',        'icon' => '🤝'],
             'lainnya'      => ['label' => 'Lainnya',     'icon' => '📋'],
         ];

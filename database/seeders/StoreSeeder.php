@@ -1,39 +1,27 @@
 <?php
-
 namespace Database\Seeders;
-
-use App\Models\Channel;
-use App\Models\Store;
 use Illuminate\Database\Seeder;
-use Illuminate\Support\Str;
+use Illuminate\Support\Facades\DB;
 
 class StoreSeeder extends Seeder
 {
     public function run(): void
     {
-        $data = [
-            ['name' => 'Insight', 'channel_code' => 'SHP'],
-            ['name' => 'Gfid', 'channel_code' => 'TTK'],
-            ['name' => 'Offline', 'channel_code' => 'OFFL'],
-        ];
+        $chanId = DB::table('channels')->where('code', 'SHP')->value('id');
+        DB::table('stores')->updateOrInsert(
+            ['code' => 'SHP-INSIGHT'],
+            ['code' => 'SHP-INSIGHT', 'name' => 'Insight', 'channel_id' => $chanId, 'is_active' => 1, 'external_shop_id' => null]
+        );
+        $chanId = DB::table('channels')->where('code', 'TTK')->value('id');
+        DB::table('stores')->updateOrInsert(
+            ['code' => 'TTK-GFID'],
+            ['code' => 'TTK-GFID', 'name' => 'Gfid', 'channel_id' => $chanId, 'is_active' => 1, 'external_shop_id' => null]
+        );
+        $chanId = DB::table('channels')->where('code', 'OFFL')->value('id');
+        DB::table('stores')->updateOrInsert(
+            ['code' => 'OFFL-OFFLINE'],
+            ['code' => 'OFFL-OFFLINE', 'name' => 'Offline', 'channel_id' => $chanId, 'is_active' => 1, 'external_shop_id' => null]
+        );
 
-        foreach ($data as $row) {
-            $channel = Channel::where('code', $row['channel_code'])->first();
-
-            if (!$channel) {
-                continue;
-            }
-
-            $code = strtoupper($channel->code . '-' . Str::slug($row['name'], '-'));
-
-            Store::updateOrCreate(
-                ['code' => $code],
-                [
-                    'name' => $row['name'],
-                    'channel_id' => $channel->id,
-                    'is_active' => true,
-                ]
-            );
-        }
     }
 }

@@ -536,7 +536,7 @@
                     </a>
                 @endif
 
-                @if ($user && ($user->isOwner() || $isAdmin) && $order->order_type !== 'packing' && $status === 'approved')
+                @if ($user && ($user->isOwner() || $isAdmin) && $status === 'approved')
                     @if ($canCreateGrn ?? true)
                         <a href="{{ route('purchasing.purchase_receipts.create_from_order', $order->id) }}"
                             class="btn btn-outline-primary btn-sm">
@@ -880,7 +880,6 @@
                     <div class="gf-card-title">Penerimaan</div>
                     <div class="mono fw-semibold" style="font-size:.9rem;">{{ $grnCount }} dokumen</div>
                 </div>
-                @if ($order->order_type !== 'packing')
                 <div class="d-flex flex-wrap gap-2">
                     @if ($status === 'approved' && !($canCreateGrn ?? true))
                         <span class="modal-kpi">Semua diterima</span>
@@ -891,9 +890,6 @@
                         Semua
                     </a>
                 </div>
-                @else
-                <span class="modal-kpi">Tanpa penerimaan</span>
-                @endif
             </div>
 
             <div class="table-responsive d-none d-md-block">

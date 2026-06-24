@@ -43,6 +43,9 @@ Route::middleware(['web', 'auth', 'access:production'])
 
             Route::post('/{cuttingJob}/void', [CuttingJobController::class, 'void'])
                 ->name('void');
+
+            Route::post('/{cuttingJob}/sisa-fabric', [CuttingJobController::class, 'recordSisaFabric'])
+                ->name('sisa_fabric');
         });
 
         /*

@@ -86,6 +86,30 @@ class ItemController extends Controller
             $query->where('item_category_id', $categoryId);
         }
 
+        if ($codes = trim((string) $request->input('category_codes', ''))) {
+            $categoryCodes = collect(explode(',', $codes))
+                ->map(fn($code) => strtoupper(trim($code)))
+                ->filter()
+                ->unique()
+                ->values();
+
+            if ($categoryCodes->isNotEmpty()) {
+                $query->whereHas('category', fn($q) => $q->whereIn('code', $categoryCodes));
+            }
+        }
+
+        if ($codes = trim((string) $request->input('exclude_category_codes', ''))) {
+            $categoryCodes = collect(explode(',', $codes))
+                ->map(fn($code) => strtoupper(trim($code)))
+                ->filter()
+                ->unique()
+                ->values();
+
+            if ($categoryCodes->isNotEmpty()) {
+                $query->whereDoesntHave('category', fn($q) => $q->whereIn('code', $categoryCodes));
+            }
+        }
+
         // 🎯 Filter berdasarkan LOT (Cutting: item sesuai LOT kain yang dipilih)
         if ($lotId = $request->input('lot_id')) {
             // asumsi: tabel lots punya kolom item_id

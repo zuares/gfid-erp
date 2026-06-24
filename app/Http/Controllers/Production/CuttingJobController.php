@@ -10,9 +10,12 @@ use App\Models\ItemRole;
 use App\Models\Lot;
 use App\Models\QcResult;
 use App\Models\Warehouse;
+use App\Models\CuttingJobLot;
 use App\Services\Accounting\JournalService;
 use App\Services\Inventory\InventoryService;
+use App\Services\Inventory\LotCostService;
 use App\Services\Production\CuttingService;
+use Illuminate\Validation\ValidationException;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Log;
@@ -25,6 +28,7 @@ class CuttingJobController extends Controller
         protected InventoryService $inventory,
         protected CuttingService $cutting,
         protected JournalService $journal,
+        protected LotCostService $lotCost,
     ) {}
 
     /**
@@ -966,6 +970,7 @@ class CuttingJobController extends Controller
         $cuttingJob->load([
             'warehouse',
             'lot.item',
+            'lots.lot.item',
             'bundles.finishedItem',
             'bundles.operator',
             'bundles.qcResults' => function ($q) {
@@ -1158,6 +1163,99 @@ class CuttingJobController extends Controller
                     'updated_at' => now(),
                 ]);
         }
+    }
+
+    /**
+     * Catat sisa kain fisik setelah cutting dan kembalikan ke RM.
+     * Tiap LOT bisa punya qty_sisa_fabric masing-masing.
+     */
+    public function recordSisaFabric(Request $request, CuttingJob $cuttingJob)
+    {
+        $validated = $request->validate([
+            'lots'              => ['required', 'array', 'min:1'],
+            'lots.*.lot_id'     => ['required', 'integer', 'exists:lots,id'],
+            'lots.*.qty_sisa'   => ['required', 'numeric', 'min:0'],
+        ]);
+
+        $rmWarehouseId = Warehouse::where('code', 'RM')->value('id');
+        if (!$rmWarehouseId) {
+            throw ValidationException::withMessages(['lots' => 'Gudang RM belum dikonfigurasi.']);
+        }
+
+        $epsilon = 0.0001;
+        $processed = 0;
+
+        DB::transaction(function () use ($validated, $cuttingJob, $rmWarehouseId, $epsilon, &$processed) {
+
+            foreach ($validated['lots'] as $row) {
+                $lotId   = (int) $row['lot_id'];
+                $qtySisa = (float) $row['qty_sisa'];
+
+                if ($qtySisa <= $epsilon) {
+                    continue;
+                }
+
+                // Cari pivot cutting_job_lots
+                $cjLot = CuttingJobLot::where('cutting_job_id', $cuttingJob->id)
+                    ->where('lot_id', $lotId)
+                    ->lockForUpdate()
+                    ->first();
+
+                if (!$cjLot) {
+                    throw ValidationException::withMessages([
+                        'lots' => "LOT #{$lotId} tidak terdaftar di cutting job ini.",
+                    ]);
+                }
+
+                if ($cjLot->sisa_recorded_at) {
+                    throw ValidationException::withMessages([
+                        'lots' => "Sisa bahan LOT #{$lotId} sudah pernah dicatat. Tidak bisa dicatat ulang.",
+                    ]);
+                }
+
+                // Ambil avg_cost LOT untuk stockIn
+                $lot     = Lot::lockForUpdate()->findOrFail($lotId);
+                $avgCost = (float) ($lot->avg_cost ?? 0);
+
+                // 1. StockIn ke RM
+                $this->inventory->stockIn(
+                    warehouseId: $rmWarehouseId,
+                    itemId: (int) $cuttingJob->fabric_item_id,
+                    qty: $qtySisa,
+                    date: now(),
+                    sourceType: 'cutting_job_sisa',
+                    sourceId: (int) $cuttingJob->id,
+                    notes: "Sisa kain cutting {$cuttingJob->code} - LOT {$lot->code}",
+                    lotId: $lotId,
+                    unitCost: $avgCost > 0 ? $avgCost : null,
+                    affectLotCost: false,
+                );
+
+                // 2. Tambah kembali qty_onhand LOT
+                $lot->qty_onhand  = (float) $lot->qty_onhand + $qtySisa;
+                $lot->total_cost  = $lot->qty_onhand * $avgCost;
+                if ($lot->status === 'closed' && $lot->qty_onhand > 0) {
+                    $lot->status = 'active';
+                }
+                $lot->save();
+
+                // 3. Catat di pivot
+                $cjLot->qty_sisa_fabric   = $qtySisa;
+                $cjLot->sisa_recorded_at  = now();
+                $cjLot->sisa_recorded_by  = auth()->id();
+                $cjLot->save();
+
+                $processed++;
+            }
+        });
+
+        if ($processed === 0) {
+            return back()->with('warning', 'Tidak ada sisa yang perlu dicatat (qty = 0).');
+        }
+
+        return redirect()
+            ->route('production.cutting_jobs.show', $cuttingJob)
+            ->with('success', "Sisa kain berhasil dicatat dan dikembalikan ke RM ({$processed} LOT).");
     }
 
 }

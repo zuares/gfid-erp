@@ -14,6 +14,7 @@ class ApplicationDatabaseMode extends Command
         {--dev-db= : Path database development custom}
         {--no-copy : Untuk mode dev, jangan copy DB operasional ke DB dev}
         {--from-current : Untuk mode dev, copy dari DB yang sedang aktif}
+        {--init-from-current : Untuk mode ops, buat DB operasional dari DB yang sedang aktif}
         {--force : Tetap lanjut walau database sumber kosong/tidak umum}';
 
     protected $description = 'Switch database global aplikasi antara operasional dan development.';
@@ -47,7 +48,7 @@ class ApplicationDatabaseMode extends Command
             return $this->switchToDev($currentDb, $opsDb, $devDb);
         }
 
-        return $this->switchToOps($opsDb, $devDb);
+        return $this->switchToOps($currentDb, $opsDb, $devDb);
     }
 
     private function switchToDev(string $currentDb, string $opsDb, string $devDb): int
@@ -93,15 +94,35 @@ class ApplicationDatabaseMode extends Command
         return self::SUCCESS;
     }
 
-    private function switchToOps(string $opsDb, string $devDb): int
+    private function switchToOps(string $currentDb, string $opsDb, string $devDb): int
     {
         $this->line('=== Switch ke Database Operasional ===');
         $this->line('Target : ' . $opsDb);
         $this->newLine();
 
+        if ($this->option('init-from-current')) {
+            $this->line('Init OPS dari DB aktif: ' . $currentDb);
+
+            if (! $this->assertReadableDatabase($currentDb, 'database aktif')) {
+                return self::FAILURE;
+            }
+
+            if ($this->samePath($currentDb, $opsDb)) {
+                $this->warn('DB aktif sudah sama dengan target OPS. Copy dilewati.');
+            } else {
+                $this->backupIfExists($opsDb, 'ops');
+                File::ensureDirectoryExists(dirname($opsDb));
+                File::copy($currentDb, $opsDb);
+                $this->info('Database operasional dibuat dari DB aktif.');
+            }
+        }
+
         if (! $this->assertReadableDatabase($opsDb, 'database operasional')) {
             $this->warn('Kalau database operasional kamu bukan database/database.sqlite, jalankan:');
             $this->line('php artisan app:mode ops --ops-db=/path/ke/database_operasional.sqlite');
+            $this->line('');
+            $this->warn('Kalau DB aktif sekarang memang mau dijadikan operasional, jalankan:');
+            $this->line('php artisan app:mode ops --init-from-current');
             return self::FAILURE;
         }
 

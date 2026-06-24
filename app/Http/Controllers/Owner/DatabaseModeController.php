@@ -23,6 +23,7 @@ class DatabaseModeController extends Controller
 
         $data = $request->validate([
             'mode' => ['required', 'in:dev,ops'],
+            'action' => ['nullable', 'in:init_from_current'],
         ]);
 
         $mode = (string) $data['mode'];
@@ -30,13 +31,21 @@ class DatabaseModeController extends Controller
 
         if ($mode === 'dev') {
             $arguments['--no-copy'] = true;
+            $arguments['--force'] = true; // izinkan devDb kosong, user bisa migrate:fresh --seed setelah ini
+        }
+
+        if ($mode === 'ops' && ($data['action'] ?? null) === 'init_from_current') {
+            $arguments['--init-from-current'] = true;
         }
 
         $code = Artisan::call('app:mode', $arguments);
         $output = trim(Artisan::output());
 
         if ($code !== 0) {
-            return back()->with('error', $output ?: 'Gagal mengganti mode database.');
+            // Ambil baris terakhir yang bermakna dari output artisan (hindari raw multi-line di toast)
+            $lines = array_filter(array_map('trim', explode("\n", $output)));
+            $lastLine = end($lines) ?: 'Gagal mengganti mode database.';
+            return back()->with('error', $lastLine);
         }
 
         return back()->with('success', $mode === 'dev'

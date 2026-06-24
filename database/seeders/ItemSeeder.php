@@ -1,469 +1,2894 @@
 <?php
-
 namespace Database\Seeders;
-
-use App\Models\Item;
-use App\Models\ItemCategory;
-use App\Models\ItemCostSnapshot;
 use Illuminate\Database\Seeder;
-use Illuminate\Support\Carbon;
 use Illuminate\Support\Facades\DB;
-use Illuminate\Support\Facades\Schema;
 
 class ItemSeeder extends Seeder
 {
     public function run(): void
     {
-        DB::transaction(function () {
+        $catId = DB::table('item_categories')->where('code', 'CRG')->value('id');
+        $roleId = DB::table('item_roles')->where('code', 'FG')->value('id');
+        DB::table('items')->updateOrInsert(
+            ['code' => 'C5BLK'],
+            [
+                'code' => 'C5BLK',
+                'name' => 'Jogger Pendek Cargo C5 Hitam',
+                'unit' => 'pcs',
+                'type' => 'finished_good',
+                'item_category_id' => $catId,
+                'item_role' => 'finished_good',
+                'item_role_id' => $roleId,
+                'last_purchase_price' => 0,
+                'hpp' => 35000,
+                'active' => 1,
+                'affects_hpp' => 1,
+                'default_allocation' => 'hpp',
+                'production_source' => 'in_house',
+                'allow_negative' => 0,
+                'is_stocked' => 1,
+            ]
+        );
+        $catId = DB::table('item_categories')->where('code', 'CRG')->value('id');
+        $roleId = DB::table('item_roles')->where('code', 'FG')->value('id');
+        DB::table('items')->updateOrInsert(
+            ['code' => 'C5MST'],
+            [
+                'code' => 'C5MST',
+                'name' => 'Jogger Pendek Cargo C5 Misty (Abu-Abu) M71',
+                'unit' => 'pcs',
+                'type' => 'finished_good',
+                'item_category_id' => $catId,
+                'item_role' => 'finished_good',
+                'item_role_id' => $roleId,
+                'last_purchase_price' => 0,
+                'hpp' => 35000,
+                'active' => 1,
+                'affects_hpp' => 1,
+                'default_allocation' => 'hpp',
+                'production_source' => 'in_house',
+                'allow_negative' => 0,
+                'is_stocked' => 1,
+            ]
+        );
+        $catId = DB::table('item_categories')->where('code', 'CRG')->value('id');
+        $roleId = DB::table('item_roles')->where('code', 'FG')->value('id');
+        DB::table('items')->updateOrInsert(
+            ['code' => 'C5NVY'],
+            [
+                'code' => 'C5NVY',
+                'name' => 'Jogger Pendek Cargo C5 Navy',
+                'unit' => 'pcs',
+                'type' => 'finished_good',
+                'item_category_id' => $catId,
+                'item_role' => 'finished_good',
+                'item_role_id' => $roleId,
+                'last_purchase_price' => 0,
+                'hpp' => 35000,
+                'active' => 1,
+                'affects_hpp' => 1,
+                'default_allocation' => 'hpp',
+                'production_source' => 'in_house',
+                'allow_negative' => 0,
+                'is_stocked' => 1,
+            ]
+        );
+        $catId = DB::table('item_categories')->where('code', 'CRG')->value('id');
+        $roleId = DB::table('item_roles')->where('code', 'FG')->value('id');
+        DB::table('items')->updateOrInsert(
+            ['code' => 'C7BLK'],
+            [
+                'code' => 'C7BLK',
+                'name' => 'Jogger Pendek Cargo C7 Hitam',
+                'unit' => 'pcs',
+                'type' => 'finished_good',
+                'item_category_id' => $catId,
+                'item_role' => 'finished_good',
+                'item_role_id' => $roleId,
+                'last_purchase_price' => 0,
+                'hpp' => 35000,
+                'active' => 1,
+                'affects_hpp' => 1,
+                'default_allocation' => 'hpp',
+                'production_source' => 'in_house',
+                'allow_negative' => 0,
+                'is_stocked' => 1,
+            ]
+        );
+        $catId = DB::table('item_categories')->where('code', 'CRG')->value('id');
+        $roleId = DB::table('item_roles')->where('code', 'FG')->value('id');
+        DB::table('items')->updateOrInsert(
+            ['code' => 'C7MST'],
+            [
+                'code' => 'C7MST',
+                'name' => 'Jogger Pendek Cargo C7 Misty (Abu-Abu) M71',
+                'unit' => 'pcs',
+                'type' => 'finished_good',
+                'item_category_id' => $catId,
+                'item_role' => 'finished_good',
+                'item_role_id' => $roleId,
+                'last_purchase_price' => 0,
+                'hpp' => 35000,
+                'active' => 1,
+                'affects_hpp' => 1,
+                'default_allocation' => 'hpp',
+                'production_source' => 'in_house',
+                'allow_negative' => 0,
+                'is_stocked' => 1,
+            ]
+        );
+        $catId = DB::table('item_categories')->where('code', 'CRG')->value('id');
+        $roleId = DB::table('item_roles')->where('code', 'FG')->value('id');
+        DB::table('items')->updateOrInsert(
+            ['code' => 'C7NVY'],
+            [
+                'code' => 'C7NVY',
+                'name' => 'Jogger Pendek Cargo C7 Navy',
+                'unit' => 'pcs',
+                'type' => 'finished_good',
+                'item_category_id' => $catId,
+                'item_role' => 'finished_good',
+                'item_role_id' => $roleId,
+                'last_purchase_price' => 0,
+                'hpp' => 35000,
+                'active' => 1,
+                'affects_hpp' => 1,
+                'default_allocation' => 'hpp',
+                'production_source' => 'in_house',
+                'allow_negative' => 0,
+                'is_stocked' => 1,
+            ]
+        );
+        $catId = DB::table('item_categories')->where('code', 'LJR')->value('id');
+        $roleId = DB::table('item_roles')->where('code', 'FG')->value('id');
+        DB::table('items')->updateOrInsert(
+            ['code' => 'J3ABT'],
+            [
+                'code' => 'J3ABT',
+                'name' => 'Jogger Panjang Basic J3 Abu Tua M81',
+                'unit' => 'pcs',
+                'type' => 'finished_good',
+                'item_category_id' => $catId,
+                'item_role' => 'finished_good',
+                'item_role_id' => $roleId,
+                'last_purchase_price' => 0,
+                'hpp' => 51500,
+                'active' => 1,
+                'affects_hpp' => 1,
+                'default_allocation' => 'hpp',
+                'production_source' => 'in_house',
+                'allow_negative' => 0,
+                'is_stocked' => 1,
+            ]
+        );
+        $catId = DB::table('item_categories')->where('code', 'LJR')->value('id');
+        $roleId = DB::table('item_roles')->where('code', 'FG')->value('id');
+        DB::table('items')->updateOrInsert(
+            ['code' => 'J3BLK'],
+            [
+                'code' => 'J3BLK',
+                'name' => 'Jogger Panjang Basic J3 Hitam',
+                'unit' => 'pcs',
+                'type' => 'finished_good',
+                'item_category_id' => $catId,
+                'item_role' => 'finished_good',
+                'item_role_id' => $roleId,
+                'last_purchase_price' => 0,
+                'hpp' => 51500,
+                'active' => 1,
+                'affects_hpp' => 1,
+                'default_allocation' => 'hpp',
+                'production_source' => 'in_house',
+                'allow_negative' => 0,
+                'is_stocked' => 1,
+            ]
+        );
+        $catId = DB::table('item_categories')->where('code', 'LJR')->value('id');
+        $roleId = DB::table('item_roles')->where('code', 'FG')->value('id');
+        DB::table('items')->updateOrInsert(
+            ['code' => 'J3MST'],
+            [
+                'code' => 'J3MST',
+                'name' => 'Jogger Panjang Basic J3 Misty (Abu-Abu) M71',
+                'unit' => 'pcs',
+                'type' => 'finished_good',
+                'item_category_id' => $catId,
+                'item_role' => 'finished_good',
+                'item_role_id' => $roleId,
+                'last_purchase_price' => 0,
+                'hpp' => 51500,
+                'active' => 1,
+                'affects_hpp' => 1,
+                'default_allocation' => 'hpp',
+                'production_source' => 'in_house',
+                'allow_negative' => 0,
+                'is_stocked' => 1,
+            ]
+        );
+        $catId = DB::table('item_categories')->where('code', 'LJR')->value('id');
+        $roleId = DB::table('item_roles')->where('code', 'FG')->value('id');
+        DB::table('items')->updateOrInsert(
+            ['code' => 'J3NVY'],
+            [
+                'code' => 'J3NVY',
+                'name' => 'Jogger Panjang Basic J3 Navy',
+                'unit' => 'pcs',
+                'type' => 'finished_good',
+                'item_category_id' => $catId,
+                'item_role' => 'finished_good',
+                'item_role_id' => $roleId,
+                'last_purchase_price' => 0,
+                'hpp' => 51500,
+                'active' => 1,
+                'affects_hpp' => 1,
+                'default_allocation' => 'hpp',
+                'production_source' => 'in_house',
+                'allow_negative' => 0,
+                'is_stocked' => 1,
+            ]
+        );
+        $catId = DB::table('item_categories')->where('code', 'LJR')->value('id');
+        $roleId = DB::table('item_roles')->where('code', 'FG')->value('id');
+        DB::table('items')->updateOrInsert(
+            ['code' => 'J5ABT'],
+            [
+                'code' => 'J5ABT',
+                'name' => 'Jogger Panjang Basic J5 Abu Tua M81',
+                'unit' => 'pcs',
+                'type' => 'finished_good',
+                'item_category_id' => $catId,
+                'item_role' => 'finished_good',
+                'item_role_id' => $roleId,
+                'last_purchase_price' => 0,
+                'hpp' => 51500,
+                'active' => 1,
+                'affects_hpp' => 1,
+                'default_allocation' => 'hpp',
+                'production_source' => 'in_house',
+                'allow_negative' => 0,
+                'is_stocked' => 1,
+            ]
+        );
+        $catId = DB::table('item_categories')->where('code', 'LJR')->value('id');
+        $roleId = DB::table('item_roles')->where('code', 'FG')->value('id');
+        DB::table('items')->updateOrInsert(
+            ['code' => 'J5BLK'],
+            [
+                'code' => 'J5BLK',
+                'name' => 'Jogger Panjang Basic J5 Hitam',
+                'unit' => 'pcs',
+                'type' => 'finished_good',
+                'item_category_id' => $catId,
+                'item_role' => 'finished_good',
+                'item_role_id' => $roleId,
+                'last_purchase_price' => 0,
+                'hpp' => 51500,
+                'active' => 1,
+                'affects_hpp' => 1,
+                'default_allocation' => 'hpp',
+                'production_source' => 'in_house',
+                'allow_negative' => 0,
+                'is_stocked' => 1,
+            ]
+        );
+        $catId = DB::table('item_categories')->where('code', 'LJR')->value('id');
+        $roleId = DB::table('item_roles')->where('code', 'FG')->value('id');
+        DB::table('items')->updateOrInsert(
+            ['code' => 'J5MST'],
+            [
+                'code' => 'J5MST',
+                'name' => 'Jogger Panjang Basic J5 Misty (Abu-Abu) M71',
+                'unit' => 'pcs',
+                'type' => 'finished_good',
+                'item_category_id' => $catId,
+                'item_role' => 'finished_good',
+                'item_role_id' => $roleId,
+                'last_purchase_price' => 0,
+                'hpp' => 51500,
+                'active' => 1,
+                'affects_hpp' => 1,
+                'default_allocation' => 'hpp',
+                'production_source' => 'in_house',
+                'allow_negative' => 0,
+                'is_stocked' => 1,
+            ]
+        );
+        $catId = DB::table('item_categories')->where('code', 'LJR')->value('id');
+        $roleId = DB::table('item_roles')->where('code', 'FG')->value('id');
+        DB::table('items')->updateOrInsert(
+            ['code' => 'J5NVY'],
+            [
+                'code' => 'J5NVY',
+                'name' => 'Jogger Panjang Basic J5 Navy',
+                'unit' => 'pcs',
+                'type' => 'finished_good',
+                'item_category_id' => $catId,
+                'item_role' => 'finished_good',
+                'item_role_id' => $roleId,
+                'last_purchase_price' => 0,
+                'hpp' => 51500,
+                'active' => 1,
+                'affects_hpp' => 1,
+                'default_allocation' => 'hpp',
+                'production_source' => 'in_house',
+                'allow_negative' => 0,
+                'is_stocked' => 1,
+            ]
+        );
+        $catId = DB::table('item_categories')->where('code', 'LJR')->value('id');
+        $roleId = DB::table('item_roles')->where('code', 'FG')->value('id');
+        DB::table('items')->updateOrInsert(
+            ['code' => 'J7ABT'],
+            [
+                'code' => 'J7ABT',
+                'name' => 'Jogger Panjang Basic J7 Abu Tua M81',
+                'unit' => 'pcs',
+                'type' => 'finished_good',
+                'item_category_id' => $catId,
+                'item_role' => 'finished_good',
+                'item_role_id' => $roleId,
+                'last_purchase_price' => 0,
+                'hpp' => 51500,
+                'active' => 1,
+                'affects_hpp' => 1,
+                'default_allocation' => 'hpp',
+                'production_source' => 'in_house',
+                'allow_negative' => 0,
+                'is_stocked' => 1,
+            ]
+        );
+        $catId = DB::table('item_categories')->where('code', 'LJR')->value('id');
+        $roleId = DB::table('item_roles')->where('code', 'FG')->value('id');
+        DB::table('items')->updateOrInsert(
+            ['code' => 'J7BLK'],
+            [
+                'code' => 'J7BLK',
+                'name' => 'Jogger Panjang Basic J7 Hitam',
+                'unit' => 'pcs',
+                'type' => 'finished_good',
+                'item_category_id' => $catId,
+                'item_role' => 'finished_good',
+                'item_role_id' => $roleId,
+                'last_purchase_price' => 0,
+                'hpp' => 51500,
+                'active' => 1,
+                'affects_hpp' => 1,
+                'default_allocation' => 'hpp',
+                'production_source' => 'in_house',
+                'allow_negative' => 0,
+                'is_stocked' => 1,
+            ]
+        );
+        $catId = DB::table('item_categories')->where('code', 'LJR')->value('id');
+        $roleId = DB::table('item_roles')->where('code', 'FG')->value('id');
+        DB::table('items')->updateOrInsert(
+            ['code' => 'J7MST'],
+            [
+                'code' => 'J7MST',
+                'name' => 'Jogger Panjang Basic J7 Misty (Abu-Abu) M71',
+                'unit' => 'pcs',
+                'type' => 'finished_good',
+                'item_category_id' => $catId,
+                'item_role' => 'finished_good',
+                'item_role_id' => $roleId,
+                'last_purchase_price' => 0,
+                'hpp' => 51500,
+                'active' => 1,
+                'affects_hpp' => 1,
+                'default_allocation' => 'hpp',
+                'production_source' => 'in_house',
+                'allow_negative' => 0,
+                'is_stocked' => 1,
+            ]
+        );
+        $catId = DB::table('item_categories')->where('code', 'LJR')->value('id');
+        $roleId = DB::table('item_roles')->where('code', 'FG')->value('id');
+        DB::table('items')->updateOrInsert(
+            ['code' => 'J7NVY'],
+            [
+                'code' => 'J7NVY',
+                'name' => 'Jogger Panjang Basic J7 Navy',
+                'unit' => 'pcs',
+                'type' => 'finished_good',
+                'item_category_id' => $catId,
+                'item_role' => 'finished_good',
+                'item_role_id' => $roleId,
+                'last_purchase_price' => 0,
+                'hpp' => 51500,
+                'active' => 1,
+                'affects_hpp' => 1,
+                'default_allocation' => 'hpp',
+                'production_source' => 'in_house',
+                'allow_negative' => 0,
+                'is_stocked' => 1,
+            ]
+        );
+        $catId = DB::table('item_categories')->where('code', 'SJR')->value('id');
+        $roleId = DB::table('item_roles')->where('code', 'FG')->value('id');
+        DB::table('items')->updateOrInsert(
+            ['code' => 'K1ABT'],
+            [
+                'code' => 'K1ABT',
+                'name' => 'Jogger Pendek Basic K1 Abu Tua M81',
+                'unit' => 'pcs',
+                'type' => 'finished_good',
+                'item_category_id' => $catId,
+                'item_role' => 'finished_good',
+                'item_role_id' => $roleId,
+                'last_purchase_price' => 0,
+                'hpp' => 33000,
+                'active' => 1,
+                'affects_hpp' => 1,
+                'default_allocation' => 'hpp',
+                'production_source' => 'in_house',
+                'allow_negative' => 0,
+                'is_stocked' => 1,
+            ]
+        );
+        $catId = DB::table('item_categories')->where('code', 'SJR')->value('id');
+        $roleId = DB::table('item_roles')->where('code', 'FG')->value('id');
+        DB::table('items')->updateOrInsert(
+            ['code' => 'K1BLK'],
+            [
+                'code' => 'K1BLK',
+                'name' => 'Jogger Pendek Basic K1 Hitam',
+                'unit' => 'pcs',
+                'type' => 'finished_good',
+                'item_category_id' => $catId,
+                'item_role' => 'finished_good',
+                'item_role_id' => $roleId,
+                'last_purchase_price' => 0,
+                'hpp' => 33000,
+                'active' => 1,
+                'affects_hpp' => 1,
+                'default_allocation' => 'hpp',
+                'production_source' => 'in_house',
+                'allow_negative' => 0,
+                'is_stocked' => 1,
+            ]
+        );
+        $catId = DB::table('item_categories')->where('code', 'SJR')->value('id');
+        $roleId = DB::table('item_roles')->where('code', 'FG')->value('id');
+        DB::table('items')->updateOrInsert(
+            ['code' => 'K1MST'],
+            [
+                'code' => 'K1MST',
+                'name' => 'Jogger Pendek Basic K1 Misty (Abu-Abu) M71',
+                'unit' => 'pcs',
+                'type' => 'finished_good',
+                'item_category_id' => $catId,
+                'item_role' => 'finished_good',
+                'item_role_id' => $roleId,
+                'last_purchase_price' => 0,
+                'hpp' => 33000,
+                'active' => 1,
+                'affects_hpp' => 1,
+                'default_allocation' => 'hpp',
+                'production_source' => 'in_house',
+                'allow_negative' => 0,
+                'is_stocked' => 1,
+            ]
+        );
+        $catId = DB::table('item_categories')->where('code', 'SJR')->value('id');
+        $roleId = DB::table('item_roles')->where('code', 'FG')->value('id');
+        DB::table('items')->updateOrInsert(
+            ['code' => 'K1NVY'],
+            [
+                'code' => 'K1NVY',
+                'name' => 'Jogger Pendek Basic K1 Navy',
+                'unit' => 'pcs',
+                'type' => 'finished_good',
+                'item_category_id' => $catId,
+                'item_role' => 'finished_good',
+                'item_role_id' => $roleId,
+                'last_purchase_price' => 0,
+                'hpp' => 33000,
+                'active' => 1,
+                'affects_hpp' => 1,
+                'default_allocation' => 'hpp',
+                'production_source' => 'in_house',
+                'allow_negative' => 0,
+                'is_stocked' => 1,
+            ]
+        );
+        $catId = DB::table('item_categories')->where('code', 'SJR')->value('id');
+        $roleId = DB::table('item_roles')->where('code', 'FG')->value('id');
+        DB::table('items')->updateOrInsert(
+            ['code' => 'K1WHT'],
+            [
+                'code' => 'K1WHT',
+                'name' => 'Jogger Pendek Basic K1 Putih',
+                'unit' => 'pcs',
+                'type' => 'finished_good',
+                'item_category_id' => $catId,
+                'item_role' => 'finished_good',
+                'item_role_id' => $roleId,
+                'last_purchase_price' => 0,
+                'hpp' => 33000,
+                'active' => 1,
+                'affects_hpp' => 1,
+                'default_allocation' => 'hpp',
+                'production_source' => 'in_house',
+                'allow_negative' => 0,
+                'is_stocked' => 1,
+            ]
+        );
+        $catId = DB::table('item_categories')->where('code', 'SJR')->value('id');
+        $roleId = DB::table('item_roles')->where('code', 'FG')->value('id');
+        DB::table('items')->updateOrInsert(
+            ['code' => 'K2ABT'],
+            [
+                'code' => 'K2ABT',
+                'name' => 'Jogger Pendek Basic K2 Abu Tua M81',
+                'unit' => 'pcs',
+                'type' => 'finished_good',
+                'item_category_id' => $catId,
+                'item_role' => 'finished_good',
+                'item_role_id' => $roleId,
+                'last_purchase_price' => 0,
+                'hpp' => 33000,
+                'active' => 1,
+                'affects_hpp' => 1,
+                'default_allocation' => 'hpp',
+                'production_source' => 'in_house',
+                'allow_negative' => 0,
+                'is_stocked' => 1,
+            ]
+        );
+        $catId = DB::table('item_categories')->where('code', 'SJR')->value('id');
+        $roleId = DB::table('item_roles')->where('code', 'FG')->value('id');
+        DB::table('items')->updateOrInsert(
+            ['code' => 'K2BLK'],
+            [
+                'code' => 'K2BLK',
+                'name' => 'Jogger Pendek Basic K2 Hitam',
+                'unit' => 'pcs',
+                'type' => 'finished_good',
+                'item_category_id' => $catId,
+                'item_role' => 'finished_good',
+                'item_role_id' => $roleId,
+                'last_purchase_price' => 0,
+                'hpp' => 33000,
+                'active' => 1,
+                'affects_hpp' => 1,
+                'default_allocation' => 'hpp',
+                'production_source' => 'in_house',
+                'allow_negative' => 0,
+                'is_stocked' => 1,
+            ]
+        );
+        $catId = DB::table('item_categories')->where('code', 'SJR')->value('id');
+        $roleId = DB::table('item_roles')->where('code', 'FG')->value('id');
+        DB::table('items')->updateOrInsert(
+            ['code' => 'K2MST'],
+            [
+                'code' => 'K2MST',
+                'name' => 'Jogger Pendek Basic K2 Misty (Abu-Abu) M71',
+                'unit' => 'pcs',
+                'type' => 'finished_good',
+                'item_category_id' => $catId,
+                'item_role' => 'finished_good',
+                'item_role_id' => $roleId,
+                'last_purchase_price' => 0,
+                'hpp' => 33000,
+                'active' => 1,
+                'affects_hpp' => 1,
+                'default_allocation' => 'hpp',
+                'production_source' => 'in_house',
+                'allow_negative' => 0,
+                'is_stocked' => 1,
+            ]
+        );
+        $catId = DB::table('item_categories')->where('code', 'SJR')->value('id');
+        $roleId = DB::table('item_roles')->where('code', 'FG')->value('id');
+        DB::table('items')->updateOrInsert(
+            ['code' => 'K2NVY'],
+            [
+                'code' => 'K2NVY',
+                'name' => 'Jogger Pendek Basic K2 Navy',
+                'unit' => 'pcs',
+                'type' => 'finished_good',
+                'item_category_id' => $catId,
+                'item_role' => 'finished_good',
+                'item_role_id' => $roleId,
+                'last_purchase_price' => 0,
+                'hpp' => 33000,
+                'active' => 1,
+                'affects_hpp' => 1,
+                'default_allocation' => 'hpp',
+                'production_source' => 'in_house',
+                'allow_negative' => 0,
+                'is_stocked' => 1,
+            ]
+        );
+        $catId = DB::table('item_categories')->where('code', 'SJR')->value('id');
+        $roleId = DB::table('item_roles')->where('code', 'FG')->value('id');
+        DB::table('items')->updateOrInsert(
+            ['code' => 'K3ABT'],
+            [
+                'code' => 'K3ABT',
+                'name' => 'Jogger Pendek Basic K3 Abu Tua M81',
+                'unit' => 'pcs',
+                'type' => 'finished_good',
+                'item_category_id' => $catId,
+                'item_role' => 'finished_good',
+                'item_role_id' => $roleId,
+                'last_purchase_price' => 0,
+                'hpp' => 33000,
+                'active' => 1,
+                'affects_hpp' => 1,
+                'default_allocation' => 'hpp',
+                'production_source' => 'in_house',
+                'allow_negative' => 0,
+                'is_stocked' => 1,
+            ]
+        );
+        $catId = DB::table('item_categories')->where('code', 'SJR')->value('id');
+        $roleId = DB::table('item_roles')->where('code', 'FG')->value('id');
+        DB::table('items')->updateOrInsert(
+            ['code' => 'K3BBL'],
+            [
+                'code' => 'K3BBL',
+                'name' => 'Jogger Pendek Basic K3 Baby Blue',
+                'unit' => 'pcs',
+                'type' => 'finished_good',
+                'item_category_id' => $catId,
+                'item_role' => 'finished_good',
+                'item_role_id' => $roleId,
+                'last_purchase_price' => 0,
+                'hpp' => 33000,
+                'active' => 1,
+                'affects_hpp' => 1,
+                'default_allocation' => 'hpp',
+                'production_source' => 'in_house',
+                'allow_negative' => 0,
+                'is_stocked' => 1,
+            ]
+        );
+        $catId = DB::table('item_categories')->where('code', 'SJR')->value('id');
+        $roleId = DB::table('item_roles')->where('code', 'FG')->value('id');
+        DB::table('items')->updateOrInsert(
+            ['code' => 'K3BLK'],
+            [
+                'code' => 'K3BLK',
+                'name' => 'Jogger Pendek Basic K3 Hitam',
+                'unit' => 'pcs',
+                'type' => 'finished_good',
+                'item_category_id' => $catId,
+                'item_role' => 'finished_good',
+                'item_role_id' => $roleId,
+                'last_purchase_price' => 0,
+                'hpp' => 33000,
+                'active' => 1,
+                'affects_hpp' => 1,
+                'default_allocation' => 'hpp',
+                'production_source' => 'in_house',
+                'allow_negative' => 0,
+                'is_stocked' => 1,
+            ]
+        );
+        $catId = DB::table('item_categories')->where('code', 'SJR')->value('id');
+        $roleId = DB::table('item_roles')->where('code', 'FG')->value('id');
+        DB::table('items')->updateOrInsert(
+            ['code' => 'K3MST'],
+            [
+                'code' => 'K3MST',
+                'name' => 'Jogger Pendek Basic K3 Misty (Abu-Abu) M71',
+                'unit' => 'pcs',
+                'type' => 'finished_good',
+                'item_category_id' => $catId,
+                'item_role' => 'finished_good',
+                'item_role_id' => $roleId,
+                'last_purchase_price' => 0,
+                'hpp' => 33000,
+                'active' => 1,
+                'affects_hpp' => 1,
+                'default_allocation' => 'hpp',
+                'production_source' => 'in_house',
+                'allow_negative' => 0,
+                'is_stocked' => 1,
+            ]
+        );
+        $catId = DB::table('item_categories')->where('code', 'SJR')->value('id');
+        $roleId = DB::table('item_roles')->where('code', 'FG')->value('id');
+        DB::table('items')->updateOrInsert(
+            ['code' => 'K3NVY'],
+            [
+                'code' => 'K3NVY',
+                'name' => 'Jogger Pendek Basic K3 Navy',
+                'unit' => 'pcs',
+                'type' => 'finished_good',
+                'item_category_id' => $catId,
+                'item_role' => 'finished_good',
+                'item_role_id' => $roleId,
+                'last_purchase_price' => 0,
+                'hpp' => 33000,
+                'active' => 1,
+                'affects_hpp' => 1,
+                'default_allocation' => 'hpp',
+                'production_source' => 'in_house',
+                'allow_negative' => 0,
+                'is_stocked' => 1,
+            ]
+        );
+        $catId = DB::table('item_categories')->where('code', 'SJR')->value('id');
+        $roleId = DB::table('item_roles')->where('code', 'FG')->value('id');
+        DB::table('items')->updateOrInsert(
+            ['code' => 'K3WHT'],
+            [
+                'code' => 'K3WHT',
+                'name' => 'Jogger Pendek Basic K3 Putih',
+                'unit' => 'pcs',
+                'type' => 'finished_good',
+                'item_category_id' => $catId,
+                'item_role' => 'finished_good',
+                'item_role_id' => $roleId,
+                'last_purchase_price' => 0,
+                'hpp' => 33000,
+                'active' => 1,
+                'affects_hpp' => 1,
+                'default_allocation' => 'hpp',
+                'production_source' => 'in_house',
+                'allow_negative' => 0,
+                'is_stocked' => 1,
+            ]
+        );
+        $catId = DB::table('item_categories')->where('code', 'SJR')->value('id');
+        $roleId = DB::table('item_roles')->where('code', 'FG')->value('id');
+        DB::table('items')->updateOrInsert(
+            ['code' => 'K5ABT'],
+            [
+                'code' => 'K5ABT',
+                'name' => 'Jogger Pendek Basic K5 Abu Tua M81',
+                'unit' => 'pcs',
+                'type' => 'finished_good',
+                'item_category_id' => $catId,
+                'item_role' => 'finished_good',
+                'item_role_id' => $roleId,
+                'last_purchase_price' => 0,
+                'hpp' => 33000,
+                'active' => 1,
+                'affects_hpp' => 1,
+                'default_allocation' => 'hpp',
+                'production_source' => 'in_house',
+                'allow_negative' => 0,
+                'is_stocked' => 1,
+            ]
+        );
+        $catId = DB::table('item_categories')->where('code', 'SJR')->value('id');
+        $roleId = DB::table('item_roles')->where('code', 'FG')->value('id');
+        DB::table('items')->updateOrInsert(
+            ['code' => 'K5BBL'],
+            [
+                'code' => 'K5BBL',
+                'name' => 'Jogger Pendek Basic K5 Baby Blue',
+                'unit' => 'pcs',
+                'type' => 'finished_good',
+                'item_category_id' => $catId,
+                'item_role' => 'finished_good',
+                'item_role_id' => $roleId,
+                'last_purchase_price' => 0,
+                'hpp' => 33000,
+                'active' => 1,
+                'affects_hpp' => 1,
+                'default_allocation' => 'hpp',
+                'production_source' => 'in_house',
+                'allow_negative' => 0,
+                'is_stocked' => 1,
+            ]
+        );
+        $catId = DB::table('item_categories')->where('code', 'SJR')->value('id');
+        $roleId = DB::table('item_roles')->where('code', 'FG')->value('id');
+        DB::table('items')->updateOrInsert(
+            ['code' => 'K5BLK'],
+            [
+                'code' => 'K5BLK',
+                'name' => 'Jogger Pendek Basic K5 Hitam',
+                'unit' => 'pcs',
+                'type' => 'finished_good',
+                'item_category_id' => $catId,
+                'item_role' => 'finished_good',
+                'item_role_id' => $roleId,
+                'last_purchase_price' => 0,
+                'hpp' => 33000,
+                'active' => 1,
+                'affects_hpp' => 1,
+                'default_allocation' => 'hpp',
+                'production_source' => 'in_house',
+                'allow_negative' => 0,
+                'is_stocked' => 1,
+            ]
+        );
+        $catId = DB::table('item_categories')->where('code', 'SJR')->value('id');
+        $roleId = DB::table('item_roles')->where('code', 'FG')->value('id');
+        DB::table('items')->updateOrInsert(
+            ['code' => 'K5MST'],
+            [
+                'code' => 'K5MST',
+                'name' => 'Jogger Pendek Basic K5 Misty (Abu-Abu) M71',
+                'unit' => 'pcs',
+                'type' => 'finished_good',
+                'item_category_id' => $catId,
+                'item_role' => 'finished_good',
+                'item_role_id' => $roleId,
+                'last_purchase_price' => 0,
+                'hpp' => 33000,
+                'active' => 1,
+                'affects_hpp' => 1,
+                'default_allocation' => 'hpp',
+                'production_source' => 'in_house',
+                'allow_negative' => 0,
+                'is_stocked' => 1,
+            ]
+        );
+        $catId = DB::table('item_categories')->where('code', 'SJR')->value('id');
+        $roleId = DB::table('item_roles')->where('code', 'FG')->value('id');
+        DB::table('items')->updateOrInsert(
+            ['code' => 'K5NVY'],
+            [
+                'code' => 'K5NVY',
+                'name' => 'Jogger Pendek Basic K5 Navy',
+                'unit' => 'pcs',
+                'type' => 'finished_good',
+                'item_category_id' => $catId,
+                'item_role' => 'finished_good',
+                'item_role_id' => $roleId,
+                'last_purchase_price' => 0,
+                'hpp' => 33000,
+                'active' => 1,
+                'affects_hpp' => 1,
+                'default_allocation' => 'hpp',
+                'production_source' => 'in_house',
+                'allow_negative' => 0,
+                'is_stocked' => 1,
+            ]
+        );
+        $catId = DB::table('item_categories')->where('code', 'SJR')->value('id');
+        $roleId = DB::table('item_roles')->where('code', 'FG')->value('id');
+        DB::table('items')->updateOrInsert(
+            ['code' => 'K5WHT'],
+            [
+                'code' => 'K5WHT',
+                'name' => 'Jogger Pendek Basic K5 Putih',
+                'unit' => 'pcs',
+                'type' => 'finished_good',
+                'item_category_id' => $catId,
+                'item_role' => 'finished_good',
+                'item_role_id' => $roleId,
+                'last_purchase_price' => 0,
+                'hpp' => 33000,
+                'active' => 1,
+                'affects_hpp' => 1,
+                'default_allocation' => 'hpp',
+                'production_source' => 'in_house',
+                'allow_negative' => 0,
+                'is_stocked' => 1,
+            ]
+        );
+        $catId = DB::table('item_categories')->where('code', 'SJR')->value('id');
+        $roleId = DB::table('item_roles')->where('code', 'FG')->value('id');
+        DB::table('items')->updateOrInsert(
+            ['code' => 'K7ABT'],
+            [
+                'code' => 'K7ABT',
+                'name' => 'Jogger Pendek Basic K7 Abu Tua M81',
+                'unit' => 'pcs',
+                'type' => 'finished_good',
+                'item_category_id' => $catId,
+                'item_role' => 'finished_good',
+                'item_role_id' => $roleId,
+                'last_purchase_price' => 0,
+                'hpp' => 33000,
+                'active' => 1,
+                'affects_hpp' => 1,
+                'default_allocation' => 'hpp',
+                'production_source' => 'in_house',
+                'allow_negative' => 0,
+                'is_stocked' => 1,
+            ]
+        );
+        $catId = DB::table('item_categories')->where('code', 'SJR')->value('id');
+        $roleId = DB::table('item_roles')->where('code', 'FG')->value('id');
+        DB::table('items')->updateOrInsert(
+            ['code' => 'K7BBL'],
+            [
+                'code' => 'K7BBL',
+                'name' => 'Jogger Pendek Basic K7 Baby Blue',
+                'unit' => 'pcs',
+                'type' => 'finished_good',
+                'item_category_id' => $catId,
+                'item_role' => 'finished_good',
+                'item_role_id' => $roleId,
+                'last_purchase_price' => 0,
+                'hpp' => 33000,
+                'active' => 1,
+                'affects_hpp' => 1,
+                'default_allocation' => 'hpp',
+                'production_source' => 'in_house',
+                'allow_negative' => 0,
+                'is_stocked' => 1,
+            ]
+        );
+        $catId = DB::table('item_categories')->where('code', 'SJR')->value('id');
+        $roleId = DB::table('item_roles')->where('code', 'FG')->value('id');
+        DB::table('items')->updateOrInsert(
+            ['code' => 'K7BLK'],
+            [
+                'code' => 'K7BLK',
+                'name' => 'Jogger Pendek Basic K7 Hitam',
+                'unit' => 'pcs',
+                'type' => 'finished_good',
+                'item_category_id' => $catId,
+                'item_role' => 'finished_good',
+                'item_role_id' => $roleId,
+                'last_purchase_price' => 0,
+                'hpp' => 33000,
+                'active' => 1,
+                'affects_hpp' => 1,
+                'default_allocation' => 'hpp',
+                'production_source' => 'in_house',
+                'allow_negative' => 0,
+                'is_stocked' => 1,
+            ]
+        );
+        $catId = DB::table('item_categories')->where('code', 'SJR')->value('id');
+        $roleId = DB::table('item_roles')->where('code', 'FG')->value('id');
+        DB::table('items')->updateOrInsert(
+            ['code' => 'K7MST'],
+            [
+                'code' => 'K7MST',
+                'name' => 'Jogger Pendek Basic K7 Misty (Abu-Abu) M71',
+                'unit' => 'pcs',
+                'type' => 'finished_good',
+                'item_category_id' => $catId,
+                'item_role' => 'finished_good',
+                'item_role_id' => $roleId,
+                'last_purchase_price' => 0,
+                'hpp' => 33000,
+                'active' => 1,
+                'affects_hpp' => 1,
+                'default_allocation' => 'hpp',
+                'production_source' => 'in_house',
+                'allow_negative' => 0,
+                'is_stocked' => 1,
+            ]
+        );
+        $catId = DB::table('item_categories')->where('code', 'SJR')->value('id');
+        $roleId = DB::table('item_roles')->where('code', 'FG')->value('id');
+        DB::table('items')->updateOrInsert(
+            ['code' => 'K7NVY'],
+            [
+                'code' => 'K7NVY',
+                'name' => 'Jogger Pendek Basic K7 Navy',
+                'unit' => 'pcs',
+                'type' => 'finished_good',
+                'item_category_id' => $catId,
+                'item_role' => 'finished_good',
+                'item_role_id' => $roleId,
+                'last_purchase_price' => 0,
+                'hpp' => 33000,
+                'active' => 1,
+                'affects_hpp' => 1,
+                'default_allocation' => 'hpp',
+                'production_source' => 'in_house',
+                'allow_negative' => 0,
+                'is_stocked' => 1,
+            ]
+        );
+        $catId = DB::table('item_categories')->where('code', 'SJR')->value('id');
+        $roleId = DB::table('item_roles')->where('code', 'FG')->value('id');
+        DB::table('items')->updateOrInsert(
+            ['code' => 'K7WHT'],
+            [
+                'code' => 'K7WHT',
+                'name' => 'Jogger Pendek Basic K7 Putih',
+                'unit' => 'pcs',
+                'type' => 'finished_good',
+                'item_category_id' => $catId,
+                'item_role' => 'finished_good',
+                'item_role_id' => $roleId,
+                'last_purchase_price' => 0,
+                'hpp' => 33000,
+                'active' => 1,
+                'affects_hpp' => 1,
+                'default_allocation' => 'hpp',
+                'production_source' => 'in_house',
+                'allow_negative' => 0,
+                'is_stocked' => 1,
+            ]
+        );
+        $catId = DB::table('item_categories')->where('code', 'SJR')->value('id');
+        $roleId = DB::table('item_roles')->where('code', 'FG')->value('id');
+        DB::table('items')->updateOrInsert(
+            ['code' => 'K1BBL'],
+            [
+                'code' => 'K1BBL',
+                'name' => 'Jogger Pendek Basic K1 Baby Blue',
+                'unit' => 'pcs',
+                'type' => 'finished_good',
+                'item_category_id' => $catId,
+                'item_role' => 'finished_good',
+                'item_role_id' => $roleId,
+                'last_purchase_price' => 0,
+                'hpp' => 33000,
+                'active' => 1,
+                'affects_hpp' => 1,
+                'default_allocation' => 'hpp',
+                'production_source' => 'in_house',
+                'allow_negative' => 0,
+                'is_stocked' => 1,
+            ]
+        );
+        $catId = DB::table('item_categories')->where('code', 'SJR')->value('id');
+        $roleId = DB::table('item_roles')->where('code', 'FG')->value('id');
+        DB::table('items')->updateOrInsert(
+            ['code' => 'K2BBL'],
+            [
+                'code' => 'K2BBL',
+                'name' => 'Jogger Pendek Basic K2 Baby Blue',
+                'unit' => 'pcs',
+                'type' => 'finished_good',
+                'item_category_id' => $catId,
+                'item_role' => 'finished_good',
+                'item_role_id' => $roleId,
+                'last_purchase_price' => 0,
+                'hpp' => 33000,
+                'active' => 1,
+                'affects_hpp' => 1,
+                'default_allocation' => 'hpp',
+                'production_source' => 'in_house',
+                'allow_negative' => 0,
+                'is_stocked' => 1,
+            ]
+        );
+        $catId = DB::table('item_categories')->where('code', 'SJR')->value('id');
+        $roleId = DB::table('item_roles')->where('code', 'FG')->value('id');
+        DB::table('items')->updateOrInsert(
+            ['code' => 'K2WHT'],
+            [
+                'code' => 'K2WHT',
+                'name' => 'Jogger Pendek Basic K2 Putih',
+                'unit' => 'pcs',
+                'type' => 'finished_good',
+                'item_category_id' => $catId,
+                'item_role' => 'finished_good',
+                'item_role_id' => $roleId,
+                'last_purchase_price' => 0,
+                'hpp' => 33000,
+                'active' => 1,
+                'affects_hpp' => 1,
+                'default_allocation' => 'hpp',
+                'production_source' => 'in_house',
+                'allow_negative' => 0,
+                'is_stocked' => 1,
+            ]
+        );
+        $catId = DB::table('item_categories')->where('code', 'LCG')->value('id');
+        $roleId = DB::table('item_roles')->where('code', 'FG')->value('id');
+        DB::table('items')->updateOrInsert(
+            ['code' => 'L1BLK'],
+            [
+                'code' => 'L1BLK',
+                'name' => 'Jogger Panjang Cargo L1 Hitam',
+                'unit' => 'pcs',
+                'type' => 'finished_good',
+                'item_category_id' => $catId,
+                'item_role' => 'finished_good',
+                'item_role_id' => $roleId,
+                'last_purchase_price' => 0,
+                'hpp' => 45500,
+                'active' => 1,
+                'affects_hpp' => 1,
+                'default_allocation' => 'hpp',
+                'production_source' => 'in_house',
+                'allow_negative' => 0,
+                'is_stocked' => 1,
+            ]
+        );
+        $catId = DB::table('item_categories')->where('code', 'LCG')->value('id');
+        $roleId = DB::table('item_roles')->where('code', 'FG')->value('id');
+        DB::table('items')->updateOrInsert(
+            ['code' => 'L1MST'],
+            [
+                'code' => 'L1MST',
+                'name' => 'Jogger Panjang Cargo L1 Misty (Abu-Abu) M71',
+                'unit' => 'pcs',
+                'type' => 'finished_good',
+                'item_category_id' => $catId,
+                'item_role' => 'finished_good',
+                'item_role_id' => $roleId,
+                'last_purchase_price' => 0,
+                'hpp' => 45500,
+                'active' => 1,
+                'affects_hpp' => 1,
+                'default_allocation' => 'hpp',
+                'production_source' => 'in_house',
+                'allow_negative' => 0,
+                'is_stocked' => 1,
+            ]
+        );
+        $catId = DB::table('item_categories')->where('code', 'LCG')->value('id');
+        $roleId = DB::table('item_roles')->where('code', 'FG')->value('id');
+        DB::table('items')->updateOrInsert(
+            ['code' => 'L1NVY'],
+            [
+                'code' => 'L1NVY',
+                'name' => 'Jogger Panjang Cargo L1 Navy',
+                'unit' => 'pcs',
+                'type' => 'finished_good',
+                'item_category_id' => $catId,
+                'item_role' => 'finished_good',
+                'item_role_id' => $roleId,
+                'last_purchase_price' => 0,
+                'hpp' => 45500,
+                'active' => 1,
+                'affects_hpp' => 1,
+                'default_allocation' => 'hpp',
+                'production_source' => 'in_house',
+                'allow_negative' => 0,
+                'is_stocked' => 1,
+            ]
+        );
+        $catId = DB::table('item_categories')->where('code', 'LCG')->value('id');
+        $roleId = DB::table('item_roles')->where('code', 'FG')->value('id');
+        DB::table('items')->updateOrInsert(
+            ['code' => 'L2BLK'],
+            [
+                'code' => 'L2BLK',
+                'name' => 'Jogger Panjang Cargo L2 Hitam',
+                'unit' => 'pcs',
+                'type' => 'finished_good',
+                'item_category_id' => $catId,
+                'item_role' => 'finished_good',
+                'item_role_id' => $roleId,
+                'last_purchase_price' => 0,
+                'hpp' => 35000,
+                'active' => 1,
+                'affects_hpp' => 1,
+                'default_allocation' => 'hpp',
+                'production_source' => 'in_house',
+                'allow_negative' => 0,
+                'is_stocked' => 1,
+            ]
+        );
+        $catId = DB::table('item_categories')->where('code', 'LCG')->value('id');
+        $roleId = DB::table('item_roles')->where('code', 'FG')->value('id');
+        DB::table('items')->updateOrInsert(
+            ['code' => 'L2MST'],
+            [
+                'code' => 'L2MST',
+                'name' => 'Jogger Panjang Cargo L2 Misty (Abu-Abu) M71',
+                'unit' => 'pcs',
+                'type' => 'finished_good',
+                'item_category_id' => $catId,
+                'item_role' => 'finished_good',
+                'item_role_id' => $roleId,
+                'last_purchase_price' => 0,
+                'hpp' => 35000,
+                'active' => 1,
+                'affects_hpp' => 1,
+                'default_allocation' => 'hpp',
+                'production_source' => 'in_house',
+                'allow_negative' => 0,
+                'is_stocked' => 1,
+            ]
+        );
+        $catId = DB::table('item_categories')->where('code', 'LCG')->value('id');
+        $roleId = DB::table('item_roles')->where('code', 'FG')->value('id');
+        DB::table('items')->updateOrInsert(
+            ['code' => 'L2NVY'],
+            [
+                'code' => 'L2NVY',
+                'name' => 'Jogger Panjang Cargo L2 Navy',
+                'unit' => 'pcs',
+                'type' => 'finished_good',
+                'item_category_id' => $catId,
+                'item_role' => 'finished_good',
+                'item_role_id' => $roleId,
+                'last_purchase_price' => 0,
+                'hpp' => 35000,
+                'active' => 1,
+                'affects_hpp' => 1,
+                'default_allocation' => 'hpp',
+                'production_source' => 'in_house',
+                'allow_negative' => 0,
+                'is_stocked' => 1,
+            ]
+        );
+        $catId = DB::table('item_categories')->where('code', 'LCG')->value('id');
+        $roleId = DB::table('item_roles')->where('code', 'FG')->value('id');
+        DB::table('items')->updateOrInsert(
+            ['code' => 'L1ABT'],
+            [
+                'code' => 'L1ABT',
+                'name' => 'Jogger Panjang Cargo L1 Abu Tua M81',
+                'unit' => 'pcs',
+                'type' => 'finished_good',
+                'item_category_id' => $catId,
+                'item_role' => 'finished_good',
+                'item_role_id' => $roleId,
+                'last_purchase_price' => 0,
+                'hpp' => 45500,
+                'active' => 1,
+                'affects_hpp' => 1,
+                'default_allocation' => 'hpp',
+                'production_source' => 'in_house',
+                'allow_negative' => 0,
+                'is_stocked' => 1,
+            ]
+        );
+        $catId = DB::table('item_categories')->where('code', 'LCG')->value('id');
+        $roleId = DB::table('item_roles')->where('code', 'FG')->value('id');
+        DB::table('items')->updateOrInsert(
+            ['code' => 'L2ABT'],
+            [
+                'code' => 'L2ABT',
+                'name' => 'Jogger Panjang Cargo L2 Abu Tua M81',
+                'unit' => 'pcs',
+                'type' => 'finished_good',
+                'item_category_id' => $catId,
+                'item_role' => 'finished_good',
+                'item_role_id' => $roleId,
+                'last_purchase_price' => 0,
+                'hpp' => 35000,
+                'active' => 1,
+                'affects_hpp' => 1,
+                'default_allocation' => 'hpp',
+                'production_source' => 'in_house',
+                'allow_negative' => 0,
+                'is_stocked' => 1,
+            ]
+        );
+        $catId = DB::table('item_categories')->where('code', 'SHT')->value('id');
+        $roleId = DB::table('item_roles')->where('code', 'FG')->value('id');
+        DB::table('items')->updateOrInsert(
+            ['code' => 'S2RDM'],
+            [
+                'code' => 'S2RDM',
+                'name' => 'Shot Boxer Brief S2 Random',
+                'unit' => 'pcs',
+                'type' => 'finished_good',
+                'item_category_id' => $catId,
+                'item_role' => 'finished_good',
+                'item_role_id' => $roleId,
+                'last_purchase_price' => 6417,
+                'hpp' => 6700,
+                'active' => 1,
+                'affects_hpp' => 1,
+                'default_allocation' => 'hpp',
+                'production_source' => 'buy',
+                'allow_negative' => 0,
+                'is_stocked' => 1,
+            ]
+        );
+        $catId = DB::table('item_categories')->where('code', 'SHT')->value('id');
+        $roleId = DB::table('item_roles')->where('code', 'FG')->value('id');
+        DB::table('items')->updateOrInsert(
+            ['code' => 'S2RDM-3'],
+            [
+                'code' => 'S2RDM-3',
+                'name' => 'Shot Boxer Brief S2RDM-3 ',
+                'unit' => 'pcs',
+                'type' => 'finished_good',
+                'item_category_id' => $catId,
+                'item_role' => 'finished_good',
+                'item_role_id' => $roleId,
+                'last_purchase_price' => 0,
+                'hpp' => 20100,
+                'active' => 1,
+                'affects_hpp' => 1,
+                'default_allocation' => 'hpp',
+                'production_source' => 'buy',
+                'allow_negative' => 0,
+                'is_stocked' => 1,
+            ]
+        );
+        $catId = DB::table('item_categories')->where('code', 'SHT')->value('id');
+        $roleId = DB::table('item_roles')->where('code', 'FG')->value('id');
+        DB::table('items')->updateOrInsert(
+            ['code' => 'S2RDM-6'],
+            [
+                'code' => 'S2RDM-6',
+                'name' => 'Shot Boxer Brief S2RDM-6 ',
+                'unit' => 'pcs',
+                'type' => 'finished_good',
+                'item_category_id' => $catId,
+                'item_role' => 'finished_good',
+                'item_role_id' => $roleId,
+                'last_purchase_price' => 0,
+                'hpp' => 40200,
+                'active' => 1,
+                'affects_hpp' => 1,
+                'default_allocation' => 'hpp',
+                'production_source' => 'buy',
+                'allow_negative' => 0,
+                'is_stocked' => 1,
+            ]
+        );
+        $catId = DB::table('item_categories')->where('code', 'SHT')->value('id');
+        $roleId = DB::table('item_roles')->where('code', 'FG')->value('id');
+        DB::table('items')->updateOrInsert(
+            ['code' => 'S3RDM'],
+            [
+                'code' => 'S3RDM',
+                'name' => 'Shot Boxer Brief S3 Random',
+                'unit' => 'pcs',
+                'type' => 'finished_good',
+                'item_category_id' => $catId,
+                'item_role' => 'finished_good',
+                'item_role_id' => $roleId,
+                'last_purchase_price' => 6667,
+                'hpp' => 6700,
+                'active' => 1,
+                'affects_hpp' => 1,
+                'default_allocation' => 'hpp',
+                'production_source' => 'buy',
+                'allow_negative' => 0,
+                'is_stocked' => 1,
+            ]
+        );
+        $catId = DB::table('item_categories')->where('code', 'SHT')->value('id');
+        $roleId = DB::table('item_roles')->where('code', 'FG')->value('id');
+        DB::table('items')->updateOrInsert(
+            ['code' => 'S3RDM-3'],
+            [
+                'code' => 'S3RDM-3',
+                'name' => 'Shot Boxer Brief S3RDM-3 ',
+                'unit' => 'pcs',
+                'type' => 'finished_good',
+                'item_category_id' => $catId,
+                'item_role' => 'finished_good',
+                'item_role_id' => $roleId,
+                'last_purchase_price' => 0,
+                'hpp' => 20100,
+                'active' => 1,
+                'affects_hpp' => 1,
+                'default_allocation' => 'hpp',
+                'production_source' => 'buy',
+                'allow_negative' => 0,
+                'is_stocked' => 1,
+            ]
+        );
+        $catId = DB::table('item_categories')->where('code', 'SHT')->value('id');
+        $roleId = DB::table('item_roles')->where('code', 'FG')->value('id');
+        DB::table('items')->updateOrInsert(
+            ['code' => 'S3RDM-6'],
+            [
+                'code' => 'S3RDM-6',
+                'name' => 'Shot Boxer Brief S3RDM-6 ',
+                'unit' => 'pcs',
+                'type' => 'finished_good',
+                'item_category_id' => $catId,
+                'item_role' => 'finished_good',
+                'item_role_id' => $roleId,
+                'last_purchase_price' => 0,
+                'hpp' => 40200,
+                'active' => 1,
+                'affects_hpp' => 1,
+                'default_allocation' => 'hpp',
+                'production_source' => 'buy',
+                'allow_negative' => 0,
+                'is_stocked' => 1,
+            ]
+        );
+        $catId = DB::table('item_categories')->where('code', 'SHT')->value('id');
+        $roleId = DB::table('item_roles')->where('code', 'FG')->value('id');
+        DB::table('items')->updateOrInsert(
+            ['code' => 'S4RDM'],
+            [
+                'code' => 'S4RDM',
+                'name' => 'Shot Boxer Brief S4 Random',
+                'unit' => 'pcs',
+                'type' => 'finished_good',
+                'item_category_id' => $catId,
+                'item_role' => 'finished_good',
+                'item_role_id' => $roleId,
+                'last_purchase_price' => 6667,
+                'hpp' => 6700,
+                'active' => 1,
+                'affects_hpp' => 1,
+                'default_allocation' => 'hpp',
+                'production_source' => 'buy',
+                'allow_negative' => 0,
+                'is_stocked' => 1,
+            ]
+        );
+        $catId = DB::table('item_categories')->where('code', 'SHT')->value('id');
+        $roleId = DB::table('item_roles')->where('code', 'FG')->value('id');
+        DB::table('items')->updateOrInsert(
+            ['code' => 'S4RDM-3'],
+            [
+                'code' => 'S4RDM-3',
+                'name' => 'Shot Boxer Brief S4RDM-3 ',
+                'unit' => 'pcs',
+                'type' => 'finished_good',
+                'item_category_id' => $catId,
+                'item_role' => 'finished_good',
+                'item_role_id' => $roleId,
+                'last_purchase_price' => 0,
+                'hpp' => 20100,
+                'active' => 1,
+                'affects_hpp' => 1,
+                'default_allocation' => 'hpp',
+                'production_source' => 'buy',
+                'allow_negative' => 0,
+                'is_stocked' => 1,
+            ]
+        );
+        $catId = DB::table('item_categories')->where('code', 'SHT')->value('id');
+        $roleId = DB::table('item_roles')->where('code', 'FG')->value('id');
+        DB::table('items')->updateOrInsert(
+            ['code' => 'S4RDM-6'],
+            [
+                'code' => 'S4RDM-6',
+                'name' => 'Shot Boxer Brief S4RDM-6 ',
+                'unit' => 'pcs',
+                'type' => 'finished_good',
+                'item_category_id' => $catId,
+                'item_role' => 'finished_good',
+                'item_role_id' => $roleId,
+                'last_purchase_price' => 0,
+                'hpp' => 40200,
+                'active' => 1,
+                'affects_hpp' => 1,
+                'default_allocation' => 'hpp',
+                'production_source' => 'buy',
+                'allow_negative' => 0,
+                'is_stocked' => 1,
+            ]
+        );
+        $catId = DB::table('item_categories')->where('code', 'SHT')->value('id');
+        $roleId = DB::table('item_roles')->where('code', 'FG')->value('id');
+        DB::table('items')->updateOrInsert(
+            ['code' => 'S5RDM'],
+            [
+                'code' => 'S5RDM',
+                'name' => 'Shot Boxer Brief S5 Random',
+                'unit' => 'pcs',
+                'type' => 'finished_good',
+                'item_category_id' => $catId,
+                'item_role' => 'finished_good',
+                'item_role_id' => $roleId,
+                'last_purchase_price' => 8333,
+                'hpp' => 8400,
+                'active' => 1,
+                'affects_hpp' => 1,
+                'default_allocation' => 'hpp',
+                'production_source' => 'buy',
+                'allow_negative' => 0,
+                'is_stocked' => 1,
+            ]
+        );
+        $catId = DB::table('item_categories')->where('code', 'SHT')->value('id');
+        $roleId = DB::table('item_roles')->where('code', 'FG')->value('id');
+        DB::table('items')->updateOrInsert(
+            ['code' => 'S5RDM-3'],
+            [
+                'code' => 'S5RDM-3',
+                'name' => 'Shot Boxer Brief S5RDM-3 ',
+                'unit' => 'pcs',
+                'type' => 'finished_good',
+                'item_category_id' => $catId,
+                'item_role' => 'finished_good',
+                'item_role_id' => $roleId,
+                'last_purchase_price' => 0,
+                'hpp' => 25200,
+                'active' => 1,
+                'affects_hpp' => 1,
+                'default_allocation' => 'hpp',
+                'production_source' => 'buy',
+                'allow_negative' => 0,
+                'is_stocked' => 1,
+            ]
+        );
+        $catId = DB::table('item_categories')->where('code', 'SHT')->value('id');
+        $roleId = DB::table('item_roles')->where('code', 'FG')->value('id');
+        DB::table('items')->updateOrInsert(
+            ['code' => 'S5RDM-6'],
+            [
+                'code' => 'S5RDM-6',
+                'name' => 'Shot Boxer Brief S5RDM-6 ',
+                'unit' => 'pcs',
+                'type' => 'finished_good',
+                'item_category_id' => $catId,
+                'item_role' => 'finished_good',
+                'item_role_id' => $roleId,
+                'last_purchase_price' => 0,
+                'hpp' => 50400,
+                'active' => 1,
+                'affects_hpp' => 1,
+                'default_allocation' => 'hpp',
+                'production_source' => 'buy',
+                'allow_negative' => 0,
+                'is_stocked' => 1,
+            ]
+        );
+        $catId = DB::table('item_categories')->where('code', 'TJR')->value('id');
+        $roleId = DB::table('item_roles')->where('code', 'FG')->value('id');
+        DB::table('items')->updateOrInsert(
+            ['code' => 'T1ABT'],
+            [
+                'code' => 'T1ABT',
+                'name' => 'Jogger Pendek Bodyfit T1 Abu Tua M81',
+                'unit' => 'pcs',
+                'type' => 'finished_good',
+                'item_category_id' => $catId,
+                'item_role' => 'finished_good',
+                'item_role_id' => $roleId,
+                'last_purchase_price' => 0,
+                'hpp' => 28000,
+                'active' => 1,
+                'affects_hpp' => 1,
+                'default_allocation' => 'hpp',
+                'production_source' => 'in_house',
+                'allow_negative' => 0,
+                'is_stocked' => 1,
+            ]
+        );
+        $catId = DB::table('item_categories')->where('code', 'TJR')->value('id');
+        $roleId = DB::table('item_roles')->where('code', 'FG')->value('id');
+        DB::table('items')->updateOrInsert(
+            ['code' => 'T1BLK'],
+            [
+                'code' => 'T1BLK',
+                'name' => 'Jogger Pendek Bodyfit T1 Hitam',
+                'unit' => 'pcs',
+                'type' => 'finished_good',
+                'item_category_id' => $catId,
+                'item_role' => 'finished_good',
+                'item_role_id' => $roleId,
+                'last_purchase_price' => 0,
+                'hpp' => 28000,
+                'active' => 1,
+                'affects_hpp' => 1,
+                'default_allocation' => 'hpp',
+                'production_source' => 'in_house',
+                'allow_negative' => 0,
+                'is_stocked' => 1,
+            ]
+        );
+        $catId = DB::table('item_categories')->where('code', 'TJR')->value('id');
+        $roleId = DB::table('item_roles')->where('code', 'FG')->value('id');
+        DB::table('items')->updateOrInsert(
+            ['code' => 'T1MST'],
+            [
+                'code' => 'T1MST',
+                'name' => 'Jogger Pendek Bodyfit T1 Misty (Abu-Abu) M71',
+                'unit' => 'pcs',
+                'type' => 'finished_good',
+                'item_category_id' => $catId,
+                'item_role' => 'finished_good',
+                'item_role_id' => $roleId,
+                'last_purchase_price' => 0,
+                'hpp' => 28000,
+                'active' => 1,
+                'affects_hpp' => 1,
+                'default_allocation' => 'hpp',
+                'production_source' => 'in_house',
+                'allow_negative' => 0,
+                'is_stocked' => 1,
+            ]
+        );
+        $catId = DB::table('item_categories')->where('code', 'TJR')->value('id');
+        $roleId = DB::table('item_roles')->where('code', 'FG')->value('id');
+        DB::table('items')->updateOrInsert(
+            ['code' => 'T1NVY'],
+            [
+                'code' => 'T1NVY',
+                'name' => 'Jogger Pendek Bodyfit T1 Navy',
+                'unit' => 'pcs',
+                'type' => 'finished_good',
+                'item_category_id' => $catId,
+                'item_role' => 'finished_good',
+                'item_role_id' => $roleId,
+                'last_purchase_price' => 0,
+                'hpp' => 28000,
+                'active' => 1,
+                'affects_hpp' => 1,
+                'default_allocation' => 'hpp',
+                'production_source' => 'in_house',
+                'allow_negative' => 0,
+                'is_stocked' => 1,
+            ]
+        );
+        $catId = DB::table('item_categories')->where('code', 'TJR')->value('id');
+        $roleId = DB::table('item_roles')->where('code', 'FG')->value('id');
+        DB::table('items')->updateOrInsert(
+            ['code' => 'T2ABT'],
+            [
+                'code' => 'T2ABT',
+                'name' => 'Jogger Pendek Bodyfit T2 Abu Tua M81',
+                'unit' => 'pcs',
+                'type' => 'finished_good',
+                'item_category_id' => $catId,
+                'item_role' => 'finished_good',
+                'item_role_id' => $roleId,
+                'last_purchase_price' => 0,
+                'hpp' => 28000,
+                'active' => 1,
+                'affects_hpp' => 1,
+                'default_allocation' => 'hpp',
+                'production_source' => 'in_house',
+                'allow_negative' => 0,
+                'is_stocked' => 1,
+            ]
+        );
+        $catId = DB::table('item_categories')->where('code', 'TJR')->value('id');
+        $roleId = DB::table('item_roles')->where('code', 'FG')->value('id');
+        DB::table('items')->updateOrInsert(
+            ['code' => 'T2BLK'],
+            [
+                'code' => 'T2BLK',
+                'name' => 'Jogger Pendek Bodyfit T2 Hitam',
+                'unit' => 'pcs',
+                'type' => 'finished_good',
+                'item_category_id' => $catId,
+                'item_role' => 'finished_good',
+                'item_role_id' => $roleId,
+                'last_purchase_price' => 0,
+                'hpp' => 28000,
+                'active' => 1,
+                'affects_hpp' => 1,
+                'default_allocation' => 'hpp',
+                'production_source' => 'in_house',
+                'allow_negative' => 0,
+                'is_stocked' => 1,
+            ]
+        );
+        $catId = DB::table('item_categories')->where('code', 'TJR')->value('id');
+        $roleId = DB::table('item_roles')->where('code', 'FG')->value('id');
+        DB::table('items')->updateOrInsert(
+            ['code' => 'T2MST'],
+            [
+                'code' => 'T2MST',
+                'name' => 'Jogger Pendek Bodyfit T2 Misty (Abu-Abu) M71',
+                'unit' => 'pcs',
+                'type' => 'finished_good',
+                'item_category_id' => $catId,
+                'item_role' => 'finished_good',
+                'item_role_id' => $roleId,
+                'last_purchase_price' => 0,
+                'hpp' => 28000,
+                'active' => 1,
+                'affects_hpp' => 1,
+                'default_allocation' => 'hpp',
+                'production_source' => 'in_house',
+                'allow_negative' => 0,
+                'is_stocked' => 1,
+            ]
+        );
+        $catId = DB::table('item_categories')->where('code', 'TJR')->value('id');
+        $roleId = DB::table('item_roles')->where('code', 'FG')->value('id');
+        DB::table('items')->updateOrInsert(
+            ['code' => 'T2NVY'],
+            [
+                'code' => 'T2NVY',
+                'name' => 'Jogger Pendek Bodyfit T2 Navy',
+                'unit' => 'pcs',
+                'type' => 'finished_good',
+                'item_category_id' => $catId,
+                'item_role' => 'finished_good',
+                'item_role_id' => $roleId,
+                'last_purchase_price' => 0,
+                'hpp' => 28000,
+                'active' => 1,
+                'affects_hpp' => 1,
+                'default_allocation' => 'hpp',
+                'production_source' => 'in_house',
+                'allow_negative' => 0,
+                'is_stocked' => 1,
+            ]
+        );
+        $catId = DB::table('item_categories')->where('code', 'MAT')->value('id');
+        $roleId = DB::table('item_roles')->where('code', 'RM')->value('id');
+        DB::table('items')->updateOrInsert(
+            ['code' => 'FLC280BLK'],
+            [
+                'code' => 'FLC280BLK',
+                'name' => 'Fleece 280 Hitam',
+                'unit' => 'pcs',
+                'type' => 'material',
+                'item_category_id' => $catId,
+                'item_role' => 'raw_material',
+                'item_role_id' => $roleId,
+                'last_purchase_price' => 59000,
+                'hpp' => 0,
+                'active' => 1,
+                'affects_hpp' => 1,
+                'default_allocation' => 'hpp',
+                'production_source' => null,
+                'allow_negative' => 1,
+                'is_stocked' => 1,
+            ]
+        );
+        $catId = DB::table('item_categories')->where('code', 'MAT')->value('id');
+        $roleId = DB::table('item_roles')->where('code', 'RM')->value('id');
+        DB::table('items')->updateOrInsert(
+            ['code' => 'FLC280NVY'],
+            [
+                'code' => 'FLC280NVY',
+                'name' => 'Fleece 280 Navy',
+                'unit' => 'pcs',
+                'type' => 'material',
+                'item_category_id' => $catId,
+                'item_role' => 'raw_material',
+                'item_role_id' => $roleId,
+                'last_purchase_price' => 59000,
+                'hpp' => 0,
+                'active' => 1,
+                'affects_hpp' => 1,
+                'default_allocation' => 'hpp',
+                'production_source' => null,
+                'allow_negative' => 1,
+                'is_stocked' => 1,
+            ]
+        );
+        $catId = DB::table('item_categories')->where('code', 'MAT')->value('id');
+        $roleId = DB::table('item_roles')->where('code', 'RM')->value('id');
+        DB::table('items')->updateOrInsert(
+            ['code' => 'FLC280MST'],
+            [
+                'code' => 'FLC280MST',
+                'name' => 'Fleece 280 Misty (Abu-Abu) M71',
+                'unit' => 'pcs',
+                'type' => 'material',
+                'item_category_id' => $catId,
+                'item_role' => 'raw_material',
+                'item_role_id' => $roleId,
+                'last_purchase_price' => 52350,
+                'hpp' => 0,
+                'active' => 1,
+                'affects_hpp' => 1,
+                'default_allocation' => 'hpp',
+                'production_source' => null,
+                'allow_negative' => 1,
+                'is_stocked' => 1,
+            ]
+        );
+        $catId = DB::table('item_categories')->where('code', 'MAT')->value('id');
+        $roleId = DB::table('item_roles')->where('code', 'RM')->value('id');
+        DB::table('items')->updateOrInsert(
+            ['code' => 'FLC280ABT'],
+            [
+                'code' => 'FLC280ABT',
+                'name' => 'Fleece 280 Abu Tua M81',
+                'unit' => 'pcs',
+                'type' => 'material',
+                'item_category_id' => $catId,
+                'item_role' => 'raw_material',
+                'item_role_id' => $roleId,
+                'last_purchase_price' => 54100,
+                'hpp' => 0,
+                'active' => 1,
+                'affects_hpp' => 1,
+                'default_allocation' => 'hpp',
+                'production_source' => null,
+                'allow_negative' => 1,
+                'is_stocked' => 1,
+            ]
+        );
+        $catId = DB::table('item_categories')->where('code', 'MAT')->value('id');
+        $roleId = DB::table('item_roles')->where('code', 'RM')->value('id');
+        DB::table('items')->updateOrInsert(
+            ['code' => 'FLC280WHT'],
+            [
+                'code' => 'FLC280WHT',
+                'name' => 'Fleece 280 Putih',
+                'unit' => 'pcs',
+                'type' => 'material',
+                'item_category_id' => $catId,
+                'item_role' => 'raw_material',
+                'item_role_id' => $roleId,
+                'last_purchase_price' => 59800,
+                'hpp' => 0,
+                'active' => 1,
+                'affects_hpp' => 1,
+                'default_allocation' => 'hpp',
+                'production_source' => null,
+                'allow_negative' => 1,
+                'is_stocked' => 1,
+            ]
+        );
+        $catId = DB::table('item_categories')->where('code', 'MAT')->value('id');
+        $roleId = DB::table('item_roles')->where('code', 'RM')->value('id');
+        DB::table('items')->updateOrInsert(
+            ['code' => 'FLC280BBL'],
+            [
+                'code' => 'FLC280BBL',
+                'name' => 'Fleece 280 Baby Blue',
+                'unit' => 'pcs',
+                'type' => 'material',
+                'item_category_id' => $catId,
+                'item_role' => 'raw_material',
+                'item_role_id' => $roleId,
+                'last_purchase_price' => 51750,
+                'hpp' => 0,
+                'active' => 1,
+                'affects_hpp' => 1,
+                'default_allocation' => 'hpp',
+                'production_source' => null,
+                'allow_negative' => 1,
+                'is_stocked' => 1,
+            ]
+        );
+        $catId = DB::table('item_categories')->where('code', 'MAT')->value('id');
+        $roleId = DB::table('item_roles')->where('code', 'SUP')->value('id');
+        DB::table('items')->updateOrInsert(
+            ['code' => 'RIB280BLK'],
+            [
+                'code' => 'RIB280BLK',
+                'name' => 'Rib 280 Hitam',
+                'unit' => 'kg',
+                'type' => 'material',
+                'item_category_id' => $catId,
+                'item_role' => 'production_supply',
+                'item_role_id' => $roleId,
+                'last_purchase_price' => 52100,
+                'hpp' => 0,
+                'active' => 1,
+                'affects_hpp' => 1,
+                'default_allocation' => 'hpp',
+                'production_source' => null,
+                'allow_negative' => 1,
+                'is_stocked' => 1,
+            ]
+        );
+        $catId = DB::table('item_categories')->where('code', 'MAT')->value('id');
+        $roleId = DB::table('item_roles')->where('code', 'SUP')->value('id');
+        DB::table('items')->updateOrInsert(
+            ['code' => 'RIB280NVY'],
+            [
+                'code' => 'RIB280NVY',
+                'name' => 'Rib 280 Navy',
+                'unit' => 'kg',
+                'type' => 'material',
+                'item_category_id' => $catId,
+                'item_role' => 'production_supply',
+                'item_role_id' => $roleId,
+                'last_purchase_price' => 54100,
+                'hpp' => 0,
+                'active' => 1,
+                'affects_hpp' => 1,
+                'default_allocation' => 'hpp',
+                'production_source' => null,
+                'allow_negative' => 1,
+                'is_stocked' => 1,
+            ]
+        );
+        $catId = DB::table('item_categories')->where('code', 'MAT')->value('id');
+        $roleId = DB::table('item_roles')->where('code', 'SUP')->value('id');
+        DB::table('items')->updateOrInsert(
+            ['code' => 'RIB280MST'],
+            [
+                'code' => 'RIB280MST',
+                'name' => 'Rib 280 Misty (Abu-Abu) M71',
+                'unit' => 'kg',
+                'type' => 'material',
+                'item_category_id' => $catId,
+                'item_role' => 'production_supply',
+                'item_role_id' => $roleId,
+                'last_purchase_price' => 56760,
+                'hpp' => 0,
+                'active' => 1,
+                'affects_hpp' => 1,
+                'default_allocation' => 'hpp',
+                'production_source' => null,
+                'allow_negative' => 1,
+                'is_stocked' => 1,
+            ]
+        );
+        $catId = DB::table('item_categories')->where('code', 'MAT')->value('id');
+        $roleId = DB::table('item_roles')->where('code', 'SUP')->value('id');
+        DB::table('items')->updateOrInsert(
+            ['code' => 'RIB280ABT'],
+            [
+                'code' => 'RIB280ABT',
+                'name' => 'Rib 280 Abu Tua M81',
+                'unit' => 'kg',
+                'type' => 'material',
+                'item_category_id' => $catId,
+                'item_role' => 'production_supply',
+                'item_role_id' => $roleId,
+                'last_purchase_price' => 57600,
+                'hpp' => 0,
+                'active' => 1,
+                'affects_hpp' => 1,
+                'default_allocation' => 'hpp',
+                'production_source' => null,
+                'allow_negative' => 1,
+                'is_stocked' => 1,
+            ]
+        );
+        $catId = DB::table('item_categories')->where('code', 'MAT')->value('id');
+        $roleId = DB::table('item_roles')->where('code', 'SUP')->value('id');
+        DB::table('items')->updateOrInsert(
+            ['code' => 'RIB280WHT'],
+            [
+                'code' => 'RIB280WHT',
+                'name' => 'Rib 280 Putih',
+                'unit' => 'kg',
+                'type' => 'material',
+                'item_category_id' => $catId,
+                'item_role' => 'production_supply',
+                'item_role_id' => $roleId,
+                'last_purchase_price' => 59150,
+                'hpp' => 0,
+                'active' => 1,
+                'affects_hpp' => 1,
+                'default_allocation' => 'hpp',
+                'production_source' => null,
+                'allow_negative' => 1,
+                'is_stocked' => 1,
+            ]
+        );
+        $catId = DB::table('item_categories')->where('code', 'MAT')->value('id');
+        $roleId = DB::table('item_roles')->where('code', 'SUP')->value('id');
+        DB::table('items')->updateOrInsert(
+            ['code' => 'RIB280BBL'],
+            [
+                'code' => 'RIB280BBL',
+                'name' => 'Rib 280 Baby Blue',
+                'unit' => 'kg',
+                'type' => 'material',
+                'item_category_id' => $catId,
+                'item_role' => 'production_supply',
+                'item_role_id' => $roleId,
+                'last_purchase_price' => 51800,
+                'hpp' => 0,
+                'active' => 1,
+                'affects_hpp' => 1,
+                'default_allocation' => 'hpp',
+                'production_source' => null,
+                'allow_negative' => 1,
+                'is_stocked' => 1,
+            ]
+        );
+        $catId = DB::table('item_categories')->where('code', 'BPU')->value('id');
+        $roleId = DB::table('item_roles')->where('code', 'SUP')->value('id');
+        DB::table('items')->updateOrInsert(
+            ['code' => 'TLKADDS'],
+            [
+                'code' => 'TLKADDS',
+                'name' => 'Tali Karet Adidas',
+                'unit' => 'kg',
+                'type' => 'material',
+                'item_category_id' => $catId,
+                'item_role' => 'production_supply',
+                'item_role_id' => $roleId,
+                'last_purchase_price' => 0,
+                'hpp' => 0,
+                'active' => 1,
+                'affects_hpp' => 1,
+                'default_allocation' => 'hpp',
+                'production_source' => null,
+                'allow_negative' => 1,
+                'is_stocked' => 1,
+            ]
+        );
+        $catId = DB::table('item_categories')->where('code', 'BPU')->value('id');
+        $roleId = DB::table('item_roles')->where('code', 'SUP')->value('id');
+        DB::table('items')->updateOrInsert(
+            ['code' => 'KRT4CM'],
+            [
+                'code' => 'KRT4CM',
+                'name' => 'Karet 4 CM',
+                'unit' => 'kg',
+                'type' => 'material',
+                'item_category_id' => $catId,
+                'item_role' => 'production_supply',
+                'item_role_id' => $roleId,
+                'last_purchase_price' => 36000,
+                'hpp' => 0,
+                'active' => 1,
+                'affects_hpp' => 1,
+                'default_allocation' => 'hpp',
+                'production_source' => null,
+                'allow_negative' => 1,
+                'is_stocked' => 1,
+            ]
+        );
+        $catId = DB::table('item_categories')->where('code', 'BPU')->value('id');
+        $roleId = DB::table('item_roles')->where('code', 'SUP')->value('id');
+        DB::table('items')->updateOrInsert(
+            ['code' => 'BNGJHT'],
+            [
+                'code' => 'BNGJHT',
+                'name' => 'Benang Jahit',
+                'unit' => 'pcs',
+                'type' => 'material',
+                'item_category_id' => $catId,
+                'item_role' => 'production_supply',
+                'item_role_id' => $roleId,
+                'last_purchase_price' => 0,
+                'hpp' => 0,
+                'active' => 1,
+                'affects_hpp' => 1,
+                'default_allocation' => 'hpp',
+                'production_source' => null,
+                'allow_negative' => 1,
+                'is_stocked' => 1,
+            ]
+        );
+        $catId = DB::table('item_categories')->where('code', 'PACK')->value('id');
+        $roleId = DB::table('item_roles')->where('code', 'PKG')->value('id');
+        DB::table('items')->updateOrInsert(
+            ['code' => 'THR57X30'],
+            [
+                'code' => 'THR57X30',
+                'name' => 'Kertas Thermal 57mm x 30mm',
+                'unit' => 'roll',
+                'type' => 'material',
+                'item_category_id' => $catId,
+                'item_role' => 'shipping_supply',
+                'item_role_id' => $roleId,
+                'last_purchase_price' => 0,
+                'hpp' => 0,
+                'active' => 1,
+                'affects_hpp' => 0,
+                'default_allocation' => 'expense',
+                'production_source' => null,
+                'allow_negative' => 0,
+                'is_stocked' => 0,
+            ]
+        );
+        $catId = DB::table('item_categories')->where('code', 'PACK')->value('id');
+        $roleId = DB::table('item_roles')->where('code', 'PKG')->value('id');
+        DB::table('items')->updateOrInsert(
+            ['code' => 'THR57X40'],
+            [
+                'code' => 'THR57X40',
+                'name' => 'Kertas Thermal 57mm x 40mm',
+                'unit' => 'roll',
+                'type' => 'material',
+                'item_category_id' => $catId,
+                'item_role' => 'shipping_supply',
+                'item_role_id' => $roleId,
+                'last_purchase_price' => 0,
+                'hpp' => 0,
+                'active' => 1,
+                'affects_hpp' => 0,
+                'default_allocation' => 'expense',
+                'production_source' => null,
+                'allow_negative' => 0,
+                'is_stocked' => 0,
+            ]
+        );
+        $catId = DB::table('item_categories')->where('code', 'PACK')->value('id');
+        $roleId = DB::table('item_roles')->where('code', 'PKG')->value('id');
+        DB::table('items')->updateOrInsert(
+            ['code' => 'THR80X50'],
+            [
+                'code' => 'THR80X50',
+                'name' => 'Kertas Thermal 80mm x 50mm',
+                'unit' => 'roll',
+                'type' => 'material',
+                'item_category_id' => $catId,
+                'item_role' => 'shipping_supply',
+                'item_role_id' => $roleId,
+                'last_purchase_price' => 0,
+                'hpp' => 0,
+                'active' => 1,
+                'affects_hpp' => 0,
+                'default_allocation' => 'expense',
+                'production_source' => null,
+                'allow_negative' => 0,
+                'is_stocked' => 0,
+            ]
+        );
+        $catId = DB::table('item_categories')->where('code', 'PACK')->value('id');
+        $roleId = DB::table('item_roles')->where('code', 'SUP')->value('id');
+        DB::table('items')->updateOrInsert(
+            ['code' => 'OPP10X15'],
+            [
+                'code' => 'OPP10X15',
+                'name' => 'Plastik OPP 10 x 15',
+                'unit' => 'pack',
+                'type' => 'material',
+                'item_category_id' => $catId,
+                'item_role' => 'production_supply',
+                'item_role_id' => $roleId,
+                'last_purchase_price' => 0,
+                'hpp' => 0,
+                'active' => 1,
+                'affects_hpp' => 1,
+                'default_allocation' => 'hpp',
+                'production_source' => null,
+                'allow_negative' => 1,
+                'is_stocked' => 1,
+            ]
+        );
+        $catId = DB::table('item_categories')->where('code', 'PACK')->value('id');
+        $roleId = DB::table('item_roles')->where('code', 'SUP')->value('id');
+        DB::table('items')->updateOrInsert(
+            ['code' => 'OPP12X20'],
+            [
+                'code' => 'OPP12X20',
+                'name' => 'Plastik OPP 12 x 20',
+                'unit' => 'pack',
+                'type' => 'material',
+                'item_category_id' => $catId,
+                'item_role' => 'production_supply',
+                'item_role_id' => $roleId,
+                'last_purchase_price' => 0,
+                'hpp' => 0,
+                'active' => 1,
+                'affects_hpp' => 1,
+                'default_allocation' => 'hpp',
+                'production_source' => null,
+                'allow_negative' => 1,
+                'is_stocked' => 1,
+            ]
+        );
+        $catId = DB::table('item_categories')->where('code', 'PACK')->value('id');
+        $roleId = DB::table('item_roles')->where('code', 'SUP')->value('id');
+        DB::table('items')->updateOrInsert(
+            ['code' => 'OPP15X25'],
+            [
+                'code' => 'OPP15X25',
+                'name' => 'Plastik OPP 15 x 25',
+                'unit' => 'pack',
+                'type' => 'material',
+                'item_category_id' => $catId,
+                'item_role' => 'production_supply',
+                'item_role_id' => $roleId,
+                'last_purchase_price' => 0,
+                'hpp' => 0,
+                'active' => 1,
+                'affects_hpp' => 1,
+                'default_allocation' => 'hpp',
+                'production_source' => null,
+                'allow_negative' => 1,
+                'is_stocked' => 1,
+            ]
+        );
+        $catId = DB::table('item_categories')->where('code', 'PACK')->value('id');
+        $roleId = DB::table('item_roles')->where('code', 'SUP')->value('id');
+        DB::table('items')->updateOrInsert(
+            ['code' => 'OPP20X30'],
+            [
+                'code' => 'OPP20X30',
+                'name' => 'Plastik OPP 20 x 30',
+                'unit' => 'pack',
+                'type' => 'material',
+                'item_category_id' => $catId,
+                'item_role' => 'production_supply',
+                'item_role_id' => $roleId,
+                'last_purchase_price' => 0,
+                'hpp' => 0,
+                'active' => 1,
+                'affects_hpp' => 1,
+                'default_allocation' => 'hpp',
+                'production_source' => null,
+                'allow_negative' => 1,
+                'is_stocked' => 1,
+            ]
+        );
+        $catId = DB::table('item_categories')->where('code', 'PACK')->value('id');
+        $roleId = DB::table('item_roles')->where('code', 'PKG')->value('id');
+        DB::table('items')->updateOrInsert(
+            ['code' => 'PLY20X30'],
+            [
+                'code' => 'PLY20X30',
+                'name' => 'Polymailer 20 x 30',
+                'unit' => 'pack',
+                'type' => 'material',
+                'item_category_id' => $catId,
+                'item_role' => 'shipping_supply',
+                'item_role_id' => $roleId,
+                'last_purchase_price' => 0,
+                'hpp' => 0,
+                'active' => 1,
+                'affects_hpp' => 0,
+                'default_allocation' => 'expense',
+                'production_source' => null,
+                'allow_negative' => 0,
+                'is_stocked' => 0,
+            ]
+        );
+        $catId = DB::table('item_categories')->where('code', 'PACK')->value('id');
+        $roleId = DB::table('item_roles')->where('code', 'PKG')->value('id');
+        DB::table('items')->updateOrInsert(
+            ['code' => 'PLY25X35'],
+            [
+                'code' => 'PLY25X35',
+                'name' => 'Polymailer 25 x 35',
+                'unit' => 'pack',
+                'type' => 'material',
+                'item_category_id' => $catId,
+                'item_role' => 'shipping_supply',
+                'item_role_id' => $roleId,
+                'last_purchase_price' => 0,
+                'hpp' => 0,
+                'active' => 1,
+                'affects_hpp' => 0,
+                'default_allocation' => 'expense',
+                'production_source' => null,
+                'allow_negative' => 0,
+                'is_stocked' => 0,
+            ]
+        );
+        $catId = DB::table('item_categories')->where('code', 'PACK')->value('id');
+        $roleId = DB::table('item_roles')->where('code', 'PKG')->value('id');
+        DB::table('items')->updateOrInsert(
+            ['code' => 'PLY30X40'],
+            [
+                'code' => 'PLY30X40',
+                'name' => 'Polymailer 30 x 40',
+                'unit' => 'pack',
+                'type' => 'material',
+                'item_category_id' => $catId,
+                'item_role' => 'shipping_supply',
+                'item_role_id' => $roleId,
+                'last_purchase_price' => 0,
+                'hpp' => 0,
+                'active' => 1,
+                'affects_hpp' => 0,
+                'default_allocation' => 'expense',
+                'production_source' => null,
+                'allow_negative' => 0,
+                'is_stocked' => 0,
+            ]
+        );
+        $catId = DB::table('item_categories')->where('code', 'MAT')->value('id');
+        $roleId = DB::table('item_roles')->where('code', 'RM')->value('id');
+        DB::table('items')->updateOrInsert(
+            ['code' => 'FLC240ABM'],
+            [
+                'code' => 'FLC240ABM',
+                'name' => 'Fleece 240 Abu Muda M68',
+                'unit' => 'kg',
+                'type' => 'material',
+                'item_category_id' => $catId,
+                'item_role' => 'raw_material',
+                'item_role_id' => $roleId,
+                'last_purchase_price' => 56000,
+                'hpp' => 0,
+                'active' => 1,
+                'affects_hpp' => 1,
+                'default_allocation' => 'hpp',
+                'production_source' => null,
+                'allow_negative' => 1,
+                'is_stocked' => 1,
+            ]
+        );
+        $catId = DB::table('item_categories')->where('code', 'LBP')->value('id');
+        $roleId = DB::table('item_roles')->where('code', 'FG')->value('id');
+        DB::table('items')->updateOrInsert(
+            ['code' => 'BP2ABT'],
+            [
+                'code' => 'BP2ABT',
+                'name' => 'Celana Panjang Baggy Ukuran XL Abu Tua',
+                'unit' => 'pcs',
+                'type' => 'finished_good',
+                'item_category_id' => $catId,
+                'item_role' => 'finished_good',
+                'item_role_id' => $roleId,
+                'last_purchase_price' => 0,
+                'hpp' => 41500,
+                'active' => 1,
+                'affects_hpp' => 1,
+                'default_allocation' => 'hpp',
+                'production_source' => 'in_house',
+                'allow_negative' => 0,
+                'is_stocked' => 1,
+            ]
+        );
+        $catId = DB::table('item_categories')->where('code', 'LBP')->value('id');
+        $roleId = DB::table('item_roles')->where('code', 'FG')->value('id');
+        DB::table('items')->updateOrInsert(
+            ['code' => 'BP1ABT'],
+            [
+                'code' => 'BP1ABT',
+                'name' => 'Celana Panjang Baggy Ukuran L Abu Tua',
+                'unit' => 'pcs',
+                'type' => 'finished_good',
+                'item_category_id' => $catId,
+                'item_role' => 'finished_good',
+                'item_role_id' => $roleId,
+                'last_purchase_price' => 0,
+                'hpp' => 41500,
+                'active' => 1,
+                'affects_hpp' => 1,
+                'default_allocation' => 'hpp',
+                'production_source' => 'in_house',
+                'allow_negative' => 0,
+                'is_stocked' => 1,
+            ]
+        );
+        $catId = DB::table('item_categories')->where('code', 'LBP')->value('id');
+        $roleId = DB::table('item_roles')->where('code', 'FG')->value('id');
+        DB::table('items')->updateOrInsert(
+            ['code' => 'BP1MST'],
+            [
+                'code' => 'BP1MST',
+                'name' => 'Celana Panjang Baggy Ukuran L Abu Misty M71',
+                'unit' => 'pcs',
+                'type' => 'finished_good',
+                'item_category_id' => $catId,
+                'item_role' => 'finished_good',
+                'item_role_id' => $roleId,
+                'last_purchase_price' => 0,
+                'hpp' => 41500,
+                'active' => 1,
+                'affects_hpp' => 1,
+                'default_allocation' => 'hpp',
+                'production_source' => 'in_house',
+                'allow_negative' => 0,
+                'is_stocked' => 1,
+            ]
+        );
+        $catId = DB::table('item_categories')->where('code', 'LBP')->value('id');
+        $roleId = DB::table('item_roles')->where('code', 'FG')->value('id');
+        DB::table('items')->updateOrInsert(
+            ['code' => 'BP2ABM'],
+            [
+                'code' => 'BP2ABM',
+                'name' => 'Celana Panjang Baggy Ukuran XL Abu Muda M68',
+                'unit' => 'pcs',
+                'type' => 'finished_good',
+                'item_category_id' => $catId,
+                'item_role' => 'finished_good',
+                'item_role_id' => $roleId,
+                'last_purchase_price' => 0,
+                'hpp' => 41500,
+                'active' => 1,
+                'affects_hpp' => 1,
+                'default_allocation' => 'hpp',
+                'production_source' => 'in_house',
+                'allow_negative' => 0,
+                'is_stocked' => 1,
+            ]
+        );
+        $catId = DB::table('item_categories')->where('code', 'LBP')->value('id');
+        $roleId = DB::table('item_roles')->where('code', 'FG')->value('id');
+        DB::table('items')->updateOrInsert(
+            ['code' => 'BP2MST'],
+            [
+                'code' => 'BP2MST',
+                'name' => 'Celana Panjang Baggy Ukuran XL Abu Misty M71',
+                'unit' => 'pcs',
+                'type' => 'finished_good',
+                'item_category_id' => $catId,
+                'item_role' => 'finished_good',
+                'item_role_id' => $roleId,
+                'last_purchase_price' => 0,
+                'hpp' => 41500,
+                'active' => 1,
+                'affects_hpp' => 1,
+                'default_allocation' => 'hpp',
+                'production_source' => 'in_house',
+                'allow_negative' => 0,
+                'is_stocked' => 1,
+            ]
+        );
+        $catId = DB::table('item_categories')->where('code', 'LBP')->value('id');
+        $roleId = DB::table('item_roles')->where('code', 'FG')->value('id');
+        DB::table('items')->updateOrInsert(
+            ['code' => 'BP1ABM'],
+            [
+                'code' => 'BP1ABM',
+                'name' => 'Celana Panjang Baggy Ukuran L Abu Muda M68',
+                'unit' => 'pcs',
+                'type' => 'finished_good',
+                'item_category_id' => $catId,
+                'item_role' => 'finished_good',
+                'item_role_id' => $roleId,
+                'last_purchase_price' => 0,
+                'hpp' => 41500,
+                'active' => 1,
+                'affects_hpp' => 1,
+                'default_allocation' => 'hpp',
+                'production_source' => 'in_house',
+                'allow_negative' => 0,
+                'is_stocked' => 1,
+            ]
+        );
+        $catId = DB::table('item_categories')->where('code', 'MAT')->value('id');
+        $roleId = DB::table('item_roles')->where('code', 'RM')->value('id');
+        DB::table('items')->updateOrInsert(
+            ['code' => 'BP1BLK'],
+            [
+                'code' => 'BP1BLK',
+                'name' => 'Celana Panjang Baggy Ukuran L Hitam',
+                'unit' => 'pcs',
+                'type' => 'material',
+                'item_category_id' => $catId,
+                'item_role' => 'raw_material',
+                'item_role_id' => $roleId,
+                'last_purchase_price' => 0,
+                'hpp' => 41500,
+                'active' => 1,
+                'affects_hpp' => 1,
+                'default_allocation' => 'hpp',
+                'production_source' => null,
+                'allow_negative' => 1,
+                'is_stocked' => 1,
+            ]
+        );
+        $catId = DB::table('item_categories')->where('code', 'LBP')->value('id');
+        $roleId = DB::table('item_roles')->where('code', 'FG')->value('id');
+        DB::table('items')->updateOrInsert(
+            ['code' => 'BP2BLK'],
+            [
+                'code' => 'BP2BLK',
+                'name' => 'Celana Panjang Baggy Ukuran XL Hitam',
+                'unit' => 'pcs',
+                'type' => 'finished_good',
+                'item_category_id' => $catId,
+                'item_role' => 'finished_good',
+                'item_role_id' => $roleId,
+                'last_purchase_price' => 0,
+                'hpp' => 41500,
+                'active' => 1,
+                'affects_hpp' => 1,
+                'default_allocation' => 'hpp',
+                'production_source' => 'in_house',
+                'allow_negative' => 0,
+                'is_stocked' => 1,
+            ]
+        );
+        $catId = DB::table('item_categories')->where('code', 'MAT')->value('id');
+        $roleId = DB::table('item_roles')->where('code', 'RM')->value('id');
+        DB::table('items')->updateOrInsert(
+            ['code' => 'FLC240MST'],
+            [
+                'code' => 'FLC240MST',
+                'name' => 'Fleece 240 Abu Misty M71',
+                'unit' => 'pcs',
+                'type' => 'material',
+                'item_category_id' => $catId,
+                'item_role' => 'raw_material',
+                'item_role_id' => $roleId,
+                'last_purchase_price' => 0,
+                'hpp' => 0,
+                'active' => 1,
+                'affects_hpp' => 1,
+                'default_allocation' => 'hpp',
+                'production_source' => null,
+                'allow_negative' => 1,
+                'is_stocked' => 1,
+            ]
+        );
+        $catId = DB::table('item_categories')->where('code', 'MAT')->value('id');
+        $roleId = DB::table('item_roles')->where('code', 'RM')->value('id');
+        DB::table('items')->updateOrInsert(
+            ['code' => 'FLC240ABT'],
+            [
+                'code' => 'FLC240ABT',
+                'name' => 'Fleece 240 Abu Tua M68',
+                'unit' => 'pcs',
+                'type' => 'material',
+                'item_category_id' => $catId,
+                'item_role' => 'raw_material',
+                'item_role_id' => $roleId,
+                'last_purchase_price' => 0,
+                'hpp' => 0,
+                'active' => 1,
+                'affects_hpp' => 1,
+                'default_allocation' => 'hpp',
+                'production_source' => null,
+                'allow_negative' => 1,
+                'is_stocked' => 1,
+            ]
+        );
+        $catId = DB::table('item_categories')->where('code', 'MAT')->value('id');
+        $roleId = DB::table('item_roles')->where('code', 'RM')->value('id');
+        DB::table('items')->updateOrInsert(
+            ['code' => 'FLC240BLK'],
+            [
+                'code' => 'FLC240BLK',
+                'name' => 'Fleece 240 Hitam',
+                'unit' => 'pcs',
+                'type' => 'material',
+                'item_category_id' => $catId,
+                'item_role' => 'raw_material',
+                'item_role_id' => $roleId,
+                'last_purchase_price' => 0,
+                'hpp' => 0,
+                'active' => 1,
+                'affects_hpp' => 1,
+                'default_allocation' => 'hpp',
+                'production_source' => null,
+                'allow_negative' => 1,
+                'is_stocked' => 1,
+            ]
+        );
+        $catId = DB::table('item_categories')->where('code', 'TTB')->value('id');
+        $roleId = DB::table('item_roles')->where('code', 'FG')->value('id');
+        DB::table('items')->updateOrInsert(
+            ['code' => 'TTB-BLK-L'],
+            [
+                'code' => 'TTB-BLK-L',
+                'name' => 'Tracktop Hitam Garis 3 Tangan Ukuiran L',
+                'unit' => 'pcs',
+                'type' => 'finished_good',
+                'item_category_id' => $catId,
+                'item_role' => 'finished_good',
+                'item_role_id' => $roleId,
+                'last_purchase_price' => 0,
+                'hpp' => 45000,
+                'active' => 1,
+                'affects_hpp' => 1,
+                'default_allocation' => 'hpp',
+                'production_source' => 'buy',
+                'allow_negative' => 0,
+                'is_stocked' => 1,
+            ]
+        );
+        $catId = DB::table('item_categories')->where('code', 'TTB')->value('id');
+        $roleId = DB::table('item_roles')->where('code', 'FG')->value('id');
+        DB::table('items')->updateOrInsert(
+            ['code' => 'TTB-BLK-M'],
+            [
+                'code' => 'TTB-BLK-M',
+                'name' => 'Tracktop Hitam Garis 3 Tangan Ukuiran M',
+                'unit' => 'pcs',
+                'type' => 'finished_good',
+                'item_category_id' => $catId,
+                'item_role' => 'finished_good',
+                'item_role_id' => $roleId,
+                'last_purchase_price' => 0,
+                'hpp' => 43000,
+                'active' => 1,
+                'affects_hpp' => 1,
+                'default_allocation' => 'hpp',
+                'production_source' => 'buy',
+                'allow_negative' => 0,
+                'is_stocked' => 1,
+            ]
+        );
+        $catId = DB::table('item_categories')->where('code', 'TTB')->value('id');
+        $roleId = DB::table('item_roles')->where('code', 'FG')->value('id');
+        DB::table('items')->updateOrInsert(
+            ['code' => 'TTB-BLK-XL'],
+            [
+                'code' => 'TTB-BLK-XL',
+                'name' => 'Tracktop Hitam Garis 3 Tangan Ukuiran Xl',
+                'unit' => 'pcs',
+                'type' => 'finished_good',
+                'item_category_id' => $catId,
+                'item_role' => 'finished_good',
+                'item_role_id' => $roleId,
+                'last_purchase_price' => 0,
+                'hpp' => 47000,
+                'active' => 1,
+                'affects_hpp' => 1,
+                'default_allocation' => 'hpp',
+                'production_source' => 'buy',
+                'allow_negative' => 0,
+                'is_stocked' => 1,
+            ]
+        );
+        $catId = DB::table('item_categories')->where('code', 'TTB')->value('id');
+        $roleId = DB::table('item_roles')->where('code', 'FG')->value('id');
+        DB::table('items')->updateOrInsert(
+            ['code' => 'TTB-BLK-XXL'],
+            [
+                'code' => 'TTB-BLK-XXL',
+                'name' => 'Tracktop Hitam Garis 3 Tangan Ukuiran XXL',
+                'unit' => 'pcs',
+                'type' => 'finished_good',
+                'item_category_id' => $catId,
+                'item_role' => 'finished_good',
+                'item_role_id' => $roleId,
+                'last_purchase_price' => 0,
+                'hpp' => 49000,
+                'active' => 1,
+                'affects_hpp' => 1,
+                'default_allocation' => 'hpp',
+                'production_source' => 'buy',
+                'allow_negative' => 0,
+                'is_stocked' => 1,
+            ]
+        );
+        $catId = DB::table('item_categories')->where('code', 'TTB')->value('id');
+        $roleId = DB::table('item_roles')->where('code', 'FG')->value('id');
+        DB::table('items')->updateOrInsert(
+            ['code' => 'TTB-WHT-M'],
+            [
+                'code' => 'TTB-WHT-M',
+                'name' => 'Tracktop Putih Garis 3 Tangan Ukuiran M',
+                'unit' => 'pcs',
+                'type' => 'finished_good',
+                'item_category_id' => $catId,
+                'item_role' => 'finished_good',
+                'item_role_id' => $roleId,
+                'last_purchase_price' => 0,
+                'hpp' => 43000,
+                'active' => 1,
+                'affects_hpp' => 1,
+                'default_allocation' => 'hpp',
+                'production_source' => 'buy',
+                'allow_negative' => 0,
+                'is_stocked' => 1,
+            ]
+        );
+        $catId = DB::table('item_categories')->where('code', 'TTB')->value('id');
+        $roleId = DB::table('item_roles')->where('code', 'FG')->value('id');
+        DB::table('items')->updateOrInsert(
+            ['code' => 'TTB-WHT-L'],
+            [
+                'code' => 'TTB-WHT-L',
+                'name' => 'Tracktop Putih Garis 3 Tangan Ukuiran L',
+                'unit' => 'pcs',
+                'type' => 'finished_good',
+                'item_category_id' => $catId,
+                'item_role' => 'finished_good',
+                'item_role_id' => $roleId,
+                'last_purchase_price' => 0,
+                'hpp' => 45000,
+                'active' => 1,
+                'affects_hpp' => 1,
+                'default_allocation' => 'hpp',
+                'production_source' => 'buy',
+                'allow_negative' => 0,
+                'is_stocked' => 1,
+            ]
+        );
+        $catId = DB::table('item_categories')->where('code', 'TTB')->value('id');
+        $roleId = DB::table('item_roles')->where('code', 'FG')->value('id');
+        DB::table('items')->updateOrInsert(
+            ['code' => 'TTB-WHT-XL'],
+            [
+                'code' => 'TTB-WHT-XL',
+                'name' => 'Tracktop Putih Garis 3 Tangan Ukuiran XL',
+                'unit' => 'pcs',
+                'type' => 'finished_good',
+                'item_category_id' => $catId,
+                'item_role' => 'finished_good',
+                'item_role_id' => $roleId,
+                'last_purchase_price' => 0,
+                'hpp' => 47000,
+                'active' => 1,
+                'affects_hpp' => 1,
+                'default_allocation' => 'hpp',
+                'production_source' => 'buy',
+                'allow_negative' => 0,
+                'is_stocked' => 1,
+            ]
+        );
+        $catId = DB::table('item_categories')->where('code', 'TTB')->value('id');
+        $roleId = DB::table('item_roles')->where('code', 'FG')->value('id');
+        DB::table('items')->updateOrInsert(
+            ['code' => 'TTB-WHT-XXL'],
+            [
+                'code' => 'TTB-WHT-XXL',
+                'name' => 'Tracktop Putih Garis 3 Tangan Ukuiran XXL',
+                'unit' => 'pcs',
+                'type' => 'finished_good',
+                'item_category_id' => $catId,
+                'item_role' => 'finished_good',
+                'item_role_id' => $roleId,
+                'last_purchase_price' => 0,
+                'hpp' => 49000,
+                'active' => 1,
+                'affects_hpp' => 1,
+                'default_allocation' => 'hpp',
+                'production_source' => 'buy',
+                'allow_negative' => 0,
+                'is_stocked' => 1,
+            ]
+        );
+        $catId = DB::table('item_categories')->where('code', 'TTB')->value('id');
+        $roleId = DB::table('item_roles')->where('code', 'FG')->value('id');
+        DB::table('items')->updateOrInsert(
+            ['code' => 'TTC-BLK-M'],
+            [
+                'code' => 'TTC-BLK-M',
+                'name' => 'Tracktop Hitam Strip 2 Tangan Ukuran M',
+                'unit' => 'pcs',
+                'type' => 'finished_good',
+                'item_category_id' => $catId,
+                'item_role' => 'finished_good',
+                'item_role_id' => $roleId,
+                'last_purchase_price' => 0,
+                'hpp' => 0,
+                'active' => 1,
+                'affects_hpp' => 1,
+                'default_allocation' => 'hpp',
+                'production_source' => 'buy',
+                'allow_negative' => 0,
+                'is_stocked' => 1,
+            ]
+        );
+        $catId = DB::table('item_categories')->where('code', 'TTB')->value('id');
+        $roleId = DB::table('item_roles')->where('code', 'FG')->value('id');
+        DB::table('items')->updateOrInsert(
+            ['code' => 'TTC-BLK-L'],
+            [
+                'code' => 'TTC-BLK-L',
+                'name' => 'Tracktop Hitam Strip 2 Tangan Ukuiran L',
+                'unit' => 'pcs',
+                'type' => 'finished_good',
+                'item_category_id' => $catId,
+                'item_role' => 'finished_good',
+                'item_role_id' => $roleId,
+                'last_purchase_price' => 0,
+                'hpp' => 0,
+                'active' => 1,
+                'affects_hpp' => 1,
+                'default_allocation' => 'hpp',
+                'production_source' => 'buy',
+                'allow_negative' => 0,
+                'is_stocked' => 1,
+            ]
+        );
+        $catId = DB::table('item_categories')->where('code', 'TTB')->value('id');
+        $roleId = DB::table('item_roles')->where('code', 'FG')->value('id');
+        DB::table('items')->updateOrInsert(
+            ['code' => 'TTC-BLK-XL'],
+            [
+                'code' => 'TTC-BLK-XL',
+                'name' => 'Tracktop Hitam Strip 2 Tangan Ukuran XL',
+                'unit' => 'pcs',
+                'type' => 'finished_good',
+                'item_category_id' => $catId,
+                'item_role' => 'finished_good',
+                'item_role_id' => $roleId,
+                'last_purchase_price' => 0,
+                'hpp' => 0,
+                'active' => 1,
+                'affects_hpp' => 1,
+                'default_allocation' => 'hpp',
+                'production_source' => 'buy',
+                'allow_negative' => 0,
+                'is_stocked' => 1,
+            ]
+        );
+        $catId = DB::table('item_categories')->where('code', 'TTB')->value('id');
+        $roleId = DB::table('item_roles')->where('code', 'FG')->value('id');
+        DB::table('items')->updateOrInsert(
+            ['code' => 'TTC-BLK-XXL'],
+            [
+                'code' => 'TTC-BLK-XXL',
+                'name' => 'Tracktop Hitam Strip 2 Tangan Ukuiran XXL',
+                'unit' => 'pcs',
+                'type' => 'finished_good',
+                'item_category_id' => $catId,
+                'item_role' => 'finished_good',
+                'item_role_id' => $roleId,
+                'last_purchase_price' => 0,
+                'hpp' => 0,
+                'active' => 1,
+                'affects_hpp' => 1,
+                'default_allocation' => 'hpp',
+                'production_source' => 'buy',
+                'allow_negative' => 0,
+                'is_stocked' => 1,
+            ]
+        );
+        $catId = DB::table('item_categories')->where('code', 'LBP')->value('id');
+        $roleId = DB::table('item_roles')->where('code', 'FG')->value('id');
+        DB::table('items')->updateOrInsert(
+            ['code' => 'LPS-ABT-M'],
+            [
+                'code' => 'LPS-ABT-M',
+                'name' => 'Celana Panjang Loose Pants Abu Tua Ukuran M',
+                'unit' => 'pcs',
+                'type' => 'finished_good',
+                'item_category_id' => $catId,
+                'item_role' => 'finished_good',
+                'item_role_id' => $roleId,
+                'last_purchase_price' => 0,
+                'hpp' => 0,
+                'active' => 1,
+                'affects_hpp' => 1,
+                'default_allocation' => 'hpp',
+                'production_source' => 'in_house',
+                'allow_negative' => 0,
+                'is_stocked' => 1,
+            ]
+        );
+        $catId = DB::table('item_categories')->where('code', 'BRD')->value('id');
+        $roleId = DB::table('item_roles')->where('code', 'FG')->value('id');
+        DB::table('items')->updateOrInsert(
+            ['code' => 'B7BLK'],
+            [
+                'code' => 'B7BLK',
+                'name' => 'Boardshort Parasit Hitam 7L',
+                'unit' => 'pcs',
+                'type' => 'finished_good',
+                'item_category_id' => $catId,
+                'item_role' => 'finished_good',
+                'item_role_id' => $roleId,
+                'last_purchase_price' => 0,
+                'hpp' => 28000,
+                'active' => 1,
+                'affects_hpp' => 1,
+                'default_allocation' => 'hpp',
+                'production_source' => 'in_house',
+                'allow_negative' => 0,
+                'is_stocked' => 1,
+            ]
+        );
+        $catId = DB::table('item_categories')->where('code', 'BRD')->value('id');
+        $roleId = DB::table('item_roles')->where('code', 'FG')->value('id');
+        DB::table('items')->updateOrInsert(
+            ['code' => 'B5BLK'],
+            [
+                'code' => 'B5BLK',
+                'name' => 'Boardshort Parasit Hitam 5L',
+                'unit' => 'pcs',
+                'type' => 'finished_good',
+                'item_category_id' => $catId,
+                'item_role' => 'finished_good',
+                'item_role_id' => $roleId,
+                'last_purchase_price' => 0,
+                'hpp' => 28000,
+                'active' => 1,
+                'affects_hpp' => 1,
+                'default_allocation' => 'hpp',
+                'production_source' => 'in_house',
+                'allow_negative' => 0,
+                'is_stocked' => 1,
+            ]
+        );
+        $catId = DB::table('item_categories')->where('code', 'BRD')->value('id');
+        $roleId = DB::table('item_roles')->where('code', 'FG')->value('id');
+        DB::table('items')->updateOrInsert(
+            ['code' => 'B3BLK'],
+            [
+                'code' => 'B3BLK',
+                'name' => 'Boardshort Parasit Hitam 3L',
+                'unit' => 'pcs',
+                'type' => 'finished_good',
+                'item_category_id' => $catId,
+                'item_role' => 'finished_good',
+                'item_role_id' => $roleId,
+                'last_purchase_price' => 0,
+                'hpp' => 28000,
+                'active' => 1,
+                'affects_hpp' => 1,
+                'default_allocation' => 'hpp',
+                'production_source' => 'buy',
+                'allow_negative' => 0,
+                'is_stocked' => 1,
+            ]
+        );
+        $catId = DB::table('item_categories')->where('code', 'BPU')->value('id');
+        $roleId = DB::table('item_roles')->where('code', 'SUP')->value('id');
+        DB::table('items')->updateOrInsert(
+            ['code' => 'LBLSIZE'],
+            [
+                'code' => 'LBLSIZE',
+                'name' => 'Label Size',
+                'unit' => 'pcs',
+                'type' => 'material',
+                'item_category_id' => $catId,
+                'item_role' => 'production_supply',
+                'item_role_id' => $roleId,
+                'last_purchase_price' => 0,
+                'hpp' => 0,
+                'active' => 1,
+                'affects_hpp' => 1,
+                'default_allocation' => 'hpp',
+                'production_source' => null,
+                'allow_negative' => 1,
+                'is_stocked' => 1,
+            ]
+        );
+        $catId = DB::table('item_categories')->where('code', 'PACK')->value('id');
+        $roleId = DB::table('item_roles')->where('code', 'PKG')->value('id');
+        DB::table('items')->updateOrInsert(
+            ['code' => 'THR100X150'],
+            [
+                'code' => 'THR100X150',
+                'name' => 'Thermal 100mm x 150mm',
+                'unit' => 'roll',
+                'type' => 'material',
+                'item_category_id' => $catId,
+                'item_role' => 'shipping_supply',
+                'item_role_id' => $roleId,
+                'last_purchase_price' => 0,
+                'hpp' => 0,
+                'active' => 1,
+                'affects_hpp' => 0,
+                'default_allocation' => 'expense',
+                'production_source' => null,
+                'allow_negative' => 0,
+                'is_stocked' => 0,
+            ]
+        );
 
-            $data = $this->seedConfig();
-
-            $finishedGoodCategories = ['CRG', 'LJR', 'SJR', 'LCG', 'SHT', 'TJR', 'LBP', 'TTB', 'BRD'];
-
-            // ✅ COA SIMPLE
-            $packingExpenseAccountId = $this->lookupAccountIdByCode('6110');
-
-            // =========================================================
-            // ✅ Schema guards
-            // =========================================================
-            $hasAffectsHpp      = Schema::hasColumn('items', 'affects_hpp');
-            $hasDefaultAlloc    = Schema::hasColumn('items', 'default_allocation');
-            $hasDefaultExpAcc   = Schema::hasColumn('items', 'default_expense_account_id');
-            $hasItemRole        = Schema::hasColumn('items', 'item_role');
-            $hasIsStocked       = Schema::hasColumn('items', 'is_stocked');
-            $hasHppBehavior     = Schema::hasColumn('items', 'hpp_behavior');
-
-            // =========================================================
-            // ✅ BACKFILL GLOBAL: PACK category
-            // =========================================================
-            $packCatId = DB::table('item_categories')->where('code', 'PACK')->value('id');
-            if ($packCatId) {
-                if ($hasDefaultExpAcc && $packingExpenseAccountId && $hasDefaultAlloc) {
-                    DB::table('items')
-                        ->where('item_category_id', (int) $packCatId)
-                        ->where('default_allocation', 'expense')
-                        ->where(function ($q) {
-                            $q->whereNull('default_expense_account_id')
-                                ->orWhere('default_expense_account_id', 0);
-                        })
-                        ->update(['default_expense_account_id' => (int) $packingExpenseAccountId, 'updated_at' => now()]);
-                }
-
-                DB::table('items')
-                    ->where('item_category_id', (int) $packCatId)
-                    ->where('active', '!=', 1)
-                    ->update(['active' => 1, 'updated_at' => now()]);
-            }
-
-            // =========================================================
-            // ✅ MAIN SEED
-            // =========================================================
-            foreach ($data as $catCode => $config) {
-
-                $category = ItemCategory::updateOrCreate(
-                    ['code' => $catCode],
-                    ['name' => (string) ($config['name'] ?? $catCode), 'active' => 1]
-                );
-
-                foreach (($config['items'] ?? []) as $itemDef) {
-
-                    $code         = is_array($itemDef) ? (string) ($itemDef['code'] ?? '') : (string) $itemDef;
-                    $unitOverride = is_array($itemDef) ? ($itemDef['unit'] ?? null) : null;
-                    $nameOverride = is_array($itemDef) ? ($itemDef['name'] ?? null) : null;
-                    $typeOverride = is_array($itemDef) ? ($itemDef['type'] ?? null) : null;
-
-                    if ($code === '') continue;
-
-                    $type = $typeOverride
-                        ?? (in_array($catCode, $finishedGoodCategories, true) ? 'finished_good' : 'material');
-
-                    $defaultName = $nameOverride ?: $this->generateName($catCode, $code);
-                    $defaultUnit = $unitOverride ?: 'pcs';
-
-                    $affectsHpp  = $this->guessAffectsHpp($catCode, $code, $type);
-                    $allocation  = $affectsHpp ? 'hpp' : 'expense';
-                    $itemRole    = $this->guessItemRole($catCode, $code, $type);
-                    $isStocked   = $this->guessIsStocked($catCode, $code, $type, $affectsHpp, $allocation, $itemRole);
-                    $hppBehavior = $this->guessHppBehavior($affectsHpp, $allocation);
-
-                    /** @var Item|null $item */
-                    $item = Item::where('code', $code)->first();
-
-                    if (!$item) {
-                        $payload = [
-                            'code'              => $code,
-                            'name'              => $defaultName,
-                            'unit'              => $defaultUnit,
-                            'type'              => $type,
-                            'item_category_id'  => $category->id,
-                            'last_purchase_price' => 0,
-                            'hpp'               => 0,
-                            'active'            => 1,
-                        ];
-
-                        if ($hasAffectsHpp)    $payload['affects_hpp']    = $affectsHpp ? 1 : 0;
-                        if ($hasDefaultAlloc)  $payload['default_allocation'] = $allocation;
-                        if ($hasDefaultExpAcc) {
-                            $payload['default_expense_account_id'] = ($catCode === 'PACK' && $allocation === 'expense')
-                                ? $packingExpenseAccountId : null;
-                        }
-                        if ($hasItemRole)    $payload['item_role']    = $itemRole;
-                        if ($hasIsStocked)   $payload['is_stocked']   = $isStocked ? 1 : 0;
-                        if ($hasHppBehavior) $payload['hpp_behavior'] = $hppBehavior;
-
-                        $item = Item::create($payload);
-
-                    } else {
-                        // Update hanya field yang kosong/null (tidak timpa data manual)
-                        $dirty = false;
-
-                        if (empty($item->unit))             { $item->unit = $defaultUnit;      $dirty = true; }
-                        if (empty($item->type))             { $item->type = $type;             $dirty = true; }
-                        if (empty($item->item_category_id)) { $item->item_category_id = $category->id; $dirty = true; }
-                        if ($item->last_purchase_price === null) { $item->last_purchase_price = 0; $dirty = true; }
-                        if ($item->hpp === null)            { $item->hpp = 0;                  $dirty = true; }
-                        if ((int) $item->active !== 1)     { $item->active = 1;               $dirty = true; }
-
-                        if ($hasAffectsHpp) {
-                            $attrs = $item->getAttributes();
-                            if (array_key_exists('affects_hpp', $attrs) && $item->affects_hpp === null) {
-                                $item->affects_hpp = $affectsHpp ? 1 : 0; $dirty = true;
-                            }
-                        }
-                        if ($hasDefaultAlloc) {
-                            $attrs = $item->getAttributes();
-                            $cur = $attrs['default_allocation'] ?? null;
-                            if ($cur === null || $cur === '') { $item->default_allocation = $allocation; $dirty = true; }
-                        }
-                        if ($hasDefaultExpAcc && $catCode === 'PACK' && $allocation === 'expense' && $packingExpenseAccountId) {
-                            $attrs = $item->getAttributes();
-                            $cur = $attrs['default_expense_account_id'] ?? null;
-                            if ($cur === null || (int) $cur === 0) {
-                                $item->default_expense_account_id = (int) $packingExpenseAccountId; $dirty = true;
-                            }
-                        }
-                        if ($hasItemRole) {
-                            $attrs = $item->getAttributes();
-                            $cur = $attrs['item_role'] ?? null;
-                            if ($cur === null || $cur === '') { $item->item_role = $itemRole; $dirty = true; }
-                        }
-                        if ($hasIsStocked) {
-                            $attrs = $item->getAttributes();
-                            if (($attrs['is_stocked'] ?? null) === null) { $item->is_stocked = $isStocked ? 1 : 0; $dirty = true; }
-                        }
-                        if ($hasHppBehavior) {
-                            $attrs = $item->getAttributes();
-                            $cur = $attrs['hpp_behavior'] ?? null;
-                            if ($cur === null || $cur === '') { $item->hpp_behavior = $hppBehavior; $dirty = true; }
-                        }
-
-                        if ($dirty) $item->save();
-                    }
-
-                    // HPP snapshot untuk Finished Good
-                    if ($type === 'finished_good') {
-                        $hppGuess = $this->guessHppFromCode($code);
-
-                        if ($hppGuess !== null && ((float) ($item->hpp ?? 0) == 0.0)) {
-                            $item->hpp = $hppGuess;
-                            $item->save();
-                        }
-
-                        if ($hppGuess !== null) {
-                            $hasActive = ItemCostSnapshot::where('item_id', $item->id)->where('is_active', 1)->exists();
-                            if (!$hasActive) {
-                                ItemCostSnapshot::create([
-                                    'item_id'              => $item->id,
-                                    'warehouse_id'         => null,
-                                    'snapshot_date'        => Carbon::today()->toDateString(),
-                                    'reference_type'       => 'seed',
-                                    'reference_id'         => null,
-                                    'qty_basis'            => 1,
-                                    'rm_unit_cost'         => 0,
-                                    'cutting_unit_cost'    => 0,
-                                    'sewing_unit_cost'     => 0,
-                                    'finishing_unit_cost'  => 0,
-                                    'packaging_unit_cost'  => 0,
-                                    'overhead_unit_cost'   => 0,
-                                    'unit_cost'            => (int) $hppGuess,
-                                    'notes'                => 'Initial HPP seed from ItemSeeder (production-safe)',
-                                    'is_active'            => 1,
-                                ]);
-                            }
-                        }
-                    }
-                }
-            }
-        });
-    }
-
-    // =========================================================
-    // seedConfig — source of truth untuk semua item
-    // =========================================================
-    private function seedConfig(): array
-    {
-        return [
-
-            // ── Finished Goods ────────────────────────────────────────
-
-            'CRG' => [
-                'name'  => 'Jogger Pendek Cargo',
-                'items' => ['C5BLK', 'C5MST', 'C5NVY', 'C7BLK', 'C7MST', 'C7NVY'],
-            ],
-
-            'LJR' => [
-                'name'  => 'Jogger Panjang Basic',
-                'items' => [
-                    'J3ABT', 'J3BLK', 'J3MST', 'J3NVY',
-                    'J5ABT', 'J5BLK', 'J5MST', 'J5NVY',
-                    'J7ABT', 'J7BLK', 'J7MST', 'J7NVY',
-                ],
-            ],
-
-            'SJR' => [
-                'name'  => 'Jogger Pendek Basic',
-                'items' => [
-                    'K1ABT', 'K1BBL', 'K1BLK', 'K1MST', 'K1NVY', 'K1WHT',
-                    'K2ABT', 'K2BBL', 'K2BLK', 'K2MST', 'K2NVY', 'K2WHT',
-                    'K3ABT', 'K3BBL', 'K3BLK', 'K3MST', 'K3NVY', 'K3WHT',
-                    'K5ABT', 'K5BBL', 'K5BLK', 'K5MST', 'K5NVY', 'K5WHT',
-                    'K7ABT', 'K7BBL', 'K7BLK', 'K7MST', 'K7NVY', 'K7WHT',
-                ],
-            ],
-
-            'LCG' => [
-                'name'  => 'Jogger Panjang Cargo',
-                'items' => ['L1ABT', 'L1BLK', 'L1MST', 'L1NVY', 'L2ABT', 'L2BLK', 'L2MST', 'L2NVY'],
-            ],
-
-            'SHT' => [
-                'name'  => 'Shot Boxer Brief',
-                'items' => [
-                    'S2RDM', 'S2RDM-3', 'S2RDM-6',
-                    'S3RDM', 'S3RDM-3', 'S3RDM-6',
-                    'S4RDM', 'S4RDM-3', 'S4RDM-6',
-                    'S5RDM', 'S5RDM-3', 'S5RDM-6',
-                ],
-            ],
-
-            'TJR' => [
-                'name'  => 'Celana Jogger Pendek Bodyfit',
-                'items' => ['T1ABT', 'T1BLK', 'T1MST', 'T1NVY', 'T2ABT', 'T2BLK', 'T2MST', 'T2NVY'],
-            ],
-
-            'LBP' => [
-                'name'  => 'Celana Panjang Baggy Pants',
-                'items' => [
-                    ['code' => 'BP1ABM', 'name' => 'Celana Panjang Baggy Ukuran L Abu Muda M68'],
-                    ['code' => 'BP1ABT', 'name' => 'Celana Panjang Baggy Ukuran L Abu Tua'],
-                    ['code' => 'BP1MST', 'name' => 'Celana Panjang Baggy Ukuran L Abu Misty M71'],
-                    ['code' => 'BP2ABM', 'name' => 'Celana Panjang Baggy Ukuran XL Abu Muda M68'],
-                    ['code' => 'BP2ABT', 'name' => 'Celana Panjang Baggy Ukuran XL Abu Tua'],
-                    ['code' => 'BP2BLK', 'name' => 'Celana Panjang Baggy Ukuran XL Hitam'],
-                    ['code' => 'BP2MST', 'name' => 'Celana Panjang Baggy Ukuran XL Abu Misty M71'],
-                    ['code' => 'LPS-ABT-M', 'name' => 'Celana Panjang Loose Pants Abu Tua Ukuran M'],
-                ],
-            ],
-
-            'TTB' => [
-                'name'  => 'Tracktop',
-                'items' => [
-                    // Tracktop Garis 3
-                    ['code' => 'TTB-BLK-L',   'name' => 'Tracktop Hitam Garis 3 Tangan Ukuiran L'],
-                    ['code' => 'TTB-BLK-M',   'name' => 'Tracktop Hitam Garis 3 Tangan Ukuiran M'],
-                    ['code' => 'TTB-BLK-XL',  'name' => 'Tracktop Hitam Garis 3 Tangan Ukuiran XL'],
-                    ['code' => 'TTB-BLK-XXL', 'name' => 'Tracktop Hitam Garis 3 Tangan Ukuiran XXL'],
-                    ['code' => 'TTB-WHT-L',   'name' => 'Tracktop Putih Garis 3 Tangan Ukuiran L'],
-                    ['code' => 'TTB-WHT-M',   'name' => 'Tracktop Putih Garis 3 Tangan Ukuiran M'],
-                    ['code' => 'TTB-WHT-XL',  'name' => 'Tracktop Putih Garis 3 Tangan Ukuiran XL'],
-                    ['code' => 'TTB-WHT-XXL', 'name' => 'Tracktop Putih Garis 3 Tangan Ukuiran XXL'],
-                    // Tracktop Strip 2
-                    ['code' => 'TTC-BLK-L',   'name' => 'Tracktop Hitam Strip 2 Tangan Ukuiran L'],
-                    ['code' => 'TTC-BLK-M',   'name' => 'Tracktop Hitam Strip 2 Tangan Ukuran M'],
-                    ['code' => 'TTC-BLK-XL',  'name' => 'Tracktop Hitam Strip 2 Tangan Ukuran XL'],
-                    ['code' => 'TTC-BLK-XXL', 'name' => 'Tracktop Hitam Strip 2 Tangan Ukuiran XXL'],
-                ],
-            ],
-
-            'BRD' => [
-                'name'  => 'Celana Boardshort Parasit',
-                'items' => [
-                    ['code' => 'B3BLK', 'name' => 'Boardshort Parasit Hitam 3L'],
-                    ['code' => 'B5BLK', 'name' => 'Boardshort Parasit Hitam 5L'],
-                    ['code' => 'B7BLK', 'name' => 'Boardshort Parasit Hitam 7L'],
-                ],
-            ],
-
-            // ── Material / Bahan Baku ─────────────────────────────────
-
-            'MAT' => [
-                'name'  => 'Bahan Baku',
-                'items' => [
-                    // Fleece 280
-                    ['code' => 'FLC280ABT', 'unit' => 'kg'],
-                    ['code' => 'FLC280BBL', 'unit' => 'kg'],
-                    ['code' => 'FLC280BLK', 'unit' => 'kg'],
-                    ['code' => 'FLC280MST', 'unit' => 'kg'],
-                    ['code' => 'FLC280NVY', 'unit' => 'kg'],
-                    ['code' => 'FLC280WHT', 'unit' => 'kg'],
-                    // Fleece 240
-                    ['code' => 'FLC240ABM', 'unit' => 'kg', 'name' => 'Fleece 240 Abu Muda M68'],
-                    ['code' => 'FLC240ABT', 'unit' => 'kg', 'name' => 'Fleece 240 Abu Tua M68'],
-                    ['code' => 'FLC240BLK', 'unit' => 'kg'],
-                    ['code' => 'FLC240MST', 'unit' => 'kg'],
-                    // Rib 280
-                    ['code' => 'RIB280ABT', 'unit' => 'kg'],
-                    ['code' => 'RIB280BBL', 'unit' => 'kg'],
-                    ['code' => 'RIB280BLK', 'unit' => 'kg'],
-                    ['code' => 'RIB280MST', 'unit' => 'kg'],
-                    ['code' => 'RIB280NVY', 'unit' => 'kg'],
-                    ['code' => 'RIB280WHT', 'unit' => 'kg'],
-                    // Anomali: BP1BLK tercatat type=material di DB
-                    ['code' => 'BP1BLK', 'name' => 'Celana Panjang Baggy Ukuran L Hitam', 'type' => 'material'],
-                ],
-            ],
-
-            'BPU' => [
-                'name'  => 'Bahan Pendukung',
-                'items' => [
-                    ['code' => 'TLKADDS', 'name' => 'Tali Karet Adidas'],
-                    ['code' => 'KRT4CM',  'name' => 'Karet 4 CM'],
-                    ['code' => 'BNGJHT',  'name' => 'Benang Jahit'],
-                    ['code' => 'LBLSIZE', 'name' => 'Label Size'],
-                ],
-            ],
-
-            // ── Packaging & Shipping ──────────────────────────────────
-
-            'PACK' => [
-                'name'  => 'Packaging & Shipping',
-                'items' => [
-                    // Thermal — expense, non-stocked
-                    ['code' => 'THR100X150', 'unit' => 'roll', 'name' => 'Thermal 100mm x 150mm'],
-                    ['code' => 'THR57X30',   'unit' => 'roll'],
-                    ['code' => 'THR57X40',   'unit' => 'roll'],
-                    ['code' => 'THR80X50',   'unit' => 'roll'],
-                    // OPP — stocked, affects HPP
-                    ['code' => 'OPP10X15', 'unit' => 'pack'],
-                    ['code' => 'OPP12X20', 'unit' => 'pack'],
-                    ['code' => 'OPP15X25', 'unit' => 'pack'],
-                    ['code' => 'OPP20X30', 'unit' => 'pack'],
-                    // Polymailer — expense, non-stocked
-                    ['code' => 'PLY20X30', 'unit' => 'pack'],
-                    ['code' => 'PLY25X35', 'unit' => 'pack'],
-                    ['code' => 'PLY30X40', 'unit' => 'pack'],
-                ],
-            ],
-        ];
-    }
-
-    // =========================================================
-    // Helpers
-    // =========================================================
-
-    private function lookupAccountIdByCode(string $code): ?int
-    {
-        if (!Schema::hasTable('accounts')) return null;
-        $id = DB::table('accounts')->where('code', $code)->value('id');
-        return $id ? (int) $id : null;
-    }
-
-    private function guessAffectsHpp(string $catCode, string $code, string $type): bool
-    {
-        $c = strtoupper($code);
-        if ($catCode === 'PACK') {
-            if (str_starts_with($c, 'OPP')) return true;
-            if (str_starts_with($c, 'THR') || str_starts_with($c, 'PLY')) return false;
-        }
-        return true;
-    }
-
-    private function guessItemRole(string $catCode, string $code, string $type): string
-    {
-        $c = strtoupper($code);
-        if ($type === 'finished_good') return 'finished_good';
-        if ($catCode === 'PACK') {
-            if (str_starts_with($c, 'OPP')) return 'production_supply';
-            if (str_starts_with($c, 'THR') || str_starts_with($c, 'PLY')) return 'shipping_supply';
-        }
-        if ($catCode === 'BPU') return 'production_supply';
-        return 'raw_material';
-    }
-
-    private function guessIsStocked(string $catCode, string $code, string $type, bool $affectsHpp, string $allocation, string $itemRole): bool
-    {
-        $c = strtoupper($code);
-        if ($type === 'finished_good') return true;
-        if ($catCode === 'PACK') {
-            if (str_starts_with($c, 'OPP')) return true;
-            if (str_starts_with($c, 'THR') || str_starts_with($c, 'PLY')) return false;
-        }
-        return !($allocation === 'expense' || !$affectsHpp);
-    }
-
-    private function guessHppBehavior(bool $affectsHpp, string $allocation): string
-    {
-        if ($allocation === 'expense') return 'non_hpp';
-        return $affectsHpp ? 'hpp' : 'non_hpp';
-    }
-
-    private function generateName(string $catCode, string $code): string
-    {
-        $colors = [
-            'BLK' => 'Hitam', 'MST' => 'Misty (Abu-Abu) M71', 'NVY' => 'Navy',
-            'ABT' => 'Abu Tua M81', 'BBL' => 'Baby Blue', 'WHT' => 'Putih', 'RDM' => 'Random',
-        ];
-        $prefixMap = [
-            'CRG' => 'Jogger Pendek Cargo',  'LJR' => 'Jogger Panjang Basic',
-            'SJR' => 'Jogger Pendek Basic',  'LCG' => 'Jogger Panjang Cargo',
-            'SHT' => 'Shot Boxer Brief',     'TJR' => 'Jogger Pendek Bodyfit',
-        ];
-        $manual = [
-            'TLKADDS' => 'Tali Karet Adidas', 'KRT4CM' => 'Karet 4 CM',
-            'BNGJHT'  => 'Benang Jahit',      'LBLSIZE' => 'Label Size',
-        ];
-
-        $c = strtoupper($code);
-        if (isset($manual[$c])) return $manual[$c];
-
-        if (str_starts_with($c, 'THR') && preg_match('/^THR(\d+)X(\d+)$/', $c, $m))
-            return "Kertas Thermal {$m[1]}mm x {$m[2]}mm";
-        if (str_starts_with($c, 'OPP') && preg_match('/^OPP(\d+)X(\d+)$/', $c, $m))
-            return "Plastik OPP {$m[1]} x {$m[2]}";
-        if (str_starts_with($c, 'PLY') && preg_match('/^PLY(\d+)X(\d+)$/', $c, $m))
-            return "Polymailer {$m[1]} x {$m[2]}";
-        if (str_starts_with($c, 'FLC') && preg_match('/^FLC(\d+)([A-Z]+)$/', $c, $m))
-            return 'Fleece ' . $m[1] . ' ' . ($colors[$m[2]] ?? $m[2]);
-        if (str_starts_with($c, 'RIB') && preg_match('/^RIB(\d+)([A-Z]+)$/', $c, $m))
-            return 'Rib ' . $m[1] . ' ' . ($colors[$m[2]] ?? $m[2]);
-
-        $catName = $prefixMap[$catCode] ?? $catCode;
-        preg_match('/^(.*?)([A-Z]{3})(-\d+)?$/', $c, $m);
-        $model     = $m[1] ?? $c;
-        $clr       = $m[2] ?? '';
-        $suffix    = $m[3] ?? '';
-        $colorName = $colors[$clr] ?? $clr;
-
-        return trim("{$catName} {$model} {$colorName}{$suffix}");
-    }
-
-    private function guessHppFromCode(string $code): ?int
-    {
-        $c    = strtoupper($code);
-        $pre2 = substr($c, 0, 2);
-        $base = null;
-
-        if (in_array($pre2, ['K1', 'K2', 'K3', 'K5', 'K7'], true)) $base = 30000;
-        if (in_array($pre2, ['J3', 'J5', 'J7'], true))              $base = 45000;
-        if (in_array($pre2, ['L1', 'L2'], true))                    $base = 35000;
-        if (in_array($pre2, ['C3', 'C5', 'C7'], true))              $base = 35000;
-        if (in_array($pre2, ['T1', 'T2'], true))                    $base = 30000;
-        if (preg_match('/^S[2-4]RDM/i', $c)) $base = 6700;
-        elseif (preg_match('/^S5RDM/i', $c)) $base = 8400;
-
-        if ($base === null) return null;
-        if (str_ends_with($c, '-6')) $base *= 6;
-        elseif (str_ends_with($c, '-3')) $base *= 3;
-        return $base;
     }
 }

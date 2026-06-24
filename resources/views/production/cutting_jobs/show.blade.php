@@ -693,6 +693,89 @@
         </div>
 
         {{-- ===========================
+            SISA KAIN PER LOT
+        ============================ --}}
+        @if ($job->lots && $job->lots->count() > 0)
+        @php
+            $lotsWithSisa = $job->lots->filter(fn($l) => $l->sisa_recorded_at);
+            $lotsNeedSisa = $job->lots->filter(fn($l) => !$l->sisa_recorded_at && (float)($l->used_fabric_qty ?? 0) > 0);
+        @endphp
+        <div class="card p-3 mb-3">
+            <h2 class="h6 mb-2">Sisa Kain per LOT</h2>
+
+            {{-- Sudah tercatat --}}
+            @if ($lotsWithSisa->isNotEmpty())
+            <div class="table-responsive mb-3">
+                <table class="table table-sm mb-0">
+                    <thead>
+                        <tr>
+                            <th>LOT</th>
+                            <th class="text-end">Terpakai</th>
+                            <th class="text-end">Sisa Dicatat</th>
+                            <th>Dicatat</th>
+                        </tr>
+                    </thead>
+                    <tbody>
+                        @foreach ($lotsWithSisa as $cjl)
+                        <tr>
+                            <td class="mono">{{ $cjl->lot?->code ?? '-' }}</td>
+                            <td class="text-end mono">{{ number_format((float)$cjl->used_fabric_qty, 2, ',', '.') }}</td>
+                            <td class="text-end mono fw-semibold text-success">{{ number_format((float)$cjl->qty_sisa_fabric, 2, ',', '.') }}</td>
+                            <td class="small text-muted">{{ \Carbon\Carbon::parse($cjl->sisa_recorded_at)->format('d/m/Y H:i') }}</td>
+                        </tr>
+                        @endforeach
+                    </tbody>
+                </table>
+            </div>
+            @endif
+
+            {{-- Form catat sisa --}}
+            @if ($lotsNeedSisa->isNotEmpty())
+            <form method="POST" action="{{ route('production.cutting_jobs.sisa_fabric', $job) }}">
+                @csrf
+                <div class="table-responsive mb-2">
+                    <table class="table table-sm mb-0">
+                        <thead>
+                            <tr>
+                                <th>LOT</th>
+                                <th class="text-end">Dipakai (kg)</th>
+                                <th class="text-end" style="width:160px">Sisa Fisik (kg)</th>
+                            </tr>
+                        </thead>
+                        <tbody>
+                            @foreach ($lotsNeedSisa as $i => $cjl)
+                            <input type="hidden" name="lots[{{ $i }}][lot_id]" value="{{ $cjl->lot_id }}">
+                            <tr>
+                                <td class="mono">{{ $cjl->lot?->code ?? '-' }}
+                                    <div class="small text-muted">{{ $cjl->lot?->item?->code ?? '' }}</div>
+                                </td>
+                                <td class="text-end mono">{{ number_format((float)$cjl->used_fabric_qty, 2, ',', '.') }}</td>
+                                <td class="text-end">
+                                    <input type="number" name="lots[{{ $i }}][qty_sisa]"
+                                           class="form-control form-control-sm text-end mono"
+                                           step="0.01" min="0" placeholder="0"
+                                           style="max-width:130px;margin-left:auto">
+                                </td>
+                            </tr>
+                            @endforeach
+                        </tbody>
+                    </table>
+                </div>
+                <div class="d-flex justify-content-end">
+                    <button type="submit" class="btn btn-sm btn-outline-success">
+                        <i class="bi bi-box-arrow-in-down me-1"></i>Catat Sisa → Kembalikan ke RM
+                    </button>
+                </div>
+            </form>
+            @elseif ($lotsWithSisa->isEmpty())
+            <div class="text-muted small">Belum ada pemakaian kain yang tercatat untuk LOT ini.</div>
+            @else
+            <div class="text-success small"><i class="bi bi-check-circle me-1"></i>Semua sisa kain sudah dicatat.</div>
+            @endif
+        </div>
+        @endif
+
+        {{-- ===========================
             SUMMARY
         ============================ --}}
         <div class="card p-3 mb-3 d-none d-md-block">

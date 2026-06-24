@@ -232,7 +232,7 @@
                         icon: 'error',
                         title: 'Tidak bisa disimpan',
                         html: '<ul style="text-align:left;padding-left:1.2rem;margin:0">'
-                            + @json(collect($errors->all())->map(fn($e) => '<li>'.$e.'</li>')->implode(''))
+                            + @json(collect($errors->all())->map(fn($e) => '<li>' . nl2br(e($e)) . '</li>')->implode(''))
                             + '</ul>',
                         confirmButtonText: 'OK, perbaiki',
                         confirmButtonColor: '#0f172a',

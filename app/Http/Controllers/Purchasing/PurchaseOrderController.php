@@ -29,15 +29,26 @@ class PurchaseOrderController extends Controller
      */
     public function index(Request $request)
     {
+        $sortCol = in_array($request->sort, ['date', 'code', 'grand_total', 'status', 'supplier_id'], true)
+            ? $request->sort : 'date';
+        $sortDir = $request->dir === 'asc' ? 'asc' : 'desc';
+
         $q = PurchaseOrder::query()
             ->with([
                 'supplier',
                 'approvedBy',
                 'paymentMethod',
                 'purchaseReceipts',
-            ])
-            ->orderByDesc('date')
-            ->orderByDesc('id');
+            ]);
+
+        if ($sortCol === 'supplier_id') {
+            $q->leftJoin('suppliers', 'suppliers.id', '=', 'purchase_orders.supplier_id')
+              ->orderBy('suppliers.name', $sortDir)
+              ->select('purchase_orders.*');
+        } else {
+            $q->orderBy($sortCol, $sortDir);
+            if ($sortCol !== 'id') $q->orderByDesc('purchase_orders.id');
+        }
 
         if ($request->filled('supplier_id')) {
             $q->where('supplier_id', (int) $request->supplier_id);
@@ -97,7 +108,7 @@ class PurchaseOrderController extends Controller
 
         $suppliers = Supplier::orderBy('name')->get();
 
-        return view('purchasing.purchase_orders.index', compact('orders', 'suppliers', 'summary'));
+        return view('purchasing.purchase_orders.index', compact('orders', 'suppliers', 'summary', 'sortCol', 'sortDir'));
     }
 
     /**
@@ -127,12 +138,6 @@ class PurchaseOrderController extends Controller
 
         $suppliers = Supplier::query()->orderBy('name')->get(['id', 'name', 'po_types']);
 
-        // ✅ FIX: category_id -> item_category_id
-        // ✅ PACK di atas (OPP/PLY/THR ngumpul dulu)
-        // packing PO memakai item type=material (packing supplies bukan type tersendiri)
-        // asset/service/jasa/lainnya: tampilkan semua item aktif (tidak filter by type)
-        $nonInventoryTypes = ['asset', 'service', 'jasa', 'lainnya'];
-        $itemTypeFilter = $orderType === 'packing' ? 'material' : $orderType;
         $itemQuery = Item::query()
             ->select(['id', 'code', 'name', 'item_category_id', 'type', 'active'])
             ->where('active', 1)
@@ -145,9 +150,7 @@ class PurchaseOrderController extends Controller
             ")
             ->orderBy('name')
             ->limit(300);
-        if (!in_array($orderType, $nonInventoryTypes, true)) {
-            $itemQuery->where('type', $itemTypeFilter);
-        }
+        $this->applyPoItemFilter($itemQuery, $orderType);
         $items = $itemQuery->get();
 
         $cashAccounts = Account::query()
@@ -449,11 +452,6 @@ class PurchaseOrderController extends Controller
             (string) ($purchase_order->getAttribute('order_type') ?: $request->input('order_type', 'material'))
         );
 
-        // ✅ biar konsisten: PACK ditaruh di atas juga di edit form
-        // packing PO memakai item type=material
-        // asset/service/jasa/lainnya: tampilkan semua item aktif
-        $nonInventoryTypes = ['asset', 'service', 'jasa', 'lainnya'];
-        $itemTypeFilter = $orderType === 'packing' ? 'material' : $orderType;
         $itemsBaseQuery = Item::query()
             ->where('active', 1)
             ->with('category')
@@ -465,9 +463,7 @@ class PurchaseOrderController extends Controller
             ")
             ->orderBy('name')
             ->limit(300);
-        if (!in_array($orderType, $nonInventoryTypes, true)) {
-            $itemsBaseQuery->where('type', $itemTypeFilter);
-        }
+        $this->applyPoItemFilter($itemsBaseQuery, $orderType);
         $itemsBase = $itemsBaseQuery->get();
 
         $lineItemIds = $purchase_order->lines
@@ -614,30 +610,37 @@ class PurchaseOrderController extends Controller
             return response()->json(['last_price' => null]);
         }
 
-        // 1) sumber utama: supplier_items (kalau tabel ada)
+        // 1) supplier_prices — diupdate setiap PO approve/save, paling akurat
+        if (Schema::hasTable('supplier_prices')) {
+            $last = DB::table('supplier_prices')
+                ->where('supplier_id', $supplierId)
+                ->where('item_id', $itemId)
+                ->value('last_price');
+
+            if ($last !== null && (float) $last > 0) {
+                return response()->json(['last_price' => (float) $last]);
+            }
+        }
+
+        // 2) supplier_items — harga master yang diset manual
         if (Schema::hasTable('supplier_items')) {
             $last = DB::table('supplier_items')
                 ->where('supplier_id', $supplierId)
                 ->where('item_id', $itemId)
                 ->value('last_price');
 
-            if ($last !== null) {
-                $n = (float) $last;
-                return response()->json(['last_price' => $n > 0 ? $n : 0.0]);
+            if ($last !== null && (float) $last > 0) {
+                return response()->json(['last_price' => (float) $last]);
             }
         }
 
-        // 2) fallback: item.last_purchase_price
+        // 3) fallback global: item.last_purchase_price (tidak spesifik supplier)
         $fallback = Item::query()
             ->whereKey($itemId)
             ->value('last_purchase_price');
 
-        if ($fallback === null) {
-            return response()->json(['last_price' => null]);
-        }
-
-        $n = (float) $fallback;
-        return response()->json(['last_price' => $n > 0 ? $n : 0.0]);
+        $n = (float) ($fallback ?? 0);
+        return response()->json(['last_price' => $n > 0 ? $n : null]);
     }
 
     // ======================================================================
@@ -832,6 +835,25 @@ class PurchaseOrderController extends Controller
         $v = strtolower(trim((string) $value));
         $allowed = ['material', 'finished_good', 'packing', 'asset', 'service', 'jasa', 'lainnya'];
         return in_array($v, $allowed, true) ? $v : 'material';
+    }
+
+    protected function applyPoItemFilter($query, string $orderType): void
+    {
+        if ($orderType === 'packing') {
+            $query->where('type', 'material')
+                ->whereHas('category', fn($q) => $q->where('code', 'PACK'));
+            return;
+        }
+
+        if ($orderType === 'material') {
+            $query->where('type', 'material')
+                ->whereDoesntHave('category', fn($q) => $q->where('code', 'PACK'));
+            return;
+        }
+
+        if ($orderType === 'finished_good') {
+            $query->where('type', 'finished_good');
+        }
     }
 
     protected function canSeeMoney(?Request $request = null): bool

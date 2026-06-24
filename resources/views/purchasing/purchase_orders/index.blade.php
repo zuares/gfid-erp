@@ -5,6 +5,16 @@
 @php
     $user = auth()->user();
     $canSeeMoney = $user?->isOwner() ?? false;
+    $sortCol ??= 'date';
+    $sortDir ??= 'desc';
+    $sortUrl = fn(string $col) => request()->fullUrlWithQuery([
+        'sort' => $col,
+        'dir'  => ($sortCol === $col && $sortDir === 'asc') ? 'desc' : 'asc',
+        'page' => 1,
+    ]);
+    $sortIcon = fn(string $col) => $sortCol === $col
+        ? ($sortDir === 'asc' ? '↑' : '↓')
+        : '↕';
 @endphp
 
 @push('head')
@@ -40,6 +50,18 @@
             white-space: nowrap;
             padding: .52rem .65rem;
         }
+
+        .th-sort {
+            cursor: pointer;
+            user-select: none;
+            text-decoration: none;
+            color: var(--muted);
+            display: inline-flex;
+            align-items: center;
+            gap: .25rem;
+        }
+        .th-sort:hover { color: var(--body); }
+        .th-sort.active { color: var(--body); font-weight: 700; }
 
         .table tbody td {
             vertical-align: middle;
@@ -498,12 +520,28 @@
                 <table class="table table-sm align-middle mb-0">
                     <thead>
                         <tr>
-                            <th style="width:18%;">PO</th>
-                            <th>Supplier</th>
+                            <th style="width:18%;">
+                                <a href="{{ $sortUrl('date') }}" class="th-sort {{ $sortCol === 'date' ? 'active' : '' }}">
+                                    PO {{ $sortIcon('date') }}
+                                </a>
+                            </th>
+                            <th>
+                                <a href="{{ $sortUrl('supplier_id') }}" class="th-sort {{ $sortCol === 'supplier_id' ? 'active' : '' }}">
+                                    Supplier {{ $sortIcon('supplier_id') }}
+                                </a>
+                            </th>
                             @if ($canSeeMoney)
-                                <th style="width:14%;" class="text-end">Total</th>
+                                <th style="width:14%;" class="text-end">
+                                    <a href="{{ $sortUrl('grand_total') }}" class="th-sort {{ $sortCol === 'grand_total' ? 'active' : '' }}">
+                                        Total {{ $sortIcon('grand_total') }}
+                                    </a>
+                                </th>
                             @endif
-                            <th style="width:25%;">Status</th>
+                            <th style="width:25%;">
+                                <a href="{{ $sortUrl('status') }}" class="th-sort {{ $sortCol === 'status' ? 'active' : '' }}">
+                                    Status {{ $sortIcon('status') }}
+                                </a>
+                            </th>
                             <th style="width:4%;"></th>
                         </tr>
                     </thead>

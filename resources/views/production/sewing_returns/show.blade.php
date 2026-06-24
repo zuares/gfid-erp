@@ -515,7 +515,7 @@
             <div class="alert alert-warning py-2 mb-3">
               <div class="fw-bold">Perhatian</div>
               <div class="small">
-                Aksi ini akan <b>membalik stok & counter</b> (WIP-SEW/WIP-FIN/REJ-SEW) sesuai data return ini.
+                Aksi ini akan <b>membalik stok & counter</b> (WIP-SEW/WH-PRD/REJ-SEW) sesuai data return ini.
               </div>
             </div>
 

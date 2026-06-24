@@ -260,68 +260,70 @@ class CuttingService
         if ($lotPlans && $lotPlans->count() > 0) {
             $totalPlanned = (float) $lotPlans->sum('planned_fabric_qty');
 
-            if ($totalPlanned <= 0) {
-                $perLot = $totalUsed / max(1, $lotPlans->count());
-                $perLot = $this->num($perLot);
-
-                $remaining = $totalUsed;
-                foreach ($lotPlans as $index => $plan) {
-                    $qtyOut = $perLot;
-                    if ($index === $lotPlans->count() - 1) {
-                        $qtyOut = $this->num($remaining);
-                    }
-
-                    if ($qtyOut <= 0) {
-                        $plan->used_fabric_qty = 0;
-                        $plan->save();
-                        continue;
-                    }
-
-                    $this->inventory->stockOut(
-                        warehouseId: $warehouseId,
-                        itemId: $fabricItemId,
-                        qty: $qtyOut,
-                        date: $job->date,
-                        sourceType: 'cutting_job',
-                        sourceId: $job->id,
-                        notes: "Pemakaian kain untuk Cutting {$job->code} (LOT {$plan->lot_id})",
-                        allowNegative: true,
-                        lotId: $plan->lot_id,
-                        unitCostOverride: null,
-                        affectLotCost: true,
-                        strictNonNegative: true,
-                    );
-
-                    $plan->used_fabric_qty = $qtyOut;
-                    $plan->save();
-
-                    $remaining -= $qtyOut;
-                    if ($remaining <= 0) {
-                        break;
-                    }
-
-                }
-                return;
+            // Ambil qty_onhand tiap LOT sebagai batas atas per LOT
+            $lotAvail = [];
+            foreach ($lotPlans as $plan) {
+                $lot = \App\Models\Lot::find($plan->lot_id);
+                $lotAvail[$plan->lot_id] = max($this->num($lot->qty_onhand ?? 0), 0.0);
             }
 
-            $remaining = $totalUsed;
-            foreach ($lotPlans as $index => $plan) {
-                $planned = (float) $plan->planned_fabric_qty;
-
-                if ($planned <= 0) {
-                    $plan->used_fabric_qty = 0;
-                    $plan->save();
-                    continue;
+            // Hitung raw portion per LOT (proporsional atau rata)
+            $rawPortions = [];
+            if ($totalPlanned <= 0) {
+                $perLot = $totalUsed / max(1, $lotPlans->count());
+                foreach ($lotPlans as $plan) {
+                    $rawPortions[$plan->lot_id] = $this->num($perLot);
                 }
-
-                $portion = ($planned / $totalPlanned) * $totalUsed;
-                $portion = $this->num($portion);
-
-                if ($index === $lotPlans->count() - 1) {
-                    $portion = $this->num($remaining);
+            } else {
+                foreach ($lotPlans as $plan) {
+                    $planned = (float) $plan->planned_fabric_qty;
+                    $rawPortions[$plan->lot_id] = $this->num(($planned / $totalPlanned) * $totalUsed);
                 }
+            }
 
-                if ($portion <= 0) {
+            // Distribusi cerdas: cap per LOT di qty_onhand, overflow pindah ke LOT lain
+            $finalPortions = $rawPortions;
+            $overflow = 0.0;
+            foreach ($lotPlans as $plan) {
+                $lid = $plan->lot_id;
+                if ($finalPortions[$lid] > $lotAvail[$lid] + 0.0001) {
+                    $overflow += $finalPortions[$lid] - $lotAvail[$lid];
+                    $finalPortions[$lid] = $lotAvail[$lid];
+                }
+            }
+            // Distribusikan overflow ke LOT yang masih punya sisa kapasitas
+            if ($overflow > 0.0001) {
+                foreach ($lotPlans as $plan) {
+                    if ($overflow <= 0.0001) break;
+                    $lid  = $plan->lot_id;
+                    $spare = $lotAvail[$lid] - $finalPortions[$lid];
+                    if ($spare > 0.0001) {
+                        $add = min($spare, $overflow);
+                        $finalPortions[$lid] += $add;
+                        $overflow -= $add;
+                    }
+                }
+            }
+
+            // Koreksi rounding: selisih kecil masuk ke LOT terakhir yang punya stok
+            $sumFinal = array_sum($finalPortions);
+            $diff = $this->num($totalUsed - $sumFinal);
+            if (abs($diff) > 0.0001) {
+                foreach (array_reverse($lotPlans->all()) as $plan) {
+                    $lid = $plan->lot_id;
+                    if ($finalPortions[$lid] > 0) {
+                        $finalPortions[$lid] = $this->num($finalPortions[$lid] + $diff);
+                        break;
+                    }
+                }
+            }
+
+            // Eksekusi stockOut per LOT
+            foreach ($lotPlans as $plan) {
+                $lid    = $plan->lot_id;
+                $qtyOut = $finalPortions[$lid] ?? 0.0;
+
+                if ($qtyOut <= 0.0001) {
                     $plan->used_fabric_qty = 0;
                     $plan->save();
                     continue;
@@ -330,27 +332,22 @@ class CuttingService
                 $this->inventory->stockOut(
                     warehouseId: $warehouseId,
                     itemId: $fabricItemId,
-                    qty: $portion,
+                    qty: $qtyOut,
                     date: $job->date,
                     sourceType: 'cutting_job',
                     sourceId: $job->id,
-                    notes: "Pemakaian kain untuk Cutting {$job->code} (LOT {$plan->lot_id})",
+                    notes: "Pemakaian kain untuk Cutting {$job->code} (LOT {$lid})",
                     allowNegative: true,
-                    lotId: $plan->lot_id,
+                    lotId: $lid,
                     unitCostOverride: null,
                     affectLotCost: true,
-                    strictNonNegative: true,
+                    strictNonNegative: false,
                 );
 
-                $plan->used_fabric_qty = $portion;
+                $plan->used_fabric_qty = $qtyOut;
                 $plan->save();
-
-                $remaining -= $portion;
-                if ($remaining <= 0) {
-                    break;
-                }
-
             }
+
             return;
         }
 

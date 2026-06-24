@@ -82,6 +82,35 @@
   .row-main-action { display:flex; gap:.3rem; justify-content:flex-end; flex-wrap:wrap; margin-top:.3rem; }
   .return-input-wrap { display:flex; flex-direction:column; align-items:flex-end; }
   .return-mobile-head { display:none; }
+  .effect-card {
+    border:1px solid var(--line);
+    border-radius:14px;
+    background:linear-gradient(135deg, rgba(59,130,246,.08), rgba(148,163,184,.05));
+    padding:.85rem 1rem;
+  }
+  .effect-title {
+    font-size:.72rem;
+    text-transform:uppercase;
+    letter-spacing:.07em;
+    color:#2563eb;
+    font-weight:800;
+    margin-bottom:.6rem;
+  }
+  .effect-grid {
+    display:grid;
+    grid-template-columns:repeat(4, minmax(0,1fr));
+    gap:.5rem;
+  }
+  .effect-item {
+    border:1px solid rgba(148,163,184,.25);
+    border-radius:10px;
+    background:rgba(255,255,255,.45);
+    padding:.55rem .65rem;
+    min-width:0;
+  }
+  .effect-label { font-size:.68rem; color:var(--muted); margin-bottom:.15rem; }
+  .effect-value { font-size:.85rem; font-weight:800; line-height:1.2; }
+  .effect-note { color:var(--muted); font-size:.77rem; margin-top:.55rem; }
 
   @media (max-width:767.98px){
     .page-wrap { padding-inline:.75rem; }
@@ -113,6 +142,7 @@
     .return-mobile-head { display:block; }
     .row-main-action { justify-content:stretch; }
     .row-main-action .btn { flex:1; }
+    .effect-grid { grid-template-columns:repeat(2, minmax(0,1fr)); }
   }
 </style>
 @endpush
@@ -137,6 +167,12 @@
   $totalQty = (float) (($returnRows ?? collect())->sum('qty'));
   $grnHref = route('purchasing.purchase_receipts.show', $ret->purchase_receipt_id ?? $ret->grn_id ?? ($ret->grn?->id ?? 0));
   $dateValue = old('date', $ret->date ? \Illuminate\Support\Carbon::parse($ret->date)->format('Y-m-d') : now()->toDateString());
+  $effect = $journalEffect ?? [];
+  $effectTotal = (float) ($effect['total'] ?? 0);
+  $effectInv = (float) ($effect['inventory_total'] ?? 0);
+  $effectExpense = (float) ($effect['expense_total'] ?? 0);
+  $effectAp = (float) ($effect['ap_portion'] ?? 0);
+  $effectClaim = (float) ($effect['claim_portion'] ?? 0);
 @endphp
 
 <div class="page-wrap py-4">
@@ -214,6 +250,65 @@
           </div>
         </div>
       </div>
+    </div>
+
+    <div class="effect-card mb-3">
+      <div class="d-flex justify-content-between align-items-start gap-2 flex-wrap">
+        <div>
+          <div class="effect-title mb-1">
+            @if($isVoided)
+              Efek Void
+            @elseif($isPosted)
+              Efek Sudah Posted
+            @else
+              Efek Saat Diposting
+            @endif
+          </div>
+          <div class="effect-note mt-0">
+            @if($isVoided)
+              Stok sudah dikembalikan ke gudang asal dan jurnal return sudah dibatalkan.
+            @elseif($isPosted)
+              Stok sudah keluar dari gudang asal dan jurnal return sudah tercatat.
+            @else
+              Draft belum mengubah stok atau jurnal. Efek di bawah baru terjadi saat tombol Post ditekan.
+            @endif
+          </div>
+        </div>
+        @if($isPosted && !$isVoided)
+          <span class="badge-status badge-posted">{{ $mutationCount }} mutasi · {{ $journalCount }} jurnal</span>
+        @elseif($isVoided)
+          <span class="badge-status badge-voided">VOID</span>
+        @else
+          <span class="badge-status badge-draft">Belum berdampak</span>
+        @endif
+      </div>
+
+      @if($canSeeMoney)
+        <div class="effect-grid mt-3">
+          <div class="effect-item">
+            <div class="effect-label">Total Return</div>
+            <div class="effect-value mono">{{ rupiah($effectTotal) }}</div>
+          </div>
+          <div class="effect-item">
+            <div class="effect-label">Kurangi Stok</div>
+            <div class="effect-value mono">{{ rupiah($effectInv) }}</div>
+          </div>
+          <div class="effect-item">
+            <div class="effect-label">Potong Hutang</div>
+            <div class="effect-value mono">{{ $isDraft && !$isVoided ? rupiah($effectAp) : '-' }}</div>
+          </div>
+          <div class="effect-item">
+            <div class="effect-label">Klaim Supplier</div>
+            <div class="effect-value mono">{{ $isDraft && !$isVoided ? rupiah($effectClaim) : '-' }}</div>
+          </div>
+        </div>
+
+        @if($isDraft && !$isVoided && $effectClaim > 0.0001)
+          <div class="alert alert-warning py-2 px-3 mt-3 mb-0" style="font-size:.82rem;">
+            Sebagian nilai return akan masuk ke <strong>Klaim Supplier</strong> karena sisa hutang tidak cukup.
+          </div>
+        @endif
+      @endif
     </div>
 
     {{-- INFO CARD: metadata dokumen --}}
@@ -614,7 +709,7 @@ document.addEventListener('DOMContentLoaded', function () {
     confirmSubmit(form, {
       icon: 'question',
       title: 'Posting return?',
-      text: 'Stok gudang akan berkurang dan jurnal return akan dibuat.',
+      text: 'Draft akan resmi: stok keluar dari gudang asal dan jurnal return dibuat.',
       confirmText: 'Ya, Posting',
       color: '#16a34a'
     });
@@ -624,8 +719,8 @@ document.addEventListener('DOMContentLoaded', function () {
     confirmSubmit(form, {
       icon: 'warning',
       title: 'Void return?',
-      text: 'Stok akan dikembalikan dan jurnal return akan dibalik.',
-      confirmText: 'Ya, Void',
+      text: 'Stok akan dikembalikan ke gudang asal dan jurnal return akan dibatalkan.',
+      confirmText: 'Ya, Void Return',
       color: '#dc2626'
     });
   });

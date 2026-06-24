@@ -6,29 +6,34 @@
     $canSeeMoney = auth()->user()?->isOwner() ?? false;
 
     // =========================
-    // ORDER TYPE (Material / FG)
+    // ORDER TYPE
     // =========================
     $orderTypeRaw = old('order_type') ?? ($order?->order_type ?? (request('order_type') ?? 'material'));
     $allowedOrderTypes = ['material', 'finished_good', 'packing', 'asset', 'service', 'jasa', 'lainnya'];
     $orderType = in_array($orderTypeRaw, $allowedOrderTypes, true) ? $orderTypeRaw : 'material';
 
     $orderTypeOptions = [
-        'material'     => 'Bahan Baku (Material)',
-        'finished_good'=> 'Barang Jadi (FG)',
-        'packing'      => 'Packing (Kemasan)',
-        'asset'        => 'Aset',
-        'service'      => 'Service',
-        'jasa'         => 'Jasa',
-        'lainnya'      => 'Lainnya',
+        'material' => 'Bahan Produksi',
+        'packing'  => 'Packaging',
+        'service'  => 'Operasional',
+        'finished_good' => 'Barang Jadi',
     ];
+    $itemSuggestType = in_array($orderType, ['material', 'packing'], true)
+        ? 'material'
+        : ($orderType === 'finished_good' ? 'finished_good' : null);
+    $itemSuggestExtra = match ($orderType) {
+        'packing' => ['category_codes' => 'PACK'],
+        'material' => ['exclude_category_codes' => 'PACK'],
+        default => [],
+    };
 
     // === DATE ===
     $dateRaw = old('date') ?? ($order?->date ?? now()->toDateString());
     $orderDate = $dateRaw instanceof Carbon ? $dateRaw->toDateString() : (string) $dateRaw;
 
     // === SUPPLIER ===
-    $defaultSupplierId = $suppliers->first()->id ?? null;
-    $selectedSupplierId = old('supplier_id', $order?->supplier_id ?? request('supplier_id') ?? $defaultSupplierId);
+    // Saat create: tidak ada default supplier (user wajib pilih manual)
+    $selectedSupplierId = old('supplier_id', $order?->supplier_id ?? request('supplier_id') ?? null);
 
     // === PAYMENT METHOD ===
     // Filter: exclude DP_APPLY (internal only)
@@ -74,6 +79,48 @@
             border-radius: 16px;
             overflow: visible;
             margin-bottom: .85rem;
+        }
+
+        /* Focal card — Jenis PO + Supplier */
+        .po-focal {
+            border: 1px solid var(--line);
+        }
+
+        /* Jenis PO pill buttons */
+        .po-type-pill {
+            display: inline-flex;
+            align-items: center;
+            gap: .3rem;
+            padding: .38rem .85rem;
+            border-radius: 999px;
+            border: 1.5px solid var(--line);
+            background: transparent;
+            color: var(--body);
+            font-size: .82rem;
+            font-weight: 600;
+            cursor: pointer;
+            transition: all .15s;
+            white-space: nowrap;
+        }
+        .po-type-pill:hover {
+            border-color: var(--primary, #2563eb);
+            color: var(--primary, #2563eb);
+            background: color-mix(in srgb, var(--primary, #2563eb) 6%, transparent);
+        }
+        .po-type-pill--active {
+            border-color: var(--primary, #2563eb);
+            background: var(--primary, #2563eb);
+            color: #fff;
+        }
+        .po-type-pill--active:hover {
+            background: var(--primary, #2563eb);
+            color: #fff;
+        }
+
+        /* Supplier select lebih menonjol */
+        .po-supplier-select {
+            font-size: .95rem;
+            padding: .55rem .85rem;
         }
 
         .po-card .card-body {
@@ -398,47 +445,59 @@
     </style>
 @endpush
 
-{{-- HEADER --}}
-<div class="card po-card mb-3" data-order-type="{{ $orderType }}">
-    <div class="card-body">
-        <div class="row g-3">
-            <div class="col-12 col-md-3">
-                <div class="po-label">Tanggal</div>
+{{-- FOCAL: JENIS PO + SUPPLIER + TANGGAL --}}
+<div class="card po-card po-focal mb-3" data-order-type="{{ $orderType }}">
+    <div class="card-body" style="padding:1.1rem 1.1rem .9rem;">
+
+        {{-- Row atas: Jenis PO (kiri) + Tanggal (kanan) --}}
+        <div class="d-flex align-items-start justify-content-between gap-3 mb-3 flex-wrap">
+            <div style="min-width:0;flex:1;">
+                <div class="po-label mb-2">Jenis PO</div>
+                <div class="d-flex flex-wrap gap-2" id="po-type-pills">
+                    @foreach ($orderTypeOptions as $k => $label)
+                        @php
+                            $icons = ['material'=>'🧵','packing'=>'📦','service'=>'🔧','finished_good'=>'👕'];
+                            $active = $orderType === $k;
+                        @endphp
+                        <button type="button"
+                            class="po-type-pill {{ $active ? 'po-type-pill--active' : '' }}"
+                            data-type="{{ $k }}">
+                            {{ $icons[$k] ?? '' }} {{ $label }}
+                        </button>
+                    @endforeach
+                </div>
+            </div>
+            <div style="min-width:140px;">
+                <div class="po-label mb-1">Tanggal</div>
                 <input type="text" name="date" value="{{ $orderDate }}"
                     class="form-control po-field gf-date-input @error('date') is-invalid @enderror"
-                    data-gf-date autocomplete="off">
+                    data-gf-date autocomplete="off" style="min-width:140px;">
                 @error('date')
                     <div class="invalid-feedback">{{ $message }}</div>
                 @enderror
             </div>
-
-            <div class="col-12 col-md-3">
-                <div class="po-label">Jenis PO</div>
-                <select name="order_type" id="po-order-type"
-                    class="form-select po-field @error('order_type') is-invalid @enderror">
-                    @foreach ($orderTypeOptions as $k => $label)
-                        <option value="{{ $k }}" @selected($orderType === $k)>{{ $label }}</option>
-                    @endforeach
-                </select>
-                @error('order_type')
-                    <div class="invalid-feedback">{{ $message }}</div>
-                @enderror
-            </div>
-
-            <div class="col-12 col-md-6">
-                <div class="po-label">Supplier</div>
-                <select name="supplier_id" class="form-select po-field @error('supplier_id') is-invalid @enderror">
-                    @foreach ($suppliers as $sup)
-                        <option value="{{ $sup->id }}" @selected((string) $selectedSupplierId === (string) $sup->id)>
-                            {{ $sup->code }} — {{ $sup->name }}
-                        </option>
-                    @endforeach
-                </select>
-                @error('supplier_id')
-                    <div class="invalid-feedback">{{ $message }}</div>
-                @enderror
-            </div>
         </div>
+
+        {{-- hidden input order_type --}}
+        <input type="hidden" name="order_type" id="po-order-type-hidden" value="{{ $orderType }}">
+
+        {{-- Supplier --}}
+        <div class="po-label mb-1">Supplier</div>
+        <select name="supplier_id" id="po-supplier"
+            class="form-select po-field po-supplier-select @error('supplier_id') is-invalid @enderror"
+            required>
+            <option value="">— Pilih Supplier —</option>
+            @foreach ($suppliers as $sup)
+                <option value="{{ $sup->id }}"
+                    data-po-types="{{ implode(',', (array) ($sup->po_types ?? [])) }}"
+                    @selected((string) $selectedSupplierId === (string) $sup->id)>
+                    {{ $sup->code }} — {{ $sup->name }}
+                </option>
+            @endforeach
+        </select>
+        @error('supplier_id')
+            <div class="invalid-feedback">{{ $message }}</div>
+        @enderror
     </div>
 </div>
 
@@ -509,7 +568,7 @@
 
                         <td class="po-td-item" data-label="Item">
                             <x-item-suggest :items="$items" idName="lines[{{ $i }}][item_id]"
-                                :idValue="$lineItemId" :displayValue="$itemDisplay" type="{{ $orderType === 'packing' ? 'material' : $orderType }}" variant="mini"
+                                :idValue="$lineItemId" :displayValue="$itemDisplay" :type="$itemSuggestType" :extraParams="$itemSuggestExtra" variant="mini"
                                 displayMode="{{ $orderType === 'packing' ? 'name' : 'code' }}"
                                 :minChars="1" />
                             @error("lines.$i.item_id")
@@ -560,7 +619,7 @@
 
                         <td class="po-td-item" data-label="Item">
                             <x-item-suggest idName="lines[0][item_id]" :items="$items" displayMode="{{ $orderType === 'packing' ? 'name' : 'code-name' }}"
-                                :showName="true" :showCategory="false" type="{{ $orderType === 'packing' ? 'material' : $orderType }}"
+                                :showName="true" :showCategory="false" :type="$itemSuggestType" :extraParams="$itemSuggestExtra"
                                 placeholder="Masukan kode / nama barang" />
                             <input type="hidden" name="lines[0][allocation]" class="line-alloc-raw" value="hpp">
                             <input type="hidden" name="lines[0][expense_account_id]" class="line-expacc-raw"
@@ -687,7 +746,7 @@
             const liveLines = document.getElementById('po-live-lines');
             const liveQty = document.getElementById('po-live-qty');
 
-            const orderTypeSelect = document.getElementById('po-order-type');
+            const orderTypeSelect = document.getElementById('po-order-type-hidden');
             const currentOrderType = @json($orderType);
             const isEdit = @json((bool) $order?->id);
             const canSeeMoney = @json($canSeeMoney);
@@ -695,6 +754,26 @@
             const shippingDisplay = document.querySelector('.shipping-display');
             const shippingRaw = document.querySelector('.shipping-raw');
             const supplierSelect = document.querySelector('select[name="supplier_id"]');
+
+            function filterSuppliersByOrderType(type) {
+                if (!supplierSelect) return;
+
+                const options = Array.from(supplierSelect.querySelectorAll('option[value]'));
+                let selectedVisible = false;
+
+                options.forEach(opt => {
+                    const types = (opt.dataset.poTypes || '').split(',').map(s => s.trim()).filter(Boolean);
+                    const visible = types.length === 0 || types.includes(type);
+                    opt.hidden = !visible;
+                    opt.disabled = !visible;
+                    if (visible && opt.selected) selectedVisible = true;
+                });
+
+                if (!selectedVisible) {
+                    const firstVisible = options.find(opt => !opt.disabled);
+                    if (firstVisible) supplierSelect.value = firstVisible.value;
+                }
+            }
 
             // =========================
             // Helpers
@@ -1160,28 +1239,45 @@
             }
 
             // order type change => reload
+            // Pill buttons — Jenis PO
+            const hiddenOrderType = document.getElementById('po-order-type-hidden');
+            function switchOrderType(nextType) {
+                filterSuppliersByOrderType(nextType);
+                if (nextType === currentOrderType) return;
+
+                if (isEdit) {
+                    const ids = Array.from(document.querySelectorAll('.js-item-suggest-id'));
+                    const hasFilled = ids.some(el => (el.value || '').toString().trim() !== '');
+                    if (hasFilled) {
+                        const ok = confirm(
+                            'Mengubah Jenis PO akan memuat ulang daftar item. Pastikan item yang sudah dipilih sesuai jenis baru. Lanjut?'
+                        );
+                        if (!ok) return;
+                    }
+                }
+
+                const url = new URL(window.location.href);
+                url.searchParams.set('order_type', nextType);
+                window.location.href = url.toString();
+            }
+
+            document.querySelectorAll('.po-type-pill').forEach(btn => {
+                btn.addEventListener('click', function() {
+                    const nextType = this.dataset.type;
+                    if (hiddenOrderType) hiddenOrderType.value = nextType;
+                    document.querySelectorAll('.po-type-pill').forEach(b => b.classList.remove('po-type-pill--active'));
+                    this.classList.add('po-type-pill--active');
+                    switchOrderType(nextType);
+                });
+            });
+
+            // init supplier filter based on current type
+            filterSuppliersByOrderType(currentOrderType);
+
+            // legacy select fallback (hidden but kept for compatibility)
             if (orderTypeSelect) {
                 orderTypeSelect.addEventListener('change', function() {
-                    const nextType = orderTypeSelect.value || 'material';
-                    if (nextType === currentOrderType) return;
-
-                    if (isEdit) {
-                        const ids = Array.from(document.querySelectorAll('.js-item-suggest-id'));
-                        const hasFilled = ids.some(el => (el.value || '').toString().trim() !== '');
-                        if (hasFilled) {
-                            const ok = confirm(
-                                'Mengubah Jenis PO akan memuat ulang daftar item. Pastikan item yang sudah dipilih sesuai jenis baru. Lanjut?'
-                            );
-                            if (!ok) {
-                                orderTypeSelect.value = currentOrderType;
-                                return;
-                            }
-                        }
-                    }
-
-                    const url = new URL(window.location.href);
-                    url.searchParams.set('order_type', nextType);
-                    window.location.href = url.toString();
+                    switchOrderType(this.value || 'material');
                 });
             }
 

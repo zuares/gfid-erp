@@ -775,10 +775,10 @@
                         <div class="col-lg-2 d-none d-lg-block" id="dest-wrap">
                             <label class="form-label form-label-sm">Tujuan</label>
                             <input type="hidden" id="destination" name="destination_warehouse_id" value="{{ (int) $defaultDestWarehouseId }}"
-                                   data-label="{{ optional($destinationWarehouses->firstWhere('id', $defaultDestWarehouseId))->code ?? 'WIP-FIN' }} — {{ optional($destinationWarehouses->firstWhere('id', $defaultDestWarehouseId))->name ?? 'Sedang Finishing' }}">
+                                   data-label="{{ optional($destinationWarehouses->firstWhere('id', $defaultDestWarehouseId))->code ?? 'WH-PRD' }} — {{ optional($destinationWarehouses->firstWhere('id', $defaultDestWarehouseId))->name ?? 'Gudang Produksi' }}">
                             <div class="form-control form-control-sm mono return-dest-pill">
-                                <span class="return-dest-code">{{ optional($destinationWarehouses->firstWhere('id', $defaultDestWarehouseId))->code ?? 'WIP-FIN' }}</span>
-                                <span class="return-dest-name">— {{ optional($destinationWarehouses->firstWhere('id', $defaultDestWarehouseId))->name ?? 'Sedang Finishing' }}</span>
+                                <span class="return-dest-code">{{ optional($destinationWarehouses->firstWhere('id', $defaultDestWarehouseId))->code ?? 'WH-PRD' }}</span>
+                                <span class="return-dest-name">— {{ optional($destinationWarehouses->firstWhere('id', $defaultDestWarehouseId))->name ?? 'Gudang Produksi' }}</span>
                             </div>
                             @error('destination_warehouse_id')
                                 <div class="text-danger small mt-1">{{ $message }}</div>

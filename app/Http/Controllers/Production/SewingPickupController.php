@@ -494,6 +494,29 @@ class SewingPickupController extends Controller
                 submittedPayload: $validated['supplies_checklist'] ?? null,
             );
             $this->syncLineSupplyIssuedFromAggregate($pickup);
+
+            // ✅ VALIDASI STOK RM: tolak pickup jika stok kelengkapan jahit tidak mencukupi kebutuhan
+            $pickup->loadMissing('supplyLines.material');
+            $stockShortages = $pickup->supplyLines->filter(
+                fn($sl) => (float) $sl->required_qty > 0.000001
+                    && (float) $sl->issued_qty + 0.000001 < (float) $sl->required_qty
+            );
+            if ($stockShortages->isNotEmpty()) {
+                $details = $stockShortages->map(function ($sl) {
+                    $code  = $sl->material?->code ?? "material #{$sl->material_item_id}";
+                    $need  = number_format((float) $sl->required_qty, 2, ',', '.');
+                    $have  = number_format((float) ($sl->stock_available_snapshot ?? 0), 2, ',', '.');
+                    $short = number_format(
+                        max((float) $sl->required_qty - (float) ($sl->stock_available_snapshot ?? 0), 0),
+                        2, ',', '.'
+                    );
+                    return "• {$code}: butuh {$need}, stok RM {$have} (kurang {$short})";
+                })->implode("\n");
+                throw ValidationException::withMessages([
+                    'supplies' => "Stok RM tidak cukup untuk kelengkapan jahit. Pickup ditolak.\n\n{$details}",
+                ]);
+            }
+
             $this->createSupplyPhysicalAdjustment(
                 $pickup,
                 $validated['supplies_checklist'] ?? null,

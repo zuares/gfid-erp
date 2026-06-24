@@ -3,6 +3,7 @@
 namespace App\Services\Production;
 
 use App\Models\FinishingJob;
+use App\Models\InventoryStock;
 use App\Models\ItemBom;
 use App\Models\ItemBomLine;
 use App\Models\Warehouse;
@@ -35,6 +36,66 @@ class FinishingBomService
         $rmWarehouseId = Warehouse::where('code', 'RM')->value('id');
         if (!$rmWarehouseId) {
             throw new \RuntimeException('Warehouse RM belum dikonfigurasi (code = RM).');
+        }
+
+        // ✅ VALIDASI STOK RM: agregasi kebutuhan semua line yang belum di-apply,
+        // lalu tolak jika stok RM tidak mencukupi sebelum mutasi apapun dilakukan.
+        $totalNeedByMaterial = []; // material_item_id → ['code' => ..., 'need' => float]
+        foreach ($job->lines as $line) {
+            if (!empty($line->bom_applied_at)) continue;
+            $fgItemId = (int) ($line->item_id ?? 0);
+            $qtyOk    = (float) ($line->qty_ok ?? 0);
+            if ($fgItemId <= 0 || $qtyOk <= 0) continue;
+
+            $bom = ItemBom::where('item_id', $fgItemId)->where('active', true)->first();
+            if (!$bom) continue;
+
+            $excludeFLC = (int) ($line->bundle?->cuttingJob?->fabric_item_id ?? 0);
+            $bomLines   = ItemBomLine::where('item_bom_id', $bom->id)
+                ->where('usage_stage', ItemBomLine::STAGE_PACKING_SUPPLY)
+                ->where('is_optional', false)
+                ->get();
+
+            foreach ($bomLines as $bl) {
+                if ($excludeFLC > 0 && (int) $bl->material_item_id === $excludeFLC) continue;
+                $bomQty = (float) ($bl->qty ?? 0);
+                if ($bomQty <= 0) continue;
+                $need   = $qtyOk * $bomQty * (1 + ((float) ($bl->scrap_pct ?? 0) / 100.0));
+                $matId  = (int) $bl->material_item_id;
+                if (!isset($totalNeedByMaterial[$matId])) {
+                    $totalNeedByMaterial[$matId] = ['code' => (string) ($bl->material?->code ?? "material #{$matId}"), 'need' => 0.0];
+                }
+                $totalNeedByMaterial[$matId]['need'] += $need;
+            }
+        }
+
+        if (!empty($totalNeedByMaterial)) {
+            $matIds    = array_keys($totalNeedByMaterial);
+            $rmStocks  = InventoryStock::where('warehouse_id', $rmWarehouseId)
+                ->whereIn('item_id', $matIds)
+                ->pluck('qty', 'item_id')
+                ->map(fn($v) => (float) $v)
+                ->toArray();
+
+            $shortages = [];
+            foreach ($totalNeedByMaterial as $matId => $row) {
+                $have  = (float) ($rmStocks[$matId] ?? 0);
+                $need  = $row['need'];
+                if ($have + 0.000001 < $need) {
+                    $code  = $row['code'];
+                    $n     = number_format($need, 2, ',', '.');
+                    $h     = number_format($have, 2, ',', '.');
+                    $short = number_format($need - $have, 2, ',', '.');
+                    $shortages[] = "• {$code}: butuh {$n}, stok RM {$h} (kurang {$short})";
+                }
+            }
+
+            if (!empty($shortages)) {
+                throw ValidationException::withMessages([
+                    'supplies' => "Stok RM tidak cukup untuk kelengkapan finishing. Posting ditolak.\n\n"
+                        . implode("\n", $shortages),
+                ]);
+            }
         }
 
         foreach ($job->lines as $line) {
@@ -128,11 +189,10 @@ class FinishingBomService
                     sourceType: 'finishing_bom',
                     sourceId: (int) $line->id,
                     notes: "FIN {$job->code} • BOM SUP • line {$line->id}",
-                    allowNegative: true,
+                    allowNegative: false,
                     lotId: null,
                     unitCostOverride: $unitCost,
                     affectLotCost: false,
-                    strictNonNegative: false,
                 );
             }
 

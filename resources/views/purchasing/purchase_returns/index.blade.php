@@ -36,6 +36,12 @@
   .purchase-return-index .status-draft{ background:rgba(245,158,11,.12); color:#b45309; }
   .purchase-return-index .status-posted{ background:rgba(34,197,94,.12); color:#15803d; }
   .purchase-return-index .status-void{ background:rgba(239,68,68,.12); color:#b91c1c; }
+  .purchase-return-index .effect-text{
+    margin-top:.2rem;
+    color:var(--muted);
+    font-size:.72rem;
+    line-height:1.2;
+  }
   .purchase-return-index .table-wrap{ overflow-x:auto; }
   .purchase-return-index thead th{
     background:color-mix(in srgb, var(--card) 90%, var(--bg) 10%);
@@ -89,9 +95,6 @@
     <div class="page-header d-flex justify-content-between align-items-start gap-2 mb-3">
       <div>
         <h1 class="page-title mb-1">Return Pembelian</h1>
-        <div class="page-subtitle">
-          Daftar barang yang dikembalikan ke supplier. Return dibuat dari GRN yang sudah posted.
-        </div>
       </div>
       <div class="d-flex gap-2 flex-wrap">
         <a href="{{ route('purchasing.purchase_receipts.index') }}" class="btn btn-outline-secondary btn-sm rounded-pill">
@@ -158,7 +161,7 @@
               @if($canSeeMoney)
                 <th class="text-end">Nilai</th>
               @endif
-              <th>Status</th>
+              <th>Status / Efek</th>
               <th class="text-end">Aksi</th>
             </tr>
           </thead>
@@ -168,6 +171,9 @@
                 $isVoid = (bool) $ret->voided_at;
                 $statusCss = $isVoid ? 'status-void' : (($ret->status === 'posted') ? 'status-posted' : 'status-draft');
                 $statusText = $isVoid ? 'VOID' : strtoupper((string) $ret->status);
+                $effectText = $isVoid
+                  ? 'Stok balik, jurnal batal'
+                  : (($ret->status === 'posted') ? 'Stok keluar, jurnal masuk' : 'Belum ubah stok/jurnal');
                 $href = route('purchasing.purchase_returns.show', $ret->id);
               @endphp
               <tr class="row-link" data-href="{{ $href }}">
@@ -186,7 +192,10 @@
                 @if($canSeeMoney)
                   <td class="text-end mono" data-label="Nilai">{{ rupiah($ret->total ?? 0) }}</td>
                 @endif
-                <td data-label="Status"><span class="status-badge {{ $statusCss }}">{{ $statusText }}</span></td>
+                <td data-label="Status / Efek">
+                  <span class="status-badge {{ $statusCss }}">{{ $statusText }}</span>
+                  <div class="effect-text">{{ $effectText }}</div>
+                </td>
                 <td class="text-end" data-label="Aksi">
                   <a href="{{ $href }}" class="btn btn-outline-primary btn-sm rounded-pill">Buka</a>
                 </td>

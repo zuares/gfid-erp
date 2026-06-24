@@ -119,8 +119,7 @@ class PurchaseReceiptController extends Controller
                 $q->whereHas('receipt', fn($r) => $r->where('status', 'posted'));
             }], 'qty_received')
             ->whereHas('purchaseOrder', function ($q) use ($selectedSupplierId, $selectedOrderType) {
-                $q->where('status', 'approved')
-                  ->where('order_type', '!=', 'packing'); // packing skip GRN
+                $q->where('status', 'approved');
 
                 if (!empty($selectedSupplierId)) {
                     $q->where('supplier_id', (int) $selectedSupplierId);
@@ -173,12 +172,6 @@ class PurchaseReceiptController extends Controller
      */
     public function createFromOrder(PurchaseOrder $purchase_order)
     {
-        if ($purchase_order->order_type === 'packing') {
-            return redirect()
-                ->route('purchasing.purchase_orders.show', $purchase_order->id)
-                ->with('info', 'PO Packing tidak memerlukan GRN.');
-        }
-
         if ($purchase_order->status !== 'approved') {
             return redirect()
                 ->route('purchasing.purchase_orders.show', $purchase_order->id)
