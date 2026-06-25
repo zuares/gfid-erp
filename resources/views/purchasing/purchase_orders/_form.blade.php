@@ -518,10 +518,20 @@
                 font-size: .78rem;
             }
             #btn-reset-empty-lines { display: none; }
-            #btn-add-line { width: 100%; }
+            #btn-add-line { display: none; }
             .po-toolbar-summary { display: none; }
-            /* Hapus tombol + Barang bawah — sudah ada di toolbar */
-            .d-block.d-lg-none.text-center.py-2 { display: none !important; }
+            /* + Barang bawah: posisi di bawah harga (kolom 2), bukan full-width */
+            .d-block.d-lg-none.text-center.py-2 {
+                display: flex !important;
+                justify-content: flex-end;
+                padding: .3rem .5rem .1rem !important;
+            }
+            #btn-add-line-bottom {
+                border-radius: 999px !important;
+                font-size: .78rem;
+                padding: .28rem .85rem;
+                min-height: 32px;
+            }
             /* Meta section: sembunyikan Status + total rows, keep tipe bayar + ongkir + grand total */
             .po-meta-wrap { padding: .1rem .5rem .6rem; }
             .po-meta-card { border-radius: 10px; padding: .6rem .7rem; }
