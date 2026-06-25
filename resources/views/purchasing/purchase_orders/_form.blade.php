@@ -539,19 +539,23 @@
             .po-lines-table tbody {
                 display: block;
             }
+            /* ── Compact grid card per baris ── */
             .po-lines-table tbody tr {
-                display: block;
-                position: relative;
+                display: grid;
+                grid-template-columns: 1fr 1fr auto;
+                grid-template-rows: auto auto;
+                align-items: start;
+                column-gap: .45rem;
+                row-gap: .3rem;
                 width: 100%;
-                max-width: none;
                 box-sizing: border-box;
                 margin: 0 0 .5rem;
-                padding: .5rem .62rem .56rem;
+                padding: .5rem .55rem .5rem;
                 border-radius: 12px;
                 border: 1px solid rgba(148, 163, 184, .30);
                 background: var(--card);
                 box-shadow:
-                    0 8px 24px rgba(15, 23, 42, .08),
+                    0 4px 14px rgba(15, 23, 42, .07),
                     0 0 0 1px rgba(15, 23, 42, .02);
                 overflow: visible;
             }
@@ -559,81 +563,76 @@
                 background: rgba(15, 23, 42, .96);
             }
             .po-lines-table tbody td {
-                display: block;
                 border: 0 !important;
-                padding: .1rem 0;
+                padding: 0;
             }
+            /* nomor baris — hidden, tidak butuh ruang */
             .po-col-no {
-                min-height: 28px;
-                padding-right: 4.3rem !important;
-                text-align: left !important;
-                font-weight: 850;
-                color: var(--text);
-                font-size: .78rem;
+                display: none !important;
             }
-            .po-col-no::before {
-                content: "Item #";
-                color: var(--muted);
-                font-weight: 750;
-                margin-right: .1rem;
-            }
-            .po-td-action {
-                position: absolute;
-                top: .42rem;
-                right: .62rem;
-                text-align: right;
-                margin-top: 0;
-            }
-            .po-td-action .btn {
-                min-height: 32px;
-                padding: .15rem .65rem;
-                border-radius: 999px !important;
-                font-weight: 800;
-            }
+            /* item input — baris 1, span 2 kolom pertama */
             .po-td-item {
-                margin-top: .05rem;
-            }
-            .po-td-qty,
-            .po-td-price {
-                display: inline-block !important;
-                width: calc(50% - .28rem);
-                vertical-align: top;
-                margin-top: .45rem;
-            }
-            .po-td-price {
-                margin-left: .5rem;
-            }
-            .po-lines-no-money .po-td-qty {
-                display: block !important;
-                width: 100%;
-            }
-            .po-lines-table tbody td[data-label]::before {
-                font-size: .64rem;
-                margin-bottom: .18rem;
+                grid-column: 1 / span 2;
+                grid-row: 1;
             }
             .po-td-item[data-label]::before {
                 display: none !important;
             }
+            /* tombol hapus — baris 1, kolom 3 (auto width) */
+            .po-td-action {
+                grid-column: 3;
+                grid-row: 1;
+                position: static !important;
+                display: flex !important;
+                align-items: center;
+                justify-content: flex-end;
+                padding: 0 !important;
+            }
+            .po-td-action .btn {
+                min-height: 34px;
+                min-width: 34px;
+                padding: .15rem .45rem;
+                border-radius: 999px !important;
+                font-weight: 800;
+                font-size: .8rem;
+            }
+            /* qty — baris 2, kolom 1 */
+            .po-td-qty {
+                grid-column: 1;
+                grid-row: 2;
+                display: block !important;
+                width: auto !important;
+                margin: 0 !important;
+                vertical-align: unset;
+            }
+            /* harga — baris 2, kolom 2 */
+            .po-td-price {
+                grid-column: 2;
+                grid-row: 2;
+                display: block !important;
+                width: auto !important;
+                margin: 0 !important;
+            }
+            /* total — hidden (tersedia di ringkasan bawah) */
+            .po-td-total {
+                display: none !important;
+            }
+            /* tanpa money: qty span 2 kolom */
+            .po-lines-no-money .po-td-qty {
+                grid-column: 1 / span 2;
+            }
+            .po-lines-table tbody td[data-label]::before {
+                display: block;
+                font-size: .62rem;
+                font-weight: 750;
+                text-transform: uppercase;
+                letter-spacing: .07em;
+                color: var(--muted);
+                margin-bottom: .12rem;
+            }
             .po-num-display {
                 text-align: left;
                 font-weight: 800;
-            }
-            .po-td-total {
-                display: flex;
-                justify-content: space-between;
-                align-items: center;
-                padding-top: .35rem !important;
-                margin-top: .42rem;
-                border-top: 1px dashed rgba(148, 163, 184, .25) !important;
-                font-size: .86rem;
-                color: var(--muted);
-                font-weight: 800;
-            }
-            .po-td-total::before {
-                content: "Nilai";
-                color: var(--muted);
-                font-size: .72rem;
-                font-weight: 750;
             }
             .po-row.has-qty {
                 background: color-mix(in srgb, var(--card) 93%, rgba(37,99,235,.12));
@@ -844,8 +843,7 @@
                         <td class="text-center po-td-action">
                             <button type="button" class="btn btn-sm btn-outline-danger btn-remove-line"
                                 style="border-radius:12px;">
-                                <span class="d-inline d-lg-none">Hapus</span>
-                                <span class="d-none d-lg-inline">&times;</span>
+                                &times;
                             </button>
                         </td>
                     </tr>
@@ -881,8 +879,7 @@
                         <td class="text-center po-td-action">
                             <button type="button" class="btn btn-sm btn-outline-danger btn-remove-line"
                                 style="border-radius:12px;">
-                                <span class="d-inline d-lg-none">Hapus</span>
-                                <span class="d-none d-lg-inline">&times;</span>
+                                &times;
                             </button>
                         </td>
                     </tr>
