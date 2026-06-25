@@ -539,18 +539,17 @@
             .po-lines-table tbody {
                 display: block;
             }
-            /* ── Compact grid card per baris ── */
+            /* ── Single-row card per baris ── */
             .po-lines-table tbody tr {
                 display: grid;
-                grid-template-columns: 1fr 1fr auto;
-                grid-template-rows: auto auto;
-                align-items: start;
-                column-gap: .45rem;
-                row-gap: .3rem;
+                grid-template-columns: 2fr 1fr 1fr auto;
+                grid-template-rows: auto;
+                align-items: center;
+                gap: .4rem;
                 width: 100%;
                 box-sizing: border-box;
-                margin: 0 0 .5rem;
-                padding: .5rem .55rem .5rem;
+                margin: 0 0 .45rem;
+                padding: .42rem .5rem;
                 border-radius: 12px;
                 border: 1px solid rgba(148, 163, 184, .30);
                 background: var(--card);
@@ -566,74 +565,18 @@
                 border: 0 !important;
                 padding: 0;
             }
-            /* nomor baris — hidden, tidak butuh ruang */
-            .po-col-no {
-                display: none !important;
-            }
-            /* item input — baris 1, span 2 kolom pertama */
-            .po-td-item {
-                grid-column: 1 / span 2;
-                grid-row: 1;
-            }
-            .po-td-item[data-label]::before {
-                display: none !important;
-            }
-            /* tombol hapus — baris 1, kolom 3 (auto width) */
-            .po-td-action {
-                grid-column: 3;
-                grid-row: 1;
-                position: static !important;
-                display: flex !important;
-                align-items: center;
-                justify-content: flex-end;
-                padding: 0 !important;
-            }
-            .po-td-action .btn {
-                min-height: 34px;
-                min-width: 34px;
-                padding: .15rem .45rem;
-                border-radius: 999px !important;
-                font-weight: 800;
-                font-size: .8rem;
-            }
-            /* qty — baris 2, kolom 1 */
-            .po-td-qty {
-                grid-column: 1;
-                grid-row: 2;
-                display: block !important;
-                width: auto !important;
-                margin: 0 !important;
-                vertical-align: unset;
-            }
-            /* harga — baris 2, kolom 2 */
-            .po-td-price {
-                grid-column: 2;
-                grid-row: 2;
-                display: block !important;
-                width: auto !important;
-                margin: 0 !important;
-            }
-            /* total — hidden (tersedia di ringkasan bawah) */
-            .po-td-total {
-                display: none !important;
-            }
-            /* tanpa money: qty span 2 kolom */
-            .po-lines-no-money .po-td-qty {
-                grid-column: 1 / span 2;
-            }
-            .po-lines-table tbody td[data-label]::before {
-                display: block;
-                font-size: .62rem;
-                font-weight: 750;
-                text-transform: uppercase;
-                letter-spacing: .07em;
-                color: var(--muted);
-                margin-bottom: .12rem;
-            }
-            .po-num-display {
-                text-align: left;
-                font-weight: 800;
-            }
+            .po-col-no    { display: none !important; }
+            .po-td-item   { grid-column: 1; grid-row: 1; min-width: 0; }
+            .po-td-qty    { grid-column: 2; grid-row: 1; display: block !important; width: auto !important; margin: 0 !important; }
+            .po-td-price  { grid-column: 3; grid-row: 1; display: block !important; width: auto !important; margin: 0 !important; }
+            .po-td-action { grid-column: 4; grid-row: 1; position: static !important; display: flex !important; align-items: center; justify-content: flex-end; padding: 0 !important; }
+            .po-td-action .btn { min-height: 34px; min-width: 34px; padding: .1rem .4rem; border-radius: 999px !important; font-weight: 800; font-size: .82rem; }
+            .po-td-total  { display: none !important; }
+            /* tanpa money: qty span ke kolom harga */
+            .po-lines-no-money .po-td-qty { grid-column: 2 / span 2; }
+            /* label data-label disembunyikan — pakai placeholder saja */
+            .po-lines-table tbody td[data-label]::before { display: none !important; }
+            .po-num-display { text-align: left; font-weight: 800; }
             .po-row.has-qty {
                 background: color-mix(in srgb, var(--card) 93%, rgba(37,99,235,.12));
                 box-shadow:
@@ -818,7 +761,7 @@
 
                         <td data-label="Qty Beli" class="po-td-qty">
                             <input type="text" class="form-control po-field po-num-display line-qty-display"
-                                inputmode="decimal" placeholder="0,00" value="{{ $qtyDisplay }}" autocomplete="off">
+                                inputmode="decimal" placeholder="Qty" value="{{ $qtyDisplay }}" autocomplete="off">
                             <input type="hidden" name="lines[{{ $i }}][qty]" class="line-qty-raw"
                                 value="{{ $qtyRaw }}">
                             @error("lines.$i.qty")
@@ -829,7 +772,7 @@
                         @if ($canSeeMoney)
                             <td data-label="Harga" class="po-td-price">
                                 <input type="text" class="form-control po-field po-num-display line-price-display"
-                                    inputmode="numeric" placeholder="0" value="{{ $priceDisplay }}" autocomplete="off">
+                                    inputmode="numeric" placeholder="Harga" value="{{ $priceDisplay }}" autocomplete="off">
                                 <input type="hidden" name="lines[{{ $i }}][unit_price]" class="line-price-raw"
                                     value="{{ $priceRaw }}">
                                 @error("lines.$i.unit_price")
@@ -862,14 +805,14 @@
 
                         <td data-label="Qty Beli" class="po-td-qty">
                             <input type="text" class="form-control po-field po-num-display line-qty-display"
-                                inputmode="decimal" placeholder="0,00" value="" autocomplete="off">
+                                inputmode="decimal" placeholder="Qty" value="" autocomplete="off">
                             <input type="hidden" name="lines[0][qty]" class="line-qty-raw" value="">
                         </td>
 
                         @if ($canSeeMoney)
                             <td data-label="Harga" class="po-td-price">
                                 <input type="text" class="form-control po-field po-num-display line-price-display"
-                                    inputmode="numeric" placeholder="0" value="" autocomplete="off">
+                                    inputmode="numeric" placeholder="Harga" value="" autocomplete="off">
                                 <input type="hidden" name="lines[0][unit_price]" class="line-price-raw" value="">
                             </td>
 
