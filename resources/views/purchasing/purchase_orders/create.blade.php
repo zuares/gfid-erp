@@ -41,12 +41,19 @@
     }
     .po-fab-wrap .btn { pointer-events: auto; }
     .po-fab-back {
-        width: 42px; height: 42px;
+        width: 36px; height: 36px;
         padding: 0;
         border-radius: 999px;
-        font-weight: 900;
-        box-shadow: 0 8px 20px rgba(15,23,42,.18), 0 0 0 1px rgba(15,23,42,.06);
+        font-weight: 700;
+        font-size: .88rem;
+        background: rgba(255,255,255,.72);
+        border-color: rgba(148,163,184,.35);
+        color: #64748b;
+        box-shadow: 0 4px 12px rgba(15,23,42,.10);
+        backdrop-filter: blur(6px);
+        -webkit-backdrop-filter: blur(6px);
     }
+    .po-fab-back:hover { background: rgba(255,255,255,.92); color: #0f172a; }
     .po-fab-save {
         border-radius: 999px;
         border: none;

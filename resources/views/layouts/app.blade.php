@@ -242,22 +242,66 @@
 
     @media (max-width: 768px) {
         .gf-owner-floating-tools {
-            left: 14px;
-            right: 14px;
-            bottom: calc(76px + env(safe-area-inset-bottom));
+            left: 8px;
+            right: auto;
+            bottom: calc(72px + 12px + env(safe-area-inset-bottom));
             width: auto;
-            justify-content: stretch;
+            justify-content: flex-start;
+            gap: 5px;
+            transform: scale(.86);
+            transform-origin: left bottom;
+            opacity: .72;
         }
 
         .gf-owner-mode-wrap,
         .gf-owner-worklog-nav {
-            flex: 1 1 0;
+            flex: 0 0 auto;
         }
 
         .gf-owner-mode-trigger,
         .gf-owner-worklog-nav {
-            width: 100%;
-            min-height: 44px;
+            width: auto;
+            min-width: 0;
+            min-height: 32px;
+            height: 32px;
+            gap: 5px;
+            padding: 0 9px;
+            font-size: 10px;
+            box-shadow: 0 8px 20px rgba(15,23,42,.10);
+            border-color: rgba(15,23,42,.08);
+        }
+
+        .gf-owner-worklog-nav span {
+            display: none;
+        }
+
+        .gf-owner-worklog-nav::after {
+            content: "Log";
+        }
+
+        .gf-owner-worklog-dot {
+            width: 6px;
+            height: 6px;
+            box-shadow: 0 0 0 3px rgba(56,189,248,.13);
+        }
+
+        .gf-owner-mode-menu {
+            min-width: 210px;
+            max-width: calc(100vw - 20px);
+            max-height: 55vh;
+            overflow-y: auto;
+            font-size: 11px;
+            border-radius: 12px;
+        }
+
+        .gf-owner-mode-path {
+            max-width: 194px;
+        }
+
+        .gf-owner-floating-tools:focus-within,
+        .gf-owner-floating-tools:hover {
+            opacity: 1;
+            transform: scale(.94);
         }
     }
 </style>
