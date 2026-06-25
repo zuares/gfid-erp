@@ -227,22 +227,33 @@ document.querySelectorAll('.type-card').forEach(card => {
                 </button>
             </div>
 
-            {{-- Mobile: hidden submit di dalam form — dipicu FAB --}}
-            <button type="submit" id="po-submit-hidden" class="d-none"></button>
         </form>
 
-        {{-- Mobile FAB: di luar form, trigger hidden submit --}}
+        {{-- Mobile FAB --}}
         <div class="po-fab-wrap d-md-none">
             <a href="{{ route('purchasing.purchase_orders.create') }}"
                 class="btn btn-outline-secondary po-fab-back" title="Ganti Jenis / Supplier">
                 ←
             </a>
-            <button type="button" class="po-fab-save"
-                onclick="document.getElementById('po-submit-hidden').click()">
+            <button type="button" class="po-fab-save" id="po-fab-submit">
                 <i class="bi bi-check2-circle"></i>
                 Simpan PO
             </button>
         </div>
+
+        @push('scripts')
+        <script>
+            document.getElementById('po-fab-submit')?.addEventListener('click', function() {
+                const form = document.getElementById('po-create-form');
+                if (!form) return;
+                if (typeof form.requestSubmit === 'function') {
+                    form.requestSubmit();
+                } else {
+                    form.submit();
+                }
+            });
+        </script>
+        @endpush
         </div>
     </div>
 

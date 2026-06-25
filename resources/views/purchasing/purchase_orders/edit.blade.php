@@ -84,8 +84,6 @@
                     </button>
                 </div>
 
-                {{-- Mobile: hidden submit di dalam form --}}
-                <button type="submit" id="po-submit-hidden" class="d-none"></button>
             </form>
         </div>
     </div>
@@ -96,10 +94,23 @@
             class="btn btn-outline-secondary po-fab-back" title="Batal">
             ←
         </a>
-        <button type="button" class="po-fab-save"
-            onclick="document.getElementById('po-submit-hidden').click()">
+        <button type="button" class="po-fab-save" id="po-fab-submit">
             <i class="bi bi-check2-circle"></i>
             Simpan Perubahan
         </button>
     </div>
+
+    @push('scripts')
+    <script>
+        document.getElementById('po-fab-submit')?.addEventListener('click', function() {
+            const form = document.getElementById('po-edit-form');
+            if (!form) return;
+            if (typeof form.requestSubmit === 'function') {
+                form.requestSubmit();
+            } else {
+                form.submit();
+            }
+        });
+    </script>
+    @endpush
 @endsection
