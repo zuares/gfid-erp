@@ -450,25 +450,42 @@
             .po-focal .card-body {
                 padding: .7rem !important;
             }
-            /* Jenis PO + Tanggal: inline, tanggal compact di kanan */
+            /* Jenis PO + Tanggal: pills kiri, tanggal compact di kanan, sama baris */
             .po-focal-top {
                 display: flex !important;
-                align-items: flex-start;
-                gap: .6rem;
-                margin-bottom: .55rem !important;
+                align-items: center;
+                gap: .5rem;
+                margin-bottom: .5rem !important;
+                flex-wrap: nowrap;
             }
-            .po-focal-top > div:first-child { flex: 1; min-width: 0; }
+            .po-focal-top > div:first-child {
+                flex: 1;
+                min-width: 0;
+                overflow: hidden;
+            }
+            .po-type-scroll {
+                flex-wrap: nowrap !important;
+                gap: .35rem !important;
+                overflow-x: auto;
+                margin-inline: 0 !important;
+                padding-bottom: .1rem;
+                -webkit-overflow-scrolling: touch;
+                scrollbar-width: none;
+            }
             .po-date-wrap {
                 flex: 0 0 auto;
                 min-width: 0 !important;
-                width: 118px;
+                width: 108px;
+                margin-top: 0 !important;
             }
+            .po-date-wrap .po-label { display: none; }
             .po-date-wrap input {
                 min-width: 0 !important;
                 width: 100%;
-                font-size: .82rem !important;
-                padding: .32rem .45rem;
-                min-height: 36px;
+                font-size: .8rem !important;
+                padding: .3rem .4rem;
+                min-height: 34px;
+                text-align: center;
             }
             .po-type-scroll {
                 flex-wrap: nowrap !important;

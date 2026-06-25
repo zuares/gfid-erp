@@ -68,7 +68,7 @@
         <div class="po-edit-shell">
             <h1 class="po-edit-title mb-3">Edit PO {{ $order->code }}</h1>
 
-            <form action="{{ route('purchasing.purchase_orders.update', $order->id) }}" method="POST">
+            <form id="po-edit-form" action="{{ route('purchasing.purchase_orders.update', $order->id) }}" method="POST">
                 @csrf
                 @method('PUT')
 
@@ -83,7 +83,7 @@
             ←
         </a>
         <button type="button" class="po-fab-save"
-            onclick="document.querySelector('form[action*=purchase-orders]').requestSubmit()">
+            onclick="document.getElementById('po-edit-form').requestSubmit()">
             <i class="bi bi-check2-circle"></i>
             Simpan Perubahan
         </button>

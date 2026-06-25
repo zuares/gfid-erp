@@ -204,7 +204,7 @@ document.querySelectorAll('.type-card').forEach(card => {
             </div>
         @endif
 
-        <form action="{{ route('purchasing.purchase_orders.store') }}" method="POST">
+        <form id="po-create-form" action="{{ route('purchasing.purchase_orders.store') }}" method="POST">
             @csrf
 
             {{-- PR-D: hidden purchase_request_id agar store() bisa link PR → PO --}}
@@ -222,7 +222,7 @@ document.querySelectorAll('.type-card').forEach(card => {
                 ←
             </a>
             <button type="button" class="po-fab-save"
-                onclick="document.querySelector('form[action*=purchase-orders]').requestSubmit()">
+                onclick="document.getElementById('po-create-form').requestSubmit()">
                 <i class="bi bi-check2-circle"></i>
                 Simpan PO
             </button>
