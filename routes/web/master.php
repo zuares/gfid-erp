@@ -18,11 +18,21 @@ Route::middleware(['web', 'auth', 'access:master'])->group(function () {
         | ITEMS
         |--------------------------------------------------------------------------
          */
-        Route::resource('items', ItemController::class);
+        // ⚠️ Static routes harus SEBELUM resource agar tidak ditangkap {item} wildcard
+
+        // metadata master item (akun2, kategori, dll)
+        Route::get('items/meta', [ItemController::class, 'meta'])
+            ->name('items.meta');
+
+        // ✅ suggest items buat mapping (ringan)
+        Route::get('items/suggest', [SupplierController::class, 'suggestItems'])
+            ->name('items.suggest');
 
         // ✅ Bulk update (kategori / tipe / HPP) untuk beberapa item sekaligus
         Route::post('items/bulk-update', [ItemController::class, 'bulkUpdate'])
             ->name('items.bulk_update');
+
+        Route::resource('items', ItemController::class);
 
         /*
         |--------------------------------------------------------------------------
@@ -39,14 +49,6 @@ Route::middleware(['web', 'auth', 'access:master'])->group(function () {
             ->name('items.hpp_temp.edit');
         Route::post('items/{item}/hpp-temp', [ItemController::class, 'storeHppTemp'])
             ->name('items.hpp_temp.store');
-
-        // metadata master item (akun2, kategori, dll)
-        Route::get('items/meta', [ItemController::class, 'meta'])
-            ->name('items.meta');
-
-        // ✅ suggest items buat mapping (ringan)
-        Route::get('items/suggest', [SupplierController::class, 'suggestItems'])
-            ->name('items.suggest');
 
         /*
         |--------------------------------------------------------------------------
