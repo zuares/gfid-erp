@@ -144,6 +144,21 @@
             .js-item-suggest-input.is-invalid {
                 border-color: #dc3545;
             }
+
+            @media (max-width: 767.98px) {
+                .item-suggest-dropdown {
+                    font-size: .78rem;
+                }
+                .item-suggest-option {
+                    padding: .35rem .5rem;
+                }
+                .item-suggest-option-code {
+                    font-size: .78rem;
+                }
+                .item-suggest-option-name {
+                    font-size: .7rem;
+                }
+            }
         </style>
     @endpush
 
