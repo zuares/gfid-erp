@@ -122,6 +122,11 @@
             font-size: .95rem;
             padding: .55rem .85rem;
         }
+        .po-type-scroll {
+            display: flex;
+            flex-wrap: wrap;
+            gap: .5rem;
+        }
 
         .po-card .card-body {
             padding: .9rem 1rem;
@@ -437,6 +442,237 @@
             }
         }
 
+        @media (max-width: 767.98px) {
+            .po-card {
+                border-radius: 12px;
+                margin-bottom: .65rem;
+            }
+            .po-focal .card-body {
+                padding: .75rem !important;
+            }
+            .po-focal-top {
+                display: block !important;
+                margin-bottom: .65rem !important;
+            }
+            .po-date-wrap {
+                margin-top: .65rem;
+                min-width: 0 !important;
+                width: 100%;
+            }
+            .po-date-wrap input {
+                min-width: 0 !important;
+                width: 100%;
+            }
+            .po-type-scroll {
+                flex-wrap: nowrap !important;
+                gap: .4rem !important;
+                overflow-x: auto;
+                margin-inline: -.75rem;
+                padding-inline: .75rem;
+                padding-bottom: .15rem;
+                -webkit-overflow-scrolling: touch;
+                scrollbar-width: none;
+            }
+            .po-type-scroll::-webkit-scrollbar {
+                display: none;
+            }
+            .po-type-pill {
+                flex: 0 0 auto;
+                min-height: 38px;
+                padding: .35rem .7rem;
+                font-size: .78rem;
+            }
+            .po-supplier-select,
+            .po-field,
+            .js-item-suggest-input {
+                min-height: 42px;
+                font-size: 16px !important;
+            }
+            .po-label {
+                font-size: .66rem;
+                margin-bottom: .22rem;
+            }
+            .po-card .card-header {
+                border-bottom: 0 !important;
+                padding: .65rem .75rem .35rem;
+            }
+            .po-section-title {
+                font-size: .95rem;
+            }
+            .po-toolbar {
+                position: sticky;
+                top: 0;
+                z-index: 20;
+                margin-inline: -.01rem;
+                padding: .45rem .6rem;
+                background: color-mix(in srgb, var(--card) 97%, transparent);
+                border-top: 1px solid var(--line);
+                border-bottom: 1px solid var(--line);
+            }
+            .po-toolbar .btn {
+                min-height: 36px;
+                padding-inline: .55rem;
+                font-size: .78rem;
+            }
+            #btn-reset-empty-lines {
+                display: none;
+            }
+            #btn-add-line {
+                width: 100%;
+            }
+            .po-toolbar-summary {
+                display: none;
+            }
+            .po-table-wrapper {
+                overflow: visible;
+            }
+            .po-lines-table {
+                display: block;
+                width: 100%;
+                table-layout: fixed;
+                border-collapse: separate;
+                border-spacing: 0 8px;
+            }
+            .po-lines-table thead {
+                display: none;
+            }
+            .po-lines-table tbody {
+                display: block;
+            }
+            .po-lines-table tbody tr {
+                display: block;
+                position: relative;
+                width: 100%;
+                max-width: none;
+                box-sizing: border-box;
+                margin: 0 0 .5rem;
+                padding: .5rem .62rem .56rem;
+                border-radius: 12px;
+                border: 1px solid rgba(148, 163, 184, .30);
+                background: var(--card);
+                box-shadow:
+                    0 8px 24px rgba(15, 23, 42, .08),
+                    0 0 0 1px rgba(15, 23, 42, .02);
+                overflow: visible;
+            }
+            body[data-theme="dark"] .po-lines-table tbody tr {
+                background: rgba(15, 23, 42, .96);
+            }
+            .po-lines-table tbody td {
+                display: block;
+                border: 0 !important;
+                padding: .1rem 0;
+            }
+            .po-col-no {
+                min-height: 28px;
+                padding-right: 4.3rem !important;
+                text-align: left !important;
+                font-weight: 850;
+                color: var(--text);
+                font-size: .78rem;
+            }
+            .po-col-no::before {
+                content: "Item #";
+                color: var(--muted);
+                font-weight: 750;
+                margin-right: .1rem;
+            }
+            .po-td-action {
+                position: absolute;
+                top: .42rem;
+                right: .62rem;
+                text-align: right;
+                margin-top: 0;
+            }
+            .po-td-action .btn {
+                min-height: 32px;
+                padding: .15rem .65rem;
+                border-radius: 999px !important;
+                font-weight: 800;
+            }
+            .po-td-item {
+                margin-top: .05rem;
+            }
+            .po-td-qty,
+            .po-td-price {
+                display: inline-block !important;
+                width: calc(50% - .28rem);
+                vertical-align: top;
+                margin-top: .45rem;
+            }
+            .po-td-price {
+                margin-left: .5rem;
+            }
+            .po-lines-no-money .po-td-qty {
+                display: block !important;
+                width: 100%;
+            }
+            .po-lines-table tbody td[data-label]::before {
+                font-size: .64rem;
+                margin-bottom: .18rem;
+            }
+            .po-td-item[data-label]::before {
+                display: none !important;
+            }
+            .po-num-display {
+                text-align: left;
+                font-weight: 800;
+            }
+            .po-td-total {
+                display: flex;
+                justify-content: space-between;
+                align-items: center;
+                padding-top: .35rem !important;
+                margin-top: .42rem;
+                border-top: 1px dashed rgba(148, 163, 184, .25) !important;
+                font-size: .86rem;
+                color: var(--muted);
+                font-weight: 800;
+            }
+            .po-td-total::before {
+                content: "Nilai";
+                color: var(--muted);
+                font-size: .72rem;
+                font-weight: 750;
+            }
+            .po-row.has-qty {
+                background: color-mix(in srgb, var(--card) 93%, rgba(37,99,235,.12));
+                box-shadow:
+                    inset 3px 0 0 rgba(37,99,235,.55),
+                    0 8px 24px rgba(15, 23, 42, .08),
+                    0 0 0 1px rgba(15, 23, 42, .02);
+            }
+            .po-row.is-empty {
+                opacity: 1;
+            }
+            .po-meta-wrap {
+                padding: .15rem .55rem .7rem;
+            }
+            .po-meta-card {
+                border-radius: 12px;
+                padding: .75rem;
+            }
+            .po-meta-inputs {
+                gap: .55rem;
+                margin-bottom: .7rem;
+            }
+            .po-total-line {
+                padding: .32rem 0;
+            }
+            .po-total-key {
+                font-size: .66rem;
+            }
+            .po-total-val {
+                font-size: .86rem;
+            }
+            #btn-add-line-bottom {
+                width: calc(100% - 1.1rem);
+                min-height: 42px;
+                border-radius: 12px !important;
+                font-weight: 850;
+            }
+        }
+
         @media (min-width: 993px) {
             .po-col-no {
                 width: 5%
@@ -450,10 +686,10 @@
     <div class="card-body" style="padding:1.1rem 1.1rem .9rem;">
 
         {{-- Row atas: Jenis PO (kiri) + Tanggal (kanan) --}}
-        <div class="d-flex align-items-start justify-content-between gap-3 mb-3 flex-wrap">
+        <div class="po-focal-top d-flex align-items-start justify-content-between gap-3 mb-3 flex-wrap">
             <div style="min-width:0;flex:1;">
                 <div class="po-label mb-2">Jenis PO</div>
-                <div class="d-flex flex-wrap gap-2" id="po-type-pills">
+                <div class="po-type-scroll" id="po-type-pills">
                     @foreach ($orderTypeOptions as $k => $label)
                         @php
                             $icons = ['material'=>'🧵','packing'=>'📦','service'=>'🔧','finished_good'=>'👕'];
@@ -467,7 +703,7 @@
                     @endforeach
                 </div>
             </div>
-            <div style="min-width:140px;">
+            <div class="po-date-wrap" style="min-width:140px;">
                 <div class="po-label mb-1">Tanggal</div>
                 <input type="text" name="date" value="{{ $orderDate }}"
                     class="form-control po-field gf-date-input @error('date') is-invalid @enderror"
@@ -520,7 +756,7 @@
     </div>
 
     <div class="table-responsive po-table-wrapper">
-        <table class="table table-sm mb-0 po-lines-table" id="po-lines-table">
+        <table class="table table-sm mb-0 po-lines-table {{ $canSeeMoney ? 'po-lines-has-money' : 'po-lines-no-money' }}" id="po-lines-table">
             <thead class="table-light">
                 <tr>
                     <th class="po-col-no text-center">No</th>
@@ -618,9 +854,9 @@
                         <td class="text-center align-middle line-index po-col-no">1</td>
 
                         <td class="po-td-item" data-label="Item">
-                            <x-item-suggest idName="lines[0][item_id]" :items="$items" displayMode="{{ $orderType === 'packing' ? 'name' : 'code-name' }}"
-                                :showName="true" :showCategory="false" :type="$itemSuggestType" :extraParams="$itemSuggestExtra"
-                                placeholder="Masukan kode / nama barang" />
+                            <x-item-suggest idName="lines[0][item_id]" :items="$items" displayMode="{{ $orderType === 'packing' ? 'name' : 'code' }}"
+                                :showName="false" :showCategory="false" :type="$itemSuggestType" :extraParams="$itemSuggestExtra"
+                                placeholder="Masukan kode barang" />
                             <input type="hidden" name="lines[0][allocation]" class="line-alloc-raw" value="hpp">
                             <input type="hidden" name="lines[0][expense_account_id]" class="line-expacc-raw"
                                 value="">

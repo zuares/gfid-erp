@@ -311,15 +311,8 @@
                             }
                             if (sub.length) html += `<div class='item-suggest-option-name'>${sub.join(" • ")}</div>`;
                         } else {
+                            // displayMode === 'code': tampilkan kode saja
                             html = `<div class='item-suggest-option-code'>${(item.code || '').toUpperCase()}</div>`;
-                            if (!mobile) {
-                                const sub = [];
-                                if (showName && item.name) sub.push(item.name);
-                                if (showCategory && (item.item_category_name || item.item_category)) {
-                                    sub.push(item.item_category_name || item.item_category);
-                                }
-                                if (sub.length) html += `<div class='item-suggest-option-name'>${sub.join(" • ")}</div>`;
-                            }
                         }
 
                         btn.innerHTML = html;
