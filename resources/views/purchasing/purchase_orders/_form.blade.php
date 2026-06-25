@@ -542,20 +542,39 @@
                 padding: .28rem .85rem;
                 min-height: 32px;
             }
-            /* Meta section: sembunyikan Status + total rows, keep tipe bayar + ongkir + grand total */
-            .po-meta-wrap { padding: .1rem .5rem .6rem; }
-            .po-meta-card { border-radius: 10px; padding: .6rem .7rem; }
-            .po-meta-inputs { gap: .45rem; margin-bottom: .55rem; }
-            /* Sembunyikan kolom Status di mobile */
-            .po-meta-inputs > div:first-child { display: none; }
-            /* Tipe Pembayaran + Ongkir: 2 kolom full */
-            .po-meta-inputs { grid-template-columns: 1fr 1fr !important; }
-            .po-meta-inputs .po-meta-ongkir { grid-column: 1 / span 2 !important; }
-            /* Sembunyikan Subtotal & Ongkir di total, keep Grand Total saja */
+            /* Meta section: 1 baris — [Tipe Bayar] [Ongkir] [= Total] */
+            .po-meta-wrap { padding: .05rem .5rem .5rem; }
+            .po-meta-card {
+                display: flex;
+                align-items: center;
+                gap: .4rem;
+                border-radius: 10px;
+                padding: .45rem .55rem;
+            }
+            /* inputs jadi flex row */
+            .po-meta-inputs {
+                flex: 1;
+                display: flex !important;
+                gap: .4rem;
+                margin-bottom: 0 !important;
+                min-width: 0;
+            }
+            .po-meta-inputs > div:first-child { display: none !important; } /* status */
+            .po-meta-inputs > div:nth-child(2) { flex: 1.4; min-width: 0; } /* tipe bayar */
+            .po-meta-ongkir { flex: 1; min-width: 0; grid-column: unset !important; }
+            /* sembunyikan label di dalam meta card */
+            .po-meta-card .po-label { display: none; }
+            /* total: hanya grand total, di kanan */
+            .po-meta-totals {
+                flex: 0 0 auto;
+                border-top: 0 !important;
+                padding-top: 0 !important;
+                text-align: right;
+            }
             .po-total-line:not(:last-child) { display: none !important; }
-            .po-total-line:last-child { border-top: 0; padding-top: 0; }
-            .po-total-key { font-size: .7rem; }
-            .po-total-val { font-size: 1rem; font-weight: 900; }
+            .po-total-line:last-child { border-top: 0; padding: 0; flex-direction: column; align-items: flex-end; }
+            .po-total-key { font-size: .6rem; color: var(--muted); }
+            .po-total-val { font-size: .95rem; font-weight: 900; }
             .po-table-wrapper {
                 overflow: visible;
             }
