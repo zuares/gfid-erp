@@ -16,7 +16,7 @@
         letter-spacing: -.02em;
     }
     .po-create-shell {
-        padding-bottom: 5.5rem !important;
+        padding-bottom: calc(72px + 4rem) !important;
     }
     @media (max-width: 767.98px) {
         .po-create-shell {
@@ -30,12 +30,13 @@
     }
     .po-create-actions {
         position: fixed;
-        left: 0; right: 0; bottom: 0;
+        left: 0; right: 0;
+        bottom: calc(72px + env(safe-area-inset-bottom));
         z-index: 1040;
         display: flex;
         gap: .65rem;
         margin: 0;
-        padding: .65rem 1rem calc(.65rem + env(safe-area-inset-bottom));
+        padding: .65rem 1rem;
         background: color-mix(in srgb, var(--card) 96%, transparent);
         border-top: 1px solid var(--line);
         box-shadow: 0 -8px 24px rgba(15, 23, 42, .08);

@@ -7,7 +7,7 @@
     .po-edit-shell {
         max-width: 1120px;
         margin-inline: auto;
-        padding-bottom: 5.5rem;
+        padding-bottom: calc(72px + 4rem);
     }
     .po-edit-title {
         font-size: 1.35rem;
@@ -16,11 +16,12 @@
     }
     .po-edit-actions {
         position: fixed;
-        left: 0; right: 0; bottom: 0;
+        left: 0; right: 0;
+        bottom: calc(72px + env(safe-area-inset-bottom));
         z-index: 1040;
         display: flex;
         gap: .65rem;
-        padding: .65rem 1rem calc(.65rem + env(safe-area-inset-bottom));
+        padding: .65rem 1rem;
         background: color-mix(in srgb, var(--card) 96%, transparent);
         border-top: 1px solid var(--line);
         box-shadow: 0 -8px 24px rgba(15,23,42,.08);
