@@ -542,7 +542,7 @@
             /* ── Single-row card per baris ── */
             .po-lines-table tbody tr {
                 display: grid;
-                grid-template-columns: 2fr 1fr 1fr auto;
+                grid-template-columns: 1.4fr 0.9fr 1.5fr auto;
                 grid-template-rows: auto;
                 align-items: center;
                 gap: .4rem;
