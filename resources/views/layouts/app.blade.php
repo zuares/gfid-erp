@@ -244,13 +244,14 @@
         .gf-owner-floating-tools {
             left: 8px;
             right: auto;
-            bottom: calc(72px + 12px + env(safe-area-inset-bottom));
+            top: calc(56px + env(safe-area-inset-top));
+            bottom: auto;
             width: auto;
             justify-content: flex-start;
             gap: 5px;
-            transform: scale(.86);
-            transform-origin: left bottom;
-            opacity: .72;
+            transform: scale(.82);
+            transform-origin: left top;
+            opacity: .60;
         }
 
         .gf-owner-mode-wrap,
