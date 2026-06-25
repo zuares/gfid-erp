@@ -486,12 +486,22 @@
                 padding: .28rem .6rem;
                 font-size: .76rem;
             }
-            .po-supplier-select,
-            .js-item-suggest-input {
+            .po-supplier-select {
                 min-height: 42px;
                 font-size: 16px !important;
             }
-            .po-field { font-size: 15px !important; }
+            /* Detail Barang: input lebih kecil */
+            .js-item-suggest-input {
+                min-height: 36px;
+                font-size: 13px !important;
+            }
+            .po-td-qty .po-field,
+            .po-td-price .po-field {
+                min-height: 36px;
+                font-size: 13px !important;
+                padding: .28rem .4rem;
+            }
+            .po-field { font-size: 14px !important; }
             .po-label {
                 font-size: .64rem;
                 margin-bottom: .18rem;
