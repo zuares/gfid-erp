@@ -82,8 +82,7 @@
             class="btn btn-outline-secondary po-fab-back" title="Batal">
             ←
         </a>
-        <button type="button" class="po-fab-save"
-            onclick="document.getElementById('po-edit-form').requestSubmit()">
+        <button type="submit" form="po-edit-form" class="po-fab-save">
             <i class="bi bi-check2-circle"></i>
             Simpan Perubahan
         </button>

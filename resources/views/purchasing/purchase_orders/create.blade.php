@@ -221,8 +221,7 @@ document.querySelectorAll('.type-card').forEach(card => {
                 class="btn btn-outline-secondary po-fab-back" title="Ganti Jenis / Supplier">
                 ←
             </a>
-            <button type="button" class="po-fab-save"
-                onclick="document.getElementById('po-create-form').requestSubmit()">
+            <button type="submit" form="po-create-form" class="po-fab-save">
                 <i class="bi bi-check2-circle"></i>
                 Simpan PO
             </button>
