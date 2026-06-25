@@ -16,7 +16,7 @@
         letter-spacing: -.02em;
     }
     .po-create-shell {
-        padding-bottom: calc(72px + 4rem) !important;
+        padding-bottom: calc(72px + 5rem) !important;
     }
     @media (max-width: 767.98px) {
         .po-create-shell {
@@ -28,46 +28,44 @@
             margin-bottom: .6rem !important;
         }
     }
-    .po-create-actions {
+    /* FAB */
+    .po-fab-wrap {
         position: fixed;
-        left: 0; right: 0;
-        bottom: calc(72px + env(safe-area-inset-bottom));
-        z-index: 1040;
+        right: 14px;
+        bottom: calc(72px + 12px + env(safe-area-inset-bottom));
+        z-index: 1090;
         display: flex;
-        gap: .65rem;
-        margin: 0;
-        padding: .65rem 1rem;
-        background: color-mix(in srgb, var(--card) 96%, transparent);
-        border-top: 1px solid var(--line);
-        box-shadow: 0 -8px 24px rgba(15, 23, 42, .08);
-        backdrop-filter: blur(8px);
-        -webkit-backdrop-filter: blur(8px);
+        gap: 10px;
+        align-items: center;
+        pointer-events: none;
     }
-    .po-create-actions .btn {
-        min-height: 44px;
-        border-radius: 12px;
-        font-weight: 850;
+    .po-fab-wrap .btn { pointer-events: auto; }
+    .po-fab-back {
+        width: 42px; height: 42px;
+        padding: 0;
+        border-radius: 999px;
+        font-weight: 900;
+        box-shadow: 0 8px 20px rgba(15,23,42,.18), 0 0 0 1px rgba(15,23,42,.06);
     }
-    .po-create-actions .btn-outline-secondary {
-        flex: 0 0 auto;
-        width: 44px;
-        padding-inline: 0;
-        font-size: 0;
+    .po-fab-save {
+        border-radius: 999px;
+        border: none;
+        padding: .52rem 1.15rem;
+        font-size: .88rem;
+        font-weight: 700;
+        background: linear-gradient(135deg, #0d6efd 0%, #2563eb 60%, #1d4ed8 100%);
+        color: #f9fafb;
+        box-shadow:
+            0 12px 24px rgba(15,23,42,.32),
+            0 0 0 1px rgba(191,219,254,.85);
+        display: inline-flex;
+        align-items: center;
+        gap: .38rem;
+        white-space: nowrap;
     }
-    .po-create-actions .btn-outline-secondary::before {
-        content: "←";
-        font-size: 1.05rem;
-    }
-    .po-create-actions .btn-primary {
-        flex: 1 1 auto;
-    }
-    @media (min-width: 768px) {
-        .po-create-actions {
-            max-width: 1120px;
-            left: 50%; right: auto;
-            transform: translateX(-50%);
-            width: 100%;
-        }
+    .po-fab-save:hover {
+        background: linear-gradient(135deg, #2563eb 0%, #1d4ed8 100%);
+        color: #fff;
     }
 </style>
 @endpush
@@ -209,15 +207,19 @@ document.querySelectorAll('.type-card').forEach(card => {
 
             @include('purchasing.purchase_orders._form')
 
-            <div class="po-create-actions">
-                <a href="{{ route('purchasing.purchase_orders.create') }}" class="btn btn-outline-secondary">
-                    &larr; Ganti Jenis / Supplier
-                </a>
-                <button type="submit" class="btn btn-primary">
-                    Simpan PO
-                </button>
-            </div>
         </form>
+
+        <div class="po-fab-wrap">
+            <a href="{{ route('purchasing.purchase_orders.create') }}"
+                class="btn btn-outline-secondary po-fab-back" title="Ganti Jenis / Supplier">
+                ←
+            </a>
+            <button type="button" class="po-fab-save"
+                onclick="document.querySelector('form[action*=purchase-orders]').requestSubmit()">
+                <i class="bi bi-check2-circle"></i>
+                Simpan PO
+            </button>
+        </div>
         </div>
     </div>
 
