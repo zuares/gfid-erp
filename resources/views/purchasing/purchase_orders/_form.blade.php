@@ -445,84 +445,97 @@
         @media (max-width: 767.98px) {
             .po-card {
                 border-radius: 12px;
-                margin-bottom: .65rem;
+                margin-bottom: .5rem;
             }
             .po-focal .card-body {
-                padding: .75rem !important;
+                padding: .7rem !important;
             }
+            /* Jenis PO + Tanggal: inline, tanggal compact di kanan */
             .po-focal-top {
-                display: block !important;
-                margin-bottom: .65rem !important;
+                display: flex !important;
+                align-items: flex-start;
+                gap: .6rem;
+                margin-bottom: .55rem !important;
             }
+            .po-focal-top > div:first-child { flex: 1; min-width: 0; }
             .po-date-wrap {
-                margin-top: .65rem;
+                flex: 0 0 auto;
                 min-width: 0 !important;
-                width: 100%;
+                width: 118px;
             }
             .po-date-wrap input {
                 min-width: 0 !important;
                 width: 100%;
+                font-size: .82rem !important;
+                padding: .32rem .45rem;
+                min-height: 36px;
             }
             .po-type-scroll {
                 flex-wrap: nowrap !important;
-                gap: .4rem !important;
+                gap: .35rem !important;
                 overflow-x: auto;
-                margin-inline: -.75rem;
-                padding-inline: .75rem;
-                padding-bottom: .15rem;
+                margin-inline: 0;
+                padding-bottom: .1rem;
                 -webkit-overflow-scrolling: touch;
                 scrollbar-width: none;
             }
-            .po-type-scroll::-webkit-scrollbar {
-                display: none;
-            }
+            .po-type-scroll::-webkit-scrollbar { display: none; }
             .po-type-pill {
                 flex: 0 0 auto;
-                min-height: 38px;
-                padding: .35rem .7rem;
-                font-size: .78rem;
+                min-height: 34px;
+                padding: .28rem .6rem;
+                font-size: .76rem;
             }
             .po-supplier-select,
-            .po-field,
             .js-item-suggest-input {
                 min-height: 42px;
                 font-size: 16px !important;
             }
+            .po-field { font-size: 15px !important; }
             .po-label {
-                font-size: .66rem;
-                margin-bottom: .22rem;
+                font-size: .64rem;
+                margin-bottom: .18rem;
             }
             .po-card .card-header {
                 border-bottom: 0 !important;
-                padding: .65rem .75rem .35rem;
+                padding: .55rem .7rem .25rem;
             }
-            .po-section-title {
-                font-size: .95rem;
-            }
+            .po-section-title { font-size: .92rem; }
+            /* Toolbar: sticky, hanya tampil tombol + Barang */
             .po-toolbar {
                 position: sticky;
                 top: 0;
                 z-index: 20;
                 margin-inline: -.01rem;
-                padding: .45rem .6rem;
+                padding: .38rem .55rem;
                 background: color-mix(in srgb, var(--card) 97%, transparent);
                 border-top: 1px solid var(--line);
                 border-bottom: 1px solid var(--line);
             }
             .po-toolbar .btn {
-                min-height: 36px;
-                padding-inline: .55rem;
+                min-height: 34px;
+                padding-inline: .5rem;
                 font-size: .78rem;
             }
-            #btn-reset-empty-lines {
-                display: none;
-            }
-            #btn-add-line {
-                width: 100%;
-            }
-            .po-toolbar-summary {
-                display: none;
-            }
+            #btn-reset-empty-lines { display: none; }
+            #btn-add-line { width: 100%; }
+            .po-toolbar-summary { display: none; }
+            /* Hapus tombol + Barang bawah — sudah ada di toolbar */
+            .d-block.d-lg-none.text-center.py-2 { display: none !important; }
+            /* Meta section: sembunyikan Status + total rows, keep tipe bayar + ongkir + grand total */
+            .po-meta-wrap { padding: .1rem .5rem .6rem; }
+            .po-meta-card { border-radius: 10px; padding: .6rem .7rem; }
+            .po-meta-inputs { gap: .45rem; margin-bottom: .55rem; }
+            /* Sembunyikan kolom Status di mobile */
+            .po-meta-inputs > div:first-child { display: none; }
+            /* Tipe Pembayaran + Ongkir: 2 kolom full */
+            .po-meta-inputs { grid-template-columns: 1fr 1fr !important; }
+            .po-meta-inputs .po-meta-ongkir { grid-column: 1 / span 2 !important; }
+            /* Sembunyikan Subtotal & Ongkir di total, keep Grand Total saja */
+            .po-total-line:not(:last-child) { display: none !important; }
+            .po-total-line:last-child { border-top: 0; padding-top: 0; }
+            .po-total-key { font-size: .7rem; }
+            .po-total-val { font-size: 1rem; font-weight: 900; }
             .po-table-wrapper {
                 overflow: visible;
             }
