@@ -4,6 +4,73 @@
 
 @section('content')
 
+@push('head')
+<style>
+    .po-create-page {
+        max-width: 1120px;
+        margin-inline: auto;
+    }
+    .po-create-title {
+        font-size: 1.35rem;
+        font-weight: 900;
+        letter-spacing: -.02em;
+    }
+    .po-create-shell {
+        padding-bottom: 5.5rem !important;
+    }
+    @media (max-width: 767.98px) {
+        .po-create-shell {
+            padding-inline: .65rem !important;
+            padding-top: .65rem !important;
+        }
+        .po-create-title {
+            font-size: 1.05rem;
+            margin-bottom: .6rem !important;
+        }
+    }
+    .po-create-actions {
+        position: fixed;
+        left: 0; right: 0; bottom: 0;
+        z-index: 1040;
+        display: flex;
+        gap: .65rem;
+        margin: 0;
+        padding: .65rem 1rem calc(.65rem + env(safe-area-inset-bottom));
+        background: color-mix(in srgb, var(--card) 96%, transparent);
+        border-top: 1px solid var(--line);
+        box-shadow: 0 -8px 24px rgba(15, 23, 42, .08);
+        backdrop-filter: blur(8px);
+        -webkit-backdrop-filter: blur(8px);
+    }
+    .po-create-actions .btn {
+        min-height: 44px;
+        border-radius: 12px;
+        font-weight: 850;
+    }
+    .po-create-actions .btn-outline-secondary {
+        flex: 0 0 auto;
+        width: 44px;
+        padding-inline: 0;
+        font-size: 0;
+    }
+    .po-create-actions .btn-outline-secondary::before {
+        content: "←";
+        font-size: 1.05rem;
+    }
+    .po-create-actions .btn-primary {
+        flex: 1 1 auto;
+    }
+    @media (min-width: 768px) {
+        .po-create-actions {
+            max-width: 1120px;
+            left: 50%; right: auto;
+            transform: translateX(-50%);
+            width: 100%;
+        }
+    }
+</style>
+@endpush
+
 {{-- ── STEP 1: Pilih Jenis PO + Supplier (muncul jika belum ada params) ── --}}
 @php
     $stepDone = true; // skip step pilih jenis PO, langsung ke form
@@ -113,8 +180,9 @@ document.querySelectorAll('.type-card').forEach(card => {
 
 @else
 
-    <div class="container py-3">
-        <h1 class="mb-3">Purchase Order Baru</h1>
+    <div class="container py-3 po-create-shell">
+        <div class="po-create-page">
+        <h1 class="po-create-title mb-3">Purchase Order Baru</h1>
 
         {{-- PR-D: banner jika PO ini dibuat dari PR --}}
         @if (!empty($fromPr))
@@ -140,7 +208,7 @@ document.querySelectorAll('.type-card').forEach(card => {
 
             @include('purchasing.purchase_orders._form')
 
-            <div class="mt-3 d-flex justify-content-between">
+            <div class="po-create-actions">
                 <a href="{{ route('purchasing.purchase_orders.create') }}" class="btn btn-outline-secondary">
                     &larr; Ganti Jenis / Supplier
                 </a>
@@ -149,6 +217,7 @@ document.querySelectorAll('.type-card').forEach(card => {
                 </button>
             </div>
         </form>
+        </div>
     </div>
 
 @endif
