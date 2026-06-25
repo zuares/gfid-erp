@@ -73,16 +73,31 @@
                 @method('PUT')
 
                 @include('purchasing.purchase_orders._form')
+
+                {{-- Desktop: action bar di dalam form --}}
+                <div class="d-none d-md-flex justify-content-between align-items-center mt-3 mb-2">
+                    <a href="{{ route('purchasing.purchase_orders.show', $order->id) }}" class="btn btn-outline-secondary">
+                        &larr; Batal
+                    </a>
+                    <button type="submit" class="btn btn-primary px-4">
+                        Simpan Perubahan
+                    </button>
+                </div>
+
+                {{-- Mobile: hidden submit di dalam form --}}
+                <button type="submit" id="po-submit-hidden" class="d-none"></button>
             </form>
         </div>
     </div>
 
-    <div class="po-fab-wrap">
+    {{-- Mobile FAB --}}
+    <div class="po-fab-wrap d-md-none">
         <a href="{{ route('purchasing.purchase_orders.show', $order->id) }}"
             class="btn btn-outline-secondary po-fab-back" title="Batal">
             ←
         </a>
-        <button type="submit" form="po-edit-form" class="po-fab-save">
+        <button type="button" class="po-fab-save"
+            onclick="document.getElementById('po-submit-hidden').click()">
             <i class="bi bi-check2-circle"></i>
             Simpan Perubahan
         </button>

@@ -16,7 +16,10 @@
         letter-spacing: -.02em;
     }
     .po-create-shell {
-        padding-bottom: calc(72px + 5rem) !important;
+        padding-bottom: 1rem !important;
+    }
+    @media (max-width: 767.98px) {
+        .po-create-shell { padding-bottom: calc(72px + 5rem) !important; }
     }
     @media (max-width: 767.98px) {
         .po-create-shell {
@@ -214,14 +217,28 @@ document.querySelectorAll('.type-card').forEach(card => {
 
             @include('purchasing.purchase_orders._form')
 
+            {{-- Desktop: action bar biasa di dalam form --}}
+            <div class="d-none d-md-flex justify-content-between align-items-center mt-3 mb-2">
+                <a href="{{ route('purchasing.purchase_orders.create') }}" class="btn btn-outline-secondary">
+                    &larr; Ganti Jenis / Supplier
+                </a>
+                <button type="submit" class="btn btn-primary px-4">
+                    Simpan PO
+                </button>
+            </div>
+
+            {{-- Mobile: hidden submit di dalam form — dipicu FAB --}}
+            <button type="submit" id="po-submit-hidden" class="d-none"></button>
         </form>
 
-        <div class="po-fab-wrap">
+        {{-- Mobile FAB: di luar form, trigger hidden submit --}}
+        <div class="po-fab-wrap d-md-none">
             <a href="{{ route('purchasing.purchase_orders.create') }}"
                 class="btn btn-outline-secondary po-fab-back" title="Ganti Jenis / Supplier">
                 ←
             </a>
-            <button type="submit" form="po-create-form" class="po-fab-save">
+            <button type="button" class="po-fab-save"
+                onclick="document.getElementById('po-submit-hidden').click()">
                 <i class="bi bi-check2-circle"></i>
                 Simpan PO
             </button>
