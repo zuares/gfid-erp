@@ -1005,10 +1005,7 @@
                             <thead>
                                 <tr>
                                     <th>Material</th>
-                                    <th class="text-end">Butuh</th>
                                     <th class="text-end">PCS</th>
-                                    <th class="text-end">Stok RM</th>
-                                    <th class="text-end">Status</th>
                                 </tr>
                             </thead>
                             <tbody id="sewing-supply-body"></tbody>
@@ -1551,31 +1548,11 @@
                         materialTd.appendChild(nameEl);
                     }
 
-                    const needTd = document.createElement('td');
-                    needTd.className = 'text-end mono fw-bold';
-                    needTd.textContent = `${nf.format(item.qty || 0)} ${item.uom || ''}`.trim();
-
-                    const stockTd = document.createElement('td');
-                    stockTd.className = 'text-end mono';
-                    stockTd.textContent = `${nf.format(item.stock_available || 0)} ${item.uom || ''}`.trim();
-
                     const pcsTd = document.createElement('td');
                     pcsTd.className = 'text-end mono fw-bold';
                     pcsTd.textContent = `${nf.format(item.totalPieces || 0)} pcs`;
 
-                    const statusTd = document.createElement('td');
-                    statusTd.className = 'text-end mono';
-                    const statusSpan = document.createElement('span');
-                    if (item.shortage_qty > 0.000001) {
-                        statusSpan.className = 'supply-short';
-                        statusSpan.textContent = `Kurang ${nf.format(item.shortage_qty)} ${item.uom || ''}`.trim();
-                    } else {
-                        statusSpan.className = 'supply-ok';
-                        statusSpan.textContent = 'Cukup';
-                    }
-                    statusTd.appendChild(statusSpan);
-
-                    tr.append(materialTd, needTd, pcsTd, stockTd, statusTd);
+                    tr.append(materialTd, pcsTd);
                     sewingSupplyBody.appendChild(tr);
                 });
             }

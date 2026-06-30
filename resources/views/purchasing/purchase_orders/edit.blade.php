@@ -25,7 +25,8 @@
         align-items: center;
         pointer-events: none;
     }
-    .po-fab-wrap .btn { pointer-events: auto; }
+    .po-fab-wrap .btn,
+    .po-fab-wrap .po-fab-save { pointer-events: auto; }
     .po-fab-back {
         width: 36px; height: 36px;
         padding: 0;

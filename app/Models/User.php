@@ -149,7 +149,7 @@ class User extends Authenticatable
         $preferredModules = match (strtolower((string) $this->role)) {
             'operating' => ['production', 'inventory', 'dashboard'],
             'admin' => ['sales', 'inventory', 'purchasing', 'marketplace', 'imports', 'accounting', 'dashboard'],
-            'owner' => ['dashboard'],
+            'owner' => ['master'],
             default => ['dashboard'],
         };
 

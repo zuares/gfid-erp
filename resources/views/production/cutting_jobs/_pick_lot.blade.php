@@ -38,83 +38,314 @@
             gap: .25rem;
         }
 
-        /* === FILTER WARNA === */
-        .lot-picker-filter {
-            margin-top: .45rem;
-            padding: .4rem .6rem;
-            border-radius: 999px;
+        /* === STEP INDICATOR BAR === */
+        .lot-step-bar {
+            display: flex;
+            align-items: center;
+            margin-bottom: .7rem;
+            padding: .42rem .52rem;
+            background: rgba(148, 163, 184, .06);
+            border-radius: 8px;
+            border: 1px solid rgba(148, 163, 184, .15);
+        }
+
+        body[data-theme="dark"] .lot-step-bar {
+            background: rgba(15, 23, 42, .3);
+            border-color: rgba(148, 163, 184, .12);
+        }
+
+        .lot-step-item {
+            display: flex;
+            align-items: center;
+            gap: .25rem;
+        }
+
+        .lot-step-num {
+            width: 17px;
+            height: 17px;
+            border-radius: 50%;
+            border: 1.5px solid rgba(148, 163, 184, .4);
+            background: transparent;
             display: inline-flex;
             align-items: center;
-            gap: .45rem;
-            background: color-mix(in srgb, var(--card) 85%, rgba(59, 130, 246, 0.15));
-            border: 1px solid rgba(59, 130, 246, 0.35);
-            box-shadow: 0 4px 10px rgba(15, 23, 42, 0.08);
+            justify-content: center;
+            font-size: .6rem;
+            font-weight: 700;
+            color: var(--muted);
+            transition: all .18s;
+            flex-shrink: 0;
         }
 
-        body[data-theme="dark"] .lot-picker-filter {
-            background: color-mix(in srgb, var(--card) 80%, rgba(37, 99, 235, 0.25));
-            border-color: rgba(129, 140, 248, 0.75);
-            box-shadow: 0 6px 18px rgba(15, 23, 42, 0.5);
+        .lot-step-item.active .lot-step-num {
+            background: #2563eb;
+            border-color: #2563eb;
+            color: #fff;
+            box-shadow: 0 0 0 3px rgba(37, 99, 235, .18);
         }
 
-        .lot-picker-filter-label {
-            font-size: .74rem;
-            text-transform: uppercase;
-            letter-spacing: .11em;
+        .lot-step-label {
+            font-size: .62rem;
             font-weight: 600;
-            color: #0f172a;
+            color: var(--muted);
+            text-transform: uppercase;
+            letter-spacing: .05em;
+            transition: color .18s;
+        }
+
+        .lot-step-item.active .lot-step-label {
+            color: var(--text);
+        }
+
+        .lot-step-sep {
+            flex: 1;
+            height: 1px;
+            background: rgba(148, 163, 184, .25);
+            margin: 0 .35rem;
+            min-width: 12px;
+        }
+
+        /* === ITEM PICK BUTTONS (step 1) === */
+        .lot-item-select-list {
+            display: flex;
+            flex-direction: column;
+            gap: .22rem;
+        }
+
+        .lot-item-pick-btn {
+            display: flex;
+            align-items: center;
+            gap: .6rem;
+            padding: .52rem .62rem .52rem .7rem;
+            border-radius: 10px;
+            border: 1px solid rgba(148, 163, 184, .3);
+            border-left: 3px solid rgba(148, 163, 184, .35);
+            background: var(--card);
+            cursor: pointer;
+            text-align: left;
+            width: 100%;
+            transition:
+                border-color .14s,
+                border-left-color .14s,
+                box-shadow .14s,
+                transform .07s,
+                background .14s;
+            -webkit-tap-highlight-color: transparent;
+        }
+
+        .lot-item-pick-btn:hover {
+            border-color: rgba(59, 130, 246, .35);
+            border-left-color: #2563eb;
+            box-shadow: 0 3px 12px rgba(15, 23, 42, .10);
+            transform: translateX(2px);
+            outline: none;
+        }
+
+        .lot-item-pick-btn:active {
+            transform: translateX(1px);
+        }
+
+        .lot-item-pick-btn.has-selected {
+            border-color: rgba(37, 99, 235, .3);
+            border-left-color: #2563eb;
+            background: color-mix(in srgb, var(--card) 90%, rgba(59, 130, 246, .06));
+        }
+
+        body[data-theme="dark"] .lot-item-pick-btn {
+            border-left-color: rgba(99, 149, 246, .4);
+        }
+
+        body[data-theme="dark"] .lot-item-pick-btn:hover,
+        body[data-theme="dark"] .lot-item-pick-btn.has-selected {
+            border-left-color: #3b82f6;
+            border-color: rgba(99, 149, 246, .35);
+            background: color-mix(in srgb, var(--card) 85%, rgba(37, 99, 235, .15));
+        }
+
+        /* Left section: name + meta */
+        .lipb-left {
+            display: flex;
+            flex-direction: column;
+            gap: .06rem;
+            min-width: 0;
+            flex: 1;
+        }
+
+        .lipb-name {
+            font-size: .8rem;
+            font-weight: 650;
+            color: var(--text);
+            white-space: nowrap;
+            overflow: hidden;
+            text-overflow: ellipsis;
+            line-height: 1.2;
+        }
+
+        .lipb-meta {
+            display: flex;
+            align-items: center;
+            gap: .25rem;
+            font-size: .62rem;
+            color: var(--muted);
+        }
+
+        .lipb-code {
+            font-family: ui-monospace, SFMono-Regular, Menlo, Consolas, monospace;
+            font-size: .58rem;
+            padding: .02rem .3rem;
+            border-radius: 4px;
+            background: rgba(148, 163, 184, .1);
+            border: 1px solid rgba(148, 163, 184, .2);
+            letter-spacing: .02em;
+        }
+
+        .lipb-dot { opacity: .35; font-size: .55rem; }
+
+        /* Center: qty stock (focal point) */
+        .lipb-qty {
+            display: flex;
+            flex-direction: column;
+            align-items: flex-end;
+            flex-shrink: 0;
+            gap: 0;
+        }
+
+        .lipb-qty-num {
+            font-size: .88rem;
+            font-weight: 700;
+            font-variant-numeric: tabular-nums;
+            font-family: ui-monospace, SFMono-Regular, Menlo, Consolas, monospace;
+            color: var(--text);
+            line-height: 1;
+        }
+
+        .lipb-qty-unit {
+            font-size: .6rem;
+            color: var(--muted);
+            font-weight: 500;
+            text-align: right;
+        }
+
+        /* Right: selected badge + arrow */
+        .lipb-right {
+            display: flex;
+            align-items: center;
+            gap: .28rem;
+            flex-shrink: 0;
+        }
+
+        .lipb-selected {
+            font-size: .58rem;
+            font-weight: 700;
+            padding: .06rem .4rem;
+            border-radius: 999px;
+            background: #2563eb;
+            color: #fff;
+            display: none;
             white-space: nowrap;
         }
 
-        body[data-theme="dark"] .lot-picker-filter-label {
-            color: #e5e7eb;
+        .lipb-selected.visible { display: inline-block; }
+
+        .lipb-arrow {
+            width: 12px;
+            height: 12px;
+            color: rgba(100, 116, 139, .5);
+            flex-shrink: 0;
+            transition: transform .14s, color .14s;
         }
 
-        .lot-picker-filter select.form-select {
+        .lot-item-pick-btn:hover .lipb-arrow {
+            color: #2563eb;
+            transform: translateX(2px);
+        }
+
+        /* Step done (completed) */
+        .lot-step-item.done .lot-step-num {
+            background: rgba(37, 99, 235, .15);
+            border-color: rgba(37, 99, 235, .35);
+            color: #2563eb;
+        }
+
+        .lot-step-item.done .lot-step-label {
+            color: var(--muted);
+        }
+
+        /* === STEP 3 SUMMARY (compact) === */
+        .lot-step3-summary {
+            display: flex;
+            align-items: center;
+            justify-content: space-between;
+            gap: .5rem;
+            padding: .38rem .48rem;
+            background: color-mix(in srgb, var(--card) 85%, rgba(37, 99, 235, .1));
+            border: 1px solid rgba(37, 99, 235, .2);
+            border-radius: 8px;
+        }
+
+        .lot-step3-info {
+            font-size: .72rem;
+            color: var(--muted);
+            min-width: 0;
+            overflow: hidden;
+            text-overflow: ellipsis;
+            white-space: nowrap;
+        }
+
+        .lot-step3-info strong {
+            color: var(--text);
+        }
+
+        /* === STEP 2 HEADER === */
+        .lot-step2-header {
+            display: flex;
+            align-items: center;
+            gap: .45rem;
+            margin-bottom: .45rem;
+        }
+
+        .lot-back-btn {
+            background: transparent;
+            border: 1px solid rgba(148, 163, 184, .35);
             border-radius: 999px;
-            border-color: rgba(37, 99, 235, 0.7);
-            font-size: .82rem;
+            padding: .18rem .55rem;
+            font-size: .68rem;
             font-weight: 500;
-            padding-inline: .75rem;
-            padding-block: .24rem;
-            min-height: 2.05rem;
-            background-color: rgba(255, 255, 255, 0.96);
+            color: var(--muted);
+            cursor: pointer;
+            flex-shrink: 0;
+            transition: border-color .12s, color .12s;
+            line-height: 1.4;
         }
 
-        body[data-theme="dark"] .lot-picker-filter select.form-select {
-            background-color: rgba(15, 23, 42, 0.92);
-            border-color: rgba(191, 219, 254, 0.9);
-            color: #e5e7eb;
+        .lot-back-btn:hover {
+            border-color: rgba(59, 130, 246, .45);
+            color: var(--text);
         }
 
-        .lot-picker-filter select.form-select:focus {
-            box-shadow:
-                0 0 0 1px rgba(248, 250, 252, 0.8),
-                0 0 0 2px rgba(59, 130, 246, 0.55);
+        .lot-step2-item-name {
+            font-size: .75rem;
+            font-weight: 600;
+            color: var(--text);
+            white-space: nowrap;
+            overflow: hidden;
+            text-overflow: ellipsis;
+            min-width: 0;
         }
 
-        @media (min-width: 576px) {
-            .lot-picker-filter {
-                max-width: 340px;
-            }
+        /* Hide accordion header in step 2 */
+        .lot-accordion-header-hidden {
+            display: none !important;
         }
 
-        @media (max-width: 575.98px) {
-            .lot-picker-filter {
-                margin-top: .35rem;
-                width: 100%;
-                border-radius: 10px;
-            }
-            .lot-picker-filter select.form-select {
-                flex: 1;
-                border-radius: 8px;
-            }
+        /* Open accordion body by default in step 2 */
+        .lot-item-group.step2-open .lot-accordion-body {
+            display: block;
         }
 
         /* === ACCORDION ITEM GROUP === */
         .lot-item-group {
-            margin-top: .55rem;
-            border-radius: 12px;
+            margin-top: .4rem;
+            border-radius: 10px;
             border: 1px solid rgba(148, 163, 184, 0.4);
             background: color-mix(in srgb, var(--card) 88%, rgba(59, 130, 246, 0.06));
             overflow: hidden;
@@ -139,8 +370,8 @@
             display: flex;
             justify-content: space-between;
             align-items: center;
-            gap: .5rem;
-            padding: .48rem .58rem;
+            gap: .4rem;
+            padding: .32rem .48rem;
             user-select: none;
             -webkit-tap-highlight-color: transparent;
         }
@@ -169,7 +400,15 @@
         .lot-accordion-header-left {
             display: flex;
             flex-direction: column;
-            gap: .08rem;
+            gap: .05rem;
+            min-width: 0;
+        }
+
+        .lot-item-header-row {
+            display: flex;
+            align-items: baseline;
+            gap: .35rem;
+            flex-wrap: nowrap;
             min-width: 0;
         }
 
@@ -193,23 +432,42 @@
         }
 
         .lot-item-name {
-            font-size: .82rem;
+            font-size: .78rem;
             font-weight: 600;
             line-height: 1.18;
+            white-space: nowrap;
+            overflow: hidden;
+            text-overflow: ellipsis;
         }
 
         .lot-item-code-inline {
-            font-weight: 800;
-            margin-right: .35rem;
+            font-size: .72rem;
+            font-weight: 500;
+            color: var(--muted);
+            margin-right: .3rem;
+            opacity: .8;
+        }
+
+        .lot-item-code-pill {
+            display: inline-block;
+            font-size: .58rem;
+            font-weight: 500;
+            padding: .04rem .36rem;
+            border-radius: 999px;
+            background: rgba(148, 163, 184, .1);
+            border: 1px solid rgba(148, 163, 184, .25);
+            color: var(--muted);
+            white-space: nowrap;
+            flex-shrink: 0;
         }
 
         .lot-item-meta {
             display: inline-flex;
             align-items: center;
-            gap: .35rem;
+            gap: .3rem;
             flex-wrap: wrap;
             color: var(--muted);
-            font-size: .72rem;
+            font-size: .67rem;
             line-height: 1.15;
         }
 
@@ -252,7 +510,7 @@
         /* === ACCORDION BODY === */
         .lot-accordion-body {
             display: none;
-            padding: 0 .65rem .6rem;
+            padding: 0 .5rem .45rem;
         }
 
         .lot-item-group.open .lot-accordion-body {
@@ -262,7 +520,7 @@
         /* === LOT GRID === */
         .lot-grid {
             display: grid;
-            gap: .5rem;
+            gap: .38rem;
             grid-template-columns: repeat(2, minmax(0, 1fr));
         }
 
@@ -274,9 +532,9 @@
 
         /* === LOT CARD === */
         .lot-card-modern {
-            border-radius: 10px;
+            border-radius: 8px;
             border: 1px solid rgba(148, 163, 184, 0.45);
-            padding: .5rem .55rem .4rem;
+            padding: .38rem .42rem .3rem;
             background: var(--card);
             cursor: pointer;
             transition:
@@ -348,31 +606,144 @@
             margin-top: .35rem;
         }
 
+        /* === CHECKBOX HIDDEN === */
+        .lot-checkbox-hidden {
+            position: absolute;
+            opacity: 0;
+            pointer-events: none;
+            width: 0;
+            height: 0;
+        }
+
+        /* === LOT CARD REDESIGN === */
+        .lot-card-modern {
+            position: relative;
+            display: flex;
+            flex-direction: column;
+            gap: .1rem;
+        }
+
+        .lot-qty-main {
+            display: flex;
+            align-items: baseline;
+            gap: .18rem;
+        }
+
+        .lot-qty-main .lot-balance {
+            font-size: .95rem;
+            font-weight: 700;
+            color: var(--text);
+            line-height: 1;
+        }
+
+        .lot-qty-unit {
+            font-size: .62rem;
+            font-weight: 500;
+            color: var(--muted);
+        }
+
+        .lot-supplier-name {
+            font-size: .65rem;
+            color: var(--muted);
+            font-weight: 400;
+            white-space: nowrap;
+            overflow: hidden;
+            text-overflow: ellipsis;
+            max-width: 120px;
+            line-height: 1.2;
+        }
+
+        .lot-pills-row {
+            display: flex;
+            flex-wrap: wrap;
+            gap: .2rem;
+            margin-top: .08rem;
+        }
+
+        .lot-pill {
+            display: inline-block;
+            font-size: .58rem;
+            font-weight: 500;
+            padding: .05rem .32rem;
+            border-radius: 999px;
+            white-space: nowrap;
+            overflow: hidden;
+            text-overflow: ellipsis;
+            max-width: 100px;
+        }
+
+        .lot-pill-item {
+            background: rgba(148, 163, 184, .12);
+            border: 1px solid rgba(148, 163, 184, .3);
+            color: var(--muted);
+        }
+
+        .lot-pill-lot {
+            background: rgba(148, 163, 184, .08);
+            border: 1px solid rgba(148, 163, 184, .2);
+            color: var(--muted);
+            opacity: .75;
+        }
+
+        body[data-theme="dark"] .lot-pill-item,
+        body[data-theme="dark"] .lot-pill-lot {
+            background: rgba(148, 163, 184, .08);
+            border-color: rgba(148, 163, 184, .2);
+        }
+
+        /* === CHECKMARK INDICATOR === */
+        .lot-check-indicator {
+            position: absolute;
+            top: .34rem;
+            right: .4rem;
+            width: 16px;
+            height: 16px;
+            border-radius: 50%;
+            border: 1.5px solid rgba(148, 163, 184, .5);
+            background: transparent;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            color: transparent;
+            transition: all 0.15s ease;
+        }
+
+        .lot-card-modern.lot-selected .lot-check-indicator {
+            background: #2563eb;
+            border-color: #2563eb;
+            color: #fff;
+        }
+
+        body[data-theme="dark"] .lot-card-modern.lot-selected .lot-check-indicator {
+            background: #3b82f6;
+            border-color: #3b82f6;
+        }
+
         /* === MOBILE OVERRIDES === */
         @media (max-width: 575.98px) {
             .lot-accordion-header {
-                min-height: 54px;
-                padding: .58rem .68rem;
-                gap: .75rem;
+                min-height: 48px;
+                padding: .42rem .58rem;
+                gap: .5rem;
             }
 
             .lot-accordion-toggle {
-                min-height: 44px;
+                min-height: 40px;
             }
 
             .lot-item-name {
-                font-size: .86rem;
-                line-height: 1.24;
+                font-size: .82rem;
+                line-height: 1.22;
             }
 
             .lot-item-meta {
-                font-size: .74rem;
-                gap: .42rem;
+                font-size: .7rem;
+                gap: .32rem;
             }
 
             .lot-group-check {
-                min-width: 44px;
-                min-height: 44px;
+                min-width: 48px;
+                min-height: 48px;
                 justify-content: center;
                 border-radius: 999px;
                 background: rgba(148, 163, 184, .1);
@@ -380,23 +751,43 @@
 
             .lot-group-check input,
             .lot-checkbox {
-                width: 1.28rem;
-                height: 1.28rem;
+                width: 1.5rem;
+                height: 1.5rem;
             }
 
             .lot-grid {
                 grid-template-columns: 1fr;
-                gap: .58rem;
+                gap: .62rem;
             }
 
             .lot-accordion-body {
                 padding: 0 .58rem .68rem;
             }
 
+            /* Sticky confirm bar at bottom */
+            .lot-picker-footer {
+                position: sticky;
+                bottom: 0;
+                background: var(--card, #fff);
+                margin: .5rem -.85rem -.85rem;
+                padding: .75rem .85rem;
+                border-top: 1px solid rgba(148, 163, 184, .2);
+                box-shadow: 0 -6px 20px rgba(15, 23, 42, .10);
+                z-index: 30;
+                border-radius: 0 0 14px 14px;
+            }
+
+            .lot-picker-footer .btn-primary {
+                min-height: 48px;
+                font-size: .95rem;
+                font-weight: 700;
+                letter-spacing: .02em;
+            }
+
             .lot-card-modern {
-                min-height: 64px;
-                padding: .62rem .7rem;
-                border-radius: 12px;
+                min-height: 72px;
+                padding: .72rem .78rem;
+                border-radius: 14px;
             }
 
             .lot-card-main {
@@ -448,163 +839,176 @@
 @endpush
 
 <div class="lot-picker-wrap" id="cutting-pick-lot">
-    {{-- Header + filter warna + tombol select all --}}
-    <div class="lot-picker-header">
-        <div style="flex:1; min-width:0;">
-            <div class="lot-picker-title">Pilih LOT Kain</div>
-            <div class="lot-picker-help">
-                Tap <strong>item kain</strong> untuk buka, lalu centang LOT yang mau dipakai.
+
+    {{-- Step indicator --}}
+    <div class="lot-step-bar">
+        <div class="lot-step-item active" id="lstep-ind-1">
+            <span class="lot-step-num">1</span>
+            <span class="lot-step-label">Pilih Kain</span>
+        </div>
+        <div class="lot-step-sep"></div>
+        <div class="lot-step-item" id="lstep-ind-2">
+            <span class="lot-step-num">2</span>
+            <span class="lot-step-label">Centang LOT</span>
+        </div>
+        <div class="lot-step-sep"></div>
+        <div class="lot-step-item" id="lstep-ind-3">
+            <span class="lot-step-num">3</span>
+            <span class="lot-step-label">Hasil Cutting</span>
+        </div>
+    </div>
+
+    @if ($lotStocks->isEmpty())
+        <div class="lot-empty-hint">
+            Belum ada LOT bahan baku utama yang siap dipakai. Cek stok kain utama di GRN / gudang RM.
+        </div>
+    @else
+        @php $groupedLots = $lotStocks->groupBy(fn($row) => $row->lot->item_id); @endphp
+
+        {{-- STEP 1: Pilih Kain --}}
+        <div id="lot-step1-panel">
+            <div class="lot-item-select-list">
+                @foreach ($groupedLots as $itemId => $rows)
+                    @php
+                        $firstRow     = $rows->first();
+                        $item         = $firstRow->lot->item;
+                        $totalBalance = $rows->sum('qty_balance');
+                        $lotCount     = $rows->count();
+                    @endphp
+                    <button type="button" class="lot-item-pick-btn"
+                        data-item-id="{{ $itemId }}"
+                        data-item-name="{{ $item->name }}">
+                        <div class="lipb-left">
+                            <span class="lipb-name">{{ $item->name }}</span>
+                            <div class="lipb-meta">
+                                <span class="lipb-code">{{ $item->code }}</span>
+                                <span class="lipb-dot">·</span>
+                                <span>{{ $lotCount }} LOT</span>
+                            </div>
+                        </div>
+                        <div class="lipb-qty">
+                            <span class="lipb-qty-num">{{ number_format($totalBalance, 2, ',', '.') }}</span>
+                            <span class="lipb-qty-unit">kg stok</span>
+                        </div>
+                        <div class="lipb-right">
+                            <span class="lipb-selected" id="lipb-sel-{{ $itemId }}">✓</span>
+                            <svg class="lipb-arrow" viewBox="0 0 20 20" fill="currentColor">
+                                <path fill-rule="evenodd" d="M7.21 14.77a.75.75 0 01.02-1.06L11.168 10 7.23 6.29a.75.75 0 111.04-1.08l4.5 4.25a.75.75 0 010 1.08l-4.5 4.25a.75.75 0 01-1.06-.02z" clip-rule="evenodd"/>
+                            </svg>
+                        </div>
+                    </button>
+                @endforeach
             </div>
-
-            @if (!$lotStocks->isEmpty())
-                @php
-                    $itemGroupsForSelect = $lotStocks->groupBy(fn($row) => $row->lot->item_id);
-                @endphp
-
-                <div class="lot-picker-filter">
-                    <div class="lot-picker-filter-label">Warna Kain</div>
-                    <select id="lot-item-filter" class="form-select form-select-sm">
-                        <option value="">Semua warna</option>
-                        @foreach ($itemGroupsForSelect as $itemId => $rowsForSelect)
-                            @php
-                                $firstRowForSelect = $rowsForSelect->first();
-                                $itemSelect = $firstRowForSelect->lot->item ?? null;
-                            @endphp
-                            @if ($itemSelect)
-                                <option value="{{ $itemId }}">
-                                    {{ $itemSelect->name }} ({{ $itemSelect->code }})
-                                </option>
-                            @endif
-                        @endforeach
-                    </select>
-                </div>
-            @endif
         </div>
 
-        <div class="lot-picker-actions">
-            <button type="button" class="btn btn-outline-secondary btn-pill-sm btn-sm" id="btn-select-all-lots" disabled>
-                Centang semua
-            </button>
-            <button type="button" class="btn btn-outline-secondary btn-pill-sm btn-sm" id="btn-unselect-all-lots" disabled>
-                Hapus centang
+        {{-- STEP 2: Centang LOT --}}
+        <div id="lot-step2-panel" style="display:none;">
+            <div class="lot-step2-header">
+                <button type="button" id="lot-back-btn" class="lot-back-btn">← Pilih kain lain</button>
+                <div id="lot-step2-item-name" class="lot-step2-item-name"></div>
+            </div>
+
+            <div id="lot-grid">
+                @foreach ($groupedLots as $itemId => $rows)
+                    @php
+                        $firstRow     = $rows->first();
+                        $lot          = $firstRow->lot;
+                        $item         = $lot->item;
+                        $totalBalance = $rows->sum('qty_balance');
+                        $lotCount     = $rows->count();
+                        $whCodes      = $rows->pluck('warehouse.code')->filter()->unique()->values();
+                    @endphp
+
+                    <div class="lot-item-group" data-item-id="{{ $itemId }}">
+
+                        {{-- Accordion header — hidden in step 2, kept for JS compatibility --}}
+                        <div class="lot-accordion-header lot-accordion-header-hidden">
+                            <button type="button" class="lot-accordion-toggle">
+                                <div class="lot-accordion-header-left">
+                                    <div class="lot-item-header-row">
+                                        <span class="lot-item-name">{{ $item->name }}</span>
+                                        <span class="lot-item-code-pill mono">{{ $item->code }}</span>
+                                    </div>
+                                    <div class="lot-item-meta">
+                                        <span>{{ $lotCount }} LOT</span>
+                                        <span class="mono">{{ number_format($totalBalance, 2, ',', '.') }} kg</span>
+                                        @if ($whCodes->isNotEmpty())
+                                            <span>{{ $whCodes->implode(', ') }}</span>
+                                        @endif
+                                        <span class="lot-selected-badge" id="badge-item-{{ $itemId }}"></span>
+                                    </div>
+                                </div>
+                                <svg class="lot-accordion-chevron" viewBox="0 0 20 20" fill="currentColor">
+                                    <path fill-rule="evenodd" d="M5.23 7.21a.75.75 0 011.06.02L10 11.168l3.71-3.938a.75.75 0 111.08 1.04l-4.25 4.5a.75.75 0 01-1.08 0l-4.25-4.5a.75.75 0 01.02-1.06z" clip-rule="evenodd" />
+                                </svg>
+                            </button>
+                        </div>
+
+                        {{-- LOT cards --}}
+                        <div class="lot-accordion-body">
+                            <div class="lot-grid">
+                                @foreach ($rows as $row)
+                                    @php
+                                        $lotRow      = $row->lot;
+                                        $supplierName = $lotSupplierMap[$row->lot_id] ?? null;
+                                    @endphp
+                                    <div class="lot-card-modern lot-row lot-card-item"
+                                        data-lot-id="{{ $row->lot_id }}"
+                                        data-balance="{{ $row->qty_balance }}"
+                                        data-item-id="{{ $item->id }}"
+                                        data-item-code="{{ $item->code }}">
+
+                                        <input type="checkbox" class="lot-checkbox lot-checkbox-hidden"
+                                            name="selected_lots[]" value="{{ $row->lot_id }}"
+                                            data-item-id="{{ $item->id }}"
+                                            autocomplete="off"
+                                            tabindex="-1">
+
+                                        <div class="lot-qty-main">
+                                            <span class="mono lot-balance">{{ number_format($row->qty_balance, 2, ',', '.') }}</span>
+                                            <span class="lot-qty-unit">kg</span>
+                                        </div>
+
+                                        @if ($supplierName)
+                                            <div class="lot-supplier-name">{{ $supplierName }}</div>
+                                        @endif
+
+                                        <div class="lot-pills-row">
+                                            <span class="lot-pill lot-pill-item mono">{{ $item->code }}</span>
+                                            <span class="lot-pill lot-pill-lot mono">{{ $lotRow->code }}</span>
+                                        </div>
+
+                                        <div class="lot-check-indicator">
+                                            <svg viewBox="0 0 20 20" fill="currentColor" width="10" height="10">
+                                                <path fill-rule="evenodd" d="M16.707 5.293a1 1 0 010 1.414l-8 8a1 1 0 01-1.414 0l-4-4a1 1 0 011.414-1.414L8 12.586l7.293-7.293a1 1 0 011.414 0z" clip-rule="evenodd"/>
+                                            </svg>
+                                        </div>
+                                    </div>
+                                @endforeach
+                            </div>
+                        </div>
+                    </div>
+                @endforeach
+            </div>
+        </div>
+    @endif
+
+    {{-- STEP 3: Ringkasan LOT (compact, setelah confirm) --}}
+    <div id="lot-step3-panel" style="display:none;">
+        <div class="lot-step3-summary">
+            <div class="lot-step3-info">
+                <span id="lot-step3-label"></span>
+            </div>
+            <button type="button" id="btn-change-lots-picker" class="lot-back-btn">
+                Ubah LOT
             </button>
         </div>
     </div>
 
-    {{-- Accordion groups --}}
-    @if ($lotStocks->isEmpty())
-        <div id="lot-grid-hint" class="lot-empty-hint">
-            Belum ada LOT bahan baku utama yang siap dipakai. Cek stok kain utama di GRN / gudang RM.
-        </div>
-    @else
-        @php
-            $groupedLots = $lotStocks->groupBy(fn($row) => $row->lot->item_id);
-        @endphp
-
-        <div id="lot-grid">
-            @foreach ($groupedLots as $itemId => $rows)
-                @php
-                    $firstRow = $rows->first();
-                    $lot      = $firstRow->lot;
-                    $item     = $lot->item;
-                    $totalBalance = $rows->sum('qty_balance');
-                    $lotCount = $rows->count();
-                    $whCodes  = $rows->pluck('warehouse.code')->filter()->unique()->values();
-                @endphp
-
-                <div class="lot-item-group" data-item-id="{{ $itemId }}">
-
-                    {{-- ACCORDION HEADER --}}
-                    <div class="lot-accordion-header">
-                        <button type="button" class="lot-accordion-toggle">
-                            <div class="lot-accordion-header-left">
-                                <div class="lot-item-name">
-                                    <span class="mono lot-item-code-inline">{{ $item->code }}</span>{{ $item->name }}
-                                </div>
-                                <div class="lot-item-meta">
-                                    <span>{{ $lotCount }} LOT</span>
-                                    <span class="mono">{{ number_format($totalBalance, 2, ',', '.') }} kg</span>
-                                    @if ($whCodes->isNotEmpty())
-                                        <span>{{ $whCodes->implode(', ') }}</span>
-                                    @endif
-                                    <span class="lot-selected-badge" id="badge-item-{{ $itemId }}"></span>
-                                </div>
-                            </div>
-                            {{-- Chevron --}}
-                            <svg class="lot-accordion-chevron" viewBox="0 0 20 20" fill="currentColor">
-                                <path fill-rule="evenodd" d="M5.23 7.21a.75.75 0 011.06.02L10 11.168l3.71-3.938a.75.75 0 111.08 1.04l-4.25 4.5a.75.75 0 01-1.08 0l-4.25-4.5a.75.75 0 01.02-1.06z" clip-rule="evenodd" />
-                            </svg>
-                        </button>
-                        <div class="lot-accordion-header-right">
-                            <label class="lot-group-check" title="Centang semua LOT item ini">
-                                <input type="checkbox" class="form-check-input lot-group-checkbox">
-                            </label>
-                        </div>
-                    </div>
-
-                    {{-- ACCORDION BODY --}}
-                    <div class="lot-accordion-body">
-                        <div class="lot-grid">
-                            @foreach ($rows as $row)
-                                @php
-                                    $lotRow = $row->lot;
-                                    $wh     = $row->warehouse;
-                                    $purchaseDateValue = $row->purchase_date ?: $row->first_in_date ?: $lotRow?->created_at;
-                                    $purchaseDate = $purchaseDateValue ? \Illuminate\Support\Carbon::parse($purchaseDateValue) : null;
-                                    $shortDays = ['Min', 'Sen', 'Sel', 'Rab', 'Kam', 'Jum', 'Sab'];
-                                @endphp
-
-                                <div class="lot-card-modern lot-row lot-card-item"
-                                    data-lot-id="{{ $row->lot_id }}"
-                                    data-balance="{{ $row->qty_balance }}"
-                                    data-item-id="{{ $item->id }}">
-
-                                    <div class="d-flex justify-content-between align-items-start gap-1 lot-card-main">
-                                        <div style="min-width:0;">
-                                            <div class="fw-semibold mono lot-code" style="word-break:break-all;">
-                                                {{ $lotRow->code }}
-                                            </div>
-                                            @if ($wh?->code)
-                                                <div class="lot-warehouse text-muted mt-1">
-                                                    <span class="lot-card-badge">{{ $wh->code }}</span>
-                                                </div>
-                                            @endif
-                                            @if ($purchaseDate)
-                                                <div class="lot-purchase-date text-muted mt-1">
-                                                    Beli {{ $shortDays[$purchaseDate->dayOfWeek] }} {{ $purchaseDate->format('d/m/y') }}
-                                                </div>
-                                            @endif
-                                        </div>
-                                        <div class="text-end flex-shrink-0">
-                                            <div class="fw-semibold mono lot-balance">
-                                                {{ number_format($row->qty_balance, 2, ',', '.') }}
-                                            </div>
-                                            <div class="text-muted" style="font-size:.68rem;">kg</div>
-                                        </div>
-                                        <div class="lot-card-check">
-                                            <div class="form-check">
-                                            <input type="checkbox" class="form-check-input lot-checkbox"
-                                                name="selected_lots[]" value="{{ $row->lot_id }}"
-                                                data-item-id="{{ $item->id }}">
-                                            <span class="visually-hidden">Pakai LOT ini</span>
-                                            </div>
-                                        </div>
-                                    </div>
-                                </div>
-                            @endforeach
-                        </div>
-                    </div>
-                </div>
-
-                @php $isFirst = false; @endphp
-            @endforeach
-        </div>
-    @endif
-
     {{-- Footer --}}
-    <div class="d-flex justify-content-between align-items-center mt-3 lot-picker-footer">
-        <div class="small text-muted">
-            Setelah LOT dipilih, lanjutkan isi bundles di bawah.
+    <div class="d-flex justify-content-between align-items-center mt-3 lot-picker-footer" id="lot-picker-footer">
+        <div class="small text-muted" id="lot-footer-hint">
+            Tap kain untuk pilih LOT.
         </div>
         <button type="button" class="btn btn-primary btn-sm" id="btn-confirm-lots">
             Simpan LOT &amp; Lanjut
@@ -615,89 +1019,141 @@
 @push('scripts')
     <script>
         document.addEventListener('DOMContentLoaded', function () {
-            const lotGrid       = document.getElementById('lot-grid');
-            const lotCards      = lotGrid ? Array.from(lotGrid.querySelectorAll('.lot-card-item')) : [];
-            const lotGroups     = lotGrid ? Array.from(lotGrid.querySelectorAll('.lot-item-group')) : [];
-            const btnSelectAll  = document.getElementById('btn-select-all-lots');
-            const btnUnselectAll= document.getElementById('btn-unselect-all-lots');
-            const itemFilter    = document.getElementById('lot-item-filter');
+            // Reset checkbox saat load — cegah browser restore
+            document.querySelectorAll('.lot-checkbox').forEach(cb => { cb.checked = false; });
 
-            /* ── ACCORDION ─────────────────────────────────────── */
-            function openGroup(group) {
-                group.classList.add('open');
-            }
+            const lotGrid    = document.getElementById('lot-grid');
+            const step1Panel = document.getElementById('lot-step1-panel');
+            const step2Panel = document.getElementById('lot-step2-panel');
+            const step3Panel = document.getElementById('lot-step3-panel');
+            const pickerFooter = document.getElementById('lot-picker-footer');
+            const backBtn    = document.getElementById('lot-back-btn');
+            const step2Name  = document.getElementById('lot-step2-item-name');
+            const step3Label = document.getElementById('lot-step3-label');
+            const footerHint = document.getElementById('lot-footer-hint');
+            const stepInd1   = document.getElementById('lstep-ind-1');
+            const stepInd2   = document.getElementById('lstep-ind-2');
+            const stepInd3   = document.getElementById('lstep-ind-3');
+            const btnChangeLotsPicker = document.getElementById('btn-change-lots-picker');
 
-            function closeGroup(group) {
-                group.classList.remove('open');
-            }
+            const lotCards  = lotGrid ? Array.from(lotGrid.querySelectorAll('.lot-card-item')) : [];
+            const lotGroups = lotGrid ? Array.from(lotGrid.querySelectorAll('.lot-item-group')) : [];
 
-            function toggleGroup(group) {
-                group.classList.toggle('open');
-            }
-
-            // Bind click on header
-            lotGroups.forEach(group => {
-                const toggle = group.querySelector('.lot-accordion-toggle');
-                if (!toggle) return;
-
-                toggle.addEventListener('click', function () {
-                    toggleGroup(group);
+            /* ── STEP NAVIGATION ─────────────────── */
+            function setStepActive(n) {
+                [stepInd1, stepInd2, stepInd3].forEach((el, i) => {
+                    if (!el) return;
+                    const step = i + 1;
+                    el.classList.toggle('active', step === n);
+                    el.classList.toggle('done',   step < n);
                 });
-            });
-
-            /* ── BADGE: N LOT dipilih ───────────────────────────── */
-            function updateGroupBadge(group) {
-                const itemId = group.getAttribute('data-item-id');
-                const badge  = document.getElementById('badge-item-' + itemId);
-                const groupCheckbox = group.querySelector('.lot-group-checkbox');
-
-                const children = Array.from(group.querySelectorAll('.lot-checkbox'));
-                const checked = children.filter(cb => cb.checked).length;
-                const total = children.length;
-
-                if (groupCheckbox) {
-                    groupCheckbox.checked = total > 0 && checked === total;
-                    groupCheckbox.indeterminate = checked > 0 && checked < total;
-                }
-
-                if (!badge) return;
-                if (checked > 0) {
-                    badge.textContent  = checked + ' dipilih';
-                    badge.classList.add('visible');
-                    group.classList.add('has-selected');
-                } else {
-                    badge.textContent  = '';
-                    badge.classList.remove('visible');
-                    group.classList.remove('has-selected');
-                }
             }
 
-            function updateAllBadges() {
-                lotGroups.forEach(updateGroupBadge);
-            }
-
-            lotGroups.forEach(group => {
-                const groupCheckbox = group.querySelector('.lot-group-checkbox');
-                if (!groupCheckbox) return;
-
-                groupCheckbox.addEventListener('click', function (event) {
-                    event.stopPropagation();
+            function goToStep1() {
+                if (step1Panel) step1Panel.style.display = '';
+                if (step2Panel) step2Panel.style.display = 'none';
+                if (step3Panel) step3Panel.style.display = 'none';
+                if (pickerFooter) pickerFooter.style.display = '';
+                lotGroups.forEach(g => {
+                    g.style.display = 'none';
+                    g.classList.remove('step2-open');
                 });
+                setStepActive(1);
+                if (footerHint) footerHint.textContent = 'Tap kain untuk pilih LOT.';
+            }
 
-                groupCheckbox.addEventListener('change', function () {
-                    openGroup(group);
-                    const shouldCheck = groupCheckbox.checked;
-                    group.querySelectorAll('.lot-checkbox').forEach(cb => {
-                        if (cb.checked !== shouldCheck) {
-                            cb.checked = shouldCheck;
-                            cb.dispatchEvent(new Event('change', { bubbles: true }));
-                        }
+            function goToStep2(itemId, itemName) {
+                if (step1Panel) step1Panel.style.display = 'none';
+                if (step2Panel) step2Panel.style.display = '';
+                if (step3Panel) step3Panel.style.display = 'none';
+                if (pickerFooter) pickerFooter.style.display = '';
+                lotGroups.forEach(g => {
+                    const gId = g.getAttribute('data-item-id');
+                    if (gId === String(itemId)) {
+                        g.style.display = '';
+                        g.classList.add('step2-open');
+                    } else {
+                        g.style.display = 'none';
+                        g.classList.remove('step2-open');
+                    }
+                });
+                if (step2Name) step2Name.textContent = itemName || '';
+                setStepActive(2);
+                if (footerHint) footerHint.textContent = 'Centang LOT yang mau dipakai, lalu simpan.';
+            }
+
+            function goToStep3(summaryText) {
+                if (step1Panel) step1Panel.style.display = 'none';
+                if (step2Panel) step2Panel.style.display = 'none';
+                if (step3Panel) step3Panel.style.display = '';
+                if (pickerFooter) pickerFooter.style.display = 'none';
+                if (step3Label) step3Label.innerHTML = summaryText || '';
+                setStepActive(3);
+            }
+
+            // Expose for _form.blade.php
+            window.lotPickerGoToStep1 = goToStep1;
+            window.lotPickerGoToStep2 = goToStep2;
+            window.lotPickerGoToStep3 = goToStep3;
+
+            // Init: show step 1, hide all groups
+            lotGroups.forEach(g => { g.style.display = 'none'; });
+
+            // Item pick buttons
+            if (step1Panel) {
+                step1Panel.querySelectorAll('.lot-item-pick-btn').forEach(btn => {
+                    btn.addEventListener('click', function () {
+                        const itemId   = this.getAttribute('data-item-id');
+                        const itemName = this.getAttribute('data-item-name');
+                        goToStep2(itemId, itemName);
                     });
-                    updateGroupBadge(group);
                 });
-            });
+            }
 
-            /* ── CARD CLICK → toggle checkbox + highlight ─────── */
+            // Back button (step 2 → step 1)
+            if (backBtn) backBtn.addEventListener('click', goToStep1);
+
+            // "Ubah LOT" in step 3 → step 1
+            if (btnChangeLotsPicker) {
+                btnChangeLotsPicker.addEventListener('click', () => {
+                    // delegate to _form.blade.php's unlock + showPickLot
+                    document.getElementById('btn-change-lots')?.click();
+                });
+            }
+
+            /* ── BADGE: N LOT dipilih ───────────────── */
+            function updateGroupBadge(group) {
+                const itemId  = group.getAttribute('data-item-id');
+                const checked = Array.from(group.querySelectorAll('.lot-checkbox')).filter(cb => cb.checked).length;
+
+                // Badge inside accordion header (not visible but kept for compat)
+                const badge = document.getElementById('badge-item-' + itemId);
+                if (badge) {
+                    if (checked > 0) {
+                        badge.textContent = checked + ' dipilih';
+                        badge.classList.add('visible');
+                    } else {
+                        badge.textContent = '';
+                        badge.classList.remove('visible');
+                    }
+                }
+
+                // Badge + border on step 1 pick button
+                const pickBtn  = step1Panel ? step1Panel.querySelector('.lot-item-pick-btn[data-item-id="' + itemId + '"]') : null;
+                const lipbSel  = document.getElementById('lipb-sel-' + itemId);
+                if (pickBtn) pickBtn.classList.toggle('has-selected', checked > 0);
+                if (lipbSel) {
+                    if (checked > 0) {
+                        lipbSel.textContent = checked + ' dipilih';
+                        lipbSel.classList.add('visible');
+                    } else {
+                        lipbSel.textContent = '';
+                        lipbSel.classList.remove('visible');
+                    }
+                }
+            }
+
+            /* ── CARD CLICK → toggle checkbox ──────── */
             lotCards.forEach(card => {
                 const checkbox = card.querySelector('.lot-checkbox');
                 if (!checkbox) return;
@@ -708,99 +1164,15 @@
                     if (group) updateGroupBadge(group);
                 }
 
-                card.addEventListener('click', function (e) {
-                    if (e.target === checkbox) return;
+                card.addEventListener('click', function () {
                     checkbox.checked = !checkbox.checked;
                     checkbox.dispatchEvent(new Event('change', { bubbles: true }));
+                    syncCardState();
                 });
 
                 checkbox.addEventListener('change', syncCardState);
                 syncCardState();
             });
-
-            /* ── FILTER WARNA ────────────────────────────────────── */
-            function getCurrentItemId() {
-                return itemFilter ? (itemFilter.value || '') : '';
-            }
-
-            function getVisibleCards() {
-                const selectedItemId = getCurrentItemId();
-                return lotCards.filter(card => {
-                    const cardItemId = card.getAttribute('data-item-id') || '';
-                    if (selectedItemId) return cardItemId === selectedItemId;
-                    return card.closest('.lot-item-group')?.style.display !== 'none';
-                });
-            }
-
-            function updateButtonsState() {
-                const visible = getVisibleCards();
-                if (btnSelectAll)   btnSelectAll.disabled   = visible.length === 0;
-                if (btnUnselectAll) btnUnselectAll.disabled = visible.length === 0;
-            }
-
-            function applyItemFilter() {
-                const selectedItemId = getCurrentItemId();
-
-                lotGroups.forEach(group => {
-                    const itemId = group.getAttribute('data-item-id') || '';
-                    const show   = !selectedItemId || selectedItemId === itemId;
-                    group.style.display = show ? '' : 'none';
-
-                    // Jika filter ke 1 item → auto buka accordion-nya
-                    if (show && selectedItemId) {
-                        openGroup(group);
-                    }
-                });
-
-                updateButtonsState();
-            }
-
-            /* ── SELECT ALL / UNSELECT ALL ───────────────────────── */
-            if (btnSelectAll) {
-                btnSelectAll.addEventListener('click', function () {
-                    const selectedItemId = getCurrentItemId();
-                    lotGroups.forEach(group => {
-                        const itemId = group.getAttribute('data-item-id') || '';
-                        if (selectedItemId && itemId !== selectedItemId) return;
-                        if (group.style.display === 'none') return;
-
-                        // Auto-buka accordion supaya user tahu mana yang dipilih
-                        openGroup(group);
-                        group.querySelectorAll('.lot-checkbox').forEach(cb => {
-                            if (!cb.checked) {
-                                cb.checked = true;
-                                cb.dispatchEvent(new Event('change', { bubbles: true }));
-                            }
-                        });
-                    });
-                });
-            }
-
-            if (btnUnselectAll) {
-                btnUnselectAll.addEventListener('click', function () {
-                    const selectedItemId = getCurrentItemId();
-                    lotGroups.forEach(group => {
-                        const itemId = group.getAttribute('data-item-id') || '';
-                        if (selectedItemId && itemId !== selectedItemId) return;
-                        if (group.style.display === 'none') return;
-
-                        group.querySelectorAll('.lot-checkbox').forEach(cb => {
-                            if (cb.checked) {
-                                cb.checked = false;
-                                cb.dispatchEvent(new Event('change', { bubbles: true }));
-                            }
-                        });
-                    });
-                });
-            }
-
-            if (itemFilter) {
-                itemFilter.addEventListener('change', applyItemFilter);
-            }
-
-            // Init
-            applyItemFilter();
-            updateAllBadges();
         });
     </script>
 @endpush

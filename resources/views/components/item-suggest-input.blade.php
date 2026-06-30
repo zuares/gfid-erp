@@ -251,6 +251,16 @@
                         url += `&item_category_id=${encodeURIComponent(itemCategoryId)}`;
                     }
 
+                    // extra-params dinamis (misal color_code dari cutting form)
+                    try {
+                        const extra = JSON.parse(wrap.dataset.extraParams || '{}');
+                        for (const [k, v] of Object.entries(extra)) {
+                            if (v !== '' && v !== null && v !== undefined) {
+                                url += `&${encodeURIComponent(k)}=${encodeURIComponent(v)}`;
+                            }
+                        }
+                    } catch (e) {}
+
                     setLoading();
 
                     fetch(url)

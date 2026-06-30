@@ -375,62 +375,41 @@
 
                 {{-- MOBILE --}}
                 <div class="d-block d-md-none">
-                    <div class="d-flex justify-content-between align-items-center mb-1">
+                    {{-- Baris 1: code + badge + tombol --}}
+                    <div class="d-flex justify-content-between align-items-center gap-2 mb-2">
                         <div>
-                            <div class="small text-muted">QC Cutting</div>
-                            <div class="fw-semibold mono">{{ $cuttingJob->code }}</div>
+                            <div class="fw-semibold mono lh-1">{{ $cuttingJob->code }}</div>
+                            <div class="small-muted" style="font-size:.72rem">{{ $lot?->item?->code ?? '-' }} • {{ $warehouse?->code ?? '-' }}</div>
                         </div>
-                        <span class="badge bg-{{ $statusClass }} px-2 py-1">{{ strtoupper($cuttingJob->status) }}</span>
-                    </div>
-
-                    <div class="small-muted mb-2">
-                        LOT {{ $lot?->code ?? '-' }} • {{ $lot?->item?->code ?? '-' }}
-                        @if ($warehouse)
-                            • Gudang {{ $warehouse->code }}
-                        @endif
-                    </div>
-
-                    <div class="status-stepper mb-2">
-                        <div class="status-step">
-                            <div
-                                class="status-dot {{ $step1State === 'current' ? 'current' : ($step1State === 'done' ? 'active' : '') }}">
-                            </div>
-                            <div
-                                class="status-label {{ $step1State === 'current' ? 'current' : ($step1State === 'done' ? 'done' : '') }}">
-                                Cutting</div>
-                        </div>
-                        <div class="status-step">
-                            <div
-                                class="status-dot {{ $step2State === 'current' ? 'current' : ($step2State === 'done' ? 'active' : '') }}">
-                            </div>
-                            <div
-                                class="status-label {{ $step2State === 'current' ? 'current' : ($step2State === 'done' ? 'done' : '') }}">
-                                Input QC</div>
-                        </div>
-                        <div class="status-step">
-                            <div
-                                class="status-dot {{ $step3State === 'current' ? 'current' : ($step3State === 'done' ? 'active' : '') }}">
-                            </div>
-                            <div
-                                class="status-label {{ $step3State === 'current' ? 'current' : ($step3State === 'done' ? 'done' : '') }}">
-                                Hasil QC</div>
+                        <div class="d-flex align-items-center gap-1">
+                            <span class="badge bg-{{ $statusClass }} px-2 py-1" style="font-size:.72rem">{{ strtoupper($cuttingJob->status) }}</span>
+                            <a href="{{ route('production.cutting_jobs.show', $cuttingJob) }}"
+                               class="btn btn-sm btn-outline-secondary px-2">←</a>
+                            @if ($canCancelQc)
+                                <form action="{{ route('production.qc.cutting.cancel', $cuttingJob) }}" method="post"
+                                    onsubmit="return confirm('Batalkan QC Cutting? Sistem akan reversal mutasi QC dan QC harus diinput ulang.')">
+                                    @csrf
+                                    <button type="submit" class="btn btn-sm btn-outline-danger px-2">✕</button>
+                                </form>
+                            @endif
                         </div>
                     </div>
-
-                    <div class="d-flex gap-2 flex-wrap">
-                        <a href="{{ route('production.cutting_jobs.show', $cuttingJob) }}"
-                            class="btn btn-sm btn-outline-secondary flex-fill">
-                            Kembali
-                        </a>
-
-                        @if ($canCancelQc)
-                            <form action="{{ route('production.qc.cutting.cancel', $cuttingJob) }}" method="post"
-                                class="flex-fill"
-                                onsubmit="return confirm('Batalkan QC Cutting? Sistem akan reversal mutasi QC dan QC harus diinput ulang.')">
-                                @csrf
-                                <button type="submit" class="btn btn-sm btn-outline-danger w-100">Batalkan QC</button>
-                            </form>
-                        @endif
+                    {{-- Baris 2: stepper --}}
+                    <div class="status-stepper">
+                        <div class="status-step">
+                            <div class="status-dot {{ $step1State === 'current' ? 'current' : ($step1State === 'done' ? 'active' : '') }}"></div>
+                            <div class="status-label {{ $step1State === 'current' ? 'current' : ($step1State === 'done' ? 'done' : '') }}">Cutting</div>
+                        </div>
+                        <div class="status-separator"></div>
+                        <div class="status-step">
+                            <div class="status-dot {{ $step2State === 'current' ? 'current' : ($step2State === 'done' ? 'active' : '') }}"></div>
+                            <div class="status-label {{ $step2State === 'current' ? 'current' : ($step2State === 'done' ? 'done' : '') }}">Input QC</div>
+                        </div>
+                        <div class="status-separator"></div>
+                        <div class="status-step">
+                            <div class="status-dot {{ $step3State === 'current' ? 'current' : ($step3State === 'done' ? 'active' : '') }}"></div>
+                            <div class="status-label {{ $step3State === 'current' ? 'current' : ($step3State === 'done' ? 'done' : '') }}">Hasil QC</div>
+                        </div>
                     </div>
                 </div>
             </div>
@@ -450,51 +429,21 @@
 
                 {{-- HEADER QC --}}
                 @if (!in_array($userRole, ['operating', 'produksi'], true))
-                    <div class="card p-3 mb-3">
-                        <div class="d-flex justify-content-between align-items-center mb-2">
-                            <div class="section-title mb-0">Header QC</div>
-
-                            <div class="d-none d-md-flex gap-2">
-                                <div class="pill"><span>Total OK</span> <span class="mono" id="sum-ok">0</span></div>
-                                <div class="pill"><span>Reject</span> <span class="mono" id="sum-reject">0</span></div>
-                            </div>
-
-                            <div class="d-block d-md-none text-end">
-                                <div class="qc-summary-inline justify-content-end">
-                                    <span>Total OK <span class="mono" id="sum-ok-mobile">0</span></span>
-                                    <span>Reject <span class="mono" id="sum-reject-mobile">0</span></span>
-                                </div>
-                            </div>
-                        </div>
-
-                        <div class="row g-3">
-                            @php
-                                $qcDateError = $isErrorBag ? $errors->first('qc_date') : null;
-                                $operatorError = $isErrorBag ? $errors->first('operator_id') : null;
-                            @endphp
-
-                            <div class="col-md-3 col-6">
-                                <label class="field-label mb-1">Tanggal QC</label>
+                    @php
+                        $qcDateError  = $isErrorBag ? $errors->first('qc_date') : null;
+                        $operatorError = $isErrorBag ? $errors->first('operator_id') : null;
+                    @endphp
+                    <div class="card p-2 mb-3">
+                        <div class="d-flex align-items-center gap-2 flex-wrap">
+                            <div style="min-width:130px">
                                 <input type="date" name="qc_date" value="{{ $defaultQcDate }}"
-                                    class="form-control {{ $qcDateError ? 'is-invalid' : '' }}">
-                                @if ($qcDateError)
-                                    <div class="invalid-feedback">{{ $qcDateError }}</div>
-                                @endif
+                                    class="form-control form-control-sm {{ $qcDateError ? 'is-invalid' : '' }}">
                             </div>
-
-                            <div class="col-md-4 col-12">
-                                <label class="field-label mb-1">Operator QC</label>
-                                <input type="hidden" name="operator_id" value="{{ $defaultOperatorId }}">
-                                <input type="text" class="form-control {{ $operatorError ? 'is-invalid' : '' }}"
-                                    value="{{ $defaultOperatorLabel }}" disabled>
-                                @if ($operatorError)
-                                    <div class="invalid-feedback d-block">{{ $operatorError }}</div>
-                                @endif
-                            </div>
-
-                            <div class="col-12">
-                                <label class="field-label mb-1">Catatan Umum</label>
-                                <textarea name="notes_global" rows="2" class="form-control" placeholder="Opsional.">{{ old('notes_global') }}</textarea>
+                            <input type="hidden" name="operator_id" value="{{ $defaultOperatorId }}">
+                            <div class="small-muted flex-fill">{{ $defaultOperatorLabel }}</div>
+                            <div class="d-flex gap-2 ms-auto">
+                                <div class="pill"><span>OK</span> <span class="mono" id="sum-ok">0</span></div>
+                                <div class="pill"><span>Reject</span> <span class="mono" id="sum-reject">0</span></div>
                             </div>
                         </div>
                     </div>
@@ -524,12 +473,9 @@
                                     <th class="text-end" style="width:120px;">Cut</th>
                                     <th class="text-end" style="width:120px;">OK</th>
                                     <th class="text-center" style="width:120px;">Reject</th>
-                                    <th class="d-none d-md-table-cell" style="width:180px;">Alasan</th>
-                                    <th class="d-none d-md-table-cell" style="width:110px;">Status</th>
+                                    <th style="width:70px;"></th>
                                     <th class="d-none d-md-table-cell" style="width:160px;">Catatan</th>
-                                    @if ($canAdjustQc)
-                                        <th class="text-end" style="width:120px;">Aksi</th>
-                                    @endif
+                                    <th style="width:60px;"></th>
                                 </tr>
                             </thead>
 
@@ -578,7 +524,7 @@
                                         $modalId = 'qcAdjustModal_' . $bundleId;
                                     @endphp
 
-                                    <tr class="{{ $qtyReject > 0 ? 'row-has-reject' : '' }}">
+                                    <tr class="{{ $qtyReject > 0 ? 'row-has-reject' : '' }}" data-bundle-id="{{ $bundleId }}">
                                         <input type="hidden" name="results[{{ $i }}][cutting_job_bundle_id]"
                                             value="{{ $bundleId }}">
                                         <input type="hidden" name="results[{{ $i }}][qty_ok]"
@@ -620,18 +566,8 @@
                                             @endif
                                         </td>
 
-                                        <td class="d-none d-md-table-cell">
-                                            <input type="text" name="results[{{ $i }}][reject_reason]"
-                                                class="form-control form-control-sm {{ $reasonError ? 'is-invalid' : '' }}"
-                                                value="{{ old("results.$i.reject_reason", $row['reject_reason'] ?? '') }}"
-                                                placeholder="mis: bolong, kotor">
-                                            @if ($reasonError)
-                                                <div class="invalid-feedback">{{ $reasonError }}</div>
-                                            @endif
-                                        </td>
-
-                                        <td class="d-none d-md-table-cell">
-                                            <span class="badge-soft bg-{{ $cls }}">{{ $st }}</span>
+                                        <td>
+                                            <span class="badge-soft bg-{{ $cls }}" style="font-size:.7rem;padding:.15rem .4rem">{{ $st }}</span>
                                         </td>
 
                                         <td class="d-none d-md-table-cell">
@@ -643,12 +579,21 @@
                                             @endif
                                         </td>
 
-                                        {{-- OWNER ADJUST ACTION --}}
-                                        @if ($canAdjustQc)
-                                            <td class="text-end">
-                                                <button type="button" class="btn btn-sm btn-outline-warning"
+                                        {{-- AKSI: Simpan inline + Adjust (owner) --}}
+                                        <td class="text-end">
+                                            <div class="d-flex gap-1 justify-content-end align-items-center">
+                                                <button type="button"
+                                                        class="btn btn-sm btn-success btn-save-bundle-edit px-2"
+                                                        title="Simpan"
+                                                        data-id="{{ $bundleId }}"
+                                                        data-code="{{ $row['bundle_code'] ?? '' }}">
+                                                    ✓
+                                                </button>
+                                                @if ($canAdjustQc)
+                                                <button type="button" class="btn btn-sm btn-outline-warning px-2"
+                                                    title="Adjust"
                                                     data-bs-toggle="modal" data-bs-target="#{{ $modalId }}">
-                                                    Adjust
+                                                    ✏
                                                 </button>
 
                                                 <div class="modal fade" id="{{ $modalId }}" tabindex="-1"
@@ -745,8 +690,9 @@
                                                         </div>
                                                     </div>
                                                 </div>
-                                            </td>
-                                        @endif
+                                                @endif
+                                            </div>
+                                        </td>
                                     </tr>
                                 @endforeach
                             </tbody>
@@ -876,6 +822,47 @@
                 </div>
             </form>
 
+            {{-- Modal Alasan Reject (shared, per bundle via JS) --}}
+            <div class="modal fade" id="modalAlasanReject" tabindex="-1" aria-hidden="true">
+                <div class="modal-dialog modal-dialog-centered">
+                    <div class="modal-content">
+                        <div class="modal-header">
+                            <div>
+                                <div class="fw-semibold" id="modalAlasanTitle">Simpan QC Bundle</div>
+                                <div class="small-muted mono" id="modalAlasanMeta"></div>
+                            </div>
+                            <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
+                        </div>
+                        <div class="modal-body">
+                            <div class="mb-3">
+                                <div class="help mb-1">Reject: <span id="modalAlasanRejectQty" class="mono fw-semibold text-danger">0</span> pcs</div>
+                            </div>
+                            <label class="field-label mb-1">Alasan Reject <span class="text-muted fw-normal">(opsional jika tidak ada reject)</span></label>
+                            <input type="text" id="modalAlasanInput" class="form-control"
+                                   placeholder="mis: bolong, kotor, salah ukuran">
+                        </div>
+                        <div class="modal-footer">
+                            <button type="button" class="btn btn-outline-secondary" data-bs-dismiss="modal">Batal</button>
+                            <button type="button" class="btn btn-success" id="modalAlasanConfirm">Simpan</button>
+                        </div>
+                    </div>
+                </div>
+            </div>
+
+            {{-- Hidden forms per bundle untuk Simpan inline --}}
+            @foreach ($rows as $row)
+                <form id="bqfe-{{ $row['cutting_job_bundle_id'] }}"
+                      action="{{ route('production.qc.cutting.bundle_save_edit', [$cuttingJob, $row['cutting_job_bundle_id']]) }}"
+                      method="post" style="display:none">
+                    @csrf
+                    <input type="hidden" name="qc_date"       value="{{ $defaultQcDate }}">
+                    <input type="hidden" name="operator_id"   value="{{ $defaultOperatorId }}">
+                    <input type="hidden" name="qty_reject"    value="0">
+                    <input type="hidden" name="reject_reason" value="">
+                    <input type="hidden" name="notes"         value="">
+                </form>
+            @endforeach
+
         </div>
     </div>
 @endsection
@@ -886,8 +873,6 @@
             const inputsReject = document.querySelectorAll('.input-reject');
             const sumOkSpan = document.getElementById('sum-ok');
             const sumRejectSpan = document.getElementById('sum-reject');
-            const sumOkMobileSpan = document.getElementById('sum-ok-mobile');
-            const sumRejectMobileSpan = document.getElementById('sum-reject-mobile');
             const warningEl = document.getElementById('qc-warning');
 
             function attachSelectAllOnFocus(input) {
@@ -941,8 +926,6 @@
 
                 if (sumOkSpan) sumOkSpan.textContent = formatInt(okInt);
                 if (sumRejectSpan) sumRejectSpan.textContent = formatInt(rejInt);
-                if (sumOkMobileSpan) sumOkMobileSpan.textContent = formatInt(okInt);
-                if (sumRejectMobileSpan) sumRejectMobileSpan.textContent = formatInt(rejInt);
 
                 if (warningEl) warningEl.style.display = anyOver ? 'block' : 'none';
             }
@@ -1038,6 +1021,81 @@
                 rejInput.addEventListener('input', clampAdjust);
                 clampAdjust();
             });
+
+            // ===== SIMPAN PER BUNDLE — via Modal Alasan =====
+            let _pendingBundleId = null;
+
+            const modalAlasan     = document.getElementById('modalAlasanReject');
+            const modalAlasanBS   = modalAlasan ? new bootstrap.Modal(modalAlasan) : null;
+            const modalTitle      = document.getElementById('modalAlasanTitle');
+            const modalMeta       = document.getElementById('modalAlasanMeta');
+            const modalRejectQty  = document.getElementById('modalAlasanRejectQty');
+            const modalInput      = document.getElementById('modalAlasanInput');
+            const modalConfirmBtn = document.getElementById('modalAlasanConfirm');
+
+            document.querySelectorAll('.btn-save-bundle-edit').forEach(btn => {
+                btn.addEventListener('click', function () {
+                    const bundleId = this.dataset.id;
+                    const code     = this.dataset.code || ('#' + bundleId);
+                    const tr       = this.closest('tr');
+                    const form     = document.getElementById('bqfe-' + bundleId);
+                    if (!form || !tr) return;
+
+                    // Siapkan nilai dari baris
+                    const rejInput   = tr.querySelector('.input-reject');
+                    const notesInput = tr.querySelector('input[name*="[notes]"]');
+                    const rej        = parseFloat(rejInput?.value || '0');
+
+                    // Isi form hidden dulu (kecuali reason — akan diisi di modal)
+                    const mainDate = document.querySelector('input[name="qc_date"]')?.value;
+                    const mainOp   = document.querySelector('input[name="operator_id"]')?.value;
+                    if (mainDate) form.querySelector('[name="qc_date"]').value    = mainDate;
+                    if (mainOp)   form.querySelector('[name="operator_id"]').value = mainOp;
+                    form.querySelector('[name="qty_reject"]').value = isNaN(rej) ? 0 : rej;
+                    form.querySelector('[name="notes"]').value      = notesInput?.value || '';
+                    form.querySelector('[name="reject_reason"]').value = '';
+
+                    // Kalau tidak ada reject → langsung submit tanpa modal
+                    if (!rej || rej <= 0) {
+                        form.submit();
+                        return;
+                    }
+
+                    _pendingBundleId = bundleId;
+
+                    // Isi modal
+                    if (modalTitle)     modalTitle.textContent     = 'Simpan QC — ' + code;
+                    if (modalMeta)      modalMeta.textContent      = 'Reject: ' + Math.round(rej) + ' pcs';
+                    if (modalRejectQty) modalRejectQty.textContent = Math.round(rej);
+                    if (modalInput)     modalInput.value           = '';
+
+                    if (modalAlasanBS) {
+                        modalAlasanBS.show();
+                        setTimeout(() => modalInput?.focus(), 300);
+                    }
+                });
+            });
+
+            if (modalConfirmBtn) {
+                modalConfirmBtn.addEventListener('click', function () {
+                    if (!_pendingBundleId) return;
+                    const form   = document.getElementById('bqfe-' + _pendingBundleId);
+                    const reason = modalInput?.value?.trim() || '';
+                    if (form) {
+                        form.querySelector('[name="reject_reason"]').value = reason;
+                        if (modalAlasanBS) modalAlasanBS.hide();
+                        form.submit();
+                    }
+                    _pendingBundleId = null;
+                });
+            }
+
+            // Enter di input alasan → confirm
+            if (modalInput) {
+                modalInput.addEventListener('keydown', function (e) {
+                    if (e.key === 'Enter') { e.preventDefault(); modalConfirmBtn?.click(); }
+                });
+            }
         });
     </script>
 @endpush

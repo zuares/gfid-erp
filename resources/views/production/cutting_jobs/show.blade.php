@@ -27,28 +27,126 @@
             font-size: .85rem
         }
 
-        @media (max-width:767.98px) {
-            .table-wrap {
-                overflow-x: auto
-            }
+        /* ── Header style (selaras sewing pickup) ── */
+        .card-section { padding: 1rem 1.25rem }
+        @media (min-width: 768px) { .card-section { padding: 1rem 1.5rem } }
 
-            .summary-bar-mobile {
-                font-size: .85rem;
-                display: flex;
-                flex-wrap: wrap;
-                gap: .25rem .5rem
-            }
+        .hdr {
+            display: flex;
+            justify-content: space-between;
+            gap: .75rem;
+            flex-wrap: wrap;
+            align-items: center
+        }
+        .hdr h1 {
+            font-size: 1.02rem;
+            font-weight: 900;
+            margin: 0;
+            letter-spacing: -.01em;
+            font-variant-numeric: tabular-nums;
+            font-family: ui-monospace, SFMono-Regular, Menlo, Consolas
+        }
+        .sub {
+            font-size: .8rem;
+            color: var(--muted);
+            line-height: 1.35;
+            margin-top: .15rem
+        }
+        .btn-header-link {
+            border-radius: 999px;
+            padding: .32rem .9rem;
+            font-size: .78rem;
+            font-weight: 600
+        }
+        /* Semua tombol di hdr-right seragam (pill style) */
+        .hdr-right .btn {
+            border-radius: 999px;
+            font-size: .78rem;
+            font-weight: 600;
+            padding: .32rem .9rem;
+        }
 
-            .summary-bar-mobile span::after {
-                content: "•";
-                margin: 0 .25rem;
-                color: var(--muted)
-            }
+        @media (max-width: 767.98px) {
+            .hdr { flex-direction: column; align-items: flex-start; gap: .5rem }
+            .hdr h1 { font-size: 1rem }
+            .hdr-right { flex-wrap: wrap; gap: .4rem }
+            .hdr-right .btn { font-size: .75rem; padding: .3rem .6rem }
+        }
 
-            .summary-bar-mobile span:last-child::after {
-                content: "";
-                margin: 0
-            }
+        .summary-bar-mobile {
+            font-size: .85rem;
+            display: flex;
+            flex-wrap: wrap;
+            gap: .25rem .5rem
+        }
+
+        .summary-bar-mobile span::after {
+            content: "•";
+            margin: 0 .25rem;
+            color: var(--muted)
+        }
+
+        .summary-bar-mobile span:last-child::after {
+            content: "";
+            margin: 0
+        }
+
+        /* ── Bundle table ── */
+        .bq-table thead th {
+            font-size: .78rem;
+            text-transform: uppercase;
+            letter-spacing: .04em;
+            font-weight: 600
+        }
+
+        .row-has-reject { background: rgba(248,113,113,.04) }
+        .row-has-reject .cell-reject { color: #dc2626; font-weight: 600 }
+        .row-no-qc { background: rgba(148,163,184,.04) }
+
+        .cell-ok { font-variant-numeric: tabular-nums }
+
+        .small-muted { font-size: .8rem; color: var(--muted) }
+        .badge-soft  { border-radius: 999px; padding: .2rem .6rem; font-size: .75rem }
+
+        /* WIP pills (same as edit page) */
+        .wip-inline { display: flex; flex-wrap: wrap; gap: .18rem; margin-top: .18rem }
+        .wp { display: inline-flex; align-items: center; padding: .08rem .38rem;
+              border-radius: 999px; font-size: .68rem; font-weight: 600;
+              border: 1px solid rgba(148,163,184,.3); background: var(--card) }
+        .wp-wip   { color: #2563eb }
+        .wp-pick  { color: #d97706 }
+        .wp-ready { color: #059669 }
+
+        .bp-bar { position: relative; width: 100%; height: 4px; border-radius: 999px;
+                  background: rgba(148,163,184,.3); overflow: hidden; margin-top: .25rem }
+        .bp-picked { position: absolute; top: 0; bottom: 0; left: 0;
+                     background: linear-gradient(to right,#facc15,#eab308); opacity: .85 }
+        .bp-ready  { position: absolute; top: 0; bottom: 0; left: 0;
+                     background: linear-gradient(to right,#22c55e,#16a34a); opacity: .9 }
+
+        .bq-hide-ok .bq-row-ok { display: none }
+
+        /* input di tabel */
+        .bq-table .input-ok,
+        .bq-table .input-reject {
+            width: 68px !important;
+            text-align: center;
+            padding: .2rem .3rem;
+            font-size: .8rem
+        }
+
+        .bq-table .input-reason {
+            min-width: 120px;
+            font-size: .8rem;
+            padding: .2rem .35rem
+        }
+
+        @media (max-width: 767.98px) {
+            .table-wrap { overflow-x: auto }
+            .bq-table { font-size: .8rem; white-space: nowrap }
+            .bq-table th, .bq-table td { padding: .35rem .4rem }
+            .bq-table .input-ok,
+            .bq-table .input-reject { width: 56px !important; font-size: .78rem }
         }
 
         /* stepper */
@@ -201,105 +299,6 @@
             }
         }
 
-        /* pills + progress */
-        .bundle-info-pill {
-            font-size: .72rem;
-            font-weight: 700;
-            border-radius: 999px;
-            padding: .16rem .55rem .18rem;
-            box-shadow: 0 1px 2px rgba(0, 0, 0, .08), inset 0 0 0 1px rgba(148, 163, 184, .25);
-            background: var(--card);
-            letter-spacing: .18px
-        }
-
-        body[data-theme="dark"] .bundle-info-pill {
-            background: rgba(15, 23, 42, .96);
-            border-color: rgba(59, 130, 246, .35)
-        }
-
-        .pill-primary {
-            color: #2563eb
-        }
-
-        .pill-warning {
-            color: #d97706
-        }
-
-        .pill-success {
-            color: #059669
-        }
-
-        .bundle-info-wrap {
-            display: inline-flex;
-            flex-wrap: wrap;
-            gap: .25rem
-        }
-
-        @media (max-width:767.98px) {
-            .bundle-info-mobile {
-                font-size: .72rem;
-                color: var(--muted)
-            }
-        }
-
-        .bundle-progress {
-            margin-top: .18rem
-        }
-
-        .bundle-progress-bar {
-            position: relative;
-            width: 100%;
-            max-width: 220px;
-            height: 6px;
-            border-radius: 999px;
-            background: rgba(148, 163, 184, .35);
-            overflow: hidden
-        }
-
-        .bp-picked,
-        .bp-ready {
-            position: absolute;
-            top: 0;
-            bottom: 0;
-            left: 0
-        }
-
-        .bp-picked {
-            background: linear-gradient(to right, #facc15, #eab308);
-            opacity: .85
-        }
-
-        .bp-ready {
-            background: linear-gradient(to right, #22c55e, #16a34a);
-            opacity: .95
-        }
-
-        @media (max-width:767.98px) {
-            .bundle-progress-bar {
-                max-width: 100%
-            }
-        }
-
-        .bundle-progress-legend {
-            font-size: .68rem;
-            color: var(--muted)
-        }
-
-        .legend-box {
-            display: inline-block;
-            width: 10px;
-            height: 6px;
-            border-radius: 999px;
-            margin-right: .2rem
-        }
-
-        .legend-picked {
-            background: #eab308
-        }
-
-        .legend-ready {
-            background: #16a34a
-        }
     </style>
 @endpush
 
@@ -467,18 +466,6 @@
 
                 echo '<div class="d-flex gap-2 flex-wrap ' . e($wrapClass) . '">';
 
-                // Overproduction (hanya jika QC sudah ada)
-                if ($canOverproduction) {
-                    echo '<a href="' .
-                        e(route('production.cutting_overproduction.create', ['cutting_job_id' => $job->id])) .
-                        '"
-                            class="' .
-                        e($btn) .
-                        ' btn-outline-warning"
-                            onclick="return confirm(\'Cutting Overproduction?\\n\\nHanya untuk MENAMBAH qty (WIP-CUT).\')">
-                            Overproduction
-                          </a>';
-                }
 
                 // Edit Cutting (boleh sampai sent_to_qc selama QC belum ada)
                 if ($canEditCutting) {
@@ -554,96 +541,47 @@
         @endphp
 
         {{-- ===========================
-            HEADER (DESKTOP)
+            HEADER (unified)
         ============================ --}}
-        <div class="card p-3 mb-3 d-none d-md-block">
-            <div class="d-flex justify-content-between align-items-start gap-3">
-                <div>
-                    <h1 class="h5 mb-1">Cutting Job: {{ $job->code }}</h1>
-                    <div class="help">
-                        Tanggal: {{ $job->date?->format('Y-m-d') ?? $job->date }} •
-                        Lot: {{ $job->lot?->code ?? '-' }} •
-                        Gudang: {{ $job->warehouse?->code ?? '-' }}
-                    </div>
-
-                    <div class="status-stepper">
-                        <div class="status-step">
-                            <div class="status-dot {{ $dotClass(1) }}"></div>
-                            <div class="status-label {{ $lblClass(1) }}">Cutting</div>
+        <div class="card mb-3">
+            <div class="card-section">
+                <div class="hdr">
+                    <div>
+                        <div class="d-flex align-items-center gap-2 w-100">
+                            <h1>{{ $job->code }}</h1>
+                            {{-- Badge tampil di sini pada mobile --}}
+                            <span class="badge bg-{{ $statusClass }} d-md-none"
+                                  style="font-size:.68rem;white-space:normal;line-height:1.3;max-width:100px;text-align:center;margin-left:auto">{{ $statusLabel }}</span>
                         </div>
-                        <div class="status-separator"></div>
-                        <div class="status-step">
-                            <div class="status-dot {{ $dotClass(2) }}"></div>
-                            <div class="status-label {{ $lblClass(2) }}">Input QC</div>
-                        </div>
-                        <div class="status-separator"></div>
-                        <div class="status-step">
-                            <div class="status-dot {{ $dotClass(3) }}"></div>
-                            <div class="status-label {{ $lblClass(3) }}">QC Cutting</div>
+                        <div class="sub">
+                            {{ $job->lot?->item?->code ?? '-' }} • {{ $job->lot?->code ?? '-' }} • {{ $job->warehouse?->code ?? '-' }}
+                            @if ($job->date) • {{ $job->date->format('d/m/Y') }} @endif
                         </div>
                     </div>
-                </div>
-
-                <div class="d-flex flex-column align-items-end gap-2">
-                    <span class="badge bg-{{ $statusClass }} px-3 py-2">{{ $statusLabel }}</span>
-
-                    <div class="d-flex gap-2 flex-wrap justify-content-end cutting-actions">
-                        <a href="{{ route('production.cutting_jobs.index') }}" class="btn btn-sm btn-outline-secondary">
-                            Kembali
-                        </a>
+                    <div class="hdr-right d-flex align-items-center gap-2 flex-wrap">
+                        {{-- Badge tampil di sini pada desktop --}}
+                        <span class="badge bg-{{ $statusClass }} d-none d-md-inline-flex">{{ $statusLabel }}</span>
+                        <a href="{{ route('production.cutting_jobs.index') }}"
+                           class="btn btn-sm btn-outline-secondary btn-header-link">← Kembali</a>
                         {!! $renderActions(false) !!}
                     </div>
-
-                    @if ($hasQcCutting && $userRole !== 'owner')
-                        <div class="help text-end" style="max-width:420px;">
-                            QC sudah tersimpan. Jika ada salah input setelah QC done, minta <b>OWNER</b> untuk:
-                            <b>Batalkan QC</b> (jika belum dipakai) atau gunakan <b>Overproduction</b> (jika perlu menambah
-                            OK).
-                        </div>
-                    @endif
                 </div>
-            </div>
-        </div>
-
-        {{-- ===========================
-            HEADER (MOBILE)
-        ============================ --}}
-        <div class="card p-2 mb-2 d-block d-md-none">
-            <div class="d-flex justify-content-between align-items-center mb-1">
-                <div>
-                    <div class="small text-muted">Cutting Job</div>
-                    <div class="fw-semibold mono">{{ $job->code }}</div>
+                <div class="status-stepper mt-2">
+                    <div class="status-step">
+                        <div class="status-dot {{ $dotClass(1) }}"></div>
+                        <div class="status-label {{ $lblClass(1) }}">Cutting</div>
+                    </div>
+                    <div class="status-separator"></div>
+                    <div class="status-step">
+                        <div class="status-dot {{ $dotClass(2) }}"></div>
+                        <div class="status-label {{ $lblClass(2) }}">Input QC</div>
+                    </div>
+                    <div class="status-separator"></div>
+                    <div class="status-step">
+                        <div class="status-dot {{ $dotClass(3) }}"></div>
+                        <div class="status-label {{ $lblClass(3) }}">QC Cutting</div>
+                    </div>
                 </div>
-                <span class="badge bg-{{ $statusClass }} px-2 py-1">{{ $statusLabel }}</span>
-            </div>
-
-            <div class="help mb-2">
-                {{ $job->date?->format('Y-m-d') ?? $job->date }} •
-                Lot {{ $job->lot?->code ?? '-' }} •
-                {{ $job->warehouse?->code ?? '-' }}
-            </div>
-
-            <div class="status-stepper mb-2">
-                <div class="status-step">
-                    <div class="status-dot {{ $dotClass(1) }}"></div>
-                    <div class="status-label {{ $lblClass(1) }}">Cutting</div>
-                </div>
-                <div class="status-step">
-                    <div class="status-dot {{ $dotClass(2) }}"></div>
-                    <div class="status-label {{ $lblClass(2) }}">Input QC</div>
-                </div>
-                <div class="status-step">
-                    <div class="status-dot {{ $dotClass(3) }}"></div>
-                    <div class="status-label {{ $lblClass(3) }}">QC Cutting</div>
-                </div>
-            </div>
-
-            <div class="d-flex gap-2 flex-wrap cutting-actions">
-                <a href="{{ route('production.cutting_jobs.index') }}" class="btn btn-sm btn-outline-secondary flex-fill">
-                    Kembali
-                </a>
-                {{-- actions utama (tidak perlu flex-fill biar tidak kepotong) --}}
-                {!! $renderActions(true) !!}
             </div>
         </div>
 
@@ -651,44 +589,50 @@
             INFO LOT & OPERATOR
         ============================ --}}
         <div class="card p-3 mb-3">
-            <h2 class="h6 mb-2 d-none d-md-block">Informasi Lot & Operator</h2>
-
-            <div class="row g-3">
-                <div class="col-md-3 col-12">
+            {{-- Desktop: grid 4 kolom --}}
+            <div class="d-none d-md-flex gap-4 flex-wrap">
+                <div>
                     <div class="help mb-1">LOT</div>
-                    <div class="fw-semibold">{{ $job->lot?->code ?? '-' }}</div>
-                    <div class="small text-muted">{{ $job->lot?->item?->code ?? '-' }}</div>
+                    <div class="fw-semibold mono">{{ $job->lot?->code ?? '-' }}</div>
+                    <div class="small-muted">{{ $job->lot?->item?->code ?? '-' }}</div>
                 </div>
-
-                <div class="col-md-3 col-6">
+                <div>
                     <div class="help mb-1">Gudang</div>
                     <div class="mono">{{ $job->warehouse?->code }} — {{ $job->warehouse?->name }}</div>
                 </div>
-
-                <div class="col-md-3 col-6">
+                <div>
                     <div class="help mb-1">Operator Cutting</div>
-                    <div class="mono">
-                        {{ $bundleOperator?->code ? $bundleOperator->code . ' — ' . $bundleOperator->name : '-' }}
-                    </div>
+                    <div class="mono">{{ $bundleOperator?->code ? $bundleOperator->code . ' — ' . $bundleOperator->name : '-' }}</div>
                 </div>
+                <div>
+                    <div class="help mb-1">Operator QC</div>
+                    <div class="mono">{{ $qcOperator?->code ? $qcOperator->code . ' — ' . $qcOperator->name : '-' }}</div>
+                </div>
+            </div>
 
-                <div class="col-md-3 col-6">
-                    <div class="help mb-1">Operator QC Cutting</div>
-                    <div class="mono">
-                        {{ $qcOperator?->code ? $qcOperator->code . ' — ' . $qcOperator->name : '-' }}
-                    </div>
+            {{-- Mobile: satu baris compact --}}
+            <div class="d-flex d-md-none flex-column gap-1" style="font-size:.82rem">
+                <div class="d-flex gap-2 flex-wrap">
+                    <span class="fw-semibold mono">{{ $job->lot?->code ?? '-' }}</span>
+                    <span class="text-muted">{{ $job->lot?->item?->code ?? '-' }}</span>
+                    <span class="text-muted">•</span>
+                    <span class="mono">{{ $job->warehouse?->code ?? '-' }}</span>
+                </div>
+                <div class="d-flex gap-2 flex-wrap text-muted">
+                    <span>Cut: {{ $bundleOperator?->code ?? '-' }}</span>
+                    @if ($qcOperator)
+                        <span>•</span>
+                        <span>QC: {{ $qcOperator->code }}</span>
+                    @endif
+                    @if ($job->date)
+                        <span>•</span>
+                        <span>{{ $job->date?->format('d/m/Y') }}</span>
+                    @endif
                 </div>
             </div>
 
             @if (!empty($job->notes))
-                <div class="mt-2 text-muted small">Catatan: {{ $job->notes }}</div>
-            @endif
-
-            @if ($canOverproduction)
-                <div class="mt-2 alert alert-warning py-2 px-3 mb-0" style="font-size:.84rem;">
-                    <b>Cutting Overproduction</b> dipakai jika produksi real <i>lebih banyak</i> dari hasil QC/OK.
-                    Ini akan menambah stok <b>WIP-CUT</b> dan tercatat sebagai <b>Inventory Adjustment</b>.
-                </div>
+                <div class="mt-2 text-muted small">{{ $job->notes }}</div>
             @endif
         </div>
 
@@ -827,278 +771,238 @@
         </div>
 
         {{-- ===========================
-            DETAIL TABLES (biarkan seperti kamu punya)
+            DETAIL BUNDLES
         ============================ --}}
-        {{-- === DESKTOP TABLE === --}}
-        <div class="card p-3 mb-4 d-none d-md-block">
-            <h2 class="h6 mb-2">Detail Bundles</h2>
+        @php
+            // Per-bundle QC: boleh jika status job mengizinkan (tanpa syarat $hasQcCutting global)
+            $canBundleQcRoute = Route::has('production.qc.cutting.bundle_quick_ok')
+                && in_array($status, ['draft','cut','cut_sent_to_qc','sent_to_qc','qc_done','qc_ok','qc_mixed'], true);
+            $canAmbilJahit = Route::has('production.sewing.pickups.create');
+            $hasAnyReject  = false;
+        @endphp
+
+        {{-- Hidden forms untuk per-bundle submit (di luar tabel agar valid HTML) --}}
+        @foreach ($job->bundles as $row)
+            @if (!$row->qcResults->where('stage','cutting')->count())
+                <form id="bqf-{{ $row->id }}" method="POST"
+                      action="{{ route('production.qc.cutting.bundle_quick_ok', [$job, $row]) }}"
+                      style="display:none">
+                    @csrf
+                    <input type="hidden" name="qty_ok"       id="bqf-ok-{{ $row->id }}">
+                    <input type="hidden" name="qty_reject"   id="bqf-rej-{{ $row->id }}">
+                    <input type="hidden" name="reject_reason" id="bqf-rsn-{{ $row->id }}">
+                </form>
+            @endif
+        @endforeach
+
+        <div class="card p-3 mb-4">
+            <div class="d-flex justify-content-between align-items-center mb-2">
+                <h2 class="h6 mb-0">Detail Bundles</h2>
+                <button type="button" id="btnHideOk"
+                        class="btn btn-outline-secondary btn-sm"
+                        style="font-size:.72rem;padding:.2rem .55rem;display:none">
+                    Sembunyikan ✓
+                </button>
+            </div>
 
             <div class="table-wrap">
-                <table class="table table-sm align-middle mono">
+                <table class="table table-sm align-middle mono bq-table" id="bqTable">
                     <thead>
-                        @if ($hasQcCutting)
-                            <tr>
-                                <th style="width:60px;">#</th>
-                                <th style="width:160px;">Bundle Code</th>
-                                <th style="width:160px;">Item Jadi</th>
-                                <th style="width:110px;">Cutting Qty</th>
-                                <th style="width:110px;">Reject</th>
-                                <th style="width:110px;">OK (Basis)</th>
-                                <th style="width:260px;">WIP / Sewing</th>
-                            </tr>
-                        @else
-                            <tr>
-                                <th style="width:60px;">#</th>
-                                <th style="width:160px;">Bundle Code</th>
-                                <th style="width:160px;">Item Jadi</th>
-                                <th style="width:110px;">Qty (pcs)</th>
-                                <th style="width:140px;">Used Fabric</th>
-                                <th style="width:260px;">WIP / Sewing</th>
-                            </tr>
-                        @endif
+                        <tr>
+                            <th style="width:80px;">No</th>
+                            <th>Item</th>
+                            <th class="text-end d-none d-md-table-cell" style="width:80px;">Cut</th>
+                            <th class="text-end" style="width:90px;">OK</th>
+                            <th class="text-center" style="width:90px;">Reject</th>
+                            <th class="d-none d-md-table-cell" style="width:160px;">Alasan</th>
+                            <th class="d-none d-md-table-cell" style="width:160px;">WIP / Sewing</th>
+                            <th style="width:90px;">Status</th>
+                            <th class="text-end" style="width:100px;">Aksi</th>
+                        </tr>
                     </thead>
                     <tbody>
-                        @forelse ($job->bundles as $row)
-                            @php
-                                $qc = $hasQcCutting
-                                    ? $row->qcResults->where('stage', 'cutting')->sortByDesc('qc_date')->first()
-                                    : null;
+                    @forelse ($job->bundles as $i => $row)
+                        @php
+                            $qc          = $row->qcResults->where('stage','cutting')->sortByDesc('qc_date')->first();
+                            $bundleHasQc = $qc !== null;
+                            $canInputThis = $canBundleQcRoute && !$bundleHasQc;
 
-                                $wip = (float) ($row->cut_wip_qty ?? 0);
-                                $picked = (float) ($row->sewing_picked_qty ?? 0);
+                            $qtyPcs  = (float) ($row->qty_pcs ?? 0);
+                            $qtyOk   = $bundleHasQc
+                                ? (float) ($row->qty_cutting_ok ?? $qc->qty_ok ?? $qtyPcs)
+                                : $qtyPcs; // default input = semua OK
+                            $qtyRej  = $bundleHasQc ? (float) ($qc->qty_reject ?? 0) : 0.0;
+                            $rejectReason = $bundleHasQc ? ($qc->reject_reason ?? '') : '';
 
-                                $qtyOkAccessor = $row->qty_cutting_ok ?? null;
-                                if ($qtyOkAccessor === null) {
-                                    $qtyOkAccessor = $qc?->qty_ok ?? ($row->qty_pcs ?? 0);
-                                }
-                                $qtyOk = (float) $qtyOkAccessor;
+                            $wip    = (float) ($row->cut_wip_qty ?? 0);
+                            $picked = (float) ($row->sewing_picked_qty ?? 0);
+                            $effectiveOk = max(0, min($qtyOk, $wip + $picked));
+                            $ready  = (float) ($row->qty_ready_for_sewing ?? max(0, min($effectiveOk, $wip) - $picked));
+                            $basis  = max($effectiveOk, $wip, $picked, $ready);
+                            $pickedPct = $basis > 0 ? min(100, ($picked / $basis) * 100) : 0;
+                            $readyPct  = $basis > 0 ? min(100, ($ready  / $basis) * 100) : 0;
 
-                                $effectiveOk = max(0, min($qtyOk, $wip + $picked));
-                                $ready =
-                                    (float) ($row->qty_ready_for_sewing ?? max(0, min($effectiveOk, $wip) - $picked));
+                            $isAllOk  = $bundleHasQc && $qtyRej == 0 && $qtyOk > 0;
+                            $isReject = $bundleHasQc && $qtyRej > 0 && $qtyOk <= 0;
+                            $isMixed  = $bundleHasQc && $qtyRej > 0 && $qtyOk > 0;
 
-                                $basis = max($effectiveOk, $wip, $picked, $ready);
-                                $pickedPercent = $basis > 0 ? max(0, min(100, ($picked / $basis) * 100)) : 0;
-                                $readyPercent = $basis > 0 ? max(0, min(100, ($ready / $basis) * 100)) : 0;
-                            @endphp
+                            $rowClass = $isReject || $isMixed ? 'row-has-reject'
+                                : ($canInputThis ? 'row-no-qc' : '');
+                            $trHide   = $isAllOk ? 'bq-row-ok' : '';
 
-                            @if ($hasQcCutting)
-                                <tr class="{{ ((float) ($qc?->qty_reject ?? 0)) > 0 ? 'table-danger-subtle' : '' }}">
-                                    <td>{{ $row->bundle_no }}</td>
-                                    <td>{{ $row->bundle_code }}</td>
-                                    <td>{{ $row->finishedItem?->code ?? '-' }}</td>
-                                    <td>{{ number_format((float) ($row->qty_pcs ?? 0), 2, ',', '.') }}</td>
+                            if ($qtyRej > 0) $hasAnyReject = true;
 
-                                    <td
-                                        class="{{ ((float) ($qc?->qty_reject ?? 0)) > 0 ? 'text-danger fw-semibold' : '' }}">
-                                        {{ $qc ? number_format((float) ($qc->qty_reject ?? 0), 2, ',', '.') : '0,00' }}
-                                    </td>
+                            $bundleStatus = $bundleHasQc
+                                ? ($isAllOk ? 'qc_ok' : ($isReject ? 'qc_reject' : 'qc_mixed'))
+                                : ($canInputThis ? 'pending' : '—');
+                            $statusBadge  = [
+                                'qc_ok'     => 'bg-success',
+                                'qc_mixed'  => 'bg-warning',
+                                'qc_reject' => 'bg-danger',
+                                'pending'   => 'bg-secondary',
+                            ][$bundleStatus] ?? 'bg-secondary';
+                        @endphp
+                        <tr class="{{ $rowClass }} {{ $trHide }}" data-bundle-id="{{ $row->id }}">
+                            {{-- No --}}
+                            <td>
+                                <div class="fw-semibold">#{{ $row->bundle_no }}</div>
+                                <div class="small-muted d-none d-md-block" style="font-size:.68rem">{{ $row->bundle_code }}</div>
+                            </td>
 
-                                    <td>{{ number_format($effectiveOk, 2, ',', '.') }}</td>
+                            {{-- Item --}}
+                            <td>
+                                <div class="fw-bold" style="font-size:.92rem;letter-spacing:.01em;">{{ $row->finishedItem?->code ?? '-' }}</div>
+                                <div class="small-muted d-none d-md-block">{{ $row->finishedItem?->name ?? '' }}</div>
+                            </td>
 
-                                    <td>
-                                        <div class="bundle-info-wrap mb-1">
-                                            <span class="bundle-info-pill pill-primary">WIP
-                                                {{ number_format($wip, 2, ',', '.') }}</span>
-                                            <span class="bundle-info-pill pill-warning">Picked
-                                                {{ number_format($picked, 2, ',', '.') }}</span>
-                                            <span class="bundle-info-pill pill-success">Ready
-                                                {{ number_format($ready, 2, ',', '.') }}</span>
+                            {{-- Cut --}}
+                            <td class="text-end d-none d-md-table-cell">{{ number_format($qtyPcs, 0, ',', '.') }}</td>
+
+                            {{-- OK --}}
+                            <td class="text-end">
+                                @if ($canInputThis)
+                                    <input type="number" step="1" min="0" max="{{ (int)$qtyPcs }}"
+                                           class="form-control form-control-sm text-center input-ok"
+                                           value="{{ (int)$qtyPcs }}"
+                                           data-bundle="{{ (int)$qtyPcs }}"
+                                           data-id="{{ $row->id }}"
+                                           style="width:68px;display:inline-block">
+                                @else
+                                    <span class="cell-ok {{ $qtyOk > 0 ? 'text-success fw-semibold' : 'text-muted' }}">
+                                        {{ $bundleHasQc ? number_format($qtyOk, 0, ',', '.') : '—' }}
+                                    </span>
+                                @endif
+                            </td>
+
+                            {{-- Reject --}}
+                            <td class="text-center">
+                                @if ($canInputThis)
+                                    <input type="number" step="1" min="0" max="{{ (int)$qtyPcs }}"
+                                           class="form-control form-control-sm text-center input-reject"
+                                           value="0"
+                                           data-bundle="{{ (int)$qtyPcs }}"
+                                           data-id="{{ $row->id }}"
+                                           style="width:68px;display:inline-block">
+                                @else
+                                    <span class="{{ $qtyRej > 0 ? 'cell-reject' : 'text-muted' }}">
+                                        {{ $bundleHasQc ? number_format($qtyRej, 0, ',', '.') : '—' }}
+                                    </span>
+                                @endif
+                            </td>
+
+                            {{-- Alasan (desktop) --}}
+                            <td class="d-none d-md-table-cell">
+                                @if ($canInputThis)
+                                    <input type="text" class="form-control form-control-sm input-reason"
+                                           data-id="{{ $row->id }}"
+                                           placeholder="mis: bolong, kotor">
+                                @else
+                                    <span class="small-muted">{{ $rejectReason ?: ($bundleHasQc ? '—' : '') }}</span>
+                                @endif
+                            </td>
+
+                            {{-- WIP / Sewing (desktop) --}}
+                            <td class="d-none d-md-table-cell">
+                                @if ($wip > 0 || $picked > 0 || $ready > 0)
+                                    <div class="wip-inline">
+                                        <span class="wp wp-wip">WIP {{ number_format($wip, 0, ',', '.') }}</span>
+                                        <span class="wp wp-pick">Pick {{ number_format($picked, 0, ',', '.') }}</span>
+                                        <span class="wp wp-ready">Ready {{ number_format($ready, 0, ',', '.') }}</span>
+                                    </div>
+                                    @if ($basis > 0)
+                                        <div class="bp-bar" style="max-width:140px;">
+                                            <div class="bp-picked" style="width:{{ number_format($pickedPct,2,'.',''). '%' }}"></div>
+                                            <div class="bp-ready"  style="width:{{ number_format($readyPct,2,'.',''). '%' }}"></div>
                                         </div>
+                                    @endif
+                                @else
+                                    <span class="text-muted">—</span>
+                                @endif
+                            </td>
 
-                                        @if ($basis > 0)
-                                            <div class="bundle-progress">
-                                                <div class="bundle-progress-bar">
-                                                    <div class="bp-picked"
-                                                        style="width: {{ number_format($pickedPercent, 2, '.', '') }}%;">
-                                                    </div>
-                                                    <div class="bp-ready"
-                                                        style="width: {{ number_format($readyPercent, 2, '.', '') }}%;">
-                                                    </div>
-                                                </div>
-                                                <div class="bundle-progress-legend mt-1">
-                                                    <span class="me-2"><span
-                                                            class="legend-box legend-picked"></span>Picked</span>
-                                                    <span><span class="legend-box legend-ready"></span>Ready</span>
-                                                </div>
-                                            </div>
-                                        @endif
-                                    </td>
-                                </tr>
-                            @else
+                            {{-- Status --}}
+                            <td class="text-center">
                                 @php
-                                    $okNoQc = max(0, $wip + $picked);
+                                    $statusIcon = match($bundleStatus) {
+                                        'qc_ok'     => ['icon' => 'bi-check-circle-fill',        'color' => '#22c55e', 'title' => 'QC OK'],
+                                        'qc_reject' => ['icon' => 'bi-x-circle-fill',            'color' => '#ef4444', 'title' => 'QC Reject'],
+                                        'qc_mixed'  => ['icon' => 'bi-exclamation-triangle-fill', 'color' => '#f59e0b', 'title' => 'QC Mixed'],
+                                        'pending'   => ['icon' => 'bi-hourglass-split',           'color' => '#94a3b8', 'title' => 'Pending'],
+                                        default     => null,
+                                    };
                                 @endphp
-                                <tr>
-                                    <td>{{ $row->bundle_no }}</td>
-                                    <td>{{ $row->bundle_code }}</td>
-                                    <td>{{ $row->finishedItem?->code ?? '-' }}</td>
-                                    <td>{{ number_format((float) ($row->qty_pcs ?? 0), 2, ',', '.') }}</td>
-                                    <td>{{ number_format((float) ($row->qty_used_fabric ?? 0), 2, ',', '.') }}</td>
-                                    <td>
-                                        <div class="bundle-info-wrap mb-1">
-                                            <span class="bundle-info-pill pill-primary">WIP
-                                                {{ number_format($wip, 2, ',', '.') }}</span>
-                                            <span class="bundle-info-pill pill-warning">Picked
-                                                {{ number_format($picked, 2, ',', '.') }}</span>
-                                            <span class="bundle-info-pill pill-success">Ready
-                                                {{ number_format($ready, 2, ',', '.') }}</span>
-                                        </div>
+                                @if ($statusIcon)
+                                    <i class="bi {{ $statusIcon['icon'] }}"
+                                       style="font-size:1.1rem; color:{{ $statusIcon['color'] }};"
+                                       title="{{ $statusIcon['title'] }}"></i>
+                                @else
+                                    <span class="text-muted">—</span>
+                                @endif
+                            </td>
 
-                                        @if ($basis > 0)
-                                            <div class="bundle-progress">
-                                                <div class="bundle-progress-bar">
-                                                    <div class="bp-picked"
-                                                        style="width: {{ number_format($pickedPercent, 2, '.', '') }}%;">
-                                                    </div>
-                                                    <div class="bp-ready"
-                                                        style="width: {{ number_format($readyPercent, 2, '.', '') }}%;">
-                                                    </div>
-                                                </div>
-                                                <div class="bundle-progress-legend mt-1">
-                                                    <span class="me-2"><span
-                                                            class="legend-box legend-picked"></span>Picked</span>
-                                                    <span><span class="legend-box legend-ready"></span>Ready</span>
-                                                </div>
-                                            </div>
-                                        @endif
-                                    </td>
-                                </tr>
-                            @endif
-                        @empty
-                            <tr>
-                                <td colspan="{{ $hasQcCutting ? 7 : 6 }}" class="text-center text-muted small">Belum ada
-                                    data bundle.</td>
-                            </tr>
-                        @endforelse
+                            {{-- Aksi --}}
+                            <td class="text-end">
+                                <div class="d-flex gap-1 justify-content-end align-items-center">
+                                    @if ($canInputThis)
+                                        <button type="button"
+                                                class="btn btn-icon btn-save-bundle"
+                                                data-id="{{ $row->id }}"
+                                                data-pcs="{{ (int)$qtyPcs }}"
+                                                data-code="{{ $row->bundle_code }}"
+                                                title="Simpan QC"
+                                                style="width:30px;height:30px;padding:0;border-radius:8px;border:1px solid #22c55e;color:#22c55e;background:transparent;display:inline-flex;align-items:center;justify-content:center;">
+                                            <i class="bi bi-floppy" style="font-size:.95rem;"></i>
+                                        </button>
+                                    @endif
+                                    @if ($canAmbilJahit && $ready > 0)
+                                        <a href="{{ route('production.sewing.pickups.create') }}?sku={{ urlencode($row->finishedItem?->code ?? '') }}"
+                                           class="btn btn-icon"
+                                           title="Ambil Jahit"
+                                           style="width:30px;height:30px;padding:0;border-radius:8px;border:1px solid #3b82f6;color:#3b82f6;background:transparent;display:inline-flex;align-items:center;justify-content:center;">
+                                            <i class="bi bi-scissors" style="font-size:.95rem;"></i>
+                                        </a>
+                                    @endif
+                                </div>
+                            </td>
+                        </tr>
+                    @empty
+                        <tr>
+                            <td colspan="9" class="text-center text-muted small py-3">
+                                Belum ada data bundle.
+                            </td>
+                        </tr>
+                    @endforelse
                     </tbody>
                 </table>
             </div>
+
+            @if ($hasAnyReject)
+                <div class="text-warning small mt-2">
+                    ⚠️ Terdapat bundle dengan reject. Pastikan alasan reject sudah diisi (kolom Alasan di desktop).
+                </div>
+            @endif
         </div>
 
-        {{-- === MOBILE TABLE === --}}
-        <div class="card p-3 mb-4 d-block d-md-none">
-            <h2 class="h6 mb-2">Detail Bundles</h2>
-
-            <div class="table-wrap">
-                <table class="table table-sm align-middle mono">
-                    <thead>
-                        @if ($hasQcCutting)
-                            <tr>
-                                <th style="width:50px;">#</th>
-                                <th>Kode Barang</th>
-                                <th style="width:80px;">OK</th>
-                                <th style="width:80px;">Reject</th>
-                            </tr>
-                        @else
-                            <tr>
-                                <th style="width:50px;">#</th>
-                                <th>Kode Barang</th>
-                                <th style="width:110px;">Hasil</th>
-                            </tr>
-                        @endif
-                    </thead>
-                    <tbody>
-                        @forelse ($job->bundles as $row)
-                            @php
-                                $qc = $hasQcCutting
-                                    ? $row->qcResults->where('stage', 'cutting')->sortByDesc('qc_date')->first()
-                                    : null;
-
-                                $wip = (float) ($row->cut_wip_qty ?? 0);
-                                $picked = (float) ($row->sewing_picked_qty ?? 0);
-
-                                $qtyOkAccessor = $row->qty_cutting_ok ?? null;
-                                if ($qtyOkAccessor === null) {
-                                    $qtyOkAccessor = $qc?->qty_ok ?? ($row->qty_pcs ?? 0);
-                                }
-                                $qtyOk = (float) $qtyOkAccessor;
-
-                                $effectiveOk = max(0, min($qtyOk, $wip + $picked));
-                                $ready =
-                                    (float) ($row->qty_ready_for_sewing ?? max(0, min($effectiveOk, $wip) - $picked));
-
-                                $basis = max($effectiveOk, $wip, $picked, $ready);
-                                $pickedPercent = $basis > 0 ? max(0, min(100, ($picked / $basis) * 100)) : 0;
-                                $readyPercent = $basis > 0 ? max(0, min(100, ($ready / $basis) * 100)) : 0;
-
-                                $okNoQc = max(0, $wip + $picked);
-                            @endphp
-
-                            @if ($hasQcCutting)
-                                <tr class="{{ ((float) ($qc?->qty_reject ?? 0)) > 0 ? 'table-danger-subtle' : '' }}">
-                                    <td>{{ $row->bundle_no }}</td>
-                                    <td>
-                                        {{ $row->finishedItem?->code ?? '-' }}
-                                        <div class="bundle-info-mobile mt-1">
-                                            WIP {{ number_format($wip, 0, ',', '.') }} • Pick
-                                            {{ number_format($picked, 0, ',', '.') }} • Ready
-                                            {{ number_format($ready, 0, ',', '.') }}
-                                        </div>
-                                        @if ($basis > 0)
-                                            <div class="bundle-progress mt-1">
-                                                <div class="bundle-progress-bar">
-                                                    <div class="bp-picked"
-                                                        style="width: {{ number_format($pickedPercent, 2, '.', '') }}%;">
-                                                    </div>
-                                                    <div class="bp-ready"
-                                                        style="width: {{ number_format($readyPercent, 2, '.', '') }}%;">
-                                                    </div>
-                                                </div>
-                                            </div>
-                                        @endif
-                                    </td>
-                                    <td>{{ number_format($effectiveOk, 0, ',', '.') }}</td>
-                                    <td
-                                        class="{{ ((float) ($qc?->qty_reject ?? 0)) > 0 ? 'text-danger fw-semibold' : '' }}">
-                                        {{ $qc ? number_format((float) ($qc->qty_reject ?? 0), 0, ',', '.') : '0' }}
-                                    </td>
-                                </tr>
-                            @else
-                                <tr>
-                                    <td>{{ $row->bundle_no }}</td>
-                                    <td>
-                                        {{ $row->finishedItem?->code ?? '-' }}
-                                        <div class="bundle-info-mobile mt-1">
-                                            WIP {{ number_format($wip, 0, ',', '.') }} • Pick
-                                            {{ number_format($picked, 0, ',', '.') }} • Ready
-                                            {{ number_format($ready, 0, ',', '.') }}
-                                        </div>
-                                        @if ($basis > 0)
-                                            <div class="bundle-progress mt-1">
-                                                <div class="bundle-progress-bar">
-                                                    <div class="bp-picked"
-                                                        style="width: {{ number_format($pickedPercent, 2, '.', '') }}%;">
-                                                    </div>
-                                                    <div class="bp-ready"
-                                                        style="width: {{ number_format($readyPercent, 2, '.', '') }}%;">
-                                                    </div>
-                                                </div>
-                                            </div>
-                                        @endif
-                                    </td>
-                                    <td>{{ number_format($okNoQc, 0, ',', '.') }}</td>
-                                </tr>
-                            @endif
-                        @empty
-                            <tr>
-                                <td colspan="{{ $hasQcCutting ? 4 : 3 }}" class="text-center text-muted small">Belum ada
-                                    data bundle.</td>
-                            </tr>
-                        @endforelse
-                    </tbody>
-                </table>
-            </div>
-        </div>
-
-        {{-- ===========================
-            MOBILE FLOATING ACTIONS
-        ============================ --}}
-        <div class="cutting-mobile-actions d-block d-md-none">
-            <div class="cutting-mobile-actions-inner cutting-actions">
-                {!! $renderActions(true) !!}
-            </div>
-        </div>
 
     </div>
 
@@ -1173,4 +1077,111 @@
             </script>
         @endpush
     @endif
+@push('scripts')
+<script>
+(function () {
+    const table   = document.getElementById('bqTable');
+    const btnHide = document.getElementById('btnHideOk');
+    if (!table) return;
+
+    // ── Hide-OK toggle ──────────────────────────────────────
+    if (btnHide) {
+        const okRows = () => table.querySelectorAll('tbody tr.bq-row-ok');
+        let hiding = false;
+
+        function updateHideBtn() {
+            const n = okRows().length;
+            if (n > 0) btnHide.style.display = '';
+            btnHide.textContent = hiding
+                ? 'Tampilkan ✓ (' + n + ')'
+                : 'Sembunyikan ✓ (' + n + ')';
+            btnHide.disabled = n === 0;
+        }
+
+        btnHide.addEventListener('click', function () {
+            hiding = !hiding;
+            table.classList.toggle('bq-hide-ok', hiding);
+            updateHideBtn();
+        });
+
+        updateHideBtn();
+    }
+
+    // ── Inline QC inputs ────────────────────────────────────
+    // Reject → auto-calc OK = qty - reject
+    table.addEventListener('input', function (e) {
+        const id = e.target.dataset.id;
+        if (!id) return;
+
+        if (e.target.classList.contains('input-reject')) {
+            const qty  = parseInt(e.target.dataset.bundle) || 0;
+            let   rej  = Math.max(0, parseInt(e.target.value) || 0);
+            if (rej > qty) { rej = qty; e.target.value = rej; }
+            const okEl = table.querySelector('.input-ok[data-id="' + id + '"]');
+            if (okEl) { okEl.value = qty - rej; }
+        }
+
+        if (e.target.classList.contains('input-ok')) {
+            const qty = parseInt(e.target.dataset.bundle) || 0;
+            let   ok  = Math.max(0, parseInt(e.target.value) || 0);
+            if (ok > qty) { ok = qty; e.target.value = ok; }
+            const rejEl = table.querySelector('.input-reject[data-id="' + id + '"]');
+            if (rejEl) {
+                let rej = qty - ok;
+                if (rej < 0) rej = 0;
+                rejEl.value = rej;
+            }
+        }
+    });
+
+    // Select-all on focus
+    table.addEventListener('focus', function (e) {
+        if (e.target.matches('.input-ok,.input-reject')) {
+            setTimeout(() => e.target.select(), 0);
+        }
+    }, true);
+
+    // ── Simpan button ────────────────────────────────────────
+    table.addEventListener('click', function (e) {
+        const btn = e.target.closest('.btn-save-bundle');
+        if (!btn) return;
+
+        const id   = btn.dataset.id;
+        const pcs  = parseInt(btn.dataset.pcs) || 0;
+        const code = btn.dataset.code || '';
+
+        const okEl  = table.querySelector('.input-ok[data-id="' + id + '"]');
+        const rejEl = table.querySelector('.input-reject[data-id="' + id + '"]');
+        const rsnEl = table.querySelector('.input-reason[data-id="' + id + '"]');
+
+        const ok  = parseInt(okEl  ? okEl.value  : pcs) || 0;
+        const rej = parseInt(rejEl ? rejEl.value : 0)   || 0;
+        const rsn = rsnEl ? rsnEl.value.trim() : '';
+
+        if (rej > 0 && !rsn) {
+            const fill = confirm('Bundle ' + code + ':\nReject ' + rej + ' pcs tapi alasan kosong.\nLanjutkan?');
+            if (!fill) { if (rsnEl) rsnEl.focus(); return; }
+        }
+
+        const msg = 'Simpan QC Bundle ' + code + '?\nOK: ' + ok + '  Reject: ' + rej;
+        if (!confirm(msg)) return;
+
+        // Isi hidden form lalu submit
+        const form    = document.getElementById('bqf-' + id);
+        const okHid   = document.getElementById('bqf-ok-'  + id);
+        const rejHid  = document.getElementById('bqf-rej-' + id);
+        const rsnHid  = document.getElementById('bqf-rsn-' + id);
+
+        if (!form) { alert('Form tidak ditemukan.'); return; }
+        if (okHid)  okHid.value  = ok;
+        if (rejHid) rejHid.value = rej;
+        if (rsnHid) rsnHid.value = rsn;
+
+        btn.disabled = true;
+        btn.textContent = '⏳';
+        form.submit();
+    });
+})();
+</script>
+@endpush
 @endsection

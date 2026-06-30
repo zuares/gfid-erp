@@ -154,14 +154,6 @@
                          data-max-pcs="{{ $inputMax }}">
                         <div class="js-row-tap" style="cursor:pointer; min-width:0;">
                             <div class="sup-name">{{ $mat['name'] }}</div>
-                            <div class="sup-need mono">Butuh {{ number_format($reqPcs, 0, ',', '.') }} pcs</div>
-                            <div class="stock-info {{ $stockClass }}">
-                                {{ $stockIcon }}
-                                Stok RM: {{ number_format($rmStock, 2, ',', '.') }} {{ $mat['uom'] ?? '' }}
-                                @if($rmStock > 0)
-                                    = maks {{ number_format($inputMax, 0, ',', '.') }} pcs
-                                @endif
-                            </div>
                         </div>
                         <div style="display:flex; align-items:center; gap:.35rem; flex-shrink:0;">
                             <button type="button" class="js-unlock-btn"

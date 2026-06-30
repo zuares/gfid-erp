@@ -110,6 +110,11 @@ class ItemController extends Controller
             }
         }
 
+        // 🎯 Filter warna (suffix kode item, e.g. color_code=ABT → code LIKE '%ABT')
+        if ($colorCode = strtoupper(trim((string) $request->input('color_code', '')))) {
+            $query->where('code', 'like', '%' . $colorCode);
+        }
+
         // 🎯 Filter berdasarkan LOT (Cutting: item sesuai LOT kain yang dipilih)
         if ($lotId = $request->input('lot_id')) {
             // asumsi: tabel lots punya kolom item_id

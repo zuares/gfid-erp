@@ -2,6 +2,7 @@
 
 use App\Http\Controllers\Inventory\InventoryAdjustmentController;
 use App\Http\Controllers\Production\CuttingJobController;
+use App\Http\Controllers\Production\WipOpnameController;
 use App\Http\Controllers\Production\FinishingJobController;
 use App\Http\Controllers\Production\FinishingRepairController;
 use App\Http\Controllers\Production\PackingJobController;
@@ -29,6 +30,21 @@ Route::middleware(['web', 'auth', 'access:production'])
     | CUTTING JOBS
     |--------------------------------------------------------------------------
      */
+        /*
+        |----------------------------------------------------------------------
+        | WIP OPNAME
+        |----------------------------------------------------------------------
+         */
+        Route::prefix('wip-opname')->name('wip_opname.')->group(function () {
+            Route::get('/',         [WipOpnameController::class, 'index'])->name('index');
+            Route::get('/create',   [WipOpnameController::class, 'create'])->name('create');
+            Route::post('/',        [WipOpnameController::class, 'store'])->name('store');
+            Route::get('/{wipOpnamePeriod}',  [WipOpnameController::class, 'show'])->name('show');
+            Route::post('/{wipOpnamePeriod}/lines/{line}/update', [WipOpnameController::class, 'updateLine'])->name('update_line');
+            Route::post('/{wipOpnamePeriod}/submit',  [WipOpnameController::class, 'submitForApproval'])->name('submit');
+            Route::post('/{wipOpnamePeriod}/approve', [WipOpnameController::class, 'approve'])->name('approve');
+        });
+
         Route::prefix('cutting-jobs')->name('cutting_jobs.')->group(function () {
             Route::get('/', [CuttingJobController::class, 'index'])->name('index');
             Route::get('/create', [CuttingJobController::class, 'create'])->name('create');
@@ -64,6 +80,12 @@ Route::middleware(['web', 'auth', 'access:production'])
 
             Route::post('/cutting/{cuttingJob}/quick-ok', [QcController::class, 'quickOkCutting'])
                 ->name('cutting.quick_ok');
+
+            Route::post('/cutting/{cuttingJob}/bundles/{bundle}/quick-ok', [QcController::class, 'quickOkBundle'])
+                ->name('cutting.bundle_quick_ok');
+
+            Route::post('/cutting/{cuttingJob}/bundles/{bundle}/save-edit', [QcController::class, 'saveBundleEdit'])
+                ->name('cutting.bundle_save_edit');
 
             Route::post('/cutting/{cuttingJob}/cancel', [QcController::class, 'cancelCutting'])
                 ->middleware('role:owner')

@@ -598,6 +598,16 @@
             .po-lines-table {
                 display: block;
                 width: 100%;
+            }
+            .po-lines-table thead {
+                display: none;
+            }
+            .po-lines-table tbody {
+                display: block;
+            }
+            .po-lines-table {
+                display: block;
+                width: 100%;
                 table-layout: fixed;
                 border-collapse: separate;
                 border-spacing: 0 8px;
@@ -608,17 +618,18 @@
             .po-lines-table tbody {
                 display: block;
             }
-            /* ── Single-row card per baris ── */
+            /* ── 2-row card per baris ── */
             .po-lines-table tbody tr {
                 display: grid;
-                grid-template-columns: 1.4fr 0.9fr 1.5fr auto;
-                grid-template-rows: auto;
-                align-items: center;
-                gap: .4rem;
+                grid-template-columns: 1fr 1fr auto;
+                grid-template-rows: auto auto;
+                align-items: start;
+                column-gap: .4rem;
+                row-gap: .3rem;
                 width: 100%;
                 box-sizing: border-box;
-                margin: 0 0 .45rem;
-                padding: .42rem .5rem;
+                margin: 0 0 .5rem;
+                padding: .5rem .55rem .5rem;
                 border-radius: 12px;
                 border: 1px solid rgba(148, 163, 184, .30);
                 background: var(--card);
@@ -635,15 +646,13 @@
                 padding: 0;
             }
             .po-col-no    { display: none !important; }
-            .po-td-item   { grid-column: 1; grid-row: 1; min-width: 0; }
-            .po-td-qty    { grid-column: 2; grid-row: 1; display: block !important; width: auto !important; margin: 0 !important; }
-            .po-td-price  { grid-column: 3; grid-row: 1; display: block !important; width: auto !important; margin: 0 !important; }
-            .po-td-action { grid-column: 4; grid-row: 1; position: static !important; display: flex !important; align-items: center; justify-content: flex-end; padding: 0 !important; }
-            .po-td-action .btn { min-height: 34px; min-width: 34px; padding: .1rem .4rem; border-radius: 999px !important; font-weight: 800; font-size: .82rem; }
+            .po-td-item   { grid-column: 1 / span 2; grid-row: 1; min-width: 0; }
+            .po-td-action { grid-column: 3; grid-row: 1; position: static !important; display: flex !important; align-items: center; justify-content: flex-end; padding: 0 !important; }
+            .po-td-action .btn { min-height: 32px; min-width: 32px; padding: .1rem .4rem; border-radius: 999px !important; font-weight: 800; font-size: .82rem; }
+            .po-td-qty    { grid-column: 1; grid-row: 2; display: block !important; width: auto !important; margin: 0 !important; }
+            .po-td-price  { grid-column: 2; grid-row: 2; display: block !important; width: auto !important; margin: 0 !important; }
             .po-td-total  { display: none !important; }
-            /* tanpa money: qty span ke kolom harga */
-            .po-lines-no-money .po-td-qty { grid-column: 2 / span 2; }
-            /* label data-label disembunyikan — pakai placeholder saja */
+            .po-lines-no-money .po-td-qty { grid-column: 1 / span 2; }
             .po-lines-table tbody td[data-label]::before { display: none !important; }
             .po-num-display { text-align: left; font-weight: 800; }
             .po-row.has-qty {

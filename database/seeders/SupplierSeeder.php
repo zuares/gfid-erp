@@ -9,7 +9,7 @@ class SupplierSeeder extends Seeder
     {
             DB::table('suppliers')->updateOrInsert(['code' => 'TPL'], [
                 'code' => 'TPL',
-                'name' => '@ KAIN & RIB @ TOPLIS JAYA',
+                'name' => 'Toplis Jaya',
                 'phone' => '081234567890',
                 'email' => null,
                 'address' => 'Palembang, Sumatera Selatan',
@@ -19,7 +19,7 @@ class SupplierSeeder extends Seeder
             ]);
             DB::table('suppliers')->updateOrInsert(['code' => 'ORG'], [
                 'code' => 'ORG',
-                'name' => '@ KAIN & RIB @ ORIGAMI TEXTILE',
+                'name' => 'Origami Textile',
                 'phone' => '6282284964421',
                 'email' => null,
                 'address' => 'Jl Cijantung Cigondewah Hilir',
@@ -29,7 +29,7 @@ class SupplierSeeder extends Seeder
             ]);
             DB::table('suppliers')->updateOrInsert(['code' => 'DDN'], [
                 'code' => 'DDN',
-                'name' => '@ KAIN & RIB @ HJ Didin Cigondewah',
+                'name' => 'HJ Didin Cigondewah',
                 'phone' => null,
                 'email' => null,
                 'address' => 'Jl. Cigondewah Kaler Deket Stopan Taman Holis',
@@ -39,7 +39,7 @@ class SupplierSeeder extends Seeder
             ]);
             DB::table('suppliers')->updateOrInsert(['code' => 'RDN'], [
                 'code' => 'RDN',
-                'name' => '@ SHOT @ Lia & Dede Ridwan',
+                'name' => 'Lia & Dede Ridwan',
                 'phone' => null,
                 'email' => null,
                 'address' => null,
@@ -49,7 +49,7 @@ class SupplierSeeder extends Seeder
             ]);
             DB::table('suppliers')->updateOrInsert(['code' => 'FRS'], [
                 'code' => 'FRS',
-                'name' => '@ KAIN & RIB @ Fransyino Textile',
+                'name' => 'Fransyino Textile',
                 'phone' => null,
                 'email' => null,
                 'address' => 'Jl. Cikeueus Cigondewah Hilir',
@@ -59,7 +59,7 @@ class SupplierSeeder extends Seeder
             ]);
             DB::table('suppliers')->updateOrInsert(['code' => 'OHN'], [
                 'code' => 'OHN',
-                'name' => '@ KAIN & RIB & ACC @ Haji Ohan Cikeueus',
+                'name' => 'Haji Ohan Cikeueus',
                 'phone' => '08211222333',
                 'email' => null,
                 'address' => null,
@@ -69,7 +69,7 @@ class SupplierSeeder extends Seeder
             ]);
             DB::table('suppliers')->updateOrInsert(['code' => 'BDY'], [
                 'code' => 'BDY',
-                'name' => '@ JAKET & SWEATER @ BADAI ATO & TONI',
+                'name' => 'Badai Ato & Toni',
                 'phone' => '62895339443198',
                 'email' => null,
                 'address' => 'Jl Inpres',
@@ -79,7 +79,7 @@ class SupplierSeeder extends Seeder
             ]);
             DB::table('suppliers')->updateOrInsert(['code' => 'BRY'], [
                 'code' => 'BRY',
-                'name' => '@ KARET & RIB @ Toko Briyan',
+                'name' => 'Toko Briyan',
                 'phone' => null,
                 'email' => null,
                 'address' => null,
@@ -89,7 +89,7 @@ class SupplierSeeder extends Seeder
             ]);
             DB::table('suppliers')->updateOrInsert(['code' => 'JFM'], [
                 'code' => 'JFM',
-                'name' => '@ KARET & TALI @ Jhony F Man',
+                'name' => 'Jhony F Man',
                 'phone' => '6281322398603',
                 'email' => null,
                 'address' => null,
@@ -99,7 +99,7 @@ class SupplierSeeder extends Seeder
             ]);
             DB::table('suppliers')->updateOrInsert(['code' => 'SRI'], [
                 'code' => 'SRI',
-                'name' => '@ PLASTIK & TERMAL @ Sri Haryati',
+                'name' => 'Sri Haryati',
                 'phone' => '62882000345979',
                 'email' => null,
                 'address' => 'Jl Cikeueus',
@@ -109,7 +109,7 @@ class SupplierSeeder extends Seeder
             ]);
             DB::table('suppliers')->updateOrInsert(['code' => 'INY'], [
                 'code' => 'INY',
-                'name' => '@ TALIKUR @ Inayah Ragil',
+                'name' => 'Inayah Ragil',
                 'phone' => '6287848733992',
                 'email' => null,
                 'address' => 'Jl Cikeueus Cigondewah Hilir',

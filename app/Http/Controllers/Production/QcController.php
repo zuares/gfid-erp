@@ -276,6 +276,155 @@ class QcController extends Controller
             ->with('material_shortage_count', $shortageCount);
     }
 
+    /**
+     * Quick OK per bundle — tandai satu bundle sebagai QC OK dan buat WIP-CUT-nya.
+     * Tidak perlu semua bundle selesai dulu.
+     */
+    public function quickOkBundle(Request $request, CuttingJob $cuttingJob, CuttingJobBundle $bundle): RedirectResponse
+    {
+        // Pastikan bundle milik cutting job ini
+        if ((int) $bundle->cutting_job_id !== $cuttingJob->id) {
+            return back()->with('error', 'Bundle tidak ditemukan di Cutting Job ini.');
+        }
+
+        // Jika bundle sudah punya QC, skip (sudah diproses)
+        $existingQc = QcResult::where('stage', QcResult::STAGE_CUTTING)
+            ->where('cutting_job_bundle_id', $bundle->id)
+            ->first();
+
+        if ($existingQc) {
+            return back()->with('info', 'Bundle ' . $bundle->bundle_code . ' sudah pernah di-QC.');
+        }
+
+        $operatorId = Auth::user()->employee?->id;
+        $qcDate     = now()->toDateString();
+
+        // Ambil qty dari request jika ada, fallback semua OK
+        $qtyPcs    = (float) $bundle->qty_pcs;
+        $qtyOk     = $request->has('qty_ok')
+            ? max(0, min($qtyPcs, (float) $request->input('qty_ok', $qtyPcs)))
+            : $qtyPcs;
+        $qtyReject = $request->has('qty_reject')
+            ? max(0, min($qtyPcs - $qtyOk, (float) $request->input('qty_reject', 0)))
+            : 0.0;
+        $rejectReason = $request->input('reject_reason');
+        $autoNote     = $request->has('qty_ok') ? null : 'Auto OK dari halaman detail cutting';
+
+        $payload = [
+            'qc_date'     => $qcDate,
+            'operator_id' => $operatorId,
+            'results'     => [[
+                'cutting_job_bundle_id' => $bundle->id,
+                'qty_ok'        => $qtyOk,
+                'qty_reject'    => $qtyReject,
+                'reject_reason' => $rejectReason,
+                'notes'         => $autoNote,
+            ]],
+        ];
+
+        try {
+            $this->qc->saveCuttingQc($cuttingJob, $payload);
+
+            $this->cutting->createWipFromCuttingQc(
+                job: $cuttingJob->fresh('bundles'),
+                qcDate: $qcDate,
+            );
+
+            try {
+                $this->journal->postCuttingWip($cuttingJob->fresh(), $qcDate);
+            } catch (\Throwable $journalError) {
+                Log::warning('Gagal membuat jurnal cutting_wip (quickOkBundle)', [
+                    'cutting_job_id' => $cuttingJob->id,
+                    'bundle_id'      => $bundle->id,
+                    'message'        => $journalError->getMessage(),
+                ]);
+            }
+        } catch (\Throwable $e) {
+            return back()->with('error', 'Quick OK bundle gagal: ' . $e->getMessage());
+        }
+
+        // Cek apakah SEMUA bundle sudah QC sekarang
+        $totalBundles = $cuttingJob->bundles()->count();
+        $doneCount    = QcResult::where('stage', QcResult::STAGE_CUTTING)
+            ->where('cutting_job_id', $cuttingJob->id)
+            ->distinct('cutting_job_bundle_id')
+            ->count('cutting_job_bundle_id');
+
+        $newStatus = $doneCount >= $totalBundles ? 'qc_done' : $cuttingJob->status;
+
+        $cuttingJob->update([
+            'status'     => $newStatus,
+            'updated_by' => Auth::id(),
+        ]);
+
+        return redirect()
+            ->route('production.cutting_jobs.show', $cuttingJob)
+            ->with('success', 'Bundle ' . $bundle->bundle_code . ' berhasil di-QC OK dan masuk WIP-CUT.');
+    }
+
+    /**
+     * Simpan QC per bundle dari halaman edit (updateOrCreate — bisa create & update).
+     * Redirect kembali ke halaman edit QC.
+     */
+    public function saveBundleEdit(Request $request, CuttingJob $cuttingJob, CuttingJobBundle $bundle): RedirectResponse
+    {
+        if ((int) $bundle->cutting_job_id !== $cuttingJob->id) {
+            return back()->with('error', 'Bundle tidak ditemukan di Cutting Job ini.');
+        }
+
+        $qtyPcs    = (float) $bundle->qty_pcs;
+        $qtyReject = max(0, min($qtyPcs, (float) $request->input('qty_reject', 0)));
+        $qtyOk     = max(0, $qtyPcs - $qtyReject);
+        $qcDate    = $request->input('qc_date') ?: now()->toDateString();
+        $operatorId = $request->input('operator_id') ?: Auth::user()->employee?->id;
+
+        $payload = [
+            'qc_date'     => $qcDate,
+            'operator_id' => $operatorId,
+            'results'     => [[
+                'cutting_job_bundle_id' => $bundle->id,
+                'qty_ok'        => $qtyOk,
+                'qty_reject'    => $qtyReject,
+                'reject_reason' => $request->input('reject_reason'),
+                'notes'         => $request->input('notes'),
+            ]],
+        ];
+
+        try {
+            $this->qc->saveCuttingQc($cuttingJob, $payload);
+
+            $this->cutting->createWipFromCuttingQc(
+                job: $cuttingJob->fresh('bundles'),
+                qcDate: $qcDate,
+            );
+
+            try {
+                $this->journal->postCuttingWip($cuttingJob->fresh(), $qcDate);
+            } catch (\Throwable $journalError) {
+                Log::warning('Gagal membuat jurnal cutting_wip (saveBundleEdit)', [
+                    'cutting_job_id' => $cuttingJob->id,
+                    'bundle_id'      => $bundle->id,
+                    'message'        => $journalError->getMessage(),
+                ]);
+            }
+        } catch (\Throwable $e) {
+            return back()->with('error', 'Simpan bundle gagal: ' . $e->getMessage());
+        }
+
+        // Update status job — qc_done hanya kalau semua bundle sudah QC
+        $totalBundles = $cuttingJob->bundles()->count();
+        $doneCount    = QcResult::where('stage', QcResult::STAGE_CUTTING)
+            ->where('cutting_job_id', $cuttingJob->id)
+            ->distinct('cutting_job_bundle_id')
+            ->count('cutting_job_bundle_id');
+        $newStatus = $doneCount >= $totalBundles ? 'qc_done' : $cuttingJob->status;
+        $cuttingJob->update(['status' => $newStatus, 'updated_by' => Auth::id()]);
+
+        return redirect()
+            ->route('production.qc.cutting.edit', $cuttingJob)
+            ->with('success', 'Bundle ' . $bundle->bundle_code . ' berhasil disimpan.');
+    }
+
     public function cancelCutting(CuttingJob $cuttingJob): RedirectResponse
     {
         $role = Auth::user()->role ?? null;

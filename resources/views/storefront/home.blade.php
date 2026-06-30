@@ -183,89 +183,21 @@
     </header>
 
     <main>
-        <section class="hero">
-            <div class="wrap hero-grid">
-                <div>
-                    <span class="eyebrow">Dummy Storefront</span>
-                    <h1>Daily wear yang rapi, nyaman, dan siap kirim.</h1>
-                    <p class="lead">
-                        Website toko sederhana untuk preview katalog Greatfit. Data produk masih dummy,
-                        nanti bisa disambungkan ke master item, stok, marketplace, dan checkout.
-                    </p>
-                    <div class="hero-actions">
-                        <a class="btn btn-dark" href="#produk">Lihat Produk</a>
-                        <a class="btn" href="https://wa.me/6281200000000">Chat WhatsApp</a>
-                    </div>
-                </div>
-                <div class="hero-card">
-                    <div class="mock-product">
-                        <div class="mock-img">SJR</div>
-                        <div class="mock-row">
-                            <div>
-                                <div class="mock-title">Jogger Pendek Basic</div>
-                                <div class="product-meta">Best seller dummy</div>
-                            </div>
-                            <div class="mock-price">Rp 89.000</div>
-                        </div>
-                    </div>
-                </div>
+        <div class="wrap" style="min-height: calc(100vh - 64px); display: flex; align-items: center; justify-content: center; padding: 48px 0;">
+            <div style="text-align: center; max-width: 480px;">
+                <div style="font-size: 48px; margin-bottom: 20px;">🔧</div>
+                <h1 style="font-size: 28px; font-weight: 950; letter-spacing: -.02em; margin: 0 0 12px;">
+                    Sedang dalam pemeliharaan
+                </h1>
+                <p style="color: var(--muted); font-size: 15px; line-height: 1.65; margin: 0 0 28px;">
+                    Halaman ini sedang dalam proses pengembangan.<br>
+                    Silakan kembali lagi nanti.
+                </p>
+                <a class="btn" href="{{ route('login', [], false) }}" style="font-size: 14px;">
+                    Login Admin →
+                </a>
             </div>
-        </section>
-
-        <section class="section" id="produk">
-            <div class="wrap">
-                <div class="section-head">
-                    <div>
-                        <h2 class="section-title">Produk Pilihan</h2>
-                        <p class="section-sub">Dummy katalog untuk tampilan awal toko.</p>
-                    </div>
-                    <a class="btn" href="#">Lihat Semua</a>
-                </div>
-                <div class="grid">
-                    @foreach ([
-                        ['code' => 'SJR', 'name' => 'Jogger Pendek Basic', 'meta' => '30 warna dummy', 'price' => 'Rp 89.000'],
-                        ['code' => 'LJR', 'name' => 'Jogger Panjang Basic', 'meta' => 'Bahan adem', 'price' => 'Rp 119.000'],
-                        ['code' => 'CRG', 'name' => 'Jogger Pendek Cargo', 'meta' => 'Kantong cargo', 'price' => 'Rp 99.000'],
-                        ['code' => 'LBP', 'name' => 'Baggy Pants', 'meta' => 'Loose fit', 'price' => 'Rp 129.000'],
-                    ] as $item)
-                        <article class="product">
-                            <div class="product-img">{{ $item['code'] }}</div>
-                            <div class="product-body">
-                                <div class="product-name">{{ $item['name'] }}</div>
-                                <div class="product-meta">{{ $item['meta'] }}</div>
-                                <div class="product-bottom">
-                                    <span class="price">{{ $item['price'] }}</span>
-                                    <span class="pill">Ready</span>
-                                </div>
-                            </div>
-                        </article>
-                    @endforeach
-                </div>
-            </div>
-        </section>
-
-        <section class="section" id="keunggulan">
-            <div class="wrap features">
-                <div class="feature">
-                    <b>Produksi Sendiri</b>
-                    <p>Dummy copy untuk menjelaskan produk dibuat dan dikontrol langsung oleh tim Greatfit.</p>
-                </div>
-                <div class="feature">
-                    <b>Stok Terpantau</b>
-                    <p>Nanti bisa disambungkan ke stok barang jadi agar katalog lebih akurat.</p>
-                </div>
-                <div class="feature">
-                    <b>Siap Marketplace</b>
-                    <p>Struktur ini bisa dikembangkan ke checkout, WhatsApp order, atau sinkron marketplace.</p>
-                </div>
-            </div>
-        </section>
-    </main>
-
-    <footer class="footer">
-        <div class="wrap">
-            © {{ now()->year }} Greatfit Store. Dummy storefront.
         </div>
-    </footer>
+    </main>
 </body>
 </html>

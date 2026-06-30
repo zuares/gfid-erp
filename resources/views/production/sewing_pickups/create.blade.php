@@ -196,19 +196,8 @@
                 align-self: flex-start;
             }
 
-            .form-footer {
-                flex-direction: column-reverse;
-                align-items: stretch !important;
-                gap: .5rem;
-            }
-
-            .form-footer .btn {
-                width: 100%;
-            }
-
-            .form-footer .btn-outline-secondary span {
-                display: inline;
-            }
+            /* Sembunyikan form-footer di mobile — diganti FAB */
+            .form-footer { display: none !important; }
         }
     </style>
 @endpush

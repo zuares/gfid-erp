@@ -11,6 +11,7 @@ use App\Models\Lot;
 use App\Models\QcResult;
 use App\Models\Warehouse;
 use App\Models\CuttingJobLot;
+use App\Models\WipOpnamePeriod;
 use App\Services\Accounting\JournalService;
 use App\Services\Inventory\InventoryService;
 use App\Services\Inventory\LotCostService;
@@ -81,6 +82,12 @@ class CuttingJobController extends Controller
      */
     public function create(Request $request)
     {
+        // Blok jika ada WIP opname aktif
+        if (WipOpnamePeriod::cutting()->active()->exists()) {
+            return redirect()->route('production.wip_opname.index')
+                ->with('error', 'Transaksi cutting dibekukan — sedang ada WIP opname berjalan. Selesaikan opname terlebih dahulu.');
+        }
+
         // 1️⃣ Cari gudang RM (wajib ada, konfigurasi awal di warehouses)
         $rmWarehouseId = Warehouse::where('code', 'RM')->value('id');
 
@@ -96,6 +103,35 @@ class CuttingJobController extends Controller
             includeZeroBalance: false,
         );
         $lotStocks = $this->onlyMainRawMaterialLots($lotStocks);
+
+        // 2b️⃣ Cari supplier dari GRN pertama per LOT
+        $lotIds = $lotStocks->pluck('lot_id')->filter()->unique()->values()->all();
+        $lotSupplierMap = [];
+        if (!empty($lotIds)) {
+            $firstGrnPerLot = \DB::table('inventory_mutations')
+                ->select('lot_id', \DB::raw('MIN(source_id) as grn_id'))
+                ->whereIn('lot_id', $lotIds)
+                ->where('source_type', 'purchase_receipt')
+                ->where('direction', 'in')
+                ->groupBy('lot_id')
+                ->get()
+                ->keyBy('lot_id');
+
+            $grnIds = $firstGrnPerLot->pluck('grn_id')->filter()->unique()->values()->all();
+            if (!empty($grnIds)) {
+                $supplierByGrn = \DB::table('purchase_receipts')
+                    ->join('suppliers', 'purchase_receipts.supplier_id', '=', 'suppliers.id')
+                    ->whereIn('purchase_receipts.id', $grnIds)
+                    ->pluck('suppliers.name', 'purchase_receipts.id');
+
+                foreach ($firstGrnPerLot as $lotId => $row) {
+                    $supplierName = $supplierByGrn[$row->grn_id] ?? null;
+                    if ($supplierName) {
+                        $lotSupplierMap[$lotId] = $supplierName;
+                    }
+                }
+            }
+        }
 
         // 3️⃣ Data master item jadi (finished_good) untuk combobox di bundle
         $items = Item::query()
@@ -145,13 +181,14 @@ class CuttingJobController extends Controller
             ]);
 
         return view('production.cutting_jobs.create', [
-            'lotStocks'    => $lotStocks,
-            'items'        => $items,
-            'operators'    => $operators,
-            'warehouses'   => $warehouses,
-            'bomData'      => $bomData,
-            'bomEditUrls'  => $bomEditUrls,
-            'bomQuickUrls' => $bomQuickUrls,
+            'lotStocks'      => $lotStocks,
+            'lotSupplierMap' => $lotSupplierMap,
+            'items'          => $items,
+            'operators'      => $operators,
+            'warehouses'     => $warehouses,
+            'bomData'        => $bomData,
+            'bomEditUrls'    => $bomEditUrls,
+            'bomQuickUrls'   => $bomQuickUrls,
         ]);
     }
 
@@ -461,6 +498,12 @@ class CuttingJobController extends Controller
 
     public function store(Request $request)
     {
+        // Blok jika ada WIP opname aktif
+        if (WipOpnamePeriod::cutting()->active()->exists()) {
+            return redirect()->route('production.wip_opname.index')
+                ->with('error', 'Transaksi cutting dibekukan — sedang ada WIP opname berjalan.');
+        }
+
         $this->resolveTypedFinishedItems($request);
 
         $validated = $request->validate([
@@ -507,36 +550,16 @@ class CuttingJobController extends Controller
 
         if (empty($selectedLotIds)) {
             return back()
-                ->withErrors(['selected_lots' => 'Minimal satu LOT harus dipilih.'])
-                ->withInput();
+                ->withErrors(['selected_lots' => 'Minimal satu LOT harus dipilih.']);
         }
 
         $warehouseId = (int) $validated['warehouse_id'];
         $fabricItemId = (int) $validated['fabric_item_id'];
 
-        // ====================================================
-        // 1.a SAFETY: semua LOT harus item kain yang sama
-        //      dan harus sama dengan fabric_item_id
-        // ====================================================
+        // 1.a: ambil item_id per LOT (untuk keperluan hitung saldo)
         $lotItems = \App\Models\Lot::query()
             ->whereIn('id', $selectedLotIds)
             ->pluck('item_id', 'id'); // [lot_id => item_id]
-
-        if ($lotItems->isEmpty()) {
-            return back()
-                ->withErrors(['selected_lots' => 'Data LOT tidak ditemukan.'])
-                ->withInput();
-        }
-
-        $uniqueItemIds = $lotItems->unique()->values();
-
-        if ($uniqueItemIds->count() !== 1 || (int) $uniqueItemIds->first() !== $fabricItemId) {
-            return back()
-                ->withErrors([
-                    'selected_lots' => 'Semua LOT yang dipilih harus untuk item kain yang sama dengan Item Kain header.',
-                ])
-                ->withInput();
-        }
 
         // ==========================================
         // 2) HITUNG SALDO PER LOT (info saja, tidak memblok jika 0)
@@ -576,8 +599,7 @@ class CuttingJobController extends Controller
 
             if (!in_array($lotId, $selectedLotIds, true)) {
                 return back()
-                    ->withErrors(['bundles' => 'LOT pada baris bundle harus termasuk LOT yang dipilih di atas.'])
-                    ->withInput();
+                    ->withErrors(['bundles' => 'LOT pada baris bundle harus termasuk LOT yang dipilih di atas.']);
             }
 
             $idx = count($validBundles);
@@ -588,8 +610,7 @@ class CuttingJobController extends Controller
 
         if (count($validBundles) === 0) {
             return back()
-                ->withErrors(['bundles' => 'Minimal 1 baris bundle harus diisi dengan item, LOT & qty pcs > 0.'])
-                ->withInput();
+                ->withErrors(['bundles' => 'Minimal 1 baris bundle harus diisi dengan item, LOT & qty pcs > 0.']);
         }
 
         // =========================
@@ -704,8 +725,7 @@ class CuttingJobController extends Controller
             }
 
             return back()
-                ->withErrors(['selected_lots' => $this->humanizeStockError($e->getMessage())])
-                ->withInput();
+                ->withErrors(['selected_lots' => $this->humanizeStockError($e->getMessage())]);
         } catch (\Throwable $e) {
             if ($devRollback && DB::transactionLevel() > 0) {
                 DB::rollBack();
@@ -726,7 +746,7 @@ class CuttingJobController extends Controller
             DB::rollBack();
 
             return back()
-                ->withInput()
+                
                 ->with('dev_rollback_result', $summary)
                 ->with('success', 'Mode Developer: simulasi cutting berhasil dan sudah di-rollback. Tidak ada data/stok yang berubah.');
         }
@@ -794,12 +814,7 @@ class CuttingJobController extends Controller
             return back()->withErrors(['selected_lots' => 'Data LOT tidak ditemukan.'])->withInput();
         }
 
-        $uniqueItemIds = $lotItems->unique()->values();
-        if ($uniqueItemIds->count() !== 1) {
-            return back()->withErrors(['selected_lots' => 'Semua LOT yang dipilih harus dari item kain yang sama.'])->withInput();
-        }
-
-        $fabricItemId = (int) $uniqueItemIds->first();
+        $fabricItemId = (int) ($lotItems->first() ?? 0);
         $validated['fabric_item_id'] = $fabricItemId;
 
         // valid bundles + pastikan lot_id bundle termasuk selected
