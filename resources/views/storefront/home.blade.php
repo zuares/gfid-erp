@@ -107,8 +107,10 @@
         .sec-a:hover { color: var(--ink); }
 
         /* CHANNELS */
+        .sec-beli { position: sticky; top: 56px; z-index: 90; background: rgba(255,255,255,.97); backdrop-filter: blur(10px); border-bottom: 1px solid var(--line); padding: 14px 0 12px; }
+        .sec-beli-label { font-size: 11px; font-weight: 800; letter-spacing: .08em; text-transform: uppercase; color: var(--mid); margin-bottom: 10px; }
         .chs { display: grid; grid-template-columns: repeat(4, 1fr); gap: 7px; }
-        .ch { height: 48px; border-radius: 12px; background: var(--soft); border: 1px solid var(--line); display: flex; align-items: center; justify-content: center; font-size: 11px; font-weight: 800; transition: background .15s; }
+        .ch { height: 40px; border-radius: 10px; background: var(--soft); border: 1px solid var(--line); display: flex; align-items: center; justify-content: center; font-size: 11px; font-weight: 800; transition: background .15s; }
         .ch:hover { background: var(--line); }
         .ch.dk { background: var(--ink); color: var(--white); border-color: var(--ink); }
 
@@ -162,17 +164,6 @@
         .sf-love { font-size: 11px; color: rgba(255,255,255,.3); }
 
 
-        /* BELI LEWAT FLOATING BAR */
-        .beli-float { position: fixed; bottom: calc(14px + var(--safe)); left: 50%; transform: translateX(-50%) translateY(20px); z-index: 110; opacity: 0; pointer-events: none; transition: opacity .28s ease, transform .28s ease; white-space: nowrap; }
-        .beli-float.visible { opacity: 1; transform: translateX(-50%) translateY(0); pointer-events: auto; }
-        .beli-float-inner { display: flex; align-items: center; gap: 6px; background: rgba(10,10,10,.96); color: #fff; border-radius: 999px; padding: 8px 8px 8px 16px; box-shadow: 0 8px 28px rgba(0,0,0,.22); backdrop-filter: blur(12px); }
-        .beli-float-label { font-size: 11px; font-weight: 800; letter-spacing: .06em; text-transform: uppercase; color: rgba(255,255,255,.6); margin-right: 4px; }
-        .beli-float-ch { height: 30px; padding: 0 12px; border-radius: 999px; background: rgba(255,255,255,.12); font-size: 11px; font-weight: 800; color: #fff; border: none; display: inline-flex; align-items: center; font-family: inherit; cursor: pointer; transition: background .15s; text-decoration: none; }
-        .beli-float-ch:hover { background: rgba(255,255,255,.22); }
-        .beli-float-ch.active { background: #fff; color: #0a0a0a; }
-        .beli-float-close { width: 28px; height: 28px; border-radius: 50%; background: rgba(255,255,255,.1); border: none; color: rgba(255,255,255,.5); font-size: 15px; cursor: pointer; display: flex; align-items: center; justify-content: center; margin-left: 2px; }
-        .beli-float-close:hover { background: rgba(255,255,255,.2); color: #fff; }
-
         /* DESKTOP */
         @media (min-width: 760px) {
             body { padding-bottom: 0; }
@@ -182,17 +173,14 @@
             .strip { margin-top: 0; }
             .prods { grid-template-columns: repeat(4, 1fr); gap: 12px; }
             .chs { gap: 10px; }
-            .ch { height: 56px; font-size: 12px; }
+            .ch { height: 44px; font-size: 12px; }
+
             .val-d { display: block; }
             .val { padding: 28px 22px; }
             .cta { padding: 56px 24px; border-radius: 24px; }
             .sec { padding: 40px 0; }
             .foot { display: none; }
             .site-footer { display: block; }
-            .beli-float-label { display: inline-block; }
-        }
-        @media (max-width: 759px) {
-            .beli-float-label { display: none; }
         }
     </style>
 </head>
@@ -294,21 +282,22 @@
     </div>
 </div>
 
+{{-- BELI LEWAT — sticky di bawah nav --}}
+<div class="sec-beli" id="beli">
+    <div class="wrap">
+        <div class="sec-beli-label">Beli Lewat</div>
+        <div class="chs">
+            @foreach($channels as $ch)
+            <a class="ch {{ ($ch['dark'] ?? false) ? 'dk' : '' }}" href="{{ $ch['url'] ?? '#' }}" @if(!($ch['dark'] ?? false)) target="_blank" rel="noopener" @endif>{{ $ch['label'] }}</a>
+            @endforeach
+        </div>
+    </div>
+</div>
+
 <div class="wrap">
 
-    {{-- CHANNELS --}}
-    <section class="sec" id="beli">
-        <div class="sec-head"><div class="sec-t">Beli Lewat</div></div>
-        <div class="chs">
-            <a class="ch dk" href="#">Website</a>
-            <a class="ch" href="#">Shopee</a>
-            <a class="ch" href="#">TikTok</a>
-            <a class="ch" href="#">Tokopedia</a>
-        </div>
-    </section>
-
     {{-- PRODUCTS --}}
-    <section class="sec" id="products" style="padding-top:0;">
+    <section class="sec" id="products">
         <div class="sec-head">
             <div class="sec-t">Produk</div>
             <a href="{{ route('storefront.products') }}" class="sec-a">Semua →</a>
@@ -411,16 +400,6 @@
     </div>
 </footer>
 
-{{-- BELI LEWAT FLOATING BAR --}}
-<div class="beli-float" id="beli-float">
-    <div class="beli-float-inner">
-        <span class="beli-float-label">Beli Lewat</span>
-        @foreach($channels as $ch)
-        <a href="{{ $ch['url'] ?? '#' }}" class="beli-float-ch {{ ($ch['dark'] ?? false) ? 'active' : '' }}" @if(!($ch['dark'] ?? false)) target="_blank" rel="noopener" @endif>{{ $ch['label'] }}</a>
-        @endforeach
-        <button class="beli-float-close" onclick="dismissBeliFloat()" title="Tutup">×</button>
-    </div>
-</div>
 
 <script>
 (function () {
@@ -440,29 +419,6 @@
         }, 5000);
     }
 
-    // Beli Lewat floating bar — appears when #products is visible
-    var floatBar   = document.getElementById('beli-float');
-    var prodsSection = document.getElementById('products');
-    var dismissed  = false;
-
-    window.dismissBeliFloat = function () {
-        dismissed = true;
-        floatBar.classList.remove('visible');
-    };
-
-    if (floatBar && prodsSection && 'IntersectionObserver' in window) {
-        var observer = new IntersectionObserver(function (entries) {
-            entries.forEach(function (e) {
-                if (dismissed) return;
-                if (e.isIntersecting) {
-                    floatBar.classList.add('visible');
-                } else {
-                    floatBar.classList.remove('visible');
-                }
-            });
-        }, { threshold: 0.1 });
-        observer.observe(prodsSection);
-    }
 })();
 </script>
 
