@@ -93,12 +93,22 @@ if ($navIsOwner) {
 
     /* BRAND */
     .app-navbar .navbar-brand {
-        font-size: 1.02rem;
-        font-weight: 600;
-        letter-spacing: -0.3px;
+        display: flex;
+        align-items: center;
+        gap: 8px;
+        font-size: 11px;
+        font-weight: 900;
+        letter-spacing: .15em;
+        text-transform: uppercase;
         color: var(--text) !important;
         padding: 0;
         margin: 0;
+        text-decoration: none;
+    }
+    .app-navbar .navbar-brand img {
+        width: 26px;
+        height: 26px;
+        object-fit: contain;
     }
 
     /* THEME BUTTON */
@@ -347,7 +357,8 @@ if ($navIsOwner) {
 
         {{-- LEFT: Brand --}}
         <a class="navbar-brand" href="{{ url('/') }}">
-            {{ config('app.name', 'GFID') }}
+            <img src="{{ asset('images/logo-mark.svg') }}" alt="{{ config('app.name', 'Greatfit') }}">
+            <span>{{ config('app.name', 'Greatfit') }}</span>
         </a>
 
         {{-- RIGHT: mobile cluster (theme + logout + hamburger) + desktop nav --}}

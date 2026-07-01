@@ -1,0 +1,32 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 400 400">
+  <rect width="400" height="400" fill="#d0d0d0"/>
+  <!-- Body -->
+  <path d="M120 160 L100 200 L100 320 L300 320 L300 200 L280 160 Z" fill="#c8c8c8" stroke="#b0b0b0" stroke-width="1.5"/>
+  <!-- Left sleeve -->
+  <path d="M120 160 L70 180 L60 260 L100 265 L100 200 Z" fill="#c8c8c8" stroke="#b0b0b0" stroke-width="1.5"/>
+  <!-- Right sleeve -->
+  <path d="M280 160 L330 180 L340 260 L300 265 L300 200 Z" fill="#c8c8c8" stroke="#b0b0b0" stroke-width="1.5"/>
+  <!-- Collar -->
+  <path d="M160 160 Q200 140 240 160 L230 175 Q200 162 170 175 Z" fill="#bbb" stroke="#aaa" stroke-width="1"/>
+  <!-- Zipper -->
+  <line x1="200" y1="162" x2="200" y2="320" stroke="#aaa" stroke-width="2"/>
+  <!-- Side stripes -->
+  <line x1="100" y1="200" x2="100" y2="320" stroke="#000" stroke-width="3" opacity=".12"/>
+  <line x1="106" y1="200" x2="106" y2="320" stroke="#000" stroke-width="1.5" opacity=".06"/>
+  <line x1="300" y1="200" x2="300" y2="320" stroke="#000" stroke-width="3" opacity=".12"/>
+  <line x1="294" y1="200" x2="294" y2="320" stroke="#000" stroke-width="1.5" opacity=".06"/>
+  <!-- Chest logo -->
+  <g transform="translate(165, 210)" opacity=".7">
+    <path d="M17 3 A14 14 0 1 0 28 22" stroke="#111" stroke-width="3.5" stroke-linecap="round" fill="none"/>
+    <line x1="23" y1="19" x2="32" y2="13" stroke="#111" stroke-width="3.5" stroke-linecap="round"/>
+    <line x1="23" y1="24" x2="32" y2="18" stroke="#111" stroke-width="3.5" stroke-linecap="round"/>
+  </g>
+  <!-- Shadow -->
+  <rect width="400" height="400" fill="url(#sh2)" opacity=".25"/>
+  <defs>
+    <radialGradient id="sh2" cx="50%" cy="30%" r="70%">
+      <stop offset="0%" stop-color="transparent"/>
+      <stop offset="100%" stop-color="#888"/>
+    </radialGradient>
+  </defs>
+</svg>

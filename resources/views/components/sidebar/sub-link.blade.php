@@ -15,7 +15,13 @@
         'class' => 'sidebar-link-sub ' . ($active ? 'active' : ''),
     ]) }}>
     @if ($icon)
-        <span class="icon">{{ $icon }}</span>
+        <span class="icon">
+            @if (str_starts_with($icon, 'bi '))
+                <i class="{{ $icon }}"></i>
+            @else
+                {{ $icon }}
+            @endif
+        </span>
     @endif
 
     <span>{{ $slot }}</span>

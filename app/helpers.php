@@ -173,3 +173,99 @@ if (!function_exists('pr_status_label')) {
         };
     }
 }
+
+if (!function_exists('storefront_img')) {
+    /**
+     * Resolve a storefront product image URL.
+     * Accepts full URLs (Unsplash, CDN) or local asset paths.
+     */
+    function storefront_img(string $img): string
+    {
+        return str_starts_with($img, 'http') ? $img : asset($img);
+    }
+}
+
+if (!function_exists('storefrontProducts')) {
+    function storefrontProducts(): array
+    {
+        return [
+            [
+                'slug'  => 'gf-track-jacket',
+                'name'  => 'GF Track Jacket',
+                'price' => 149000,
+                'label' => 'Best Seller',
+                'img'   => 'https://images.unsplash.com/photo-1768983953826-231e8ef0b6dc?w=600&h=600&fit=crop&auto=format&q=80',
+                'dark'  => true,
+                'sold'  => '1.200+',
+                'sizes' => ['S','M','L','XL','XXL'],
+                'colors' => [
+                    ['name' => 'Navy',  'hex' => '#1c2b4a'],
+                    ['name' => 'Black', 'hex' => '#0a0a0a'],
+                    ['name' => 'Olive', 'hex' => '#3a4a2b'],
+                ],
+                'desc'  => 'Jaket training ringan dengan bahan polyester premium. Full zipper, cocok untuk gym dan aktivitas outdoor sehari-hari.',
+            ],
+            [
+                'slug'  => 'gf-essential-hoodie',
+                'name'  => 'GF Essential Hoodie',
+                'price' => 165000,
+                'label' => 'New',
+                'img'   => 'https://images.unsplash.com/photo-1564557287817-3785e38ec1f5?w=600&h=600&fit=crop&auto=format&q=80',
+                'dark'  => false,
+                'sold'  => '847+',
+                'sizes' => ['S','M','L','XL'],
+                'colors' => [
+                    ['name' => 'Grey',  'hex' => '#878787'],
+                    ['name' => 'Black', 'hex' => '#0a0a0a'],
+                    ['name' => 'Sand',  'hex' => '#c8b89a'],
+                ],
+                'desc'  => 'Hoodie dengan bahan fleece lembut dan hangat. Fit oversized yang nyaman untuk santai maupun olahraga ringan.',
+            ],
+            [
+                'slug'  => 'gf-jogger-pants',
+                'name'  => 'GF Jogger Pants',
+                'price' => 135000,
+                'label' => 'Ready',
+                'img'   => 'https://images.unsplash.com/photo-1569032915512-922c2e506c51?w=600&h=600&fit=crop&auto=format&q=80',
+                'dark'  => false,
+                'sold'  => '631+',
+                'sizes' => ['S','M','L','XL','XXL'],
+                'colors' => [
+                    ['name' => 'Black',    'hex' => '#0a0a0a'],
+                    ['name' => 'Navy',     'hex' => '#1c2b4a'],
+                    ['name' => 'Charcoal', 'hex' => '#3c3c3c'],
+                ],
+                'desc'  => 'Celana jogger slim dengan tali pinggang adjustable. Bahan stretch 4-way yang mengikuti gerakan tubuh sepanjang hari.',
+            ],
+            [
+                'slug'  => 'gf-training-tee',
+                'name'  => 'GF Training Tee',
+                'price' => 89000,
+                'label' => 'Promo',
+                'img'   => 'https://images.unsplash.com/photo-1571455786673-9d9d6c194f90?w=600&h=600&fit=crop&auto=format&q=80',
+                'dark'  => false,
+                'sold'  => '514+',
+                'sizes' => ['S','M','L','XL','XXL'],
+                'colors' => [
+                    ['name' => 'Black', 'hex' => '#0a0a0a'],
+                    ['name' => 'White', 'hex' => '#f0f0f0', 'light' => true],
+                    ['name' => 'Olive', 'hex' => '#4a5c3a'],
+                    ['name' => 'Navy',  'hex' => '#1c2b4a'],
+                ],
+                'desc'  => 'Kaos training dengan teknologi moisture-wicking. Tetap kering dan segar saat olahraga intens.',
+            ],
+        ];
+    }
+}
+
+if (!function_exists('storefrontChannels')) {
+    function storefrontChannels(): array
+    {
+        return [
+            ['label' => 'Website',   'url' => '#', 'dark' => true],
+            ['label' => 'Shopee',    'url' => '#', 'dark' => false],
+            ['label' => 'TikTok',    'url' => '#', 'dark' => false],
+            ['label' => 'Tokopedia', 'url' => '#', 'dark' => false],
+        ];
+    }
+}

@@ -1,0 +1,33 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 400 400">
+  <rect width="400" height="400" fill="#c8c8c8"/>
+  <!-- Waistband -->
+  <rect x="110" y="110" width="180" height="28" rx="4" fill="#b8b8b8" stroke="#aaa" stroke-width="1"/>
+  <!-- Drawstring -->
+  <path d="M175 124 Q200 132 225 124" stroke="#999" stroke-width="2" fill="none" stroke-linecap="round"/>
+  <circle cx="175" cy="124" r="3" fill="#888"/>
+  <circle cx="225" cy="124" r="3" fill="#888"/>
+  <!-- Left leg -->
+  <path d="M110 138 L118 310 L190 310 L200 220 L210 310 L282 310 L290 138 Z" fill="#c0c0c0" stroke="#aaa" stroke-width="1.5"/>
+  <!-- Center seam -->
+  <line x1="200" y1="138" x2="200" y2="220" stroke="#b0b0b0" stroke-width="1.5"/>
+  <!-- Left leg stripe -->
+  <line x1="122" y1="150" x2="128" y2="305" stroke="#000" stroke-width="2.5" opacity=".1"/>
+  <line x1="128" y1="150" x2="134" y2="305" stroke="#000" stroke-width="1.5" opacity=".05"/>
+  <!-- Right leg stripe -->
+  <line x1="278" y1="150" x2="272" y2="305" stroke="#000" stroke-width="2.5" opacity=".1"/>
+  <line x1="272" y1="150" x2="266" y2="305" stroke="#000" stroke-width="1.5" opacity=".05"/>
+  <!-- Logo on left thigh -->
+  <g transform="translate(130, 195)" opacity=".55">
+    <path d="M11 2 A9 9 0 1 0 18 14" stroke="#111" stroke-width="2.5" stroke-linecap="round" fill="none"/>
+    <line x1="15" y1="12" x2="21" y2="8" stroke="#111" stroke-width="2.5" stroke-linecap="round"/>
+    <line x1="15" y1="16" x2="21" y2="12" stroke="#111" stroke-width="2.5" stroke-linecap="round"/>
+  </g>
+  <!-- Shadow -->
+  <rect width="400" height="400" fill="url(#sh4)" opacity=".2"/>
+  <defs>
+    <radialGradient id="sh4" cx="50%" cy="40%" r="60%">
+      <stop offset="0%" stop-color="transparent"/>
+      <stop offset="100%" stop-color="#666"/>
+    </radialGradient>
+  </defs>
+</svg>
