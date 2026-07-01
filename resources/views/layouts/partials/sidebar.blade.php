@@ -667,6 +667,50 @@
                     </x-sidebar.simple-link>
                 </li>
             @endif
+            @if ($isOwner && $router->has('admin.catalog.products.index'))
+                <x-sidebar.label text="Website" />
+                <li class="simple-group">
+                    <x-sidebar.simple-link href="{{ route('admin.catalog.products.index') }}" icon="bi bi-box-seam"
+                        :active="request()->routeIs('admin.catalog.products*')">
+                        Produk Website
+                    </x-sidebar.simple-link>
+                    @if($router->has('admin.catalog.categories.index'))
+                    <x-sidebar.simple-link href="{{ route('admin.catalog.categories.index') }}" icon="bi bi-tag"
+                        :active="request()->routeIs('admin.catalog.categories*')">
+                        Kategori Produk
+                    </x-sidebar.simple-link>
+                    @endif
+                </li>
+            @endif
+            @if ($isOwner && $router->has('admin.crm.dashboard'))
+                <x-sidebar.label text="CRM Storefront" />
+                <li class="simple-group">
+                    <x-sidebar.simple-link href="{{ route('admin.crm.dashboard') }}" icon="bi bi-bar-chart-line"
+                        :active="request()->routeIs('admin.crm.dashboard')">
+                        Dashboard
+                    </x-sidebar.simple-link>
+                    <x-sidebar.simple-link href="{{ route('admin.crm.visitors') }}" icon="bi bi-person-video3"
+                        :active="request()->routeIs('admin.crm.visitors*')">
+                        Visitors
+                    </x-sidebar.simple-link>
+                    <x-sidebar.simple-link href="{{ route('admin.crm.orders') }}" icon="bi bi-bag-check"
+                        :active="request()->routeIs('admin.crm.orders*')">
+                        Orders
+                    </x-sidebar.simple-link>
+                    <x-sidebar.simple-link href="{{ route('admin.crm.prospects') }}" icon="bi bi-person-lines-fill"
+                        :active="request()->routeIs('admin.crm.prospects*')">
+                        Prospects
+                    </x-sidebar.simple-link>
+                    <x-sidebar.simple-link href="{{ route('admin.crm.customers') }}" icon="bi bi-people"
+                        :active="request()->routeIs('admin.crm.customers*')">
+                        Customers
+                    </x-sidebar.simple-link>
+                    <x-sidebar.simple-link href="{{ route('admin.crm.segments') }}" icon="bi bi-diagram-3"
+                        :active="request()->routeIs('admin.crm.segments*')">
+                        Segments
+                    </x-sidebar.simple-link>
+                </li>
+            @endif
             <div class="sidebar-divider"></div>
         @endif
 
@@ -764,6 +808,54 @@
                             Reconcile Items
                         </x-sidebar.simple-link>
                     @endif
+                </li>
+            @endif
+
+            {{-- Produk Website --}}
+            @if (($isAdmin || $isOwner) && $router->has('admin.catalog.products.index'))
+                <x-sidebar.label text="Website" />
+                <li class="simple-group">
+                    <x-sidebar.simple-link href="{{ route('admin.catalog.products.index') }}" icon="bi bi-box-seam"
+                        :active="request()->routeIs('admin.catalog.products*')">
+                        Produk Website
+                    </x-sidebar.simple-link>
+                    @if($router->has('admin.catalog.categories.index'))
+                    <x-sidebar.simple-link href="{{ route('admin.catalog.categories.index') }}" icon="bi bi-tag"
+                        :active="request()->routeIs('admin.catalog.categories*')">
+                        Kategori Produk
+                    </x-sidebar.simple-link>
+                    @endif
+                </li>
+            @endif
+
+            {{-- CRM Storefront --}}
+            @if ($isAdmin || $isOwner)
+                <x-sidebar.label text="CRM Storefront" />
+                <li class="simple-group">
+                    <x-sidebar.simple-link href="{{ route('admin.crm.dashboard') }}" icon="bi bi-bar-chart-line"
+                        :active="request()->routeIs('admin.crm.dashboard')">
+                        Dashboard
+                    </x-sidebar.simple-link>
+                    <x-sidebar.simple-link href="{{ route('admin.crm.visitors') }}" icon="bi bi-person-video3"
+                        :active="request()->routeIs('admin.crm.visitors*')">
+                        Visitors
+                    </x-sidebar.simple-link>
+                    <x-sidebar.simple-link href="{{ route('admin.crm.orders') }}" icon="bi bi-bag-check"
+                        :active="request()->routeIs('admin.crm.orders*')">
+                        Orders
+                    </x-sidebar.simple-link>
+                    <x-sidebar.simple-link href="{{ route('admin.crm.prospects') }}" icon="bi bi-person-lines-fill"
+                        :active="request()->routeIs('admin.crm.prospects*')">
+                        Prospects
+                    </x-sidebar.simple-link>
+                    <x-sidebar.simple-link href="{{ route('admin.crm.customers') }}" icon="bi bi-people"
+                        :active="request()->routeIs('admin.crm.customers*')">
+                        Customers
+                    </x-sidebar.simple-link>
+                    <x-sidebar.simple-link href="{{ route('admin.crm.segments') }}" icon="bi bi-diagram-3"
+                        :active="request()->routeIs('admin.crm.segments*')">
+                        Segments
+                    </x-sidebar.simple-link>
                 </li>
             @endif
 

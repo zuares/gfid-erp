@@ -30,7 +30,7 @@
         }
         a { color: inherit; text-decoration: none; }
         img { display: block; max-width: 100%; }
-        .wrap { width: min(1680px, calc(100% - 40px)); margin: 0 auto; }
+        .wrap { width: min(1680px, calc(100% - 64px)); margin: 0 auto; }
 
         /* NAV */
         .nav {
@@ -164,6 +164,10 @@
         .sf-love { font-size: 11px; color: rgba(255,255,255,.3); }
 
 
+        @media (max-width: 719px) {
+            .wrap { width: min(520px, calc(100% - 28px)); }
+        }
+
         /* DESKTOP */
         @media (min-width: 720px) {
             body { padding-bottom: 0; }
@@ -244,7 +248,7 @@
 
 {{-- HERO DESKTOP --}}
 <section class="hero-desktop">
-    <div class="hd-content" style="padding-left:max(14px,calc((100vw - 1120px)/2 + 14px));">
+    <div class="hd-content" style="padding-left:max(32px,calc((100vw - 1680px)/2 + 32px));">
         <div class="hd-label">New Collection 2026</div>
         <h1 class="hd-title">Good Fit,<br>Good Feel.</h1>
         <div class="hd-actions">
@@ -304,14 +308,45 @@
             <div class="sec-t">Produk</div>
             <a href="{{ route('storefront.products') }}" class="sec-a">Semua →</a>
         </div>
+        @if($categories->isNotEmpty())
+        <div style="display:flex;gap:7px;overflow-x:auto;padding:2px 0 12px;scrollbar-width:none;">
+            @foreach($categories as $cat)
+            <a href="{{ route('storefront.products', ['kategori' => $cat->slug]) }}"
+               style="flex:0 0 auto;height:28px;padding:0 11px;border-radius:999px;border:1px solid var(--line);background:var(--soft);font-size:11px;font-weight:700;color:var(--ink);display:inline-flex;align-items:center;white-space:nowrap;">
+                {{ $cat->name }}
+            </a>
+            @endforeach
+            <a href="{{ route('storefront.products') }}"
+               style="flex:0 0 auto;height:28px;padding:0 11px;border-radius:999px;border:1px solid var(--line);font-size:11px;font-weight:700;color:var(--mid);display:inline-flex;align-items:center;white-space:nowrap;">
+                Semua →
+            </a>
+        </div>
+        @endif
         <div class="prods">
             @foreach ($products as $p)
             <a href="{{ route('storefront.product_detail', $p['slug']) }}" class="pc">
                 <div class="pc-img">
+                    @if(!empty($p['label']))
+                    @if(($p['product_type'] ?? '') === 'jumbo')
+                    <span class="pc-tag" style="background:#7c3aed;">{{ $p['label'] }}</span>
+                    @else
                     <span class="pc-tag">{{ $p['label'] }}</span>
+                    @endif
+                    @endif
                     <img src="{{ storefront_img($p['img']) }}" alt="{{ $p['name'] }}" loading="lazy">
                 </div>
                 <div class="pc-b">
+                    @if(!empty($p['category_name']) || !empty($p['audience_label']))
+                    <div style="display:flex;gap:4px;flex-wrap:wrap;margin-bottom:3px;">
+                        @if(!empty($p['category_name']))
+                        <span style="font-size:9px;font-weight:700;letter-spacing:.07em;text-transform:uppercase;color:var(--mid);">{{ $p['category_name'] }}</span>
+                        @endif
+                        @if(!empty($p['audience_label']))
+                        @php $audColors=['pria'=>'#1d4ed8','wanita'=>'#be185d','anak'=>'#d97706','olahraga'=>'#15803d','unisex'=>'#6b7280']; @endphp
+                        <span style="font-size:9px;font-weight:700;letter-spacing:.07em;text-transform:uppercase;color:{{ $audColors[$p['audience']] ?? '#6b7280' }};">{{ $p['audience_label'] }}</span>
+                        @endif
+                    </div>
+                    @endif
                     <div class="pc-n">{{ $p['name'] }}</div>
                     <div class="pc-p">Rp{{ number_format($p['price'], 0, ',', '.') }}</div>
                 </div>
@@ -373,15 +408,9 @@
                 <div class="sf-col">
                     <h4>Koleksi</h4>
                     <a href="{{ route('storefront.products') }}">Semua Produk</a>
-                    @if(count($products ?? []) > 6)
-                        @foreach ($products as $p)
-                        <a href="{{ route('storefront.product_detail', $p['slug']) }}">{{ $p['name'] }}</a>
-                        @endforeach
-                    @else
-                        @foreach (collect($products ?? [])->take(3) as $p)
-                        <a href="{{ route('storefront.product_detail', $p['slug']) }}">{{ $p['name'] }}</a>
-                        @endforeach
-                    @endif
+                    @foreach($categories as $cat)
+                    <a href="{{ route('storefront.products', ['kategori' => $cat->slug]) }}">{{ $cat->name }}</a>
+                    @endforeach
                 </div>
                 <div class="sf-col">
                     <h4>Toko</h4>
@@ -424,6 +453,7 @@
 })();
 </script>
 
+@include('storefront._tracker')
 @include('storefront._mobile_zoom_lock')
 
 </body>

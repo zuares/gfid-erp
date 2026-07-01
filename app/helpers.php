@@ -188,73 +188,60 @@ if (!function_exists('storefront_img')) {
 if (!function_exists('storefrontProducts')) {
     function storefrontProducts(): array
     {
-        return [
-            [
-                'slug'  => 'gf-track-jacket',
-                'name'  => 'GF Track Jacket',
-                'price' => 149000,
-                'label' => 'Best Seller',
-                'img'   => 'https://images.unsplash.com/photo-1768983953826-231e8ef0b6dc?w=600&h=600&fit=crop&auto=format&q=80',
-                'dark'  => true,
-                'sold'  => '1.200+',
-                'sizes' => ['S','M','L','XL','XXL'],
-                'colors' => [
-                    ['name' => 'Navy',  'hex' => '#1c2b4a'],
-                    ['name' => 'Black', 'hex' => '#0a0a0a'],
-                    ['name' => 'Olive', 'hex' => '#3a4a2b'],
-                ],
-                'desc'  => 'Jaket training ringan dengan bahan polyester premium. Full zipper, cocok untuk gym dan aktivitas outdoor sehari-hari.',
-            ],
-            [
-                'slug'  => 'gf-essential-hoodie',
-                'name'  => 'GF Essential Hoodie',
-                'price' => 165000,
-                'label' => 'New',
-                'img'   => 'https://images.unsplash.com/photo-1564557287817-3785e38ec1f5?w=600&h=600&fit=crop&auto=format&q=80',
-                'dark'  => false,
-                'sold'  => '847+',
-                'sizes' => ['S','M','L','XL'],
-                'colors' => [
-                    ['name' => 'Grey',  'hex' => '#878787'],
-                    ['name' => 'Black', 'hex' => '#0a0a0a'],
-                    ['name' => 'Sand',  'hex' => '#c8b89a'],
-                ],
-                'desc'  => 'Hoodie dengan bahan fleece lembut dan hangat. Fit oversized yang nyaman untuk santai maupun olahraga ringan.',
-            ],
-            [
-                'slug'  => 'gf-jogger-pants',
-                'name'  => 'GF Jogger Pants',
-                'price' => 135000,
-                'label' => 'Ready',
-                'img'   => 'https://images.unsplash.com/photo-1569032915512-922c2e506c51?w=600&h=600&fit=crop&auto=format&q=80',
-                'dark'  => false,
-                'sold'  => '631+',
-                'sizes' => ['S','M','L','XL','XXL'],
-                'colors' => [
-                    ['name' => 'Black',    'hex' => '#0a0a0a'],
-                    ['name' => 'Navy',     'hex' => '#1c2b4a'],
-                    ['name' => 'Charcoal', 'hex' => '#3c3c3c'],
-                ],
-                'desc'  => 'Celana jogger slim dengan tali pinggang adjustable. Bahan stretch 4-way yang mengikuti gerakan tubuh sepanjang hari.',
-            ],
-            [
-                'slug'  => 'gf-training-tee',
-                'name'  => 'GF Training Tee',
-                'price' => 89000,
-                'label' => 'Promo',
-                'img'   => 'https://images.unsplash.com/photo-1571455786673-9d9d6c194f90?w=600&h=600&fit=crop&auto=format&q=80',
-                'dark'  => false,
-                'sold'  => '514+',
-                'sizes' => ['S','M','L','XL','XXL'],
-                'colors' => [
-                    ['name' => 'Black', 'hex' => '#0a0a0a'],
-                    ['name' => 'White', 'hex' => '#f0f0f0', 'light' => true],
-                    ['name' => 'Olive', 'hex' => '#4a5c3a'],
-                    ['name' => 'Navy',  'hex' => '#1c2b4a'],
-                ],
-                'desc'  => 'Kaos training dengan teknologi moisture-wicking. Tetap kering dan segar saat olahraga intens.',
-            ],
-        ];
+        try {
+            return \App\Models\StorefrontProduct::where('is_published', true)
+                ->with([
+                    'category',
+                    'variants' => fn($q) => $q->where('is_active', true)->orderBy('sort_order'),
+                    'sizes'    => fn($q) => $q->where('is_active', true)->orderBy('sort_order'),
+                ])
+                ->orderBy('sort_order')
+                ->orderBy('name')
+                ->get()
+                ->map(function ($p) {
+                    // Variant default = foto utama
+                    $default = $p->variants->firstWhere('is_default', true) ?? $p->variants->first();
+
+                    return [
+                        'slug'         => $p->slug,
+                        'name'         => $p->name,
+                        'price'        => $default?->price_override ?? $p->base_price,
+                        'label'        => $p->label ?? '',
+                        'product_type' => $p->product_type,
+                        'img'          => $default?->getImageSrc() ?: $p->getImageSrc(),
+                        'dark'         => false,
+                        'sold'         => '',
+                        'desc'         => $p->description ?? '',
+                        'sizes'  => $p->sizes->pluck('size_label')->toArray(),
+                        'colors' => $p->variants->map(fn($v) => [
+                            'name' => $v->color_name,
+                            'hex'  => $v->hex_color ?? '#888888',
+                        ])->toArray(),
+                        // Kategori
+                        'category_slug' => $p->category?->slug ?? '',
+                        'category_name' => $p->category?->name ?? '',
+                        // Audience
+                        'audience'       => $p->audience ?? '',
+                        'audience_label' => $p->audience_label,
+                        // Data tambahan untuk image swap, price update & cart
+                        '_base_price' => $p->base_price,
+                        '_variants'   => $p->variants->map(fn($v) => [
+                            'name'           => $v->color_name,
+                            'img'            => $v->getImageSrc(),
+                            'price_override' => $v->price_override,
+                            'is_default'     => $v->is_default,
+                        ])->values()->toArray(),
+                        '_sizes' => $p->sizes->map(fn($s) => [
+                            'label'          => $s->size_label,
+                            'price_override' => $s->price_override,
+                        ])->values()->toArray(),
+                    ];
+                })
+                ->toArray();
+        } catch (\Throwable $e) {
+            // Fallback kalau tabel belum ada (sebelum migrate)
+            return [];
+        }
     }
 }
 

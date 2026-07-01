@@ -354,6 +354,7 @@
 })();
 </script>
 
+@include('storefront._tracker')
 @include('storefront._mobile_zoom_lock')
 
 </body>

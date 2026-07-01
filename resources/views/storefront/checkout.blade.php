@@ -429,6 +429,7 @@
     </div>
 </div>
 
+@include('storefront._tracker')
 @include('storefront._mobile_zoom_lock')
 
 <script>
@@ -750,7 +751,31 @@
         document.getElementById('modal-wa-btn').onclick = function () {
             var msg = buildMessage();
             if (_buktiUrl) msg += '\n\nBukti Bayar: ' + _buktiUrl;
-            window.open('https://wa.me/' + WA_NUMBER + '?text=' + encodeURIComponent(msg), '_blank');
+
+            // Kirim ke server dulu — server simpan order ke DB lalu redirect ke success page
+            var ongkir = selectedShipping ? selectedShipping.cost : 0;
+            var form = document.createElement('form');
+            form.method = 'POST';
+            form.action = '{{ route('storefront.checkout.place_order') }}';
+            var fields = {
+                '_token':            csrfToken,
+                'subtotal':          productTotal,
+                'shipping_cost':     ongkir,
+                'shipping_courier':  selectedShipping ? (selectedShipping.label || '') : '',
+                'shipping_service':  selectedShipping ? (selectedShipping.etd || '') : '',
+                'payment_method':    selectedPayment  ? selectedPayment.method : '',
+                'payment_proof_url': _buktiUrl || '',
+                'wa_message':        msg,
+            };
+            for (var name in fields) {
+                var input = document.createElement('input');
+                input.type  = 'hidden';
+                input.name  = name;
+                input.value = fields[name];
+                form.appendChild(input);
+            }
+            document.body.appendChild(form);
+            form.submit();
         };
     }
 

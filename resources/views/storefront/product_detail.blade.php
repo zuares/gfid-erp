@@ -33,17 +33,18 @@
         img { display: block; max-width: 100%; }
 
         /* ─── NAV ─── */
-        .nav { position: sticky; top: 0; z-index: 200; background: rgba(255,255,255,.96); backdrop-filter: blur(14px); border-bottom: 1px solid var(--line); }
-        .nav-inner { height: 56px; display: flex; align-items: center; justify-content: space-between; padding: 0 20px; max-width: 1680px; margin: 0 auto; }
+        .nav { position: sticky; top: 0; z-index: 100; background: rgba(255,255,255,.95); backdrop-filter: blur(12px); border-bottom: 1px solid var(--line); }
+        .nav-inner { height: 56px; display: flex; align-items: center; justify-content: space-between; max-width: 1680px; margin: 0 auto; padding: 0 20px; }
         .brand { display: flex; align-items: center; gap: 8px; font-weight: 900; font-size: 12px; letter-spacing: .16em; text-transform: uppercase; }
         .brand img { width: 28px; height: 28px; object-fit: contain; }
-        .nav-links { display: none; gap: 18px; font-size: 11px; font-weight: 700; letter-spacing: .1em; text-transform: uppercase; color: var(--mid); }
+        .nav-r { display: flex; align-items: center; gap: 16px; }
+        .nav-links { display: none; gap: 18px; font-size: 11px; font-weight: 700; letter-spacing: .1em; text-transform: uppercase; color: #555; }
         .nav-links a:hover { color: var(--ink); }
-        .nav-r { display: flex; align-items: center; gap: 4px; }
-        .icon-btn { width: 36px; height: 36px; border-radius: 50%; display: inline-flex; align-items: center; justify-content: center; transition: background .15s; border: none; background: transparent; cursor: pointer; color: var(--ink); flex-shrink: 0; }
-        .icon-btn:hover { background: var(--soft); }
+        .nav-links a.active { color: var(--ink); }
+        .cart-icon { position: relative; width: 34px; height: 34px; border-radius: 50%; display: inline-flex; align-items: center; justify-content: center; color: var(--ink); transition: background .15s; flex-shrink: 0; }
+        .cart-icon:hover { background: var(--soft); }
         .cart-wrap { position: relative; }
-        .cart-badge { position: absolute; top: -1px; right: -1px; width: 15px; height: 15px; border-radius: 50%; background: var(--ink); color: var(--white); font-size: 8px; font-weight: 800; display: grid; place-items: center; border: 2px solid var(--white); }
+        .cart-badge { position: absolute; top: -2px; right: -2px; width: 16px; height: 16px; border-radius: 50%; background: var(--ink); color: var(--white); font-size: 9px; font-weight: 800; display: grid; place-items: center; border: 2px solid var(--white); }
         .cart-wrap.cart-pop { animation: cartPulse .7s ease both; }
         .cart-toast { position: fixed; top: 68px; right: 16px; z-index: 500; display: flex; align-items: center; gap: 10px; max-width: min(320px, calc(100vw - 32px)); padding: 11px 13px; border-radius: 14px; background: var(--ink); color: var(--white); box-shadow: 0 16px 40px rgba(0,0,0,.18); font-size: 12px; font-weight: 800; transform: translateY(-10px); opacity: 0; pointer-events: none; animation: toastIn 2.4s ease forwards; }
         .cart-toast-icon { width: 26px; height: 26px; border-radius: 50%; background: rgba(255,255,255,.14); display: grid; place-items: center; flex-shrink: 0; }
@@ -202,6 +203,7 @@
         /* ─── DESKTOP ─── */
         @media (min-width: 720px) {
             body { padding-bottom: 0; }
+            .nav-inner { padding: 0 32px; }
             .nav-links { display: flex; }
 
             /* Breadcrumb */
@@ -254,7 +256,7 @@
             .site-footer { display: block; }
         }
         @media (min-width: 720px) and (max-width: 1080px) {
-            .nav-inner { padding: 0 36px; }
+            .nav-inner { padding: 0 32px; }
             .desktop-breadcrumb { padding: 18px 36px 0; }
             .pd-grid {
                 grid-template-columns: minmax(280px, 42%) minmax(0, 1fr);
@@ -268,6 +270,7 @@
             .site-footer-inner { padding-left: 36px; padding-right: 36px; }
         }
         @media (max-width: 719px) {
+            .nav-r { gap: 8px; }
             .desktop-breadcrumb { display: none; }
             .pd-grid { display: contents; }
             .pd-left, .pd-right { display: contents; }
@@ -283,28 +286,10 @@
 <body>
 
 {{-- NAV --}}
-<header class="nav">
-    <div class="nav-inner">
-        <a href="{{ route('storefront.home') }}" class="brand">
-            <img src="{{ asset('images/logo-mark.svg') }}" alt="Greatfit">
-            <span>Greatfit</span>
-        </a>
-        <nav class="nav-links">
-            <a href="{{ route('storefront.products') }}">Produk</a>
-            <a href="{{ route('storefront.home') }}#beli">Beli</a>
-        </nav>
-        <div class="nav-r">
-            @php $cartCount = array_sum(array_column(session('cart', []), 'qty')); @endphp
-            <button class="icon-btn" title="Cari" onclick="return false;">
-                <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="11" cy="11" r="8"/><path d="M21 21l-4.35-4.35"/></svg>
-            </button>
-            <a href="{{ route('storefront.cart') }}" class="icon-btn cart-wrap @if(session('cart_added')) cart-pop @endif" title="Keranjang">
-                <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M6 2L3 6v14a2 2 0 002 2h14a2 2 0 002-2V6l-3-4z"/><line x1="3" y1="6" x2="21" y2="6"/><path d="M16 10a4 4 0 01-8 0"/></svg>
-                @if($cartCount > 0)<span class="cart-badge">{{ $cartCount }}</span>@endif
-            </a>
-        </div>
-    </div>
-</header>
+@php
+    $navActive = 'products';
+@endphp
+@include('storefront._nav')
 
 @if(session('cart_added'))
 <div class="cart-fly"></div>
@@ -319,10 +304,17 @@
 {{-- BREADCRUMB mobile --}}
 <div class="breadcrumb-bar">
     <div class="breadcrumb">
+        @if(!empty($product['category_slug']) && !empty($product['category_name']))
+        <a href="{{ route('storefront.products', ['kategori' => $product['category_slug']]) }}" class="mobile-back">
+            <span>←</span>
+            <span>{{ $product['category_name'] }}</span>
+        </a>
+        @else
         <a href="{{ route('storefront.products') }}" class="mobile-back">
             <span>←</span>
             <span>Semua Produk</span>
         </a>
+        @endif
     </div>
 </div>
 
@@ -331,6 +323,10 @@
     <a href="{{ route('storefront.home') }}">Home</a>
     <span>/</span>
     <a href="{{ route('storefront.products') }}">Produk</a>
+    @if(!empty($product['category_slug']) && !empty($product['category_name']))
+    <span>/</span>
+    <a href="{{ route('storefront.products', ['kategori' => $product['category_slug']]) }}">{{ $product['category_name'] }}</a>
+    @endif
     <span>/</span>
     <span>{{ $product['name'] }}</span>
 </div>
@@ -340,8 +336,8 @@
     {{-- LEFT: IMAGE --}}
     <div class="pd-left">
         <div class="img-section">
-            <span class="img-badge">{{ $product['label'] }}</span>
-            <img src="{{ storefront_img($product['img']) }}" alt="{{ $product['name'] }}">
+            @if($product['label'])<span class="img-badge">{{ $product['label'] }}</span>@endif
+            <img id="main-product-img" src="{{ storefront_img($product['img']) }}" alt="{{ $product['name'] }}">
         </div>
     </div>
 
@@ -351,10 +347,38 @@
         {{-- PRICE CARD --}}
         <div class="section price-section">
             <div class="price-row">
-                <div class="product-price">Rp{{ number_format($product['price'], 0, ',', '.') }}</div>
-                <div class="product-sold">{{ $product['sold'] }} terjual</div>
+                <div class="product-price" id="product-price-display">Rp{{ number_format($product['price'], 0, ',', '.') }}</div>
+                @if($product['sold'])<div class="product-sold">{{ $product['sold'] }} terjual</div>@endif
             </div>
             <div class="product-name">{{ $product['name'] }}</div>
+            @php
+            $audColors = ['pria'=>'#1d4ed8','wanita'=>'#be185d','anak'=>'#d97706','olahraga'=>'#15803d','unisex'=>'#6b7280'];
+            $audColor  = $audColors[$product['audience'] ?? ''] ?? '#6b7280';
+            $isJumbo   = ($product['product_type'] ?? '') === 'jumbo';
+            @endphp
+            @if(!empty($product['category_name']) || !empty($product['audience_label']) || $isJumbo)
+            <div style="margin-top:8px;display:flex;gap:6px;flex-wrap:wrap;">
+                @if($isJumbo)
+                <a href="{{ route('storefront.products', ['type' => 'jumbo']) }}"
+                   style="display:inline-flex;align-items:center;gap:4px;font-size:10px;font-weight:700;letter-spacing:.06em;text-transform:uppercase;color:#7c3aed;text-decoration:none;background:#7c3aed14;padding:3px 9px;border-radius:999px;">
+                    ✦ Big Size
+                </a>
+                @endif
+                @if(!empty($product['category_name']))
+                <a href="{{ route('storefront.products', ['kategori' => $product['category_slug']]) }}"
+                   style="display:inline-flex;align-items:center;gap:4px;font-size:10px;font-weight:700;letter-spacing:.06em;text-transform:uppercase;color:var(--mid);text-decoration:none;border:1px solid var(--line);padding:3px 9px;border-radius:999px;">
+                    <svg width="10" height="10" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><path d="M20.59 13.41l-7.17 7.17a2 2 0 01-2.83 0L2 12V2h10l8.59 8.59a2 2 0 010 2.82z"/><line x1="7" y1="7" x2="7.01" y2="7"/></svg>
+                    {{ $product['category_name'] }}
+                </a>
+                @endif
+                @if(!empty($product['audience_label']))
+                <a href="{{ route('storefront.products', ['audience' => $product['audience']]) }}"
+                   style="display:inline-flex;align-items:center;gap:4px;font-size:10px;font-weight:700;letter-spacing:.06em;text-transform:uppercase;color:{{ $audColor }};text-decoration:none;background:{{ $audColor }}14;padding:3px 9px;border-radius:999px;">
+                    {{ $product['audience_label'] }}
+                </a>
+                @endif
+            </div>
+            @endif
         </div>
 
         {{-- MOBILE: tappable row that opens modal --}}
@@ -409,11 +433,12 @@
 
             <form action="{{ route('storefront.cart.add') }}" method="POST" id="desk-cart-form" style="display:none">
                 @csrf
-                <input type="hidden" name="slug"  value="{{ $slug }}">
-                <input type="hidden" name="color" id="desk-color" value="">
-                <input type="hidden" name="size"  id="desk-size"  value="">
-                <input type="hidden" name="qty"   id="desk-qty"   value="1">
-                <input type="hidden" name="mode"  id="desk-mode"  value="cart">
+                <input type="hidden" name="slug"      value="{{ $slug }}">
+                <input type="hidden" name="color"     id="desk-color" value="">
+                <input type="hidden" name="size"      id="desk-size"  value="">
+                <input type="hidden" name="qty"       id="desk-qty"   value="1">
+                <input type="hidden" name="mode"      id="desk-mode"  value="cart">
+                <input type="hidden" name="_sf_token" value="{{ $_sfToken ?? '' }}">
             </form>
 
             <div class="btn-row">
@@ -551,10 +576,10 @@
 
     <div class="sheet-head">
         <div class="sheet-img">
-            <img src="{{ storefront_img($product['img']) }}" alt="{{ $product['name'] }}">
+            <img id="sheet-product-img" src="{{ storefront_img($product['img']) }}" alt="{{ $product['name'] }}">
         </div>
         <div class="sheet-meta">
-            <div class="sheet-price">Rp{{ number_format($product['price'], 0, ',', '.') }}</div>
+            <div class="sheet-price" id="sheet-price-display">Rp{{ number_format($product['price'], 0, ',', '.') }}</div>
             <div class="sheet-name">{{ $product['name'] }}</div>
         </div>
         <button class="sheet-close" onclick="closeModal()">
@@ -598,11 +623,12 @@
     <div class="sheet-footer">
         <form action="{{ route('storefront.cart.add') }}" method="POST" id="modal-form">
             @csrf
-            <input type="hidden" name="slug"  value="{{ $slug }}">
-            <input type="hidden" name="color" id="modal-color" value="">
-            <input type="hidden" name="size"  id="modal-size"  value="">
-            <input type="hidden" name="qty"   id="modal-qty"   value="1">
-            <input type="hidden" name="mode"  id="modal-mode"  value="cart">
+            <input type="hidden" name="slug"      value="{{ $slug }}">
+            <input type="hidden" name="color"     id="modal-color" value="">
+            <input type="hidden" name="size"      id="modal-size"  value="">
+            <input type="hidden" name="qty"       id="modal-qty"   value="1">
+            <input type="hidden" name="mode"      id="modal-mode"  value="cart">
+            <input type="hidden" name="_sf_token" value="{{ $_sfToken ?? '' }}">
         </form>
         <button type="button" class="sheet-action mode-now" id="sheet-action-btn" onclick="modalSubmit()">
             Beli Sekarang
@@ -612,6 +638,44 @@
 </div>
 
 <script>
+/* ─── VARIANT DATA (dari DB) ─── */
+var variantData = @json($product['_variants'] ?? []);
+var basePrice   = {{ $product['_base_price'] ?? $product['price'] }};
+
+// Buat lookup: colorName → {img, price_override}
+var variantMap = {};
+variantData.forEach(function(v) { variantMap[v.name] = v; });
+
+function formatRupiah(n) {
+    return 'Rp' + n.toString().replace(/\B(?=(\d{3})+(?!\d))/g, '.');
+}
+
+function swapVariant(colorName) {
+    var v = variantMap[colorName];
+    if (!v) return;
+
+    // Ganti foto
+    if (v.img) {
+        var mainImg  = document.getElementById('main-product-img');
+        var sheetImg = document.getElementById('sheet-product-img');
+        if (mainImg)  { mainImg.style.opacity  = '0.6'; mainImg.src  = v.img; mainImg.onload  = function(){ this.style.opacity='1'; }; }
+        if (sheetImg) { sheetImg.src = v.img; }
+    }
+
+    // Update harga
+    var price = v.price_override || basePrice;
+    var fmt   = formatRupiah(price);
+    var el1 = document.getElementById('product-price-display');
+    var el2 = document.getElementById('sheet-price-display');
+    if (el1) el1.textContent = fmt;
+    if (el2) el2.textContent = fmt;
+
+    // Update hidden form inputs
+    var deskColor  = document.getElementById('desk-color');
+    var modalColor = document.getElementById('modal-color');
+    // (value-nya di-set di deskColor() / modalColor() masing-masing)
+}
+
 /* ─── SHARED STATE ─── */
 var mColor = '', mSize = '', mQty = 1;
 var dColor = '', dSize = '', dQty = 1;
@@ -644,6 +708,7 @@ function modalColor(el, name) {
     el.classList.add('active');
     mColor = name;
     document.getElementById('modal-color').value = name;
+    swapVariant(name);
     updateTapRow();
 }
 
@@ -693,6 +758,7 @@ function deskColor(el, name) {
     el.classList.add('active');
     dColor = name;
     document.getElementById('desk-color').value = name;
+    swapVariant(name);
     updateDeskSummary();
 }
 
@@ -750,8 +816,25 @@ function deskSubmit(mode) {
         if (dy > 60) closeModal();
     }, { passive: true });
 })();
+
+/* ─── AUTO-SELECT DEFAULT VARIANT ─── */
+(function() {
+    var defaultVariant = variantData.find(function(v) { return v.is_default; }) || variantData[0];
+    if (!defaultVariant) return;
+
+    // Klik tombol warna pertama di desktop
+    var deskBtn = document.querySelector('#color-btns-desk .color-btn[title="' + defaultVariant.name + '"]')
+                  || document.querySelector('#color-btns-desk .color-btn');
+    if (deskBtn) deskBtn.click();
+
+    // Klik tombol warna pertama di modal
+    var modalBtn = document.querySelector('#color-btns-modal .color-btn[title="' + defaultVariant.name + '"]')
+                   || document.querySelector('#color-btns-modal .color-btn');
+    if (modalBtn) { modalBtn.click(); mColor = defaultVariant.name; }
+})();
 </script>
 
+@include('storefront._tracker')
 @include('storefront._mobile_zoom_lock')
 
 </body>

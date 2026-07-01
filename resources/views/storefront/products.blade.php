@@ -58,10 +58,27 @@
         .breadcrumb a:hover { color: var(--ink); }
         .page-title { font-size: 24px; font-weight: 900; letter-spacing: -.03em; }
         .page-count { font-size: 13px; color: var(--mid); font-weight: 500; margin-top: 4px; }
-        .product-rail { display: flex; gap: 8px; overflow-x: auto; padding: 2px 0 2px; margin-top: 16px; scrollbar-width: none; }
-        .product-rail::-webkit-scrollbar { display: none; }
-        .rail-chip { flex: 0 0 auto; height: 34px; padding: 0 13px; border-radius: 999px; border: 1px solid var(--line); background: var(--soft); display: inline-flex; align-items: center; font-size: 12px; font-weight: 800; color: #222; }
-        .rail-chip.dark { background: var(--ink); color: var(--white); border-color: var(--ink); }
+        .filter-panel { margin-top: 18px; min-width: 0; }
+        .filter-group { min-width: 0; }
+        .filter-label { display: block; font-size: 10px; font-weight: 900; letter-spacing: .1em; text-transform: uppercase; color: var(--mid); margin-bottom: 8px; }
+        .filter-scroll { display: flex; align-items: center; gap: 6px; overflow-x: auto; padding: 1px; scrollbar-width: none; }
+        .filter-scroll::-webkit-scrollbar { display: none; }
+        .filter-option { flex: 0 0 auto; min-height: 32px; padding: 0 11px; border-radius: 8px; border: 1px solid transparent; background: transparent; color: var(--mid); display: inline-flex; align-items: center; justify-content: center; font-size: 12px; font-weight: 800; transition: background .15s, border-color .15s, color .15s; }
+        .filter-option:hover { background: var(--soft); color: var(--ink); }
+        .filter-option.active { background: var(--ink); color: var(--white); border-color: var(--ink); }
+        .filter-category { margin-top: 14px; padding-bottom: 12px; border-bottom: 1px solid var(--line); }
+        .filter-category .filter-option { min-height: 30px; padding: 0 4px; border-radius: 0; background: transparent; border: 0; color: var(--mid); position: relative; }
+        .filter-category .filter-option + .filter-option { margin-left: 14px; }
+        .filter-category .filter-option.active { color: var(--ink); background: transparent; }
+        .filter-category .filter-option.active::after { content: ""; position: absolute; left: 0; right: 0; bottom: -13px; height: 2px; border-radius: 99px; background: var(--ink); }
+        .filter-secondary { margin-top: 12px; display: grid; grid-template-columns: minmax(0, 1fr) auto auto; gap: 12px; align-items: center; }
+        .filter-secondary .filter-group { display: flex; align-items: center; gap: 8px; overflow: hidden; }
+        .filter-secondary .filter-label { margin: 0; flex: 0 0 auto; }
+        .filter-size { justify-self: end; }
+        .filter-reset { min-height: 32px; padding: 0 2px; border: 0; background: transparent; color: var(--mid); display: inline-flex; align-items: center; justify-content: center; font-size: 12px; font-weight: 800; white-space: nowrap; }
+        .filter-reset:hover { color: var(--ink); }
+        .filter-summary { margin-top: 10px; display: flex; align-items: center; justify-content: space-between; gap: 12px; font-size: 12px; color: var(--mid); font-weight: 700; }
+        .filter-summary strong { color: var(--ink); font-weight: 900; }
 
         /* PRODUCTS GRID */
         .products { display: grid; grid-template-columns: repeat(2, 1fr); gap: 10px; }
@@ -111,9 +128,9 @@
         @media (min-width: 720px) {
             .nav-inner { padding: 0 32px; }
             .nav-links { display: flex; }
-            .products { grid-template-columns: repeat(4, 1fr); gap: 14px; }
+            .products { grid-template-columns: repeat(4, 1fr); gap: 14px; margin-bottom: 72px; }
             .page-head { border-bottom: 1px solid var(--line); padding: 28px 0 20px; margin-bottom: 20px; }
-            .product-rail { margin-top: 18px; }
+            .filter-panel { margin-top: 20px; }
             .foot { display: none; }
             .site-footer { display: block; }
             .channels { gap: 12px; }
@@ -125,6 +142,10 @@
         @media (min-width: 720px) and (max-width: 1080px) {
             .wrap { width: min(100% - 56px, 920px); }
             .page-head { padding: 34px 0 24px; margin-bottom: 24px; }
+            .filter-secondary { grid-template-columns: 1fr; gap: 10px; align-items: start; }
+            .filter-secondary .filter-group { display: block; }
+            .filter-secondary .filter-label { margin-bottom: 8px; }
+            .filter-size { justify-self: stretch; }
             .products { grid-template-columns: repeat(3, 1fr); gap: 16px; }
             .pc { border-radius: 16px; }
             .pc-body { padding: 14px; }
@@ -138,7 +159,17 @@
             .breadcrumb { display: none; }
             .page-head { padding: 28px 0 22px; margin-bottom: 18px; }
             .page-title { font-size: 26px; }
-            .product-rail { margin-top: 18px; }
+            .filter-panel { margin-top: 18px; }
+            .filter-option { min-height: 32px; padding: 0 10px; font-size: 11px; }
+            .filter-category { margin-top: 12px; padding-bottom: 10px; }
+            .filter-category .filter-option { padding: 0 2px; }
+            .filter-category .filter-option + .filter-option { margin-left: 13px; }
+            .filter-category .filter-option.active::after { bottom: -11px; }
+            .filter-secondary { grid-template-columns: 1fr; gap: 10px; align-items: start; margin-top: 12px; }
+            .filter-secondary .filter-group { display: block; }
+            .filter-secondary .filter-label { margin-bottom: 8px; }
+            .filter-size { justify-self: stretch; }
+            .filter-summary { align-items: flex-start; flex-direction: column; gap: 6px; }
             .products { gap: 12px; }
             .pc { border-radius: 14px; }
             .pc-body { padding: 12px; }
@@ -153,28 +184,10 @@
 </head>
 <body>
 
-<header class="nav">
-    <div class="nav-inner">
-        <a href="{{ route('storefront.home') }}" class="brand">
-            <img src="{{ asset('images/logo-mark.svg') }}" alt="Greatfit">
-            <span>Greatfit</span>
-        </a>
-        <div class="nav-r">
-            <nav class="nav-links">
-                <a href="{{ route('storefront.products') }}" class="active">Produk</a>
-                <a href="{{ route('storefront.home') }}#beli">Beli</a>
-            </nav>
-            @php $cartCount = array_sum(array_column(session('cart', []), 'qty')); @endphp
-            <a href="#" class="cart-icon" title="Cari" onclick="return false;">
-                <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="11" cy="11" r="8"/><path d="M21 21l-4.35-4.35"/></svg>
-            </a>
-            <a href="{{ route('storefront.cart') }}" class="cart-icon" title="Keranjang">
-                <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M6 2L3 6v14a2 2 0 002 2h14a2 2 0 002-2V6l-3-4z"/><line x1="3" y1="6" x2="21" y2="6"/><path d="M16 10a4 4 0 01-8 0"/></svg>
-                @if($cartCount > 0)<span class="cart-badge">{{ $cartCount }}</span>@endif
-            </a>
-        </div>
-    </div>
-</header>
+@php
+    $navActive = 'products';
+@endphp
+@include('storefront._nav')
 
 <main>
 <div class="wrap">
@@ -185,13 +198,84 @@
             <span>/</span>
             <span>Produk</span>
         </div>
-        <div class="page-title">Semua Produk</div>
+        <div class="page-title">
+            @if($activeType === 'jumbo')
+                Koleksi Big Size
+                @if($activeCategory && $categories->firstWhere('slug', $activeCategory))
+                    — {{ $categories->firstWhere('slug', $activeCategory)->name }}
+                @endif
+            @elseif($activeAudience && isset($audienceOptions[$activeAudience]))
+                Koleksi {{ $audienceOptions[$activeAudience] }}
+                @if($activeCategory && $categories->firstWhere('slug', $activeCategory))
+                    — {{ $categories->firstWhere('slug', $activeCategory)->name }}
+                @endif
+            @elseif($activeCategory && $categories->firstWhere('slug', $activeCategory))
+                {{ $categories->firstWhere('slug', $activeCategory)->name }}
+            @else
+                Semua Produk
+            @endif
+        </div>
         <div class="page-count">{{ count($products) }} produk tersedia</div>
-        <div class="product-rail" aria-label="Sorotan produk">
-            <span class="rail-chip dark">Ready stock</span>
-            <span class="rail-chip">Bahan nyaman</span>
-            <span class="rail-chip">Ukuran S-XXL</span>
-            <span class="rail-chip">Warna basic</span>
+        @php
+        $audienceChipColors = [
+            'pria'     => '#1d4ed8',
+            'wanita'   => '#be185d',
+            'anak'     => '#d97706',
+            'olahraga' => '#15803d',
+            'unisex'   => '#6b7280',
+        ];
+        $hasActiveFilter = $activeCategory || $activeAudience || $activeType;
+        $baseParams = array_filter([
+            'audience' => $activeAudience,
+            'type'     => $activeType,
+        ]);
+        @endphp
+
+        <div class="filter-panel" aria-label="Filter produk">
+            @if($categories->isNotEmpty())
+            <div class="filter-group filter-category">
+                <div class="filter-scroll">
+                    <a href="{{ route('storefront.products', $baseParams) }}"
+                       class="filter-option{{ !$activeCategory ? ' active' : '' }}">Semua</a>
+                    @foreach($categories as $cat)
+                    <a href="{{ route('storefront.products', array_filter(['kategori' => $cat->slug, 'audience' => $activeAudience, 'type' => $activeType])) }}"
+                       class="filter-option{{ $activeCategory === $cat->slug ? ' active' : '' }}">{{ $cat->name }}</a>
+                    @endforeach
+                </div>
+            </div>
+            @endif
+
+            <div class="filter-secondary">
+                <div class="filter-group">
+                    <span class="filter-label">Untuk</span>
+                    <div class="filter-scroll">
+                        <a href="{{ route('storefront.products', array_filter(['kategori' => $activeCategory, 'type' => $activeType])) }}"
+                           class="filter-option{{ !$activeAudience ? ' active' : '' }}">Semua</a>
+                        @foreach($audienceOptions as $val => $lbl)
+                        <a href="{{ route('storefront.products', array_filter(['audience' => $val, 'kategori' => $activeCategory, 'type' => $activeType])) }}"
+                           class="filter-option{{ $activeAudience === $val ? ' active' : '' }}">{{ $lbl }}</a>
+                        @endforeach
+                    </div>
+                </div>
+
+                <div class="filter-group filter-size">
+                    <span class="filter-label">Ukuran</span>
+                    <div class="filter-scroll">
+                        <a href="{{ route('storefront.products', array_filter(['kategori' => $activeCategory, 'audience' => $activeAudience])) }}"
+                           class="filter-option{{ !$activeType ? ' active' : '' }}">Semua</a>
+                        <a href="{{ route('storefront.products', array_filter(['type' => 'jumbo', 'kategori' => $activeCategory, 'audience' => $activeAudience])) }}"
+                           class="filter-option{{ $activeType === 'jumbo' ? ' active' : '' }}">Big Size</a>
+                    </div>
+                </div>
+
+                @if($hasActiveFilter)
+                <a href="{{ route('storefront.products') }}" class="filter-reset">Reset</a>
+                @endif
+            </div>
+        </div>
+
+        <div class="filter-summary">
+            <span><strong>{{ count($products) }}</strong> produk ditemukan</span>
         </div>
     </div>
 
@@ -199,10 +283,25 @@
         @foreach ($products as $p)
         <a href="{{ route('storefront.product_detail', $p['slug']) }}" class="pc">
             <div class="pc-img">
+                @if(!empty($p['label']))
+                @if(($p['product_type'] ?? '') === 'jumbo')
+                <span class="pc-lbl" style="background:#7c3aed;">{{ $p['label'] }}</span>
+                @else
                 <span class="pc-lbl">{{ $p['label'] }}</span>
+                @endif
+                @endif
                 <img src="{{ storefront_img($p['img']) }}" alt="{{ $p['name'] }}" loading="lazy">
             </div>
             <div class="pc-body">
+                @if(!empty($p['audience_label']))
+                <div style="margin-bottom:5px;">
+                    <span style="font-size:10px;font-weight:800;padding:2px 7px;border-radius:999px;
+                                 background:{{ $audienceChipColors[$p['audience']] ?? '#6b7280' }}18;
+                                 color:{{ $audienceChipColors[$p['audience']] ?? '#6b7280' }};">
+                        {{ $p['audience_label'] }}
+                    </span>
+                </div>
+                @endif
                 <div class="pc-name">{{ $p['name'] }}</div>
                 <div class="pc-meta">
                     <div class="pc-price">Rp{{ number_format($p['price'], 0, ',', '.') }}</div>
@@ -260,15 +359,9 @@
                 <div class="sf-col">
                     <h4>Koleksi</h4>
                     <a href="{{ route('storefront.products') }}">Semua Produk</a>
-                    @if(count($products ?? []) > 6)
-                        @foreach ($products as $p)
-                        <a href="{{ route('storefront.product_detail', $p['slug']) }}">{{ $p['name'] }}</a>
-                        @endforeach
-                    @else
-                        @foreach (collect($products ?? [])->take(3) as $p)
-                        <a href="{{ route('storefront.product_detail', $p['slug']) }}">{{ $p['name'] }}</a>
-                        @endforeach
-                    @endif
+                    @foreach($categories as $cat)
+                    <a href="{{ route('storefront.products', ['kategori' => $cat->slug]) }}">{{ $cat->name }}</a>
+                    @endforeach
                 </div>
                 <div class="sf-col">
                     <h4>Toko</h4>
@@ -289,6 +382,7 @@
     </div>
 </footer>
 
+@include('storefront._tracker')
 @include('storefront._mobile_zoom_lock')
 
 </body>

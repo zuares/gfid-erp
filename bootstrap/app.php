@@ -1,8 +1,10 @@
 <?php
 
+use App\Console\Commands\SendWeeklyCrmSummary;
 use App\Console\Commands\SeedProductionBoms;
 use App\Http\Middleware\EnsureModuleAccess;
 use App\Http\Middleware\RoleMiddleware;
+use App\Http\Middleware\TrackStorefrontVisitor;
 use Illuminate\Console\Scheduling\Schedule;
 use Illuminate\Foundation\Application;
 use Illuminate\Foundation\Configuration\Exceptions;
@@ -17,13 +19,15 @@ return Application::configure(basePath: dirname(__DIR__))
     )
     ->withMiddleware(function (Middleware $middleware): void {
         $middleware->alias([
-            'access' => EnsureModuleAccess::class,
-            'role' => RoleMiddleware::class,
+            'access'           => EnsureModuleAccess::class,
+            'role'             => RoleMiddleware::class,
+            'track.storefront' => TrackStorefrontVisitor::class,
             \Laravel\Sanctum\Http\Middleware\EnsureFrontendRequestsAreStateful::class,
         ]);
     })
     ->withCommands([
         SeedProductionBoms::class,
+        SendWeeklyCrmSummary::class,
     ])
     ->withSchedule(function (Schedule $schedule) {
         // ✅ Ini yang bikin scheduler Laravel 12 aktif
@@ -36,6 +40,11 @@ return Application::configure(basePath: dirname(__DIR__))
         //         FILE_APPEND
         //     );
         // })->everyMinute();
+
+        // CRM: weekly summary ke admin WA setiap Senin jam 08:00
+        $schedule->command('crm:weekly-summary')
+            ->weeklyOn(1, '08:00')
+            ->withoutOverlapping();
 
         $schedule->command('sales:rebuild-daily-item-sales --days=90')
             ->dailyAt('01:00')

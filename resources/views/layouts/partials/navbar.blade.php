@@ -4,11 +4,14 @@ use Illuminate\Support\Facades\Cache;
 
 $navUser     = auth()->user();
 $navIsOwner  = $navUser && method_exists($navUser, 'isOwner') && $navUser->isOwner();
+$navRole     = strtolower((string) ($navUser->role ?? ''));
+$navIsAdmin  = $navRole === 'admin';
+$navShowBell = $navIsOwner || $navIsAdmin;
 
 $navPendingCount = 0;
 $navPendingItems = [];
 
-if ($navIsOwner) {
+if ($navShowBell) {
     $navCacheKey = 'navbar_notif_owner_v2_' . (int) $navUser->id;
     $navPending  = Cache::remember($navCacheKey, now()->addSeconds(20), function () {
         $poDrafts = \App\Models\PurchaseOrder::where('status', 'draft')
@@ -22,28 +25,91 @@ if ($navIsOwner) {
             ->limit(10)
             ->get(['id', 'code']);
 
+        // ── CRM Storefront notifications ──────────────────────────────────────
+        $crmAgingCount = 0;
+        $crmNewOrders  = 0;
+        $crmProspects  = 0;
+
+        if (class_exists(\App\Models\StorefrontOrder::class)) {
+            // Order pending > 24 jam (aging)
+            $crmAgingCount = \App\Models\StorefrontOrder::where('status', 'pending')
+                ->where('created_at', '<=', now()->subHours(24))
+                ->count();
+
+            // Order masuk hari ini (baru)
+            $crmNewOrders = \App\Models\StorefrontOrder::whereDate('created_at', today())
+                ->where('status', 'pending')
+                ->count();
+        }
+
+        if (class_exists(\App\Models\StorefrontEvent::class)) {
+            // Prospects baru hari ini (add_to_cart tanpa order)
+            $orderedToday = \App\Models\StorefrontOrder::whereDate('created_at', today())
+                ->pluck('visitor_token')->filter()->unique();
+            $crmProspects = \App\Models\StorefrontEvent::where('event_type', 'add_to_cart')
+                ->whereDate('created_at', today())
+                ->whereNotIn('visitor_token', $orderedToday)
+                ->distinct('visitor_token')
+                ->count('visitor_token');
+        }
+
         return [
-            'po_drafts'  => $poDrafts,
-            'grn_drafts' => $grnDrafts,
+            'po_drafts'      => $poDrafts,
+            'grn_drafts'     => $grnDrafts,
+            'crm_aging'      => $crmAgingCount,
+            'crm_new_orders' => $crmNewOrders,
+            'crm_prospects'  => $crmProspects,
         ];
     });
 
-    foreach (($navPending['po_drafts'] ?? collect()) as $po) {
+    // PO & GRN hanya untuk owner
+    if ($navIsOwner) {
+        foreach (($navPending['po_drafts'] ?? collect()) as $po) {
+            $navPendingItems[] = [
+                'type'  => 'po',
+                'label' => $po->code ?? 'PO #' . $po->id,
+                'sub'   => 'Menunggu approval',
+                'url'   => route('purchasing.purchase_orders.show', $po->id),
+                'icon'  => '🧾',
+            ];
+        }
+        foreach (($navPending['grn_drafts'] ?? collect()) as $grn) {
+            $navPendingItems[] = [
+                'type'  => 'grn',
+                'label' => $grn->code ?? 'GRN #' . $grn->id,
+                'sub'   => 'Belum di-post',
+                'url'   => route('purchasing.purchase_receipts.show', $grn->id),
+                'icon'  => '📦',
+            ];
+        }
+    }
+
+    // ── CRM items ─────────────────────────────────────────────────────────────
+    if (($navPending['crm_aging'] ?? 0) > 0) {
         $navPendingItems[] = [
-            'type'  => 'po',
-            'label' => $po->code ?? 'PO #' . $po->id,
-            'sub'   => 'Menunggu approval',
-            'url'   => route('purchasing.purchase_orders.show', $po->id),
-            'icon'  => '🧾',
+            'type'  => 'crm_aging',
+            'label' => $navPending['crm_aging'] . ' order pending >24 jam',
+            'sub'   => 'Segera konfirmasi ke customer',
+            'url'   => route('admin.crm.orders'),
+            'icon'  => '⏰',
         ];
     }
-    foreach (($navPending['grn_drafts'] ?? collect()) as $grn) {
+    if (($navPending['crm_new_orders'] ?? 0) > 0) {
         $navPendingItems[] = [
-            'type'  => 'grn',
-            'label' => $grn->code ?? 'GRN #' . $grn->id,
-            'sub'   => 'Belum di-post',
-            'url'   => route('purchasing.purchase_receipts.show', $grn->id),
-            'icon'  => '📦',
+            'type'  => 'crm_new_orders',
+            'label' => $navPending['crm_new_orders'] . ' order baru hari ini',
+            'sub'   => 'Menunggu konfirmasi pembayaran',
+            'url'   => route('admin.crm.orders'),
+            'icon'  => '🛒',
+        ];
+    }
+    if (($navPending['crm_prospects'] ?? 0) > 0) {
+        $navPendingItems[] = [
+            'type'  => 'crm_prospects',
+            'label' => $navPending['crm_prospects'] . ' prospect baru hari ini',
+            'sub'   => 'Add to cart tapi belum checkout',
+            'url'   => route('admin.crm.prospects'),
+            'icon'  => '👤',
         ];
     }
 
@@ -364,8 +430,8 @@ if ($navIsOwner) {
         {{-- RIGHT: mobile cluster (theme + logout + hamburger) + desktop nav --}}
         <div class="d-flex align-items-center gap-2">
 
-            {{-- NOTIFICATION BELL (owner only) --}}
-            @if ($navIsOwner)
+            {{-- NOTIFICATION BELL (owner + admin) --}}
+            @if ($navShowBell)
             <div style="position:relative;" id="notifWrapper">
                 <button type="button" class="notif-bell-btn" id="notifBellBtn" aria-label="Notifikasi">
                     <svg viewBox="0 0 24 24" xmlns="http://www.w3.org/2000/svg">
