@@ -30,7 +30,7 @@
         }
         a { color: inherit; text-decoration: none; }
         img { display: block; max-width: 100%; }
-        .wrap { width: min(1120px, calc(100% - 28px)); margin: 0 auto; }
+        .wrap { width: min(1680px, calc(100% - 40px)); margin: 0 auto; }
 
         /* NAV */
         .nav {
@@ -39,7 +39,7 @@
             backdrop-filter: blur(14px);
             border-bottom: 1px solid var(--line);
         }
-        .nav-inner { height: 56px; display: flex; align-items: center; justify-content: space-between; }
+        .nav-inner { height: 56px; display: flex; align-items: center; justify-content: space-between; max-width: 1680px; margin: 0 auto; padding: 0 20px; }
         .brand { display: flex; align-items: center; gap: 8px; font-weight: 900; font-size: 12px; letter-spacing: .16em; text-transform: uppercase; }
         .brand img { width: 28px; height: 28px; object-fit: contain; }
         .nav-r { display: flex; align-items: center; gap: 16px; }
@@ -165,8 +165,9 @@
 
 
         /* DESKTOP */
-        @media (min-width: 760px) {
+        @media (min-width: 720px) {
             body { padding-bottom: 0; }
+            .nav-inner { padding: 0 32px; }
             .hero-mobile { display: none; }
             .hero-desktop { display: grid; }
             .nav-links { display: flex; }
@@ -187,14 +188,15 @@
 <body>
 
 <header class="nav">
-    <div class="wrap nav-inner">
+    <div class="nav-inner">
         <a href="{{ route('storefront.home') }}" class="brand">
             <img src="{{ asset('images/logo-mark.svg') }}" alt="Greatfit">
             <span>Greatfit</span>
         </a>
         <div class="nav-r">
             <nav class="nav-links">
-                <a href="#products">Products</a>
+                <a href="{{ route('storefront.products') }}">Produk</a>
+                <a href="#beli">Beli</a>
             </nav>
             @php $cartCount = array_sum(array_column(session('cart', []), 'qty')); @endphp
             <a href="#" class="cart-icon" title="Cari" onclick="return false;" style="color:var(--ink)">
@@ -215,11 +217,11 @@
             <div class="hm-label">New Collection 2026</div>
             <div class="hm-title">Good Fit,<br>Good Feel.</div>
             <div class="hm-actions">
-                <a href="#products" class="btn-dk">
+                <a href="#produk" class="btn-dk">
                     Products
                     <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><path d="M5 12h14M12 5l7 7-7 7"/></svg>
                 </a>
-                <a href="#products" class="btn-sk">Lihat Koleksi</a>
+                <a href="#produk" class="btn-sk">Lihat Koleksi</a>
             </div>
         </div>
         <div class="hm-visual">
@@ -227,7 +229,7 @@
             <img class="hero-bg" src="https://images.unsplash.com/photo-1548690312-e3b507d8c110?w=600&h=760&fit=crop&auto=format&q=80" alt="">
             <img class="hero-bg" src="https://images.unsplash.com/photo-1526506118085-60ce8714f8c5?w=600&h=760&fit=crop&auto=format&q=80" alt="">
             <div class="hm-badge">New<br>2026</div>
-            <a href="#products" class="hm-card">
+            <a href="#produk" class="hm-card">
                 <div>
                     <div class="hm-card-t">Greatfit Collection</div>
                     <div class="hm-card-s">Comfort & Style</div>
@@ -246,11 +248,11 @@
         <div class="hd-label">New Collection 2026</div>
         <h1 class="hd-title">Good Fit,<br>Good Feel.</h1>
         <div class="hd-actions">
-            <a href="#products" class="btn-dk">
+            <a href="#produk" class="btn-dk">
                 Products
                 <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><path d="M5 12h14M12 5l7 7-7 7"/></svg>
             </a>
-            <a href="#products" class="btn-sk">Lihat Koleksi</a>
+            <a href="#produk" class="btn-sk">Lihat Koleksi</a>
         </div>
     </div>
     <div class="hd-visual">
@@ -258,7 +260,7 @@
         <img class="hd-photo" src="https://images.unsplash.com/photo-1548690312-e3b507d8c110?w=900&h=1100&fit=crop&auto=format&q=80" alt="">
         <img class="hd-photo" src="https://images.unsplash.com/photo-1526506118085-60ce8714f8c5?w=900&h=1100&fit=crop&auto=format&q=80" alt="">
         <div class="hd-badge">New<br>2026</div>
-        <a href="#products" class="hd-card">
+        <a href="#produk" class="hd-card">
             <div>
                 <div class="hd-card-t">Greatfit Collection</div>
                 <div class="hd-card-s">Comfort & Style</div>
@@ -297,7 +299,7 @@
 <div class="wrap">
 
     {{-- PRODUCTS --}}
-    <section class="sec" id="products">
+    <section class="sec" id="produk">
         <div class="sec-head">
             <div class="sec-t">Produk</div>
             <a href="{{ route('storefront.products') }}" class="sec-a">Semua →</a>

@@ -33,11 +33,13 @@
         .wrap { width: min(760px, calc(100% - 32px)); margin: 0 auto; }
 
         /* NAV */
-        .nav { position: sticky; top: 0; z-index: 100; background: rgba(255,255,255,.95); backdrop-filter: blur(12px); border-bottom: 1px solid var(--line); }
-        .nav-inner { height: 58px; display: flex; align-items: center; justify-content: space-between; }
-        .brand { display: flex; align-items: center; gap: 9px; font-weight: 800; font-size: 13px; letter-spacing: .14em; text-transform: uppercase; }
-        .brand img { width: 30px; height: 30px; object-fit: contain; }
-        .nav-right { display: flex; align-items: center; gap: 14px; }
+        .nav { position: sticky; top: 0; z-index: 100; background: rgba(255,255,255,.96); backdrop-filter: blur(14px); border-bottom: 1px solid var(--line); }
+        .nav-inner { height: 56px; display: flex; align-items: center; justify-content: space-between; max-width: 1680px; margin: 0 auto; padding: 0 20px; }
+        .brand { display: flex; align-items: center; gap: 8px; font-weight: 900; font-size: 12px; letter-spacing: .16em; text-transform: uppercase; }
+        .brand img { width: 28px; height: 28px; object-fit: contain; }
+        .nav-r { display: flex; align-items: center; gap: 16px; }
+        .nav-links { display: none; gap: 18px; font-size: 11px; font-weight: 700; letter-spacing: .1em; text-transform: uppercase; color: var(--mid); }
+        .nav-links a:hover { color: var(--ink); }
         .cart-icon { position: relative; width: 34px; height: 34px; border-radius: 50%; display: inline-flex; align-items: center; justify-content: center; color: var(--ink); transition: background .15s; }
         .cart-icon:hover { background: var(--soft); }
         .cart-badge { position: absolute; top: -2px; right: -2px; width: 16px; height: 16px; border-radius: 50%; background: var(--ink); color: var(--white); font-size: 9px; font-weight: 800; display: grid; place-items: center; border: 2px solid var(--white); }
@@ -117,6 +119,8 @@
         .sf-copy, .sf-love { font-size: 11px; color: rgba(255,255,255,.3); }
 
         @media (min-width: 720px) {
+            .nav-inner { padding: 0 32px; }
+            .nav-links { display: flex; }
             .desktop-breadcrumb { display: flex; }
             .foot { display: none; }
             .site-footer { display: block; }
@@ -141,12 +145,16 @@
 <body class="{{ !empty($cart) ? 'has-checkout-bar' : '' }}">
 
 <header class="nav">
-    <div class="wrap nav-inner">
+    <div class="nav-inner">
         <a href="{{ route('storefront.home') }}" class="brand">
             <img src="{{ asset('images/logo-mark.svg') }}" alt="Greatfit">
             <span>Greatfit</span>
         </a>
-        <div class="nav-right">
+        <div class="nav-r">
+            <nav class="nav-links">
+                <a href="{{ route('storefront.products') }}">Produk</a>
+                <a href="{{ route('storefront.home') }}#beli">Beli</a>
+            </nav>
             @php $cartCount = array_sum(array_column(session('cart', []), 'qty')); @endphp
             <a href="{{ route('storefront.cart') }}" class="cart-icon" title="Keranjang">
                 <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M6 2L3 6v14a2 2 0 002 2h14a2 2 0 002-2V6l-3-4z"/><line x1="3" y1="6" x2="21" y2="6"/><path d="M16 10a4 4 0 01-8 0"/></svg>

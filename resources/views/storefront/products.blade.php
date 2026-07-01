@@ -31,7 +31,7 @@
         main > .wrap { flex: 1 0 auto; display: flex; flex-direction: column; }
         a { color: inherit; text-decoration: none; }
         img { display: block; max-width: 100%; }
-        .wrap { width: min(1120px, calc(100% - 32px)); margin: 0 auto; }
+        .wrap { width: min(1680px, calc(100% - 64px)); margin: 0 auto; }
 
         /* NAV */
         .nav {
@@ -40,11 +40,11 @@
             backdrop-filter: blur(12px);
             border-bottom: 1px solid var(--line);
         }
-        .nav-inner { height: 58px; display: flex; align-items: center; justify-content: space-between; }
-        .brand { display: flex; align-items: center; gap: 9px; font-weight: 800; font-size: 13px; letter-spacing: .14em; text-transform: uppercase; }
-        .brand img { width: 30px; height: 30px; object-fit: contain; }
-        .nav-right { display: flex; align-items: center; gap: 20px; }
-        .nav-links { display: none; gap: 20px; font-size: 12px; font-weight: 700; letter-spacing: .08em; text-transform: uppercase; color: var(--mid); }
+        .nav-inner { height: 56px; display: flex; align-items: center; justify-content: space-between; max-width: 1680px; margin: 0 auto; padding: 0 20px; }
+        .brand { display: flex; align-items: center; gap: 8px; font-weight: 900; font-size: 12px; letter-spacing: .16em; text-transform: uppercase; }
+        .brand img { width: 28px; height: 28px; object-fit: contain; }
+        .nav-r { display: flex; align-items: center; gap: 16px; }
+        .nav-links { display: none; gap: 18px; font-size: 11px; font-weight: 700; letter-spacing: .1em; text-transform: uppercase; color: var(--mid); }
         .nav-links a:hover { color: var(--ink); }
         .nav-links a.active { color: var(--ink); }
         .btn-nav { height: 34px; padding: 0 14px; border-radius: 999px; background: var(--ink); color: var(--white); font-size: 12px; font-weight: 700; letter-spacing: .06em; text-transform: uppercase; display: inline-flex; align-items: center; }
@@ -109,6 +109,7 @@
         .sf-love { font-size: 11px; color: rgba(255,255,255,.3); }
 
         @media (min-width: 720px) {
+            .nav-inner { padding: 0 32px; }
             .nav-links { display: flex; }
             .products { grid-template-columns: repeat(4, 1fr); gap: 14px; }
             .page-head { border-bottom: 1px solid var(--line); padding: 28px 0 20px; margin-bottom: 20px; }
@@ -118,9 +119,11 @@
             .channels { gap: 12px; }
             .ch { height: 58px; font-size: 13px; }
         }
+        @media (min-width: 1280px) {
+            .products { grid-template-columns: repeat(5, 1fr); gap: 16px; }
+        }
         @media (min-width: 720px) and (max-width: 1080px) {
             .wrap { width: min(100% - 56px, 920px); }
-            .nav-inner { height: 60px; }
             .page-head { padding: 34px 0 24px; margin-bottom: 24px; }
             .products { grid-template-columns: repeat(3, 1fr); gap: 16px; }
             .pc { border-radius: 16px; }
@@ -131,8 +134,7 @@
         }
         @media (max-width: 719px) {
             .wrap { width: min(520px, calc(100% - 28px)); }
-            .nav-inner { height: 54px; }
-            .nav-right { gap: 8px; }
+            .nav-r { gap: 8px; }
             .breadcrumb { display: none; }
             .page-head { padding: 28px 0 22px; margin-bottom: 18px; }
             .page-title { font-size: 26px; }
@@ -152,12 +154,12 @@
 <body>
 
 <header class="nav">
-    <div class="wrap nav-inner">
+    <div class="nav-inner">
         <a href="{{ route('storefront.home') }}" class="brand">
             <img src="{{ asset('images/logo-mark.svg') }}" alt="Greatfit">
             <span>Greatfit</span>
         </a>
-        <div class="nav-right">
+        <div class="nav-r">
             <nav class="nav-links">
                 <a href="{{ route('storefront.products') }}" class="active">Produk</a>
                 <a href="{{ route('storefront.home') }}#beli">Beli</a>

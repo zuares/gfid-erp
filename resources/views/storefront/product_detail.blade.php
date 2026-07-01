@@ -34,9 +34,9 @@
 
         /* ─── NAV ─── */
         .nav { position: sticky; top: 0; z-index: 200; background: rgba(255,255,255,.96); backdrop-filter: blur(14px); border-bottom: 1px solid var(--line); }
-        .nav-inner { height: 52px; display: flex; align-items: center; justify-content: space-between; padding: 0 16px; max-width: 1160px; margin: 0 auto; }
+        .nav-inner { height: 56px; display: flex; align-items: center; justify-content: space-between; padding: 0 20px; max-width: 1680px; margin: 0 auto; }
         .brand { display: flex; align-items: center; gap: 8px; font-weight: 900; font-size: 12px; letter-spacing: .16em; text-transform: uppercase; }
-        .brand img { width: 26px; height: 26px; object-fit: contain; }
+        .brand img { width: 28px; height: 28px; object-fit: contain; }
         .nav-links { display: none; gap: 18px; font-size: 11px; font-weight: 700; letter-spacing: .1em; text-transform: uppercase; color: var(--mid); }
         .nav-links a:hover { color: var(--ink); }
         .nav-r { display: flex; align-items: center; gap: 4px; }
@@ -54,7 +54,7 @@
 
         /* ─── BREADCRUMB ─── */
         .breadcrumb-bar { background: var(--white); border-bottom: 1px solid var(--line); padding: 9px 16px; }
-        .breadcrumb { font-size: 11px; color: var(--mid); display: flex; align-items: center; gap: 5px; font-weight: 500; max-width: 1160px; margin: 0 auto; }
+        .breadcrumb { font-size: 11px; color: var(--mid); display: flex; align-items: center; gap: 5px; font-weight: 500; max-width: 1680px; margin: 0 auto; }
         .breadcrumb a:hover { color: var(--ink); }
         .mobile-back { font-size: 12px; color: var(--mid); font-weight: 800; display: inline-flex; align-items: center; gap: 6px; }
         .mobile-back:hover { color: var(--ink); }

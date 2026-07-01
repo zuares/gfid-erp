@@ -30,8 +30,8 @@
         a { color: inherit; text-decoration: none; }
         .wrap { width: min(720px, calc(100% - 28px)); margin: 0 auto; }
         .nav { position: sticky; top: 0; z-index: 80; background: rgba(255,255,255,.96); backdrop-filter: blur(12px); border-bottom: 1px solid var(--line); }
-        .nav-inner { height: 54px; display: flex; align-items: center; justify-content: space-between; }
-        .brand { display: flex; align-items: center; gap: 9px; font-weight: 900; font-size: 12px; letter-spacing: .14em; text-transform: uppercase; }
+        .nav-inner { height: 56px; display: flex; align-items: center; justify-content: space-between; max-width: 1680px; margin: 0 auto; padding: 0 20px; }
+        .brand { display: flex; align-items: center; gap: 8px; font-weight: 900; font-size: 12px; letter-spacing: .16em; text-transform: uppercase; }
         .brand img { width: 28px; height: 28px; object-fit: contain; }
         .back { font-size: 11px; font-weight: 800; color: var(--mid); }
         .head { padding: 18px 0 14px; border-bottom: 1px solid var(--line); margin-bottom: 16px; }
@@ -68,7 +68,7 @@
         .btn-primary { flex: 1.2; background: var(--ink); color: var(--white); box-shadow: 0 10px 24px rgba(0,0,0,.16); }
         @media (min-width: 720px) {
             body { padding-bottom: 0; background: var(--soft); }
-            .nav-inner { height: 60px; }
+            .nav-inner { padding: 0 32px; }
             .head { padding: 28px 0 18px; margin-bottom: 20px; }
             .title { font-size: 20px; }
             .panel { padding: 22px; border-radius: 18px; }
@@ -81,7 +81,7 @@
 </head>
 <body>
 <header class="nav">
-    <div class="wrap nav-inner">
+    <div class="nav-inner">
         <a href="{{ route('storefront.home') }}" class="brand">
             <img src="{{ asset('images/logo-mark.svg') }}" alt="Greatfit">
             <span>Greatfit</span>
