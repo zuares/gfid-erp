@@ -1,242 +1,213 @@
-<!doctype html>
-<html lang="id">
-<head>
-    <meta charset="utf-8">
-    <meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=1, user-scalable=no, viewport-fit=cover">
-    <title>Greatfit</title>
-    <link rel="preconnect" href="https://fonts.googleapis.com">
-    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
-    <link href="https://fonts.googleapis.com/css2?family=Plus+Jakarta+Sans:wght@500;700;800;900&family=Barlow+Condensed:wght@800;900&display=swap" rel="stylesheet">
-    <style>
-        *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
-        :root {
-            --ink: #0a0a0a;
-            --mid: #888;
-            --line: #e8e8e8;
-            --soft: #f4f4f4;
-            --white: #fff;
-            --safe: env(safe-area-inset-bottom, 0px);
-        }
-        html { scroll-behavior: smooth; min-height: 100%; }
-        body {
-            font-family: 'Plus Jakarta Sans', system-ui, sans-serif;
-            color: var(--ink); background: var(--white);
-            -webkit-font-smoothing: antialiased;
-            overflow-x: hidden;
-            padding-bottom: 0;
-            min-height: 100vh;
-            display: flex;
-            flex-direction: column;
-        }
-        a { color: inherit; text-decoration: none; }
-        img { display: block; max-width: 100%; }
-        .wrap { width: min(1680px, calc(100% - 64px)); margin: 0 auto; }
+@extends('storefront.layouts.app')
 
-        /* NAV */
-        .nav {
-            position: sticky; top: 0; z-index: 100;
-            background: rgba(255,255,255,.96);
-            backdrop-filter: blur(14px);
-            border-bottom: 1px solid var(--line);
-        }
-        .nav-inner { height: 56px; display: flex; align-items: center; justify-content: space-between; max-width: 1680px; margin: 0 auto; padding: 0 20px; }
-        .brand { display: flex; align-items: center; gap: 8px; font-weight: 900; font-size: 12px; letter-spacing: .16em; text-transform: uppercase; }
-        .brand img { width: 28px; height: 28px; object-fit: contain; }
-        .nav-r { display: flex; align-items: center; gap: 16px; }
-        .nav-links { display: none; gap: 18px; font-size: 11px; font-weight: 700; letter-spacing: .1em; text-transform: uppercase; color: var(--mid); }
-        .nav-links a:hover { color: var(--ink); }
-        .btn-nav { height: 32px; padding: 0 14px; border-radius: 999px; background: var(--ink); color: var(--white); font-size: 11px; font-weight: 700; letter-spacing: .06em; text-transform: uppercase; display: inline-flex; align-items: center; }
-        .cart-icon { position: relative; width: 34px; height: 34px; border-radius: 50%; display: inline-flex; align-items: center; justify-content: center; color: var(--ink); transition: background .15s; }
-        .cart-icon:hover { background: var(--soft); }
-        .cart-badge { position: absolute; top: -2px; right: -2px; width: 16px; height: 16px; border-radius: 50%; background: var(--ink); color: var(--white); font-size: 9px; font-weight: 800; display: grid; place-items: center; border: 2px solid var(--white); }
+@section('title', 'Greatfit')
 
-        /* HERO — mobile stacked, desktop split */
-        .hero-mobile {
-            margin: 10px 0 0;
-            display: grid;
-            gap: 12px;
-        }
-        .hm-content { min-height: 284px; display: flex; flex-direction: column; justify-content: center; padding: 24px 4px 10px; position: relative; overflow: hidden; }
-        .hm-label { font-size: 10px; font-weight: 800; letter-spacing: .16em; text-transform: uppercase; color: var(--mid); display: flex; align-items: center; gap: 8px; margin-bottom: 16px; }
-        .hm-label::before { content: ''; width: 18px; height: 2px; background: var(--ink); display: block; }
-        .hm-title { font-family: 'Barlow Condensed', sans-serif; font-size: clamp(64px, 19vw, 82px); font-weight: 900; line-height: .86; letter-spacing: -.01em; text-transform: uppercase; margin-bottom: 22px; }
-        .hm-actions { display: flex; gap: 8px; flex-wrap: wrap; }
-        .btn-w { height: 42px; padding: 0 20px; border-radius: 999px; background: var(--white); color: var(--ink); font-size: 12px; font-weight: 800; display: inline-flex; align-items: center; gap: 6px; }
-        .btn-g { height: 42px; padding: 0 20px; border-radius: 999px; background: transparent; color: var(--ink); font-size: 12px; font-weight: 700; border: 1.5px solid var(--line); display: inline-flex; align-items: center; }
-        .hm-visual { min-height: 360px; border-radius: 20px; background: var(--ink); display: flex; align-items: center; justify-content: center; position: relative; overflow: hidden; }
-        .hero-bg { position: absolute; inset: 0; width: 100%; height: 100%; object-fit: cover; z-index: 0; opacity: 0; transition: opacity 1.4s ease; }
-        .hero-bg.active { opacity: .6; }
-        .hm-badge { position: absolute; top: 18px; right: 18px; z-index: 2; width: 62px; height: 62px; border-radius: 50%; background: var(--white); color: var(--ink); display: grid; place-items: center; font-size: 9px; font-weight: 800; letter-spacing: .08em; text-transform: uppercase; text-align: center; line-height: 1.4; }
-        .hm-card { position: absolute; left: 14px; right: 14px; bottom: 14px; z-index: 2; background: rgba(255,255,255,.95); backdrop-filter: blur(10px); border-radius: 14px; padding: 13px 14px; display: flex; align-items: center; justify-content: space-between; box-shadow: 0 4px 20px rgba(0,0,0,.15); }
-        .hm-card-t { font-size: 13px; font-weight: 700; }
-        .hm-card-s { font-size: 11px; color: var(--mid); margin-top: 2px; }
-        .hm-card-ic { width: 34px; height: 34px; border-radius: 50%; background: var(--ink); color: var(--white); display: grid; place-items: center; flex-shrink: 0; }
+@push('styles')
+<style>
+    html { scroll-behavior: smooth; scroll-padding-top: 82px; }
+    body { overflow-x: hidden; }
+    .wrap { width: min(1680px, calc(100% - 64px)); margin: 0 auto; }
 
-        /* HERO — desktop split */
-        .hero-desktop { display: none; min-height: calc(100svh - 56px); grid-template-columns: 1fr 1fr; }
-        .hd-content { display: flex; flex-direction: column; justify-content: center; padding: 60px 0; }
-        .hd-label { font-size: 10px; font-weight: 800; letter-spacing: .16em; text-transform: uppercase; color: var(--mid); display: flex; align-items: center; gap: 8px; margin-bottom: 18px; }
-        .hd-label::before { content: ''; width: 18px; height: 2px; background: var(--ink); display: block; }
-        .hd-title { font-family: 'Barlow Condensed', sans-serif; font-size: clamp(64px, 8vw, 100px); font-weight: 900; line-height: .88; text-transform: uppercase; letter-spacing: -.01em; margin-bottom: 28px; }
-        .hd-actions { display: flex; gap: 10px; }
-        .btn-dk { height: 46px; padding: 0 24px; border-radius: 999px; background: var(--ink); color: var(--white); font-size: 12px; font-weight: 800; display: inline-flex; align-items: center; gap: 7px; transition: opacity .15s; }
-        .btn-dk:hover { opacity: .8; }
-        .btn-sk { height: 46px; padding: 0 24px; border-radius: 999px; background: transparent; color: var(--ink); border: 1.5px solid var(--line); font-size: 12px; font-weight: 700; display: inline-flex; align-items: center; transition: border-color .15s; }
-        .btn-sk:hover { border-color: var(--ink); }
-        .hd-visual { background: var(--ink); display: flex; align-items: center; justify-content: center; position: relative; overflow: hidden; }
-        .hd-photo { position: absolute; inset: 0; width: 100%; height: 100%; object-fit: cover; z-index: 0; opacity: 0; transition: opacity 1.4s ease; }
-        .hd-photo.active { opacity: .6; }
-        .hd-badge { position: absolute; top: 28px; right: 28px; z-index: 2; width: 68px; height: 68px; border-radius: 50%; background: var(--white); color: var(--ink); display: grid; place-items: center; font-size: 9px; font-weight: 800; letter-spacing: .08em; text-transform: uppercase; text-align: center; line-height: 1.4; }
-        .hd-card { position: absolute; bottom: 24px; left: 24px; right: 24px; z-index: 2; background: rgba(255,255,255,.95); backdrop-filter: blur(10px); border-radius: 14px; padding: 14px 16px; display: flex; align-items: center; justify-content: space-between; box-shadow: 0 4px 20px rgba(0,0,0,.15); }
-        .hd-card-t { font-size: 13px; font-weight: 700; }
-        .hd-card-s { font-size: 11px; color: var(--mid); margin-top: 2px; }
-        .hd-card-ic { width: 34px; height: 34px; border-radius: 50%; background: var(--ink); color: var(--white); display: grid; place-items: center; }
+    /* HERO — mobile */
+    .hero-mobile { margin: 10px 0 0; display: grid; gap: 12px; }
+    .hm-content { min-height: 284px; display: flex; flex-direction: column; justify-content: center; padding: 24px 4px 10px; position: relative; overflow: hidden; }
+    .hm-label { font-size: 10px; font-weight: 800; letter-spacing: .16em; text-transform: uppercase; color: var(--mid); display: flex; align-items: center; gap: 8px; margin-bottom: 16px; }
+    .hm-label::before { content: ''; width: 18px; height: 2px; background: var(--ink); display: block; }
+    .hm-title { font-family: var(--font-display); font-size: clamp(64px, 19vw, 82px); font-weight: 900; line-height: .86; letter-spacing: -.01em; text-transform: uppercase; margin-bottom: 22px; }
+    .hm-copy { max-width: 300px; margin: -8px 0 18px; font-size: 13px; color: var(--mid); font-weight: 600; line-height: 1.55; }
+    .hm-actions { display: flex; gap: 8px; flex-wrap: wrap; }
+    .btn-dk { height: 42px; padding: 0 20px; border-radius: var(--radius-pill); background: var(--ink); color: var(--white); font-size: 12px; font-weight: 800; display: inline-flex; align-items: center; gap: 6px; transition: opacity .15s; }
+    .btn-dk:hover { opacity: .8; }
+    .btn-sk { height: 42px; padding: 0 20px; border-radius: var(--radius-pill); background: transparent; color: var(--ink); font-size: 12px; font-weight: 700; border: 1.5px solid var(--line); display: inline-flex; align-items: center; transition: border-color .15s; }
+    .btn-sk:hover { border-color: var(--ink); }
+    .hm-visual { min-height: 360px; border-radius: 20px; background: var(--ink); display: flex; align-items: center; justify-content: center; position: relative; overflow: hidden; }
+    .hero-bg { position: absolute; inset: 0; width: 100%; height: 100%; object-fit: cover; object-position: center; z-index: 0; opacity: 0; transition: opacity 1.4s ease; }
+    .hero-bg.active { opacity: .68; }
+    .hm-badge { position: absolute; top: 18px; right: 18px; z-index: 2; width: 62px; height: 62px; border-radius: 50%; background: var(--white); color: var(--ink); display: grid; place-items: center; font-size: 9px; font-weight: 800; letter-spacing: .08em; text-transform: uppercase; text-align: center; line-height: 1.4; }
+    .hm-card { position: absolute; left: 14px; right: 14px; bottom: 14px; z-index: 2; background: rgba(255,255,255,.95); backdrop-filter: blur(10px); border-radius: 14px; padding: 13px 14px; display: flex; align-items: center; justify-content: space-between; box-shadow: 0 4px 20px rgba(0,0,0,.15); }
+    .hm-card-t { font-size: 13px; font-weight: 700; }
+    .hm-card-s { font-size: 11px; color: var(--mid); margin-top: 2px; }
+    .hm-card-ic { width: 34px; height: 34px; border-radius: 50%; background: var(--ink); color: var(--white); display: grid; place-items: center; flex-shrink: 0; }
 
-        /* STRIP */
-        .strip { background: var(--ink); padding: 11px 0; overflow: hidden; margin-top: 12px; }
-        .strip-track { display: flex; gap: 36px; white-space: nowrap; animation: mq 20s linear infinite; }
-        .strip-i { display: inline-flex; align-items: center; gap: 8px; font-size: 10px; font-weight: 800; letter-spacing: .16em; text-transform: uppercase; color: rgba(255,255,255,.7); flex-shrink: 0; }
-        .strip-dot { width: 3px; height: 3px; border-radius: 50%; background: rgba(255,255,255,.3); }
-        @keyframes mq { from { transform: translateX(0); } to { transform: translateX(-50%); } }
+    /* HERO — desktop */
+    .hero-desktop { display: none; min-height: calc(100svh - 56px); grid-template-columns: 1fr 1fr; }
+    .hd-content { display: flex; flex-direction: column; justify-content: center; padding: 60px 0; }
+    .hd-label { font-size: 10px; font-weight: 800; letter-spacing: .16em; text-transform: uppercase; color: var(--mid); display: flex; align-items: center; gap: 8px; margin-bottom: 18px; }
+    .hd-label::before { content: ''; width: 18px; height: 2px; background: var(--ink); display: block; }
+    .hd-title { font-family: var(--font-display); font-size: clamp(64px, 8vw, 100px); font-weight: 900; line-height: .88; text-transform: uppercase; letter-spacing: -.01em; margin-bottom: 18px; }
+    .hd-copy { max-width: 360px; margin-bottom: 28px; font-size: 14px; color: var(--mid); font-weight: 700; line-height: 1.6; }
+    .hd-actions { display: flex; gap: 10px; }
+    .hd-visual { background: var(--ink); display: flex; align-items: center; justify-content: center; position: relative; overflow: hidden; }
+    .hd-photo { position: absolute; inset: 0; width: 100%; height: 100%; object-fit: cover; object-position: center; z-index: 0; opacity: 0; transition: opacity 1.4s ease; }
+    .hd-photo.active { opacity: .68; }
+    .hd-badge { position: absolute; top: 28px; right: 28px; z-index: 2; width: 68px; height: 68px; border-radius: 50%; background: var(--white); color: var(--ink); display: grid; place-items: center; font-size: 9px; font-weight: 800; letter-spacing: .08em; text-transform: uppercase; text-align: center; line-height: 1.4; }
+    .hd-card { position: absolute; bottom: 24px; left: 24px; right: 24px; z-index: 2; background: rgba(255,255,255,.95); backdrop-filter: blur(10px); border-radius: 14px; padding: 14px 16px; display: flex; align-items: center; justify-content: space-between; box-shadow: 0 4px 20px rgba(0,0,0,.15); }
+    .hd-card-t { font-size: 13px; font-weight: 700; }
+    .hd-card-s { font-size: 11px; color: var(--mid); margin-top: 2px; }
+    .hd-card-ic { width: 34px; height: 34px; border-radius: 50%; background: var(--ink); color: var(--white); display: grid; place-items: center; }
 
-        /* SECTIONS */
-        .sec { padding: 28px 0; }
-        .sec-head { display: flex; align-items: center; justify-content: space-between; margin-bottom: 12px; }
-        .sec-t { font-size: 13px; font-weight: 800; letter-spacing: -.01em; }
-        .sec-a { font-size: 12px; font-weight: 700; color: var(--mid); }
-        .sec-a:hover { color: var(--ink); }
+    /* STRIP */
+    .strip { background: var(--ink); padding: 11px 0; overflow: hidden; margin-top: 12px; }
+    .strip-track { display: flex; gap: 36px; white-space: nowrap; animation: mq 20s linear infinite; }
+    .strip-i { display: inline-flex; align-items: center; gap: 8px; font-size: 10px; font-weight: 800; letter-spacing: .16em; text-transform: uppercase; color: rgba(255,255,255,.7); flex-shrink: 0; }
+    .strip-dot { width: 3px; height: 3px; border-radius: 50%; background: rgba(255,255,255,.3); }
+    @@keyframes mq { from { transform: translateX(0); } to { transform: translateX(-50%); } }
 
-        /* CHANNELS */
-        .sec-beli { position: sticky; top: 56px; z-index: 90; background: rgba(255,255,255,.97); backdrop-filter: blur(10px); border-bottom: 1px solid var(--line); padding: 14px 0 12px; }
-        .sec-beli-label { font-size: 11px; font-weight: 800; letter-spacing: .08em; text-transform: uppercase; color: var(--mid); margin-bottom: 10px; }
-        .chs { display: grid; grid-template-columns: repeat(4, 1fr); gap: 7px; }
-        .ch { height: 40px; border-radius: 10px; background: var(--soft); border: 1px solid var(--line); display: flex; align-items: center; justify-content: center; font-size: 11px; font-weight: 800; transition: background .15s; }
-        .ch:hover { background: var(--line); }
-        .ch.dk { background: var(--ink); color: var(--white); border-color: var(--ink); }
+    /* SECTIONS */
+    .sec { padding: 32px 0; scroll-margin-top: 82px; }
+    .sec-head { display: flex; align-items: flex-end; justify-content: space-between; gap: 16px; margin-bottom: 16px; }
+    .sec-t { font-size: 15px; font-weight: 900; letter-spacing: -.01em; }
+    .sec-a { font-size: 12px; font-weight: 800; color: var(--mid); white-space: nowrap; }
+    .sec-a:hover { color: var(--ink); }
+    .sec-a.all-products { min-height: 34px; padding: 0 13px; border: 1px solid var(--ink); border-radius: var(--radius-pill); color: var(--ink); display: inline-flex; align-items: center; gap: 7px; font-size: 11px; }
+    .sec-a.all-products:hover { background: var(--ink); color: var(--white); }
 
-        /* PRODUCTS */
-        .prods { display: grid; grid-template-columns: repeat(2, 1fr); gap: 9px; }
-        .pc { border-radius: 16px; overflow: hidden; background: var(--soft); border: 1px solid var(--line); display: block; }
-        .pc-img { aspect-ratio: 1; position: relative; background: var(--soft); overflow: hidden; }
-        .pc-img img { width: 100%; height: 100%; object-fit: cover; display: block; }
-        .pc-tag { position: absolute; top: 9px; left: 9px; z-index: 3; background: var(--ink); color: var(--white); font-size: 9px; font-weight: 800; padding: 3px 7px; border-radius: 999px; letter-spacing: .04em; }
-        .pc-b { padding: 10px 11px; }
-        .pc-n { font-size: 12px; font-weight: 700; line-height: 1.2; color: var(--ink); }
-        .pc-p { font-size: 14px; font-weight: 900; margin-top: 4px; }
+    /* CATEGORY SEARCH */
+    .cat-search { padding-top: 34px; padding-bottom: 14px; }
+    .cat-eyebrow { font-size: 10px; font-weight: 900; letter-spacing: .14em; text-transform: uppercase; color: var(--mid); margin-bottom: 6px; }
+    .cat-title { font-size: 18px; font-weight: 900; letter-spacing: -.02em; line-height: 1.15; }
+    .cat-copy { max-width: 360px; margin-top: 6px; font-size: 12px; color: var(--mid); font-weight: 600; line-height: 1.5; }
+    .cat-grid { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 8px; }
+    .cat-card { min-height: 78px; border: 1px solid var(--line); border-radius: 14px; background: var(--white); padding: 12px; display: grid; grid-template-columns: 34px minmax(0, 1fr); align-items: center; column-gap: 10px; transition: background .15s, border-color .15s; }
+    .cat-card:hover { border-color: #d2d2d2; background: #fafafa; }
+    .cat-ic { width: 34px; height: 34px; border-radius: 50%; background: var(--soft); display: grid; place-items: center; }
+    .cat-ic svg { width: 22px; height: 22px; }
+    .cat-name { font-size: 11px; font-weight: 900; line-height: 1.28; letter-spacing: .04em; text-transform: uppercase; overflow-wrap: anywhere; }
 
-        /* VALUES — minimal row */
-        .vals { display: grid; grid-template-columns: repeat(3, 1fr); gap: 1px; background: var(--line); border: 1px solid var(--line); border-radius: 16px; overflow: hidden; }
-        .val { background: var(--white); padding: 20px 16px; }
-        .val-n { font-family: 'Barlow Condensed', sans-serif; font-size: 32px; font-weight: 900; color: var(--line); line-height: 1; margin-bottom: 8px; }
-        .val-t { font-size: 12px; font-weight: 800; margin-bottom: 4px; }
-        .val-d { font-size: 11px; color: var(--mid); font-weight: 500; line-height: 1.55; display: none; }
+    /* CHANNELS */
+    .shop-channels { padding-top: 12px; }
+    .shop-panel { border: 1px solid var(--line); border-radius: 20px; background: #fafafa; padding: 18px; }
+    .shop-head { margin-bottom: 16px; }
+    .shop-kicker { display: inline-flex; align-items: center; gap: 7px; height: 26px; padding: 0 10px; border-radius: var(--radius-pill); background: var(--ink); color: var(--white); font-size: 9px; font-weight: 900; letter-spacing: .12em; text-transform: uppercase; margin-bottom: 12px; }
+    .shop-kicker::before { content: ""; width: 5px; height: 5px; border-radius: 50%; background: currentColor; opacity: .75; }
+    .shop-title { font-size: 22px; font-weight: 900; letter-spacing: -.03em; line-height: 1.08; }
+    .shop-copy { max-width: 440px; margin-top: 8px; font-size: 12px; color: var(--mid); font-weight: 700; line-height: 1.55; }
+    .chs { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 9px; }
+    .ch { position: relative; min-height: 62px; border-radius: 14px; background: var(--white); border: 1px solid var(--line); padding: 12px; display: flex; align-items: center; justify-content: space-between; gap: 10px; font-size: 12px; font-weight: 900; transition: background .15s, border-color .15s; }
+    .ch:hover { border-color: #d2d2d2; background: #fafafa; }
+    .ch.dk { background: var(--ink); color: var(--white); border-color: var(--ink); }
+    .ch.dk::after { content: "Rekomendasi"; position: absolute; top: 8px; right: 9px; font-size: 8px; font-weight: 900; letter-spacing: .08em; text-transform: uppercase; color: rgba(255,255,255,.62); }
+    .ch-main { display: flex; align-items: center; gap: 9px; min-width: 0; }
+    .ch-mark { width: 30px; height: 30px; border-radius: 50%; background: var(--soft); color: var(--ink); display: grid; place-items: center; font-size: 10px; font-weight: 900; flex: 0 0 auto; }
+    .ch.dk .ch-mark { background: rgba(255,255,255,.14); color: var(--white); }
+    .ch-name { display: block; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+    .ch-note { display: block; margin-top: 2px; font-size: 10px; color: var(--mid); font-weight: 700; }
+    .ch.dk .ch-note { color: rgba(255,255,255,.58); }
+    .ch-arr { color: var(--mid); flex: 0 0 auto; }
+    .ch.dk .ch-arr { color: rgba(255,255,255,.75); }
 
-        /* CLOSING */
-        .cta { background: var(--ink); color: var(--white); border-radius: 20px; padding: 40px 20px; text-align: center; }
-        .cta-t { font-family: 'Barlow Condensed', sans-serif; font-size: clamp(40px, 10vw, 72px); font-weight: 900; text-transform: uppercase; line-height: .88; margin-bottom: 20px; }
-        .cta-row { display: flex; gap: 8px; justify-content: center; }
-        .btn-cw { height: 44px; padding: 0 22px; border-radius: 999px; background: var(--white); color: var(--ink); font-size: 12px; font-weight: 800; display: inline-flex; align-items: center; }
-        .btn-co { height: 44px; padding: 0 22px; border-radius: 999px; background: transparent; color: rgba(255,255,255,.65); border: 1px solid rgba(255,255,255,.2); font-size: 12px; font-weight: 700; display: inline-flex; align-items: center; }
+    /* PRODUCTS */
+    .prods { display: grid; grid-template-columns: repeat(2, 1fr); gap: 9px; }
+    .pc { border-radius: 16px; overflow: hidden; background: var(--soft); border: 1px solid var(--line); display: block; }
+    .pc-img { aspect-ratio: 1; position: relative; background: var(--soft); overflow: hidden; }
+    .pc-img img { width: 100%; height: 100%; object-fit: cover; display: block; }
+    .pc-tag { position: absolute; top: 9px; left: 9px; z-index: 3; background: var(--ink); color: var(--white); font-size: 9px; font-weight: 800; padding: 3px 7px; border-radius: var(--radius-pill); letter-spacing: .04em; }
+    .pc-tag.badge-trending { background: #0f172a; }
+    .pc-tag.badge-new      { background: #6366f1; }
+    .pc-tag.badge-jumbo    { background: #7c3aed; }
+    .pc-stock-badge { position: absolute; top: 9px; right: 9px; z-index: 3; background: #f97316; color: #fff; font-size: 9px; font-weight: 900; padding: 3px 7px; border-radius: var(--radius-pill); letter-spacing: .03em; }
+    .pc-stock-badge.out { background: #111; }
+    .pc-b { padding: 10px 11px; }
+    .pc-n { font-size: 12px; font-weight: 700; line-height: 1.2; color: var(--ink); }
+    .pc-p { font-size: 14px; font-weight: 900; margin-top: 4px; }
+    .pc-stock-line { margin-top: 5px; font-size: 10px; color: var(--mid); font-weight: 800; }
+    .pc-stock-line.low { color: #f97316; }
+    .pc-stock-line.out { color: #b91c1c; }
+    .pc-mini { display: none; }
 
-        /* FOOTER */
-        .foot { padding: 22px 0 18px; border-top: 1px solid var(--line); margin-top: 28px; }
-        .foot-brand { display: flex; align-items: center; gap: 9px; margin-bottom: 8px; }
-        .foot-brand img { width: 26px; height: 26px; object-fit: contain; }
-        .foot-name { font-size: 12px; font-weight: 900; letter-spacing: .15em; text-transform: uppercase; }
-        .foot-tagline { font-size: 12px; color: var(--mid); font-weight: 600; line-height: 1.55; margin-bottom: 16px; }
-        .foot-links { display: grid; grid-template-columns: repeat(3, 1fr); gap: 8px; margin-bottom: 16px; }
-        .foot-links a { height: 38px; border-radius: 12px; background: var(--soft); border: 1px solid var(--line); display: grid; place-items: center; font-size: 11px; font-weight: 800; color: var(--ink); }
-        .foot-bottom { display: flex; align-items: center; justify-content: space-between; gap: 12px; }
-        .foot-bottom span, .foot-bottom a { font-size: 11px; color: var(--mid); font-weight: 600; }
-        .site-footer { background: var(--ink); color: rgba(255,255,255,.7); display: none; margin-top: auto; }
-        .site-footer-inner { max-width: 1680px; margin: 0 auto; padding: 40px 32px 28px; }
-        .sf-top { display: grid; grid-template-columns: 1fr auto; gap: 40px; align-items: start; margin-bottom: 36px; }
-        .sf-brand { display: flex; align-items: center; gap: 10px; margin-bottom: 10px; }
-        .sf-brand img { width: 28px; height: 28px; object-fit: contain; filter: invert(1); }
-        .sf-brand-name { font-size: 13px; font-weight: 900; letter-spacing: .15em; text-transform: uppercase; color: #fff; }
-        .sf-tagline { font-size: 12px; color: rgba(255,255,255,.45); font-weight: 500; line-height: 1.6; max-width: 280px; }
-        .sf-nav { display: flex; gap: 32px; }
-        .sf-col h4 { font-size: 10px; font-weight: 800; letter-spacing: .1em; text-transform: uppercase; color: rgba(255,255,255,.4); margin-bottom: 12px; }
-        .sf-col a { display: block; font-size: 12px; font-weight: 600; color: rgba(255,255,255,.65); margin-bottom: 8px; text-decoration: none; transition: color .15s; }
-        .sf-col a:hover { color: #fff; }
-        .sf-bottom { border-top: 1px solid rgba(255,255,255,.08); padding-top: 20px; display: flex; align-items: center; justify-content: space-between; }
-        .sf-copy { font-size: 11px; color: rgba(255,255,255,.3); }
-        .sf-love { font-size: 11px; color: rgba(255,255,255,.3); }
+    /* VALUES */
+    .vals { display: grid; grid-template-columns: repeat(3, 1fr); gap: 1px; background: var(--line); border: 1px solid var(--line); border-radius: 16px; overflow: hidden; }
+    .val { background: var(--white); padding: 20px 16px; }
+    .val-n { font-family: var(--font-display); font-size: 32px; font-weight: 900; color: var(--line); line-height: 1; margin-bottom: 8px; }
+    .val-t { font-size: 12px; font-weight: 800; margin-bottom: 4px; }
+    .val-d { font-size: 11px; color: var(--mid); font-weight: 500; line-height: 1.55; display: none; }
 
+    /* CLOSING CTA */
+    .cta-blk { background: var(--ink); color: var(--white); border-radius: 20px; padding: 40px 20px; text-align: center; }
+    .cta-blk-t { font-family: var(--font-display); font-size: clamp(40px, 10vw, 72px); font-weight: 900; text-transform: uppercase; line-height: .88; margin-bottom: 20px; }
+    .cta-blk-row { display: flex; gap: 8px; justify-content: center; }
+    .btn-cw { height: 44px; padding: 0 22px; border-radius: var(--radius-pill); background: var(--white); color: var(--ink); font-size: 12px; font-weight: 800; display: inline-flex; align-items: center; }
+    .btn-co { height: 44px; padding: 0 22px; border-radius: var(--radius-pill); background: transparent; color: rgba(255,255,255,.65); border: 1px solid rgba(255,255,255,.2); font-size: 12px; font-weight: 700; display: inline-flex; align-items: center; }
 
-        @media (max-width: 719px) {
-            .wrap { width: min(520px, calc(100% - 28px)); }
-        }
+    @@media (max-width: 719px) {
+        .wrap { width: min(520px, calc(100% - 28px)); }
+        html { scroll-padding-top: 96px; }
+        .hm-content { min-height: 266px; padding-top: 22px; }
+        .hm-label { margin-bottom: 14px; }
+        .hm-title { margin-bottom: 18px; }
+        .hm-actions { display: grid; grid-template-columns: 1fr 1fr; gap: 9px; }
+        .btn-dk, .btn-sk { height: 44px; justify-content: center; padding: 0 14px; font-size: 12px; }
+        .hm-visual { min-height: 330px; border-radius: 18px; }
+        .shop-channels { padding-top: 10px; padding-bottom: 20px; }
+        .shop-panel { padding: 16px; border-radius: 18px; }
+        .shop-kicker { height: 24px; font-size: 8.5px; margin-bottom: 11px; }
+        .shop-title { font-size: 21px; max-width: 260px; }
+        .shop-copy { max-width: 280px; font-size: 12px; }
+        .ch { min-height: 64px; border-radius: 13px; padding: 11px; }
+        .ch.dk { grid-column: 1 / -1; min-height: 70px; }
+        .ch-mark { width: 28px; height: 28px; }
+        .ch-name { font-size: 11.5px; }
+        .sec { padding: 30px 0; scroll-margin-top: 96px; }
+        .cat-search { padding-top: 30px; padding-bottom: 14px; }
+        .cat-title { font-size: 18px; }
+        .cat-grid { gap: 8px; }
+        .cat-card { min-height: 66px; border-radius: 12px; background: var(--soft); padding: 10px; }
+        .cat-card:active { background: var(--ink); color: var(--white); border-color: var(--ink); transform: scale(.985); }
+        .cat-card:active .cat-ic { background: rgba(255,255,255,.14); }
+        .prods { gap: 10px; }
+        .pc { border-radius: 14px; background: var(--white); }
+        .pc-b { padding: 11px; }
+        .pc-n { font-size: 12.5px; min-height: 32px; display: -webkit-box; -webkit-line-clamp: 2; -webkit-box-orient: vertical; overflow: hidden; }
+        .pc-mini { display: flex; align-items: center; justify-content: space-between; gap: 8px; margin-top: 9px; padding-top: 9px; border-top: 1px solid var(--line); font-size: 10px; color: var(--mid); font-weight: 800; }
+    }
+    @@media (min-width: 720px) {
+        .hero-mobile { display: none; }
+        .hero-desktop { display: grid; }
+        .strip { margin-top: 0; }
+        .cat-search { padding-top: 44px; }
+        .cat-head { display: flex; margin-bottom: 16px; }
+        .cat-title { font-size: 22px; }
+        .cat-grid { grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 12px; }
+        .cat-card { min-height: 104px; padding: 16px; grid-template-columns: 42px minmax(0, 1fr); }
+        .cat-ic { width: 42px; height: 42px; }
+        .cat-name { font-size: 12px; }
+        .prods { grid-template-columns: repeat(4, 1fr); gap: 12px; }
+        .chs { grid-template-columns: repeat(4, minmax(0, 1fr)); gap: 10px; }
+        .val-d { display: block; }
+        .val { padding: 28px 22px; }
+        .cta-blk { padding: 56px 24px; border-radius: 24px; }
+        .sec { padding: 44px 0; }
+    }
+</style>
+@endpush
 
-        /* DESKTOP */
-        @media (min-width: 720px) {
-            body { padding-bottom: 0; }
-            .nav-inner { padding: 0 32px; }
-            .hero-mobile { display: none; }
-            .hero-desktop { display: grid; }
-            .nav-links { display: flex; }
-            .strip { margin-top: 0; }
-            .prods { grid-template-columns: repeat(4, 1fr); gap: 12px; }
-            .chs { gap: 10px; }
-            .ch { height: 44px; font-size: 12px; }
+@php $navActive = 'home'; @endphp
 
-            .val-d { display: block; }
-            .val { padding: 28px 22px; }
-            .cta { padding: 56px 24px; border-radius: 24px; }
-            .sec { padding: 40px 0; }
-            .foot { display: none; }
-            .site-footer { display: block; }
-        }
-    </style>
-</head>
-<body>
-
-<header class="nav">
-    <div class="nav-inner">
-        <a href="{{ route('storefront.home') }}" class="brand">
-            <img src="{{ asset('images/logo-mark.svg') }}" alt="Greatfit">
-            <span>Greatfit</span>
-        </a>
-        <div class="nav-r">
-            <nav class="nav-links">
-                <a href="{{ route('storefront.products') }}">Produk</a>
-                <a href="#beli">Beli</a>
-            </nav>
-            @php $cartCount = array_sum(array_column(session('cart', []), 'qty')); @endphp
-            <a href="#" class="cart-icon" title="Cari" onclick="return false;" style="color:var(--ink)">
-                <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="11" cy="11" r="8"/><path d="M21 21l-4.35-4.35"/></svg>
-            </a>
-            <a href="{{ route('storefront.cart') }}" class="cart-icon" title="Keranjang">
-                <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M6 2L3 6v14a2 2 0 002 2h14a2 2 0 002-2V6l-3-4z"/><line x1="3" y1="6" x2="21" y2="6"/><path d="M16 10a4 4 0 01-8 0"/></svg>
-                @if($cartCount > 0)<span class="cart-badge">{{ $cartCount }}</span>@endif
-            </a>
-        </div>
-    </div>
-</header>
-
+@section('content')
 {{-- HERO MOBILE --}}
 <div class="wrap">
     <div class="hero-mobile">
         <div class="hm-content">
             <div class="hm-label">New Collection 2026</div>
             <div class="hm-title">Good Fit,<br>Good Feel.</div>
+            <div class="hm-copy">The little things that make life great.</div>
             <div class="hm-actions">
-                <a href="#produk" class="btn-dk">
-                    Products
+                <a href="#beli" class="btn-dk">
+                    Mulai Belanja
                     <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><path d="M5 12h14M12 5l7 7-7 7"/></svg>
                 </a>
-                <a href="#produk" class="btn-sk">Lihat Koleksi</a>
+                <a href="#kategori" class="btn-sk">Pilih Kategori</a>
             </div>
         </div>
         <div class="hm-visual">
-            <img class="hero-bg active" src="https://images.unsplash.com/photo-1583454110551-21f2fa2afe61?w=600&h=760&fit=crop&auto=format&q=80" alt="">
-            <img class="hero-bg" src="https://images.unsplash.com/photo-1548690312-e3b507d8c110?w=600&h=760&fit=crop&auto=format&q=80" alt="">
-            <img class="hero-bg" src="https://images.unsplash.com/photo-1526506118085-60ce8714f8c5?w=600&h=760&fit=crop&auto=format&q=80" alt="">
+            <img class="hero-bg active" src="https://images.unsplash.com/photo-1660167213901-e2f33a1a7486?ixlib=rb-4.1.0&q=85&fm=jpg&crop=entropy&cs=srgb&w=700&h=920&fit=crop" alt="Outfit sporty">
+            <img class="hero-bg" src="https://images.unsplash.com/photo-1756786825067-4b153740e7c2?ixlib=rb-4.1.0&q=85&fm=jpg&crop=entropy&cs=srgb&w=700&h=920&fit=crop" alt="Gaya kasual outdoor">
+            <img class="hero-bg" src="https://images.unsplash.com/photo-1774160928808-afdd9b93363b?ixlib=rb-4.1.0&q=85&fm=jpg&crop=entropy&cs=srgb&w=700&h=920&fit=crop" alt="Koleksi Greatfit">
             <div class="hm-badge">New<br>2026</div>
-            <a href="#produk" class="hm-card">
+            <a href="{{ route('storefront.products') }}" class="hm-card">
                 <div>
                     <div class="hm-card-t">Greatfit Collection</div>
-                    <div class="hm-card-s">Comfort & Style</div>
+                    <div class="hm-card-s">Hal kecil yang membuat hidup luar biasa.</div>
                 </div>
                 <div class="hm-card-ic">
                     <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><path d="M5 12h14M12 5l7 7-7 7"/></svg>
@@ -251,23 +222,24 @@
     <div class="hd-content" style="padding-left:max(32px,calc((100vw - 1680px)/2 + 32px));">
         <div class="hd-label">New Collection 2026</div>
         <h1 class="hd-title">Good Fit,<br>Good Feel.</h1>
+        <div class="hd-copy">The little things that make life great.</div>
         <div class="hd-actions">
-            <a href="#produk" class="btn-dk">
-                Products
+            <a href="#beli" class="btn-dk">
+                Mulai Belanja
                 <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><path d="M5 12h14M12 5l7 7-7 7"/></svg>
             </a>
-            <a href="#produk" class="btn-sk">Lihat Koleksi</a>
+            <a href="#kategori" class="btn-sk">Pilih Kategori</a>
         </div>
     </div>
     <div class="hd-visual">
-        <img class="hd-photo active" src="https://images.unsplash.com/photo-1583454110551-21f2fa2afe61?w=900&h=1100&fit=crop&auto=format&q=80" alt="">
-        <img class="hd-photo" src="https://images.unsplash.com/photo-1548690312-e3b507d8c110?w=900&h=1100&fit=crop&auto=format&q=80" alt="">
-        <img class="hd-photo" src="https://images.unsplash.com/photo-1526506118085-60ce8714f8c5?w=900&h=1100&fit=crop&auto=format&q=80" alt="">
+        <img class="hd-photo active" src="https://images.unsplash.com/photo-1660167213901-e2f33a1a7486?ixlib=rb-4.1.0&q=85&fm=jpg&crop=entropy&cs=srgb&w=1000&h=1200&fit=crop" alt="Outfit sporty">
+        <img class="hd-photo" src="https://images.unsplash.com/photo-1756786825067-4b153740e7c2?ixlib=rb-4.1.0&q=85&fm=jpg&crop=entropy&cs=srgb&w=1000&h=1200&fit=crop" alt="Gaya kasual outdoor">
+        <img class="hd-photo" src="https://images.unsplash.com/photo-1774160928808-afdd9b93363b?ixlib=rb-4.1.0&q=85&fm=jpg&crop=entropy&cs=srgb&w=1000&h=1200&fit=crop" alt="Koleksi Greatfit">
         <div class="hd-badge">New<br>2026</div>
-        <a href="#produk" class="hd-card">
+        <a href="{{ route('storefront.products') }}" class="hd-card">
             <div>
                 <div class="hd-card-t">Greatfit Collection</div>
-                <div class="hd-card-s">Comfort & Style</div>
+                <div class="hd-card-s">Hal kecil yang membuat hidup luar biasa.</div>
             </div>
             <div class="hd-card-ic">
                 <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><path d="M5 12h14M12 5l7 7-7 7"/></svg>
@@ -288,50 +260,123 @@
     </div>
 </div>
 
-{{-- BELI LEWAT — sticky di bawah nav --}}
-<div class="sec-beli" id="beli">
-    <div class="wrap">
-        <div class="sec-beli-label">Beli Lewat</div>
-        <div class="chs">
-            @foreach($channels as $ch)
-            <a class="ch {{ ($ch['dark'] ?? false) ? 'dk' : '' }}" href="{{ $ch['url'] ?? '#' }}" @if(!($ch['dark'] ?? false)) target="_blank" rel="noopener" @endif>{{ $ch['label'] }}</a>
+<div class="wrap">
+
+    {{-- CATEGORY SEARCH --}}
+    @if($categories->isNotEmpty())
+    <section class="sec cat-search" id="kategori">
+        <div class="sec-head cat-head">
+            <div>
+                <div class="cat-eyebrow">Koleksi</div>
+                <div class="cat-title">Cari yang paling pas</div>
+                <div class="cat-copy">Mulai dari kategori yang kamu butuhkan.</div>
+            </div>
+            <a href="{{ route('storefront.products') }}" class="sec-a">Lihat semua</a>
+        </div>
+        <div class="cat-grid">
+            @foreach($categories->take(8) as $cat)
+            @php
+                $catSlug = strtolower($cat->slug ?? $cat->name);
+                $catIcon = match(true) {
+                    str_contains($catSlug, 'hoodie')                                                   => 'hoodie',
+                    str_contains($catSlug, 'jacket') || str_contains($catSlug, 'jaket')               => 'jacket',
+                    str_contains($catSlug, 'pants') || str_contains($catSlug, 'celana') || str_contains($catSlug, 'jogger') => 'pants',
+                    str_contains($catSlug, 'shirt') || str_contains($catSlug, 'kaos')                 => 'shirt',
+                    default                                                                             => 'tag',
+                };
+            @endphp
+            <a href="{{ route('storefront.products', ['kategori' => $cat->slug]) }}" class="cat-card">
+                <span class="cat-ic">
+                    @if($catIcon === 'hoodie')
+                    <svg width="34" height="34" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round"><path d="M8 4l4 3 4-3 4 4-2 4v8H6v-8L4 8l4-4z"/><path d="M9 20v-6h6v6"/></svg>
+                    @elseif($catIcon === 'jacket')
+                    <svg width="34" height="34" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round"><path d="M9 4h6l4 4v12H5V8l4-4z"/><path d="M12 7v13"/><path d="M8 12h2"/><path d="M14 12h2"/></svg>
+                    @elseif($catIcon === 'pants')
+                    <svg width="34" height="34" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round"><path d="M8 4h8l1 16h-4l-1-9-1 9H7L8 4z"/><path d="M9 4v3h6V4"/></svg>
+                    @elseif($catIcon === 'shirt')
+                    <svg width="34" height="34" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round"><path d="M8 4l4 3 4-3 4 5-3 2v9H7v-9L4 9l4-5z"/></svg>
+                    @else
+                    <svg width="34" height="34" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round"><path d="M20.59 13.41l-7.17 7.17a2 2 0 01-2.83 0L2 12V2h10l8.59 8.59a2 2 0 010 2.82z"/><path d="M7 7h.01"/></svg>
+                    @endif
+                </span>
+                <div class="cat-name">{{ $cat->name }}</div>
+            </a>
             @endforeach
         </div>
-    </div>
-</div>
+    </section>
+    @endif
 
-<div class="wrap">
+    {{-- SHOP CHANNELS --}}
+    <section class="sec shop-channels" id="beli">
+        <div class="shop-panel">
+            <div class="shop-head">
+                <div class="shop-kicker">Channel Belanja</div>
+                <div class="shop-title">Mau belanja lewat mana?</div>
+                <div class="shop-copy">Website Greatfit atau marketplace favorit, pilih yang paling nyaman.</div>
+            </div>
+            <div class="chs">
+                @foreach($channels as $ch)
+                @php
+                    $label     = $ch['label'] ?? 'Store';
+                    $isWebsite = (bool) ($ch['dark'] ?? false);
+                    $initial   = collect(explode(' ', $label))->map(fn($p) => mb_substr($p, 0, 1))->join('');
+                    $note      = $isWebsite ? 'Lihat produk pilihan' : 'Buka marketplace';
+                    $chUrl     = $isWebsite ? '#produk' : ($ch['url'] ?? '#');
+                @endphp
+                <a class="ch {{ $isWebsite ? 'dk' : '' }}" href="{{ $chUrl }}" @if(!$isWebsite) target="_blank" rel="noopener" @endif>
+                    <span class="ch-main">
+                        <span class="ch-mark">{{ mb_substr($initial ?: $label, 0, 2) }}</span>
+                        <span class="ch-text">
+                            <span class="ch-name">{{ $label }}</span>
+                            <span class="ch-note">{{ $note }}</span>
+                        </span>
+                    </span>
+                    <span class="ch-arr">
+                        <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round"><path d="M7 17L17 7"/><path d="M9 7h8v8"/></svg>
+                    </span>
+                </a>
+                @endforeach
+            </div>
+        </div>
+    </section>
 
     {{-- PRODUCTS --}}
     <section class="sec" id="produk">
         <div class="sec-head">
-            <div class="sec-t">Produk</div>
-            <a href="{{ route('storefront.products') }}" class="sec-a">Semua →</a>
-        </div>
-        @if($categories->isNotEmpty())
-        <div style="display:flex;gap:7px;overflow-x:auto;padding:2px 0 12px;scrollbar-width:none;">
-            @foreach($categories as $cat)
-            <a href="{{ route('storefront.products', ['kategori' => $cat->slug]) }}"
-               style="flex:0 0 auto;height:28px;padding:0 11px;border-radius:999px;border:1px solid var(--line);background:var(--soft);font-size:11px;font-weight:700;color:var(--ink);display:inline-flex;align-items:center;white-space:nowrap;">
-                {{ $cat->name }}
-            </a>
-            @endforeach
-            <a href="{{ route('storefront.products') }}"
-               style="flex:0 0 auto;height:28px;padding:0 11px;border-radius:999px;border:1px solid var(--line);font-size:11px;font-weight:700;color:var(--mid);display:inline-flex;align-items:center;white-space:nowrap;">
-                Semua →
+            <div class="sec-t">Produk pilihan</div>
+            <a href="{{ route('storefront.products') }}" class="sec-a all-products">
+                Lihat semua produk
+                <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round"><path d="M5 12h14"/><path d="M12 5l7 7-7 7"/></svg>
             </a>
         </div>
-        @endif
         <div class="prods">
             @foreach ($products as $p)
+            @php
+                if (!empty($p['label'])) {
+                    $badgeText  = $p['label'];
+                    $badgeClass = ($p['product_type'] ?? '') === 'jumbo' ? 'badge-jumbo' : '';
+                } elseif (($p['rank_position'] ?? null) && $p['rank_position'] <= 3) {
+                    $badgeText  = '🔥 Trending';
+                    $badgeClass = 'badge-trending';
+                } elseif ($p['is_new_product'] ?? false) {
+                    $badgeText  = '✨ Baru';
+                    $badgeClass = 'badge-new';
+                } else {
+                    $badgeText  = null;
+                    $badgeClass = '';
+                }
+                $stockStatus = $p['stock_status'] ?? 'ok';
+                $availableStock = (int) ($p['available_stock'] ?? 0);
+            @endphp
             <a href="{{ route('storefront.product_detail', $p['slug']) }}" class="pc">
                 <div class="pc-img">
-                    @if(!empty($p['label']))
-                    @if(($p['product_type'] ?? '') === 'jumbo')
-                    <span class="pc-tag" style="background:#7c3aed;">{{ $p['label'] }}</span>
-                    @else
-                    <span class="pc-tag">{{ $p['label'] }}</span>
+                    @if($badgeText)
+                    <span class="pc-tag {{ $badgeClass }}">{{ $badgeText }}</span>
                     @endif
+                    @if($stockStatus === 'out')
+                    <span class="pc-stock-badge out">Stok Habis</span>
+                    @elseif($stockStatus === 'low')
+                    <span class="pc-stock-badge">Stok Terbatas</span>
                     @endif
                     <img src="{{ storefront_img($p['img']) }}" alt="{{ $p['name'] }}" loading="lazy">
                 </div>
@@ -342,13 +387,17 @@
                         <span style="font-size:9px;font-weight:700;letter-spacing:.07em;text-transform:uppercase;color:var(--mid);">{{ $p['category_name'] }}</span>
                         @endif
                         @if(!empty($p['audience_label']))
-                        @php $audColors=['pria'=>'#1d4ed8','wanita'=>'#be185d','anak'=>'#d97706','olahraga'=>'#15803d','unisex'=>'#6b7280']; @endphp
+                        @php $audColors = ['pria'=>'#1d4ed8','wanita'=>'#be185d','anak'=>'#d97706','olahraga'=>'#15803d','unisex'=>'#6b7280']; @endphp
                         <span style="font-size:9px;font-weight:700;letter-spacing:.07em;text-transform:uppercase;color:{{ $audColors[$p['audience']] ?? '#6b7280' }};">{{ $p['audience_label'] }}</span>
                         @endif
                     </div>
                     @endif
                     <div class="pc-n">{{ $p['name'] }}</div>
                     <div class="pc-p">Rp{{ number_format($p['price'], 0, ',', '.') }}</div>
+                    <div class="pc-stock-line {{ $stockStatus === 'out' ? 'out' : ($stockStatus === 'low' ? 'low' : '') }}">
+                        {{ $stockStatus === 'out' ? 'Belum tersedia' : ($stockStatus === 'low' ? 'Tersisa ' . $availableStock . ' pcs' : 'Stok tersedia') }}
+                    </div>
+                    <div class="pc-mini"><span>Detail</span><span>→</span></div>
                 </div>
             </a>
             @endforeach
@@ -366,72 +415,19 @@
 
     {{-- CTA --}}
     <section class="sec" style="padding-top:0;">
-        <div class="cta">
-            <div class="cta-t">Ready to<br>Wear Daily.</div>
-            <div class="cta-row">
+        <div class="cta-blk">
+            <div class="cta-blk-t">Ready to<br>Wear Daily.</div>
+            <div class="cta-blk-row">
                 <a href="{{ route('storefront.products') }}" class="btn-cw">Shop Now</a>
                 <a href="#beli" class="btn-co">Marketplace</a>
             </div>
         </div>
     </section>
 
-    <footer class="foot">
-        <div class="foot-brand">
-            <img src="{{ asset('images/logo-mark.svg') }}" alt="Greatfit">
-            <span class="foot-name">Greatfit</span>
-        </div>
-        <div class="foot-tagline">Pakaian olahraga nyaman untuk aktivitas harian.</div>
-        <nav class="foot-links" aria-label="Footer mobile">
-            <a href="{{ route('storefront.products') }}">Produk</a>
-            <a href="{{ route('storefront.cart') }}">Keranjang</a>
-            <a href="{{ route('storefront.home') }}#beli">Cara Beli</a>
-        </nav>
-        <div class="foot-bottom">
-            <span>© {{ date('Y') }} Greatfit</span>
-            <a href="{{ route('login', [], false) }}">Admin</a>
-        </div>
-    </footer>
-
 </div>
+@endsection
 
-<footer class="site-footer">
-    <div class="site-footer-inner">
-        <div class="sf-top">
-            <div>
-                <div class="sf-brand">
-                    <img src="{{ asset('images/logo-mark.svg') }}" alt="Greatfit">
-                    <span class="sf-brand-name">Greatfit</span>
-                </div>
-                <div class="sf-tagline">Pakaian olahraga nyaman<br>untuk aktivitas harian.</div>
-            </div>
-            <nav class="sf-nav">
-                <div class="sf-col">
-                    <h4>Koleksi</h4>
-                    <a href="{{ route('storefront.products') }}">Semua Produk</a>
-                    @foreach($categories as $cat)
-                    <a href="{{ route('storefront.products', ['kategori' => $cat->slug]) }}">{{ $cat->name }}</a>
-                    @endforeach
-                </div>
-                <div class="sf-col">
-                    <h4>Toko</h4>
-                    <a href="{{ route('storefront.home') }}">Home</a>
-                    <a href="{{ route('storefront.cart') }}">Keranjang</a>
-                    <a href="{{ route('storefront.home') }}#beli">Cara Beli</a>
-                </div>
-                <div class="sf-col">
-                    <h4>Lainnya</h4>
-                    <a href="{{ route('login', [], false) }}">Admin Login</a>
-                </div>
-            </nav>
-        </div>
-        <div class="sf-bottom">
-            <span class="sf-copy">© {{ date('Y') }} Greatfit. All rights reserved.</span>
-            <span class="sf-love">Made with care in Indonesia</span>
-        </div>
-    </div>
-</footer>
-
-
+@push('scripts')
 <script>
 (function () {
     // Hero slideshow
@@ -450,11 +446,30 @@
         }, 5000);
     }
 
+    // Smooth scroll to #beli
+    document.querySelectorAll('a[href="#beli"]').forEach(function (link) {
+        link.addEventListener('click', function (e) {
+            var target = document.getElementById('beli');
+            var panel  = target && target.querySelector('.shop-panel');
+            var nav    = document.querySelector('.nav');
+            if (!target || !panel) return;
+            e.preventDefault();
+            var top = panel.getBoundingClientRect().top + window.scrollY - (nav ? nav.getBoundingClientRect().height : 0) - 26;
+            window.scrollTo({ top: Math.max(0, top), behavior: 'smooth' });
+        });
+    });
+
+    // Smooth scroll to #produk
+    document.querySelectorAll('a[href="#produk"]').forEach(function (link) {
+        link.addEventListener('click', function (e) {
+            var target = document.getElementById('produk');
+            var nav    = document.querySelector('.nav');
+            if (!target) return;
+            e.preventDefault();
+            var top = target.getBoundingClientRect().top + window.scrollY - (nav ? nav.getBoundingClientRect().height : 0) - 18;
+            window.scrollTo({ top: Math.max(0, top), behavior: 'smooth' });
+        });
+    });
 })();
 </script>
-
-@include('storefront._tracker')
-@include('storefront._mobile_zoom_lock')
-
-</body>
-</html>
+@endpush

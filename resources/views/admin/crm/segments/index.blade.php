@@ -10,7 +10,9 @@
 .seg-count { font-size:1.7rem;font-weight:900;line-height:1; }
 .seg-desc  { font-size:.72rem;color:#64748b;margin-top:.3rem; }
 .seg-action { font-size:.7rem;font-style:italic;color:#94a3b8;margin-top:.4rem; }
-.seg-meta { font-size:.72rem;color:#64748b;margin-top:.5rem;padding-top:.5rem;border-top:1px solid #f1f5f9;display:flex;gap:1rem; }
+.seg-meta { font-size:.72rem;color:#64748b;margin-top:.5rem;padding-top:.5rem;border-top:1px solid #f1f5f9;display:flex;gap:.75rem;flex-wrap:wrap; }
+.seg-pct-bar { height:4px;border-radius:4px;margin-top:.5rem;background:#f1f5f9;overflow:hidden; }
+.seg-pct-fill { height:4px;border-radius:4px; }
 .summary-card { background:#fff;border:1.5px solid #e8ecf0;border-radius:14px;padding:.9rem 1.1rem; }
 </style>
 @endpush
@@ -61,26 +63,42 @@
         </div>
     </div>
 
-    {{-- Segment cards --}}
+    {{-- Segment cards (sorted by count desc) --}}
     <div class="row g-3">
-        @foreach($overview as $seg)
+        @foreach($overview->sortByDesc('count') as $seg)
         <div class="col-12 col-sm-6 col-md-4 col-xl-3">
             <a href="{{ route('admin.crm.segments.show', $seg['key']) }}" class="seg-card">
                 <div class="d-flex align-items-center gap-3 mb-2">
                     <div class="seg-icon" style="background:{{ $seg['bg'] }};color:{{ $seg['color'] }};">
                         <i class="bi {{ $seg['icon'] }}"></i>
                     </div>
-                    <div>
+                    <div style="flex:1;min-width:0;">
                         <div class="seg-label">{{ $seg['label'] }}</div>
-                        <div class="seg-count" style="color:{{ $seg['color'] }};">{{ $seg['count'] }}</div>
+                        <div class="d-flex align-items-baseline gap-2">
+                            <div class="seg-count" style="color:{{ $seg['color'] }};">{{ $seg['count'] }}</div>
+                            @if($seg['count'] > 0 && $seg['pct'] > 0)
+                            <span style="font-size:.72rem;font-weight:600;color:#94a3b8;">{{ $seg['pct'] }}%</span>
+                            @endif
+                        </div>
                     </div>
                 </div>
-                <div class="seg-desc">{{ $seg['desc'] }}</div>
+
+                {{-- % of total bar --}}
+                @if($seg['count'] > 0)
+                <div class="seg-pct-bar">
+                    <div class="seg-pct-fill" style="width:{{ $seg['pct'] }}%;background:{{ $seg['color'] }};"></div>
+                </div>
+                @endif
+
+                <div class="seg-desc mt-2">{{ $seg['desc'] }}</div>
                 <div class="seg-action"><i class="bi bi-arrow-right me-1"></i>{{ $seg['action'] }}</div>
                 <div class="seg-meta">
-                    <span><strong>Rp{{ number_format($seg['revenue']) }}</strong> total</span>
+                    <span><strong>Rp{{ number_format($seg['revenue']) }}</strong> revenue</span>
+                    @if($seg['count'] > 0 && $seg['avg_clv'] > 0)
+                    <span>avg <strong>Rp{{ number_format($seg['avg_clv']) }}</strong></span>
+                    @endif
                     @if($seg['count'] > 0)
-                    <span><strong>{{ $seg['has_phone'] }}</strong> ada HP</span>
+                    <span><strong>{{ $seg['has_account'] }}</strong> akun</span>
                     @endif
                 </div>
             </a>

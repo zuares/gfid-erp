@@ -8,6 +8,7 @@ use App\Http\Controllers\Admin\StorefrontProductCategoryController;
 use App\Http\Controllers\Admin\StorefrontSegmentController;
 use App\Http\Controllers\Admin\StorefrontVisitorController;
 use App\Http\Controllers\Storefront\CartController;
+use App\Http\Controllers\Storefront\CustomerAuthController;
 use App\Http\Controllers\Storefront\EventTrackController;
 
 // ─── STOREFRONT (public, dengan visitor tracking) ───────────────────────────
@@ -55,6 +56,23 @@ Route::middleware(['track.storefront'])->group(function () {
             'activeCategory', 'activeAudience', 'activeType', 'audienceOptions'
         ));
     })->name('storefront.products');
+
+    // ── Customer Auth ─────────────────────────────────────────────────────────
+    Route::get('/login',         [CustomerAuthController::class, 'loginPage'])->name('storefront.login');
+    Route::post('/login',        [CustomerAuthController::class, 'loginSubmit'])->name('storefront.login.post');
+    Route::get('/login/verify',  [CustomerAuthController::class, 'verifyPage'])->name('storefront.login.verify');
+    Route::post('/login/verify', [CustomerAuthController::class, 'verifySubmit'])->name('storefront.login.verify.post');
+    Route::post('/login/resend', [CustomerAuthController::class, 'resendOtp'])->name('storefront.login.resend');
+    Route::get('/register',      [CustomerAuthController::class, 'registerPage'])->name('storefront.register');
+    Route::post('/register',     [CustomerAuthController::class, 'registerSubmit'])->name('storefront.register.post');
+    Route::post('/logout',       [CustomerAuthController::class, 'logout'])->name('storefront.logout');
+
+    // ── Customer Dashboard ───────────────────────────────────────────────────
+    Route::get('/user', [CustomerAuthController::class, 'userPage'])->name('storefront.user');
+    Route::get('/user/orders', [CustomerAuthController::class, 'ordersPage'])->name('storefront.user.orders');
+
+    // Legacy redirects
+    Route::get('/masuk', fn() => redirect()->route('storefront.login', [], 301))->name('storefront.masuk');
 
     Route::get('/products/{slug}', function ($slug) {
         $products = storefrontProducts();
@@ -126,6 +144,7 @@ Route::middleware(['auth'])->group(function () {
         // ── Catalog Produk Website ────────────────────────────────────────────
         Route::prefix('admin/catalog/products')->name('admin.catalog.products.')->group(function () {
             Route::get('/',                          [StorefrontProductCatalogController::class, 'index'])->name('index');
+            Route::get('/items/suggest',             [StorefrontProductCatalogController::class, 'suggestItems'])->name('items.suggest');
             Route::get('/create',                    [StorefrontProductCatalogController::class, 'create'])->name('create');
             Route::post('/',                         [StorefrontProductCatalogController::class, 'store'])->name('store');
             Route::get('/{product}/edit',            [StorefrontProductCatalogController::class, 'edit'])->name('edit');
@@ -140,20 +159,33 @@ Route::middleware(['auth'])->group(function () {
             Route::post('/{product}/sizes',                      [StorefrontProductCatalogController::class, 'storeSize'])->name('sizes.store');
             Route::patch('/{product}/sizes/{size}',              [StorefrontProductCatalogController::class, 'updateSize'])->name('sizes.update');
             Route::delete('/{product}/sizes/{size}',             [StorefrontProductCatalogController::class, 'destroySize'])->name('sizes.destroy');
+            // Item mapping
+            Route::patch('/{product}/variant-items',              [StorefrontProductCatalogController::class, 'updateVariantItems'])->name('variant-items.update');
+            // Ranking
+            Route::patch('/{product}/ranking',                   [StorefrontProductCatalogController::class, 'updateRanking'])->name('ranking.update');
+            Route::post('/rank-now',                             [StorefrontProductCatalogController::class, 'rankNow'])->name('rank-now');
         });
 
         // ── CRM Storefront ────────────────────────────────────────────────────
         Route::prefix('admin/crm')->name('admin.crm.')->group(function () {
             Route::get('/',                          [StorefrontCrmController::class, 'dashboard'])->name('dashboard');
             Route::get('/orders',                    [StorefrontCrmController::class, 'orders'])->name('orders');
+            Route::get('/orders/live',               [StorefrontCrmController::class, 'ordersLive'])->name('orders.live');
             Route::patch('/orders/{order}/status',   [StorefrontCrmController::class, 'updateStatus'])->name('orders.status');
             Route::get('/prospects',                 [StorefrontCrmController::class, 'prospects'])->name('prospects');
+            Route::get('/prospects/live',            [StorefrontCrmController::class, 'prospectsLive'])->name('prospects.live');
             Route::get('/prospects/export',          [StorefrontCrmController::class, 'exportProspects'])->name('prospects.export');
             Route::get('/visitors',                  [StorefrontVisitorController::class, 'index'])->name('visitors');
+            Route::get('/visitors/live',             [StorefrontVisitorController::class, 'live'])->name('visitors.live');
             Route::get('/segments',                  [StorefrontSegmentController::class, 'index'])->name('segments');
             Route::get('/segments/{segment}',        [StorefrontSegmentController::class, 'show'])->name('segments.show');
             Route::get('/customers',                 [StorefrontCustomerController::class, 'index'])->name('customers');
             Route::get('/customers/{phone}',         [StorefrontCustomerController::class, 'show'])->name('customers.show');
+            // DEV ONLY — seed & reset data storefront (owner + APP_DB_MODE=dev)
+            Route::post('/dev-seed',                 [StorefrontCrmController::class, 'devSeed'])->name('dev_seed');
+            Route::post('/dev-seed-abandoned',       [StorefrontCrmController::class, 'devSeedAbandoned'])->name('dev_seed_abandoned');
+            Route::post('/dev-reset',                [StorefrontCrmController::class, 'devReset'])->name('dev_reset');
+            Route::post('/dev-backfill-city',        [StorefrontCrmController::class, 'devBackfillCity'])->name('dev_backfill_city');
         });
     });
 });

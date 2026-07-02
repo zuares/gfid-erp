@@ -49,17 +49,48 @@
 @section('content')
 <div class="container-fluid py-3">
 
+    {{-- Dev reset flash --}}
+    @if(session('dev_reset_done'))
+    <div class="alert alert-success alert-dismissible d-flex align-items-center gap-2 mb-3 py-2" style="border-radius:12px;font-size:.82rem;border:1.5px solid #bbf7d0;background:#f0fdf4;color:#166534;">
+        <i class="bi bi-check-circle-fill"></i>
+        <span>Semua data storefront berhasil direset.</span>
+        <button type="button" class="btn-close btn-close-sm ms-auto" data-bs-dismiss="alert"></button>
+    </div>
+    @endif
+
     {{-- Header --}}
     <div class="d-flex align-items-center justify-content-between mb-3 flex-wrap gap-2">
         <div>
             <h5 class="fw-black mb-0" style="font-size:1.05rem;">CRM Dashboard</h5>
             <div style="font-size:.75rem;color:#94a3b8;margin-top:2px;">Visitor tracking & analisa calon konsumen</div>
         </div>
-        <div class="d-flex gap-2">
+        <div class="d-flex align-items-center gap-2 flex-wrap">
             @foreach([1=>'Hari ini', 7=>'7 Hari', 30=>'30 Hari', 90=>'90 Hari'] as $d => $label)
                 <a href="{{ route('admin.crm.dashboard', ['days' => $d]) }}"
                    class="crm-period-btn {{ $days == $d ? 'active' : '' }}">{{ $label }}</a>
             @endforeach
+
+            @if(env('APP_DB_MODE') === 'dev' && auth()->user()?->role === 'owner')
+            <form method="POST" action="{{ route('admin.crm.dev_backfill_city') }}">
+                @csrf
+                <button type="submit"
+                        class="btn btn-sm fw-bold"
+                        style="background:#f0f9ff;color:#0369a1;border:1.5px dashed #7dd3fc;border-radius:10px;font-size:.72rem;padding:.25rem .7rem;">
+                    <i class="bi bi-geo-alt me-1"></i>Isi Kota
+                    <span style="font-size:.6rem;background:#bae6fd;color:#0c4a6e;border-radius:4px;padding:.05rem .3rem;margin-left:4px;font-weight:900;">DEV</span>
+                </button>
+            </form>
+            <form method="POST" action="{{ route('admin.crm.dev_reset') }}"
+                  onsubmit="return confirm('⚠️ RESET semua data storefront?\n\nIni akan menghapus:\n• storefront_customers\n• storefront_orders\n• storefront_visitors\n• storefront_events\n\nTidak bisa di-undo!')">
+                @csrf
+                <button type="submit"
+                        class="btn btn-sm fw-bold"
+                        style="background:#fff0f0;color:#b91c1c;border:1.5px dashed #fca5a5;border-radius:10px;font-size:.72rem;padding:.25rem .7rem;letter-spacing:.02em;">
+                    <i class="bi bi-trash3 me-1"></i>Reset Data
+                    <span style="font-size:.6rem;background:#fecaca;color:#991b1b;border-radius:4px;padding:.05rem .3rem;margin-left:4px;font-weight:900;">DEV</span>
+                </button>
+            </form>
+            @endif
         </div>
     </div>
 
@@ -95,24 +126,59 @@
         </div>
     </div>
 
+    {{-- Registered accounts summary --}}
+    <div class="row g-2 mb-3">
+        <div class="col-6 col-md-3">
+            <div class="crm-stat-card">
+                <div class="crm-stat-label">Akun Terdaftar</div>
+                <div class="crm-stat-val" style="color:#6366f1;">{{ number_format($registeredTotal) }}</div>
+                <div class="crm-stat-sub">total sejak awal</div>
+            </div>
+        </div>
+        <div class="col-6 col-md-3">
+            <div class="crm-stat-card">
+                <div class="crm-stat-label">Terverifikasi WA</div>
+                <div class="crm-stat-val" style="color:#10b981;">{{ number_format($registeredVerified) }}</div>
+                <div class="crm-stat-sub">{{ $registeredTotal > 0 ? number_format($registeredVerified / $registeredTotal * 100, 0) : 0 }}% dari terdaftar</div>
+            </div>
+        </div>
+        <div class="col-6 col-md-3">
+            <div class="crm-stat-card">
+                <div class="crm-stat-label">Daftar periode ini</div>
+                <div class="crm-stat-val">{{ number_format($funnel['registered']) }}</div>
+                <div class="crm-stat-sub">dalam {{ $days }} hari</div>
+            </div>
+        </div>
+        <div class="col-6 col-md-3">
+            <div class="crm-stat-card">
+                <div class="crm-stat-label">Konversi Register</div>
+                <div class="crm-stat-val">{{ $funnel['registered'] > 0 ? number_format($funnel['orders'] / $funnel['registered'] * 100, 0) : 0 }}%</div>
+                <div class="crm-stat-sub">akun → order (periode ini)</div>
+            </div>
+        </div>
+    </div>
+
     {{-- Funnel --}}
     <div class="mb-3">
         <div class="crm-section-title">Funnel Konversi</div>
         <div class="funnel-row">
             @php
                 $steps = [
-                    ['label' => 'Visitor', 'val' => $funnel['visitors'], 'prev' => null],
-                    ['label' => 'Lihat Produk', 'val' => $funnel['product_view'], 'prev' => $funnel['visitors']],
-                    ['label' => 'Add to Cart', 'val' => $funnel['add_to_cart'], 'prev' => $funnel['product_view']],
-                    ['label' => 'Checkout', 'val' => $funnel['checkout'], 'prev' => $funnel['add_to_cart']],
-                    ['label' => 'Order', 'val' => $funnel['orders'], 'prev' => $funnel['checkout']],
-                    ['label' => 'WA Klik', 'val' => $funnel['wa_click'], 'prev' => $funnel['orders']],
+                    ['label' => 'Visitor',      'val' => $funnel['visitors'],    'prev' => null,                   'color' => null],
+                    ['label' => 'Lihat Produk', 'val' => $funnel['product_view'],'prev' => $funnel['visitors'],    'color' => null],
+                    ['label' => 'Add to Cart',  'val' => $funnel['add_to_cart'], 'prev' => $funnel['product_view'],'color' => null],
+                    ['label' => 'Daftar Akun',  'val' => $funnel['registered'],  'prev' => $funnel['add_to_cart'], 'color' => '#6366f1'],
+                    ['label' => 'Checkout',     'val' => $funnel['checkout'],    'prev' => $funnel['add_to_cart'], 'color' => null],
+                    ['label' => 'Order',        'val' => $funnel['orders'],      'prev' => $funnel['checkout'],    'color' => null],
+                    ['label' => 'WA Klik',      'val' => $funnel['wa_click'],    'prev' => $funnel['orders'],      'color' => '#25d366'],
                 ];
             @endphp
             @foreach($steps as $i => $step)
             <div class="funnel-step">
                 <div class="funnel-step-label">{{ $step['label'] }}</div>
-                <div class="funnel-step-val">{{ number_format($step['val']) }}</div>
+                <div class="funnel-step-val" @if($step['color']) style="color:{{ $step['color'] }}" @endif>
+                    {{ number_format($step['val']) }}
+                </div>
                 @if($step['prev'] !== null)
                 <div class="funnel-step-pct">
                     {{ $step['prev'] > 0 ? number_format($step['val'] / $step['prev'] * 100, 0) . '%' : '—' }}

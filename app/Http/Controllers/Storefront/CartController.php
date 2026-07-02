@@ -3,9 +3,11 @@
 namespace App\Http\Controllers\Storefront;
 
 use App\Http\Controllers\Controller;
+use App\Models\StorefrontProduct;
 use App\Models\StorefrontEvent;
 use App\Models\StorefrontOrder;
 use App\Models\StorefrontVisitor;
+use App\Services\Storefront\StockResolver;
 use App\Services\WaNotificationService;
 use Illuminate\Http\Request;
 use Illuminate\Support\Str;
@@ -17,9 +19,10 @@ class CartController extends Controller
         $cart     = session('cart', []);
         $channels = storefrontChannels();
         $products = storefrontProducts();
+        $cartStock = $this->cartStockSnapshot($cart);
         $total    = array_sum(array_map(fn($i) => $i['price'] * $i['qty'], $cart));
 
-        return view('storefront.cart', compact('cart', 'channels', 'products', 'total'));
+        return view('storefront.cart', compact('cart', 'channels', 'products', 'total', 'cartStock'));
     }
 
     public function checkout(Request $request)
@@ -35,12 +38,15 @@ class CartController extends Controller
             $cart = array_intersect_key($cart, array_flip($selected));
         }
 
+        session(['checkout_active_cart' => $cart]);
+
         $channels = storefrontChannels();
         $products = storefrontProducts();
         $address  = session('checkout_address', []);
+        $cartStock = $this->cartStockSnapshot($cart);
         $total    = array_sum(array_map(fn($i) => $i['price'] * $i['qty'], $cart));
 
-        return view('storefront.checkout', compact('cart', 'channels', 'products', 'address', 'total'));
+        return view('storefront.checkout', compact('cart', 'channels', 'products', 'address', 'total', 'cartStock'));
     }
 
     public function address(Request $request)
@@ -197,20 +203,43 @@ class CartController extends Controller
 
         $products = storefrontProducts();
         $product  = collect($products)->firstWhere('slug', $slug);
+        $catalogProduct = StorefrontProduct::where('slug', $slug)
+            ->where('is_published', true)
+            ->with(['variants.itemMappings.item.inventoryStocks.warehouse', 'sizes', 'variantItemMappings.item.inventoryStocks.warehouse'])
+            ->first();
 
-        if (!$product || !$color || !$size) {
+        if (!$product || !$catalogProduct || !$color || !$size) {
             return back()->with('cart_error', 'Pilih warna dan ukuran terlebih dahulu.');
+        }
+
+        $stockResolver = app(StockResolver::class);
+        $selectedMapping = $stockResolver->mappingForSelection($catalogProduct, $color, $size);
+        $selectedVariant = $stockResolver->variantForSelection($catalogProduct, $color, $size);
+        $availableStock = $selectedMapping
+            ? $stockResolver->forMapping($selectedMapping)
+            : ($selectedVariant ? $stockResolver->forVariant($selectedVariant) : 0);
+
+        if ($availableStock < $qty) {
+            return back()->with('cart_error', $availableStock > 0
+                ? "Stok {$color} ukuran {$size} tersisa {$availableStock} pcs."
+                : "Stok {$color} ukuran {$size} sedang kosong.");
         }
 
         // ── Resolve harga: size_override > color_override > base_price ──────────
         $basePrice = $product['_base_price'] ?? $product['price'];
-        $variant   = collect($product['_variants'] ?? [])->firstWhere('name', $color);
+        $variant   = collect($product['_variants'] ?? [])->first(function ($row) use ($color, $size) {
+            return strcasecmp((string) ($row['name'] ?? ''), $color) === 0
+                && strcasecmp((string) ($row['size_label'] ?? ''), $size) === 0;
+        }) ?: collect($product['_variants'] ?? [])->firstWhere('name', $color);
         $price     = $variant['price_override'] ?? $basePrice;
 
         // Cek size price_override (opsional, jarang dipakai tapi support)
         $sizeData = collect($product['_sizes'] ?? [])->firstWhere('label', $size);
         if (!empty($sizeData['price_override'])) {
             $price = $sizeData['price_override'];
+        }
+        if (!empty($selectedMapping?->price_override)) {
+            $price = $selectedMapping->price_override;
         }
 
         // ── Resolve gambar dari variant warna yang dipilih ───────────────────────
@@ -225,6 +254,9 @@ class CartController extends Controller
             'price' => $price,
             'img'   => $img,
             'qty'   => $qty,
+            'variant_id' => $selectedVariant?->id,
+            'item_id' => $selectedMapping?->item_id ?? $selectedVariant?->item_id,
+            'item_code' => $selectedMapping?->item?->code ?? $selectedVariant?->item?->code,
         ];
 
         $this->logEvent($request, 'add_to_cart', [
@@ -268,6 +300,12 @@ class CartController extends Controller
             if ($qty <= 0) {
                 unset($cart[$key]);
             } else {
+                $availableStock = $this->stockForCartLine($cart[$key]);
+                if ($availableStock !== null && $qty > $availableStock) {
+                    return back()->with('cart_error', $availableStock > 0
+                        ? "Stok {$cart[$key]['color']} ukuran {$cart[$key]['size']} tersisa {$availableStock} pcs."
+                        : "Stok {$cart[$key]['color']} ukuran {$cart[$key]['size']} sedang kosong.");
+                }
                 $cart[$key]['qty'] = $qty;
             }
         }
@@ -294,11 +332,16 @@ class CartController extends Controller
 
     public function placeOrder(Request $request)
     {
-        $cart    = session('cart', []);
+        $cart    = session('checkout_active_cart', session('cart', []));
         $address = session('checkout_address', []);
 
         if (empty($cart) || empty($address)) {
             return redirect()->route('storefront.checkout')->with('order_error', 'Keranjang atau alamat kosong.');
+        }
+
+        $stockErrors = $this->validateCartStock($cart);
+        if (!empty($stockErrors)) {
+            return redirect()->route('storefront.checkout')->with('order_error', implode(' ', $stockErrors));
         }
 
         $subtotal     = (int) $request->input('subtotal', array_sum(array_map(fn($i) => $i['price'] * $i['qty'], $cart)));
@@ -346,7 +389,8 @@ class CartController extends Controller
         session(['last_wa_message' => $request->input('wa_message', '')]);
 
         // Bersihkan cart
-        session()->forget(['cart', 'checkout_buy_now']);
+        $this->forgetOrderedCartLines($cart);
+        session()->forget(['checkout_active_cart', 'checkout_buy_now']);
 
         return redirect()->route('storefront.order.success', $orderNumber);
     }
@@ -419,14 +463,92 @@ class CartController extends Controller
         }
 
         $base = url('/');
+
+        // Allow checkout URLs
         if (str_starts_with($returnTo, $base . '/checkout')) {
             return $returnTo;
         }
-
         if (str_starts_with($returnTo, '/checkout')) {
             return url($returnTo);
         }
 
+        // Allow /user (setelah registrasi baru isi alamat)
+        if ($returnTo === '/user' || $returnTo === $base . '/user') {
+            return url('/user');
+        }
+
         return $checkoutUrl;
+    }
+
+    private function validateCartStock(array $cart): array
+    {
+        $stockResolver = app(StockResolver::class);
+        $errors = [];
+
+        foreach ($cart as $line) {
+            $product = StorefrontProduct::where('slug', $line['slug'] ?? '')
+                ->with(['variants.itemMappings.item.inventoryStocks.warehouse', 'sizes', 'variantItemMappings.item.inventoryStocks.warehouse'])
+                ->first();
+
+            if (! $product) {
+                $errors[] = 'Produk ' . ($line['name'] ?? '') . ' tidak ditemukan.';
+                continue;
+            }
+
+            $available = $stockResolver->forSelection($product, (string) ($line['color'] ?? ''), (string) ($line['size'] ?? ''));
+            $qty = max(1, (int) ($line['qty'] ?? 1));
+
+            if ($available < $qty) {
+                $label = trim(($line['name'] ?? 'Produk') . ' ' . ($line['color'] ?? '') . ' ' . ($line['size'] ?? ''));
+                $errors[] = $available > 0
+                    ? "{$label} stok tersisa {$available} pcs."
+                    : "{$label} sedang kosong.";
+            }
+        }
+
+        return $errors;
+    }
+
+    private function cartStockSnapshot(array $cart): array
+    {
+        $snapshot = [];
+
+        foreach ($cart as $key => $line) {
+            $available = $this->stockForCartLine($line);
+            $qty = max(1, (int) ($line['qty'] ?? 1));
+
+            $snapshot[$key] = [
+                'available' => $available,
+                'qty' => $qty,
+                'ok' => $available === null || $available >= $qty,
+                'low' => $available !== null && $available > 0 && $available <= 4,
+            ];
+        }
+
+        return $snapshot;
+    }
+
+    private function stockForCartLine(array $line): ?int
+    {
+        $product = StorefrontProduct::where('slug', $line['slug'] ?? '')
+            ->with(['variants.itemMappings.item.inventoryStocks.warehouse', 'sizes', 'variantItemMappings.item.inventoryStocks.warehouse'])
+            ->first();
+
+        if (! $product) {
+            return null;
+        }
+
+        return app(StockResolver::class)->forSelection($product, (string) ($line['color'] ?? ''), (string) ($line['size'] ?? ''));
+    }
+
+    private function forgetOrderedCartLines(array $orderedCart): void
+    {
+        $cart = session('cart', []);
+
+        foreach (array_keys($orderedCart) as $key) {
+            unset($cart[$key]);
+        }
+
+        session(['cart' => $cart]);
     }
 }

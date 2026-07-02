@@ -17,6 +17,8 @@
 .repeat-badge { font-size:.62rem;font-weight:800;background:#fef3c7;color:#92400e;padding:.15rem .4rem;border-radius:6px;white-space:nowrap; }
 .vip-badge { font-size:.62rem;font-weight:800;background:#fdf4ff;color:#7e22ce;padding:.15rem .4rem;border-radius:6px;white-space:nowrap; }
 .seg-badge { font-size:.6rem;font-weight:800;padding:.12rem .38rem;border-radius:5px;white-space:nowrap; }
+.acct-badge { font-size:.6rem;font-weight:800;padding:.12rem .4rem;border-radius:5px;white-space:nowrap;background:#d1fae5;color:#065f46; }
+.acct-badge.unverified { background:#fef3c7;color:#92400e; }
 </style>
 @endpush
 
@@ -29,44 +31,70 @@
             <h5 class="fw-black mb-0" style="font-size:1.05rem;">Customers</h5>
             <div style="font-size:.75rem;color:#94a3b8;margin-top:2px;">Semua customer yang pernah order</div>
         </div>
-        <div class="d-flex gap-2">
+        <div class="d-flex align-items-center gap-2 flex-wrap">
             <a href="{{ route('admin.crm.segments') }}" class="btn btn-sm btn-outline-primary" style="border-radius:10px;font-size:.75rem;">
                 <i class="bi bi-diagram-3 me-1"></i> Segments
             </a>
             <a href="{{ route('admin.crm.dashboard') }}" class="btn btn-sm btn-outline-secondary" style="border-radius:10px;font-size:.75rem;">
                 <i class="bi bi-arrow-left me-1"></i> Dashboard
             </a>
+            @if(env('APP_DB_MODE') === 'dev' && auth()->user()?->role === 'owner')
+            <form method="POST" action="{{ route('admin.crm.dev_reset') }}"
+                  onsubmit="return confirm('⚠️ RESET semua data storefront?\n\nIni akan menghapus:\n• storefront_customers\n• storefront_orders\n• storefront_visitors\n• storefront_events\n\nTidak bisa di-undo!')">
+                @csrf
+                <button type="submit"
+                        class="btn btn-sm fw-bold"
+                        style="background:#fff0f0;color:#b91c1c;border:1.5px dashed #fca5a5;border-radius:10px;font-size:.72rem;padding:.25rem .7rem;">
+                    <i class="bi bi-trash3 me-1"></i>Reset Data
+                    <span style="font-size:.6rem;background:#fecaca;color:#991b1b;border-radius:4px;padding:.05rem .3rem;margin-left:4px;font-weight:900;">DEV</span>
+                </button>
+            </form>
+            @endif
         </div>
     </div>
 
     {{-- Stat cards --}}
     <div class="row g-2 mb-3">
-        <div class="col-6 col-md-3">
+        <div class="col-6 col-md-2">
             <div class="crm-stat-card">
                 <div class="crm-stat-label">Total Customers</div>
                 <div class="crm-stat-val">{{ number_format($totalCustomers) }}</div>
-                <div class="crm-stat-sub">unique nomor HP</div>
+                <div class="crm-stat-sub">pernah order</div>
             </div>
         </div>
-        <div class="col-6 col-md-3">
+        <div class="col-6 col-md-2">
+            <div class="crm-stat-card">
+                <div class="crm-stat-label">Baru Bulan Ini</div>
+                <div class="crm-stat-val" style="color:#0ea5e9;">{{ number_format($newThisMonth) }}</div>
+                <div class="crm-stat-sub">{{ now()->format('M Y') }}</div>
+            </div>
+        </div>
+        <div class="col-6 col-md-2">
             <div class="crm-stat-card">
                 <div class="crm-stat-label">Repeat Buyers</div>
                 <div class="crm-stat-val" style="color:#f59e0b;">{{ number_format($repeatBuyers) }}</div>
-                <div class="crm-stat-sub">{{ $totalCustomers > 0 ? number_format($repeatBuyers / $totalCustomers * 100, 1) : 0 }}% dari total customer</div>
+                <div class="crm-stat-sub">{{ $totalCustomers > 0 ? number_format($repeatBuyers / $totalCustomers * 100, 1) : 0 }}% dari total</div>
             </div>
         </div>
-        <div class="col-6 col-md-3">
-            <div class="crm-stat-card">
-                <div class="crm-stat-label">Avg CLV</div>
-                <div class="crm-stat-val">Rp{{ number_format($avgClv / 1000, 0, ',', '.') }}K</div>
-                <div class="crm-stat-sub">rata-rata total belanja per customer</div>
+        <div class="col-6 col-md-2">
+            <div class="crm-stat-card" style="border-color:#e0e7ff;">
+                <div class="crm-stat-label" style="color:#4338ca;">Akun Terdaftar</div>
+                <div class="crm-stat-val" style="color:#6366f1;">{{ number_format($registeredCount) }}</div>
+                <div class="crm-stat-sub">login storefront</div>
             </div>
         </div>
-        <div class="col-6 col-md-3">
+        <div class="col-6 col-md-2">
+            <div class="crm-stat-card" style="border-color:#bbf7d0;">
+                <div class="crm-stat-label" style="color:#16a34a;">Verifikasi WA</div>
+                <div class="crm-stat-val" style="color:#16a34a;">{{ number_format($verifiedCount) }}</div>
+                <div class="crm-stat-sub">{{ $registeredCount > 0 ? number_format($verifiedCount / $registeredCount * 100, 0) : 0 }}% dari akun</div>
+            </div>
+        </div>
+        <div class="col-6 col-md-2">
             <div class="crm-stat-card">
                 <div class="crm-stat-label">Total Revenue</div>
-                <div class="crm-stat-val">Rp{{ number_format($totalRevenue / 1000000, 1, ',', '.') }}JT</div>
-                <div class="crm-stat-sub">dari semua order valid</div>
+                <div class="crm-stat-val" style="font-size:1.15rem;">Rp{{ number_format($totalRevenue / 1000000, 1, ',', '.') }}JT</div>
+                <div class="crm-stat-sub">avg Rp{{ number_format($avgClv / 1000, 0) }}K / customer</div>
             </div>
         </div>
     </div>
@@ -119,9 +147,14 @@
                     @php $segDefs = \App\Http\Controllers\Admin\StorefrontSegmentController::segments(); @endphp
                     @forelse($customers as $c)
                     @php
-                        $daysSince = now()->diffInDays($c->last_order_at);
-                        $segKey    = \App\Http\Controllers\Admin\StorefrontSegmentController::classify((int)$c->order_count, $daysSince, (float)$c->total_spent);
-                        $segDef    = $segDefs[$segKey] ?? null;
+                        $daysSince  = now()->diffInDays($c->last_order_at);
+                        $segKey     = \App\Http\Controllers\Admin\StorefrontSegmentController::classify((int)$c->order_count, $daysSince, (float)$c->total_spent);
+                        $segDef     = $segDefs[$segKey] ?? null;
+                        // Normalize phone to 628xxx for account lookup
+                        $normPhone  = str_starts_with($c->customer_phone, '0')
+                            ? '62' . substr($c->customer_phone, 1)
+                            : $c->customer_phone;
+                        $acct       = $accountsByPhone->get($normPhone) ?? $accountsByPhone->get($c->customer_phone);
                     @endphp
                     <tr>
                         <td>
@@ -135,6 +168,17 @@
                                            class="seg-badge" style="background:{{ $segDef['bg'] }};color:{{ $segDef['color'] }};text-decoration:none;">
                                             <i class="bi {{ $segDef['icon'] }} me-1"></i>{{ $segDef['label'] }}
                                         </a>
+                                        @endif
+                                        @if($acct)
+                                            @if($acct->phone_verified_at)
+                                            <span class="acct-badge" title="Akun terdaftar, WA terverifikasi {{ \Carbon\Carbon::parse($acct->created_at)->format('d M Y') }}">
+                                                <i class="bi bi-person-check-fill me-1"></i>Akun ✓
+                                            </span>
+                                            @else
+                                            <span class="acct-badge unverified" title="Akun terdaftar, belum verifikasi WA">
+                                                <i class="bi bi-person me-1"></i>Akun
+                                            </span>
+                                            @endif
                                         @endif
                                         @if($c->order_count > 1)
                                         <span class="repeat-badge"><i class="bi bi-arrow-repeat me-1"></i>×{{ $c->order_count }}</span>
@@ -159,7 +203,12 @@
                                    class="btn btn-sm btn-dark" style="border-radius:8px;font-size:.7rem;padding:.2rem .55rem;">
                                     <i class="bi bi-person-lines-fill"></i> Detail
                                 </a>
-                                <a href="https://wa.me/62{{ ltrim($c->customer_phone, '0') }}" target="_blank"
+                                @php
+                                    $waPhone = str_starts_with($c->customer_phone, '62')
+                                        ? $c->customer_phone
+                                        : '62' . ltrim($c->customer_phone, '0');
+                                @endphp
+                                <a href="https://wa.me/{{ $waPhone }}" target="_blank"
                                    class="btn btn-sm" style="background:#25d366;color:#fff;border-radius:8px;font-size:.7rem;padding:.2rem .5rem;">
                                     <i class="bi bi-whatsapp"></i>
                                 </a>

@@ -4,6 +4,7 @@ namespace App\Models;
 
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Eloquent\Relations\BelongsTo;
+use Illuminate\Database\Eloquent\Relations\HasMany;
 
 class StorefrontProductSize extends Model
 {
@@ -19,5 +20,10 @@ class StorefrontProductSize extends Model
     public function product(): BelongsTo
     {
         return $this->belongsTo(StorefrontProduct::class, 'product_id');
+    }
+
+    public function itemMappings(): HasMany
+    {
+        return $this->hasMany(StorefrontVariantItemMapping::class, 'size_id');
     }
 }

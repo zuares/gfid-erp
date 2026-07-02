@@ -143,6 +143,29 @@ class TrackStorefrontVisitor
 
         if (! $visitor || ! $visitor->ip_address) return;
 
+        // Dev mode: IP lokal/private → pakai kota simulasi supaya UI bisa dites
+        $isPrivate = ! filter_var(
+            $visitor->ip_address,
+            FILTER_VALIDATE_IP,
+            FILTER_FLAG_NO_PRIV_RANGE | FILTER_FLAG_NO_RES_RANGE
+        );
+
+        if ($isPrivate && env('APP_DB_MODE') === 'dev') {
+            static $devCities = [
+                ['city' => 'Bandung',    'province' => 'Jawa Barat'],
+                ['city' => 'Jakarta',    'province' => 'DKI Jakarta'],
+                ['city' => 'Surabaya',   'province' => 'Jawa Timur'],
+                ['city' => 'Yogyakarta', 'province' => 'DI Yogyakarta'],
+                ['city' => 'Semarang',   'province' => 'Jawa Tengah'],
+                ['city' => 'Medan',      'province' => 'Sumatera Utara'],
+                ['city' => 'Makassar',   'province' => 'Sulawesi Selatan'],
+                ['city' => 'Denpasar',   'province' => 'Bali'],
+            ];
+            $pick = $devCities[array_rand($devCities)];
+            $visitor->update(['city' => $pick['city'], 'province' => $pick['province']]);
+            return;
+        }
+
         [$city, $province] = $this->geolocateIp($visitor->ip_address);
 
         if ($city) {

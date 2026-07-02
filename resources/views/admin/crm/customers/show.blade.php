@@ -59,7 +59,12 @@
                 @endif
             </div>
         </div>
-        <a href="https://wa.me/62{{ ltrim($customer->phone, '0') }}" target="_blank"
+        @php
+            $waNum = str_starts_with($customer->phone, '62')
+                ? $customer->phone
+                : '62' . ltrim($customer->phone, '0');
+        @endphp
+        <a href="https://wa.me/{{ $waNum }}" target="_blank"
            class="btn btn-sm fw-bold" style="background:#25d366;color:#fff;border-radius:10px;font-size:.8rem;">
             <i class="bi bi-whatsapp me-1"></i> Hubungi via WA
         </a>
@@ -260,8 +265,61 @@
 
         </div>
 
-        {{-- Kolom kanan: Visitor info + Klik + Timeline --}}
+        {{-- Kolom kanan: Akun + Visitor info + Klik + Timeline --}}
         <div class="col-md-5">
+
+            {{-- Registered Account Info --}}
+            <div class="section-card">
+                <div class="section-title">
+                    <i class="bi bi-person-badge-fill me-1"></i>Akun Storefront
+                </div>
+                <div style="padding:.5rem 1.1rem;">
+                @if($account)
+                    <div class="info-row">
+                        <div class="info-label">Status</div>
+                        <div class="info-val">
+                            @if($account->phone_verified_at)
+                            <span style="font-size:.7rem;background:#d1fae5;color:#065f46;border-radius:5px;padding:.15rem .45rem;font-weight:800;">
+                                <i class="bi bi-check-circle-fill me-1"></i>Terverifikasi
+                            </span>
+                            @else
+                            <span style="font-size:.7rem;background:#fef3c7;color:#92400e;border-radius:5px;padding:.15rem .45rem;font-weight:800;">
+                                <i class="bi bi-clock me-1"></i>Belum verifikasi WA
+                            </span>
+                            @endif
+                        </div>
+                    </div>
+                    <div class="info-row">
+                        <div class="info-label">Terdaftar Sejak</div>
+                        <div class="info-val">{{ \Carbon\Carbon::parse($account->created_at)->format('d M Y H:i') }}</div>
+                        <div style="font-size:.68rem;color:#94a3b8;">{{ \Carbon\Carbon::parse($account->created_at)->diffForHumans() }}</div>
+                    </div>
+                    @if($account->phone_verified_at)
+                    <div class="info-row">
+                        <div class="info-label">Verifikasi WA</div>
+                        <div class="info-val">{{ \Carbon\Carbon::parse($account->phone_verified_at)->format('d M Y H:i') }}</div>
+                    </div>
+                    @endif
+                    @if($account->email)
+                    <div class="info-row">
+                        <div class="info-label">Email</div>
+                        <div class="info-val">{{ $account->email }}</div>
+                    </div>
+                    @endif
+                    <div class="info-row">
+                        <div class="info-label">Nomor HP (Akun)</div>
+                        <div class="info-val" style="font-family:monospace;font-size:.78rem;">{{ $account->phone }}</div>
+                    </div>
+                @else
+                    <div style="font-size:.82rem;color:#94a3b8;padding:.5rem 0;">
+                        <i class="bi bi-person-x me-1"></i>Belum punya akun terdaftar
+                    </div>
+                    <div style="font-size:.72rem;color:#94a3b8;margin-top:.25rem;">
+                        Customer ini belum login / daftar ke storefront.
+                    </div>
+                @endif
+                </div>
+            </div>
 
             {{-- Visitor Info --}}
             <div class="section-card">
@@ -296,13 +354,14 @@
                     @endif
                     <div class="info-row">
                         <div class="info-label">Device</div>
-                        <div class="info-val" style="font-size:.72rem;">
+                        <div class="info-val" style="font-size:.78rem;">
                             @php
-                                $ua = $visitor->user_agent ?? '';
-                                $isMobile = preg_match('/Mobile|Android|iPhone|iPad/i', $ua);
+                                $devIcon  = match($device) { 'mobile' => 'bi-phone', 'tablet' => 'bi-tablet', default => 'bi-laptop' };
+                                $devColor = match($device) { 'mobile' => '#0ea5e9', 'tablet' => '#8b5cf6', default => '#64748b' };
+                                $devLabel = $brand !== '—' ? $brand : match($device) { 'mobile' => 'Mobile', 'tablet' => 'Tablet', default => 'Desktop' };
                             @endphp
-                            <i class="bi {{ $isMobile ? 'bi-phone' : 'bi-laptop' }} me-1"></i>
-                            {{ $isMobile ? 'Mobile' : 'Desktop' }}
+                            <i class="bi {{ $devIcon }} me-1" style="color:{{ $devColor }};"></i>
+                            <span style="color:{{ $devColor }};font-weight:700;">{{ $devLabel }}</span>
                         </div>
                     </div>
                     @if($visitor->ip_address)

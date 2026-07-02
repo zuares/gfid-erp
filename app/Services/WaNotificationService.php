@@ -3,6 +3,7 @@
 namespace App\Services;
 
 use App\Models\StorefrontOrder;
+use Illuminate\Support\Facades\Log;
 
 class WaNotificationService
 {
@@ -58,10 +59,45 @@ class WaNotificationService
         $this->sendFonnte($token, $adminPhone, $message);
     }
 
-    private function sendFonnte(string $token, string $target, string $message): void
+    /**
+     * Kirim OTP via WhatsApp ke nomor customer.
+     * Fallback ke log jika Fonnte belum dikonfigurasi.
+     */
+    public function sendOtp(string $phone, string $otp, string $name = ''): bool
     {
+        $greeting = $name ? "Hai *{$name}*! 👋\n\n" : '';
+        $message  = $greeting
+            . "Kode verifikasi Greatfit kamu:\n\n"
+            . "🔐 *{$otp}*\n\n"
+            . "Kode berlaku 10 menit. Jangan bagikan ke siapapun.";
+
+        $token = env('FONNTE_TOKEN');
+        if ($token) {
+            $sent = $this->sendFonnte($token, $phone, $message);
+            if (! $sent) {
+                Log::warning('OTP WhatsApp gagal dikirim via Fonnte', [
+                    'target' => $this->maskPhone($phone),
+                ]);
+            }
+            return $sent;
+        } else {
+            // Fallback: log ke Laravel log (dev mode)
+            Log::info("[OTP] Ke +{$phone}: {$otp}");
+            return true;
+        }
+    }
+
+    private function sendFonnte(string $token, string $target, string $message): bool
+    {
+        $target = preg_replace('/\D/', '', $target);
+
         try {
             $ch = curl_init('https://api.fonnte.com/send');
+            if (! $ch) {
+                Log::warning('Fonnte curl_init gagal');
+                return false;
+            }
+
             curl_setopt_array($ch, [
                 CURLOPT_POST           => true,
                 CURLOPT_RETURNTRANSFER => true,
@@ -73,10 +109,55 @@ class WaNotificationService
                     'message' => $message,
                 ]),
             ]);
-            curl_exec($ch);
+
+            $body = curl_exec($ch);
+            $errno = curl_errno($ch);
+            $error = curl_error($ch);
+            $status = (int) curl_getinfo($ch, CURLINFO_HTTP_CODE);
             curl_close($ch);
-        } catch (\Throwable) {
+
+            if ($errno) {
+                Log::warning('Fonnte request error', [
+                    'target' => $this->maskPhone($target),
+                    'errno'  => $errno,
+                    'error'  => $error,
+                ]);
+                return false;
+            }
+
+            $decoded = is_string($body) ? json_decode($body, true) : null;
+            $isSuccess = $status >= 200 && $status < 300 && (
+                (is_array($decoded) && (($decoded['status'] ?? null) === true || ($decoded['status'] ?? null) === 'success'))
+                || (is_string($body) && str_contains(strtolower($body), 'success'))
+            );
+
+            if (! $isSuccess) {
+                Log::warning('Fonnte response tidak sukses', [
+                    'target' => $this->maskPhone($target),
+                    'status' => $status,
+                    'body'   => is_string($body) ? mb_substr($body, 0, 500) : null,
+                ]);
+                return false;
+            }
+
+            return true;
+        } catch (\Throwable $e) {
             // Jangan pernah WA error mengganggu order flow
+            Log::warning('Fonnte exception', [
+                'target' => $this->maskPhone($target),
+                'error'  => $e->getMessage(),
+            ]);
+            return false;
         }
+    }
+
+    private function maskPhone(string $phone): string
+    {
+        $phone = preg_replace('/\D/', '', $phone);
+        if (strlen($phone) <= 6) {
+            return $phone;
+        }
+
+        return substr($phone, 0, 4) . str_repeat('*', max(0, strlen($phone) - 7)) . substr($phone, -3);
     }
 }

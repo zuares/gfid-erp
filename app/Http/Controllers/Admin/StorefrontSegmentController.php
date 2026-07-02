@@ -3,6 +3,7 @@
 namespace App\Http\Controllers\Admin;
 
 use App\Http\Controllers\Controller;
+use App\Models\StorefrontCustomer;
 use App\Models\StorefrontOrder;
 use Illuminate\Support\Collection;
 use Illuminate\Support\Facades\DB;
@@ -97,6 +98,15 @@ class StorefrontSegmentController extends Controller
 
     private function allCustomers(): Collection
     {
+        // Pre-load phones that have a registered StorefrontCustomer account
+        // StorefrontCustomer.phone is stored as 628xxx; normalise to base (strip leading 62/0)
+        $accountPhones = StorefrontCustomer::whereNotNull('phone')
+            ->pluck('phone')
+            ->mapWithKeys(function ($p) {
+                $base = preg_replace('/^(\+?62|0)/', '', $p);
+                return [$base => true];
+            });
+
         return StorefrontOrder::whereNotNull('customer_phone')
             ->whereNotIn('status', ['cancelled'])
             ->select(
@@ -110,10 +120,14 @@ class StorefrontSegmentController extends Controller
             )
             ->groupBy('customer_phone')
             ->get()
-            ->map(function ($c) {
-                $daysSinceLast     = now()->diffInDays($c->last_order_at);
-                $c->segment        = self::classify((int) $c->order_count, $daysSinceLast, (float) $c->total_spent);
-                $c->days_since     = $daysSinceLast;
+            ->map(function ($c) use ($accountPhones) {
+                $daysSinceLast = now()->diffInDays($c->last_order_at);
+                // Normalise phone → wa_phone (always 628xxx)
+                $base           = preg_replace('/^(\+?62|0)/', '', $c->customer_phone ?? '');
+                $c->wa_phone    = '62' . $base;
+                $c->has_account = isset($accountPhones[$base]);
+                $c->segment     = self::classify((int) $c->order_count, $daysSinceLast, (float) $c->total_spent);
+                $c->days_since  = $daysSinceLast;
                 return $c;
             });
     }
@@ -127,14 +141,17 @@ class StorefrontSegmentController extends Controller
         $totalCustomers = $customers->count();
         $totalRevenue   = $customers->sum('total_spent');
 
-        $overview = collect($segmentDefs)->map(function ($def, $key) use ($customers) {
+        $overview = collect($segmentDefs)->map(function ($def, $key) use ($customers, $totalCustomers) {
             $group = $customers->where('segment', $key);
+            $cnt   = $group->count();
             return array_merge($def, [
                 'key'         => $key,
-                'count'       => $group->count(),
+                'count'       => $cnt,
+                'pct'         => $totalCustomers > 0 ? round($cnt / $totalCustomers * 100) : 0,
                 'revenue'     => $group->sum('total_spent'),
-                'avg_clv'     => $group->count() > 0 ? $group->avg('total_spent') : 0,
+                'avg_clv'     => $cnt > 0 ? (int) $group->avg('total_spent') : 0,
                 'has_phone'   => $group->filter(fn ($c) => $c->customer_phone)->count(),
+                'has_account' => $group->filter(fn ($c) => $c->has_account)->count(),
             ]);
         });
 

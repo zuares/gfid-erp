@@ -192,15 +192,34 @@ if (!function_exists('storefrontProducts')) {
             return \App\Models\StorefrontProduct::where('is_published', true)
                 ->with([
                     'category',
-                    'variants' => fn($q) => $q->where('is_active', true)->orderBy('sort_order'),
+                    'variants' => fn($q) => $q->where('is_active', true)->with(['itemMappings.item.inventoryStocks.warehouse'])->orderBy('sort_order'),
                     'sizes'    => fn($q) => $q->where('is_active', true)->orderBy('sort_order'),
+                    'variantItemMappings.variant',
+                    'variantItemMappings.size',
+                    'variantItemMappings.item.inventoryStocks.warehouse',
                 ])
+                // Produk dengan rank_position tampil duluan (ranked products first),
+                // sisa produk tanpa rank fallback ke sort_order lalu name.
+                ->orderByRaw('rank_position IS NULL ASC')
+                ->orderBy('rank_position')
                 ->orderBy('sort_order')
                 ->orderBy('name')
                 ->get()
                 ->map(function ($p) {
                     // Variant default = foto utama
                     $default = $p->variants->firstWhere('is_default', true) ?? $p->variants->first();
+
+                    $stockResolver = app(\App\Services\Storefront\StockResolver::class);
+                    $availableStock = $stockResolver->forProduct($p);
+
+                    // Badge signals
+                    $ageInDays   = (int) now()->diffInDays($p->created_at);
+                    $isNewProduct = $ageInDays < 14;
+                    $stockStatus = match (true) {
+                        $availableStock === 0 => 'out',
+                        $availableStock <= 4  => 'low',
+                        default               => 'ok',
+                    };
 
                     return [
                         'slug'         => $p->slug,
@@ -213,23 +232,49 @@ if (!function_exists('storefrontProducts')) {
                         'sold'         => '',
                         'desc'         => $p->description ?? '',
                         'sizes'  => $p->sizes->pluck('size_label')->toArray(),
-                        'colors' => $p->variants->map(fn($v) => [
+                        'colors' => $p->variants
+                            ->groupBy(fn($v) => strtolower(trim((string) $v->color_name)))
+                            ->map(fn($group) => $group->firstWhere('size_label', null) ?? $group->first())
+                            ->map(fn($v) => [
                             'name' => $v->color_name,
                             'hex'  => $v->hex_color ?? '#888888',
-                        ])->toArray(),
+                        ])->values()->toArray(),
                         // Kategori
                         'category_slug' => $p->category?->slug ?? '',
                         'category_name' => $p->category?->name ?? '',
                         // Audience
                         'audience'       => $p->audience ?? '',
                         'audience_label' => $p->audience_label,
+                        // Ranking
+                        'rank_position'   => $p->rank_position,
+                        'rank_score'      => $p->rank_score,
+                        'available_stock' => $availableStock,
+                        'is_pinned'       => (bool) $p->is_pinned,
+                        // Badge signals
+                        'is_new_product' => $isNewProduct,
+                        'stock_status'   => $stockStatus,
                         // Data tambahan untuk image swap, price update & cart
                         '_base_price' => $p->base_price,
                         '_variants'   => $p->variants->map(fn($v) => [
+                            'id'             => $v->id,
                             'name'           => $v->color_name,
+                            'size_label'     => $v->size_label,
                             'img'            => $v->getImageSrc(),
                             'price_override' => $v->price_override,
+                            'stock'          => $stockResolver->forVariant($v),
+                            'item_id'        => $v->item_id,
+                            'item_code'      => $v->item?->code,
                             'is_default'     => $v->is_default,
+                        ])->values()->toArray(),
+                        '_variant_items' => $p->variantItemMappings->map(fn($m) => [
+                            'variant_id'     => $m->variant_id,
+                            'size_id'        => $m->size_id,
+                            'color'          => $m->variant?->color_name,
+                            'size'           => $m->size?->size_label,
+                            'price_override' => $m->price_override,
+                            'stock'          => $stockResolver->forMapping($m),
+                            'item_id'        => $m->item_id,
+                            'item_code'      => $m->item?->code,
                         ])->values()->toArray(),
                         '_sizes' => $p->sizes->map(fn($s) => [
                             'label'          => $s->size_label,

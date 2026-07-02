@@ -12,11 +12,26 @@ class StorefrontProduct extends Model
     protected $fillable = [
         'slug', 'name', 'description', 'product_type', 'base_price',
         'label', 'image_url', 'is_published', 'sort_order', 'item_id', 'category_id', 'audience',
+        // Stock
+        'stock',
+        // Ranking overrides (owner)
+        'is_pinned', 'pin_position', 'manual_boost', 'featured_until',
+        // Computed ranking
+        'rank_score', 'rank_position', 'rank_updated_at', 'rank_debug',
     ];
 
     protected $casts = [
-        'base_price'   => 'integer',
-        'is_published' => 'boolean',
+        'base_price'     => 'integer',
+        'is_published'   => 'boolean',
+        'stock'          => 'integer',
+        'is_pinned'      => 'boolean',
+        'pin_position'   => 'integer',
+        'manual_boost'   => 'float',
+        'featured_until' => 'datetime',
+        'rank_score'     => 'float',
+        'rank_position'  => 'integer',
+        'rank_updated_at'=> 'datetime',
+        'rank_debug'     => 'array',
     ];
 
     // ── Relations ──────────────────────────────────────────────────────────
@@ -33,6 +48,11 @@ class StorefrontProduct extends Model
         return $this->hasMany(StorefrontProductSize::class, 'product_id')
                     ->orderBy('sort_order')
                     ->orderBy('id');
+    }
+
+    public function variantItemMappings(): HasMany
+    {
+        return $this->hasMany(StorefrontVariantItemMapping::class, 'product_id');
     }
 
     public function item(): BelongsTo

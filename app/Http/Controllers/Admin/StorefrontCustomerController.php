@@ -3,6 +3,7 @@
 namespace App\Http\Controllers\Admin;
 
 use App\Http\Controllers\Controller;
+use App\Models\StorefrontCustomer;
 use App\Models\StorefrontEvent;
 use App\Models\StorefrontOrder;
 use App\Models\StorefrontVisitor;
@@ -11,6 +12,34 @@ use Illuminate\Support\Facades\DB;
 
 class StorefrontCustomerController extends Controller
 {
+    private function parseBrand(?string $ua): string
+    {
+        if (! $ua) return '—';
+        if (str_contains($ua, 'iPhone'))    return 'iPhone';
+        if (str_contains($ua, 'iPad'))      return 'iPad';
+        if (str_contains($ua, 'Macintosh')) return 'Mac';
+        if (preg_match('/samsung|SM-[A-Z]{1,2}\d{3,}/i', $ua)) return 'Samsung';
+        if (preg_match('/xiaomi|redmi|poco/i', $ua))            return 'Xiaomi';
+        if (preg_match('/oppo|CPH\d{4}/i', $ua))               return 'OPPO';
+        if (preg_match('/realme|RMX\d{4}/i', $ua))             return 'Realme';
+        if (preg_match('/\bvivo\b/i', $ua))                     return 'Vivo';
+        if (preg_match('/huawei|honor/i', $ua))                 return 'Huawei';
+        if (preg_match('/oneplus/i', $ua))                      return 'OnePlus';
+        if (str_contains($ua, 'Android')) return 'Android';
+        if (str_contains($ua, 'Windows')) return 'Windows';
+        if (str_contains($ua, 'Linux'))   return 'Linux';
+        return '—';
+    }
+
+    private function parseDevice(?string $ua): string
+    {
+        if (! $ua) return 'desktop';
+        $ua = strtolower($ua);
+        if (str_contains($ua, 'tablet') || str_contains($ua, 'ipad')) return 'tablet';
+        if (preg_match('/mobile|android|iphone|ipod|blackberry|opera mini|windows phone/', $ua)) return 'mobile';
+        return 'desktop';
+    }
+
     // ─── Index ───────────────────────────────────────────────────────────────
 
     public function index(Request $request)
@@ -63,9 +92,28 @@ class StorefrontCustomerController extends Controller
         $avgClv         = $allStats->avg('total') ?? 0;
         $totalRevenue   = $allStats->sum('total');
 
+        // ── Registered accounts ────────────────────────────────────────────────
+        $registeredCount  = StorefrontCustomer::count();
+        $verifiedCount    = StorefrontCustomer::whereNotNull('phone_verified_at')->count();
+
+        $accountsByPhone  = StorefrontCustomer::select('id', 'phone', 'phone_verified_at', 'created_at')
+            ->get()
+            ->keyBy('phone');
+
+        // Customers with first order this month
+        $newThisMonth = StorefrontOrder::whereNotNull('customer_phone')
+            ->whereNotIn('status', ['cancelled'])
+            ->whereMonth('created_at', now()->month)
+            ->whereYear('created_at', now()->year)
+            ->select('customer_phone')
+            ->groupBy('customer_phone')
+            ->havingRaw('MIN(created_at) >= ?', [now()->startOfMonth()])
+            ->get()->count();
+
         return view('admin.crm.customers.index', compact(
             'customers', 'search', 'sort', 'repeat',
-            'totalCustomers', 'repeatBuyers', 'avgClv', 'totalRevenue'
+            'totalCustomers', 'repeatBuyers', 'avgClv', 'totalRevenue',
+            'registeredCount', 'verifiedCount', 'accountsByPhone', 'newThisMonth'
         ));
     }
 
@@ -78,6 +126,15 @@ class StorefrontCustomerController extends Controller
             ->get();
 
         abort_if($orders->isEmpty(), 404);
+
+        // ── Registered account lookup ─────────────────────────────────────────
+        // Phone in orders may be 08xxx; StorefrontCustomer stores 628xxx
+        $phoneNorm = str_starts_with($phone, '0')
+            ? '62' . substr($phone, 1)
+            : $phone;
+        $account = StorefrontCustomer::where('phone', $phoneNorm)
+            ->orWhere('phone', $phone)
+            ->first();
 
         $validOrders = $orders->whereNotIn('status', ['cancelled']);
 
@@ -186,10 +243,14 @@ class StorefrontCustomerController extends Controller
             ->whereNotIn('event_type', ['page_view_duration'])
             ->take(50);
 
+        $device = $this->parseDevice($visitor?->user_agent);
+        $brand  = $this->parseBrand($visitor?->user_agent);
+
         return view('admin.crm.customers.show', compact(
-            'customer', 'orders', 'products',
+            'customer', 'orders', 'products', 'account',
             'visitor', 'visitors', 'events', 'timeline',
-            'pageVisits', 'pageDurations', 'totalTimeOnSite', 'clickSummary'
+            'pageVisits', 'pageDurations', 'totalTimeOnSite', 'clickSummary',
+            'device', 'brand'
         ));
     }
 }

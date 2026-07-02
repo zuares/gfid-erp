@@ -1,296 +1,187 @@
-<!doctype html>
-<html lang="id">
-<head>
-    <meta charset="utf-8">
-    <meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=1, user-scalable=no, viewport-fit=cover">
-    <title>{{ $product['name'] }} — Greatfit</title>
-    <link rel="preconnect" href="https://fonts.googleapis.com">
-    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
-    <link href="https://fonts.googleapis.com/css2?family=Plus+Jakarta+Sans:wght@400;500;600;700;800;900&display=swap" rel="stylesheet">
-    <style>
-        *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
-        :root {
-            --ink: #0a0a0a;
-            --mid: #777;
-            --line: #ebebeb;
-            --soft: #f5f5f5;
-            --bg:  #f2f2f2;
-            --white: #fff;
-            --red: #e53935;
-            --safe: env(safe-area-inset-bottom, 0px);
-        }
-        html { scroll-behavior: smooth; min-height: 100%; }
-        body {
-            font-family: 'Plus Jakarta Sans', system-ui, sans-serif;
-            color: var(--ink); background: var(--bg);
-            -webkit-font-smoothing: antialiased;
-            padding-bottom: calc(72px + var(--safe));
-            min-height: 100vh;
-            display: flex;
-            flex-direction: column;
-        }
-        a { color: inherit; text-decoration: none; }
-        img { display: block; max-width: 100%; }
+@extends('storefront.layouts.app')
 
-        /* ─── NAV ─── */
-        .nav { position: sticky; top: 0; z-index: 100; background: rgba(255,255,255,.95); backdrop-filter: blur(12px); border-bottom: 1px solid var(--line); }
-        .nav-inner { height: 56px; display: flex; align-items: center; justify-content: space-between; max-width: 1680px; margin: 0 auto; padding: 0 20px; }
-        .brand { display: flex; align-items: center; gap: 8px; font-weight: 900; font-size: 12px; letter-spacing: .16em; text-transform: uppercase; }
-        .brand img { width: 28px; height: 28px; object-fit: contain; }
-        .nav-r { display: flex; align-items: center; gap: 16px; }
-        .nav-links { display: none; gap: 18px; font-size: 11px; font-weight: 700; letter-spacing: .1em; text-transform: uppercase; color: #555; }
-        .nav-links a:hover { color: var(--ink); }
-        .nav-links a.active { color: var(--ink); }
-        .cart-icon { position: relative; width: 34px; height: 34px; border-radius: 50%; display: inline-flex; align-items: center; justify-content: center; color: var(--ink); transition: background .15s; flex-shrink: 0; }
-        .cart-icon:hover { background: var(--soft); }
-        .cart-wrap { position: relative; }
-        .cart-badge { position: absolute; top: -2px; right: -2px; width: 16px; height: 16px; border-radius: 50%; background: var(--ink); color: var(--white); font-size: 9px; font-weight: 800; display: grid; place-items: center; border: 2px solid var(--white); }
-        .cart-wrap.cart-pop { animation: cartPulse .7s ease both; }
-        .cart-toast { position: fixed; top: 68px; right: 16px; z-index: 500; display: flex; align-items: center; gap: 10px; max-width: min(320px, calc(100vw - 32px)); padding: 11px 13px; border-radius: 14px; background: var(--ink); color: var(--white); box-shadow: 0 16px 40px rgba(0,0,0,.18); font-size: 12px; font-weight: 800; transform: translateY(-10px); opacity: 0; pointer-events: none; animation: toastIn 2.4s ease forwards; }
-        .cart-toast-icon { width: 26px; height: 26px; border-radius: 50%; background: rgba(255,255,255,.14); display: grid; place-items: center; flex-shrink: 0; }
-        .cart-fly { position: fixed; top: 50%; left: 50%; z-index: 499; width: 18px; height: 18px; border-radius: 50%; background: var(--ink); pointer-events: none; transform: translate(-50%, -50%); opacity: 0; animation: flyToCart .75s cubic-bezier(.2,.7,.2,1) forwards; }
-        @keyframes cartPulse { 0%, 100% { transform: scale(1); } 35% { transform: scale(1.14); } 65% { transform: scale(.96); } }
-        @keyframes toastIn { 0% { opacity: 0; transform: translateY(-10px); } 12%, 78% { opacity: 1; transform: translateY(0); } 100% { opacity: 0; transform: translateY(-8px); } }
-        @keyframes flyToCart { 0% { opacity: 0; transform: translate(-50%, -50%) scale(.7); } 18% { opacity: 1; } 100% { opacity: 0; transform: translate(calc(50vw - 42px), calc(-50vh + 23px)) scale(.25); } }
+@section('title', $product['name'] . ' — Greatfit')
 
-        /* ─── BREADCRUMB ─── */
-        .breadcrumb-bar { background: var(--white); border-bottom: 1px solid var(--line); padding: 9px 16px; }
-        .breadcrumb { font-size: 11px; color: var(--mid); display: flex; align-items: center; gap: 5px; font-weight: 500; max-width: 1680px; margin: 0 auto; }
-        .breadcrumb a:hover { color: var(--ink); }
-        .mobile-back { font-size: 12px; color: var(--mid); font-weight: 800; display: inline-flex; align-items: center; gap: 6px; }
-        .mobile-back:hover { color: var(--ink); }
+@push('styles')
+<style>
+    :root { --bg: #f2f2f2; --red: #e53935; }
+    html { scroll-behavior: smooth; }
+    body { background: var(--bg); padding-bottom: calc(72px + var(--safe)); }
 
-        /* ─── SECTION CARDS ─── */
-        .section { background: var(--white); margin-bottom: 8px; padding: 16px; }
+    /* TOAST / FLY */
+    .cart-fly { position: fixed; top: 50%; left: 50%; z-index: 499; width: 18px; height: 18px; border-radius: 50%; background: var(--ink); pointer-events: none; transform: translate(-50%, -50%); opacity: 0; animation: flyToCart .75s cubic-bezier(.2,.7,.2,1) forwards; }
+    .cart-toast { position: fixed; top: 68px; right: 16px; z-index: 500; display: flex; align-items: center; gap: 10px; max-width: min(320px, calc(100vw - 32px)); padding: 11px 13px; border-radius: 14px; background: var(--ink); color: var(--white); box-shadow: 0 16px 40px rgba(0,0,0,.18); font-size: 12px; font-weight: 800; transform: translateY(-10px); opacity: 0; pointer-events: none; animation: toastIn 2.4s ease forwards; }
+    .cart-toast-icon { width: 26px; height: 26px; border-radius: 50%; background: rgba(255,255,255,.14); display: grid; place-items: center; flex-shrink: 0; }
+    @@keyframes flyToCart { 0% { opacity: 0; transform: translate(-50%, -50%) scale(.7); } 18% { opacity: 1; } 100% { opacity: 0; transform: translate(calc(50vw - 42px), calc(-50vh + 23px)) scale(.25); } }
+    @@keyframes toastIn { 0% { opacity: 0; transform: translateY(-10px); } 12%, 78% { opacity: 1; transform: translateY(0); } 100% { opacity: 0; transform: translateY(-8px); } }
 
-        /* ─── IMAGE ─── */
-        .img-section { background: var(--white); margin-bottom: 8px; position: relative; overflow: hidden; }
-        .img-section img { width: 100%; aspect-ratio: 1; object-fit: cover; display: block; }
-        .img-badge { position: absolute; top: 14px; left: 14px; z-index: 2; background: var(--ink); color: var(--white); font-size: 10px; font-weight: 800; padding: 4px 10px; border-radius: 999px; letter-spacing: .04em; }
+    /* BREADCRUMB */
+    .breadcrumb-bar { background: var(--white); border-bottom: 1px solid var(--line); padding: 9px 16px; }
+    .breadcrumb { font-size: 11px; color: var(--mid); display: flex; align-items: center; gap: 5px; font-weight: 500; max-width: 1680px; margin: 0 auto; }
+    .breadcrumb a:hover { color: var(--ink); }
+    .mobile-back { font-size: 12px; color: var(--mid); font-weight: 800; display: inline-flex; align-items: center; gap: 6px; }
+    .mobile-back:hover { color: var(--ink); }
 
-        /* ─── PRICE CARD ─── */
-        .price-section { padding: 14px 16px 16px; }
-        .price-row { display: flex; align-items: flex-end; justify-content: space-between; margin-bottom: 8px; }
-        .product-price { font-size: 26px; font-weight: 900; letter-spacing: -.03em; line-height: 1; }
-        .product-sold { font-size: 11px; color: var(--mid); font-weight: 500; }
-        .product-name { font-size: 15px; font-weight: 700; line-height: 1.4; color: #222; }
+    /* SECTION CARDS */
+    .section { background: var(--white); margin-bottom: 8px; padding: 16px; }
 
-        /* ─── VARIANT TAPPABLE ROW (mobile — opens modal) ─── */
-        .variant-tap { display: flex; align-items: center; justify-content: space-between; padding: 13px 16px; cursor: pointer; }
-        .vt-left { display: flex; flex-direction: column; gap: 2px; }
-        .vt-label { font-size: 10px; font-weight: 700; letter-spacing: .07em; text-transform: uppercase; color: var(--mid); }
-        .vt-value { font-size: 13px; font-weight: 700; color: var(--ink); }
-        .vt-hint { font-size: 13px; font-weight: 500; color: var(--mid); font-style: italic; }
-        .vt-arrow { color: var(--mid); flex-shrink: 0; }
+    /* IMAGE */
+    .img-section { background: var(--white); margin-bottom: 8px; position: relative; overflow: hidden; }
+    .img-section img { width: 100%; aspect-ratio: 1; object-fit: cover; display: block; }
+    .img-badge { position: absolute; top: 14px; left: 14px; z-index: 2; background: var(--ink); color: var(--white); font-size: 10px; font-weight: 800; padding: 4px 10px; border-radius: var(--radius-pill); letter-spacing: .04em; }
 
-        /* ─── VARIANT SECTION (desktop inline) ─── */
-        .variant-section { padding: 14px 16px 20px; }
-        .picker-head { font-size: 11px; font-weight: 800; letter-spacing: .07em; text-transform: uppercase; color: var(--mid); margin-bottom: 10px; }
-        .variant-summary { display: flex; align-items: center; justify-content: space-between; padding: 10px 12px; background: var(--soft); border-radius: 10px; margin-bottom: 18px; }
-        .vs-label { font-size: 11px; color: var(--mid); font-weight: 600; flex-shrink: 0; margin-right: 8px; }
-        .vs-value { font-size: 12px; font-weight: 800; color: var(--ink); text-align: right; }
-        .vs-hint { font-size: 11px; color: var(--mid); font-weight: 500; font-style: italic; }
+    /* PRICE CARD */
+    .price-section { padding: 14px 16px 16px; }
+    .price-row { display: flex; align-items: flex-end; justify-content: space-between; margin-bottom: 8px; }
+    .product-price { font-size: 26px; font-weight: 900; letter-spacing: -.03em; line-height: 1; }
+    .product-sold { font-size: 11px; color: var(--mid); font-weight: 500; }
+    .product-name { font-size: 15px; font-weight: 700; line-height: 1.4; color: #222; }
 
-        /* Color swatches */
-        .colors { display: flex; gap: 8px; flex-wrap: wrap; margin-bottom: 20px; }
-        .color-btn { width: 32px; height: 32px; border-radius: 50%; border: none; cursor: pointer; flex-shrink: 0; transition: transform .12s, box-shadow .12s; }
-        .color-btn.light { box-shadow: inset 0 0 0 1.5px #ccc; }
-        .color-btn:hover { transform: scale(1.1); }
-        .color-btn.active { box-shadow: 0 0 0 2.5px var(--white), 0 0 0 4.5px var(--ink); }
-        .color-btn.color-option { width: auto; height: 38px; min-width: 0; border-radius: 999px; padding: 0 12px 0 8px; display: inline-flex; align-items: center; gap: 8px; background: var(--white); border: 1.5px solid var(--line); box-shadow: none; font-family: inherit; font-size: 12px; font-weight: 800; color: var(--ink); }
-        .color-btn.color-option:hover { transform: none; border-color: #bbb; }
-        .color-btn.color-option.active { background: var(--ink); border-color: var(--ink); color: var(--white); box-shadow: none; }
-        .color-dot { width: 20px; height: 20px; border-radius: 50%; flex-shrink: 0; box-shadow: inset 0 0 0 1px rgba(0,0,0,.12); }
-        .color-dot.light { box-shadow: inset 0 0 0 1.5px #bbb; }
+    /* VARIANT TAP ROW (mobile) */
+    .variant-tap { display: flex; align-items: center; justify-content: space-between; padding: 13px 16px; cursor: pointer; }
+    .vt-left { display: flex; flex-direction: column; gap: 2px; }
+    .vt-label { font-size: 10px; font-weight: 700; letter-spacing: .07em; text-transform: uppercase; color: var(--mid); }
+    .vt-value { font-size: 13px; font-weight: 700; color: var(--ink); }
+    .vt-hint { font-size: 13px; font-weight: 500; color: var(--mid); font-style: italic; }
+    .vt-arrow { color: var(--mid); flex-shrink: 0; }
 
-        /* Size chips */
-        .sizes { display: flex; gap: 6px; flex-wrap: wrap; margin-bottom: 20px; }
-        .size-btn { min-width: 46px; height: 36px; padding: 0 10px; border-radius: 8px; border: 1.5px solid var(--line); background: var(--white); font-size: 12px; font-weight: 800; cursor: pointer; display: grid; place-items: center; transition: all .12s; font-family: inherit; color: var(--ink); }
-        .size-btn:hover { border-color: #bbb; }
-        .size-btn.active { border-color: var(--ink); background: var(--ink); color: var(--white); }
+    /* VARIANT SECTION (desktop inline) */
+    .variant-section { padding: 14px 16px 20px; }
+    .picker-head { font-size: 11px; font-weight: 800; letter-spacing: .07em; text-transform: uppercase; color: var(--mid); margin-bottom: 10px; }
+    .variant-summary { display: flex; align-items: center; justify-content: space-between; padding: 10px 12px; background: var(--soft); border-radius: 10px; margin-bottom: 18px; }
+    .vs-label { font-size: 11px; color: var(--mid); font-weight: 600; flex-shrink: 0; margin-right: 8px; }
+    .vs-value { font-size: 12px; font-weight: 800; color: var(--ink); text-align: right; }
+    .vs-hint { font-size: 11px; color: var(--mid); font-weight: 500; font-style: italic; }
 
-        /* Qty */
-        .qty-row { display: flex; align-items: center; justify-content: space-between; }
-        .qty-label { font-size: 11px; font-weight: 800; letter-spacing: .07em; text-transform: uppercase; color: var(--mid); }
-        .qty-ctrl { display: inline-flex; align-items: center; border: 1.5px solid var(--line); border-radius: 8px; overflow: hidden; }
-        .qty-btn { width: 34px; height: 34px; border: none; background: transparent; cursor: pointer; font-size: 16px; display: grid; place-items: center; color: var(--ink); font-family: inherit; transition: background .1s; user-select: none; }
-        .qty-btn:hover { background: var(--soft); }
-        .qty-num { min-width: 36px; text-align: center; font-size: 13px; font-weight: 800; border-left: 1.5px solid var(--line); border-right: 1.5px solid var(--line); line-height: 34px; }
-        .pick-hint { font-size: 11px; color: var(--red); font-weight: 600; margin-top: 12px; display: none; }
+    /* Color swatches */
+    .colors { display: flex; gap: 8px; flex-wrap: wrap; margin-bottom: 20px; }
+    .color-btn { width: 32px; height: 32px; border-radius: 50%; border: none; cursor: pointer; flex-shrink: 0; transition: transform .12s, box-shadow .12s; }
+    .color-btn.light { box-shadow: inset 0 0 0 1.5px #ccc; }
+    .color-btn:hover { transform: scale(1.1); }
+    .color-btn.active { box-shadow: 0 0 0 2.5px var(--white), 0 0 0 4.5px var(--ink); }
+    .color-btn.color-option { width: auto; height: 38px; min-width: 0; border-radius: var(--radius-pill); padding: 0 12px 0 8px; display: inline-flex; align-items: center; gap: 8px; background: var(--white); border: 1.5px solid var(--line); box-shadow: none; font-family: var(--font-body); font-size: 12px; font-weight: 800; color: var(--ink); }
+    .color-btn.color-option:hover { transform: none; border-color: #bbb; }
+    .color-btn.color-option.active { background: var(--ink); border-color: var(--ink); color: var(--white); box-shadow: none; }
+    .color-dot { width: 20px; height: 20px; border-radius: 50%; flex-shrink: 0; box-shadow: inset 0 0 0 1px rgba(0,0,0,.12); }
+    .color-dot.light { box-shadow: inset 0 0 0 1.5px #bbb; }
 
-        /* Desktop action buttons */
-        .btn-row { display: flex; gap: 8px; margin-top: 20px; }
-        .btn-atc { flex: 1; height: 48px; border-radius: 12px; background: #f0f0f0; color: var(--ink); border: 1.5px solid var(--line); font-size: 13px; font-weight: 800; cursor: pointer; display: flex; align-items: center; justify-content: center; gap: 7px; font-family: inherit; transition: background .12s; }
-        .btn-atc:hover { background: var(--line); }
-        .btn-now { flex: 1.2; height: 48px; border-radius: 12px; background: var(--ink); color: var(--white); border: none; font-size: 13px; font-weight: 800; cursor: pointer; font-family: inherit; transition: opacity .12s; letter-spacing: .01em; }
-        .btn-now:hover { opacity: .85; }
+    /* Size chips */
+    .sizes { display: flex; gap: 6px; flex-wrap: wrap; margin-bottom: 20px; }
+    .size-btn { min-width: 46px; height: 36px; padding: 0 10px; border-radius: 8px; border: 1.5px solid var(--line); background: var(--white); font-size: 12px; font-weight: 800; cursor: pointer; display: grid; place-items: center; transition: all .12s; font-family: var(--font-body); color: var(--ink); }
+    .size-btn:hover { border-color: #bbb; }
+    .size-btn.active { border-color: var(--ink); background: var(--ink); color: var(--white); }
 
-        /* ─── DESCRIPTION ─── */
-        .desc-section { padding: 14px 16px; }
-        .section-title { font-size: 11px; font-weight: 800; letter-spacing: .08em; text-transform: uppercase; color: var(--mid); margin-bottom: 10px; }
-        .desc-text { font-size: 13px; color: #555; line-height: 1.75; font-weight: 500; }
+    /* Qty */
+    .qty-row { display: flex; align-items: center; justify-content: space-between; }
+    .qty-label { font-size: 11px; font-weight: 800; letter-spacing: .07em; text-transform: uppercase; color: var(--mid); }
+    .qty-ctrl { display: inline-flex; align-items: center; border: 1.5px solid var(--line); border-radius: 8px; overflow: hidden; }
+    .qty-btn { width: 34px; height: 34px; border: none; background: transparent; cursor: pointer; font-size: 16px; display: grid; place-items: center; color: var(--ink); font-family: var(--font-body); transition: background .1s; user-select: none; }
+    .qty-btn:hover { background: var(--soft); }
+    .qty-num { min-width: 36px; text-align: center; font-size: 13px; font-weight: 800; border-left: 1.5px solid var(--line); border-right: 1.5px solid var(--line); line-height: 34px; }
+    .pick-hint { font-size: 11px; color: var(--red); font-weight: 600; margin-top: 12px; display: none; }
+    .stock-note { font-size: 11px; color: var(--mid); font-weight: 800; margin-top: 12px; }
+    .stock-note.low { color: #f97316; }
+    .stock-note.out { color: var(--red); }
 
-        /* ─── RELATED (mobile card) ─── */
-        .related-section { padding: 14px 16px 16px; }
-        .related-grid { display: grid; grid-template-columns: repeat(2, 1fr); gap: 8px; margin-top: 12px; }
-        .rc { border-radius: 10px; overflow: hidden; background: var(--soft); border: 1px solid var(--line); display: block; transition: opacity .15s; }
-        .rc:hover { opacity: .8; }
-        .rc img { width: 100%; aspect-ratio: 1; object-fit: cover; }
-        .rc-body { padding: 9px 10px; }
-        .rc-name { font-size: 12px; font-weight: 700; line-height: 1.3; color: #333; }
-        .rc-price { font-size: 14px; font-weight: 900; margin-top: 3px; }
+    /* Desktop action buttons */
+    .btn-row { display: flex; gap: 8px; margin-top: 20px; }
+    .btn-atc { flex: 1; height: 48px; border-radius: 12px; background: #f0f0f0; color: var(--ink); border: 1.5px solid var(--line); font-size: 13px; font-weight: 800; cursor: pointer; display: flex; align-items: center; justify-content: center; gap: 7px; font-family: var(--font-body); transition: background .12s; }
+    .btn-atc:hover { background: var(--line); }
+    .btn-now { flex: 1.2; height: 48px; border-radius: 12px; background: var(--ink); color: var(--white); border: none; font-size: 13px; font-weight: 800; cursor: pointer; font-family: var(--font-body); transition: opacity .12s; }
+    .btn-now:hover { opacity: .85; }
 
-        /* ─── FULL-WIDTH RELATED (desktop) ─── */
-        .related-full { background: var(--white); margin-top: 8px; padding: 20px 16px 24px; display: none; }
-        .related-full .section-title { margin-bottom: 16px; }
-        .related-full-grid { display: grid; grid-template-columns: repeat(3, 1fr); gap: 12px; }
+    /* DESCRIPTION */
+    .desc-section { padding: 14px 16px; }
+    .section-title { font-size: 11px; font-weight: 800; letter-spacing: .08em; text-transform: uppercase; color: var(--mid); margin-bottom: 10px; }
+    .desc-text { font-size: 13px; color: #555; line-height: 1.75; font-weight: 500; }
 
-        /* ─── FOOTER ─── */
-        /* mobile minimal footer inside card */
-        .foot-section { padding: 18px 16px 12px; }
-        .foot-brand { display: flex; align-items: center; gap: 9px; margin-bottom: 8px; }
-        .foot-brand img { width: 26px; height: 26px; object-fit: contain; }
-        .foot-name { font-size: 12px; font-weight: 900; letter-spacing: .15em; text-transform: uppercase; }
-        .foot-tagline { font-size: 12px; color: var(--mid); font-weight: 600; line-height: 1.55; margin-bottom: 16px; }
-        .foot-links { display: grid; grid-template-columns: repeat(3, 1fr); gap: 8px; margin-bottom: 16px; }
-        .foot-links a { height: 38px; border-radius: 12px; background: var(--soft); border: 1px solid var(--line); display: grid; place-items: center; font-size: 11px; font-weight: 800; color: var(--ink); }
-        .foot-bottom { display: flex; align-items: center; justify-content: space-between; gap: 12px; }
-        .foot-bottom span, .foot-bottom a { font-size: 11px; color: var(--mid); font-weight: 600; }
+    /* RELATED (mobile) */
+    .related-section { padding: 14px 16px 16px; }
+    .related-grid { display: grid; grid-template-columns: repeat(2, 1fr); gap: 8px; margin-top: 12px; }
+    .rc { border-radius: 10px; overflow: hidden; background: var(--soft); border: 1px solid var(--line); display: block; transition: opacity .15s; }
+    .rc:hover { opacity: .8; }
+    .rc img { width: 100%; aspect-ratio: 1; object-fit: cover; }
+    .rc-body { padding: 9px 10px; }
+    .rc-name { font-size: 12px; font-weight: 700; line-height: 1.3; color: #333; }
+    .rc-price { font-size: 14px; font-weight: 900; margin-top: 3px; }
 
-        /* proper site footer */
-        .site-footer { background: var(--ink); color: rgba(255,255,255,.7); display: none; margin-top: auto; }
-        .site-footer-inner { max-width: 1680px; margin: 0 auto; padding: 40px 32px 28px; }
-        .sf-top { display: grid; grid-template-columns: 1fr auto; gap: 40px; align-items: start; margin-bottom: 36px; }
-        .sf-brand { display: flex; align-items: center; gap: 10px; margin-bottom: 10px; }
-        .sf-brand img { width: 28px; height: 28px; object-fit: contain; filter: invert(1); }
-        .sf-brand-name { font-size: 13px; font-weight: 900; letter-spacing: .15em; text-transform: uppercase; color: #fff; }
-        .sf-tagline { font-size: 12px; color: rgba(255,255,255,.45); font-weight: 500; line-height: 1.6; max-width: 280px; }
-        .sf-nav { display: flex; gap: 32px; }
-        .sf-col h4 { font-size: 10px; font-weight: 800; letter-spacing: .1em; text-transform: uppercase; color: rgba(255,255,255,.4); margin-bottom: 12px; }
-        .sf-col a { display: block; font-size: 12px; font-weight: 600; color: rgba(255,255,255,.65); margin-bottom: 8px; text-decoration: none; transition: color .15s; }
-        .sf-col a:hover { color: #fff; }
-        .sf-bottom { border-top: 1px solid rgba(255,255,255,.08); padding-top: 20px; display: flex; align-items: center; justify-content: space-between; }
-        .sf-copy { font-size: 11px; color: rgba(255,255,255,.3); }
-        .sf-love { font-size: 11px; color: rgba(255,255,255,.3); }
+    /* RELATED (desktop) */
+    .related-full { background: var(--white); margin-top: 8px; padding: 20px 16px 24px; display: none; }
+    .related-full .section-title { margin-bottom: 16px; }
+    .related-full-grid { display: grid; grid-template-columns: repeat(3, 1fr); gap: 12px; }
 
-        /* ─── STICKY BAR (mobile) ─── */
-        .bar { position: fixed; left: 0; right: 0; bottom: 0; z-index: 150; background: var(--white); border-top: 1px solid var(--line); padding: 10px 16px calc(10px + var(--safe)); }
-        .bar-inner { display: flex; align-items: center; gap: 8px; max-width: 600px; margin: 0 auto; }
-        .bar-cart { flex: 1; height: 46px; border-radius: 12px; background: var(--soft); color: var(--ink); border: 1.5px solid var(--line); font-size: 13px; font-weight: 800; cursor: pointer; font-family: inherit; display: flex; align-items: center; justify-content: center; gap: 6px; }
-        .bar-now { flex: 1.4; height: 46px; border-radius: 12px; background: var(--ink); color: var(--white); border: none; font-size: 13px; font-weight: 800; cursor: pointer; font-family: inherit; }
+    /* STICKY BAR (mobile) */
+    .bar { position: fixed; left: 0; right: 0; bottom: 0; z-index: 150; background: var(--white); border-top: 1px solid var(--line); padding: 10px 16px calc(10px + var(--safe)); }
+    .bar-inner { display: flex; align-items: center; gap: 8px; max-width: 600px; margin: 0 auto; }
+    .bar-cart { flex: 1; height: 46px; border-radius: 12px; background: var(--soft); color: var(--ink); border: 1.5px solid var(--line); font-size: 13px; font-weight: 800; cursor: pointer; font-family: var(--font-body); display: flex; align-items: center; justify-content: center; gap: 6px; }
+    .bar-now { flex: 1.4; height: 46px; border-radius: 12px; background: var(--ink); color: var(--white); border: none; font-size: 13px; font-weight: 800; cursor: pointer; font-family: var(--font-body); }
 
-        /* ─── MODAL / BOTTOM SHEET ─── */
-        .overlay { position: fixed; inset: 0; z-index: 300; background: rgba(0,0,0,.5); opacity: 0; pointer-events: none; transition: opacity .25s; }
-        .overlay.open { opacity: 1; pointer-events: all; }
-        .sheet { position: fixed; left: 0; right: 0; bottom: 0; z-index: 301; background: var(--white); border-radius: 20px 20px 0 0; transform: translateY(100%); transition: transform .3s cubic-bezier(.32,0,.15,1); max-height: 92vh; display: flex; flex-direction: column; }
-        .sheet.open { transform: translateY(0); }
-        .sheet-handle { width: 36px; height: 4px; background: var(--line); border-radius: 2px; margin: 12px auto 0; flex-shrink: 0; }
-        .sheet-head { display: flex; align-items: center; gap: 12px; padding: 16px 16px 14px; border-bottom: 1px solid var(--line); flex-shrink: 0; }
-        .sheet-img { width: 56px; height: 56px; border-radius: 10px; overflow: hidden; flex-shrink: 0; background: var(--soft); }
-        .sheet-img img { width: 100%; height: 100%; object-fit: cover; }
-        .sheet-meta { flex: 1; min-width: 0; }
-        .sheet-price { font-size: 20px; font-weight: 900; letter-spacing: -.03em; line-height: 1; }
-        .sheet-name { font-size: 12px; color: var(--mid); font-weight: 500; margin-top: 3px; }
-        .sheet-close { width: 32px; height: 32px; border-radius: 50%; border: 1.5px solid var(--line); background: none; cursor: pointer; display: grid; place-items: center; color: var(--mid); flex-shrink: 0; }
-        .sheet-body { overflow-y: auto; padding: 16px; flex: 1; }
-        .sheet-footer { padding: 12px 16px calc(12px + var(--safe)); border-top: 1px solid var(--line); flex-shrink: 0; }
-        .sheet-action { width: 100%; height: 50px; border-radius: 14px; border: none; font-size: 14px; font-weight: 800; cursor: pointer; font-family: inherit; transition: opacity .12s; }
-        .sheet-action:hover { opacity: .85; }
-        .sheet-action.mode-now { background: var(--ink); color: var(--white); }
-        .sheet-action.mode-cart { background: var(--ink); color: var(--white); }
-        .sheet-hint { font-size: 11px; color: var(--red); font-weight: 600; margin-top: 8px; display: none; text-align: center; }
+    /* MODAL / BOTTOM SHEET */
+    .overlay { position: fixed; inset: 0; z-index: 300; background: rgba(0,0,0,.5); opacity: 0; pointer-events: none; transition: opacity .25s; }
+    .overlay.open { opacity: 1; pointer-events: all; }
+    .sheet { position: fixed; left: 0; right: 0; bottom: 0; z-index: 301; background: var(--white); border-radius: 20px 20px 0 0; transform: translateY(100%); transition: transform .3s cubic-bezier(.32,0,.15,1); max-height: 92vh; display: flex; flex-direction: column; }
+    .sheet.open { transform: translateY(0); }
+    .sheet-handle { width: 36px; height: 4px; background: var(--line); border-radius: 2px; margin: 12px auto 0; flex-shrink: 0; }
+    .sheet-head { display: flex; align-items: center; gap: 12px; padding: 16px 16px 14px; border-bottom: 1px solid var(--line); flex-shrink: 0; }
+    .sheet-img { width: 56px; height: 56px; border-radius: 10px; overflow: hidden; flex-shrink: 0; background: var(--soft); }
+    .sheet-img img { width: 100%; height: 100%; object-fit: cover; }
+    .sheet-meta { flex: 1; min-width: 0; }
+    .sheet-price { font-size: 20px; font-weight: 900; letter-spacing: -.03em; line-height: 1; }
+    .sheet-name { font-size: 12px; color: var(--mid); font-weight: 500; margin-top: 3px; }
+    .sheet-close { width: 32px; height: 32px; border-radius: 50%; border: 1.5px solid var(--line); background: none; cursor: pointer; display: grid; place-items: center; color: var(--mid); flex-shrink: 0; }
+    .sheet-body { overflow-y: auto; padding: 16px; flex: 1; }
+    .sheet-footer { padding: 12px 16px calc(12px + var(--safe)); border-top: 1px solid var(--line); flex-shrink: 0; }
+    .sheet-action { width: 100%; height: 50px; border-radius: 14px; border: none; font-size: 14px; font-weight: 800; cursor: pointer; font-family: var(--font-body); transition: opacity .12s; background: var(--ink); color: var(--white); }
+    .sheet-action:hover { opacity: .85; }
+    .sheet-hint { font-size: 11px; color: var(--red); font-weight: 600; margin-top: 8px; display: none; text-align: center; }
 
-        /* ─── DESKTOP ─── */
-        @media (min-width: 720px) {
-            body { padding-bottom: 0; }
-            .nav-inner { padding: 0 32px; }
-            .nav-links { display: flex; }
+    @@media (min-width: 720px) {
+        body { padding-bottom: 0; }
+        .desktop-breadcrumb { display: flex; align-items: center; gap: 5px; font-size: 11px; color: var(--mid); font-weight: 500; padding: 16px 32px 0; }
+        .desktop-breadcrumb a:hover { color: var(--ink); }
+        .pd-grid { display: grid; grid-template-columns: minmax(300px, 40%) minmax(0, 1fr); gap: 28px; max-width: 1680px; margin: 0 auto; padding: 16px 32px 56px; align-items: start; width: 100%; }
+        .pd-left { position: sticky; top: 68px; }
+        .img-section { border-radius: 18px; margin-bottom: 0; overflow: hidden; }
+        .img-section img { aspect-ratio: 4/5; object-fit: cover; }
+        .pd-right { display: flex; flex-direction: column; gap: 10px; }
+        .price-section   { border-radius: 16px; padding: 22px 24px; margin-bottom: 0; }
+        .product-price   { font-size: 28px; }
+        .variant-section { border-radius: 16px; padding: 22px 24px 26px; margin-bottom: 0; }
+        .desc-section    { border-radius: 16px; padding: 20px 24px; margin-bottom: 0; }
+        .related-section { display: none; }
+        .variant-tap     { display: none; }
+        .variant-section { display: block; }
+        .bar     { display: none; }
+        .overlay { display: none; }
+        .sheet   { display: none; }
+        .breadcrumb-bar { display: none; }
+        .related-full { display: block; padding: 24px 32px 28px; }
+        .related-full-grid { grid-template-columns: repeat(3, 1fr); gap: 16px; }
+        .rc-name { font-size: 13px; }
+        .rc-price { font-size: 15px; }
+    }
+    @@media (min-width: 720px) and (max-width: 1080px) {
+        .desktop-breadcrumb { padding: 18px 36px 0; }
+        .pd-grid { grid-template-columns: minmax(280px, 42%) minmax(0, 1fr); gap: 22px; padding: 18px 36px 48px; }
+        .price-section   { padding: 20px 22px; }
+        .variant-section { padding: 20px 22px 24px; }
+        .desc-section    { padding: 18px 22px; }
+        .related-full    { padding: 24px 36px 30px; }
+    }
+    @@media (max-width: 719px) {
+        .desktop-breadcrumb { display: none; }
+        .pd-grid { display: contents; }
+        .pd-left, .pd-right { display: contents; }
+        .section { border-radius: 0; }
+        .variant-section { display: none; }
+        .variant-tap { display: flex; }
+    }
+</style>
+@endpush
 
-            /* Breadcrumb */
-            .desktop-breadcrumb { display: flex; align-items: center; gap: 5px; font-size: 11px; color: var(--mid); font-weight: 500; padding: 16px 32px 0; }
-            .desktop-breadcrumb a:hover { color: var(--ink); }
+@php $navActive = 'products'; @endphp
 
-            /* Two-col: image 40%, info 60% — fills viewport, capped at 1680px */
-            .pd-grid {
-                display: grid;
-                grid-template-columns: minmax(300px, 40%) minmax(0, 1fr);
-                gap: 28px;
-                max-width: 1680px;
-                margin: 0 auto;
-                padding: 16px 32px 56px;
-                align-items: start;
-                width: 100%;
-            }
-
-            /* Sticky image */
-            .pd-left { position: sticky; top: 68px; }
-            .img-section { border-radius: 18px; margin-bottom: 0; overflow: hidden; }
-            .img-section img { aspect-ratio: 4/5; object-fit: cover; }
-
-            /* Right column */
-            .pd-right { display: flex; flex-direction: column; gap: 10px; }
-            .price-section  { border-radius: 16px; padding: 22px 24px 22px; margin-bottom: 0; }
-            .product-price  { font-size: 28px; }
-            .variant-section{ border-radius: 16px; padding: 22px 24px 26px; margin-bottom: 0; }
-            .desc-section   { border-radius: 16px; padding: 20px 24px; margin-bottom: 0; }
-            .related-section{ border-radius: 16px; padding: 20px 24px 24px; margin-bottom: 0; }
-            .related-grid   { grid-template-columns: repeat(3, 1fr); }
-            .foot-section   { padding: 6px 2px 0; }
-
-            /* Desktop: show inline variant, hide mobile tap row */
-            .variant-tap { display: none; }
-            .variant-section { display: block; }
-
-            /* Desktop: hide mobile sticky bar and modal */
-            .bar { display: none; }
-            .overlay, .sheet { display: none; }
-            .breadcrumb-bar { display: none; }
-
-            /* Desktop: hide right-col related + minimal footer; show full-width versions */
-            .related-section { display: none; }
-            .foot-section { display: none; }
-            .related-full { display: block; padding: 24px 32px 28px; }
-            .related-full-grid { grid-template-columns: repeat(3, 1fr); gap: 16px; }
-            .rc-name { font-size: 13px; }
-            .rc-price { font-size: 15px; }
-            .site-footer { display: block; }
-        }
-        @media (min-width: 720px) and (max-width: 1080px) {
-            .nav-inner { padding: 0 32px; }
-            .desktop-breadcrumb { padding: 18px 36px 0; }
-            .pd-grid {
-                grid-template-columns: minmax(280px, 42%) minmax(0, 1fr);
-                gap: 22px;
-                padding: 18px 36px 48px;
-            }
-            .price-section { padding: 20px 22px; }
-            .variant-section { padding: 20px 22px 24px; }
-            .desc-section { padding: 18px 22px; }
-            .related-full { padding: 24px 36px 30px; }
-            .site-footer-inner { padding-left: 36px; padding-right: 36px; }
-        }
-        @media (max-width: 719px) {
-            .nav-r { gap: 8px; }
-            .desktop-breadcrumb { display: none; }
-            .pd-grid { display: contents; }
-            .pd-left, .pd-right { display: contents; }
-            .section { border-radius: 0; }
-            .foot-section { display: none; }
-
-            /* Mobile: hide inline variant section, show tap row */
-            .variant-section { display: none; }
-            .variant-tap { display: flex; }
-        }
-    </style>
-</head>
-<body>
-
-{{-- NAV --}}
-@php
-    $navActive = 'products';
-@endphp
-@include('storefront._nav')
-
+@section('content')
 @if(session('cart_added'))
 <div class="cart-fly"></div>
 <div class="cart-toast">
@@ -306,13 +197,11 @@
     <div class="breadcrumb">
         @if(!empty($product['category_slug']) && !empty($product['category_name']))
         <a href="{{ route('storefront.products', ['kategori' => $product['category_slug']]) }}" class="mobile-back">
-            <span>←</span>
-            <span>{{ $product['category_name'] }}</span>
+            <span>←</span><span>{{ $product['category_name'] }}</span>
         </a>
         @else
         <a href="{{ route('storefront.products') }}" class="mobile-back">
-            <span>←</span>
-            <span>Semua Produk</span>
+            <span>←</span><span>Semua Produk</span>
         </a>
         @endif
     </div>
@@ -332,7 +221,6 @@
 </div>
 
 <div class="pd-grid">
-
     {{-- LEFT: IMAGE --}}
     <div class="pd-left">
         <div class="img-section">
@@ -352,28 +240,28 @@
             </div>
             <div class="product-name">{{ $product['name'] }}</div>
             @php
-            $audColors = ['pria'=>'#1d4ed8','wanita'=>'#be185d','anak'=>'#d97706','olahraga'=>'#15803d','unisex'=>'#6b7280'];
-            $audColor  = $audColors[$product['audience'] ?? ''] ?? '#6b7280';
-            $isJumbo   = ($product['product_type'] ?? '') === 'jumbo';
+                $audColors = ['pria'=>'#1d4ed8','wanita'=>'#be185d','anak'=>'#d97706','olahraga'=>'#15803d','unisex'=>'#6b7280'];
+                $audColor  = $audColors[$product['audience'] ?? ''] ?? '#6b7280';
+                $isJumbo   = ($product['product_type'] ?? '') === 'jumbo';
             @endphp
             @if(!empty($product['category_name']) || !empty($product['audience_label']) || $isJumbo)
             <div style="margin-top:8px;display:flex;gap:6px;flex-wrap:wrap;">
                 @if($isJumbo)
                 <a href="{{ route('storefront.products', ['type' => 'jumbo']) }}"
-                   style="display:inline-flex;align-items:center;gap:4px;font-size:10px;font-weight:700;letter-spacing:.06em;text-transform:uppercase;color:#7c3aed;text-decoration:none;background:#7c3aed14;padding:3px 9px;border-radius:999px;">
+                   style="display:inline-flex;align-items:center;gap:4px;font-size:10px;font-weight:700;letter-spacing:.06em;text-transform:uppercase;color:#7c3aed;background:#7c3aed14;padding:3px 9px;border-radius:999px;">
                     ✦ Big Size
                 </a>
                 @endif
                 @if(!empty($product['category_name']))
                 <a href="{{ route('storefront.products', ['kategori' => $product['category_slug']]) }}"
-                   style="display:inline-flex;align-items:center;gap:4px;font-size:10px;font-weight:700;letter-spacing:.06em;text-transform:uppercase;color:var(--mid);text-decoration:none;border:1px solid var(--line);padding:3px 9px;border-radius:999px;">
+                   style="display:inline-flex;align-items:center;gap:4px;font-size:10px;font-weight:700;letter-spacing:.06em;text-transform:uppercase;color:var(--mid);border:1px solid var(--line);padding:3px 9px;border-radius:999px;">
                     <svg width="10" height="10" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><path d="M20.59 13.41l-7.17 7.17a2 2 0 01-2.83 0L2 12V2h10l8.59 8.59a2 2 0 010 2.82z"/><line x1="7" y1="7" x2="7.01" y2="7"/></svg>
                     {{ $product['category_name'] }}
                 </a>
                 @endif
                 @if(!empty($product['audience_label']))
                 <a href="{{ route('storefront.products', ['audience' => $product['audience']]) }}"
-                   style="display:inline-flex;align-items:center;gap:4px;font-size:10px;font-weight:700;letter-spacing:.06em;text-transform:uppercase;color:{{ $audColor }};text-decoration:none;background:{{ $audColor }}14;padding:3px 9px;border-radius:999px;">
+                   style="display:inline-flex;align-items:center;gap:4px;font-size:10px;font-weight:700;letter-spacing:.06em;text-transform:uppercase;color:{{ $audColor }};background:{{ $audColor }}14;padding:3px 9px;border-radius:999px;">
                     {{ $product['audience_label'] }}
                 </a>
                 @endif
@@ -381,7 +269,7 @@
             @endif
         </div>
 
-        {{-- MOBILE: tappable row that opens modal --}}
+        {{-- MOBILE: tappable row --}}
         <div class="section variant-tap" onclick="openModal('now')">
             <div class="vt-left">
                 <span class="vt-label">Pilihan</span>
@@ -427,6 +315,7 @@
             </div>
 
             <div class="pick-hint" id="desk-hint">Pilih warna dan ukuran terlebih dahulu</div>
+            <div class="stock-note" id="desk-stock-note">Pilih warna dan ukuran untuk cek stok</div>
             @if(session('cart_error'))
             <div class="pick-hint" style="display:block">{{ session('cart_error') }}</div>
             @endif
@@ -456,7 +345,7 @@
             <div class="desc-text">{{ $product['desc'] }}</div>
         </div>
 
-        {{-- RELATED (mobile only — desktop version is full-width below) --}}
+        {{-- RELATED (mobile) --}}
         @php $related = collect($products)->where('slug', '!=', $slug)->take(3)->values(); @endphp
         @if($related->count())
         <div class="section related-section">
@@ -475,28 +364,10 @@
         </div>
         @endif
 
-        {{-- Mobile minimal footer --}}
-        <div class="section foot-section">
-            <div class="foot-brand">
-                <img src="{{ asset('images/logo-mark.svg') }}" alt="Greatfit">
-                <span class="foot-name">Greatfit</span>
-            </div>
-            <div class="foot-tagline">Pakaian olahraga nyaman untuk aktivitas harian.</div>
-            <nav class="foot-links" aria-label="Footer mobile">
-                <a href="{{ route('storefront.products') }}">Produk</a>
-                <a href="{{ route('storefront.cart') }}">Keranjang</a>
-                <a href="{{ route('storefront.home') }}#beli">Cara Beli</a>
-            </nav>
-            <div class="foot-bottom">
-                <span>© {{ date('Y') }} Greatfit</span>
-                <a href="{{ route('login', [], false) }}">Admin</a>
-            </div>
-        </div>
-
     </div>
 </div>
 
-{{-- DESKTOP: Full-width related products --}}
+{{-- DESKTOP: Full-width related --}}
 @if($related->count())
 <section class="related-full">
     <div class="section-title">Produk Lainnya</div>
@@ -514,50 +385,6 @@
 </section>
 @endif
 
-{{-- DESKTOP: Site footer --}}
-<footer class="site-footer">
-    <div class="site-footer-inner">
-        <div class="sf-top">
-            <div>
-                <div class="sf-brand">
-                    <img src="{{ asset('images/logo-mark.svg') }}" alt="Greatfit">
-                    <span class="sf-brand-name">Greatfit</span>
-                </div>
-                <div class="sf-tagline">Pakaian olahraga nyaman<br>untuk aktivitas harian.</div>
-            </div>
-            <nav class="sf-nav">
-                <div class="sf-col">
-                    <h4>Koleksi</h4>
-                    <a href="{{ route('storefront.products') }}">Semua Produk</a>
-                    @if(count($products ?? []) > 6)
-                        @foreach ($products as $p)
-                        <a href="{{ route('storefront.product_detail', $p['slug']) }}">{{ $p['name'] }}</a>
-                        @endforeach
-                    @else
-                        @foreach (collect($products ?? [])->take(3) as $p)
-                        <a href="{{ route('storefront.product_detail', $p['slug']) }}">{{ $p['name'] }}</a>
-                        @endforeach
-                    @endif
-                </div>
-                <div class="sf-col">
-                    <h4>Toko</h4>
-                    <a href="{{ route('storefront.home') }}">Home</a>
-                    <a href="{{ route('storefront.cart') }}">Keranjang</a>
-                    <a href="{{ route('storefront.home') }}#beli">Cara Beli</a>
-                </div>
-                <div class="sf-col">
-                    <h4>Lainnya</h4>
-                    <a href="{{ route('login', [], false) }}">Admin Login</a>
-                </div>
-            </nav>
-        </div>
-        <div class="sf-bottom">
-            <span class="sf-copy">© {{ date('Y') }} Greatfit. All rights reserved.</span>
-            <span class="sf-love">Made with care in Indonesia</span>
-        </div>
-    </div>
-</footer>
-
 {{-- MOBILE STICKY BAR --}}
 <nav class="bar">
     <div class="bar-inner">
@@ -573,7 +400,6 @@
 <div class="overlay" id="overlay" onclick="closeModal()"></div>
 <div class="sheet" id="sheet">
     <div class="sheet-handle"></div>
-
     <div class="sheet-head">
         <div class="sheet-img">
             <img id="sheet-product-img" src="{{ storefront_img($product['img']) }}" alt="{{ $product['name'] }}">
@@ -586,12 +412,10 @@
             <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><path d="M18 6L6 18M6 6l12 12"/></svg>
         </button>
     </div>
-
     <div class="sheet-body">
-
         @if(!empty($product['colors']))
         <div class="picker-head" style="margin-top:4px">Warna</div>
-        <div class="colors" id="color-btns-modal" style="margin-bottom:20px">
+        <div class="colors" id="color-btns-modal">
             @foreach ($product['colors'] as $c)
             <button type="button" class="color-btn color-option" title="{{ $c['name'] }}"
                 onclick="modalColor(this, '{{ $c['name'] }}')">
@@ -601,14 +425,12 @@
             @endforeach
         </div>
         @endif
-
         <div class="picker-head">Ukuran</div>
-        <div class="sizes" id="size-btns-modal" style="margin-bottom:20px">
+        <div class="sizes" id="size-btns-modal">
             @foreach ($product['sizes'] as $s)
             <button type="button" class="size-btn" onclick="modalSize(this, '{{ $s }}')">{{ $s }}</button>
             @endforeach
         </div>
-
         <div class="qty-row">
             <span class="qty-label">Jumlah</span>
             <div class="qty-ctrl">
@@ -617,9 +439,8 @@
                 <button class="qty-btn" type="button" onclick="modalQty(1)">+</button>
             </div>
         </div>
-
+        <div class="stock-note" id="modal-stock-note">Pilih warna dan ukuran untuk cek stok</div>
     </div>
-
     <div class="sheet-footer">
         <form action="{{ route('storefront.cart.add') }}" method="POST" id="modal-form">
             @csrf
@@ -630,58 +451,108 @@
             <input type="hidden" name="mode"      id="modal-mode"  value="cart">
             <input type="hidden" name="_sf_token" value="{{ $_sfToken ?? '' }}">
         </form>
-        <button type="button" class="sheet-action mode-now" id="sheet-action-btn" onclick="modalSubmit()">
+        <button type="button" class="sheet-action" id="sheet-action-btn" onclick="modalSubmit()">
             Beli Sekarang
         </button>
         <div class="sheet-hint" id="sheet-hint">Pilih warna dan ukuran terlebih dahulu</div>
     </div>
 </div>
+@endsection
 
+@push('scripts')
 <script>
-/* ─── VARIANT DATA (dari DB) ─── */
 var variantData = @json($product['_variants'] ?? []);
+var variantItemData = @json($product['_variant_items'] ?? []);
 var basePrice   = {{ $product['_base_price'] ?? $product['price'] }};
-
-// Buat lookup: colorName → {img, price_override}
-var variantMap = {};
+var variantMap  = {};
 variantData.forEach(function(v) { variantMap[v.name] = v; });
 
-function formatRupiah(n) {
-    return 'Rp' + n.toString().replace(/\B(?=(\d{3})+(?!\d))/g, '.');
+function formatRupiah(n) { return 'Rp' + n.toString().replace(/\B(?=(\d{3})+(?!\d))/g, '.'); }
+
+function getVariant(colorName, sizeLabel) {
+    var exact = variantData.find(function(v) {
+        return v.name === colorName && (v.size_label || '') === (sizeLabel || '');
+    });
+    if (exact) return exact;
+    return variantData.find(function(v) {
+        return v.name === colorName && !(v.size_label || '');
+    }) || variantMap[colorName];
+}
+
+function selectedStock(colorName, sizeLabel) {
+    var mapping = getMapping(colorName, sizeLabel);
+    if (mapping) return Number(mapping.stock || 0);
+    var v = getVariant(colorName, sizeLabel);
+    if (!v) return null;
+    return Number(v.stock || 0);
+}
+
+function getMapping(colorName, sizeLabel) {
+    return variantItemData.find(function(m) {
+        return String(m.color || '').toLowerCase() === String(colorName || '').toLowerCase()
+            && String(m.size || '').toLowerCase() === String(sizeLabel || '').toLowerCase();
+    }) || null;
+}
+
+function renderStockNote(targetId, colorName, sizeLabel, qty) {
+    var el = document.getElementById(targetId);
+    if (!el) return true;
+    el.className = 'stock-note';
+
+    if (!colorName || !sizeLabel) {
+        el.textContent = 'Pilih warna dan ukuran untuk cek stok';
+        return true;
+    }
+
+    var stock = selectedStock(colorName, sizeLabel);
+    if (variantItemData.length && !getMapping(colorName, sizeLabel)) {
+        el.textContent = 'Pilihan ini belum tersedia';
+        el.classList.add('out');
+        return false;
+    }
+    if (stock === null) {
+        el.textContent = 'Stok belum tersedia';
+        el.classList.add('out');
+        return false;
+    }
+    if (stock <= 0) {
+        el.textContent = 'Stok pilihan ini sedang kosong';
+        el.classList.add('out');
+        return false;
+    }
+    if (qty > stock) {
+        el.textContent = 'Stok tersisa ' + stock + ' pcs';
+        el.classList.add('low');
+        return false;
+    }
+
+    el.textContent = stock <= 4 ? 'Stok tersisa ' + stock + ' pcs' : 'Tersedia ' + stock + ' pcs';
+    if (stock <= 4) el.classList.add('low');
+    return true;
 }
 
 function swapVariant(colorName) {
-    var v = variantMap[colorName];
+    var v = getVariant(colorName, dSize || mSize || '') || variantMap[colorName];
     if (!v) return;
-
-    // Ganti foto
     if (v.img) {
-        var mainImg  = document.getElementById('main-product-img');
-        var sheetImg = document.getElementById('sheet-product-img');
-        if (mainImg)  { mainImg.style.opacity  = '0.6'; mainImg.src  = v.img; mainImg.onload  = function(){ this.style.opacity='1'; }; }
-        if (sheetImg) { sheetImg.src = v.img; }
+        var mi = document.getElementById('main-product-img');
+        var si = document.getElementById('sheet-product-img');
+        if (mi) { mi.style.opacity = '0.6'; mi.src = v.img; mi.onload = function() { this.style.opacity='1'; }; }
+        if (si) si.src = v.img;
     }
-
-    // Update harga
-    var price = v.price_override || basePrice;
+    var mapping = getMapping(colorName, dSize || mSize || '');
+    var price = (mapping && mapping.price_override) || v.price_override || basePrice;
     var fmt   = formatRupiah(price);
-    var el1 = document.getElementById('product-price-display');
-    var el2 = document.getElementById('sheet-price-display');
-    if (el1) el1.textContent = fmt;
-    if (el2) el2.textContent = fmt;
-
-    // Update hidden form inputs
-    var deskColor  = document.getElementById('desk-color');
-    var modalColor = document.getElementById('modal-color');
-    // (value-nya di-set di deskColor() / modalColor() masing-masing)
+    var e1 = document.getElementById('product-price-display');
+    var e2 = document.getElementById('sheet-price-display');
+    if (e1) e1.textContent = fmt;
+    if (e2) e2.textContent = fmt;
 }
 
-/* ─── SHARED STATE ─── */
 var mColor = '', mSize = '', mQty = 1;
 var dColor = '', dSize = '', dQty = 1;
 var currentMode = 'cart';
 
-/* ─── MODAL ─── */
 function openModal(mode) {
     currentMode = mode;
     var btn = document.getElementById('sheet-action-btn');
@@ -710,6 +581,7 @@ function modalColor(el, name) {
     document.getElementById('modal-color').value = name;
     swapVariant(name);
     updateTapRow();
+    renderStockNote('modal-stock-note', mColor, mSize, mQty);
 }
 
 function modalSize(el, size) {
@@ -717,21 +589,21 @@ function modalSize(el, size) {
     el.classList.add('active');
     mSize = size;
     document.getElementById('modal-size').value = size;
+    if (mColor) swapVariant(mColor);
     updateTapRow();
+    renderStockNote('modal-stock-note', mColor, mSize, mQty);
 }
 
 function modalQty(delta) {
     mQty = Math.max(1, mQty + delta);
     document.getElementById('modal-qty-display').textContent = mQty;
     document.getElementById('modal-qty').value = mQty;
+    renderStockNote('modal-stock-note', mColor, mSize, mQty);
 }
 
 function modalSubmit() {
-    if (!mColor || !mSize) {
-        var hint = document.getElementById('sheet-hint');
-        hint.style.display = 'block';
-        return;
-    }
+    if (!mColor || !mSize) { document.getElementById('sheet-hint').style.display = 'block'; return; }
+    if (!renderStockNote('modal-stock-note', mColor, mSize, mQty)) { return; }
     document.getElementById('sheet-hint').style.display = 'none';
     document.getElementById('modal-form').submit();
 }
@@ -752,7 +624,6 @@ function updateTapRow() {
     }
 }
 
-/* ─── DESKTOP INLINE ─── */
 function deskColor(el, name) {
     document.querySelectorAll('#color-btns-desk .color-btn').forEach(function(b) { b.classList.remove('active'); });
     el.classList.add('active');
@@ -760,6 +631,7 @@ function deskColor(el, name) {
     document.getElementById('desk-color').value = name;
     swapVariant(name);
     updateDeskSummary();
+    renderStockNote('desk-stock-note', dColor, dSize, dQty);
 }
 
 function deskSize(el, size) {
@@ -767,7 +639,9 @@ function deskSize(el, size) {
     el.classList.add('active');
     dSize = size;
     document.getElementById('desk-size').value = size;
+    if (dColor) swapVariant(dColor);
     updateDeskSummary();
+    renderStockNote('desk-stock-note', dColor, dSize, dQty);
 }
 
 function deskQty(delta) {
@@ -775,6 +649,7 @@ function deskQty(delta) {
     document.getElementById('desk-qty-display').textContent = dQty;
     document.getElementById('desk-qty').value = dQty;
     updateDeskSummary();
+    renderStockNote('desk-stock-note', dColor, dSize, dQty);
 }
 
 function updateDeskSummary() {
@@ -801,41 +676,27 @@ function deskSubmit(mode) {
         hint.scrollIntoView({ behavior: 'smooth', block: 'center' });
         return;
     }
+    if (!renderStockNote('desk-stock-note', dColor, dSize, dQty)) { return; }
     document.getElementById('desk-mode').value = mode;
     document.getElementById('desk-qty').value = dQty;
     document.getElementById('desk-cart-form').submit();
 }
 
-/* Swipe down to close sheet */
 (function() {
     var sheet = document.getElementById('sheet');
+    if (!sheet) return;
     var startY = 0;
     sheet.addEventListener('touchstart', function(e) { startY = e.touches[0].clientY; }, { passive: true });
-    sheet.addEventListener('touchend', function(e) {
-        var dy = e.changedTouches[0].clientY - startY;
-        if (dy > 60) closeModal();
-    }, { passive: true });
+    sheet.addEventListener('touchend', function(e) { if (e.changedTouches[0].clientY - startY > 60) closeModal(); }, { passive: true });
 })();
 
-/* ─── AUTO-SELECT DEFAULT VARIANT ─── */
 (function() {
-    var defaultVariant = variantData.find(function(v) { return v.is_default; }) || variantData[0];
-    if (!defaultVariant) return;
-
-    // Klik tombol warna pertama di desktop
-    var deskBtn = document.querySelector('#color-btns-desk .color-btn[title="' + defaultVariant.name + '"]')
-                  || document.querySelector('#color-btns-desk .color-btn');
-    if (deskBtn) deskBtn.click();
-
-    // Klik tombol warna pertama di modal
-    var modalBtn = document.querySelector('#color-btns-modal .color-btn[title="' + defaultVariant.name + '"]')
-                   || document.querySelector('#color-btns-modal .color-btn');
-    if (modalBtn) { modalBtn.click(); mColor = defaultVariant.name; }
+    var def = variantData.find(function(v) { return v.is_default; }) || variantData[0];
+    if (!def) return;
+    var db = document.querySelector('#color-btns-desk .color-btn[title="' + def.name + '"]') || document.querySelector('#color-btns-desk .color-btn');
+    if (db) db.click();
+    var mb = document.querySelector('#color-btns-modal .color-btn[title="' + def.name + '"]') || document.querySelector('#color-btns-modal .color-btn');
+    if (mb) { mb.click(); mColor = def.name; }
 })();
 </script>
-
-@include('storefront._tracker')
-@include('storefront._mobile_zoom_lock')
-
-</body>
-</html>
+@endpush

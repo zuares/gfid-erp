@@ -3,6 +3,7 @@
 namespace App\Http\Controllers\Admin;
 
 use App\Http\Controllers\Controller;
+use App\Models\StorefrontCustomer;
 use App\Models\StorefrontEvent;
 use App\Models\StorefrontOrder;
 use App\Models\StorefrontVisitor;
@@ -35,7 +36,12 @@ class StorefrontCrmController extends Controller
             'wa_click'   => StorefrontEvent::where('event_type', 'wa_click')
                 ->where('created_at', '>=', $since)
                 ->distinct('visitor_token')->count('visitor_token'),
+            'registered' => StorefrontCustomer::where('created_at', '>=', $since)->count(),
         ];
+
+        // ── Registered accounts summary ───────────────────────────────────────
+        $registeredTotal   = StorefrontCustomer::count();
+        $registeredVerified = StorefrontCustomer::whereNotNull('phone_verified_at')->count();
 
         // ── Revenue ───────────────────────────────────────────────────────────
         $revenue = [
@@ -203,7 +209,8 @@ class StorefrontCrmController extends Controller
             'peakHours', 'maxHourCount',
             'mobileCount', 'desktopCount',
             'avgCartToOrderMinutes', 'avgCartToOrderSampleSize',
-            'productConversion'
+            'productConversion',
+            'registeredTotal', 'registeredVerified'
         ));
     }
 
@@ -238,7 +245,51 @@ class StorefrontCrmController extends Controller
             ->where('created_at', '<=', now()->subHours(24))
             ->count();
 
-        return view('admin.crm.orders', compact('orders', 'status', 'search', 'statusCounts', 'agingCount'));
+        $pendingCount  = $statusCounts['pending'] ?? 0;
+        $todayCount    = StorefrontOrder::whereDate('created_at', today())->count();
+        $todayRevenue  = StorefrontOrder::whereDate('created_at', today())
+            ->whereNotIn('status', ['cancelled'])
+            ->sum('total_amount');
+        $latestOrderId = StorefrontOrder::max('id') ?? 0;
+
+        return view('admin.crm.orders', compact(
+            'orders', 'status', 'search', 'statusCounts', 'agingCount',
+            'pendingCount', 'todayCount', 'todayRevenue', 'latestOrderId'
+        ));
+    }
+
+    public function ordersLive()
+    {
+        $statusCounts = StorefrontOrder::select('status', DB::raw('count(*) as total'))
+            ->groupBy('status')
+            ->pluck('total', 'status');
+
+        $agingCount   = StorefrontOrder::where('status', 'pending')
+            ->where('created_at', '<=', now()->subHours(24))
+            ->count();
+
+        $todayCount   = StorefrontOrder::whereDate('created_at', today())->count();
+        $todayRevenue = StorefrontOrder::whereDate('created_at', today())
+            ->whereNotIn('status', ['cancelled'])
+            ->sum('total_amount');
+
+        $latestOrderId = StorefrontOrder::max('id') ?? 0;
+
+        // 5 order terbaru untuk deteksi order baru di client
+        $latest = StorefrontOrder::latest()->take(5)->get(['id', 'order_number', 'customer_name', 'total_amount', 'status', 'created_at']);
+
+        return response()->json([
+            'stats' => [
+                'pending'       => $statusCounts['pending'] ?? 0,
+                'today_count'   => $todayCount,
+                'today_revenue' => $todayRevenue,
+                'aging'         => $agingCount,
+                'status_counts' => $statusCounts,
+            ],
+            'latest_order_id' => $latestOrderId,
+            'latest_orders'   => $latest,
+            'fetched_at'      => now()->format('H:i:s'),
+        ]);
     }
 
     public function updateStatus(Request $request, StorefrontOrder $order)
@@ -254,21 +305,12 @@ class StorefrontCrmController extends Controller
 
     // ─── Prospects ────────────────────────────────────────────────────────────
 
-    public function prospects(Request $request)
+    // ── Shared helper: build prospects data ──────────────────────────────────
+    private function buildProspects(int $days, \Carbon\Carbon $since): \Illuminate\Support\Collection
     {
-        $days   = (int) $request->query('days', 30);
-        $days   = in_array($days, [1, 7, 30, 90]) ? $days : 30;
-        $since  = now()->subDays($days)->startOfDay();
-        $onlyId = $request->boolean('only_identified'); // hanya yang ada HP-nya
-
-        // Token yang sudah order dalam periode ini
         $orderedTokens = StorefrontOrder::where('created_at', '>=', $since)
-            ->pluck('visitor_token')
-            ->filter()
-            ->unique()
-            ->values();
+            ->pluck('visitor_token')->filter()->unique()->values();
 
-        // Visitor yang add_to_cart tapi TIDAK order
         $cartEvents = StorefrontEvent::where('event_type', 'add_to_cart')
             ->where('created_at', '>=', $since)
             ->whereNotIn('visitor_token', $orderedTokens)
@@ -280,10 +322,8 @@ class StorefrontCrmController extends Controller
         $tokens = $cartEvents->pluck('visitor_token');
 
         $visitors = StorefrontVisitor::whereIn('visitor_token', $tokens)
-            ->get()
-            ->keyBy('visitor_token');
+            ->get()->keyBy('visitor_token');
 
-        // Semua cart items per prospect — group by visitor, lalu per slug ambil event terbaru
         $allCartItems = StorefrontEvent::where('event_type', 'add_to_cart')
             ->where('created_at', '>=', $since)
             ->whereIn('visitor_token', $tokens)
@@ -291,33 +331,187 @@ class StorefrontCrmController extends Controller
             ->get()
             ->groupBy('visitor_token')
             ->map(fn($events) => $events
-                // Per slug ambil event terakhir (reflects qty terkini)
                 ->groupBy(fn($e) => $e->payload['slug'] ?? ($e->payload['name'] ?? 'unknown'))
                 ->map(fn($g) => $g->first()->payload)
                 ->values()
             );
 
-        // Gabungkan
-        $prospects = $cartEvents->map(function ($e) use ($visitors, $allCartItems) {
+        return $cartEvents->map(function ($e) use ($visitors, $allCartItems) {
             $v     = $visitors->get($e->visitor_token);
             $items = $allCartItems->get($e->visitor_token, collect());
+
+            // Potential value dari cart items
+            $potentialValue = $items->sum(fn($item) => ($item['price'] ?? 0) * ($item['qty'] ?? 1));
+
+            // Urgency berdasarkan waktu abandon
+            $hoursAgo = \Carbon\Carbon::parse($e->last_cart_at)->diffInHours(now());
+            $urgency  = $hoursAgo < 2 ? 'hot' : ($hoursAgo < 24 ? 'warm' : 'cold');
+
+            // Normalisasi WA phone (pastikan format 628xxx)
+            $rawPhone  = $v?->customer_phone;
+            $waPhone   = $rawPhone
+                ? (str_starts_with($rawPhone, '62') ? $rawPhone : '62' . ltrim($rawPhone, '0'))
+                : null;
+
             return (object) [
-                'visitor_token'  => $e->visitor_token,
-                'name'           => $v?->customer_name,
-                'phone'          => $v?->customer_phone,
-                'city'           => $v?->city,
-                'last_product'   => $items->first()['name'] ?? '-',
-                'cart_items'     => $items,   // semua produk di keranjang
-                'cart_count'     => $e->cart_count,
-                'last_cart_at'   => $e->last_cart_at,
+                'visitor_token'   => $e->visitor_token,
+                'name'            => $v?->customer_name,
+                'phone'           => $rawPhone,
+                'wa_phone'        => $waPhone,
+                'city'            => $v?->city,
+                'last_product'    => $items->first()['name'] ?? '-',
+                'cart_items'      => $items,
+                'cart_count'      => $e->cart_count,
+                'last_cart_at'    => $e->last_cart_at,
+                'potential_value' => $potentialValue,
+                'urgency'         => $urgency,
+                'hours_ago'       => $hoursAgo,
             ];
         });
+    }
+
+    public function prospects(Request $request)
+    {
+        $days   = (int) $request->query('days', 30);
+        $days   = in_array($days, [1, 7, 30, 90]) ? $days : 30;
+        $since  = now()->subDays($days)->startOfDay();
+        $onlyId = $request->boolean('only_identified');
+
+        $prospects = $this->buildProspects($days, $since);
 
         if ($onlyId) {
             $prospects = $prospects->filter(fn($p) => $p->phone);
         }
 
-        return view('admin.crm.prospects', compact('prospects', 'days', 'onlyId'));
+        $totalCount     = $prospects->count();
+        $withPhoneCount = $prospects->filter(fn($p) => $p->phone)->count();
+        $hotCount       = $prospects->filter(fn($p) => $p->urgency === 'hot')->count();
+        $potentialTotal = $prospects->sum('potential_value');
+        $latestCartAt   = $prospects->max('last_cart_at') ?? '';
+
+        return view('admin.crm.prospects', compact(
+            'prospects', 'days', 'onlyId',
+            'totalCount', 'withPhoneCount', 'hotCount', 'potentialTotal', 'latestCartAt'
+        ));
+    }
+
+    public function prospectsLive(Request $request)
+    {
+        $days  = (int) $request->query('days', 30);
+        $days  = in_array($days, [1, 7, 30, 90]) ? $days : 30;
+        $since = now()->subDays($days)->startOfDay();
+
+        $prospects = $this->buildProspects($days, $since);
+
+        return response()->json([
+            'stats' => [
+                'total'           => $prospects->count(),
+                'with_phone'      => $prospects->filter(fn($p) => $p->phone)->count(),
+                'hot'             => $prospects->filter(fn($p) => $p->urgency === 'hot')->count(),
+                'potential_total' => $prospects->sum('potential_value'),
+            ],
+            'latest_cart_at' => $prospects->max('last_cart_at') ?? '',
+            'fetched_at'     => now()->format('H:i:s'),
+        ]);
+    }
+
+    // ─── Dev Seed (owner + APP_DB_MODE=dev only) ─────────────────────────────
+
+    public function devSeed(Request $request)
+    {
+        if (env('APP_DB_MODE') !== 'dev') abort(403);
+        if (! $request->user() || $request->user()->role !== 'owner') abort(403);
+
+        $orders = (int) $request->input('orders', 60);
+        $orders = max(10, min(200, $orders)); // clamp 10–200
+
+        \Artisan::call('storefront:seed', ['--orders' => $orders, '--yes' => true]);
+
+        $output = \Artisan::output();
+        $total  = \App\Models\StorefrontOrder::count();
+
+        return redirect()->route('admin.crm.orders')
+            ->with('dev_seed_done', "Seeder selesai — {$orders} order dibuat. Total: {$total} order.");
+    }
+
+    public function devSeedAbandoned(Request $request)
+    {
+        if (env('APP_DB_MODE') !== 'dev') abort(403);
+        if (! $request->user() || $request->user()->role !== 'owner') abort(403);
+
+        $count = max(5, min(100, (int) $request->input('abandoned', 20)));
+
+        \Artisan::call('storefront:seed', [
+            '--abandoned' => $count,
+            '--only'      => 'abandoned',
+            '--yes'       => true,
+        ]);
+
+        return redirect()->route('admin.crm.prospects')
+            ->with('dev_seed_done', "{$count} abandoned cart berhasil dibuat.");
+    }
+
+    // ─── Dev Reset (owner + APP_DB_MODE=dev only) ────────────────────────────
+
+    public function devReset(Request $request)
+    {
+        // Double-guard: mode harus dev
+        if (env('APP_DB_MODE') !== 'dev') {
+            abort(403, 'Reset hanya tersedia di mode dev.');
+        }
+
+        // Double-guard: hanya owner
+        if (! $request->user() || $request->user()->role !== 'owner') {
+            abort(403, 'Hanya owner yang bisa reset data.');
+        }
+
+        $tables = [
+            'storefront_customers',
+            'storefront_orders',
+            'storefront_events',
+            'storefront_visitors',
+        ];
+
+        \DB::statement('PRAGMA foreign_keys = OFF');
+        foreach ($tables as $table) {
+            if (\Schema::hasTable($table)) {
+                \DB::table($table)->truncate();
+            }
+        }
+        \DB::statement('PRAGMA foreign_keys = ON');
+
+        // Clear storefront session data
+        $request->session()->forget(['cart', 'checkout_address', 'storefront_customer_id']);
+
+        return redirect()->route('admin.crm.dashboard')
+            ->with('dev_reset_done', true);
+    }
+
+    // ─── Dev Backfill City (untuk visitor lokal yang city-nya masih null) ───────
+
+    public function devBackfillCity(Request $request)
+    {
+        if (env('APP_DB_MODE') !== 'dev') abort(403);
+        if (! $request->user() || $request->user()->role !== 'owner') abort(403);
+
+        $devCities = [
+            ['city' => 'Bandung',    'province' => 'Jawa Barat'],
+            ['city' => 'Jakarta',    'province' => 'DKI Jakarta'],
+            ['city' => 'Surabaya',   'province' => 'Jawa Timur'],
+            ['city' => 'Yogyakarta', 'province' => 'DI Yogyakarta'],
+            ['city' => 'Semarang',   'province' => 'Jawa Tengah'],
+            ['city' => 'Medan',      'province' => 'Sumatera Utara'],
+            ['city' => 'Makassar',   'province' => 'Sulawesi Selatan'],
+            ['city' => 'Denpasar',   'province' => 'Bali'],
+        ];
+
+        $visitors = StorefrontVisitor::whereNull('city')->get();
+        foreach ($visitors as $v) {
+            $pick = $devCities[array_rand($devCities)];
+            $v->update(['city' => $pick['city'], 'province' => $pick['province']]);
+        }
+
+        return back()->with('dev_reset_done', "Backfill kota selesai — {$visitors->count()} visitor diupdate.");
     }
 
     public function exportProspects(Request $request)

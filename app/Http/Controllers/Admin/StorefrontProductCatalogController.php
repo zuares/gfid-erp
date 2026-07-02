@@ -3,10 +3,13 @@
 namespace App\Http\Controllers\Admin;
 
 use App\Http\Controllers\Controller;
+use App\Models\Item;
 use App\Models\StorefrontProduct;
 use App\Models\StorefrontProductCategory;
 use App\Models\StorefrontProductVariant;
 use App\Models\StorefrontProductSize;
+use App\Models\StorefrontVariantItemMapping;
+use App\Services\ProductRankingService;
 use Illuminate\Http\Request;
 use Illuminate\Support\Str;
 use Illuminate\Support\Facades\Storage;
@@ -72,6 +75,49 @@ class StorefrontProductCatalogController extends Controller
 
     // ─── Create / Store ───────────────────────────────────────────────────────
 
+    public function suggestItems(Request $request)
+    {
+        $q = trim((string) $request->query('q', ''));
+        $limit = min(12, max(1, (int) $request->query('limit', 8)));
+        $excludedCodes = ['REJECT', 'REJ-CUT', 'REJ-SEW', 'REJ-FIN'];
+
+        $items = Item::query()
+            ->where('active', true)
+            ->when($q !== '', function ($query) use ($q) {
+                $tokens = preg_split('/[\s\-\/_]+/', $q, -1, PREG_SPLIT_NO_EMPTY);
+                $compact = preg_replace('/[^A-Za-z0-9]/', '', $q);
+
+                $query->where(function ($inner) use ($tokens, $compact) {
+                    foreach ($tokens as $token) {
+                        $like = '%' . $token . '%';
+                        $inner->where(function ($part) use ($like) {
+                            $part->where('code', 'like', $like)
+                                ->orWhere('name', 'like', $like);
+                        });
+                    }
+
+                    if (strlen($compact) >= 2) {
+                        $inner->orWhere('code', 'like', '%' . implode('%', str_split($compact)) . '%');
+                    }
+                });
+            })
+            ->withSum(['inventoryStocks as available_stock' => function ($query) use ($excludedCodes) {
+                $query->whereHas('warehouse', fn ($warehouse) => $warehouse->whereNotIn('code', $excludedCodes));
+            }], 'qty')
+            ->orderBy('code')
+            ->limit($limit)
+            ->get();
+
+        return response()->json([
+            'data' => $items->map(fn (Item $item) => [
+                'id' => $item->id,
+                'code' => $item->code,
+                'name' => $item->name,
+                'on_hand' => (float) ($item->available_stock ?? 0),
+            ])->values(),
+        ]);
+    }
+
     public function create()
     {
         $categories      = StorefrontProductCategory::orderBy('sort_order')->orderBy('name')->get();
@@ -118,7 +164,11 @@ class StorefrontProductCatalogController extends Controller
 
     public function edit(StorefrontProduct $product)
     {
-        $product->load(['variants', 'sizes']);
+        $product->load([
+            'variants.itemMappings.item.inventoryStocks.warehouse',
+            'sizes',
+            'variantItemMappings.item.inventoryStocks.warehouse',
+        ]);
         $categories      = StorefrontProductCategory::orderBy('sort_order')->orderBy('name')->get();
         $audienceOptions = ['pria' => 'Pria', 'wanita' => 'Wanita', 'anak' => 'Anak', 'olahraga' => 'Olahraga', 'unisex' => 'Unisex'];
         return view('admin.catalog.products.edit', compact('product', 'categories', 'audienceOptions'));
@@ -284,6 +334,63 @@ class StorefrontProductCatalogController extends Controller
         return back()->with('success', 'Variant dihapus.');
     }
 
+    public function updateVariantItems(Request $request, StorefrontProduct $product)
+    {
+        $data = $request->validate([
+            'mappings' => ['nullable', 'array'],
+            'mappings.*.*.item_id' => ['nullable', 'exists:items,id'],
+            'mappings.*.*.price_override' => ['nullable', 'integer', 'min:0'],
+            'mappings.*.*.stock_override' => ['nullable', 'integer', 'min:0'],
+        ]);
+
+        $variantIds = $product->variants()->pluck('id')->map(fn($id) => (int) $id)->all();
+        $sizeIds = $product->sizes()->pluck('id')->map(fn($id) => (int) $id)->all();
+
+        foreach (($data['mappings'] ?? []) as $variantId => $sizeRows) {
+            $variantId = (int) $variantId;
+            if (! in_array($variantId, $variantIds, true)) {
+                continue;
+            }
+
+            foreach ((array) $sizeRows as $sizeId => $row) {
+                $sizeId = (int) $sizeId;
+                if (! in_array($sizeId, $sizeIds, true)) {
+                    continue;
+                }
+
+                $itemId = filled($row['item_id'] ?? null) ? (int) $row['item_id'] : null;
+                $priceOverride = isset($row['price_override']) && $row['price_override'] !== '' ? (int) $row['price_override'] : null;
+                $stockOverride = isset($row['stock_override']) && $row['stock_override'] !== '' ? (int) $row['stock_override'] : null;
+
+                if (! $itemId && $priceOverride === null && $stockOverride === null) {
+                    StorefrontVariantItemMapping::query()
+                        ->where('variant_id', $variantId)
+                        ->where('size_id', $sizeId)
+                        ->delete();
+                    continue;
+                }
+
+                StorefrontVariantItemMapping::updateOrCreate(
+                    [
+                        'variant_id' => $variantId,
+                        'size_id' => $sizeId,
+                    ],
+                    [
+                        'product_id' => $product->id,
+                        'item_id' => $itemId,
+                        'price_override' => $priceOverride,
+                        'stock_override' => $stockOverride,
+                    ]
+                );
+            }
+        }
+
+        return redirect()
+            ->route('admin.catalog.products.edit', $product)
+            ->with('success', 'Mapping item internal disimpan.')
+            ->withFragment('tab-mapping');
+    }
+
     // ─── Sizes ────────────────────────────────────────────────────────────────
 
     public function storeSize(Request $request, StorefrontProduct $product)
@@ -329,5 +436,50 @@ class StorefrontProductCatalogController extends Controller
         $size->delete();
 
         return back()->with('success', 'Ukuran dihapus.');
+    }
+
+    // ─── Ranking Overrides ────────────────────────────────────────────────────
+
+    /**
+     * Simpan override ranking (pin, boost, featured_until, stock) untuk satu produk.
+     * Route: PATCH /admin/catalog/products/{product}/ranking
+     */
+    public function updateRanking(Request $request, StorefrontProduct $product)
+    {
+        $data = $request->validate([
+            'stock'          => ['nullable', 'integer', 'min:0'],
+            'is_pinned'      => ['nullable', 'boolean'],
+            'pin_position'   => ['nullable', 'integer', 'min:1', 'max:9999'],
+            'manual_boost'   => ['nullable', 'numeric', 'min:0', 'max:5'],
+            'featured_until' => ['nullable', 'date'],
+        ]);
+
+        $product->update([
+            'stock'          => $data['stock'] ?? $product->stock,
+            'is_pinned'      => $request->boolean('is_pinned'),
+            'pin_position'   => $request->boolean('is_pinned') ? ($data['pin_position'] ?? null) : null,
+            'manual_boost'   => $data['manual_boost'] ?? 0,
+            'featured_until' => $data['featured_until'] ?? null,
+        ]);
+
+        return redirect()
+            ->route('admin.catalog.products.edit', $product)
+            ->with('success', 'Ranking override disimpan.')
+            ->withFragment('tab-ranking');
+    }
+
+    /**
+     * Jalankan ulang ranking semua produk sekarang (dari browser).
+     * Route: POST /admin/catalog/products/rank-now
+     */
+    public function rankNow(ProductRankingService $service)
+    {
+        try {
+            $results = $service->recalculate();
+            $count   = count($results);
+            return back()->with('success', "Ranking diperbarui: {$count} produk dihitung ulang.");
+        } catch (\Throwable $e) {
+            return back()->with('error', 'Gagal menghitung ranking: ' . $e->getMessage());
+        }
     }
 }

@@ -53,6 +53,12 @@ Artisan::command('production:seed-boms {--force : Jalankan tanpa konfirmasi saat
     return 0;
 })->purpose('Generate BOM finished goods produksi sendiri kecuali kategori SHT.');
 
+// ── Storefront product ranking (setiap jam) ───────────────────────────────
+Schedule::command('storefront:rank-products')
+    ->hourly()
+    ->withoutOverlapping()
+    ->runInBackground();
+
 // Update harian setelah ganti hari
 Schedule::command('sales:rebuild-daily-item-sales --days=90')
     ->dailyAt('00:05');
