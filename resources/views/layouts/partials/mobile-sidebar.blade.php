@@ -258,6 +258,14 @@
     // ROUTE GUARDS
     $hasDashboardRoute = $router->has('dashboard');
     $hasOwnerAccessControl = $router->has('owner.access-control.index');
+    $hasAdminCatalogProducts = $router->has('admin.catalog.products.index');
+    $hasAdminCatalogCategories = $router->has('admin.catalog.categories.index');
+    $hasAdminCrmDashboard = $router->has('admin.crm.dashboard');
+    $hasAdminCrmVisitors = $router->has('admin.crm.visitors');
+    $hasAdminCrmOrders = $router->has('admin.crm.orders');
+    $hasAdminCrmProspects = $router->has('admin.crm.prospects');
+    $hasAdminCrmCustomers = $router->has('admin.crm.customers');
+    $hasAdminCrmSegments = $router->has('admin.crm.segments');
 
     // Data Master
     $hasMasterItemsIndex = $router->has('master.items.index');
@@ -474,6 +482,8 @@
     $invOpen = $invStocksOpen || $invOpnameOpen || $invOwnerExtrasOpen;
 
     $stockReqOpen = request()->routeIs('rts.stock-requests.*') || request()->routeIs('rts.direct-receives.*');
+    $websiteOpen = request()->routeIs('admin.catalog.*');
+    $crmStorefrontOpen = request()->routeIs('admin.crm.*');
 
     $prodOpen =
         request()->routeIs('production.cutting_jobs.*') ||
@@ -618,6 +628,94 @@
                                class="mobile-sidebar-link {{ request()->routeIs('dashboard') ? 'active' : '' }}">
                                 <span class="icon">🏠</span><span>Beranda</span>
                             </a>
+                        </li>
+                    @endif
+
+                    @if ($isAdmin && ($hasAdminCatalogProducts || $hasAdminCatalogCategories))
+                        <div class="mobile-sidebar-section-label">Website</div>
+                        <li class="mb-1">
+                            <button class="mobile-sidebar-link mobile-sidebar-toggle {{ $websiteOpen ? 'is-open' : '' }}"
+                                    type="button"
+                                    data-bs-toggle="collapse"
+                                    data-bs-target="#navWebsiteAdminMobile"
+                                    aria-expanded="{{ $websiteOpen ? 'true' : 'false' }}"
+                                    aria-controls="navWebsiteAdminMobile">
+                                <span class="icon">🛍️</span><span>Produk Website</span><span class="chevron">▸</span>
+                            </button>
+
+                            <div class="collapse {{ $websiteOpen ? 'show' : '' }}" id="navWebsiteAdminMobile">
+                                @if ($hasAdminCatalogProducts)
+                                    <a href="{{ route('admin.catalog.products.index') }}"
+                                       class="mobile-sidebar-link mobile-sidebar-link-sub {{ request()->routeIs('admin.catalog.products*') ? 'active' : '' }}">
+                                        <span class="icon">📦</span><span>Katalog Produk</span>
+                                    </a>
+                                @endif
+
+                                @if ($hasAdminCatalogCategories)
+                                    <a href="{{ route('admin.catalog.categories.index') }}"
+                                       class="mobile-sidebar-link mobile-sidebar-link-sub {{ request()->routeIs('admin.catalog.categories*') ? 'active' : '' }}">
+                                        <span class="icon">🏷️</span><span>Kategori Produk</span>
+                                    </a>
+                                @endif
+                            </div>
+                        </li>
+                    @endif
+
+                    @if ($isAdmin && ($hasAdminCrmDashboard || $hasAdminCrmOrders || $hasAdminCrmCustomers || $hasAdminCrmProspects || $hasAdminCrmVisitors || $hasAdminCrmSegments))
+                        <div class="mobile-sidebar-section-label">CRM Storefront</div>
+                        <li class="mb-1">
+                            <button class="mobile-sidebar-link mobile-sidebar-toggle {{ $crmStorefrontOpen ? 'is-open' : '' }}"
+                                    type="button"
+                                    data-bs-toggle="collapse"
+                                    data-bs-target="#navCrmAdminMobile"
+                                    aria-expanded="{{ $crmStorefrontOpen ? 'true' : 'false' }}"
+                                    aria-controls="navCrmAdminMobile">
+                                <span class="icon">📈</span><span>Pesanan & Customer</span><span class="chevron">▸</span>
+                            </button>
+
+                            <div class="collapse {{ $crmStorefrontOpen ? 'show' : '' }}" id="navCrmAdminMobile">
+                                @if ($hasAdminCrmDashboard)
+                                    <a href="{{ route('admin.crm.dashboard') }}"
+                                       class="mobile-sidebar-link mobile-sidebar-link-sub {{ request()->routeIs('admin.crm.dashboard') ? 'active' : '' }}">
+                                        <span class="icon">📊</span><span>Dashboard</span>
+                                    </a>
+                                @endif
+
+                                @if ($hasAdminCrmOrders)
+                                    <a href="{{ route('admin.crm.orders') }}"
+                                       class="mobile-sidebar-link mobile-sidebar-link-sub {{ request()->routeIs('admin.crm.orders*') ? 'active' : '' }}">
+                                        <span class="icon">🛒</span><span>Pesanan Website</span>
+                                    </a>
+                                @endif
+
+                                @if ($hasAdminCrmCustomers)
+                                    <a href="{{ route('admin.crm.customers') }}"
+                                       class="mobile-sidebar-link mobile-sidebar-link-sub {{ request()->routeIs('admin.crm.customers*') ? 'active' : '' }}">
+                                        <span class="icon">👥</span><span>Customer</span>
+                                    </a>
+                                @endif
+
+                                @if ($hasAdminCrmProspects)
+                                    <a href="{{ route('admin.crm.prospects') }}"
+                                       class="mobile-sidebar-link mobile-sidebar-link-sub {{ request()->routeIs('admin.crm.prospects*') ? 'active' : '' }}">
+                                        <span class="icon">📝</span><span>Prospek</span>
+                                    </a>
+                                @endif
+
+                                @if ($hasAdminCrmVisitors)
+                                    <a href="{{ route('admin.crm.visitors') }}"
+                                       class="mobile-sidebar-link mobile-sidebar-link-sub {{ request()->routeIs('admin.crm.visitors*') ? 'active' : '' }}">
+                                        <span class="icon">👣</span><span>Visitor</span>
+                                    </a>
+                                @endif
+
+                                @if ($hasAdminCrmSegments)
+                                    <a href="{{ route('admin.crm.segments') }}"
+                                       class="mobile-sidebar-link mobile-sidebar-link-sub {{ request()->routeIs('admin.crm.segments*') ? 'active' : '' }}">
+                                        <span class="icon">🔖</span><span>Segmentasi</span>
+                                    </a>
+                                @endif
+                            </div>
                         </li>
                     @endif
 
@@ -840,6 +938,94 @@
                                class="mobile-sidebar-link {{ request()->routeIs('owner.access-control.*') ? 'active' : '' }}">
                                 <span class="icon">🔐</span><span>Akses Login</span>
                             </a>
+                        </li>
+                    @endif
+
+                    @if ($hasAdminCatalogProducts || $hasAdminCatalogCategories)
+                        <div class="mobile-sidebar-section-label">Website</div>
+                        <li class="mb-1">
+                            <button class="mobile-sidebar-link mobile-sidebar-toggle {{ $websiteOpen ? 'is-open' : '' }}"
+                                    type="button"
+                                    data-bs-toggle="collapse"
+                                    data-bs-target="#navWebsiteOwnerMobile"
+                                    aria-expanded="{{ $websiteOpen ? 'true' : 'false' }}"
+                                    aria-controls="navWebsiteOwnerMobile">
+                                <span class="icon">🛍️</span><span>Produk Website</span><span class="chevron">▸</span>
+                            </button>
+
+                            <div class="collapse {{ $websiteOpen ? 'show' : '' }}" id="navWebsiteOwnerMobile">
+                                @if ($hasAdminCatalogProducts)
+                                    <a href="{{ route('admin.catalog.products.index') }}"
+                                       class="mobile-sidebar-link mobile-sidebar-link-sub {{ request()->routeIs('admin.catalog.products*') ? 'active' : '' }}">
+                                        <span class="icon">📦</span><span>Katalog Produk</span>
+                                    </a>
+                                @endif
+
+                                @if ($hasAdminCatalogCategories)
+                                    <a href="{{ route('admin.catalog.categories.index') }}"
+                                       class="mobile-sidebar-link mobile-sidebar-link-sub {{ request()->routeIs('admin.catalog.categories*') ? 'active' : '' }}">
+                                        <span class="icon">🏷️</span><span>Kategori Produk</span>
+                                    </a>
+                                @endif
+                            </div>
+                        </li>
+                    @endif
+
+                    @if ($hasAdminCrmDashboard || $hasAdminCrmOrders || $hasAdminCrmCustomers || $hasAdminCrmProspects || $hasAdminCrmVisitors || $hasAdminCrmSegments)
+                        <div class="mobile-sidebar-section-label">CRM Storefront</div>
+                        <li class="mb-1">
+                            <button class="mobile-sidebar-link mobile-sidebar-toggle {{ $crmStorefrontOpen ? 'is-open' : '' }}"
+                                    type="button"
+                                    data-bs-toggle="collapse"
+                                    data-bs-target="#navCrmOwnerMobile"
+                                    aria-expanded="{{ $crmStorefrontOpen ? 'true' : 'false' }}"
+                                    aria-controls="navCrmOwnerMobile">
+                                <span class="icon">📈</span><span>Pesanan & Customer</span><span class="chevron">▸</span>
+                            </button>
+
+                            <div class="collapse {{ $crmStorefrontOpen ? 'show' : '' }}" id="navCrmOwnerMobile">
+                                @if ($hasAdminCrmDashboard)
+                                    <a href="{{ route('admin.crm.dashboard') }}"
+                                       class="mobile-sidebar-link mobile-sidebar-link-sub {{ request()->routeIs('admin.crm.dashboard') ? 'active' : '' }}">
+                                        <span class="icon">📊</span><span>Dashboard</span>
+                                    </a>
+                                @endif
+
+                                @if ($hasAdminCrmOrders)
+                                    <a href="{{ route('admin.crm.orders') }}"
+                                       class="mobile-sidebar-link mobile-sidebar-link-sub {{ request()->routeIs('admin.crm.orders*') ? 'active' : '' }}">
+                                        <span class="icon">🛒</span><span>Pesanan Website</span>
+                                    </a>
+                                @endif
+
+                                @if ($hasAdminCrmCustomers)
+                                    <a href="{{ route('admin.crm.customers') }}"
+                                       class="mobile-sidebar-link mobile-sidebar-link-sub {{ request()->routeIs('admin.crm.customers*') ? 'active' : '' }}">
+                                        <span class="icon">👥</span><span>Customer</span>
+                                    </a>
+                                @endif
+
+                                @if ($hasAdminCrmProspects)
+                                    <a href="{{ route('admin.crm.prospects') }}"
+                                       class="mobile-sidebar-link mobile-sidebar-link-sub {{ request()->routeIs('admin.crm.prospects*') ? 'active' : '' }}">
+                                        <span class="icon">📝</span><span>Prospek</span>
+                                    </a>
+                                @endif
+
+                                @if ($hasAdminCrmVisitors)
+                                    <a href="{{ route('admin.crm.visitors') }}"
+                                       class="mobile-sidebar-link mobile-sidebar-link-sub {{ request()->routeIs('admin.crm.visitors*') ? 'active' : '' }}">
+                                        <span class="icon">👣</span><span>Visitor</span>
+                                    </a>
+                                @endif
+
+                                @if ($hasAdminCrmSegments)
+                                    <a href="{{ route('admin.crm.segments') }}"
+                                       class="mobile-sidebar-link mobile-sidebar-link-sub {{ request()->routeIs('admin.crm.segments*') ? 'active' : '' }}">
+                                        <span class="icon">🔖</span><span>Segmentasi</span>
+                                    </a>
+                                @endif
+                            </div>
                         </li>
                     @endif
 

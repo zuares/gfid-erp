@@ -20,7 +20,7 @@
     <div class="nav-inner">
         <a href="{{ route('storefront.home') }}" class="brand">
             <img src="{{ asset('images/logo-mark.svg') }}" alt="Greatfit">
-            <span>Greatfit</span>
+            <span>GREATFIT</span>
         </a>
         <div class="nav-r">
             <nav class="nav-links">

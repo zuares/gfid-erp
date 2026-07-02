@@ -10,7 +10,7 @@
             <img src="{{ asset('images/logo-mark.svg') }}" alt="Greatfit">
             <span class="foot-name">Greatfit</span>
         </div>
-        <div class="foot-tagline">The little things that make life great, lewat pilihan outfit harian yang nyaman.</div>
+        <div class="foot-tagline">Hal kecil yang bikin hari terasa lebih nyaman, lewat outfit harian Greatfit.</div>
         <nav class="foot-links" aria-label="Footer mobile">
             <a href="{{ route('storefront.products') }}">Produk</a>
             <a href="{{ route('storefront.cart') }}">Keranjang</a>
@@ -31,7 +31,7 @@
                     <img src="{{ asset('images/logo-mark.svg') }}" alt="Greatfit">
                     <span class="sf-brand-name">Greatfit</span>
                 </div>
-                <div class="sf-tagline">The little things that make life great,<br>lewat outfit harian yang nyaman.</div>
+                <div class="sf-tagline">Hal kecil yang bikin hari terasa lebih nyaman,<br>lewat outfit harian Greatfit.</div>
             </div>
             <nav class="sf-nav">
                 @if($sfCategories->isNotEmpty())

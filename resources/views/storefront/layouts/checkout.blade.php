@@ -54,8 +54,13 @@
         /* ── Checkout Nav ─────────────────────────────────────────────── */
         .ck-nav { position: sticky; top: 0; z-index: 100; background: rgba(255,255,255,.96); backdrop-filter: blur(12px); border-bottom: 1px solid var(--line); }
         .ck-nav-inner { height: 52px; display: flex; align-items: center; justify-content: space-between; max-width: 1680px; margin: 0 auto; padding: 0 20px; }
-        .brand { display: flex; align-items: center; gap: 8px; font-weight: 900; font-size: 12px; letter-spacing: .16em; text-transform: uppercase; }
-        .brand img { width: 28px; height: 28px; object-fit: contain; }
+        .brand { display: inline-flex; align-items: center; gap: 10px; min-height: 40px; font-weight: 900; font-size: 13px; letter-spacing: .18em; line-height: 1; text-transform: uppercase; color: var(--ink); }
+        .brand img { width: 32px; height: 32px; object-fit: contain; flex: 0 0 auto; }
+        .brand span { transform: translateY(.5px); }
+        @@media (max-width: 719px) {
+            .brand { gap: 9px; font-size: 12.5px; letter-spacing: .17em; }
+            .brand img { width: 31px; height: 31px; }
+        }
         @@media (min-width: 720px) { .ck-nav-inner { padding: 0 32px; } }
     </style>
     @stack('styles')
@@ -66,7 +71,7 @@
     <div class="ck-nav-inner">
         <a href="{{ route('storefront.home') }}" class="brand">
             <img src="{{ asset('images/logo-mark.svg') }}" alt="Greatfit">
-            <span>Greatfit</span>
+            <span>GREATFIT</span>
         </a>
         @yield('nav-right')
     </div>

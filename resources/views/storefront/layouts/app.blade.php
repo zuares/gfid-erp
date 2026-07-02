@@ -85,8 +85,16 @@
             justify-content: space-between;
             max-width: 1680px; margin: 0 auto; padding: 0 20px;
         }
-        .brand { display: flex; align-items: center; gap: 8px; font-weight: 900; font-size: 12px; letter-spacing: .16em; text-transform: uppercase; }
-        .brand img { width: 28px; height: 28px; object-fit: contain; }
+        .brand {
+            display: inline-flex; align-items: center; gap: 10px;
+            min-height: 40px;
+            font-weight: 900; font-size: 13px;
+            letter-spacing: .18em; line-height: 1;
+            text-transform: uppercase;
+            color: var(--ink);
+        }
+        .brand img { width: 32px; height: 32px; object-fit: contain; flex: 0 0 auto; }
+        .brand span { transform: translateY(.5px); }
         .nav-r { display: flex; align-items: center; gap: 16px; }
         .nav-links { display: none; gap: 18px; font-size: 11px; font-weight: 700; letter-spacing: .1em; text-transform: uppercase; color: var(--mid); }
         .nav-links a:hover, .nav-links a.active { color: var(--ink); }
@@ -166,6 +174,8 @@
         /* ── Responsive ───────────────────────────────────────────────── */
         @@media (max-width: 719px) {
             .nav-inner { padding: 0 14px; }
+            .brand { gap: 9px; font-size: 12.5px; letter-spacing: .17em; }
+            .brand img { width: 31px; height: 31px; }
             .nav-r { gap: 8px; }
             .user-chip { padding-right: 8px; }
             .user-chip-name { display: none; }
