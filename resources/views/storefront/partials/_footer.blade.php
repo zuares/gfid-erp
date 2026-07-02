@@ -2,8 +2,9 @@
     $sfCategories  = \App\Models\StorefrontProductCategory::where('is_active', true)
         ->orderBy('sort_order')->orderBy('name')->take(6)->get();
     $sfBrandName   = storefront_setting('branding.brand_name', 'Greatfit');
-    $sfLogoUrl     = storefront_setting('branding.logo_url', '/images/logo-mark.svg');
-    $sfLogoSrc     = str_starts_with($sfLogoUrl, 'http') ? $sfLogoUrl : asset(ltrim($sfLogoUrl, '/'));
+    $sfLogoUrl     = storefront_media_url(storefront_setting('branding.logo_url', '/images/logo-mark.svg'));
+    // URL relatif agar logo tetap muncul saat diakses via IP/host lain
+    $sfLogoSrc     = str_starts_with($sfLogoUrl, 'http') ? $sfLogoUrl : '/' . ltrim($sfLogoUrl, '/');
     $sfFootTagline = storefront_setting('footer.tagline', 'Hal kecil yang bikin hari terasa lebih nyaman, lewat outfit harian Greatfit.');
     $sfCopyright   = storefront_setting('footer.copyright', '© ' . date('Y') . ' ' . $sfBrandName . '. All rights reserved.');
     $sfMadeIn      = storefront_setting('footer.made_in', 'Made with care in Indonesia');

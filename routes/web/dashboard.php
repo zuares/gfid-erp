@@ -172,6 +172,8 @@ Route::middleware(['auth'])->group(function () {
         Route::prefix('admin/website')->name('admin.website.')->group(function () {
             Route::get('/settings',          [StorefrontWebsiteSettingsController::class, 'index'])->name('settings');
             Route::post('/settings',         [StorefrontWebsiteSettingsController::class, 'update'])->name('settings.update');
+            Route::get('/settings/sections/{section}', [StorefrontWebsiteSettingsController::class, 'editSection'])->name('settings.sections.edit');
+            Route::post('/settings/sections/{section}', [StorefrontWebsiteSettingsController::class, 'updateSection'])->name('settings.sections.update');
             Route::post('/settings/upload',  [StorefrontWebsiteSettingsController::class, 'uploadImage'])->name('settings.upload');
         });
 

@@ -79,8 +79,21 @@ class StorefrontSetting extends Model
             'branding.brand_name', 'branding.tagline', 'branding.logo_url', 'branding.whatsapp_number',
             // Colors
             'colors.ink', 'colors.accent', 'colors.mid', 'colors.soft', 'colors.line',
-            // Hero images
+            // Hero images — daftar dinamis JSON [{url, focus}], bisa tambah/hapus
+            'hero.images',
+            // Legacy (fallback)
             'hero.image_1', 'hero.image_2', 'hero.image_3',
+            'hero.mobile_image_1', 'hero.mobile_image_2', 'hero.mobile_image_3',
+            // Titik fokus per foto (format "x% y%", di-set dengan klik pada foto)
+            'hero.image_1_focus', 'hero.image_2_focus', 'hero.image_3_focus',
+            'hero.mobile_image_1_focus', 'hero.mobile_image_2_focus', 'hero.mobile_image_3_focus',
+            // Hero style
+            'hero.style', 'hero.overlay_color', 'hero.overlay_strength',
+            'hero.photo_fit', 'hero.photo_focus', 'hero.height',
+            // Hero — gaya teks & tombol (warna, ukuran, bentuk)
+            'hero.label_color', 'hero.title_color', 'hero.title_size', 'hero.title_style', 'hero.copy_color',
+            'hero.badge_bg', 'hero.badge_color',
+            'hero.cta_bg', 'hero.cta_color', 'hero.cta2_color', 'hero.cta_radius',
             // Hero content
             'hero.label', 'hero.title_line1', 'hero.title_line2', 'hero.copy',
             'hero.cta_primary_label', 'hero.cta_primary_url',
@@ -90,12 +103,30 @@ class StorefrontSetting extends Model
             'values.1_number', 'values.1_title', 'values.1_desc',
             'values.2_number', 'values.2_title', 'values.2_desc',
             'values.3_number', 'values.3_title', 'values.3_desc',
+            // Categories
+            'categories.eyebrow', 'categories.title', 'categories.copy',
+            'categories.all_label', 'categories.limit',
             // Channels
             'channels.shopee_url', 'channels.tokopedia_url', 'channels.tiktok_url',
             // Sections
             'sections.order',
             'sections.hero_visible', 'sections.categories_visible', 'sections.channels_visible',
             'sections.values_visible', 'sections.products_visible', 'sections.cta_visible',
+            'sections.categories_padding_top', 'sections.categories_padding_bottom',
+            'sections.categories_margin_top', 'sections.categories_margin_bottom',
+            'sections.categories_bg', 'sections.categories_style',
+            'sections.channels_padding_top', 'sections.channels_padding_bottom',
+            'sections.channels_margin_top', 'sections.channels_margin_bottom',
+            'sections.channels_bg', 'sections.channels_style',
+            'sections.values_padding_top', 'sections.values_padding_bottom',
+            'sections.values_margin_top', 'sections.values_margin_bottom',
+            'sections.values_bg', 'sections.values_style',
+            'sections.products_padding_top', 'sections.products_padding_bottom',
+            'sections.products_margin_top', 'sections.products_margin_bottom',
+            'sections.products_bg', 'sections.products_style',
+            'sections.cta_padding_top', 'sections.cta_padding_bottom',
+            'sections.cta_margin_top', 'sections.cta_margin_bottom',
+            'sections.cta_bg', 'sections.cta_style',
             // Footer
             'footer.tagline', 'footer.copyright', 'footer.made_in',
             'footer.instagram_url', 'footer.email', 'footer.address',

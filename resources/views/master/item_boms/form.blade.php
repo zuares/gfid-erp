@@ -512,6 +512,73 @@
         <button type="button" class="btnx" id="btn-add"><i class="bi bi-plus-lg"></i> Tambah Baris</button>
       </div>
 
+      @if(!empty($usageByMaterial ?? []))
+        {{-- ── RIWAYAT PEMAKAIAN KAIN (dari cutting job non-void) ── --}}
+        <div class="mt-3" style="background:#f0fdfa;border:1px solid #99f6e4;border-radius:12px;padding:.85rem 1rem;">
+          <div style="font-weight:800;font-size:.8rem;color:#0f766e;margin-bottom:.15rem;">
+            🧵 Riwayat Pemakaian Kain — Cutting Job
+          </div>
+          <div class="small text-muted mb-2">
+            Pemakaian aktual per material untuk produk ini. Klik "Pakai sebagai bahan utama" untuk
+            mengisi baris BOM dengan material & qty aktualnya (qty dibagi scrap% baris).
+          </div>
+          <div class="table-responsive">
+            <table class="table table-sm align-middle mb-0" style="font-size:.78rem;background:#fff;border-radius:8px;overflow:hidden;">
+              <thead>
+                <tr style="font-size:.68rem;text-transform:uppercase;letter-spacing:.04em;color:#64748b;">
+                  <th>Material</th>
+                  <th class="text-end" style="width:130px;">Aktual Terakhir</th>
+                  <th style="width:240px;">Riwayat (3 terakhir)</th>
+                  <th style="width:190px;"></th>
+                </tr>
+              </thead>
+              <tbody>
+                @foreach($usageByMaterial as $umid => $u)
+                  <tr>
+                    <td>
+                      <span class="mono fw-bold">{{ $u['material_code'] ?? ('#'.$umid) }}</span>
+                      <div class="small text-muted">{{ $u['material_name'] ?? '' }}</div>
+                    </td>
+                    <td class="text-end mono fw-bold" style="color:#0f766e;">
+                      {{ number_format($u['kg_per_pcs'], 4) }} <span class="text-muted fw-normal">/pcs</span>
+                    </td>
+                    <td class="text-muted" style="font-size:.72rem;line-height:1.5;">
+                      @foreach(($u['history'] ?? []) as $h)
+                        <div>{{ $h['job_code'] }} ({{ $h['date'] }}) · <span class="mono">{{ $h['kg_per_pcs'] }}</span></div>
+                      @endforeach
+                    </td>
+                    @php
+                      $defaultScrap = (string) ($bom?->lines
+                          ?->firstWhere('usage_stage', \App\Models\ItemBomLine::STAGE_MAIN_MATERIAL)
+                          ?->scrap_pct ?? 0);
+                    @endphp
+                    <td class="text-end">
+                      <div class="d-inline-flex align-items-center gap-1 flex-wrap justify-content-end">
+                        <span style="font-size:.68rem;color:#64748b;">Scrap</span>
+                        <input type="number" class="use-scrap-input mono" value="{{ $defaultScrap }}"
+                               min="0" max="99" step="0.1"
+                               style="width:58px;font-size:.72rem;padding:.15rem .3rem;border:1px solid #cbd5e1;border-radius:6px;text-align:right;">
+                        <span style="font-size:.68rem;color:#64748b;">%</span>
+                        <button type="button" class="btnx btn-use-material"
+                                data-mid="{{ $umid }}"
+                                data-code="{{ $u['material_code'] ?? '' }}"
+                                data-name="{{ $u['material_name'] ?? '' }}"
+                                data-kg="{{ $u['kg_per_pcs'] }}">
+                          Pakai sebagai bahan utama
+                        </button>
+                      </div>
+                      <div style="font-size:.65rem;color:#94a3b8;margin-top:2px;">
+                        Qty = {{ number_format($u['kg_per_pcs'], 4) }} ÷ (1 + scrap%)
+                      </div>
+                    </td>
+                  </tr>
+                @endforeach
+              </tbody>
+            </table>
+          </div>
+        </div>
+      @endif
+
       <div class="table-wrap mt-3">
         <table class="table table-hover table-sm table-bom gf-clean-table gf-sticky-table align-middle mb-0">
           <thead>
@@ -556,6 +623,7 @@
                          name="lines[{{ $i }}][qty]"
                          value="{{ (string) data_get($r,'qty','') }}"
                          placeholder="0.00">
+                  <div class="bom-usage-hint" style="font-size:.68rem;line-height:1.45;margin-top:3px;"></div>
                 </td>
                 <td>
                   <input class="inp mono uom"
@@ -683,7 +751,7 @@
 	        <td class="mono idx" style="font-weight:950">${i+1}</td>
 	        <td><select class="mat" name="lines[${i}][material_item_id]" style="width:100%"></select></td>
             <td><select class="inp mono usage-stage" name="lines[${i}][usage_stage]">${usageHtml}</select></td>
-	        <td><input class="inp mono qty" name="lines[${i}][qty]" placeholder="0.00"></td>
+	        <td><input class="inp mono qty" name="lines[${i}][qty]" placeholder="0.00"><div class="bom-usage-hint" style="font-size:.68rem;line-height:1.45;margin-top:3px;"></div></td>
         <td><input class="inp mono uom" name="lines[${i}][uom]" value="pcs" placeholder="pcs"></td>
         <td><input class="inp mono scrap" name="lines[${i}][scrap_pct]" value="0" placeholder="0"></td>
         <td>
@@ -711,6 +779,106 @@
 
   initSkuSelect();
   $('#lines select.mat').each(function(){ initMaterialSelect($(this)); });
+
+  // ── Pemakaian aktual terakhir per material (dari cutting job non-void) ──
+  // { material_item_id: { kg_per_pcs, job_code, date, history: [..3] } }
+  const bomUsage = @json($usageByMaterial ?? []);
+
+  function renderUsageHint($tr){
+    const $hint = $tr.find('.bom-usage-hint');
+    if (!$hint.length) return;
+
+    const stage = $tr.find('select.usage-stage').val();
+    const mid   = parseInt($tr.find('select.mat').val() || '0', 10);
+    const u     = bomUsage[mid];
+
+    if (stage !== 'main_material' || !u) { $hint.empty(); return; }
+
+    const hist = (u.history || [])
+      .map(h => `${h.job_code} (${h.date}): ${h.kg_per_pcs} kg/pcs`)
+      .join('\n');
+
+    $hint.html(
+      `<span title="${hist.replace(/"/g, '&quot;')}" style="color:#0d9488;cursor:help;">`
+      + `Aktual terakhir: <b>${Number(u.kg_per_pcs).toFixed(4)}</b>/pcs · ${u.job_code} (${u.date})</span> `
+      + `<a href="#" class="use-actual" style="font-size:.68rem;">← pakai</a>`
+    );
+
+    $hint.find('.use-actual').off('click').on('click', function(e){
+      e.preventDefault();
+      // Qty BOM = aktual per pcs dibagi (1 + scrap%) — scrap dipertahankan
+      const scrap = parseFloat($tr.find('input.scrap').val() || '0');
+      const suggested = Number(u.kg_per_pcs) / (1 + scrap / 100);
+      $tr.find('input.qty').val(suggested.toFixed(4)).trigger('input');
+    });
+  }
+
+  $('#lines tr.line').each(function(){ renderUsageHint($(this)); });
+  $('#lines').on('change', 'select.mat, select.usage-stage', function(){
+    renderUsageHint($(this).closest('tr.line'));
+  });
+
+  // ── "Pakai sebagai bahan utama" dari panel riwayat pemakaian ──
+  $(document).on('click', '.btn-use-material', function(){
+    const mid  = parseInt(this.dataset.mid, 10);
+    const kg   = parseFloat(this.dataset.kg || '0');
+    const text = `${this.dataset.code} — ${this.dataset.name}`.replace(/^ — | — $/g, '');
+    if (!mid || kg <= 0) return;
+
+    // 1) Cari baris existing dengan material sama
+    let $target = null;
+    $('#lines tr.line').each(function(){
+      if (parseInt($(this).find('select.mat').val() || '0', 10) === mid) {
+        $target = $(this);
+        return false;
+      }
+    });
+
+    // 2) Kalau tidak ada: GANTI material di baris "bahan baku utama" yang sudah ada
+    //    (replace, bukan tambah baris — BOM utama diasumsikan satu bahan).
+    if (!$target) {
+      $('#lines tr.line').each(function(){
+        if ($(this).find('select.usage-stage').val() === 'main_material'
+            && $(this).find('select.mat').val()) {
+          $target = $(this);
+          return false;
+        }
+      });
+    }
+
+    // 3) Fallback: baris kosong pertama, atau tambah baris baru
+    if (!$target) {
+      $('#lines tr.line').each(function(){
+        if (!$(this).find('select.mat').val()) { $target = $(this); return false; }
+      });
+      if (!$target) {
+        addRow();
+        $target = $('#lines tr.line').last();
+      }
+    }
+
+    // Pastikan material di baris target = material dari riwayat (replace jika beda)
+    const $sel = $target.find('select.mat');
+    if (parseInt($sel.val() || '0', 10) !== mid) {
+      $sel.append(new Option(text, String(mid), true, true)).trigger('change');
+    }
+
+    // 3) Set kelompok = bahan baku utama.
+    //    Scrap% diambil dari input di panel riwayat → di-set ke baris BOM,
+    //    lalu qty = aktual / (1 + scrap%) sehingga qty×(1+scrap) = aktual.
+    $target.find('select.usage-stage').val('main_material').trigger('change');
+    const scrap = Math.max(0, parseFloat($(this).closest('td').find('.use-scrap-input').val() || '0'));
+    $target.find('input.scrap').val(scrap);
+    $target.find('input.qty').val((kg / (1 + scrap / 100)).toFixed(4));
+
+    const $uom = $target.find('input.uom');
+    if (!$uom.val() || $uom.val() === 'pcs') $uom.val('kg');
+
+    renderUsageHint($target);
+    $target[0].scrollIntoView({ behavior: 'smooth', block: 'center' });
+    $target.css('background', '#ecfdf5');
+    setTimeout(() => $target.css('background', ''), 1500);
+  });
 })();
 </script>
 @endpush

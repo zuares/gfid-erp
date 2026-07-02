@@ -214,6 +214,32 @@
                 border-color: rgba(148, 163, 184, .9);
                 cursor: default
             }
+
+            .lot-usage-table {
+                min-width: 0
+            }
+
+            .lot-usage-table th:first-child,
+            .lot-usage-table td:first-child {
+                min-width: 150px
+            }
+
+            .lot-mobile-item {
+                font-size: .78rem;
+                font-weight: 700;
+                line-height: 1.2;
+                white-space: normal
+            }
+
+            .lot-mobile-meta {
+                display: block;
+                margin-top: .12rem;
+                font-size: .66rem;
+                line-height: 1.2;
+                color: var(--muted);
+                font-weight: 500;
+                white-space: normal
+            }
         }
     </style>
 @endpush
@@ -227,7 +253,7 @@
         $defaultOperatorId = old('operator_id', $loginOperator->id ?? null);
         $defaultOperatorLabel = $loginOperator
             ? ($loginOperator->code ?? 'OP') . ' — ' . ($loginOperator->name ?? 'Operator')
-            : 'User login';
+            : (auth()->user()?->name ?: 'User login');
 
         $userRole = auth()->user()->role ?? null;
         $isOwner = $userRole === 'owner';
@@ -544,8 +570,16 @@
                                                 @if (!empty($row['item_name']))
                                                     <div class="small-muted">{{ $row['item_name'] }}</div>
                                                 @endif
+                                                @if (!empty($row['lot_code']))
+                                                    <div class="small-muted mono" style="font-size:.68rem;">{{ $row['lot_code'] }}</div>
+                                                @endif
                                             </div>
-                                            <div class="d-block d-md-none">{{ $row['item_code'] }}</div>
+                                            <div class="d-block d-md-none">
+                                                <div>{{ $row['item_code'] }}</div>
+                                                @if (!empty($row['lot_code']))
+                                                    <div class="small-muted mono" style="font-size:.62rem;line-height:1.2;">{{ $row['lot_code'] }}</div>
+                                                @endif
+                                            </div>
                                         </td>
 
                                         <td class="text-end">{{ number_format($bundleQty, 0, ',', '.') }}</td>
@@ -727,7 +761,7 @@
                             <table class="table table-sm align-middle mono lot-usage-table">
                                 <thead>
                                     <tr>
-                                        <th style="width: 150px;">LOT</th>
+                                        <th style="width: 150px;"><span class="d-none d-md-inline">LOT</span><span class="d-md-none">Bahan</span></th>
                                         <th class="d-none d-md-table-cell">Item</th>
                                         <th class="text-end" style="width: 130px;">Rencana</th>
                                         <th class="text-end" style="width: 150px;">Dipakai (QC)</th>
@@ -763,7 +797,11 @@
                                                 value="{{ $jobLot->id }}">
 
                                             <td>
-                                                <div class="fw-semibold">{{ $lotModel?->code ?? 'LOT ?' }}</div>
+                                                <div class="fw-semibold d-none d-md-block">{{ $lotModel?->code ?? 'LOT ?' }}</div>
+                                                <div class="lot-mobile-item d-md-none">{{ $lotModel?->item?->name ?? '-' }}</div>
+                                                <span class="lot-mobile-meta d-md-none">
+                                                    {{ $lotModel?->code ?? '-' }} · {{ $lotModel?->item?->code ?? '-' }}
+                                                </span>
                                                 <div class="small-muted d-none d-md-block">
                                                     {{ $lotModel?->item?->code ?? '-' }}</div>
                                             </td>

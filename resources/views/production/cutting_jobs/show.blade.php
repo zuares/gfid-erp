@@ -655,7 +655,8 @@
                         <tr>
                             <th>LOT</th>
                             <th class="text-end">Terpakai</th>
-                            <th class="text-end">Sisa Dicatat</th>
+                            <th class="text-end">Sisa Layak</th>
+                            <th class="text-end">Scrap</th>
                             <th>Dicatat</th>
                         </tr>
                     </thead>
@@ -665,12 +666,50 @@
                             <td class="mono">{{ $cjl->lot?->code ?? '-' }}</td>
                             <td class="text-end mono">{{ number_format((float)$cjl->used_fabric_qty, 2, ',', '.') }}</td>
                             <td class="text-end mono fw-semibold text-success">{{ number_format((float)$cjl->qty_sisa_fabric, 2, ',', '.') }}</td>
+                            <td class="text-end mono fw-semibold {{ (float)($cjl->qty_scrap ?? 0) > 0 ? 'text-danger' : 'text-muted' }}">{{ number_format((float)($cjl->qty_scrap ?? 0), 2, ',', '.') }}</td>
                             <td class="small text-muted">{{ \Carbon\Carbon::parse($cjl->sisa_recorded_at)->format('d/m/Y H:i') }}</td>
                         </tr>
                         @endforeach
                     </tbody>
                 </table>
             </div>
+
+            {{-- ── EVALUASI SCRAP% AKTUAL vs BOM ── --}}
+            @php
+                $evalUsed  = $lotsWithSisa->sum(fn($l) => (float) $l->used_fabric_qty);
+                $evalSisa  = $lotsWithSisa->sum(fn($l) => (float) $l->qty_sisa_fabric);
+                $evalScrap = $lotsWithSisa->sum(fn($l) => (float) ($l->qty_scrap ?? 0));
+                $evalNet   = $evalUsed - $evalSisa;          // benar-benar terkonsumsi
+                $evalGood  = $evalNet - $evalScrap;          // jadi potongan
+                $scrapActualPct = $evalGood > 0.0001 ? round($evalScrap / $evalGood * 100, 2) : null;
+            @endphp
+            @if ($evalScrap > 0.0001 && $scrapActualPct !== null && !empty($bomScrapTargets ?? []))
+            <div class="mb-3" style="background:#fffbeb;border:1px solid #fde68a;border-radius:10px;padding:.7rem .9rem;">
+                <div style="font-size:.78rem;font-weight:800;color:#92400e;">
+                    Scrap aktual job ini: <span class="mono">{{ number_format($scrapActualPct, 2) }}%</span>
+                    <span class="text-muted fw-normal">({{ number_format($evalScrap, 2, ',', '.') }} kg dari {{ number_format($evalGood, 2, ',', '.') }} kg jadi potongan)</span>
+                </div>
+                <div class="d-flex align-items-center gap-2 flex-wrap mt-1">
+                    @foreach ($bomScrapTargets as $tItemId => $t)
+                        <div class="d-inline-flex align-items-center gap-1" style="font-size:.74rem;">
+                            <span class="mono">{{ $t['item_code'] }}</span>
+                            <span class="text-muted">scrap BOM {{ number_format($t['scrap_pct'], 2) }}%</span>
+                            @if (abs($t['scrap_pct'] - $scrapActualPct) > 0.05)
+                                <button type="button" class="btn btn-sm btn-outline-warning btn-update-scrap py-0"
+                                        style="font-size:.7rem;"
+                                        data-url="{{ $t['quick_url'] }}"
+                                        data-material="{{ (int) $job->fabric_item_id }}"
+                                        data-scrap="{{ $scrapActualPct }}">
+                                    → {{ number_format($scrapActualPct, 2) }}%
+                                </button>
+                            @else
+                                <span class="badge bg-success-subtle text-success border">sesuai</span>
+                            @endif
+                        </div>
+                    @endforeach
+                </div>
+            </div>
+            @endif
             @endif
 
             {{-- Form catat sisa --}}
@@ -683,22 +722,58 @@
                             <tr>
                                 <th>LOT</th>
                                 <th class="text-end">Dipakai (kg)</th>
-                                <th class="text-end" style="width:160px">Sisa Fisik (kg)</th>
+                                <th class="text-end" style="width:150px">Sisa Layak (kg)
+                                    <div class="fw-normal text-muted" style="font-size:.62rem;">kembali ke stok</div>
+                                </th>
+                                <th class="text-end" style="width:150px">Scrap (kg)
+                                    <div class="fw-normal text-muted" style="font-size:.62rem;">perca / terbuang</div>
+                                </th>
                             </tr>
                         </thead>
                         <tbody>
                             @foreach ($lotsNeedSisa as $i => $cjl)
+                            @php
+                                // Kain yang benar-benar jadi potongan (estimasi standar):
+                                // Σ (qty_pcs × BOM qty tanpa scrap) untuk bundle di LOT ini.
+                                $lotUsed = (float) $cjl->used_fabric_qty;
+                                $lotGood = $job->bundles
+                                    ->where('lot_id', $cjl->lot_id)
+                                    ->sum(function ($b) use ($bomScrapTargets) {
+                                        $t = $bomScrapTargets[(int) $b->finished_item_id] ?? null;
+                                        return $t ? (float) $b->qty_pcs * (float) $t['bom_qty'] : 0.0;
+                                    });
+                                // Sisa fisik LOT (ujung gulungan yang masih tercatat sebagai stok)
+                                $lotRemnant = max((float) ($cjl->lot?->qty_onhand ?? 0), 0);
+                                // Prefill scrap = kelebihan pakai + sisa fisik LOT
+                                // (asumsi sisa layak 0) — JS menyesuaikan saat sisa diketik
+                                $scrapPrefill = $lotGood > 0
+                                    ? round(max($lotUsed - $lotGood, 0) + $lotRemnant, 2)
+                                    : ($lotRemnant > 0 ? round($lotRemnant, 2) : null);
+                            @endphp
                             <input type="hidden" name="lots[{{ $i }}][lot_id]" value="{{ $cjl->lot_id }}">
-                            <tr>
+                            <tr class="js-sisa-row" data-used="{{ $lotUsed }}" data-good="{{ $lotGood }}" data-remnant="{{ $lotRemnant }}">
                                 <td class="mono">{{ $cjl->lot?->code ?? '-' }}
                                     <div class="small text-muted">{{ $cjl->lot?->item?->code ?? '' }}</div>
                                 </td>
-                                <td class="text-end mono">{{ number_format((float)$cjl->used_fabric_qty, 2, ',', '.') }}</td>
+                                <td class="text-end mono">{{ number_format($lotUsed, 2, ',', '.') }}</td>
                                 <td class="text-end">
                                     <input type="number" name="lots[{{ $i }}][qty_sisa]"
-                                           class="form-control form-control-sm text-end mono"
+                                           class="form-control form-control-sm text-end mono js-sisa-input"
+                                           step="0.01" min="0" value="0"
+                                           style="max-width:120px;margin-left:auto">
+                                </td>
+                                <td class="text-end">
+                                    <input type="number" name="lots[{{ $i }}][qty_scrap]"
+                                           class="form-control form-control-sm text-end mono js-scrap-input"
                                            step="0.01" min="0" placeholder="0"
-                                           style="max-width:130px;margin-left:auto">
+                                           value="{{ $scrapPrefill !== null ? $scrapPrefill : '' }}"
+                                           data-auto="1"
+                                           style="max-width:120px;margin-left:auto;border-color:#fca5a5;">
+                                    @if ($lotGood > 0 || $lotRemnant > 0)
+                                        <div class="text-muted" style="font-size:.62rem;">
+                                            auto: kelebihan pakai{{ $lotRemnant > 0 ? ' + sisa LOT ' . number_format($lotRemnant, 2, ',', '.') . ' kg' : '' }}
+                                        </div>
+                                    @endif
                                 </td>
                             </tr>
                             @endforeach
@@ -1078,6 +1153,67 @@
         @endpush
     @endif
 @push('scripts')
+<script>
+// ── Autofill scrap di form sisa kain: scrap = dipakai − sisa layak − potongan ──
+(function () {
+    document.querySelectorAll('.js-sisa-row').forEach(function (row) {
+        const used    = parseFloat(row.dataset.used || '0');
+        const good    = parseFloat(row.dataset.good || '0');
+        const remnant = parseFloat(row.dataset.remnant || '0');
+        const sisaI = row.querySelector('.js-sisa-input');
+        const scrapI = row.querySelector('.js-scrap-input');
+        if (!sisaI || !scrapI || (good <= 0 && remnant <= 0)) return;
+
+        function recalcScrap() {
+            if (scrapI.dataset.auto === '0') return; // sudah diedit manual
+            const sisa = parseFloat(sisaI.value || '0');
+            // scrap = kelebihan pemakaian + sisa fisik LOT − yang diambil sebagai sisa layak
+            const excess = good > 0 ? Math.max(used - good, 0) : 0;
+            scrapI.value = Math.max(excess + remnant - sisa, 0).toFixed(2);
+        }
+
+        sisaI.addEventListener('input', recalcScrap);
+        scrapI.addEventListener('input', function () {
+            scrapI.dataset.auto = '0'; // user ambil alih — stop autofill
+        });
+    });
+})();
+
+// ── Update scrap% BOM dari evaluasi sisa kain ──
+(function () {
+    document.querySelectorAll('.btn-update-scrap').forEach(function (btn) {
+        btn.addEventListener('click', async function () {
+            btn.disabled = true;
+            const orig = btn.textContent;
+            btn.textContent = '⏳';
+            try {
+                const resp = await fetch(btn.dataset.url, {
+                    method: 'PATCH',
+                    headers: {
+                        'Content-Type': 'application/json',
+                        'X-CSRF-TOKEN': '{{ csrf_token() }}',
+                        'Accept': 'application/json',
+                    },
+                    body: JSON.stringify({
+                        material_item_id: parseInt(btn.dataset.material, 10),
+                        scrap_pct: parseFloat(btn.dataset.scrap),
+                    }),
+                });
+                const json = await resp.json();
+                if (json.success) {
+                    btn.outerHTML = '<span class="badge bg-success-subtle text-success border">✓ scrap ' + Number(json.new_scrap).toFixed(2) + '%</span>';
+                } else {
+                    btn.textContent = '✗ gagal';
+                    btn.disabled = false;
+                }
+            } catch (e) {
+                btn.textContent = orig;
+                btn.disabled = false;
+            }
+        });
+    });
+})();
+</script>
 <script>
 (function () {
     const table   = document.getElementById('bqTable');

@@ -33,6 +33,7 @@ class StorefrontSettingSeeder extends Seeder
             ['key' => 'hero.label',                'type' => 'text',  'group' => 'hero', 'label' => 'Label Kecil',              'value' => 'Koleksi Terbaru'],
             ['key' => 'hero.title_line1',          'type' => 'text',  'group' => 'hero', 'label' => 'Judul Baris 1',            'value' => 'Good Fit,'],
             ['key' => 'hero.title_line2',          'type' => 'text',  'group' => 'hero', 'label' => 'Judul Baris 2',            'value' => 'Good Feel.'],
+            ['key' => 'hero.title_style',          'type' => 'text',  'group' => 'hero', 'label' => 'Gaya Judul',               'value' => 'solid'],
             ['key' => 'hero.copy',                 'type' => 'textarea', 'group' => 'hero', 'label' => 'Deskripsi Hero',        'value' => 'Hal kecil yang bikin hari terasa lebih nyaman.'],
             ['key' => 'hero.cta_primary_label',    'type' => 'text',  'group' => 'hero', 'label' => 'CTA Utama – Label',        'value' => 'Lihat Koleksi'],
             ['key' => 'hero.cta_primary_url',      'type' => 'url',   'group' => 'hero', 'label' => 'CTA Utama – URL',          'value' => '/products'],
@@ -54,6 +55,13 @@ class StorefrontSettingSeeder extends Seeder
             ['key' => 'values.3_number', 'type' => 'text', 'group' => 'values', 'label' => 'Value 3 – Angka',  'value' => '03'],
             ['key' => 'values.3_title',  'type' => 'text', 'group' => 'values', 'label' => 'Value 3 – Judul',  'value' => 'Tahan Lama'],
             ['key' => 'values.3_desc',   'type' => 'textarea', 'group' => 'values', 'label' => 'Value 3 – Deskripsi', 'value' => 'Jahitan kuat, warna awet — menemani aktivitas sehari-hari.'],
+
+            /* ── CATEGORIES ─────────────────────────────────────────── */
+            ['key' => 'categories.eyebrow',   'type' => 'text',     'group' => 'categories', 'label' => 'Kategori – Label Kecil',        'value' => 'Koleksi'],
+            ['key' => 'categories.title',     'type' => 'text',     'group' => 'categories', 'label' => 'Kategori – Judul',              'value' => 'Cari yang paling pas'],
+            ['key' => 'categories.copy',      'type' => 'textarea', 'group' => 'categories', 'label' => 'Kategori – Deskripsi Singkat',  'value' => 'Mulai dari kategori yang kamu butuhkan.'],
+            ['key' => 'categories.all_label', 'type' => 'text',     'group' => 'categories', 'label' => 'Kategori – Label Semua Produk', 'value' => 'Lihat semua'],
+            ['key' => 'categories.limit',     'type' => 'number',   'group' => 'categories', 'label' => 'Kategori – Batas Tampil',       'value' => '8'],
 
             /* ── CHANNELS ───────────────────────────────────────────── */
             ['key' => 'channels.shopee_url',    'type' => 'url', 'group' => 'channels', 'label' => 'URL Shopee',    'value' => '#'],

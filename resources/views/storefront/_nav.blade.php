@@ -20,8 +20,9 @@
     <div class="nav-inner">
         @php
             $sfBrandName = storefront_setting('branding.brand_name', 'Greatfit');
-            $sfLogoUrl   = storefront_setting('branding.logo_url', '/images/logo-mark.svg');
-            $sfLogoSrc   = str_starts_with($sfLogoUrl, 'http') ? $sfLogoUrl : asset(ltrim($sfLogoUrl, '/'));
+            $sfLogoUrl   = storefront_media_url(storefront_setting('branding.logo_url', '/images/logo-mark.svg'));
+            // URL relatif agar logo tetap muncul saat diakses via IP/host lain
+            $sfLogoSrc   = str_starts_with($sfLogoUrl, 'http') ? $sfLogoUrl : '/' . ltrim($sfLogoUrl, '/');
         @endphp
         <a href="{{ route('storefront.home') }}" class="brand">
             <img src="{{ $sfLogoSrc }}" alt="{{ $sfBrandName }}">

@@ -62,6 +62,10 @@ Route::middleware(['web', 'auth', 'access:production'])
 
             Route::post('/{cuttingJob}/sisa-fabric', [CuttingJobController::class, 'recordSisaFabric'])
                 ->name('sisa_fabric');
+
+            // DEV ONLY — bersihkan semua data transaksi produksi (owner + APP_DB_MODE=dev)
+            Route::post('/dev-clean-production', [CuttingJobController::class, 'devCleanProductionData'])
+                ->name('dev_clean_production');
         });
 
         /*

@@ -36,7 +36,12 @@
             .cutting-create-page .page-wrap { overflow-x: hidden; }
 
             .cutting-create-page .page-wrap {
-                padding: .5rem .5rem 3rem;
+                padding: .65rem .65rem 5rem;
+            }
+
+            .cutting-create-page .alert {
+                border-radius: 14px;
+                font-size: .82rem;
             }
         }
     </style>

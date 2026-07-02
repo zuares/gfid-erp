@@ -33,6 +33,141 @@ class CuttingJobController extends Controller
     ) {}
 
     /**
+     * DEV ONLY — Bersihkan SEMUA data transaksi produksi.
+     * Guard ganda: role owner + APP_DB_MODE=dev.
+     *
+     * Menghapus: cutting/sewing/QC/finishing/packing/WIP-opname + mutasi &
+     * jurnal produksi + adjustment yang ber-referensi dokumen produksi,
+     * lalu menghitung ulang stok gudang & saldo lot dari mutasi tersisa.
+     * Master data, GRN/pembelian, stock opname, & storefront TIDAK disentuh.
+     */
+    public function devCleanProductionData(Request $request)
+    {
+        if (env('APP_DB_MODE') !== 'dev') {
+            abort(403, 'Bersihkan data hanya tersedia di mode dev.');
+        }
+        if (!$request->user() || $request->user()->role !== 'owner') {
+            abort(403, 'Hanya owner yang bisa membersihkan data produksi.');
+        }
+
+        // Source type mutasi & jurnal milik alur produksi (lihat JournalService::SRC_*)
+        $prodSources = [
+            'cutting_job', 'cutting_job_void', 'cutting_job_sisa',
+            'cutting_qc_adjust_in', 'cutting_qc_adjust_out', 'cutting_reject', 'cutting_wip',
+            'sewing_qc_in', 'sewing_qc_out', 'sewing_qc_reject',
+            'sewing_reject_rework_ok', 'sewing_return_ok', 'sewing_return_reject',
+            'sewing_pickup_supply', 'sewing_pickup_supply_followup', 'sewing_pickup_supply_void_line',
+            'finishing_bom', 'finishing_job', 'finishing_qc_in_fg', 'finishing_qc_out',
+            'finishing_qc_reject', 'finishing_reject_convert', 'finishing_repair',
+            'production_movement', 'wip_fin_adjustment',
+            \App\Models\CuttingJob::class,
+            \App\Models\SewingPickup::class,
+            'App\\Models\\SewingReturn',
+            'App\\Models\\FinishingJob',
+            'App\\Models\\PackingJob',
+        ];
+        $prodSources = array_values(array_filter($prodSources));
+
+        // Tabel transaksi produksi (urutan: child dulu)
+        $prodTables = [
+            'qc_results',
+            'sewing_return_lines', 'sewing_returns',
+            'sewing_pickup_line_supply_lines', 'sewing_pickup_supply_lines',
+            'sewing_pickup_lines', 'sewing_pickups',
+            'cutting_job_lots', 'cutting_job_bundles', 'cutting_jobs',
+            'finishing_repair_lines', 'finishing_repairs',
+            'finishing_job_lines', 'finishing_jobs',
+            'packing_job_lines', 'packing_jobs',
+            'production_issue_lines', 'production_issues',
+            'production_receipt_lines', 'production_receipts',
+            'production_order_lines', 'production_orders',
+            'production_movements', 'production_activities',
+            'wip_fin_adjustment_lines', 'wip_fin_adjustments',
+            'wip_opname_lines', 'wip_opname_periods',
+        ];
+
+        $prodAdjRefs = [
+            \App\Models\SewingPickup::class,
+            \App\Models\CuttingJob::class,
+            'App\\Models\\SewingReturn',
+            'App\\Models\\FinishingJob',
+        ];
+
+        $deleted = [];
+
+        DB::transaction(function () use ($prodSources, $prodTables, $prodAdjRefs, &$deleted) {
+            // 1) Adjustment yang lahir dari dokumen produksi (beserta mutasi & jurnalnya)
+            $prodAdjIds = DB::table('inventory_adjustments')
+                ->whereIn('reference_type', $prodAdjRefs)
+                ->pluck('id');
+
+            if ($prodAdjIds->isNotEmpty()) {
+                $deleted['mutasi adjustment produksi'] = DB::table('inventory_mutations')
+                    ->where('source_type', \App\Models\InventoryAdjustment::class)
+                    ->whereIn('source_id', $prodAdjIds)->delete();
+
+                $adjJournalIds = DB::table('journals')
+                    ->where('source_type', 'inventory_adjustment')
+                    ->whereIn('source_id', $prodAdjIds)->pluck('id');
+                DB::table('journal_lines')->whereIn('journal_id', $adjJournalIds)->delete();
+                DB::table('journals')->whereIn('id', $adjJournalIds)->delete();
+
+                DB::table('inventory_adjustment_lines')->whereIn('inventory_adjustment_id', $prodAdjIds)->delete();
+                $deleted['adjustment produksi'] = DB::table('inventory_adjustments')->whereIn('id', $prodAdjIds)->delete();
+            }
+
+            // 2) Jurnal produksi
+            $journalIds = DB::table('journals')->whereIn('source_type', $prodSources)->pluck('id');
+            $deleted['baris jurnal'] = DB::table('journal_lines')->whereIn('journal_id', $journalIds)->delete();
+            $deleted['jurnal'] = DB::table('journals')->whereIn('id', $journalIds)->delete();
+
+            // 3) Mutasi inventory produksi
+            $deleted['mutasi inventory'] = DB::table('inventory_mutations')->whereIn('source_type', $prodSources)->delete();
+
+            // 4) Tabel transaksi produksi
+            foreach ($prodTables as $table) {
+                if (!\Illuminate\Support\Facades\Schema::hasTable($table)) {
+                    continue;
+                }
+                $count = DB::table($table)->delete();
+                if ($count > 0) {
+                    $deleted[$table] = $count;
+                }
+            }
+
+            // 5) Recompute stok gudang dari mutasi tersisa
+            DB::statement("
+                UPDATE inventory_stocks SET qty = COALESCE(
+                    (SELECT SUM(m.qty_change) FROM inventory_mutations m
+                     WHERE m.warehouse_id = inventory_stocks.warehouse_id
+                       AND m.item_id = inventory_stocks.item_id), 0)
+            ");
+
+            // 6) Recompute saldo & cost lot dari mutasi tersisa
+            DB::statement("
+                UPDATE lots SET
+                    qty_onhand = COALESCE((SELECT SUM(m.qty_change) FROM inventory_mutations m WHERE m.lot_id = lots.id), 0),
+                    total_cost = COALESCE((SELECT SUM(COALESCE(m.total_cost,0)) FROM inventory_mutations m WHERE m.lot_id = lots.id), 0)
+            ");
+            DB::statement("
+                UPDATE lots SET avg_cost = CASE WHEN qty_onhand > 0.000001 THEN total_cost / qty_onhand ELSE 0 END
+            ");
+        });
+
+        $summary = collect($deleted)
+            ->filter(fn($v) => $v > 0)
+            ->map(fn($v, $k) => "{$k}: {$v}")
+            ->implode(', ');
+
+        Log::warning('[DEV] Data produksi dibersihkan oleh ' . $request->user()->name, $deleted);
+
+        return redirect()
+            ->route('production.cutting_jobs.index')
+            ->with('success', 'Data produksi berhasil dibersihkan & stok dihitung ulang. '
+                . ($summary !== '' ? "Terhapus — {$summary}." : 'Tidak ada data yang perlu dihapus.'));
+    }
+
+    /**
      * List Cutting Job.
      */
     public function index(Request $request)
@@ -180,6 +315,52 @@ class CuttingJobController extends Controller
                 (int) $l->bom->item_id => route('master.item_boms.quick_line', $l->bom->id),
             ]);
 
+        // 7️⃣ Riwayat pemakaian kain AKTUAL per (finished_item × fabric_item)
+        //    dari cutting job sebelumnya (exclude voided).
+        //    Dipakai frontend untuk autofill "pemakaian terakhir" + info riwayat.
+        //    Format: { finishedItemId => { fabricItemId => { kg_per_pcs, job_code, date, history: [..max 3] } } }
+        $usageRows = \DB::table('cutting_job_bundles as b')
+            ->join('cutting_jobs as j', 'j.id', '=', 'b.cutting_job_id')
+            ->join('lots as l', 'l.id', '=', 'b.lot_id')
+            ->where('j.status', '!=', 'voided')
+            ->where('b.qty_pcs', '>', 0)
+            ->where('b.qty_used_fabric', '>', 0)
+            ->orderByDesc('j.date')
+            ->orderByDesc('b.id')
+            ->limit(600)
+            ->get([
+                'b.finished_item_id',
+                'l.item_id as fabric_item_id',
+                'b.qty_pcs',
+                'b.qty_used_fabric',
+                'j.code as job_code',
+                'j.date',
+            ]);
+
+        $lastUsage = [];
+        foreach ($usageRows as $row) {
+            $fid = (int) $row->finished_item_id;
+            $mid = (int) $row->fabric_item_id;
+            $kgPerPcs = round((float) $row->qty_used_fabric / max((float) $row->qty_pcs, 0.0001), 4);
+            $dateStr = \Illuminate\Support\Carbon::parse($row->date)->format('d/m/y');
+
+            if (!isset($lastUsage[$fid][$mid])) {
+                $lastUsage[$fid][$mid] = [
+                    'kg_per_pcs' => $kgPerPcs,
+                    'job_code'   => $row->job_code,
+                    'date'       => $dateStr,
+                    'history'    => [],
+                ];
+            }
+
+            $hist = &$lastUsage[$fid][$mid]['history'];
+            $lastJob = end($hist);
+            if (count($hist) < 3 && (!$lastJob || $lastJob['job_code'] !== $row->job_code)) {
+                $hist[] = ['kg_per_pcs' => $kgPerPcs, 'job_code' => $row->job_code, 'date' => $dateStr];
+            }
+            unset($hist);
+        }
+
         return view('production.cutting_jobs.create', [
             'lotStocks'      => $lotStocks,
             'lotSupplierMap' => $lotSupplierMap,
@@ -189,6 +370,7 @@ class CuttingJobController extends Controller
             'bomData'        => $bomData,
             'bomEditUrls'    => $bomEditUrls,
             'bomQuickUrls'   => $bomQuickUrls,
+            'lastUsage'      => $lastUsage,
         ]);
     }
 
@@ -652,6 +834,27 @@ class CuttingJobController extends Controller
                 // Prioritas 1: user sudah isi qty_used_fabric manual di form
                 $userFabric = (float) ($validBundles[$idx]['qty_used_fabric'] ?? 0);
                 if ($userFabric > 0) {
+                    // ✅ GUARD BOM: pemakaian tidak boleh melebihi standar BOM (+scrap).
+                    //    Kalau realita memang lebih besar → update BOM dulu
+                    //    (tombol "Update BOM" tersedia di form cutting).
+                    $guardBomLine = $bomLines[$finishedItemId] ?? null;
+                    if ($guardBomLine && $qtyPcs > 0) {
+                        $maxByBom = $qtyPcs * (float) $guardBomLine->qty * (1 + (float) $guardBomLine->scrap_pct / 100);
+                        if ($userFabric > $maxByBom + 0.0005) {
+                            $itemCode = Item::whereKey($finishedItemId)->value('code') ?? ('#' . $finishedItemId);
+                            throw ValidationException::withMessages([
+                                'bundles' => sprintf(
+                                    'Pemakaian kain %s = %s kg melebihi standar BOM (maks %s kg untuk %s pcs). '
+                                    . 'Jika realita memang segitu, update BOM dulu lewat tombol "Update BOM" di form, lalu simpan ulang.',
+                                    $itemCode,
+                                    rtrim(rtrim(number_format($userFabric, 4, '.', ''), '0'), '.'),
+                                    rtrim(rtrim(number_format($maxByBom, 4, '.', ''), '0'), '.'),
+                                    rtrim(rtrim(number_format($qtyPcs, 2, '.', ''), '0'), '.')
+                                ),
+                            ]);
+                        }
+                    }
+
                     $anyBom = true; // ada nilai → skip fallback LOT
                     continue;       // nilai sudah ada di $validBundles[$idx], tidak perlu overwrite
                 }
@@ -719,6 +922,10 @@ class CuttingJobController extends Controller
                     'planned_fabric_qty' => $fabricByLot[$lotId] ?? 0.0,
                 ]);
             }
+
+            // ✅ Sinkron used_fabric_qty per LOT dari total bundle —
+            //    tanpa ini form "Catat Sisa Kain" tidak pernah muncul.
+            $this->syncCuttingJobLotUsedFabric($job);
         } catch (\RuntimeException $e) {
             if ($devRollback && DB::transactionLevel() > 0) {
                 DB::rollBack();
@@ -900,6 +1107,9 @@ class CuttingJobController extends Controller
 
         $job = $this->cutting->update($validated, $cuttingJob);
 
+        // Sinkron used_fabric_qty per LOT setelah bundle berubah
+        $this->syncCuttingJobLotUsedFabric($job);
+
         return redirect()
             ->route('production.cutting_jobs.show', $job)
             ->with('success', 'Cutting job berhasil diupdate.');
@@ -1000,6 +1210,12 @@ class CuttingJobController extends Controller
      */
     public function show(CuttingJob $cuttingJob)
     {
+        // Self-healing: sinkron used_fabric_qty LOT dari bundles.
+        // Menutup job lama yang tersimpan sebelum sync dipasang di store().
+        if ($cuttingJob->status !== 'voided') {
+            $this->syncCuttingJobLotUsedFabric($cuttingJob);
+        }
+
         $cuttingJob->load([
             'warehouse',
             'lot.item',
@@ -1017,9 +1233,33 @@ class CuttingJobController extends Controller
             })
             ->exists();
 
+        // Target update scrap% BOM: item jadi di job ini yang punya BOM aktif
+        // dengan line bahan utama = kain job ini.
+        // { finished_item_id => [item_code, bom_scrap_pct, bom_qty, quick_url] }
+        $bomScrapTargets = [];
+        $finishedItemIds = $cuttingJob->bundles->pluck('finished_item_id')->filter()->unique()->values();
+        if ($finishedItemIds->isNotEmpty() && $cuttingJob->fabric_item_id) {
+            $lines = \App\Models\ItemBomLine::query()
+                ->where('material_item_id', (int) $cuttingJob->fabric_item_id)
+                ->where('usage_stage', \App\Models\ItemBomLine::STAGE_MAIN_MATERIAL)
+                ->whereHas('bom', fn($q) => $q->where('active', true)->whereIn('item_id', $finishedItemIds))
+                ->with(['bom.item:id,code'])
+                ->get();
+
+            foreach ($lines as $line) {
+                $bomScrapTargets[(int) $line->bom->item_id] = [
+                    'item_code' => $line->bom->item?->code ?? ('#' . $line->bom->item_id),
+                    'scrap_pct' => (float) $line->scrap_pct,
+                    'bom_qty'   => (float) $line->qty,
+                    'quick_url' => route('master.item_boms.quick_line', $line->bom->id),
+                ];
+            }
+        }
+
         return view('production.cutting_jobs.show', [
             'job' => $cuttingJob,
             'hasQcCutting' => $hasQcCutting,
+            'bomScrapTargets' => $bomScrapTargets,
         ]);
     }
 
@@ -1207,7 +1447,8 @@ class CuttingJobController extends Controller
         $validated = $request->validate([
             'lots'              => ['required', 'array', 'min:1'],
             'lots.*.lot_id'     => ['required', 'integer', 'exists:lots,id'],
-            'lots.*.qty_sisa'   => ['required', 'numeric', 'min:0'],
+            'lots.*.qty_sisa'   => ['nullable', 'numeric', 'min:0'],
+            'lots.*.qty_scrap'  => ['nullable', 'numeric', 'min:0'],
         ]);
 
         $rmWarehouseId = Warehouse::where('code', 'RM')->value('id');
@@ -1218,13 +1459,32 @@ class CuttingJobController extends Controller
         $epsilon = 0.0001;
         $processed = 0;
 
-        DB::transaction(function () use ($validated, $cuttingJob, $rmWarehouseId, $epsilon, &$processed) {
+        // Potongan standar (kg jadi pcs) per LOT: Σ qty_pcs × BOM qty (tanpa scrap).
+        // Dipakai untuk memisahkan scrap dari pemakaian vs scrap dari sisa LOT.
+        $bomQtyByItem = \App\Models\ItemBomLine::query()
+            ->where('material_item_id', (int) $cuttingJob->fabric_item_id)
+            ->where('usage_stage', \App\Models\ItemBomLine::STAGE_MAIN_MATERIAL)
+            ->whereHas('bom', fn($q) => $q->where('active', true))
+            ->with('bom:id,item_id')
+            ->get()
+            ->keyBy(fn($l) => (int) $l->bom->item_id)
+            ->map(fn($l) => (float) $l->qty);
+
+        $goodByLot = [];
+        foreach ($cuttingJob->bundles as $b) {
+            $goodByLot[(int) $b->lot_id] = ($goodByLot[(int) $b->lot_id] ?? 0.0)
+                + (float) $b->qty_pcs * (float) ($bomQtyByItem[(int) $b->finished_item_id] ?? 0);
+        }
+
+        DB::transaction(function () use ($validated, $cuttingJob, $rmWarehouseId, $epsilon, $goodByLot, &$processed) {
 
             foreach ($validated['lots'] as $row) {
-                $lotId   = (int) $row['lot_id'];
-                $qtySisa = (float) $row['qty_sisa'];
+                $lotId    = (int) $row['lot_id'];
+                $qtySisa  = (float) ($row['qty_sisa'] ?? 0);
+                $qtyScrap = (float) ($row['qty_scrap'] ?? 0);
 
-                if ($qtySisa <= $epsilon) {
+                // Baris tanpa sisa layak & tanpa scrap → tidak ada yang dicatat
+                if ($qtySisa <= $epsilon && $qtyScrap <= $epsilon) {
                     continue;
                 }
 
@@ -1246,34 +1506,92 @@ class CuttingJobController extends Controller
                     ]);
                 }
 
-                // Ambil avg_cost LOT untuk stockIn
                 $lot     = Lot::lockForUpdate()->findOrFail($lotId);
                 $avgCost = (float) ($lot->avg_cost ?? 0);
 
-                // 1. StockIn ke RM
-                $this->inventory->stockIn(
-                    warehouseId: $rmWarehouseId,
-                    itemId: (int) $cuttingJob->fabric_item_id,
-                    qty: $qtySisa,
-                    date: now(),
-                    sourceType: 'cutting_job_sisa',
-                    sourceId: (int) $cuttingJob->id,
-                    notes: "Sisa kain cutting {$cuttingJob->code} - LOT {$lot->code}",
-                    lotId: $lotId,
-                    unitCost: $avgCost > 0 ? $avgCost : null,
-                    affectLotCost: false,
-                );
+                $usedQty   = (float) ($cjLot->used_fabric_qty ?? 0);
+                $goodQty   = (float) ($goodByLot[$lotId] ?? 0);
+                $lotOnhand = (float) ($lot->qty_onhand ?? 0);
 
-                // 2. Tambah kembali qty_onhand LOT
-                $lot->qty_onhand  = (float) $lot->qty_onhand + $qtySisa;
-                $lot->total_cost  = $lot->qty_onhand * $avgCost;
-                if ($lot->status === 'closed' && $lot->qty_onhand > 0) {
-                    $lot->status = 'active';
+                // Batas: sisa layak + scrap ≤ kain terpakai + sisa fisik LOT
+                if (($qtySisa + $qtyScrap) > ($usedQty + $lotOnhand) + $epsilon) {
+                    throw ValidationException::withMessages([
+                        'lots' => "LOT #{$lotId}: sisa layak ({$qtySisa}) + scrap ({$qtyScrap}) melebihi kain terpakai ({$usedQty}) + sisa LOT ({$lotOnhand}).",
+                    ]);
                 }
-                $lot->save();
+
+                // ── ALOKASI SISA & SCRAP ──
+                // Sumber "kelebihan kain" ada dua:
+                // (1) EXCESS: kain terpakai melebihi potongan standar (sudah keluar stok)
+                // (2) REMNANT: sisa fisik LOT (masih tercatat sebagai stok)
+                //
+                // Sisa Layak → klaim dari EXCESS dulu (stockIn balik);
+                //              selebihnya = remnant dibiarkan tetap jadi stok (tanpa mutasi).
+                // Scrap      → klaim dari sisa EXCESS (analitik saja, stok sudah terpotong);
+                //              selebihnya = write-off dari REMNANT (stok dikurangi).
+                $excess = $goodQty > 0 ? max($usedQty - $goodQty, 0) : $usedQty;
+
+                $sisaFromUsed = min($qtySisa, $excess);
+                $remnantKept  = max($qtySisa - $sisaFromUsed, 0); // sisa LOT yang dipertahankan
+
+                if ($sisaFromUsed > $epsilon) {
+                    // 1. StockIn ke RM (hanya porsi dari pemakaian)
+                    $this->inventory->stockIn(
+                        warehouseId: $rmWarehouseId,
+                        itemId: (int) $cuttingJob->fabric_item_id,
+                        qty: $sisaFromUsed,
+                        date: now(),
+                        sourceType: 'cutting_job_sisa',
+                        sourceId: (int) $cuttingJob->id,
+                        notes: "Sisa kain cutting {$cuttingJob->code} - LOT {$lot->code}",
+                        lotId: $lotId,
+                        unitCost: $avgCost > 0 ? $avgCost : null,
+                        affectLotCost: false,
+                    );
+
+                    // 2. Tambah kembali qty_onhand LOT
+                    $lot->qty_onhand  = (float) $lot->qty_onhand + $sisaFromUsed;
+                    $lot->total_cost  = $lot->qty_onhand * $avgCost;
+                    if ($lot->status === 'closed' && $lot->qty_onhand > 0) {
+                        $lot->status = 'active';
+                    }
+                    $lot->save();
+                }
+
+                if ($qtyScrap > $epsilon) {
+                    $excessLeft    = max($excess - $sisaFromUsed, 0);
+                    $scrapFromUsed = min($qtyScrap, $excessLeft);
+                    $writeOff      = min(
+                        $qtyScrap - $scrapFromUsed,
+                        max((float) $lot->qty_onhand - $remnantKept, 0)
+                    );
+
+                    if ($writeOff > $epsilon) {
+                        $this->inventory->stockOut(
+                            warehouseId: $rmWarehouseId,
+                            itemId: (int) $cuttingJob->fabric_item_id,
+                            qty: $writeOff,
+                            date: now(),
+                            sourceType: 'cutting_job_scrap',
+                            sourceId: (int) $cuttingJob->id,
+                            notes: "Scrap sisa LOT {$lot->code} - cutting {$cuttingJob->code}",
+                            allowNegative: false,
+                            lotId: $lotId,
+                            unitCostOverride: $avgCost > 0 ? $avgCost : null,
+                            affectLotCost: false,
+                        );
+
+                        $lot->qty_onhand = max((float) $lot->qty_onhand - $writeOff, 0);
+                        $lot->total_cost = $lot->qty_onhand * $avgCost;
+                        $lot->save();
+                    }
+                }
 
                 // 3. Catat di pivot
                 $cjLot->qty_sisa_fabric   = $qtySisa;
+                if (\Illuminate\Support\Facades\Schema::hasColumn('cutting_job_lots', 'qty_scrap')) {
+                    $cjLot->qty_scrap = $qtyScrap;
+                }
                 $cjLot->sisa_recorded_at  = now();
                 $cjLot->sisa_recorded_by  = auth()->id();
                 $cjLot->save();
@@ -1283,12 +1601,12 @@ class CuttingJobController extends Controller
         });
 
         if ($processed === 0) {
-            return back()->with('warning', 'Tidak ada sisa yang perlu dicatat (qty = 0).');
+            return back()->with('warning', 'Tidak ada sisa/scrap yang perlu dicatat (semua qty = 0).');
         }
 
         return redirect()
             ->route('production.cutting_jobs.show', $cuttingJob)
-            ->with('success', "Sisa kain berhasil dicatat dan dikembalikan ke RM ({$processed} LOT).");
+            ->with('success', "Sisa kain berhasil dicatat ({$processed} LOT) — sisa layak kembali ke RM, scrap tercatat untuk evaluasi BOM.");
     }
 
 }

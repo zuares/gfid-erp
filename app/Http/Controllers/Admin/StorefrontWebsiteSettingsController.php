@@ -11,12 +11,86 @@ use Illuminate\View\View;
 
 class StorefrontWebsiteSettingsController extends Controller
 {
+    private function sectionDefinitions(): array
+    {
+        return [
+            'hero'       => ['icon' => '🦸', 'name' => 'Hero',          'desc' => 'Gambar utama, judul, dan CTA'],
+            'categories' => ['icon' => '🏷️', 'name' => 'Kategori',      'desc' => 'Grid pilih kategori produk'],
+            'channels'   => ['icon' => '🛒', 'name' => 'Channels',      'desc' => 'Shopee, TikTok, Tokopedia, Website'],
+            'values'     => ['icon' => '✨', 'name' => 'Values',         'desc' => 'Keunggulan brand'],
+            'products'   => ['icon' => '👕', 'name' => 'Produk Pilihan', 'desc' => 'Grid produk ranked / featured'],
+            'cta'        => ['icon' => '🎯', 'name' => 'Call to Action', 'desc' => 'Blok ajakan belanja'],
+        ];
+    }
+
     // ── Halaman settings ────────────────────────────────────────────────────
 
     public function index(): View
     {
         $settings = StorefrontSetting::allCached();
         return view('admin.website.settings', compact('settings'));
+    }
+
+    public function editSection(string $section): View
+    {
+        $sections = $this->sectionDefinitions();
+        abort_unless(array_key_exists($section, $sections), 404);
+
+        $settings = StorefrontSetting::allCached();
+        $meta = $sections[$section];
+
+        return view('admin.website.section-edit', compact('section', 'sections', 'settings', 'meta'));
+    }
+
+    public function updateSection(Request $request, string $section): RedirectResponse
+    {
+        $sections = $this->sectionDefinitions();
+        abort_unless(array_key_exists($section, $sections), 404);
+
+        $data = [
+            "sections.{$section}_visible" => $request->boolean('visible') ? '1' : '0',
+        ];
+
+        if ($section !== 'hero') {
+            foreach (['padding_top', 'padding_bottom', 'margin_top', 'margin_bottom'] as $field) {
+                $data["sections.{$section}_{$field}"] = (string) max(0, min(120, (int) $request->input($field, 0)));
+            }
+
+            $bg = (string) $request->input('bg', '#ffffff');
+            $data["sections.{$section}_bg"] = preg_match('/^#[0-9a-fA-F]{6}$/', $bg) ? $bg : '#ffffff';
+            $style = (string) $request->input('style', 'default');
+            $allowedStyles = ['default', 'soft', 'line', 'compact', 'outline', 'elevated', 'dark', 'editorial'];
+            $data["sections.{$section}_style"] = in_array($style, $allowedStyles, true) ? $style : 'default';
+        }
+
+        if ($section === 'channels') {
+            $data['channels.shopee_url'] = (string) $request->input('channels_shopee_url', '');
+            $data['channels.tokopedia_url'] = (string) $request->input('channels_tokopedia_url', '');
+            $data['channels.tiktok_url'] = (string) $request->input('channels_tiktok_url', '');
+        }
+
+        if ($section === 'categories') {
+            $data['categories.eyebrow'] = (string) $request->input('categories_eyebrow', '');
+            $data['categories.title'] = (string) $request->input('categories_title', '');
+            $data['categories.copy'] = (string) $request->input('categories_copy', '');
+            $data['categories.all_label'] = (string) $request->input('categories_all_label', '');
+            $limit = (int) $request->input('categories_limit', 8);
+            $data['categories.limit'] = (string) (in_array($limit, [4, 6, 8, 10, 12], true) ? $limit : 8);
+        }
+
+        if ($section === 'values') {
+            foreach ([1, 2, 3] as $i) {
+                $data["values.{$i}_number"] = (string) $request->input("values_{$i}_number", '');
+                $data["values.{$i}_title"] = (string) $request->input("values_{$i}_title", '');
+                $data["values.{$i}_desc"] = (string) $request->input("values_{$i}_desc", '');
+            }
+        }
+
+        StorefrontSetting::setMany($data);
+
+        return redirect()
+            ->route('admin.website.settings.sections.edit', $section)
+            ->with('success', 'Pengaturan section berhasil disimpan.');
     }
 
     // ── Simpan semua setting (satu form per group) ───────────────────────────
@@ -79,8 +153,9 @@ class StorefrontWebsiteSettingsController extends Controller
 
         if (! $src) {
             // Fallback: simpan as-is (mis. SVG)
+            // URL RELATIF agar tetap jalan diakses dari host/IP mana pun (mis. HP via LAN)
             $path = $file->store('website-assets', 'public');
-            return response()->json(['url' => asset('storage/' . $path)]);
+            return response()->json(['url' => '/storage/' . $path]);
         }
 
         // Resize kalau lebar > 1600px
@@ -124,6 +199,7 @@ class StorefrontWebsiteSettingsController extends Controller
         \Storage::disk('public')->put($filename, file_get_contents($tmpOut));
         @unlink($tmpOut);
 
-        return response()->json(['url' => asset('storage/' . $filename)]);
+        // URL RELATIF agar tetap jalan diakses dari host/IP mana pun (mis. HP via LAN)
+        return response()->json(['url' => '/storage/' . $filename]);
     }
 }

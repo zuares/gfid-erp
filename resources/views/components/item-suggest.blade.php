@@ -226,11 +226,12 @@
                 const type = wrap.dataset.type || null;
                 const itemCategoryId = wrap.dataset.itemCategoryId || null;
 
-                let extraParams = {};
-                try {
-                    extraParams = JSON.parse(wrap.dataset.extraParams || '{}') || {};
-                } catch (e) {
-                    extraParams = {};
+                function currentExtraParams() {
+                    try {
+                        return JSON.parse(wrap.dataset.extraParams || '{}') || {};
+                    } catch (e) {
+                        return {};
+                    }
                 }
 
                 let initialItems = [];
@@ -393,7 +394,7 @@
                     if (lastItems[idx]) selectItem(lastItems[idx]);
                 }
 
-                function fetchData(q, force) {
+                function fetchData(q, force, skipExtraParams = false) {
                     if (isDisabled()) return;
                     q = (q || '').trim();
 
@@ -415,6 +416,7 @@
                     if (type) params.set('type', type);
                     if (itemCategoryId) params.set('item_category_id', itemCategoryId);
 
+                    const extraParams = skipExtraParams ? {} : currentExtraParams();
                     if (extraParams && typeof extraParams === 'object') {
                         Object.keys(extraParams).forEach((key) => {
                             const value = extraParams[key];
@@ -430,7 +432,8 @@
                         .then(r => r.json())
                         .then(json => {
                             const data = json?.data || [];
-                            if (!data.length && initialItems.length) buildDropdown(initialItems);
+                            if (!data.length && !skipExtraParams && Object.keys(extraParams || {}).length) fetchData(q, force, true);
+                            else if (!data.length && initialItems.length) buildDropdown(initialItems);
                             else buildDropdown(data);
                         })
                         .catch(() => {

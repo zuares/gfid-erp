@@ -23,8 +23,8 @@ class ItemBomLine extends Model
     ];
 
     protected $casts = [
-        'qty' => 'decimal:2',
-        'scrap_pct' => 'decimal:2',
+        'qty' => 'decimal:8',
+        'scrap_pct' => 'decimal:3',
         'is_optional' => 'boolean',
     ];
 

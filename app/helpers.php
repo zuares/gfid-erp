@@ -290,6 +290,23 @@ if (!function_exists('storefrontProducts')) {
     }
 }
 
+if (!function_exists('storefront_media_url')) {
+    /**
+     * Normalisasi URL media storefront menjadi RELATIF (/storage/...).
+     * URL absolut hasil asset() (mis. http://gfid-dev.test/storage/x.jpg)
+     * gagal dimuat saat site diakses lewat host/IP lain (HP via LAN).
+     * URL eksternal (unsplash, CDN, dsb) dibiarkan apa adanya.
+     */
+    function storefront_media_url(?string $url): ?string
+    {
+        if (!$url) {
+            return $url;
+        }
+
+        return preg_replace('#^https?://[^/]+(/storage/)#', '$1', $url);
+    }
+}
+
 if (!function_exists('storefront_setting')) {
     /**
      * Baca satu storefront setting.

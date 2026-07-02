@@ -38,7 +38,66 @@ class ItemBomController extends Controller
             ->paginate(self::PAGINATE)
             ->withQueryString();
 
-        return view('master.item_boms.index', compact('boms', 'q'));
+        // Badge "standar vs aktual" per BOM — dari cutting job non-void terakhir.
+        // { bom_id => { kg_per_pcs, job_code, std_max, status: over|under|ok } }
+        $bomUsageBadges = [];
+        $itemIds = $boms->pluck('item_id')->filter()->all();
+
+        if (!empty($itemIds)) {
+            $rows = DB::table('cutting_job_bundles as b')
+                ->join('cutting_jobs as j', 'j.id', '=', 'b.cutting_job_id')
+                ->join('lots as l', 'l.id', '=', 'b.lot_id')
+                ->where('j.status', '!=', 'voided')
+                ->whereIn('b.finished_item_id', $itemIds)
+                ->where('b.qty_pcs', '>', 0)
+                ->where('b.qty_used_fabric', '>', 0)
+                ->orderByDesc('j.date')
+                ->orderByDesc('b.id')
+                ->get(['b.finished_item_id', 'l.item_id as material_item_id', 'b.qty_pcs', 'b.qty_used_fabric', 'j.code as job_code']);
+
+            $latest = [];
+            foreach ($rows as $r) {
+                $fid = (int) $r->finished_item_id;
+                if (!isset($latest[$fid])) {
+                    $latest[$fid] = $r;
+                }
+            }
+
+            $stdLines = ItemBomLine::query()
+                ->whereIn('item_bom_id', $boms->pluck('id')->all())
+                ->where('usage_stage', ItemBomLine::STAGE_MAIN_MATERIAL)
+                ->get(['item_bom_id', 'material_item_id', 'qty', 'scrap_pct']);
+
+            $stdMap = [];
+            foreach ($stdLines as $l) {
+                $stdMap[(int) $l->item_bom_id][(int) $l->material_item_id] = $l;
+            }
+
+            foreach ($boms as $b) {
+                $r = $latest[(int) $b->item_id] ?? null;
+                if (!$r) {
+                    continue;
+                }
+                $actual = round((float) $r->qty_used_fabric / max((float) $r->qty_pcs, 0.0001), 4);
+                $std = $stdMap[(int) $b->id][(int) $r->material_item_id] ?? null;
+                $stdMax = $std ? (float) $std->qty * (1 + (float) $std->scrap_pct / 100) : null;
+
+                $status = null;
+                if ($stdMax !== null) {
+                    $status = $actual > $stdMax + 0.0005 ? 'over'
+                        : ($actual < $stdMax - 0.0005 ? 'under' : 'ok');
+                }
+
+                $bomUsageBadges[(int) $b->id] = [
+                    'kg_per_pcs' => $actual,
+                    'job_code'   => $r->job_code,
+                    'std_max'    => $stdMax,
+                    'status'     => $status,
+                ];
+            }
+        }
+
+        return view('master.item_boms.index', compact('boms', 'q', 'bomUsageBadges'));
     }
 
     public function create()
@@ -58,6 +117,51 @@ class ItemBomController extends Controller
             'lines' => fn($q) => $q->orderBy('sort_order')
                 ->with('material:id,code,name,unit'),
         ]);
+
+        // Pemakaian kain AKTUAL terakhir per material (dari cutting job non-void)
+        // untuk item BOM ini. Dipakai form sebagai pembanding standar vs realita.
+        // Format: { material_item_id => { kg_per_pcs, job_code, date, history: [..3] } }
+        $usageByMaterial = [];
+        $usageRows = DB::table('cutting_job_bundles as b')
+            ->join('cutting_jobs as j', 'j.id', '=', 'b.cutting_job_id')
+            ->join('lots as l', 'l.id', '=', 'b.lot_id')
+            ->join('items as mi', 'mi.id', '=', 'l.item_id')
+            ->where('j.status', '!=', 'voided')
+            ->where('b.finished_item_id', $bom->item_id)
+            ->where('b.qty_pcs', '>', 0)
+            ->where('b.qty_used_fabric', '>', 0)
+            ->orderByDesc('j.date')
+            ->orderByDesc('b.id')
+            ->limit(60)
+            ->get([
+                'l.item_id as material_item_id',
+                'mi.code as material_code', 'mi.name as material_name',
+                'b.qty_pcs', 'b.qty_used_fabric', 'j.code as job_code', 'j.date',
+            ]);
+
+        foreach ($usageRows as $row) {
+            $mid = (int) $row->material_item_id;
+            $kgPerPcs = round((float) $row->qty_used_fabric / max((float) $row->qty_pcs, 0.0001), 4);
+            $dateStr = \Illuminate\Support\Carbon::parse($row->date)->format('d/m/y');
+
+            if (!isset($usageByMaterial[$mid])) {
+                $usageByMaterial[$mid] = [
+                    'material_code' => $row->material_code,
+                    'material_name' => $row->material_name,
+                    'kg_per_pcs' => $kgPerPcs,
+                    'job_code'   => $row->job_code,
+                    'date'       => $dateStr,
+                    'history'    => [],
+                ];
+            }
+
+            $hist = &$usageByMaterial[$mid]['history'];
+            $lastJob = end($hist);
+            if (count($hist) < 3 && (!$lastJob || $lastJob['job_code'] !== $row->job_code)) {
+                $hist[] = ['kg_per_pcs' => $kgPerPcs, 'job_code' => $row->job_code, 'date' => $dateStr];
+            }
+            unset($hist);
+        }
 
         $rows = old('lines');
 
@@ -83,7 +187,7 @@ class ItemBomController extends Controller
             }
         }
 
-        return view('master.item_boms.form', compact('bom', 'rows'));
+        return view('master.item_boms.form', compact('bom', 'rows', 'usageByMaterial'));
     }
 
     public function store(Request $request)
@@ -306,21 +410,35 @@ class ItemBomController extends Controller
     {
         $data = $request->validate([
             'material_item_id' => ['required', 'integer', 'exists:items,id'],
-            'qty'              => ['required', 'numeric', 'min:0.0001'],
+            'qty'              => ['nullable', 'numeric', 'min:0.0001'],
+            'scrap_pct'        => ['nullable', 'numeric', 'min:0', 'max:99'],
         ]);
+
+        if (!isset($data['qty']) && !isset($data['scrap_pct'])) {
+            throw ValidationException::withMessages([
+                'qty' => 'Minimal salah satu dari qty / scrap_pct harus diisi.',
+            ]);
+        }
 
         $line = ItemBomLine::where('item_bom_id', $bom->id)
             ->where('material_item_id', $data['material_item_id'])
             ->where('usage_stage', ItemBomLine::STAGE_MAIN_MATERIAL)
             ->firstOrFail();
 
-        $newQty = round((float) $data['qty'], 6);
-        $line->update(['qty' => (string) $newQty]);
+        $updates = [];
+        if (isset($data['qty'])) {
+            $updates['qty'] = (string) round((float) $data['qty'], 8);
+        }
+        if (isset($data['scrap_pct'])) {
+            $updates['scrap_pct'] = (string) round((float) $data['scrap_pct'], 2);
+        }
+        $line->update($updates);
 
         return response()->json([
-            'success' => true,
-            'new_qty' => $newQty,
-            'message' => 'BOM berhasil diperbarui.',
+            'success'   => true,
+            'new_qty'   => (float) $line->qty,
+            'new_scrap' => (float) $line->scrap_pct,
+            'message'   => 'BOM berhasil diperbarui.',
         ]);
     }
 

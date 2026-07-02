@@ -190,15 +190,36 @@ body[data-theme="dark"] .cj-code { color: #93c5fd; background: rgba(37,99,235,.1
 
 <div class="page-wrap">
 
+    {{-- ── FLASH ── --}}
+    @if (session('success'))
+        <div class="alert alert-success py-2 px-3 mb-3">{{ session('success') }}</div>
+    @endif
+    @if (session('error'))
+        <div class="alert alert-danger py-2 px-3 mb-3">{{ session('error') }}</div>
+    @endif
+
     {{-- ── HEADER ── --}}
     <div class="d-flex justify-content-between align-items-center mb-3 flex-wrap gap-2">
         <div>
             <h1 class="h5 mb-0">✂️ Cutting Jobs</h1>
             <div class="text-sub">Semua cutting job produksi</div>
         </div>
-        <a href="{{ route('production.cutting_jobs.create') }}" class="btn btn-primary btn-sm" style="border-radius:999px;font-weight:700">
-            + Cutting Job Baru
-        </a>
+        <div class="d-flex align-items-center gap-2 flex-wrap">
+            @if (env('APP_DB_MODE') === 'dev' && auth()->user()?->role === 'owner')
+                <form method="POST" action="{{ route('production.cutting_jobs.dev_clean_production') }}"
+                      onsubmit="return confirm('⚠️ HAPUS SEMUA data transaksi produksi?\n\nCutting, sewing, QC, finishing, packing, mutasi & jurnal produksi akan dihapus, lalu stok kain & lot dikembalikan seperti sebelum produksi.\n\nMaster data, pembelian (GRN), dan stock opname TIDAK disentuh.\n\nLanjutkan?')">
+                    @csrf
+                    <button type="submit" class="btn btn-outline-danger btn-sm"
+                            style="border-radius:999px;font-weight:700"
+                            title="DEV ONLY — hapus semua transaksi produksi & hitung ulang stok">
+                        🧹 Bersihkan Data Produksi
+                    </button>
+                </form>
+            @endif
+            <a href="{{ route('production.cutting_jobs.create') }}" class="btn btn-primary btn-sm" style="border-radius:999px;font-weight:700">
+                + Cutting Job Baru
+            </a>
+        </div>
     </div>
 
     {{-- ── KPI ── --}}

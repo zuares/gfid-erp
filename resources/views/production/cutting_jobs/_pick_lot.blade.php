@@ -721,10 +721,99 @@
 
         /* === MOBILE OVERRIDES === */
         @media (max-width: 575.98px) {
+            .lot-picker-wrap {
+                margin-bottom: .65rem;
+            }
+
+            .lot-step-bar {
+                position: sticky;
+                top: .35rem;
+                z-index: 20;
+                border-radius: 14px;
+                padding: .5rem .58rem;
+                background: color-mix(in srgb, var(--card) 88%, rgba(37, 99, 235, .08));
+                backdrop-filter: blur(12px);
+            }
+
+            .lot-step-label {
+                font-size: .58rem;
+                letter-spacing: .03em;
+            }
+
+            .lot-step-num {
+                width: 20px;
+                height: 20px;
+                font-size: .65rem;
+            }
+
+            .lot-item-select-list {
+                gap: .5rem;
+            }
+
+            .lot-item-pick-btn {
+                min-height: 74px;
+                padding: .74rem .78rem;
+                border-radius: 14px;
+                border-left-width: 4px;
+                gap: .7rem;
+            }
+
+            .lipb-name {
+                font-size: .9rem;
+                white-space: normal;
+                line-height: 1.22;
+            }
+
+            .lipb-meta {
+                margin-top: .12rem;
+                font-size: .68rem;
+            }
+
+            .lipb-code {
+                font-size: .64rem;
+                padding: .03rem .36rem;
+            }
+
+            .lipb-qty-num {
+                font-size: 1rem;
+            }
+
+            .lipb-qty-unit {
+                font-size: .64rem;
+            }
+
+            .lipb-right {
+                gap: .2rem;
+            }
+
+            .lipb-arrow {
+                width: 16px;
+                height: 16px;
+            }
+
             .lot-accordion-header {
                 min-height: 48px;
                 padding: .42rem .58rem;
                 gap: .5rem;
+            }
+
+            .lot-step2-header {
+                align-items: flex-start;
+                gap: .55rem;
+                margin-bottom: .62rem;
+            }
+
+            .lot-back-btn {
+                min-height: 34px;
+                padding-inline: .72rem;
+                font-size: .72rem;
+            }
+
+            .lot-step2-item-name {
+                padding-top: .25rem;
+                font-size: .84rem;
+                line-height: 1.25;
+                white-space: normal;
             }
 
             .lot-accordion-toggle {
@@ -824,15 +913,33 @@
                 flex-direction: column;
                 align-items: stretch;
                 gap: .4rem;
+                border-radius: 16px 16px 0 0;
             }
 
             .lot-picker-footer .btn-primary {
                 width: 100%;
                 justify-content: center;
+                border-radius: 12px;
             }
 
             .lot-picker-actions {
                 margin-top: .25rem;
+            }
+
+            #lot-footer-hint {
+                font-size: .74rem;
+                text-align: center;
+            }
+
+            .lot-step3-summary {
+                border-radius: 14px;
+                padding: .62rem .68rem;
+            }
+
+            .lot-step3-info {
+                font-size: .78rem;
+                white-space: normal;
+                line-height: 1.3;
             }
         }
     </style>
@@ -1008,7 +1115,7 @@
     {{-- Footer --}}
     <div class="d-flex justify-content-between align-items-center mt-3 lot-picker-footer" id="lot-picker-footer">
         <div class="small text-muted" id="lot-footer-hint">
-            Tap kain untuk pilih LOT.
+            Pilih kain dulu untuk melihat LOT yang tersedia.
         </div>
         <button type="button" class="btn btn-primary btn-sm" id="btn-confirm-lots">
             Simpan LOT &amp; Lanjut
@@ -1059,7 +1166,7 @@
                     g.classList.remove('step2-open');
                 });
                 setStepActive(1);
-                if (footerHint) footerHint.textContent = 'Tap kain untuk pilih LOT.';
+                if (footerHint) footerHint.textContent = 'Pilih kain dulu untuk melihat LOT yang tersedia.';
             }
 
             function goToStep2(itemId, itemName) {
@@ -1079,7 +1186,7 @@
                 });
                 if (step2Name) step2Name.textContent = itemName || '';
                 setStepActive(2);
-                if (footerHint) footerHint.textContent = 'Centang LOT yang mau dipakai, lalu simpan.';
+                if (footerHint) footerHint.textContent = 'Centang satu atau beberapa LOT, lalu lanjut.';
             }
 
             function goToStep3(summaryText) {

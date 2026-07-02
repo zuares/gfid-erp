@@ -496,6 +496,23 @@
                   <span class="badge bg-info-subtle text-info border">Packing {{ (int) $b->packing_supply_lines_count }}</span>
                 </div>
                 <div class="small text-muted mt-1">Total {{ (int) $b->lines_count }} material</div>
+                @php $ub = $bomUsageBadges[$b->id] ?? null; @endphp
+                @if($ub)
+                  <div class="small mt-1">
+                    Aktual terakhir:
+                    <span class="mono fw-semibold">{{ number_format($ub['kg_per_pcs'], 4) }}</span>/pcs
+                    <span class="text-muted">· {{ $ub['job_code'] }}</span>
+                    @if($ub['status'] === 'over')
+                      <span class="badge bg-danger-subtle text-danger border ms-1"
+                            title="Standar BOM (maks): {{ number_format($ub['std_max'], 4) }} kg/pcs">⚠ melebihi standar</span>
+                    @elseif($ub['status'] === 'under')
+                      <span class="badge bg-success-subtle text-success border ms-1"
+                            title="Standar BOM (maks): {{ number_format($ub['std_max'], 4) }} kg/pcs">lebih hemat</span>
+                    @elseif($ub['status'] === 'ok')
+                      <span class="badge bg-secondary-subtle text-secondary border ms-1">sesuai standar</span>
+                    @endif
+                  </div>
+                @endif
               </td>
               <td>
                 @if($b->active)

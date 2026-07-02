@@ -14,6 +14,7 @@
     .hm-label { font-size: 10px; font-weight: 800; letter-spacing: .12em; text-transform: uppercase; color: var(--mid); display: flex; align-items: center; gap: 8px; margin-bottom: 16px; }
     .hm-label::before { content: ''; width: 18px; height: 2px; background: var(--ink); display: block; }
     .hm-title { font-family: var(--font-display); font-size: 70px; font-weight: 800; line-height: .9; letter-spacing: 0; text-transform: uppercase; margin-bottom: 22px; }
+    .hero-title-line { display: block; }
     .hm-copy { max-width: 300px; margin: -6px 0 18px; font-size: 13px; color: var(--mid); font-weight: 500; line-height: 1.7; }
     .hm-actions { display: flex; gap: 8px; flex-wrap: wrap; }
     .btn-dk { height: 42px; padding: 0 20px; border-radius: var(--radius-pill); background: var(--ink); color: var(--white); font-size: 12px; font-weight: 800; display: inline-flex; align-items: center; gap: 6px; transition: opacity .15s; }
@@ -76,7 +77,7 @@
 
     /* CHANNELS */
     .shop-channels { padding-top: 12px; }
-    .shop-panel { border: 1px solid var(--line); border-radius: 20px; background: #fafafa; padding: 18px; }
+    .shop-panel { border: 1px solid var(--line); border-radius: 20px; background: var(--white); padding: 18px; box-shadow: none; }
     .shop-head { margin-bottom: 16px; }
     .shop-kicker { display: inline-flex; align-items: center; gap: 7px; height: 26px; padding: 0 10px; border-radius: var(--radius-pill); background: var(--ink); color: var(--white); font-size: 9px; font-weight: 800; letter-spacing: .1em; text-transform: uppercase; margin-bottom: 12px; }
     .shop-kicker::before { content: ""; width: 5px; height: 5px; border-radius: 50%; background: currentColor; opacity: .75; }
@@ -199,27 +200,282 @@
     $sfCardTitle      = storefront_setting('hero.card_title',          'Greatfit Collection');
     $sfCardSubtitle   = storefront_setting('hero.card_subtitle',       '10rb+ pelanggan puas');
     $sfBrandName      = storefront_setting('branding.brand_name',      'Greatfit');
-    $sfHeroImages     = [
-        storefront_setting('hero.image_1', 'https://images.unsplash.com/photo-1660167213901-e2f33a1a7486?ixlib=rb-4.1.0&q=85&fm=jpg&crop=entropy&cs=srgb&w=1000&h=1200&fit=crop'),
-        storefront_setting('hero.image_2', 'https://images.unsplash.com/photo-1756786825067-4b153740e7c2?ixlib=rb-4.1.0&q=85&fm=jpg&crop=entropy&cs=srgb&w=1000&h=1200&fit=crop'),
-        storefront_setting('hero.image_3', 'https://images.unsplash.com/photo-1774160928808-afdd9b93363b?ixlib=rb-4.1.0&q=85&fm=jpg&crop=entropy&cs=srgb&w=1000&h=1200&fit=crop'),
-    ];
-    $sfHeroImages = array_filter($sfHeroImages); // buang yang kosong
+    $sfCatEyebrow     = storefront_setting('categories.eyebrow',       'Koleksi');
+    $sfCatTitle       = storefront_setting('categories.title',         'Cari yang paling pas');
+    $sfCatCopy        = storefront_setting('categories.copy',          'Mulai dari kategori yang kamu butuhkan.');
+    $sfCatAllLabel    = storefront_setting('categories.all_label',     'Lihat semua');
+    $sfCatLimit       = (int) storefront_setting('categories.limit',   '8');
+    $sfCatLimit       = in_array($sfCatLimit, [4, 6, 8, 10, 12], true) ? $sfCatLimit : 8;
+    // ── FOTO HERO: daftar dinamis dari hero.images (JSON [{url, focus_desktop, focus_mobile}]) ──
+    //    >1 foto = slideshow otomatis; titik fokus per foto di-set via drag di admin.
+    $sfFocusOk = fn($v) => is_string($v) && preg_match('/^\d+% \d+%$/', $v) ? $v : null;
+
+    $sfHeroSlots = [];
+    $sfHeroDecoded = json_decode((string) storefront_setting('hero.images'), true);
+    if (is_array($sfHeroDecoded)) {
+        foreach ($sfHeroDecoded as $sfHp) {
+            $sfHpUrl = storefront_media_url($sfHp['url'] ?? null);
+            if ($sfHpUrl) {
+                $sfHeroSlots[] = [
+                    'url' => $sfHpUrl,
+                    'focus' => $sfFocusOk($sfHp['focus_desktop'] ?? null) ?: $sfFocusOk($sfHp['focus'] ?? null),
+                    'focus_mobile' => $sfFocusOk($sfHp['focus_mobile'] ?? null) ?: $sfFocusOk($sfHp['focus'] ?? null),
+                ];
+            }
+        }
+    }
+
+    // Fallback legacy: hero.image_1 lama, lalu default bawaan
+    if (empty($sfHeroSlots)) {
+        $sfHeroImage = storefront_media_url(storefront_setting(
+            'hero.image_1',
+            'https://images.unsplash.com/photo-1660167213901-e2f33a1a7486?ixlib=rb-4.1.0&q=85&fm=jpg&crop=entropy&cs=srgb&w=1000&h=1200&fit=crop'
+        ));
+        if ($sfHeroImage) {
+            $sfHeroLegacyFocus = $sfFocusOk(storefront_setting('hero.image_1_focus'));
+            $sfHeroSlots[] = ['url' => $sfHeroImage, 'focus' => $sfHeroLegacyFocus, 'focus_mobile' => $sfHeroLegacyFocus];
+        }
+    }
+
+    $sfHeroSlotsMobile = $sfHeroSlots;
+
+    // Gaya hero: split (default) / gradient (foto full-bleed melebur ke warna latar)
+    $sfHeroStyle    = storefront_setting('hero.style', 'split') === 'gradient' ? 'gradient' : 'split';
+    $sfHeroOverlay  = storefront_setting('hero.overlay_color') ?: '#ffffff';
+    if (!preg_match('/^#[0-9a-fA-F]{6}$/', $sfHeroOverlay)) { $sfHeroOverlay = '#ffffff'; }
+    $sfHeroStrength = (int) (storefront_setting('hero.overlay_strength') ?: 55);
+    $sfHeroStrength = max(30, min(90, $sfHeroStrength));
+    $sfHeroSolidStop = max($sfHeroStrength - 35, 0);
+    $sfHeroGradClass = $sfHeroStyle === 'gradient' ? 'hero-grad' : '';
+
+    // Mode & fokus foto (berlaku utk kedua gaya)
+    $sfPhotoFit   = storefront_setting('hero.photo_fit', 'cover') === 'contain' ? 'contain' : 'cover';
+    $sfPhotoFocus = storefront_setting('hero.photo_focus', 'center');
+    $sfPhotoPos   = [
+        'top'    => 'center top',
+        'bottom' => 'center bottom',
+        'left'   => 'left center',
+        'right'  => 'right center',
+    ][$sfPhotoFocus] ?? ($sfHeroStyle === 'gradient' ? '72% center' : 'center');
     // Sections
     $sfSectionOrder = array_values(array_filter(array_map('trim',
         explode(',', storefront_setting('sections.order', 'hero,categories,channels,values,products,cta'))
     )));
     $sfViz = fn($n) => storefront_setting("sections.{$n}_visible", '1') !== '0';
+    $sfSectionStyle = function ($key, $defaults = []) {
+        $num = fn($name, $default) => is_numeric(storefront_setting('sections.' . $key . '_' . $name))
+            ? (int) storefront_setting('sections.' . $key . '_' . $name)
+            : $default;
+        $hex = storefront_setting('sections.' . $key . '_bg');
+        $style = storefront_setting('sections.' . $key . '_style', 'default');
+        return [
+            'pt' => $num('padding_top', $defaults['pt'] ?? null),
+            'pb' => $num('padding_bottom', $defaults['pb'] ?? null),
+            'mt' => $num('margin_top', $defaults['mt'] ?? 0),
+            'mb' => $num('margin_bottom', $defaults['mb'] ?? 0),
+            'bg' => is_string($hex) && preg_match('/^#[0-9a-fA-F]{6}$/', $hex) ? $hex : null,
+            'style' => in_array($style, ['soft','line','compact','outline','elevated','dark','editorial'], true) ? $style : 'default',
+        ];
+    };
+    $sfSectionCss = function ($key, $styles) {
+        $css = '';
+        if ($styles['pt'] !== null) $css .= 'padding-top:' . $styles['pt'] . 'px;';
+        if ($styles['pb'] !== null) $css .= 'padding-bottom:' . $styles['pb'] . 'px;';
+        if ($styles['mt']) $css .= 'margin-top:' . $styles['mt'] . 'px;';
+        if ($styles['mb']) $css .= 'margin-bottom:' . $styles['mb'] . 'px;';
+        if ($styles['bg']) $css .= 'background:' . $styles['bg'] . ';';
+        if ($styles['style'] === 'soft') $css .= 'background:' . ($styles['bg'] ?: 'var(--soft)') . ';border-radius:20px;padding-left:18px;padding-right:18px;';
+        if ($styles['style'] === 'line') $css .= "border-top:1px solid var(--line);";
+        if ($styles['style'] === 'compact') $css .= "padding-top:20px;padding-bottom:20px;";
+        if ($styles['style'] === 'outline') $css .= 'border:1px solid var(--line);border-radius:20px;padding-left:18px;padding-right:18px;';
+        if ($styles['style'] === 'elevated') $css .= 'background:' . ($styles['bg'] ?: '#ffffff') . ';border:1px solid var(--line);border-radius:20px;padding-left:18px;padding-right:18px;box-shadow:0 14px 36px rgba(15,23,42,.08);';
+        if ($styles['style'] === 'dark') $css .= 'background:var(--ink);color:var(--white);border-radius:20px;padding-left:18px;padding-right:18px;';
+        if ($styles['style'] === 'editorial') $css .= 'border-left:3px solid var(--ink);padding-left:22px;';
+        return $css;
+    };
 @endphp
 
 {{-- HERO --}}
 @if($sfViz('hero'))
+@php
+    // Gaya teks & tombol hero (dari Pengaturan Website)
+    $sfHex = fn($k, $d) => (is_string($v = storefront_setting($k)) && preg_match('/^#[0-9a-fA-F]{6}$/', $v)) ? $v : $d;
+    $sfLabelColor = $sfHex('hero.label_color', '');
+    $sfTitleColor = $sfHex('hero.title_color', '');
+    $sfCopyColor  = $sfHex('hero.copy_color', '');
+    $sfBadgeBg    = $sfHex('hero.badge_bg', '');
+    $sfBadgeColor = $sfHex('hero.badge_color', '');
+    $sfCtaBg      = $sfHex('hero.cta_bg', '');
+    $sfCtaColor   = $sfHex('hero.cta_color', '');
+    $sfCta2Color  = $sfHex('hero.cta2_color', '');
+    $sfTitleSize  = storefront_setting('hero.title_size', 'm');
+    $sfTitleStyleRaw = storefront_setting('hero.title_style', 'solid');
+    $sfTitleStyle = in_array($sfTitleStyleRaw, ['two_tone_mask', 'promo_poster', 'clean_sans', 'condensed_impact', 'outline_editorial'], true) ? $sfTitleStyleRaw : 'solid';
+    $sfCtaRadius  = ['pill' => '999px', 'rounded' => '12px', 'square' => '6px'][storefront_setting('hero.cta_radius')] ?? null;
+    $sfTitleDesktop = ['xs' => '60px', 's' => '72px', 'm' => '96px', 'l' => '112px', 'xl' => '128px'][$sfTitleSize] ?? '96px';
+    $sfTitleMobile  = ['xs' => '44px', 's' => '54px', 'm' => '70px', 'l' => '82px', 'xl' => '92px'][$sfTitleSize] ?? '70px';
+    $sfPromoTitleDesktop = ['xs' => '44px', 's' => '52px', 'm' => '64px', 'l' => '76px', 'xl' => '88px'][$sfTitleSize] ?? '64px';
+    $sfPromoTitleMobile  = ['xs' => '30px', 's' => '36px', 'm' => '44px', 'l' => '52px', 'xl' => '58px'][$sfTitleSize] ?? '44px';
+
+    // Tinggi hero (% tinggi layar); 100 = perilaku default (full screen)
+    $sfHeroHeight = (int) (storefront_setting('hero.height') ?: 100);
+    $sfHeroHeight = max(40, min(100, $sfHeroHeight));
+    $sfHeroHeightMobile = (int) round($sfHeroHeight * 0.76); // proporsi mobile grad (default 76svh)
+@endphp
+<style>
+    /* ── Mode & fokus foto hero (dari Pengaturan Website) ── */
+    .hero-desktop .hd-photo,
+    .hero-mobile .hero-bg {
+        object-fit: {{ $sfPhotoFit }};
+        object-position: {{ $sfPhotoPos }};
+    }
+
+    /* ── Tinggi hero (dari Pengaturan Website) ── */
+    @if($sfHeroHeight < 100)
+    .hero-desktop { min-height: calc({{ $sfHeroHeight }}svh - 56px); }
+    .hero-mobile.hero-grad { min-height: {{ $sfHeroHeightMobile }}svh !important; }
+    @endif
+
+    /* ── Gaya teks & tombol hero (dari Pengaturan Website) ── */
+    @if($sfLabelColor) .hd-label, .hm-label { color: {{ $sfLabelColor }}; } .hd-label::before, .hm-label::before { background: {{ $sfLabelColor }}; } @endif
+    @if($sfTitleColor) .hd-title, .hm-title { color: {{ $sfTitleColor }}; } @endif
+    @if($sfCopyColor)  .hd-copy, .hm-copy   { color: {{ $sfCopyColor }}; } @endif
+    @if($sfBadgeBg || $sfBadgeColor)
+    .hd-badge, .hm-badge { {!! $sfBadgeBg ? "background: {$sfBadgeBg};" : '' !!} {!! $sfBadgeColor ? "color: {$sfBadgeColor};" : '' !!} }
+    @endif
+    @if($sfCtaBg || $sfCtaColor)
+    .hero-desktop .btn-dk, .hero-mobile .btn-dk { {!! $sfCtaBg ? "background: {$sfCtaBg};" : '' !!} {!! $sfCtaColor ? "color: {$sfCtaColor};" : '' !!} }
+    @endif
+    @if($sfCta2Color)
+    .hero-desktop .btn-sk, .hero-mobile .btn-sk { color: {{ $sfCta2Color }}; border-color: {{ $sfCta2Color }}; }
+    @endif
+    @if($sfCtaRadius)
+    .hero-desktop .btn-dk, .hero-mobile .btn-dk,
+    .hero-desktop .btn-sk, .hero-mobile .btn-sk { border-radius: {{ $sfCtaRadius }}; }
+    @endif
+    .hd-title { font-size: {{ $sfTitleDesktop }}; }
+    .hm-title { font-size: {{ $sfTitleMobile }}; }
+    @if($sfTitleStyle === 'two_tone_mask')
+    .hd-title, .hm-title { color: {{ $sfTitleColor ?: 'var(--ink)' }}; }
+    .hd-title .hero-title-line:nth-child(2),
+    .hm-title .hero-title-line:nth-child(2) {
+        color: transparent;
+        background: linear-gradient(90deg, {{ $sfTitleColor ?: 'var(--ink)' }} 0 52%, var(--mid) 52% 100%);
+        -webkit-background-clip: text;
+        background-clip: text;
+        -webkit-text-fill-color: transparent;
+        -webkit-text-stroke: .012em {{ $sfTitleColor ?: 'var(--ink)' }};
+        text-shadow: none;
+    }
+    @endif
+    @if($sfTitleStyle === 'promo_poster')
+    .hd-title,
+    .hm-title {
+        font-family: var(--font-body);
+        font-weight: 900;
+        text-transform: none;
+        letter-spacing: 0;
+        line-height: 1.16;
+        color: {{ $sfTitleColor ?: 'var(--ink)' }};
+    }
+    .hd-title { font-size: {{ $sfPromoTitleDesktop }}; max-width: 560px; margin-bottom: 20px; }
+    .hm-title { font-size: {{ $sfPromoTitleMobile }}; max-width: 340px; margin-bottom: 18px; }
+    .hd-title::after,
+    .hm-title::after {
+        content: "";
+        display: block;
+        width: min(320px, 100%);
+        height: 2px;
+        background: currentColor;
+        margin-top: 24px;
+    }
+    .hd-copy { max-width: 520px; margin-top: 0; font-size: 20px; line-height: 1.55; color: {{ $sfCopyColor ?: 'var(--ink)' }}; }
+    .hm-copy { max-width: 320px; margin-top: 0; font-size: 15px; line-height: 1.6; color: {{ $sfCopyColor ?: 'var(--ink)' }}; }
+    .hd-actions .btn-dk,
+    .hm-actions .btn-dk { min-height: 48px; padding: 0 26px; font-size: 17px; }
+    .hd-actions .btn-sk,
+    .hm-actions .btn-sk { min-height: 48px; padding: 0 22px; font-size: 14px; }
+    @endif
+    @if($sfTitleStyle === 'clean_sans')
+    .hd-title,
+    .hm-title {
+        font-family: var(--font-body);
+        font-weight: 900;
+        text-transform: none;
+        line-height: 1.04;
+        letter-spacing: 0;
+        color: {{ $sfTitleColor ?: 'var(--ink)' }};
+    }
+    @endif
+    @if($sfTitleStyle === 'condensed_impact')
+    .hd-title,
+    .hm-title {
+        font-family: var(--font-display);
+        font-weight: 900;
+        text-transform: uppercase;
+        line-height: .82;
+        letter-spacing: .01em;
+        color: {{ $sfTitleColor ?: 'var(--ink)' }};
+    }
+    @endif
+    @if($sfTitleStyle === 'outline_editorial')
+    .hd-title,
+    .hm-title {
+        color: transparent;
+        -webkit-text-fill-color: transparent;
+        -webkit-text-stroke: .018em {{ $sfTitleColor ?: 'var(--ink)' }};
+        text-transform: uppercase;
+        letter-spacing: .01em;
+    }
+    .hd-title .hero-title-line:nth-child(1),
+    .hm-title .hero-title-line:nth-child(1) {
+        color: {{ $sfTitleColor ?: 'var(--ink)' }};
+        -webkit-text-fill-color: currentColor;
+        -webkit-text-stroke: 0;
+    }
+    @endif
+</style>
+@if($sfHeroStyle === 'gradient')
+<style>
+    /* ── HERO GAYA GRADASI (dari Pengaturan Website) ── */
+    /* Desktop: foto full-bleed, gradasi {{ $sfHeroOverlay }} dari kiri */
+    .hero-desktop.hero-grad { position: relative; grid-template-columns: 1fr; }
+    .hero-desktop.hero-grad .hd-visual { position: absolute; inset: 0; background: {{ $sfHeroOverlay }}; }
+    .hero-desktop.hero-grad .hd-photo.active { opacity: 1; }
+    .hero-desktop.hero-grad .hd-visual::after {
+        content: ''; position: absolute; inset: 0; z-index: 1;
+        background: linear-gradient(90deg, {{ $sfHeroOverlay }} {{ $sfHeroSolidStop }}%, {{ $sfHeroOverlay }}00 {{ $sfHeroStrength }}%);
+    }
+    .hero-desktop.hero-grad .hd-content { position: relative; z-index: 2; max-width: 620px; }
+    .hero-desktop.hero-grad .hd-badge,
+    .hero-desktop.hero-grad .hd-card { z-index: 2; }
+    .hero-desktop.hero-grad .hd-card { left: 48%; }
+
+    /* Mobile: foto full-screen, gradasi naik dari bawah.
+       DIBUNGKUS media query agar tidak menimpa display:none di desktop. */
+    @@media (max-width: 767.98px) {
+        .hero-mobile.hero-grad { position: relative; display: block; min-height: 76svh; border-radius: 18px; overflow: hidden; background: {{ $sfHeroOverlay }}; }
+        .hero-mobile.hero-grad .hm-visual { position: absolute; inset: 0; height: 100%; aspect-ratio: auto; border-radius: 0; }
+        .hero-mobile.hero-grad .hero-bg.active { opacity: 1; }
+        .hero-mobile.hero-grad .hm-visual::after {
+            content: ''; position: absolute; inset: 0; z-index: 1;
+            background: linear-gradient(180deg, {{ $sfHeroOverlay }}00 32%, {{ $sfHeroOverlay }} 86%);
+        }
+        .hero-mobile.hero-grad .hm-content { position: absolute; left: 16px; right: 16px; bottom: 96px; z-index: 2; }
+        .hero-mobile.hero-grad .hm-badge,
+        .hero-mobile.hero-grad .hm-card { z-index: 2; }
+    }
+    @@media (min-width: 768px) {
+        .hero-mobile.hero-grad { display: none; }
+    }
+</style>
+@endif
 {{-- HERO MOBILE --}}
 <div class="wrap">
-    <div class="hero-mobile">
+    <div class="hero-mobile {{ $sfHeroGradClass }}">
         <div class="hm-content">
             <div class="hm-label">{{ $sfHeroLabel }}</div>
-            <div class="hm-title">{{ $sfHeroTitle1 }}<br>{{ $sfHeroTitle2 }}</div>
+            <div class="hm-title"><span class="hero-title-line">{{ $sfHeroTitle1 }}</span><span class="hero-title-line">{{ $sfHeroTitle2 }}</span></div>
             <div class="hm-copy">{{ $sfHeroCopy }}</div>
             <div class="hm-actions">
                 <a href="{{ $sfHeroCtaUrl }}" class="btn-dk">
@@ -230,8 +486,10 @@
             </div>
         </div>
         <div class="hm-visual">
-            @foreach($sfHeroImages as $i => $imgUrl)
-            <img class="hero-bg {{ $i === 0 ? 'active' : '' }}" src="{{ $imgUrl }}" alt="Foto {{ $i+1 }} {{ $sfBrandName }}">
+            @foreach($sfHeroSlotsMobile as $i => $slot)
+            <img class="hero-bg {{ $i === 0 ? 'active' : '' }}" src="{{ $slot['url'] }}"
+                 @if($slot['focus_mobile'] ?? $slot['focus'] ?? null) style="object-position: {{ $slot['focus_mobile'] ?? $slot['focus'] }};" @endif
+                 alt="Foto {{ $i+1 }} {{ $sfBrandName }}">
             @endforeach
             @if($sfHeroBadge)
             <div class="hm-badge">{{ $sfHeroBadge }}</div>
@@ -252,10 +510,10 @@
 </div>
 
 {{-- HERO DESKTOP --}}
-<section class="hero-desktop">
+<section class="hero-desktop {{ $sfHeroGradClass }}">
     <div class="hd-content" style="padding-left:max(32px,calc((100vw - 1680px)/2 + 32px));">
         <div class="hd-label">{{ $sfHeroLabel }}</div>
-        <h1 class="hd-title">{{ $sfHeroTitle1 }}<br>{{ $sfHeroTitle2 }}</h1>
+        <h1 class="hd-title"><span class="hero-title-line">{{ $sfHeroTitle1 }}</span><span class="hero-title-line">{{ $sfHeroTitle2 }}</span></h1>
         <div class="hd-copy">{{ $sfHeroCopy }}</div>
         <div class="hd-actions">
             <a href="{{ $sfHeroCtaUrl }}" class="btn-dk">
@@ -266,8 +524,10 @@
         </div>
     </div>
     <div class="hd-visual">
-        @foreach($sfHeroImages as $i => $imgUrl)
-        <img class="hd-photo {{ $i === 0 ? 'active' : '' }}" src="{{ $imgUrl }}" alt="Foto {{ $i+1 }} {{ $sfBrandName }}">
+        @foreach($sfHeroSlots as $i => $slot)
+        <img class="hd-photo {{ $i === 0 ? 'active' : '' }}" src="{{ $slot['url'] }}"
+             @if($slot['focus']) style="object-position: {{ $slot['focus'] }};" @endif
+             alt="Foto {{ $i+1 }} {{ $sfBrandName }}">
         @endforeach
         @if($sfHeroBadge)
         <div class="hd-badge">{{ $sfHeroBadge }}</div>
@@ -304,17 +564,18 @@
 
 {{-- ─── CATEGORIES ──────────────────────────────────────────────── --}}
 @if($sfSec === 'categories' && $sfViz('categories') && $categories->isNotEmpty())
-    <section class="sec cat-search" id="kategori">
+    @php $sfSecStyle = $sfSectionStyle('categories', ['pt' => null, 'pb' => null]); @endphp
+    <section class="sec cat-search" id="kategori" data-sf-sec="categories" style="{{ $sfSectionCss('categories', $sfSecStyle) }}">
         <div class="sec-head cat-head">
             <div>
-                <div class="cat-eyebrow">Koleksi</div>
-                <div class="cat-title">Cari yang paling pas</div>
-                <div class="cat-copy">Mulai dari kategori yang kamu butuhkan.</div>
+                <div class="cat-eyebrow">{{ $sfCatEyebrow }}</div>
+                <div class="cat-title">{{ $sfCatTitle }}</div>
+                <div class="cat-copy">{{ $sfCatCopy }}</div>
             </div>
-            <a href="{{ route('storefront.products') }}" class="sec-a">Lihat semua</a>
+            <a href="{{ route('storefront.products') }}" class="sec-a">{{ $sfCatAllLabel }}</a>
         </div>
         <div class="cat-grid">
-            @foreach($categories->take(8) as $cat)
+            @foreach($categories->take($sfCatLimit) as $cat)
             @php
                 $catSlug = strtolower($cat->slug ?? $cat->name);
                 $catIcon = match(true) {
@@ -348,7 +609,8 @@
 
 {{-- ─── CHANNELS ────────────────────────────────────────────────── --}}
 @if($sfSec === 'channels' && $sfViz('channels'))
-    <section class="sec shop-channels" id="beli">
+    @php $sfSecStyle = $sfSectionStyle('channels', ['pt' => null, 'pb' => null]); @endphp
+    <section class="sec shop-channels" id="beli" data-sf-sec="channels" style="{{ $sfSectionCss('channels', $sfSecStyle) }}">
         <div class="shop-panel">
             <div class="shop-head">
                 <div class="shop-kicker">Channel Belanja</div>
@@ -394,7 +656,8 @@
             ];
         }
     @endphp
-    <section class="sec" style="padding-top:0;">
+    @php $sfSecStyle = $sfSectionStyle('values', ['pt' => 0, 'pb' => null]); @endphp
+    <section class="sec" style="{{ $sfSectionCss('values', $sfSecStyle) }}" data-sf-sec="values">
         <div class="vals">
             @foreach($sfVals as $val)
             <div class="val">
@@ -409,7 +672,8 @@
 
 {{-- ─── PRODUCTS ────────────────────────────────────────────────── --}}
 @if($sfSec === 'products' && $sfViz('products'))
-    <section class="sec" id="produk">
+    @php $sfSecStyle = $sfSectionStyle('products', ['pt' => null, 'pb' => null]); @endphp
+    <section class="sec" id="produk" data-sf-sec="products" style="{{ $sfSectionCss('products', $sfSecStyle) }}">
         <div class="sec-head">
             <div class="sec-t">Produk pilihan</div>
             <a href="{{ route('storefront.products') }}" class="sec-a all-products">
@@ -475,7 +739,8 @@
 
 {{-- ─── CTA ─────────────────────────────────────────────────────── --}}
 @if($sfSec === 'cta' && $sfViz('cta'))
-    <section class="sec" style="padding-top:0;">
+    @php $sfSecStyle = $sfSectionStyle('cta', ['pt' => 0, 'pb' => null]); @endphp
+    <section class="sec" style="{{ $sfSectionCss('cta', $sfSecStyle) }}" data-sf-sec="cta">
         <div class="cta-blk">
             <div class="cta-blk-t">Ready to<br>Wear Daily.</div>
             <div class="cta-blk-row">
@@ -493,21 +758,206 @@
 @push('scripts')
 <script>
 (function () {
-    // Hero slideshow
-    var mobile  = document.querySelectorAll('.hero-bg');
-    var desktop = document.querySelectorAll('.hd-photo');
-    var total   = mobile.length;
-    var current = 0;
-
-    if (total >= 2) {
+    // Hero slideshow — mobile & desktop punya set foto sendiri,
+    // masing-masing berputar sesuai jumlah fotonya.
+    function cyclePhotos(els) {
+        if (els.length < 2) return;
+        var current = 0;
         setInterval(function () {
-            mobile[current].classList.remove('active');
-            desktop[current] && desktop[current].classList.remove('active');
-            current = (current + 1) % total;
-            mobile[current].classList.add('active');
-            desktop[current] && desktop[current].classList.add('active');
+            els[current].classList.remove('active');
+            current = (current + 1) % els.length;
+            els[current].classList.add('active');
         }, 5000);
     }
+    cyclePhotos(document.querySelectorAll('.hero-bg'));
+    cyclePhotos(document.querySelectorAll('.hd-photo'));
+
+    // Live preview dari Admin > Pengaturan Website.
+    // Hanya aktif saat halaman home ditampilkan di iframe preview admin.
+    function validHex(value) {
+        return /^#[0-9a-fA-F]{6}$/.test(value || '') ? value : '';
+    }
+
+    function setText(selector, value) {
+        document.querySelectorAll(selector).forEach(function (el) {
+            el.textContent = value || '';
+        });
+    }
+
+    function setTitle(draft) {
+        document.querySelectorAll('.hd-title, .hm-title').forEach(function (el) {
+            el.innerHTML = '';
+            var line1 = document.createElement('span');
+            var line2 = document.createElement('span');
+            line1.className = 'hero-title-line';
+            line2.className = 'hero-title-line';
+            line1.textContent = draft.title_line1 || '';
+            line2.textContent = draft.title_line2 || '';
+            el.append(line1, line2);
+        });
+    }
+
+    function setBadge(value) {
+        var text = (value || '').trim();
+        document.querySelectorAll('.hd-badge, .hm-badge').forEach(function (el) {
+            if (text) {
+                el.textContent = text;
+            } else {
+                el.innerHTML = 'New<br>2026';
+            }
+        });
+    }
+
+    function setCta(selector, label, url) {
+        document.querySelectorAll(selector).forEach(function (link) {
+            var svg = link.querySelector('svg');
+            link.textContent = label || '';
+            if (svg) link.appendChild(svg);
+            link.setAttribute('href', url || '#');
+        });
+    }
+
+    function setPhotos(photos, activeIndex) {
+        photos = Array.isArray(photos) ? photos.filter(function (p) { return p && p.url; }) : [];
+        if (!photos.length) return;
+        activeIndex = Math.min(Math.max(parseInt(activeIndex || 0, 10) || 0, 0), photos.length - 1);
+
+        [
+            ['.hd-visual', 'hd-photo'],
+            ['.hm-visual', 'hero-bg']
+        ].forEach(function (pair) {
+            var container = document.querySelector(pair[0]);
+            var cls = pair[1];
+            if (!container) return;
+            container.querySelectorAll('.' + cls).forEach(function (img) { img.remove(); });
+
+            photos.slice().reverse().forEach(function (photo, index) {
+                var sourceIndex = photos.length - 1 - index;
+                var img = document.createElement('img');
+                img.className = cls + (sourceIndex === activeIndex ? ' active' : '');
+                img.src = photo.url;
+                var focus = cls === 'hero-bg'
+                    ? (photo.focus_mobile || photo.focus)
+                    : (photo.focus_desktop || photo.focus);
+                if (/^\d+% \d+%$/.test(focus || '')) img.style.objectPosition = focus;
+                container.insertBefore(img, container.firstChild);
+            });
+        });
+    }
+
+    function applyHeroDraft(draft) {
+        if (!draft || typeof draft !== 'object') return;
+
+        setText('.hd-label, .hm-label', draft.label);
+        setTitle(draft);
+        setText('.hd-copy, .hm-copy', draft.copy);
+        setBadge(draft.badge_text);
+        setCta('.hero-desktop .btn-dk, .hero-mobile .btn-dk', draft.cta_primary_label, draft.cta_primary_url);
+        setCta('.hero-desktop .btn-sk, .hero-mobile .btn-sk', draft.cta_secondary_label, draft.cta_secondary_url);
+        setText('.hd-card-t, .hm-card-t', draft.card_title);
+        setText('.hd-card-s, .hm-card-s', draft.card_subtitle);
+        setPhotos(draft.images, draft.active_photo_index);
+
+        var isGrad = draft.style === 'gradient';
+        document.querySelectorAll('.hero-desktop, .hero-mobile').forEach(function (hero) {
+            hero.classList.toggle('hero-grad', isGrad);
+        });
+
+        var overlay = validHex(draft.overlay_color) || '#ffffff';
+        var strength = parseInt(draft.overlay_strength || '55', 10);
+        strength = Math.min(90, Math.max(30, isNaN(strength) ? 55 : strength));
+        var solid = Math.max(strength - 35, 0);
+        var height = parseInt(draft.height || '100', 10);
+        height = Math.min(100, Math.max(40, isNaN(height) ? 100 : height));
+        var titleSize = draft.title_size || 'm';
+        var titleStyle = ['two_tone_mask', 'promo_poster', 'clean_sans', 'condensed_impact', 'outline_editorial'].indexOf(draft.title_style) >= 0 ? draft.title_style : 'solid';
+        var radius = ({ pill: '999px', rounded: '12px', square: '6px' }[draft.cta_radius] || '');
+        var fit = draft.photo_fit === 'contain' ? 'contain' : 'cover';
+
+        var css = ''
+            + '.hero-desktop .hd-photo,.hero-mobile .hero-bg{object-fit:' + fit + '}'
+            + '.hd-label,.hm-label{color:' + (validHex(draft.label_color) || 'var(--mid)') + '}'
+            + '.hd-label::before,.hm-label::before{background:' + (validHex(draft.label_color) || 'var(--ink)') + '}'
+            + '.hd-title,.hm-title{color:' + (validHex(draft.title_color) || 'var(--ink)') + '}'
+            + '.hd-copy,.hm-copy{color:' + (validHex(draft.copy_color) || 'var(--mid)') + '}'
+            + '.hd-badge,.hm-badge{background:' + (validHex(draft.badge_bg) || 'var(--white)') + ';color:' + (validHex(draft.badge_color) || 'var(--ink)') + '}'
+            + '.hero-desktop .btn-dk,.hero-mobile .btn-dk{background:' + (validHex(draft.cta_bg) || 'var(--ink)') + ';color:' + (validHex(draft.cta_color) || 'var(--white)') + '}'
+            + '.hero-desktop .btn-sk,.hero-mobile .btn-sk{color:' + (validHex(draft.cta2_color) || 'var(--ink)') + ';border-color:' + (validHex(draft.cta2_color) || 'var(--line)') + '}';
+        if (radius) {
+            css += '.hero-desktop .btn-dk,.hero-mobile .btn-dk,.hero-desktop .btn-sk,.hero-mobile .btn-sk{border-radius:' + radius + '}';
+        }
+
+        var solidDesktop = ({ xs: '60px', s: '72px', m: '96px', l: '112px', xl: '128px' }[titleSize] || '96px');
+        var solidMobile = ({ xs: '44px', s: '54px', m: '70px', l: '82px', xl: '92px' }[titleSize] || '70px');
+        css += '.hd-title{font-size:' + solidDesktop + '}.hm-title{font-size:' + solidMobile + '}';
+        if (titleStyle === 'two_tone_mask') {
+            var titleColor = validHex(draft.title_color) || 'var(--ink)';
+            css += '.hero-title-line{display:block}'
+                + '.hd-title .hero-title-line:nth-child(2),.hm-title .hero-title-line:nth-child(2){color:transparent;background:linear-gradient(90deg,' + titleColor + ' 0 52%,var(--mid) 52% 100%);-webkit-background-clip:text;background-clip:text;-webkit-text-fill-color:transparent;-webkit-text-stroke:.012em ' + titleColor + ';text-shadow:none}';
+        } else if (titleStyle === 'promo_poster') {
+            var promoColor = validHex(draft.title_color) || 'var(--ink)';
+            var promoCopyColor = validHex(draft.copy_color) || 'var(--ink)';
+            var promoDesktop = ({ xs: '44px', s: '52px', m: '64px', l: '76px', xl: '88px' }[titleSize] || '64px');
+            var promoMobile = ({ xs: '30px', s: '36px', m: '44px', l: '52px', xl: '58px' }[titleSize] || '44px');
+            css += '.hero-title-line{display:block;color:inherit;background:none;-webkit-background-clip:initial;background-clip:initial;-webkit-text-fill-color:currentColor;-webkit-text-stroke:0}'
+                + '.hd-title,.hm-title{font-family:var(--font-body);font-weight:900;text-transform:none;letter-spacing:0;line-height:1.16;color:' + promoColor + '}'
+                + '.hd-title{font-size:' + promoDesktop + ';max-width:560px;margin-bottom:20px}'
+                + '.hm-title{font-size:' + promoMobile + ';max-width:340px;margin-bottom:18px}'
+                + '.hd-title::after,.hm-title::after{content:"";display:block;width:min(320px,100%);height:2px;background:currentColor;margin-top:24px}'
+                + '.hd-copy{max-width:520px;margin-top:0;font-size:20px;line-height:1.55;color:' + promoCopyColor + '}'
+                + '.hm-copy{max-width:320px;margin-top:0;font-size:15px;line-height:1.6;color:' + promoCopyColor + '}'
+                + '.hd-actions .btn-dk,.hm-actions .btn-dk{min-height:48px;padding:0 26px;font-size:17px}'
+                + '.hd-actions .btn-sk,.hm-actions .btn-sk{min-height:48px;padding:0 22px;font-size:14px}';
+        } else if (titleStyle === 'clean_sans') {
+            var cleanColor = validHex(draft.title_color) || 'var(--ink)';
+            css += '.hero-title-line{display:block;color:inherit;background:none;-webkit-background-clip:initial;background-clip:initial;-webkit-text-fill-color:currentColor;-webkit-text-stroke:0}'
+                + '.hd-title,.hm-title{font-family:var(--font-body);font-weight:900;text-transform:none;line-height:1.04;letter-spacing:0;color:' + cleanColor + '}';
+        } else if (titleStyle === 'condensed_impact') {
+            var impactColor = validHex(draft.title_color) || 'var(--ink)';
+            css += '.hero-title-line{display:block;color:inherit;background:none;-webkit-background-clip:initial;background-clip:initial;-webkit-text-fill-color:currentColor;-webkit-text-stroke:0}'
+                + '.hd-title,.hm-title{font-family:var(--font-display);font-weight:900;text-transform:uppercase;line-height:.82;letter-spacing:.01em;color:' + impactColor + '}';
+        } else if (titleStyle === 'outline_editorial') {
+            var outlineColor = validHex(draft.title_color) || 'var(--ink)';
+            css += '.hero-title-line{display:block;background:none;-webkit-background-clip:initial;background-clip:initial}'
+                + '.hd-title,.hm-title{color:transparent;-webkit-text-fill-color:transparent;-webkit-text-stroke:.018em ' + outlineColor + ';text-transform:uppercase;letter-spacing:.01em}'
+                + '.hd-title .hero-title-line:nth-child(1),.hm-title .hero-title-line:nth-child(1){color:' + outlineColor + ';-webkit-text-fill-color:currentColor;-webkit-text-stroke:0}';
+        } else {
+            css += '.hero-title-line{display:block;color:inherit;background:none;-webkit-background-clip:initial;background-clip:initial;-webkit-text-fill-color:currentColor;-webkit-text-stroke:0;text-shadow:inherit}';
+        }
+        if (height < 100) css += '.hero-desktop{min-height:calc(' + height + 'svh - 56px)}.hero-mobile.hero-grad{min-height:' + Math.round(height * 0.76) + 'svh!important}';
+
+        if (isGrad) {
+            css += '.hero-desktop.hero-grad{position:relative;grid-template-columns:1fr}'
+                + '.hero-desktop.hero-grad .hd-visual{position:absolute;inset:0;background:' + overlay + '}'
+                + '.hero-desktop.hero-grad .hd-photo.active{opacity:1}'
+                + '.hero-desktop.hero-grad .hd-visual::after{content:"";position:absolute;inset:0;z-index:1;background:linear-gradient(90deg,' + overlay + ' ' + solid + '%,' + overlay + '00 ' + strength + '%)}'
+                + '.hero-desktop.hero-grad .hd-content{position:relative;z-index:2;max-width:620px}'
+                + '.hero-desktop.hero-grad .hd-badge,.hero-desktop.hero-grad .hd-card{z-index:2}'
+                + '.hero-desktop.hero-grad .hd-card{left:48%}'
+                + '@media (max-width:767.98px){'
+                + '.hero-mobile.hero-grad{position:relative;display:block;min-height:76svh;border-radius:18px;overflow:hidden;background:' + overlay + '}'
+                + '.hero-mobile.hero-grad .hm-visual{position:absolute;inset:0;height:100%;aspect-ratio:auto;border-radius:0}'
+                + '.hero-mobile.hero-grad .hero-bg.active{opacity:1}'
+                + '.hero-mobile.hero-grad .hm-visual::after{content:"";position:absolute;inset:0;z-index:1;background:linear-gradient(180deg,' + overlay + '00 32%,' + overlay + ' 86%)}'
+                + '.hero-mobile.hero-grad .hm-content{position:absolute;left:16px;right:16px;bottom:96px;z-index:2}'
+                + '.hero-mobile.hero-grad .hm-badge,.hero-mobile.hero-grad .hm-card{z-index:2}'
+                + '}@media (min-width:768px){.hero-mobile.hero-grad{display:none}}';
+        }
+
+        var style = document.getElementById('gfid-hero-preview-style');
+        if (!style) {
+            style = document.createElement('style');
+            style.id = 'gfid-hero-preview-style';
+            document.head.appendChild(style);
+        }
+        style.textContent = css;
+    }
+
+    window.addEventListener('message', function (event) {
+        if (event.origin !== window.location.origin) return;
+        if (!event.data || event.data.type !== 'gfid:hero-preview') return;
+        applyHeroDraft(event.data.settings);
+    });
 
     // Smooth scroll to #beli
     document.querySelectorAll('a[href="#beli"]').forEach(function (link) {

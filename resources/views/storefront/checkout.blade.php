@@ -381,7 +381,7 @@
 <script>
 (function () {
     var WA_NUMBER    = '{{ storefront_setting('branding.whatsapp_number', '6281224889319') }}';
-    var QRIS_IMAGE   = @json(storefront_setting('checkout.qris_image') ?: '');
+    var QRIS_IMAGE   = @json(storefront_media_url(storefront_setting('checkout.qris_image')) ?: '');
     var KG_PER_ITEM  = {{ (float) (storefront_setting('checkout.weight_per_item') ?: 0.5) }};
     // Berat total dihitung server-side dari weight_kg tiap produk katalog
     // (fallback KG_PER_ITEM per item kalau produk belum diisi beratnya).

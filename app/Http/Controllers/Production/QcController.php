@@ -101,6 +101,7 @@ class QcController extends Controller
             'lot.item',
             'lots.lot.item', // multi-LOT: pivot + lot + item
             'bundles.finishedItem',
+            'bundles.lot', // LOT per bundle — ditampilkan kecil di bawah nama bahan
             'bundles.qcResults' => function ($q) {
                 $q->where('stage', QcResult::STAGE_CUTTING);
             },
@@ -123,6 +124,7 @@ class QcController extends Controller
                 'bundle_code' => $bundle->bundle_code,
                 'item_code' => $bundle->finishedItem?->code,
                 'item_name' => $bundle->finishedItem?->name, // ⬅️ dipakai di view (desktop)
+                'lot_code' => $bundle->lot?->code,
                 'qty_pcs' => $bundle->qty_pcs,
                 'status' => $bundle->status,
                 'qty_ok' => $qc?->qty_ok ?? $bundle->qty_pcs,
