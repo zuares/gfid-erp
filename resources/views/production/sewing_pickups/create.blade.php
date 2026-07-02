@@ -278,6 +278,18 @@
                     'bomSuppliesByItem' => $bomSuppliesByItem ?? [],
                 ])
 
+                {{-- FORCE SHORTAGE (admin/owner saja) --}}
+                @if (in_array(auth()->user()->role ?? null, ['admin', 'owner'], true))
+                    <div class="form-check mb-3">
+                        <input class="form-check-input" type="checkbox" name="force_supply_shortage"
+                            id="force_supply_shortage" value="1" @checked(old('force_supply_shortage'))>
+                        <label class="form-check-label small text-muted" for="force_supply_shortage">
+                            Paksa lanjut tanpa kelengkapan (stok kelengkapan kurang &mdash; kekurangan tetap tercatat
+                            untuk follow-up purchasing)
+                        </label>
+                    </div>
+                @endif
+
                 {{-- SUBMIT --}}
                 <div class="d-flex justify-content-between align-items-center mb-5 form-footer">
                     <a href="{{ url()->previous() }}" class="btn btn-sm btn-outline-secondary">

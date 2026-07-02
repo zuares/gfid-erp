@@ -646,8 +646,22 @@
                             <div class="collapse {{ $websiteOpen ? 'show' : '' }}" id="navWebsiteAdminMobile">
                                 @if ($hasAdminCatalogProducts)
                                     <a href="{{ route('admin.catalog.products.index') }}"
-                                       class="mobile-sidebar-link mobile-sidebar-link-sub {{ request()->routeIs('admin.catalog.products*') ? 'active' : '' }}">
+                                       class="mobile-sidebar-link mobile-sidebar-link-sub {{ (request()->routeIs('admin.catalog.products.index') || request()->routeIs('admin.catalog.products.edit') || request()->routeIs('admin.catalog.products.create')) ? 'active' : '' }}">
                                         <span class="icon">📦</span><span>Katalog Produk</span>
+                                    </a>
+                                @endif
+
+                                @if ($router->has('admin.catalog.products.ranking'))
+                                    <a href="{{ route('admin.catalog.products.ranking') }}"
+                                       class="mobile-sidebar-link mobile-sidebar-link-sub {{ request()->routeIs('admin.catalog.products.ranking') ? 'active' : '' }}">
+                                        <span class="icon">📊</span><span>Ranking Produk</span>
+                                    </a>
+                                @endif
+
+                                @if ($router->has('admin.website.settings'))
+                                    <a href="{{ route('admin.website.settings') }}"
+                                       class="mobile-sidebar-link mobile-sidebar-link-sub {{ request()->routeIs('admin.website.settings') ? 'active' : '' }}">
+                                        <span class="icon">⚙️</span><span>Pengaturan Website</span>
                                     </a>
                                 @endif
 
@@ -956,8 +970,22 @@
                             <div class="collapse {{ $websiteOpen ? 'show' : '' }}" id="navWebsiteOwnerMobile">
                                 @if ($hasAdminCatalogProducts)
                                     <a href="{{ route('admin.catalog.products.index') }}"
-                                       class="mobile-sidebar-link mobile-sidebar-link-sub {{ request()->routeIs('admin.catalog.products*') ? 'active' : '' }}">
+                                       class="mobile-sidebar-link mobile-sidebar-link-sub {{ (request()->routeIs('admin.catalog.products.index') || request()->routeIs('admin.catalog.products.edit') || request()->routeIs('admin.catalog.products.create')) ? 'active' : '' }}">
                                         <span class="icon">📦</span><span>Katalog Produk</span>
+                                    </a>
+                                @endif
+
+                                @if ($router->has('admin.catalog.products.ranking'))
+                                    <a href="{{ route('admin.catalog.products.ranking') }}"
+                                       class="mobile-sidebar-link mobile-sidebar-link-sub {{ request()->routeIs('admin.catalog.products.ranking') ? 'active' : '' }}">
+                                        <span class="icon">📊</span><span>Ranking Produk</span>
+                                    </a>
+                                @endif
+
+                                @if ($router->has('admin.website.settings'))
+                                    <a href="{{ route('admin.website.settings') }}"
+                                       class="mobile-sidebar-link mobile-sidebar-link-sub {{ request()->routeIs('admin.website.settings') ? 'active' : '' }}">
+                                        <span class="icon">⚙️</span><span>Pengaturan Website</span>
                                     </a>
                                 @endif
 

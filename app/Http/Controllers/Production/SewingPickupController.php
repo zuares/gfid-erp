@@ -493,35 +493,69 @@ class SewingPickupController extends Controller
                 pickupLines: $createdPickupLines,
                 submittedPayload: $validated['supplies_checklist'] ?? null,
             );
+
+            // 1) Konfirmasi fisik operator (checklist) yang melebihi stok sistem
+            //    didokumentasikan sebagai adjustment IN pending ("Ditemukan fisik")
+            //    — wajib diverifikasi/approve admin. Harus dibuat SEBELUM issued_qty
+            //    dinaikkan agar gap-nya masih terbaca.
+            $this->createSupplyPhysicalAdjustment(
+                $pickup,
+                $validated['supplies_checklist'] ?? null,
+                (int) $request->user()->id,
+            );
+
+            // 2) Naikkan issued_qty ke qty yang dikonfirmasi fisik oleh operator,
+            //    walaupun stok sistem kurang. Stok RM boleh minus sementara
+            //    (item supply allow_negative) dan kembali normal saat adjustment
+            //    "Ditemukan fisik" di-approve.
+            $this->applyConfirmedPhysicalToSupplyLines($pickup, $validated['supplies_checklist'] ?? null);
+
             $this->syncLineSupplyIssuedFromAggregate($pickup);
 
-            // ✅ VALIDASI STOK RM: tolak pickup jika stok kelengkapan jahit tidak mencukupi kebutuhan
+            // 3) VALIDASI SISA KEKURANGAN setelah konfirmasi fisik:
+            //    - default: tolak, arahkan operator konfirmasi checklist
+            //    - admin/owner + force_supply_shortage: lolos, gap tetap tercatat
+            //      di supply lines (required vs issued) untuk follow-up purchasing
             $pickup->loadMissing('supplyLines.material');
             $stockShortages = $pickup->supplyLines->filter(
                 fn($sl) => (float) $sl->required_qty > 0.000001
                     && (float) $sl->issued_qty + 0.000001 < (float) $sl->required_qty
             );
             if ($stockShortages->isNotEmpty()) {
-                $details = $stockShortages->map(function ($sl) {
-                    $code  = $sl->material?->code ?? "material #{$sl->material_item_id}";
-                    $need  = number_format((float) $sl->required_qty, 2, ',', '.');
-                    $have  = number_format((float) ($sl->stock_available_snapshot ?? 0), 2, ',', '.');
-                    $short = number_format(
-                        max((float) $sl->required_qty - (float) ($sl->stock_available_snapshot ?? 0), 0),
-                        2, ',', '.'
-                    );
-                    return "• {$code}: butuh {$need}, stok RM {$have} (kurang {$short})";
-                })->implode("\n");
-                throw ValidationException::withMessages([
-                    'supplies' => "Stok RM tidak cukup untuk kelengkapan jahit. Pickup ditolak.\n\n{$details}",
+                $role     = $request->user()->role ?? null;
+                $canForce = in_array($role, ['admin', 'owner'], true);
+                $forced   = $canForce && $request->boolean('force_supply_shortage');
+
+                if (!$forced) {
+                    $details = $stockShortages->map(function ($sl) {
+                        $code  = $sl->material?->code ?? "material #{$sl->material_item_id}";
+                        $need  = number_format((float) $sl->required_qty, 2, ',', '.');
+                        $have  = number_format((float) $sl->issued_qty, 2, ',', '.');
+                        $short = number_format(
+                            max((float) $sl->required_qty - (float) $sl->issued_qty, 0),
+                            2, ',', '.'
+                        );
+                        return "• {$code}: butuh {$need}, tersedia/konfirmasi {$have} (kurang {$short})";
+                    })->implode("\n");
+
+                    $hint = $canForce
+                        ? 'Jika barang ada di lapangan, isi qty pada checklist kelengkapan. Atau centang "Paksa lanjut tanpa kelengkapan" untuk tetap menyimpan.'
+                        : 'Jika barang ada di lapangan, isi qty pada checklist kelengkapan (stok sistem akan dikoreksi otomatis). Jika barang memang kosong, minta admin/owner menyimpan dengan opsi paksa.';
+
+                    throw ValidationException::withMessages([
+                        'supplies' => "Stok kelengkapan jahit tidak mencukupi.\n\n{$details}\n\n{$hint}",
+                    ]);
+                }
+
+                Log::warning("SWP {$pickup->code}: pickup dilanjutkan dengan kekurangan kelengkapan (force oleh {$role}).", [
+                    'sewing_pickup_id' => $pickup->id,
+                    'shortages' => $stockShortages->map(fn($sl) => [
+                        'material_item_id' => (int) $sl->material_item_id,
+                        'required_qty' => (float) $sl->required_qty,
+                        'issued_qty' => (float) $sl->issued_qty,
+                    ])->values()->all(),
                 ]);
             }
-
-            $this->createSupplyPhysicalAdjustment(
-                $pickup,
-                $validated['supplies_checklist'] ?? null,
-                (int) $request->user()->id,
-            );
 
             $this->issueSewingPickupSupplies($pickup);
             $this->allocateSewingSupplyCostToPickupWip($pickup);
@@ -1166,6 +1200,39 @@ class SewingPickupController extends Controller
             $line->issued_qty = $issued;
             $line->save();
             $remainingByMaterial[$materialId] = max($available - $issued, 0);
+        }
+    }
+
+    /**
+     * Naikkan issued_qty supply lines ke qty yang dikonfirmasi fisik operator
+     * lewat checklist, meskipun stok sistem tidak mencukupi.
+     * Gap-nya sudah didokumentasikan lebih dulu oleh createSupplyPhysicalAdjustment().
+     */
+    private function applyConfirmedPhysicalToSupplyLines(SewingPickup $pickup, ?string $submittedPayload): void
+    {
+        $requested = $this->parseSubmittedSewingSupplies($submittedPayload);
+        if (empty($requested)) {
+            return;
+        }
+
+        foreach ($pickup->supplyLines()->get() as $supply) {
+            $confirmed = min(
+                (float) ($requested[(int) $supply->material_item_id]['issued_qty'] ?? 0),
+                (float) $supply->required_qty
+            );
+
+            if ($confirmed <= (float) $supply->issued_qty + 0.000001) {
+                continue;
+            }
+
+            $requiredQty = (float) $supply->required_qty;
+            $requiredPcs = (float) ($supply->required_pcs ?? 0);
+
+            $supply->issued_qty = $confirmed;
+            if ($requiredQty > 0 && $requiredPcs > 0) {
+                $supply->issued_pcs = min($requiredPcs * ($confirmed / $requiredQty), $requiredPcs);
+            }
+            $supply->save();
         }
     }
 

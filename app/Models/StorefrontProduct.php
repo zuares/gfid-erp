@@ -10,7 +10,7 @@ use Illuminate\Support\Facades\Storage;
 class StorefrontProduct extends Model
 {
     protected $fillable = [
-        'slug', 'name', 'description', 'product_type', 'base_price',
+        'slug', 'name', 'description', 'product_type', 'base_price', 'weight_kg',
         'label', 'image_url', 'is_published', 'sort_order', 'item_id', 'category_id', 'audience',
         // Stock
         'stock',
@@ -22,6 +22,7 @@ class StorefrontProduct extends Model
 
     protected $casts = [
         'base_price'     => 'integer',
+        'weight_kg'      => 'float',
         'is_published'   => 'boolean',
         'stock'          => 'integer',
         'is_pinned'      => 'boolean',

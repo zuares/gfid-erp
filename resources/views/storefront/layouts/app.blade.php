@@ -3,7 +3,7 @@
 <head>
     <meta charset="utf-8">
     <meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=1, user-scalable=no, viewport-fit=cover">
-    <title>@yield('title', 'Greatfit')</title>
+    <title>@yield('title', storefront_setting('branding.brand_name', 'Greatfit'))</title>
     <link rel="preconnect" href="https://fonts.googleapis.com">
     <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
     <link href="https://fonts.googleapis.com/css2?family=Plus+Jakarta+Sans:wght@400;500;600;700;800;900&family=Barlow+Condensed:wght@700;800;900&display=swap" rel="stylesheet">
@@ -22,7 +22,7 @@
          * Set STOREFRONT_THEME in .env (e.g. theme-dark, theme-warm).
          * ─────────────────────────────────────────────────────────── */
         :root {
-            /* Colors */
+            /* Colors — defaults, overridden by settings below */
             --ink:          #0a0a0a;
             --mid:          #888;
             --line:         #e8e8e8;
@@ -37,6 +37,24 @@
             --safe:         env(safe-area-inset-bottom, 0px);
             --radius-card:  18px;
             --radius-pill:  999px;
+        }
+
+        /* ── Dynamic settings override (from storefront_settings) ─────────── */
+        @php
+            $sfInk    = storefront_setting('colors.ink',    '#0a0a0a');
+            $sfAccent = storefront_setting('colors.accent', '#E8FF00');
+            $sfMid    = storefront_setting('colors.mid',    '#888888');
+            $sfSoft   = storefront_setting('colors.soft',   '#f4f4f4');
+            $sfLine   = storefront_setting('colors.line',   '#e8e8e8');
+            // derive accent-dark: darken 20% via hex math (simple approach)
+            $sfAccentDark = '#b8c800';
+        @endphp
+        :root {
+            --ink:        {{ $sfInk }};
+            --mid:        {{ $sfMid }};
+            --line:       {{ $sfLine }};
+            --soft:       {{ $sfSoft }};
+            --accent:     {{ $sfAccent }};
         }
 
         /* Theme: dark */

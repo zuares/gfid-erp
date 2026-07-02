@@ -1,6 +1,6 @@
 @extends('storefront.layouts.app')
 
-@section('title', 'Greatfit')
+@section('title', storefront_setting('branding.brand_name', 'Greatfit'))
 
 @push('styles')
 <style>
@@ -186,30 +186,62 @@
 @php $navActive = 'home'; @endphp
 
 @section('content')
+@php
+    $sfHeroLabel      = storefront_setting('hero.label',               'Koleksi Terbaru');
+    $sfHeroTitle1     = storefront_setting('hero.title_line1',         'Good Fit,');
+    $sfHeroTitle2     = storefront_setting('hero.title_line2',         'Good Feel.');
+    $sfHeroCopy       = storefront_setting('hero.copy',                'Hal kecil yang bikin hari terasa lebih nyaman.');
+    $sfHeroCtaLabel   = storefront_setting('hero.cta_primary_label',   'Lihat Koleksi');
+    $sfHeroCtaUrl     = storefront_setting('hero.cta_primary_url',     '#beli');
+    $sfHeroCta2Label  = storefront_setting('hero.cta_secondary_label', 'Pilih Kategori');
+    $sfHeroCta2Url    = storefront_setting('hero.cta_secondary_url',   '#kategori');
+    $sfHeroBadge      = storefront_setting('hero.badge_text',          '');
+    $sfCardTitle      = storefront_setting('hero.card_title',          'Greatfit Collection');
+    $sfCardSubtitle   = storefront_setting('hero.card_subtitle',       '10rb+ pelanggan puas');
+    $sfBrandName      = storefront_setting('branding.brand_name',      'Greatfit');
+    $sfHeroImages     = [
+        storefront_setting('hero.image_1', 'https://images.unsplash.com/photo-1660167213901-e2f33a1a7486?ixlib=rb-4.1.0&q=85&fm=jpg&crop=entropy&cs=srgb&w=1000&h=1200&fit=crop'),
+        storefront_setting('hero.image_2', 'https://images.unsplash.com/photo-1756786825067-4b153740e7c2?ixlib=rb-4.1.0&q=85&fm=jpg&crop=entropy&cs=srgb&w=1000&h=1200&fit=crop'),
+        storefront_setting('hero.image_3', 'https://images.unsplash.com/photo-1774160928808-afdd9b93363b?ixlib=rb-4.1.0&q=85&fm=jpg&crop=entropy&cs=srgb&w=1000&h=1200&fit=crop'),
+    ];
+    $sfHeroImages = array_filter($sfHeroImages); // buang yang kosong
+    // Sections
+    $sfSectionOrder = array_values(array_filter(array_map('trim',
+        explode(',', storefront_setting('sections.order', 'hero,categories,channels,values,products,cta'))
+    )));
+    $sfViz = fn($n) => storefront_setting("sections.{$n}_visible", '1') !== '0';
+@endphp
+
+{{-- HERO --}}
+@if($sfViz('hero'))
 {{-- HERO MOBILE --}}
 <div class="wrap">
     <div class="hero-mobile">
         <div class="hm-content">
-            <div class="hm-label">New Collection 2026</div>
-            <div class="hm-title">Good Fit,<br>Good Feel.</div>
-            <div class="hm-copy">Hal kecil yang bikin hari terasa lebih nyaman.</div>
+            <div class="hm-label">{{ $sfHeroLabel }}</div>
+            <div class="hm-title">{{ $sfHeroTitle1 }}<br>{{ $sfHeroTitle2 }}</div>
+            <div class="hm-copy">{{ $sfHeroCopy }}</div>
             <div class="hm-actions">
-                <a href="#beli" class="btn-dk">
-                    Mulai Belanja
+                <a href="{{ $sfHeroCtaUrl }}" class="btn-dk">
+                    {{ $sfHeroCtaLabel }}
                     <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><path d="M5 12h14M12 5l7 7-7 7"/></svg>
                 </a>
-                <a href="#kategori" class="btn-sk">Pilih Kategori</a>
+                <a href="{{ $sfHeroCta2Url }}" class="btn-sk">{{ $sfHeroCta2Label }}</a>
             </div>
         </div>
         <div class="hm-visual">
-            <img class="hero-bg active" src="https://images.unsplash.com/photo-1660167213901-e2f33a1a7486?ixlib=rb-4.1.0&q=85&fm=jpg&crop=entropy&cs=srgb&w=700&h=920&fit=crop" alt="Outfit sporty">
-            <img class="hero-bg" src="https://images.unsplash.com/photo-1756786825067-4b153740e7c2?ixlib=rb-4.1.0&q=85&fm=jpg&crop=entropy&cs=srgb&w=700&h=920&fit=crop" alt="Gaya kasual outdoor">
-            <img class="hero-bg" src="https://images.unsplash.com/photo-1774160928808-afdd9b93363b?ixlib=rb-4.1.0&q=85&fm=jpg&crop=entropy&cs=srgb&w=700&h=920&fit=crop" alt="Koleksi Greatfit">
+            @foreach($sfHeroImages as $i => $imgUrl)
+            <img class="hero-bg {{ $i === 0 ? 'active' : '' }}" src="{{ $imgUrl }}" alt="Foto {{ $i+1 }} {{ $sfBrandName }}">
+            @endforeach
+            @if($sfHeroBadge)
+            <div class="hm-badge">{{ $sfHeroBadge }}</div>
+            @else
             <div class="hm-badge">New<br>2026</div>
+            @endif
             <a href="{{ route('storefront.products') }}" class="hm-card">
                 <div>
-                    <div class="hm-card-t">Greatfit Collection</div>
-                    <div class="hm-card-s">Hal kecil yang membuat hidup jadi luar biasa.</div>
+                    <div class="hm-card-t">{{ $sfCardTitle }}</div>
+                    <div class="hm-card-s">{{ $sfCardSubtitle }}</div>
                 </div>
                 <div class="hm-card-ic">
                     <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><path d="M5 12h14M12 5l7 7-7 7"/></svg>
@@ -222,26 +254,30 @@
 {{-- HERO DESKTOP --}}
 <section class="hero-desktop">
     <div class="hd-content" style="padding-left:max(32px,calc((100vw - 1680px)/2 + 32px));">
-        <div class="hd-label">New Collection 2026</div>
-        <h1 class="hd-title">Good Fit,<br>Good Feel.</h1>
-        <div class="hd-copy">Hal kecil yang bikin hari terasa lebih nyaman.</div>
+        <div class="hd-label">{{ $sfHeroLabel }}</div>
+        <h1 class="hd-title">{{ $sfHeroTitle1 }}<br>{{ $sfHeroTitle2 }}</h1>
+        <div class="hd-copy">{{ $sfHeroCopy }}</div>
         <div class="hd-actions">
-            <a href="#beli" class="btn-dk">
-                Mulai Belanja
+            <a href="{{ $sfHeroCtaUrl }}" class="btn-dk">
+                {{ $sfHeroCtaLabel }}
                 <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><path d="M5 12h14M12 5l7 7-7 7"/></svg>
             </a>
-            <a href="#kategori" class="btn-sk">Pilih Kategori</a>
+            <a href="{{ $sfHeroCta2Url }}" class="btn-sk">{{ $sfHeroCta2Label }}</a>
         </div>
     </div>
     <div class="hd-visual">
-        <img class="hd-photo active" src="https://images.unsplash.com/photo-1660167213901-e2f33a1a7486?ixlib=rb-4.1.0&q=85&fm=jpg&crop=entropy&cs=srgb&w=1000&h=1200&fit=crop" alt="Outfit sporty">
-        <img class="hd-photo" src="https://images.unsplash.com/photo-1756786825067-4b153740e7c2?ixlib=rb-4.1.0&q=85&fm=jpg&crop=entropy&cs=srgb&w=1000&h=1200&fit=crop" alt="Gaya kasual outdoor">
-        <img class="hd-photo" src="https://images.unsplash.com/photo-1774160928808-afdd9b93363b?ixlib=rb-4.1.0&q=85&fm=jpg&crop=entropy&cs=srgb&w=1000&h=1200&fit=crop" alt="Koleksi Greatfit">
+        @foreach($sfHeroImages as $i => $imgUrl)
+        <img class="hd-photo {{ $i === 0 ? 'active' : '' }}" src="{{ $imgUrl }}" alt="Foto {{ $i+1 }} {{ $sfBrandName }}">
+        @endforeach
+        @if($sfHeroBadge)
+        <div class="hd-badge">{{ $sfHeroBadge }}</div>
+        @else
         <div class="hd-badge">New<br>2026</div>
+        @endif
         <a href="{{ route('storefront.products') }}" class="hd-card">
             <div>
-                <div class="hd-card-t">Greatfit Collection</div>
-                <div class="hd-card-s">Hal kecil yang membuat hidup jadi luar biasa.</div>
+                <div class="hd-card-t">{{ $sfCardTitle }}</div>
+                <div class="hd-card-s">{{ $sfCardSubtitle }}</div>
             </div>
             <div class="hd-card-ic">
                 <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><path d="M5 12h14M12 5l7 7-7 7"/></svg>
@@ -256,16 +292,18 @@
         @foreach (range(1,8) as $i)
             <span class="strip-i">Good Fit <span class="strip-dot"></span></span>
             <span class="strip-i">Good Feel <span class="strip-dot"></span></span>
-            <span class="strip-i">Greatfit <span class="strip-dot"></span></span>
+            <span class="strip-i">{{ $sfBrandName }} <span class="strip-dot"></span></span>
             <span class="strip-i">Little Things <span class="strip-dot"></span></span>
         @endforeach
     </div>
 </div>
+@endif {{-- end hero --}}
 
 <div class="wrap">
+@foreach($sfSectionOrder as $sfSec)
 
-    {{-- CATEGORY SEARCH --}}
-    @if($categories->isNotEmpty())
+{{-- ─── CATEGORIES ──────────────────────────────────────────────── --}}
+@if($sfSec === 'categories' && $sfViz('categories') && $categories->isNotEmpty())
     <section class="sec cat-search" id="kategori">
         <div class="sec-head cat-head">
             <div>
@@ -306,15 +344,16 @@
             @endforeach
         </div>
     </section>
-    @endif
+@endif {{-- end categories --}}
 
-    {{-- SHOP CHANNELS --}}
+{{-- ─── CHANNELS ────────────────────────────────────────────────── --}}
+@if($sfSec === 'channels' && $sfViz('channels'))
     <section class="sec shop-channels" id="beli">
         <div class="shop-panel">
             <div class="shop-head">
                 <div class="shop-kicker">Channel Belanja</div>
                 <div class="shop-title">Mau belanja lewat mana?</div>
-                <div class="shop-copy">Website Greatfit atau marketplace favorit, pilih yang paling nyaman.</div>
+                <div class="shop-copy">Website {{ $sfBrandName }} atau marketplace favorit, pilih yang paling nyaman.</div>
             </div>
             <div class="chs">
                 @foreach($channels as $ch)
@@ -341,17 +380,35 @@
             </div>
         </div>
     </section>
+@endif {{-- end channels --}}
 
-    {{-- VALUES --}}
+{{-- ─── VALUES ──────────────────────────────────────────────────── --}}
+@if($sfSec === 'values' && $sfViz('values'))
+    @php
+        $sfVals = [];
+        foreach ([1,2,3] as $vi) {
+            $sfVals[] = [
+                'n' => storefront_setting("values.{$vi}_number", str_pad($vi, 2, '0', STR_PAD_LEFT)),
+                't' => storefront_setting("values.{$vi}_title",  ['Nyaman','Presisi','Tahan Lama'][$vi-1]),
+                'd' => storefront_setting("values.{$vi}_desc",   ''),
+            ];
+        }
+    @endphp
     <section class="sec" style="padding-top:0;">
         <div class="vals">
-            <div class="val"><div class="val-n">01</div><div class="val-t">Nyaman</div><div class="val-d">Enak dipakai seharian.</div></div>
-            <div class="val"><div class="val-n">02</div><div class="val-t">Presisi</div><div class="val-d">Pas di badan, pas ukurannya.</div></div>
-            <div class="val"><div class="val-n">03</div><div class="val-t">Tahan Lama</div><div class="val-d">Material berkualitas.</div></div>
+            @foreach($sfVals as $val)
+            <div class="val">
+                <div class="val-n">{{ $val['n'] }}</div>
+                <div class="val-t">{{ $val['t'] }}</div>
+                @if($val['d'])<div class="val-d">{{ $val['d'] }}</div>@endif
+            </div>
+            @endforeach
         </div>
     </section>
+@endif {{-- end values --}}
 
-    {{-- PRODUCTS --}}
+{{-- ─── PRODUCTS ────────────────────────────────────────────────── --}}
+@if($sfSec === 'products' && $sfViz('products'))
     <section class="sec" id="produk">
         <div class="sec-head">
             <div class="sec-t">Produk pilihan</div>
@@ -414,8 +471,10 @@
             @endforeach
         </div>
     </section>
+@endif {{-- end products --}}
 
-    {{-- CTA --}}
+{{-- ─── CTA ─────────────────────────────────────────────────────── --}}
+@if($sfSec === 'cta' && $sfViz('cta'))
     <section class="sec" style="padding-top:0;">
         <div class="cta-blk">
             <div class="cta-blk-t">Ready to<br>Wear Daily.</div>
@@ -425,7 +484,9 @@
             </div>
         </div>
     </section>
+@endif {{-- end cta --}}
 
+@endforeach {{-- end $sfSectionOrder loop --}}
 </div>
 @endsection
 

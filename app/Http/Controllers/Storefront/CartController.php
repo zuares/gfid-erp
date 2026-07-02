@@ -7,9 +7,12 @@ use App\Models\StorefrontProduct;
 use App\Models\StorefrontEvent;
 use App\Models\StorefrontOrder;
 use App\Models\StorefrontVisitor;
+use App\Models\Warehouse;
+use App\Services\Inventory\InventoryService;
 use App\Services\Storefront\StockResolver;
 use App\Services\WaNotificationService;
 use Illuminate\Http\Request;
+use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Str;
 
 class CartController extends Controller
@@ -45,8 +48,10 @@ class CartController extends Controller
         $address  = session('checkout_address', []);
         $cartStock = $this->cartStockSnapshot($cart);
         $total    = array_sum(array_map(fn($i) => $i['price'] * $i['qty'], $cart));
+        $uniqueCode = $this->checkoutUniqueCode($cart);
+        $totalWeightKg = $this->cartTotalWeightKg($cart);
 
-        return view('storefront.checkout', compact('cart', 'channels', 'products', 'address', 'total', 'cartStock'));
+        return view('storefront.checkout', compact('cart', 'channels', 'products', 'address', 'total', 'cartStock', 'uniqueCode', 'totalWeightKg'));
     }
 
     public function address(Request $request)
@@ -150,46 +155,42 @@ class CartController extends Controller
     public function ongkir(Request $request)
     {
         $destination = trim($request->query('destination', ''));
-        $weight      = max(0.5, (float) $request->query('weight', 0.5));
+        $destinationId = trim($request->query('destination_id', ''));
+        $weightInput = max(0.5, (float) $request->query('weight', 0.5));
+        $weight = $weightInput <= 50 ? (int) ceil($weightInput * 1000) : (int) ceil($weightInput);
 
-        if (!$destination) {
+        if (!$destination && !$destinationId) {
             return response()->json(['error' => 'Destination required'], 422);
         }
 
-        $apiKey  = env('BINDERBYTE_API_KEY', '');
-        $origin  = env('BINDERBYTE_ORIGIN', 'kab bandung');
+        $apiKey = (string) env('RAJAONGKIR_API_KEY', '');
+        $originId = (string) env('RAJAONGKIR_ORIGIN_ID', '');
+        $couriers = (string) env('RAJAONGKIR_COURIERS', 'jne:sicepat:anteraja:pos');
 
-        if (!$apiKey) {
-            return response()->json(['error' => 'API key belum dikonfigurasi'], 503);
+        if (!$apiKey || !$originId) {
+            return $this->shippingFallbackResponse('RajaOngkir belum dikonfigurasi.');
         }
 
         try {
-            $ch = curl_init('https://api.binderbyte.com/v1/cost');
-            curl_setopt_array($ch, [
-                CURLOPT_POST            => true,
-                CURLOPT_RETURNTRANSFER  => true,
-                CURLOPT_CONNECTTIMEOUT  => 5,
-                CURLOPT_TIMEOUT         => 10,
-                CURLOPT_POSTFIELDS      => http_build_query([
-                    'api_key'     => $apiKey,
-                    'origin'      => $origin,
-                    'destination' => $destination,
-                    'courier'     => 'jne,sicepat,anteraja,ide,pos',
-                    'weight'      => $weight,
-                ]),
-            ]);
-            $body = curl_exec($ch);
-            $err  = curl_error($ch);
-            curl_close($ch);
+            if (!$destinationId) {
+                $destinations = $this->rajaongkirRequest('GET', '/destination/domestic-destination', [
+                    'search' => $destination,
+                    'limit' => 1,
+                    'offset' => 0,
+                ], $apiKey);
 
-            if ($err) {
-                return response()->json(['error' => 'Gagal menghubungi API ongkir'], 502);
+                $destinationId = (string) data_get($destinations, 'data.0.id', '');
             }
 
-            $data = json_decode($body, true);
-            return response()->json($data);
+            if (!$destinationId) {
+                return $this->shippingFallbackResponse('Area ongkir tidak ditemukan di RajaOngkir.');
+            }
+
+            $cost = $this->rajaongkirCostsByAvailableCourier($originId, $destinationId, $weight, $couriers, $apiKey);
+
+            return response()->json($this->normalizeRajaongkirCost($cost));
         } catch (\Throwable $e) {
-            return response()->json(['error' => 'Terjadi kesalahan'], 500);
+            return $this->shippingFallbackResponse($e->getMessage() ?: 'Terjadi kesalahan saat memuat ongkir RajaOngkir.');
         }
     }
 
@@ -219,7 +220,9 @@ class CartController extends Controller
             ? $stockResolver->forMapping($selectedMapping)
             : ($selectedVariant ? $stockResolver->forVariant($selectedVariant) : 0);
 
-        if ($availableStock < $qty) {
+        $allowNegativeStock = (bool) ($selectedMapping?->item_id ?: $selectedVariant?->item_id);
+
+        if (! $allowNegativeStock && $availableStock < $qty) {
             return back()->with('cart_error', $availableStock > 0
                 ? "Stok {$color} ukuran {$size} tersisa {$availableStock} pcs."
                 : "Stok {$color} ukuran {$size} sedang kosong.");
@@ -344,41 +347,53 @@ class CartController extends Controller
             return redirect()->route('storefront.checkout')->with('order_error', implode(' ', $stockErrors));
         }
 
-        $subtotal     = (int) $request->input('subtotal', array_sum(array_map(fn($i) => $i['price'] * $i['qty'], $cart)));
-        $shippingCost = (int) $request->input('shipping_cost', 0);
-        $total        = $subtotal + $shippingCost;
+        try {
+            $order = DB::transaction(function () use ($request, $cart, $address) {
+                $subtotal     = (int) $request->input('subtotal', array_sum(array_map(fn($i) => $i['price'] * $i['qty'], $cart)));
+                $shippingCost = (int) $request->input('shipping_cost', 0);
+                $uniqueCode   = $this->checkoutUniqueCode($cart);
+                $total        = $subtotal + $shippingCost + $uniqueCode;
 
-        // Generate order number: GF-YYYYMMDD-XXXX
-        $dateStr     = now()->format('Ymd');
-        $todayCount  = StorefrontOrder::whereDate('created_at', today())->count() + 1;
-        $orderNumber = 'GF-' . $dateStr . '-' . str_pad($todayCount, 4, '0', STR_PAD_LEFT);
+                // Generate order number: GF-YYYYMMDD-XXXX
+                $dateStr     = now()->format('Ymd');
+                $todayCount  = StorefrontOrder::whereDate('created_at', today())->lockForUpdate()->count() + 1;
+                $orderNumber = 'GF-' . $dateStr . '-' . str_pad($todayCount, 4, '0', STR_PAD_LEFT);
 
-        $order = StorefrontOrder::create([
-            'order_number'      => $orderNumber,
-            'visitor_token'     => $request->attributes->get('visitor_token'),
-            'customer_name'     => $address['recipient_name'] ?? '',
-            'customer_phone'    => $address['phone'] ?? '',
-            'province'          => $address['province_name'] ?? '',
-            'city'              => $address['city_name'] ?? '',
-            'district'          => $address['district_name'] ?? '',
-            'village'           => $address['village_name'] ?? '',
-            'address_detail'    => $address['detail'] ?? '',
-            'postal_code'       => $address['postal_code'] ?? null,
-            'address_note'      => $address['note'] ?? null,
-            'items'             => array_values($cart),
-            'subtotal'          => $subtotal,
-            'shipping_cost'     => $shippingCost,
-            'total_amount'      => $total,
-            'shipping_courier'  => $request->input('shipping_courier'),
-            'shipping_service'  => $request->input('shipping_service'),
-            'payment_method'    => $request->input('payment_method'),
-            'payment_proof_url' => $request->input('payment_proof_url'),
-            'status'            => 'pending',
-        ]);
+                $order = StorefrontOrder::create([
+                    'order_number'      => $orderNumber,
+                    'visitor_token'     => $request->attributes->get('visitor_token'),
+                    'customer_name'     => $address['recipient_name'] ?? '',
+                    'customer_phone'    => $address['phone'] ?? '',
+                    'province'          => $address['province_name'] ?? '',
+                    'city'              => $address['city_name'] ?? '',
+                    'district'          => $address['district_name'] ?? '',
+                    'village'           => $address['village_name'] ?? '',
+                    'address_detail'    => $address['detail'] ?? '',
+                    'postal_code'       => $address['postal_code'] ?? null,
+                    'address_note'      => $address['note'] ?? null,
+                    'items'             => array_values($cart),
+                    'subtotal'          => $subtotal,
+                    'shipping_cost'     => $shippingCost,
+                    'unique_code'       => $uniqueCode,
+                    'total_amount'      => $total,
+                    'shipping_courier'  => $request->input('shipping_courier'),
+                    'shipping_service'  => $request->input('shipping_service'),
+                    'payment_method'    => $request->input('payment_method'),
+                    'payment_proof_url' => $request->input('payment_proof_url'),
+                    'status'            => 'pending',
+                ]);
+
+                $this->deductOrderStock($cart, $order);
+
+                return $order;
+            });
+        } catch (\Throwable $e) {
+            return redirect()->route('storefront.checkout')->with('order_error', $e->getMessage() ?: 'Stok gagal diperbarui. Silakan coba lagi.');
+        }
 
         $this->logEvent($request, 'order_complete', [
-            'order_number' => $orderNumber,
-            'total'        => $total,
+            'order_number' => $order->order_number,
+            'total'        => $order->total_amount,
             'items_count'  => count($cart),
         ]);
 
@@ -390,9 +405,9 @@ class CartController extends Controller
 
         // Bersihkan cart
         $this->forgetOrderedCartLines($cart);
-        session()->forget(['checkout_active_cart', 'checkout_buy_now']);
+        session()->forget(['checkout_active_cart', 'checkout_buy_now', 'checkout_unique_code']);
 
-        return redirect()->route('storefront.order.success', $orderNumber);
+        return redirect()->route('storefront.order.success', $order->order_number);
     }
 
     public function orderSuccess(Request $request, string $orderNumber)
@@ -434,6 +449,197 @@ class CartController extends Controller
         } catch (\Throwable) {
             // Jangan pernah error tracking mengganggu user flow
         }
+    }
+
+    private function rajaongkirRequest(string $method, string $path, array $params, string $apiKey): array
+    {
+        $baseUrl = rtrim((string) env('RAJAONGKIR_BASE_URL', 'https://rajaongkir.komerce.id/api/v1'), '/');
+        $method = strtoupper($method);
+        $url = $baseUrl . '/' . ltrim($path, '/');
+
+        if ($method === 'GET' && !empty($params)) {
+            $url .= '?' . http_build_query($params);
+        }
+
+        $ch = curl_init($url);
+        curl_setopt_array($ch, [
+            CURLOPT_RETURNTRANSFER => true,
+            CURLOPT_CONNECTTIMEOUT => 5,
+            CURLOPT_TIMEOUT => 12,
+            CURLOPT_HTTPHEADER => [
+                'Accept: application/json',
+                'key: ' . $apiKey,
+            ],
+        ]);
+
+        if ($method === 'POST') {
+            curl_setopt($ch, CURLOPT_POST, true);
+            curl_setopt($ch, CURLOPT_POSTFIELDS, http_build_query($params));
+        }
+
+        $body = curl_exec($ch);
+        $err = curl_error($ch);
+        $status = (int) curl_getinfo($ch, CURLINFO_HTTP_CODE);
+        curl_close($ch);
+
+        if ($err) {
+            throw new \RuntimeException('Gagal menghubungi RajaOngkir.');
+        }
+
+        $data = json_decode((string) $body, true);
+        if (!is_array($data)) {
+            throw new \RuntimeException('Response RajaOngkir tidak valid.');
+        }
+
+        if ($status >= 400) {
+            $message = data_get($data, 'meta.message')
+                ?? data_get($data, 'message')
+                ?? data_get($data, 'error')
+                ?? 'RajaOngkir menolak request.';
+            throw new \RuntimeException((string) $message);
+        }
+
+        return $data;
+    }
+
+    private function rajaongkirCostsByAvailableCourier(string $originId, string $destinationId, int $weight, string $couriers, string $apiKey): array
+    {
+        $courierCodes = array_values(array_filter(array_map(
+            fn ($code) => trim((string) $code),
+            preg_split('/[:,]/', $couriers) ?: []
+        )));
+
+        if (empty($courierCodes)) {
+            $courierCodes = ['jnt'];
+        }
+
+        $combinedRows = [];
+        $lastError = null;
+
+        foreach ($courierCodes as $courier) {
+            try {
+                $response = $this->rajaongkirRequest('POST', '/calculate/domestic-cost', [
+                    'origin' => $originId,
+                    'destination' => $destinationId,
+                    'weight' => $weight,
+                    'courier' => $courier,
+                    'price' => 'lowest',
+                ], $apiKey);
+
+                $rows = data_get($response, 'data', []);
+                if (is_array($rows) && !empty($rows)) {
+                    $combinedRows = array_merge($combinedRows, $rows);
+                }
+            } catch (\Throwable $e) {
+                $lastError = $e;
+                continue;
+            }
+        }
+
+        if (empty($combinedRows)) {
+            throw new \RuntimeException($lastError?->getMessage() ?: 'Tidak ada jasa kirim yang tersedia untuk alamat penerima.');
+        }
+
+        return [
+            'meta' => [
+                'message' => 'OK',
+            ],
+            'data' => $combinedRows,
+        ];
+    }
+
+    private function normalizeRajaongkirCost(array $payload): array
+    {
+        $rows = data_get($payload, 'data', []);
+        if (!is_array($rows)) {
+            $rows = [];
+        }
+
+        $grouped = [];
+        foreach ($rows as $row) {
+            if (!is_array($row)) {
+                continue;
+            }
+
+            $code = strtolower((string) ($row['code'] ?? $row['courier_code'] ?? $row['name'] ?? 'kurir'));
+            $name = (string) ($row['name'] ?? $row['courier_name'] ?? strtoupper($code));
+            $service = (string) ($row['service'] ?? '');
+            $description = (string) ($row['description'] ?? $service);
+            $cost = (int) ($row['cost'] ?? $row['value'] ?? 0);
+            $etd = (string) ($row['etd'] ?? '');
+            if ($cost < 0) {
+                continue;
+            }
+
+            if (!isset($grouped[$code])) {
+                $grouped[$code] = [
+                    'name' => $name,
+                    'code' => $code,
+                    'costs' => [],
+                ];
+            }
+
+            $grouped[$code]['costs'][] = [
+                'service' => $service,
+                'description' => $description,
+                'cost' => [[
+                    'value' => $cost,
+                    'etd' => $etd,
+                    'note' => '',
+                ]],
+            ];
+        }
+
+        return [
+            'code' => '200',
+            'message' => data_get($payload, 'meta.message', 'OK'),
+            'data' => [
+                'results' => array_values($grouped),
+            ],
+        ];
+    }
+
+    private function shippingFallbackResponse(string $message)
+    {
+        $rawCost = storefront_setting('shipping.fallback_cost', null);
+        if ($rawCost === null || $rawCost === '') {
+            $rawCost = env('STOREFRONT_FALLBACK_SHIPPING_COST', 15000);
+        }
+        if ($rawCost === null || $rawCost === '') {
+            $rawCost = 15000;
+        }
+        $cost = is_numeric($rawCost) ? max(0, (int) $rawCost) : null;
+
+        if ($cost === null) {
+            return response()->json([
+                'error' => $message,
+                'hint' => 'Set STOREFRONT_FALLBACK_SHIPPING_COST untuk memakai ongkir sementara.',
+            ], 503);
+        }
+
+        $service = storefront_setting('shipping.fallback_service', env('STOREFRONT_FALLBACK_SHIPPING_SERVICE', 'REG'));
+        $courier = storefront_setting('shipping.fallback_courier', env('STOREFRONT_FALLBACK_SHIPPING_COURIER', 'Greatfit'));
+        $etd = storefront_setting('shipping.fallback_etd', env('STOREFRONT_FALLBACK_SHIPPING_ETD', '2-5'));
+
+        return response()->json([
+            'code' => '200',
+            'message' => $message,
+            'data' => [
+                'results' => [[
+                    'name' => $courier,
+                    'code' => strtolower((string) $courier),
+                    'costs' => [[
+                        'service' => $service,
+                        'description' => 'Ongkir sementara',
+                        'cost' => [[
+                            'value' => $cost,
+                            'etd' => $etd,
+                            'note' => 'fallback',
+                        ]],
+                    ]],
+                ]],
+            ],
+        ]);
     }
 
     private function updateVisitorIdentity(Request $request, string $name, string $phone, string $province, string $city): void
@@ -495,6 +701,12 @@ class CartController extends Controller
                 continue;
             }
 
+            $mapping = $stockResolver->mappingForSelection($product, (string) ($line['color'] ?? ''), (string) ($line['size'] ?? ''));
+            $variant = $stockResolver->variantForSelection($product, (string) ($line['color'] ?? ''), (string) ($line['size'] ?? ''));
+            if ($mapping?->item_id || $variant?->item_id || !empty($line['item_id'])) {
+                continue;
+            }
+
             $available = $stockResolver->forSelection($product, (string) ($line['color'] ?? ''), (string) ($line['size'] ?? ''));
             $qty = max(1, (int) ($line['qty'] ?? 1));
 
@@ -509,12 +721,69 @@ class CartController extends Controller
         return $errors;
     }
 
+    /**
+     * Total berat cart (kg) untuk estimasi ongkir.
+     * Per baris: weight_kg produk katalog; kalau kosong/0 pakai fallback
+     * setting checkout.weight_per_item (default 0.5 kg).
+     */
+    private function cartTotalWeightKg(array $cart): float
+    {
+        $fallback = (float) (storefront_setting('checkout.weight_per_item') ?: 0.5);
+        if ($fallback <= 0) {
+            $fallback = 0.5;
+        }
+
+        $slugs = array_values(array_unique(array_filter(
+            array_map(fn($line) => $line['slug'] ?? null, $cart)
+        )));
+
+        $weights = empty($slugs)
+            ? collect()
+            : StorefrontProduct::whereIn('slug', $slugs)->pluck('weight_kg', 'slug');
+
+        $totalKg = 0.0;
+        foreach ($cart as $line) {
+            $qty = max(1, (int) ($line['qty'] ?? 1));
+            $weight = (float) ($weights[$line['slug'] ?? ''] ?? 0);
+            if ($weight <= 0) {
+                $weight = $fallback;
+            }
+            $totalKg += $qty * $weight;
+        }
+
+        return round($totalKg, 3);
+    }
+
+    private function checkoutUniqueCode(array $cart): int
+    {
+        if (empty($cart)) {
+            session()->forget('checkout_unique_code');
+            return 0;
+        }
+
+        $signature = md5(json_encode(array_values($cart)));
+        $current = session('checkout_unique_code');
+
+        if (is_array($current) && ($current['signature'] ?? null) === $signature) {
+            return (int) ($current['code'] ?? 0);
+        }
+
+        $code = random_int(101, 999);
+        session(['checkout_unique_code' => [
+            'signature' => $signature,
+            'code' => $code,
+        ]]);
+
+        return $code;
+    }
+
     private function cartStockSnapshot(array $cart): array
     {
         $snapshot = [];
 
         foreach ($cart as $key => $line) {
-            $available = $this->stockForCartLine($line);
+            $allowNegativeStock = $this->cartLineAllowsNegativeStock($line);
+            $available = $allowNegativeStock ? null : $this->stockForCartLine($line);
             $qty = max(1, (int) ($line['qty'] ?? 1));
 
             $snapshot[$key] = [
@@ -539,6 +808,97 @@ class CartController extends Controller
         }
 
         return app(StockResolver::class)->forSelection($product, (string) ($line['color'] ?? ''), (string) ($line['size'] ?? ''));
+    }
+
+    private function deductOrderStock(array $cart, StorefrontOrder $order): void
+    {
+        $stockResolver = app(StockResolver::class);
+
+        foreach ($cart as $line) {
+            $qty = max(1, (int) ($line['qty'] ?? 1));
+            $product = StorefrontProduct::where('slug', $line['slug'] ?? '')
+                ->with(['variants.itemMappings.item.inventoryStocks.warehouse', 'sizes', 'variantItemMappings.item.inventoryStocks.warehouse'])
+                ->first();
+
+            if (! $product) {
+                throw new \RuntimeException('Produk ' . ($line['name'] ?? '') . ' tidak ditemukan saat update stok.');
+            }
+
+            $mapping = $stockResolver->mappingForSelection($product, (string) ($line['color'] ?? ''), (string) ($line['size'] ?? ''));
+            $variant = $stockResolver->variantForSelection($product, (string) ($line['color'] ?? ''), (string) ($line['size'] ?? ''));
+            $itemId = (int) ($mapping?->item_id ?: $variant?->item_id ?: ($line['item_id'] ?? 0));
+
+            if ($itemId > 0) {
+                $this->deductItemStockFromRtsWarehouse($itemId, $qty, $order, $line);
+                continue;
+            }
+
+            if ($mapping && $mapping->stock_override !== null) {
+                if ((int) $mapping->stock_override < $qty) {
+                    throw new \RuntimeException($this->stockErrorLabel($line) . ' stok tersisa ' . (int) $mapping->stock_override . ' pcs.');
+                }
+                $mapping->decrement('stock_override', $qty);
+                continue;
+            }
+
+            if ($variant && $variant->stock_override !== null) {
+                if ((int) $variant->stock_override < $qty) {
+                    throw new \RuntimeException($this->stockErrorLabel($line) . ' stok tersisa ' . (int) $variant->stock_override . ' pcs.');
+                }
+                $variant->decrement('stock_override', $qty);
+            }
+        }
+    }
+
+    private function deductItemStockFromRtsWarehouse(int $itemId, int $qty, StorefrontOrder $order, array $line): void
+    {
+        $warehouse = Warehouse::query()
+            ->where('code', 'WH-RTS')
+            ->where('active', true)
+            ->first();
+
+        if (! $warehouse) {
+            throw new \RuntimeException('Gudang WH-RTS belum tersedia.');
+        }
+
+        app(InventoryService::class)->stockOut(
+            warehouseId: (int) $warehouse->id,
+            itemId: $itemId,
+            qty: $qty,
+            date: now(),
+            sourceType: 'storefront_order',
+            sourceId: $order->id,
+            notes: 'Checkout storefront ' . $order->order_number . ' - ' . $this->stockErrorLabel($line),
+            allowNegative: true,
+            affectLotCost: false,
+            strictNonNegative: false,
+        );
+    }
+
+    private function stockErrorLabel(array $line): string
+    {
+        return trim(($line['name'] ?? 'Produk') . ' ' . ($line['color'] ?? '') . ' ' . ($line['size'] ?? ''));
+    }
+
+    private function cartLineAllowsNegativeStock(array $line): bool
+    {
+        if (!empty($line['item_id'])) {
+            return true;
+        }
+
+        $product = StorefrontProduct::where('slug', $line['slug'] ?? '')
+            ->with(['variants.itemMappings.item.inventoryStocks.warehouse', 'sizes', 'variantItemMappings.item.inventoryStocks.warehouse'])
+            ->first();
+
+        if (! $product) {
+            return false;
+        }
+
+        $stockResolver = app(StockResolver::class);
+        $mapping = $stockResolver->mappingForSelection($product, (string) ($line['color'] ?? ''), (string) ($line['size'] ?? ''));
+        $variant = $stockResolver->variantForSelection($product, (string) ($line['color'] ?? ''), (string) ($line['size'] ?? ''));
+
+        return (bool) ($mapping?->item_id ?: $variant?->item_id);
     }
 
     private function forgetOrderedCartLines(array $orderedCart): void

@@ -18,9 +18,14 @@
 
 <header class="nav">
     <div class="nav-inner">
+        @php
+            $sfBrandName = storefront_setting('branding.brand_name', 'Greatfit');
+            $sfLogoUrl   = storefront_setting('branding.logo_url', '/images/logo-mark.svg');
+            $sfLogoSrc   = str_starts_with($sfLogoUrl, 'http') ? $sfLogoUrl : asset(ltrim($sfLogoUrl, '/'));
+        @endphp
         <a href="{{ route('storefront.home') }}" class="brand">
-            <img src="{{ asset('images/logo-mark.svg') }}" alt="Greatfit">
-            <span>GREATFIT</span>
+            <img src="{{ $sfLogoSrc }}" alt="{{ $sfBrandName }}">
+            <span>{{ strtoupper($sfBrandName) }}</span>
         </a>
         <div class="nav-r">
             <nav class="nav-links">

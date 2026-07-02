@@ -21,6 +21,7 @@ class StorefrontOrder extends Model
         'items',
         'subtotal',
         'shipping_cost',
+        'unique_code',
         'total_amount',
         'shipping_courier',
         'shipping_service',

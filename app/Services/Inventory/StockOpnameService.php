@@ -438,11 +438,30 @@ class StockOpnameService
                             $remaining -= $deduct;
                         }
 
-                        // Jika masih sisa setelah semua lot habis → log saja, tidak paksa minus
+                        // Jika masih sisa setelah semua lot habis (atau item tidak punya lot,
+                        // mis. finished goods) → tetap posting pengurangan stok gudang TANPA lot,
+                        // supaya saldo gudang benar-benar turun ke qty fisik hasil hitung.
+                        // Sebelumnya sisa ini hanya di-log, akibatnya stok sistem tidak pernah
+                        // dikoreksi dan tidak match dengan qty_after di adjustment line.
                         if ($remaining > 0.0000001) {
+                            $this->inventory->stockOut(
+                                warehouseId:      $warehouseId,
+                                itemId:           $itemId,
+                                qty:              $remaining,
+                                date:             $date,
+                                sourceType:       'stock_opname_adjustment',
+                                sourceId:         $adjustment->id,
+                                notes:            "Shortage opname {$opname->code} (tanpa lot)",
+                                allowNegative:    false,
+                                lotId:            null,
+                                unitCostOverride: $unitCost,
+                                affectLotCost:    false,
+                            );
+
                             \Illuminate\Support\Facades\Log::warning(
-                                "[StockOpname] {$opname->code}: shortage item #{$itemId} tidak terpenuhi penuh. "
-                                . "Sisa kekurangan: {$remaining} (tidak ada lot open dengan saldo cukup)."
+                                "[StockOpname] {$opname->code}: shortage item #{$itemId} sebesar {$remaining} "
+                                . "diposting tanpa lot (lot open tidak mencukupi / item tidak ber-lot). "
+                                . "Ledger lot tidak berubah untuk porsi ini."
                             );
                         }
                     }
@@ -523,6 +542,12 @@ class StockOpnameService
 
             if ($unitCost <= 0 && $line->item && (float) $line->item->base_unit_cost > 0) {
                 $unitCost = (float) $line->item->base_unit_cost;
+            }
+
+            // Fallback terakhir: HPP master item (items.hpp) — konsisten dengan
+            // jalur periodic & pesan error yang menyuruh melengkapi HPP di master.
+            if ($unitCost <= 0 && $line->item && (float) ($line->item->hpp ?? 0) > 0) {
+                $unitCost = (float) $line->item->hpp;
             }
 
             if ($unitCost <= 0) {

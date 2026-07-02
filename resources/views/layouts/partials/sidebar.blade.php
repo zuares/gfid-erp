@@ -671,9 +671,21 @@
                 <x-sidebar.label text="Website" />
                 <li class="simple-group">
                     <x-sidebar.simple-link href="{{ route('admin.catalog.products.index') }}" icon="bi bi-box-seam"
-                        :active="request()->routeIs('admin.catalog.products*')">
+                        :active="request()->routeIs('admin.catalog.products.index') || request()->routeIs('admin.catalog.products.edit') || request()->routeIs('admin.catalog.products.create')">
                         Produk Website
                     </x-sidebar.simple-link>
+                    @if($router->has('admin.catalog.products.ranking'))
+                    <x-sidebar.simple-link href="{{ route('admin.catalog.products.ranking') }}" icon="bi bi-bar-chart-steps"
+                        :active="request()->routeIs('admin.catalog.products.ranking')">
+                        Ranking Produk
+                    </x-sidebar.simple-link>
+                    @endif
+                    @if($router->has('admin.website.settings'))
+                    <x-sidebar.simple-link href="{{ route('admin.website.settings') }}" icon="bi bi-sliders"
+                        :active="request()->routeIs('admin.website.settings')">
+                        Pengaturan Website
+                    </x-sidebar.simple-link>
+                    @endif
                     @if($router->has('admin.catalog.categories.index'))
                     <x-sidebar.simple-link href="{{ route('admin.catalog.categories.index') }}" icon="bi bi-tag"
                         :active="request()->routeIs('admin.catalog.categories*')">
@@ -816,9 +828,21 @@
                 <x-sidebar.label text="Website" />
                 <li class="simple-group">
                     <x-sidebar.simple-link href="{{ route('admin.catalog.products.index') }}" icon="bi bi-box-seam"
-                        :active="request()->routeIs('admin.catalog.products*')">
+                        :active="request()->routeIs('admin.catalog.products.index') || request()->routeIs('admin.catalog.products.edit') || request()->routeIs('admin.catalog.products.create')">
                         Produk Website
                     </x-sidebar.simple-link>
+                    @if($router->has('admin.catalog.products.ranking'))
+                    <x-sidebar.simple-link href="{{ route('admin.catalog.products.ranking') }}" icon="bi bi-bar-chart-steps"
+                        :active="request()->routeIs('admin.catalog.products.ranking')">
+                        Ranking Produk
+                    </x-sidebar.simple-link>
+                    @endif
+                    @if($router->has('admin.website.settings'))
+                    <x-sidebar.simple-link href="{{ route('admin.website.settings') }}" icon="bi bi-sliders"
+                        :active="request()->routeIs('admin.website.settings')">
+                        Pengaturan Website
+                    </x-sidebar.simple-link>
+                    @endif
                     @if($router->has('admin.catalog.categories.index'))
                     <x-sidebar.simple-link href="{{ route('admin.catalog.categories.index') }}" icon="bi bi-tag"
                         :active="request()->routeIs('admin.catalog.categories*')">

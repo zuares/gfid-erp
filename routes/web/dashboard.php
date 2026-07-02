@@ -7,6 +7,7 @@ use App\Http\Controllers\Admin\StorefrontProductCatalogController;
 use App\Http\Controllers\Admin\StorefrontProductCategoryController;
 use App\Http\Controllers\Admin\StorefrontSegmentController;
 use App\Http\Controllers\Admin\StorefrontVisitorController;
+use App\Http\Controllers\Admin\StorefrontWebsiteSettingsController;
 use App\Http\Controllers\Storefront\CartController;
 use App\Http\Controllers\Storefront\CustomerAuthController;
 use App\Http\Controllers\Storefront\EventTrackController;
@@ -147,6 +148,7 @@ Route::middleware(['auth'])->group(function () {
             Route::get('/items/suggest',             [StorefrontProductCatalogController::class, 'suggestItems'])->name('items.suggest');
             Route::get('/create',                    [StorefrontProductCatalogController::class, 'create'])->name('create');
             Route::post('/',                         [StorefrontProductCatalogController::class, 'store'])->name('store');
+            Route::get('/ranking',                   [StorefrontProductCatalogController::class, 'rankingOverview'])->name('ranking');
             Route::get('/{product}/edit',            [StorefrontProductCatalogController::class, 'edit'])->name('edit');
             Route::put('/{product}',                 [StorefrontProductCatalogController::class, 'update'])->name('update');
             Route::delete('/{product}',              [StorefrontProductCatalogController::class, 'destroy'])->name('destroy');
@@ -164,6 +166,13 @@ Route::middleware(['auth'])->group(function () {
             // Ranking
             Route::patch('/{product}/ranking',                   [StorefrontProductCatalogController::class, 'updateRanking'])->name('ranking.update');
             Route::post('/rank-now',                             [StorefrontProductCatalogController::class, 'rankNow'])->name('rank-now');
+        });
+
+        // ── Website Settings ──────────────────────────────────────────────────
+        Route::prefix('admin/website')->name('admin.website.')->group(function () {
+            Route::get('/settings',          [StorefrontWebsiteSettingsController::class, 'index'])->name('settings');
+            Route::post('/settings',         [StorefrontWebsiteSettingsController::class, 'update'])->name('settings.update');
+            Route::post('/settings/upload',  [StorefrontWebsiteSettingsController::class, 'uploadImage'])->name('settings.upload');
         });
 
         // ── CRM Storefront ────────────────────────────────────────────────────

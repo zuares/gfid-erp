@@ -101,6 +101,12 @@
                 </span>
                 <span>{{ $order->shipping_cost > 0 ? 'Rp'.number_format($order->shipping_cost, 0, ',', '.') : 'Gratis' }}</span>
             </div>
+            @if(($order->unique_code ?? 0) > 0)
+            <div class="sum-row">
+                <span class="sum-label">Kode unik</span>
+                <span>Rp{{ number_format($order->unique_code, 0, ',', '.') }}</span>
+            </div>
+            @endif
             <div class="sum-row total">
                 <span class="sum-label">Total</span>
                 <span>Rp{{ number_format($order->total_amount, 0, ',', '.') }}</span>
@@ -167,7 +173,7 @@
 @push('scripts')
 <script>
 (function () {
-    var WA_NUMBER  = '6281224889319';
+    var WA_NUMBER  = '{{ storefront_setting('branding.whatsapp_number', '6281224889319') }}';
     var ORDER_NUM  = '{{ $order->order_number }}';
     var WA_MSG     = @json($waMessage);
     var MARK_URL   = '{{ route('storefront.order.wa_click', $order->order_number) }}';
@@ -186,6 +192,9 @@
         lines.push('Subtotal: Rp{{ number_format($order->subtotal, 0, ',', '.') }}');
         @if($order->shipping_cost > 0)
         lines.push('Ongkir: Rp{{ number_format($order->shipping_cost, 0, ',', '.') }}');
+        @endif
+        @if(($order->unique_code ?? 0) > 0)
+        lines.push('Kode unik: Rp{{ number_format($order->unique_code, 0, ',', '.') }}');
         @endif
         lines.push('*Total: Rp{{ number_format($order->total_amount, 0, ',', '.') }}*');
         lines.push('');

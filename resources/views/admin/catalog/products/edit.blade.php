@@ -149,6 +149,14 @@
                                 <input type="number" name="base_price" value="{{ old('base_price', $product->base_price) }}" min="0"
                                        class="form-control" style="border-radius:10px;font-size:.85rem;">
                             </div>
+                            <div class="col-6">
+                                <label class="form-label-sm">Berat per Pcs (kg)</label>
+                                <input type="number" name="weight_kg" value="{{ old('weight_kg', $product->weight_kg) }}" min="0" step="0.001"
+                                       class="form-control @error('weight_kg') is-invalid @enderror"
+                                       style="border-radius:10px;font-size:.85rem;" placeholder="0.5">
+                                <div class="form-hint" style="font-size:.68rem;color:#94a3b8;">Untuk estimasi ongkir di checkout. Kosongkan = pakai default setting website</div>
+                                @error('weight_kg')<div class="invalid-feedback">{{ $message }}</div>@enderror
+                            </div>
                         </div>
 
                         {{-- Category + Audience row --}}

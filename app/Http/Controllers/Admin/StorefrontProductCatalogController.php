@@ -135,6 +135,7 @@ class StorefrontProductCatalogController extends Controller
             'category_id'  => ['nullable', 'exists:storefront_product_categories,id'],
             'audience'     => ['nullable', 'in:pria,wanita,anak,olahraga,unisex'],
             'base_price'   => ['required', 'integer', 'min:0'],
+            'weight_kg'    => ['nullable', 'numeric', 'min:0', 'max:999'],
             'label'        => ['nullable', 'string', 'max:40'],
             'sort_order'   => ['nullable', 'integer', 'min:0'],
             'image'        => ['nullable', 'image', 'max:4096'],
@@ -182,6 +183,7 @@ class StorefrontProductCatalogController extends Controller
             'description'  => ['nullable', 'string'],
             'product_type' => ['required', 'in:regular,jumbo'],
             'base_price'   => ['required', 'integer', 'min:0'],
+            'weight_kg'    => ['nullable', 'numeric', 'min:0', 'max:999'],
             'label'        => ['nullable', 'string', 'max:40'],
             'sort_order'   => ['nullable', 'integer', 'min:0'],
             'category_id'  => ['nullable', 'exists:storefront_product_categories,id'],
@@ -438,7 +440,29 @@ class StorefrontProductCatalogController extends Controller
         return back()->with('success', 'Ukuran dihapus.');
     }
 
-    // ─── Ranking Overrides ────────────────────────────────────────────────────
+    // ─── Ranking Overview + Overrides ────────────────────────────────────────
+
+    /**
+     * Halaman overview ranking semua produk.
+     * Route: GET /admin/catalog/products/ranking
+     */
+    public function rankingOverview()
+    {
+        $products = StorefrontProduct::where('is_published', true)
+            ->with(['variants' => fn($q) => $q->where('is_active', true)->orderBy('sort_order')])
+            ->orderByRaw('rank_position IS NULL ASC')
+            ->orderBy('rank_position')
+            ->orderBy('name')
+            ->get();
+
+        $lastUpdated = $products->whereNotNull('rank_updated_at')->max('rank_updated_at');
+        $rankedCount = $products->whereNotNull('rank_position')->count();
+        $pinnedCount = $products->where('is_pinned', true)->count();
+
+        return view('admin.catalog.products.ranking', compact(
+            'products', 'lastUpdated', 'rankedCount', 'pinnedCount'
+        ));
+    }
 
     /**
      * Simpan override ranking (pin, boost, featured_until, stock) untuk satu produk.

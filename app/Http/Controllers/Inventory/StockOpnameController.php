@@ -700,7 +700,8 @@ class StockOpnameController extends Controller
                 $existingLine->physical_qty = $physicalQty;
                 $existingLine->difference_qty = $difference;
                 $existingLine->is_counted = $isCounted;
-                $existingLine->unit_cost = $unitCost !== null ? (float) $unitCost : null;
+                // Jangan timpa HPP lama dengan NULL kalau input kosong
+                $existingLine->unit_cost = $unitCost !== null ? (float) $unitCost : $existingLine->unit_cost;
                 $existingLine->notes = $notes ?? $existingLine->notes;
                 $existingLine->save();
             } else {

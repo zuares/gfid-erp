@@ -290,14 +290,49 @@ if (!function_exists('storefrontProducts')) {
     }
 }
 
+if (!function_exists('storefront_setting')) {
+    /**
+     * Baca satu storefront setting.
+     * Menggunakan in-request static cache (DB query hanya sekali per request).
+     */
+    function storefront_setting(string $key, mixed $default = null): mixed
+    {
+        static $cache = null;
+        if ($cache === null) {
+            try {
+                $cache = \App\Models\StorefrontSetting::allCached();
+            } catch (\Throwable) {
+                $cache = [];
+            }
+        }
+        return $cache[$key] ?? $default;
+    }
+}
+
 if (!function_exists('storefrontChannels')) {
     function storefrontChannels(): array
     {
         return [
-            ['label' => 'Website',   'url' => '#', 'dark' => true],
-            ['label' => 'Shopee',    'url' => '#', 'dark' => false],
-            ['label' => 'TikTok',    'url' => '#', 'dark' => false],
-            ['label' => 'Tokopedia', 'url' => '#', 'dark' => false],
+            [
+                'label' => 'Website',
+                'url'   => '/',
+                'dark'  => true,
+            ],
+            [
+                'label' => 'Shopee',
+                'url'   => storefront_setting('channels.shopee_url', '#'),
+                'dark'  => false,
+            ],
+            [
+                'label' => 'TikTok',
+                'url'   => storefront_setting('channels.tiktok_url', '#'),
+                'dark'  => false,
+            ],
+            [
+                'label' => 'Tokopedia',
+                'url'   => storefront_setting('channels.tokopedia_url', '#'),
+                'dark'  => false,
+            ],
         ];
     }
 }
