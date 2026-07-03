@@ -1267,14 +1267,13 @@ class SewingReturnController extends Controller
                 }
 
                 if (($sourceRejectLineId > 0 || $sourceFinishingLineId > 0) && $qtyOk > 0.000001) {
-                    // WIP-SEW dan REJ-SEW keduanya hanya mengandung material cost (tanpa upah).
-                    // Upah jahit ditambahkan ke WH-PRD di sini saat rework berhasil (OK).
+                    // REJ-SEW sudah membawa nilai material + upah dari pickup.
+                    // Saat rework berhasil, cukup pindahkan nilai yang sudah ada.
                     $unitCostRejSew = (float) $this->inventory->getItemIncomingUnitCost(
                         warehouseId: $rejectWarehouse->id,
                         itemId: $itemId
                     );
-                    $wagePerPcsLine = (float) ($pl->wage_per_pcs ?? 0);
-                    $unitCostFinRework = round($unitCostRejSew + $wagePerPcsLine, 10);
+                    $unitCostFinRework = round($unitCostRejSew, 10);
 
                     $this->inventory->stockOut(
                         warehouseId: $rejectWarehouse->id,
@@ -1298,7 +1297,7 @@ class SewingReturnController extends Controller
                         date: $date,
                         sourceType: 'sewing_reject_rework_ok',
                         sourceId: $sewingReturn->id,
-                        notes: "Setor ulang reject {$sewingReturn->code} IN {$destWarehouse->code}" . ($wagePerPcsLine > 0 ? " + upah @{$wagePerPcsLine}/pcs" : ''),
+                        notes: "Setor ulang reject {$sewingReturn->code} IN {$destWarehouse->code}",
                         lotId: null,
                         unitCost: $unitCostFinRework,
                         affectLotCost: false,
@@ -1309,15 +1308,14 @@ class SewingReturnController extends Controller
                     continue;
                 }
 
-                // OK: OUT WIP-SEW (material) → IN WH-PRD (material + upah jahit).
-                // WIP-SEW hanya mengandung material cost; upah ditambahkan di sini saat setor OK.
+                // OK: OUT WIP-SEW → IN WH-PRD.
+                // WIP-SEW sudah membawa material + upah sejak Ambil Jahit.
                 if ($qtyOk > 0.000001) {
                     $unitCostWipSew = (float) $this->inventory->getItemIncomingUnitCost(
                         warehouseId: $wipSewWarehouse->id,
                         itemId: $itemId
                     );
-                    $wagePerPcsLine = (float) ($pl->wage_per_pcs ?? 0);
-                    $unitCostFin = round($unitCostWipSew + $wagePerPcsLine, 10);
+                    $unitCostFin = round($unitCostWipSew, 10);
 
                     $this->inventory->stockOut(
                         warehouseId: $wipSewWarehouse->id,
@@ -1341,7 +1339,7 @@ class SewingReturnController extends Controller
                         date: $date,
                         sourceType: 'sewing_return_ok',
                         sourceId: $sewingReturn->id,
-                        notes: "Sewing Return {$sewingReturn->code} (OK) IN {$destWarehouse->code}" . ($wagePerPcsLine > 0 ? " + upah @{$wagePerPcsLine}/pcs" : ''),
+                        notes: "Sewing Return {$sewingReturn->code} (OK) IN {$destWarehouse->code}",
                         lotId: null,
                         unitCost: $unitCostFin,
                         affectLotCost: false,

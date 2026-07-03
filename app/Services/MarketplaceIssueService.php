@@ -313,6 +313,109 @@ class MarketplaceIssueService
     }
 
     // ─────────────────────────────────────────────────────────────────────────
+    // Auto-map by item code (retroaktif — untuk item mapping_not_found)
+    // ─────────────────────────────────────────────────────────────────────────
+
+    /**
+     * Untuk setiap item dengan mapping_not_found, coba cocokkan marketplace_sku
+     * ke items.code dengan dua strategi:
+     *   1. Exact match   → K5BLK-3 === item.code K5BLK-3
+     *   2. Prefix match  → K5BLK-1 → strip trailing -\d+ → K5BLK === item.code K5BLK
+     *
+     * Kalau ketemu unique match → buat SkuMapping + resolve item + resolve semua
+     * item lain dengan SKU yang sama.
+     */
+    public function autoMapByCode(?int $storeId = null): array
+    {
+        // Kumpulkan distinct SKU yang belum mapped
+        $query = MarketplaceOrderItem::query()
+            ->where('mapping_status', self::MAPPING_NOT_FOUND)
+            ->when($storeId, fn ($q) => $q->whereHas(
+                'order', fn ($q2) => $q2->where('store_id', $storeId)
+            ))
+            ->with(['order.store.channel']);
+
+        // Collect distinct (sku, channelCode) pairs to avoid processing duplicates
+        $pairs   = [];
+        $mapped  = 0;
+        $skipped = 0;
+        $errors  = 0;
+
+        $query->chunkById(200, function ($items) use (&$pairs, &$mapped, &$skipped, &$errors) {
+            foreach ($items as $item) {
+                $sku = $item->marketplace_sku
+                    ?? $item->model_sku
+                    ?? $item->item_sku
+                    ?? null;
+
+                if (! $sku) { $skipped++; continue; }
+
+                $channelCode = $item->order?->store?->channel?->code;
+                $pairKey     = $sku . '|' . ($channelCode ?? '');
+
+                // Skip if already created mapping for this SKU in this run
+                if (isset($pairs[$pairKey])) {
+                    // Still need to resolve this item against the newly created mapping
+                    try {
+                        $this->resolveItem($item, $channelCode);
+                        $mapped++;
+                    } catch (\Throwable) { $errors++; }
+                    continue;
+                }
+
+                $pairs[$pairKey] = true;
+
+                // ── Strategy 1: exact code match ──────────────────────────────
+                $internalItem = Item::where('code', $sku)->first();
+
+                // ── Strategy 2: strip trailing -\d+ suffix ────────────────────
+                if (! $internalItem) {
+                    $prefix = preg_replace('/-\d+$/', '', $sku);
+                    if ($prefix !== $sku) {
+                        $internalItem = Item::where('code', $prefix)->first();
+                    }
+                }
+
+                if (! $internalItem) { $skipped++; continue; }
+
+                try {
+                    // Create mapping
+                    SkuMapping::updateOrCreate(
+                        ['marketplace_sku' => $sku, 'channel_code' => $channelCode],
+                        ['item_id' => $internalItem->id]
+                    );
+
+                    // Resolve this item
+                    $this->resolveItem($item->fresh(), $channelCode);
+                    $mapped++;
+
+                    // Resolve all other items with same SKU (same channel)
+                    MarketplaceOrderItem::where('mapping_status', self::MAPPING_NOT_FOUND)
+                        ->where(function ($q) use ($sku) {
+                            $q->where('marketplace_sku', $sku)
+                              ->orWhere('model_sku', $sku)
+                              ->orWhere('item_sku', $sku);
+                        })
+                        ->where('id', '!=', $item->id)
+                        ->with(['order.store.channel'])
+                        ->chunkById(100, function ($chunk) use (&$mapped, &$errors) {
+                            foreach ($chunk as $s) {
+                                try {
+                                    $this->resolveItem($s->fresh(), $s->order?->store?->channel?->code);
+                                    $mapped++;
+                                } catch (\Throwable) { $errors++; }
+                            }
+                        });
+                } catch (\Throwable) {
+                    $errors++;
+                }
+            }
+        });
+
+        return ['mapped' => $mapped, 'skipped' => $skipped, 'errors' => $errors];
+    }
+
+    // ─────────────────────────────────────────────────────────────────────────
     // Re-map semua item (retroaktif)
     // ─────────────────────────────────────────────────────────────────────────
 

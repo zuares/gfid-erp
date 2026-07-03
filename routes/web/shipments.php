@@ -22,6 +22,7 @@ Route::middleware(['web', 'auth', 'access:sales'])
 
                 // ⚠️ Penting: harus sebelum {shipment}
                 Route::get('report', 'report')->name('report');
+                Route::get('invoice-lookup', 'invoiceLookup')->name('invoice_lookup');
 
                 Route::get('/', 'index')->name('index');
                 Route::get('create', 'create')->name('create');
@@ -43,6 +44,11 @@ Route::middleware(['web', 'auth', 'access:sales'])
                 Route::post('{shipment}/import-preview', 'importPreview')->name('import_preview');
                 Route::get('/{shipment}/reconcile', [ShipmentController::class, 'reconcile'])
                     ->name('reconcile');
+
+                // ── Opsi C: Rekonsiliasi Pesanan ──────────────────────────
+                Route::get('/{shipment}/rekon',        'rekon')->name('rekon');
+                Route::post('/{shipment}/rekon/match', 'rekonMatch')->name('rekon_match');
+                Route::post('/{shipment}/rekon/apply', 'rekonApply')->name('rekon_apply');
 
                 Route::post('{shipment}/cancel', 'cancelPosted')
                     ->name('cancel')

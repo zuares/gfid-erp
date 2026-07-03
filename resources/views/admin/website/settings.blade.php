@@ -2324,9 +2324,16 @@ function updateSwatch(key, val) {
 
     let dragSrc = null;
 
+    // Drag hanya dimulai dari handle ⠿ — dicatat saat POINTERDOWN, karena pada
+    // event dragstart e.target = elemen yang di-drag (item), bukan yang ditekan.
+    let pressOnHandle = false;
+    list.addEventListener('pointerdown', function (e) {
+        pressOnHandle = !!e.target.closest('.ws-drag-handle');
+    });
+
     list.querySelectorAll('.ws-sortable-item').forEach(item => {
         item.addEventListener('dragstart', function (e) {
-            if (!e.target.closest('.ws-drag-handle')) {
+            if (!pressOnHandle) {
                 e.preventDefault();
                 return;
             }
@@ -2335,6 +2342,7 @@ function updateSwatch(key, val) {
             e.dataTransfer.effectAllowed = 'move';
         });
         item.addEventListener('dragend', function () {
+            pressOnHandle = false;
             this.classList.remove('dragging');
             list.querySelectorAll('.ws-sortable-item').forEach(i => i.classList.remove('drag-over'));
             wsUpdateSectionOrder();
@@ -2364,7 +2372,11 @@ function updateSwatch(key, val) {
     function wsUpdateSectionOrder() {
         const keys = [...list.querySelectorAll('.ws-sortable-item')].map(i => i.dataset.key);
         const inp  = document.getElementById('ws-sections-order');
-        if (inp) inp.value = keys.join(',');
+        if (inp) {
+            inp.value = keys.join(',');
+            // trigger dirty state + live preview reorder
+            inp.dispatchEvent(new Event('input', { bubbles: true }));
+        }
     }
 })();
 

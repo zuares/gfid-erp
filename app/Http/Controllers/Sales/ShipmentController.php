@@ -5,6 +5,7 @@ namespace App\Http\Controllers\Sales;
 use App\Http\Controllers\Controller;
 use App\Models\InventoryStock;
 use App\Models\Item;
+use App\Models\MarketplaceOrder;
 use App\Models\MpReconciliation;
 use App\Models\SalesInvoice;
 use App\Models\Shipment;
@@ -206,6 +207,45 @@ class ShipmentController extends Controller
      * (Kalau mau hanya owner yang boleh lihat nominal, bilang ya nanti aku ubah ke whitelist.)
      */
 
+    /**
+     * AJAX: cari SalesInvoice berdasarkan no pesanan, kode invoice, atau channel_invoice_no.
+     * Dipanggil dari create.blade.php saat user mengetik no pesanan.
+     */
+    public function invoiceLookup(Request $request): \Illuminate\Http\JsonResponse
+    {
+        $q = trim($request->input('q', ''));
+
+        if (strlen($q) < 3) {
+            return response()->json(['found' => false]);
+        }
+
+        $invoice = SalesInvoice::with('store')
+            ->where(function ($query) use ($q) {
+                $query->where('code', $q)
+                    ->orWhere('channel_order_no', $q)
+                    ->orWhere('channel_invoice_no', $q)
+                    ->orWhere('code', 'like', '%' . $q . '%')
+                    ->orWhere('channel_order_no', 'like', '%' . $q . '%');
+            })
+            ->orderByRaw("CASE WHEN code = ? OR channel_order_no = ? THEN 0 ELSE 1 END", [$q, $q])
+            ->first();
+
+        if (! $invoice) {
+            return response()->json(['found' => false]);
+        }
+
+        return response()->json([
+            'found'            => true,
+            'id'               => $invoice->id,
+            'code'             => $invoice->code,
+            'channel_order_no' => $invoice->channel_order_no,
+            'date'             => optional($invoice->date)->format('Y-m-d'),
+            'store_id'         => $invoice->store_id,
+            'store_code'       => $invoice->store->code ?? null,
+            'store_name'       => $invoice->store->name ?? null,
+        ]);
+    }
+
     public function create(Request $request)
     {
         $stores = Store::orderBy('code')->get();
@@ -218,50 +258,85 @@ class ShipmentController extends Controller
             $invoice = SalesInvoice::with('store')->find($request->invoice_id);
         }
 
-        return view('sales.shipments.create', compact('stores', 'whRts', 'invoice'));
+        $today = now()->toDateString();
+        $kpi = [
+            'created' => Shipment::whereDate('created_at', $today)->count(),
+            'qty'     => (int) ShipmentLine::whereHas('shipment', fn ($q) => $q->whereDate('created_at', $today))->sum('qty_scanned'),
+            'draft'   => Shipment::whereDate('created_at', $today)->where('status', 'draft')->count(),
+            'posted'  => Shipment::whereDate('created_at', $today)->where('status', 'posted')->count(),
+        ];
+
+        return view('sales.shipments.create', compact('stores', 'whRts', 'invoice', 'kpi'));
     }
 
     public function store(Request $request)
     {
         $data = $request->validate([
-            'store_id' => ['required', 'exists:stores,id'],
-            'date' => ['required', 'date'],
-            'notes' => ['nullable', 'string'],
+            'store_id'         => ['nullable', 'exists:stores,id'],
+            'date'             => ['required', 'date'],
+            'notes'            => ['nullable', 'string'],
             'sales_invoice_id' => ['nullable', 'exists:sales_invoices,id'],
         ]);
 
-        $store = Store::findOrFail($data['store_id']);
-
-        $storeName = strtoupper(trim($store->name ?? ''));
-        $storeCode = strtoupper(trim($store->code ?? ''));
-        $storeKey = $storeCode . ' ' . $storeName;
+        // Store boleh null — diisi nanti saat rekonsiliasi dengan no pesanan
+        $store = $data['store_id'] ? Store::find($data['store_id']) : null;
 
         $prefix = 'SHP';
-        if ($storeCode !== '') {
-            $cleanCode = preg_replace('/[^A-Z0-9]/', '', $storeCode);
-            if ($cleanCode !== '') {
-                $prefix = substr($cleanCode, 0, 3);
+        if ($store) {
+            $storeName = strtoupper(trim($store->name ?? ''));
+            $storeCode = strtoupper(trim($store->code ?? ''));
+            $storeKey  = $storeCode . ' ' . $storeName;
+
+            if ($storeCode !== '') {
+                $cleanCode = preg_replace('/[^A-Z0-9]/', '', $storeCode);
+                if ($cleanCode !== '') {
+                    $prefix = substr($cleanCode, 0, 3);
+                }
             }
-
-        }
-
-        if (str_contains($storeKey, 'SHP') || str_contains($storeKey, 'SHOPEE')) {
-            $prefix = 'SHP';
-        } elseif (str_contains($storeKey, 'TTK') || str_contains($storeKey, 'TIKTOK')) {
-            $prefix = 'TTK';
+            if (str_contains($storeKey, 'SHP') || str_contains($storeKey, 'SHOPEE')) {
+                $prefix = 'SHP';
+            } elseif (str_contains($storeKey, 'TTK') || str_contains($storeKey, 'TIKTOK')) {
+                $prefix = 'TTK';
+            }
         }
 
         $code = Shipment::generateCode($prefix);
 
         $shipment = Shipment::create([
-            'code' => $code,
-            'store_id' => $data['store_id'],
+            'code'             => $code,
+            'store_id'         => $data['store_id'] ?? null,
             'sales_invoice_id' => $data['sales_invoice_id'] ?? null,
-            'date' => $data['date'],
-            'status' => 'draft',
-            'notes' => $data['notes'] ?? null,
-            'created_by' => Auth::id(),
+            'date'             => $data['date'],
+            'status'           => 'draft',
+            'notes'            => $data['notes'] ?? null,
+            'created_by'       => Auth::id(),
         ]);
+
+        if ($request->expectsJson() || $request->ajax()) {
+            // Gunakan path-only (strip host) agar AJAX selalu ke host yang sama,
+            // tidak peduli APP_URL (bisa berbeda saat pakai ngrok/expose).
+            $path = fn ($name, $params = []) => parse_url(route($name, $params), PHP_URL_PATH);
+
+            return response()->json([
+                'status'   => 'ok',
+                'shipment' => [
+                    'id'         => $shipment->id,
+                    'code'       => $shipment->code,
+                    'date'       => $shipment->date->format('Y-m-d'),
+                    'store_id'   => $shipment->store_id,
+                    'store_code' => $store?->code,
+                    'store_name' => $store?->name,
+                    'notes'      => $shipment->notes,
+                    'scan_url'         => $path('sales.shipments.scan_item', $shipment),
+                    'submit_url'       => $path('sales.shipments.submit', $shipment),
+                    'clear_url'        => $path('sales.shipments.clear_lines', $shipment),
+                    'show_url'         => $path('sales.shipments.show', $shipment),
+                    'export_url'       => $path('sales.shipments.export_lines', $shipment),
+                    'destroy_line_url' => $path('sales.shipments.destroy_line', ['line' => '__LINE_ID__']),
+                    'update_qty_url'   => $path('sales.shipments.update_line_qty', ['line' => '__LINE_ID__']),
+                ],
+            ]);
+        }
 
         return redirect()
             ->route('sales.shipments.edit', $shipment)
@@ -283,7 +358,15 @@ class ShipmentController extends Controller
         $importPreview = session('shipment_import_preview.' . $shipment->id . '.rows') ?? null;
         $importPreviewSummary = session('shipment_import_preview.' . $shipment->id . '.summary') ?? null;
 
-        return view('sales.shipments.edit', compact('shipment', 'importPreview', 'importPreviewSummary'));
+        $today = now()->toDateString();
+        $kpi = [
+            'created' => Shipment::whereDate('created_at', $today)->count(),
+            'qty'     => (int) ShipmentLine::whereHas('shipment', fn ($q) => $q->whereDate('created_at', $today))->sum('qty_scanned'),
+            'draft'   => Shipment::whereDate('created_at', $today)->where('status', 'draft')->count(),
+            'posted'  => Shipment::whereDate('created_at', $today)->where('status', 'posted')->count(),
+        ];
+
+        return view('sales.shipments.edit', compact('shipment', 'importPreview', 'importPreviewSummary', 'kpi'));
     }
 
     public function scanItem(Request $request, Shipment $shipment)
@@ -853,6 +936,306 @@ class ShipmentController extends Controller
     protected function postShipmentCogs(Shipment $shipment): void
     {
         $this->journalService->postShipmentCogsFromMutations($shipment);
+    }
+
+    /* ═══════════════════════════════════════════════════════════════════
+     |  OPSI C — REKONSILIASI PESANAN
+     |  Alur: scan batch bebas → input no pesanan → auto-match → confirm
+     ═══════════════════════════════════════════════════════════════════ */
+
+    /** Halaman rekonsiliasi pesanan untuk shipment draft */
+    public function rekon(Shipment $shipment)
+    {
+        if ($shipment->status !== 'draft') {
+            return redirect()->route('sales.shipments.show', $shipment)
+                ->with('status', 'error')
+                ->with('message', 'Hanya shipment draft yang bisa direkonsiliasi.');
+        }
+
+        $shipment->load(['store', 'lines.item']);
+
+        // Ringkasan batch: {item_id => {code, name, qty, qty_remaining}}
+        $batchPool = $shipment->lines->mapWithKeys(fn ($l) => [
+            $l->item_id => [
+                'item_id'   => $l->item_id,
+                'item_code' => $l->item?->code ?? '-',
+                'item_name' => $l->item?->name ?? '-',
+                'qty'       => (int) $l->qty_scanned,
+            ],
+        ]);
+
+        return view('sales.shipments.rekon', compact('shipment', 'batchPool'));
+    }
+
+    /**
+     * AJAX: analisis SATU no pesanan terhadap sisa pool batch.
+     *
+     * Input  (form):  order_no  — satu channel_order_no / invoice code
+     *                 pool_used — JSON {item_id: qty_already_allocated} dari sisi JS
+     *                             agar server bisa hitung sisa pool dengan benar
+     * Output (JSON):  hasil match satu pesanan + seluruh pool yang tersisa (untuk picker substitusi)
+     */
+    public function rekonMatch(Request $request, Shipment $shipment): \Illuminate\Http\JsonResponse
+    {
+        $request->validate([
+            'order_no'  => ['required', 'string', 'max:200'],
+            'pool_used' => ['nullable', 'string'], // JSON: {item_id: qty_used}
+        ]);
+
+        $shipment->load('lines.item');
+
+        // ── Build base pool dari shipment lines ──────────────────────────
+        $basePool = $shipment->lines->mapWithKeys(fn ($l) => [
+            $l->item_id => (int) $l->qty_scanned,
+        ])->toArray();
+
+        // ── Kurangi dengan apa yang sudah dialokasikan oleh pesanan sebelumnya ──
+        $poolUsed = [];
+        if ($request->filled('pool_used')) {
+            try { $poolUsed = json_decode($request->pool_used, true) ?: []; } catch (\Throwable) {}
+        }
+        $pool = $basePool;
+        foreach ($poolUsed as $itemId => $usedQty) {
+            if (isset($pool[$itemId])) {
+                $pool[$itemId] = max(0, $pool[$itemId] - (int) $usedQty);
+            }
+        }
+
+        // ── Lookup: coba SalesInvoice dulu, lalu MarketplaceOrder ────────
+        $no  = trim($request->order_no);
+
+        $inv = SalesInvoice::with(['store', 'lines.item'])
+            ->where(function ($q) use ($no) {
+                $q->where('channel_order_no', $no)
+                  ->orWhere('code', $no)
+                  ->orWhere('channel_invoice_no', $no);
+            })
+            ->first();
+
+        // Jika tidak ada di SalesInvoice, cari di MarketplaceOrder
+        $mpOrder = null;
+        if (! $inv) {
+            $mpOrder = MarketplaceOrder::with(['store', 'items.internalItem'])
+                ->where(function ($q) use ($no) {
+                    $q->where('channel_order_id', $no)
+                      ->orWhere('external_order_id', $no)
+                      ->orWhere('booking_sn', $no);
+                })
+                ->first();
+        }
+
+        if (! $inv && ! $mpOrder) {
+            $poolFull = $this->buildPoolSnapshot($shipment, $pool);
+            return response()->json([
+                'status'    => 'ok',
+                'no'        => $no,
+                'found'     => false,
+                'order'     => null,
+                'pool_full' => $poolFull,
+            ]);
+        }
+
+        // ── Build raw order lines dari sumber yang ditemukan ─────────────
+        $rawLines  = [];
+        $orderMeta = [];
+
+        if ($inv) {
+            // Sumber: SalesInvoice
+            foreach ($inv->lines as $ol) {
+                $rawLines[] = [
+                    'item_id'   => $ol->item_id,
+                    'item_code' => $ol->item?->code ?? '-',
+                    'item_name' => $ol->item?->name ?? '-',
+                    'qty'       => (int) $ol->qty,
+                ];
+            }
+            $orderMeta = [
+                'invoice_id'   => $inv->id,
+                'invoice_code' => $inv->code,
+                'order_no'     => $inv->channel_order_no,
+                'store_id'     => $inv->store_id,
+                'store_name'   => $inv->store?->name,
+                'store_code'   => $inv->store?->code,
+                'date'         => $inv->date?->format('Y-m-d'),
+                'source'       => 'sales_invoice',
+            ];
+        } else {
+            // Sumber: MarketplaceOrder — pakai internal_item_id sebagai item_id
+            foreach ($mpOrder->items as $oi) {
+                $itemId   = $oi->internal_item_id ?? $oi->item_id ?? null;
+                $itemCode = $oi->internalItem?->code ?? $oi->item_code_snapshot ?? $oi->model_sku ?? $oi->item_sku ?? '-';
+                $itemName = $oi->internalItem?->name ?? $oi->item_name_snapshot ?? $oi->item_name ?? '-';
+                if (! $itemId) continue;
+                $rawLines[] = [
+                    'item_id'   => $itemId,
+                    'item_code' => $itemCode,
+                    'item_name' => $itemName,
+                    'qty'       => (int) $oi->qty,
+                ];
+            }
+            $orderDate = $mpOrder->ordered_at ?? $mpOrder->order_date;
+            $orderMeta = [
+                'invoice_id'   => null,
+                'invoice_code' => null,
+                'order_no'     => $mpOrder->channel_order_id ?? $mpOrder->external_order_id,
+                'store_id'     => $mpOrder->store_id,
+                'store_name'   => $mpOrder->store?->name,
+                'store_code'   => $mpOrder->store?->code,
+                'date'         => $orderDate ? \Carbon\Carbon::parse($orderDate)->format('Y-m-d') : null,
+                'source'       => 'marketplace_order',
+                'mp_status'    => $mpOrder->order_status ?? $mpOrder->status,
+            ];
+        }
+
+        // ── Match lines terhadap pool ─────────────────────────────────────
+        $lines       = [];
+        $orderStatus = 'ready';
+        $allocated   = [];
+
+        // Gabungkan qty jika item_id sama (bisa terjadi pada mp order)
+        $grouped = [];
+        foreach ($rawLines as $rl) {
+            $id = $rl['item_id'];
+            if (isset($grouped[$id])) {
+                $grouped[$id]['qty'] += $rl['qty'];
+            } else {
+                $grouped[$id] = $rl;
+            }
+        }
+
+        foreach ($grouped as $ol) {
+            $needed   = $ol['qty'];
+            $avail    = $pool[$ol['item_id']] ?? 0;
+            $alloc    = min($needed, $avail);
+            $short    = $needed - $alloc;
+
+            $allocated[$ol['item_id']] = ($allocated[$ol['item_id']] ?? 0) + $alloc;
+
+            $lineStatus = match (true) {
+                $alloc >= $needed => 'ok',
+                $alloc > 0        => 'partial',
+                default           => 'missing',
+            };
+            if ($lineStatus !== 'ok' && $orderStatus === 'ready') $orderStatus = $lineStatus;
+            if ($lineStatus === 'missing') $orderStatus = 'missing';
+
+            $lines[] = [
+                'item_id'   => $ol['item_id'],
+                'item_code' => $ol['item_code'],
+                'item_name' => $ol['item_name'],
+                'qty_need'  => $needed,
+                'qty_pool'  => $avail,
+                'qty_alloc' => $alloc,
+                'qty_short' => $short,
+                'status'    => $lineStatus,
+            ];
+        }
+
+        // ── Sisa pool setelah alokasi pesanan ini ─────────────────────────
+        $poolAfter = $pool;
+        foreach ($allocated as $itemId => $qty) {
+            $poolAfter[$itemId] = max(0, ($poolAfter[$itemId] ?? 0) - $qty);
+        }
+        $poolFull = $this->buildPoolSnapshot($shipment, $poolAfter);
+
+        return response()->json([
+            'status'    => 'ok',
+            'no'        => $no,
+            'found'     => true,
+            'order'     => array_merge($orderMeta, [
+                'status'    => $orderStatus,
+                'lines'     => $lines,
+                'allocated' => $allocated,
+            ]),
+            'pool_full' => $poolFull,
+        ]);
+    }
+
+    /** Helper: build array snapshot pool saat ini untuk dikirim ke JS */
+    private function buildPoolSnapshot(Shipment $shipment, array $pool): array
+    {
+        $snap = [];
+        foreach ($pool as $itemId => $qty) {
+            $line = $shipment->lines->firstWhere('item_id', $itemId);
+            if ($line) {
+                $snap[] = [
+                    'item_id'   => $itemId,
+                    'item_code' => $line->item?->code ?? '-',
+                    'item_name' => $line->item?->name ?? '-',
+                    'qty'       => max(0, $qty),
+                ];
+            }
+        }
+        return $snap;
+    }
+
+    /**
+     * AJAX: terapkan keputusan rekonsiliasi.
+     *
+     * Menerima keputusan per-pesanan (siapa dipenuhi, pending, substitusi),
+     * lalu: set store_id shipment dari pesanan, link invoice, submit jika diminta.
+     */
+    public function rekonApply(Request $request, Shipment $shipment): \Illuminate\Http\JsonResponse
+    {
+        if ($shipment->status !== 'draft') {
+            return response()->json(['status' => 'error', 'message' => 'Shipment bukan draft.'], 409);
+        }
+
+        $request->validate([
+            'decisions'             => ['required', 'array'],
+            'decisions.*.order_no'  => ['required', 'string'],
+            'decisions.*.action'    => ['required', 'in:fulfill,pending,skip'],
+            'decisions.*.invoice_id'=> ['nullable', 'integer'],
+            'decisions.*.subs'      => ['nullable', 'array'],
+            // subs: [{item_id, sub_item_id, qty}]
+            'submit_after'          => ['boolean'],
+        ]);
+
+        $decisions = collect($request->decisions);
+
+        // Kumpulkan invoice_id yang dipenuhi
+        $fulfilledInvoiceIds = $decisions
+            ->where('action', 'fulfill')
+            ->pluck('invoice_id')
+            ->filter()
+            ->unique()
+            ->values();
+
+        // Set store_id dari invoice pertama (jika semua invoice store-nya sama)
+        $firstInvoice = $fulfilledInvoiceIds->isNotEmpty()
+            ? SalesInvoice::with('store')->find($fulfilledInvoiceIds->first())
+            : null;
+
+        if ($firstInvoice && ! $shipment->store_id) {
+            $shipment->store_id = $firstInvoice->store_id;
+        }
+
+        // Link sales_invoice_id ke shipment (pakai yang pertama jika belum ada)
+        if ($firstInvoice && ! $shipment->sales_invoice_id) {
+            $shipment->sales_invoice_id = $firstInvoice->id;
+        }
+
+        // Catat no pesanan pending di notes
+        $pendingNos = $decisions->where('action', 'pending')->pluck('order_no')->values();
+        if ($pendingNos->isNotEmpty()) {
+            $pendingNote = 'Pending: ' . $pendingNos->implode(', ');
+            $shipment->notes = $shipment->notes
+                ? $shipment->notes . ' | ' . $pendingNote
+                : $pendingNote;
+        }
+
+        $shipment->save();
+
+        $path = fn ($name, $params = []) => parse_url(route($name, $params), PHP_URL_PATH);
+
+        return response()->json([
+            'status'       => 'ok',
+            'message'      => 'Rekonsiliasi disimpan.' . ($pendingNos->isNotEmpty() ? ' ' . $pendingNos->count() . ' pesanan pending.' : ''),
+            'pending_nos'  => $pendingNos,
+            'submit_url'   => $path('sales.shipments.submit', $shipment),
+            'show_url'     => $path('sales.shipments.show', $shipment),
+            'edit_url'     => $path('sales.shipments.edit', $shipment),
+        ]);
     }
 
     public function reconcile(Shipment $shipment)

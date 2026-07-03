@@ -42,8 +42,10 @@ class JournalService
     public const SRC_FINISHING_JOB = 'finishing_job';
     public const SRC_FINISHING_BOM = 'finishing_bom';
     public const SRC_CUTTING_JOB = 'cutting_job';
+    public const SRC_CUTTING_JOB_WAGE = 'cutting_job_wage';
     public const SRC_CUTTING_WIP = 'cutting_wip';
     public const SRC_SEWING_PICKUP = 'App\\Models\\SewingPickup';
+    public const SRC_SEWING_PICKUP_WAGE = 'sewing_pickup_wage';
     public const SRC_SEWING_PICKUP_SUPPLY = 'sewing_pickup_supply';
     public const SRC_SEWING_PICKUP_SUPPLY_FOLLOWUP = 'sewing_pickup_supply_followup';
     public const SRC_SEWING_PICKUP_SUPPLY_VOID_LINE = 'sewing_pickup_supply_void_line';
@@ -845,6 +847,54 @@ class JournalService
         );
     }
 
+    public function postCuttingJobWage(\App\Models\CuttingJob $job): ?Journal
+    {
+        $existing = Journal::query()
+            ->where('source_type', self::SRC_CUTTING_JOB_WAGE)
+            ->where('source_id', (int) $job->id)
+            ->whereNull('voided_at')
+            ->first();
+        if ($existing) return $existing;
+
+        $job->loadMissing('bundles');
+        $totalWage = 0.0;
+
+        foreach ($job->bundles as $bundle) {
+            $employeeId = (int) ($bundle->operator_id ?: $job->operator_id);
+            $itemId = (int) ($bundle->finished_item_id ?? 0);
+            $qty = (float) ($bundle->qty_pcs ?? 0);
+            if ($employeeId <= 0 || $itemId <= 0 || $qty <= 0) {
+                continue;
+            }
+
+            $rate = (float) app(\App\Services\Payroll\PieceRateService::class)->getRatePerPcs(
+                module: 'cutting',
+                employeeId: $employeeId,
+                itemId: $itemId,
+                date: $job->date,
+            );
+
+            if ($rate > 0) {
+                $totalWage = round($totalWage + ($qty * $rate), 2);
+            }
+        }
+
+        if ($totalWage <= 0) {
+            return null;
+        }
+
+        return $this->post(
+            $this->dateOnly($job->date),
+            self::SRC_CUTTING_JOB_WAGE,
+            (int) $job->id,
+            "Cutting {$job->code} — Upah borongan",
+            [
+                ['account_id' => $this->accountIdByCode(self::CODE_INV_WIP), 'debit' => $totalWage, 'credit' => 0],
+                ['account_id' => $this->accountIdByCode(self::CODE_PAYROLL_PAYABLE), 'debit' => 0, 'credit' => $totalWage],
+            ]
+        );
+    }
+
     /**
      * Hasil QC cutting masuk WIP-CUT.
      *
@@ -890,8 +940,9 @@ class JournalService
     }
 
     /**
-     * Ambil jahit memindahkan stok dari WIP-CUT ke WIP-SEW (material cost saja).
-     * Upah jahit TIDAK diakui di sini — diakui saat Setoran Jahit OK (postSewingReturnOk).
+     * Ambil jahit memindahkan stok dari WIP-CUT ke WIP-SEW.
+     * Jurnal transfer ini hanya sebesar material cost; upah pickup dicatat
+     * per line lewat postSewingPickupLineWage().
      */
     public function postSewingPickup(\App\Models\SewingPickup $pickup): ?Journal
     {
@@ -907,6 +958,40 @@ class JournalService
             debitAccountCode: self::CODE_INV_WIP,
             creditAccountCode: self::CODE_INV_WIP,
             direction: 'out'
+        );
+    }
+
+    public function postSewingPickupLineWage(\App\Models\SewingPickupLine $line): ?Journal
+    {
+        $existing = Journal::query()
+            ->where('source_type', self::SRC_SEWING_PICKUP_WAGE)
+            ->where('source_id', (int) $line->id)
+            ->whereNull('voided_at')
+            ->first();
+        if ($existing) return $existing;
+
+        $line->loadMissing('sewingPickup');
+
+        $qty = (float) ($line->qty_bundle ?? 0);
+        $wagePerPcs = (float) ($line->wage_per_pcs ?? 0);
+        $amount = round($qty * $wagePerPcs, 2);
+        if ($amount <= 0) {
+            return null;
+        }
+
+        $pickup = $line->sewingPickup;
+        $date = $pickup ? $this->dateOnly($pickup->date) : $this->dateOnly(now());
+        $code = $pickup?->code ?? ('Line #' . $line->id);
+
+        return $this->post(
+            $date,
+            self::SRC_SEWING_PICKUP_WAGE,
+            (int) $line->id,
+            "Ambil Jahit {$code} — Upah borongan line {$line->id}",
+            [
+                ['account_id' => $this->accountIdByCode(self::CODE_INV_WIP), 'debit' => $amount, 'credit' => 0],
+                ['account_id' => $this->accountIdByCode(self::CODE_PAYROLL_PAYABLE), 'debit' => 0, 'credit' => $amount],
+            ]
         );
     }
 
@@ -958,16 +1043,17 @@ class JournalService
     /**
      * Void satu pickup line — reversal material WIP-CUT → WIP-SEW.
      *
-     * Original pickup line contribution (setelah refactor wage-at-return):
-     *   Dr 1202 WIP-SEW  (unit_cost × qty)   — material only
-     *   Cr 1202 WIP-CUT  (unit_cost × qty)   — material only
+     * Original pickup line contribution:
+     *   Dr 1202 WIP-SEW  (material × qty)
+     *   Cr 1202 WIP-CUT  (material × qty)
+     *   Dr 1202 WIP-SEW  (upah × qty)
+     *   Cr 2102 Hutang Upah Borongan
      *
      * Reversal:
      *   Dr 1202 WIP-CUT  (materialCost)
      *   Cr 1202 WIP-SEW  (materialCost)
      *
-     * NOTE: wage_per_pcs TIDAK di-reverse di sini karena upah belum diakui
-     * saat Ambil Jahit — upah baru diakui saat Setor Jahit OK.
+     * NOTE: upah per line direverse lewat voidBySource(SRC_SEWING_PICKUP_WAGE).
      */
     public function postSewingPickupLineVoid(\App\Models\SewingPickupLine $line): ?Journal
     {
@@ -978,8 +1064,11 @@ class JournalService
             ->first();
         if ($existing) return $existing;
 
-        // unit_cost sekarang = material only (wage_per_pcs tidak termasuk)
-        $materialCost = round((float) $line->unit_cost * (float) $line->qty_bundle, 2);
+        $materialUnitCost = max((float) $line->unit_cost - (float) ($line->wage_per_pcs ?? 0), 0);
+        if ($materialUnitCost <= 0) {
+            $materialUnitCost = (float) $line->unit_cost;
+        }
+        $materialCost = round($materialUnitCost * (float) $line->qty_bundle, 2);
         if ($materialCost <= 0) return null;
 
         $pickup = \App\Models\SewingPickup::find($line->sewing_pickup_id);
@@ -1009,9 +1098,8 @@ class JournalService
     }
 
     /**
-     * Setoran jahit OK: WIP-SEW (material) → WIP-FIN (material + upah).
-     * postValueAddedTransfer mendeteksi inCost - outCost = upah jahit
-     * dan mengkreditnya ke 2102 Hutang Upah Borongan.
+     * Setoran jahit OK: WIP-SEW → WIP-FIN.
+     * Upah jahit sudah diakui saat Ambil Jahit.
      */
     public function postSewingReturnOk(\App\Models\SewingReturn $return): ?Journal
     {

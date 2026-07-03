@@ -80,6 +80,8 @@
 <x-gf.page eyebrow="Marketplace" title="Data Perlu Diperbaiki"
     description="Selesaikan masalah data order agar order bisa diproses dan profit dapat dihitung.">
     <x-slot:actions>
+        <button id="autoMapBtn" class="btn btn-warning btn-sm fw-bold" style="border-radius:999px;font-size:.78rem"
+            onclick="runAutoMap()">⚡ Auto-Map by Kode</button>
         <button id="remapBtn" class="btn btn-outline-secondary btn-sm fw-bold" style="border-radius:999px;font-size:.78rem"
             onclick="runRemap()">⟳ Re-map Semua</button>
     </x-slot:actions>
@@ -844,6 +846,25 @@
         } catch (e) {
             toast(e.message, 'err');
             btn.disabled = false; btn.textContent = '🔄 Hitung Profit';
+        }
+    };
+
+    // ── Auto-map by kode ──────────────────────────────────────────────────
+    window.runAutoMap = async function () {
+        const btn = $('autoMapBtn');
+        btn.disabled = true; btn.textContent = '⏳ Mapping…';
+        try {
+            const storeId = $('fStore').value || '';
+            const res = await api('/api/marketplace/auto-map-by-code' + (storeId ? '?store_id=' + storeId : ''), { method: 'POST' });
+            const msg = res.mapped > 0
+                ? `⚡ Auto-map selesai — ${res.mapped} item berhasil di-mapping${res.skipped ? ', ' + res.skipped + ' tidak cocok' : ''}.`
+                : `Tidak ada SKU yang cocok dengan kode item internal.`;
+            toast(msg, res.mapped > 0 ? 'ok' : '');
+            if (res.mapped > 0) { loadItems(1); loadSummary(); }
+        } catch (e) {
+            toast(e.message, 'err');
+        } finally {
+            btn.disabled = false; btn.textContent = '⚡ Auto-Map by Kode';
         }
     };
 

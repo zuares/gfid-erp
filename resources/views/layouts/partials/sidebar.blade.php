@@ -353,6 +353,13 @@
         $open('costing.hpp.*') ||
         $open('costing.production_cost_periods.*');
 
+    $openWebsite =
+        $open('admin.catalog.products.*') ||
+        $open('admin.catalog.categories.*') ||
+        $open('admin.website.*');
+
+    $openCrm = $open('admin.crm.*');
+
     // =========================================================
     // BADGE COUNTERS (dot-only, cached)
     // =========================================================
@@ -669,58 +676,76 @@
             @endif
             @if ($isOwner && $router->has('admin.catalog.products.index'))
                 <x-sidebar.label text="Website" />
-                <li class="simple-group">
-                    <x-sidebar.simple-link href="{{ route('admin.catalog.products.index') }}" icon="bi bi-box-seam"
-                        :active="request()->routeIs('admin.catalog.products.index') || request()->routeIs('admin.catalog.products.edit') || request()->routeIs('admin.catalog.products.create')">
-                        Produk Website
-                    </x-sidebar.simple-link>
-                    @if($router->has('admin.catalog.products.ranking'))
-                    <x-sidebar.simple-link href="{{ route('admin.catalog.products.ranking') }}" icon="bi bi-bar-chart-steps"
-                        :active="request()->routeIs('admin.catalog.products.ranking')">
-                        Ranking Produk
-                    </x-sidebar.simple-link>
-                    @endif
-                    @if($router->has('admin.website.settings'))
-                    <x-sidebar.simple-link href="{{ route('admin.website.settings') }}" icon="bi bi-sliders"
-                        :active="request()->routeIs('admin.website.settings')">
-                        Pengaturan Website
-                    </x-sidebar.simple-link>
-                    @endif
-                    @if($router->has('admin.catalog.categories.index'))
-                    <x-sidebar.simple-link href="{{ route('admin.catalog.categories.index') }}" icon="bi bi-tag"
-                        :active="request()->routeIs('admin.catalog.categories*')">
-                        Kategori Produk
-                    </x-sidebar.simple-link>
-                    @endif
+                <li class="mb-1">
+                    <button class="sidebar-link sidebar-toggle {{ $openWebsite ? 'is-open' : '' }}" type="button"
+                        data-bs-toggle="collapse" data-bs-target="#navWebsite"
+                        aria-expanded="{{ $openWebsite ? 'true' : 'false' }}" aria-controls="navWebsite">
+                        <span class="icon"><i class="bi bi-globe"></i></span>
+                        <span>Website</span>
+                        <span class="chevron">▸</span>
+                    </button>
+                    <div class="collapse {{ $openWebsite ? 'show' : '' }}" id="navWebsite">
+                        <x-sidebar.sub-link href="{{ route('admin.catalog.products.index') }}" icon="bi bi-box-seam"
+                            :active="request()->routeIs('admin.catalog.products.index') || request()->routeIs('admin.catalog.products.edit') || request()->routeIs('admin.catalog.products.create')">
+                            Produk Website
+                        </x-sidebar.sub-link>
+                        @if($router->has('admin.catalog.products.ranking'))
+                        <x-sidebar.sub-link href="{{ route('admin.catalog.products.ranking') }}" icon="bi bi-bar-chart-steps"
+                            :active="request()->routeIs('admin.catalog.products.ranking')">
+                            Ranking Produk
+                        </x-sidebar.sub-link>
+                        @endif
+                        @if($router->has('admin.website.settings'))
+                        <x-sidebar.sub-link href="{{ route('admin.website.settings') }}" icon="bi bi-sliders"
+                            :active="request()->routeIs('admin.website.settings')">
+                            Pengaturan Website
+                        </x-sidebar.sub-link>
+                        @endif
+                        @if($router->has('admin.catalog.categories.index'))
+                        <x-sidebar.sub-link href="{{ route('admin.catalog.categories.index') }}" icon="bi bi-tag"
+                            :active="request()->routeIs('admin.catalog.categories*')">
+                            Kategori Produk
+                        </x-sidebar.sub-link>
+                        @endif
+                    </div>
                 </li>
             @endif
             @if ($isOwner && $router->has('admin.crm.dashboard'))
                 <x-sidebar.label text="CRM Storefront" />
-                <li class="simple-group">
-                    <x-sidebar.simple-link href="{{ route('admin.crm.dashboard') }}" icon="bi bi-bar-chart-line"
-                        :active="request()->routeIs('admin.crm.dashboard')">
-                        Dashboard
-                    </x-sidebar.simple-link>
-                    <x-sidebar.simple-link href="{{ route('admin.crm.visitors') }}" icon="bi bi-person-video3"
-                        :active="request()->routeIs('admin.crm.visitors*')">
-                        Visitors
-                    </x-sidebar.simple-link>
-                    <x-sidebar.simple-link href="{{ route('admin.crm.orders') }}" icon="bi bi-bag-check"
-                        :active="request()->routeIs('admin.crm.orders*')">
-                        Orders
-                    </x-sidebar.simple-link>
-                    <x-sidebar.simple-link href="{{ route('admin.crm.prospects') }}" icon="bi bi-person-lines-fill"
-                        :active="request()->routeIs('admin.crm.prospects*')">
-                        Prospects
-                    </x-sidebar.simple-link>
-                    <x-sidebar.simple-link href="{{ route('admin.crm.customers') }}" icon="bi bi-people"
-                        :active="request()->routeIs('admin.crm.customers*')">
-                        Customers
-                    </x-sidebar.simple-link>
-                    <x-sidebar.simple-link href="{{ route('admin.crm.segments') }}" icon="bi bi-diagram-3"
-                        :active="request()->routeIs('admin.crm.segments*')">
-                        Segments
-                    </x-sidebar.simple-link>
+                <li class="mb-1">
+                    <button class="sidebar-link sidebar-toggle {{ $openCrm ? 'is-open' : '' }}" type="button"
+                        data-bs-toggle="collapse" data-bs-target="#navCrm"
+                        aria-expanded="{{ $openCrm ? 'true' : 'false' }}" aria-controls="navCrm">
+                        <span class="icon"><i class="bi bi-people"></i></span>
+                        <span>CRM Storefront</span>
+                        <span class="chevron">▸</span>
+                    </button>
+                    <div class="collapse {{ $openCrm ? 'show' : '' }}" id="navCrm">
+                        <x-sidebar.sub-link href="{{ route('admin.crm.dashboard') }}" icon="bi bi-bar-chart-line"
+                            :active="request()->routeIs('admin.crm.dashboard')">
+                            Dashboard
+                        </x-sidebar.sub-link>
+                        <x-sidebar.sub-link href="{{ route('admin.crm.visitors') }}" icon="bi bi-person-video3"
+                            :active="request()->routeIs('admin.crm.visitors*')">
+                            Visitors
+                        </x-sidebar.sub-link>
+                        <x-sidebar.sub-link href="{{ route('admin.crm.orders') }}" icon="bi bi-bag-check"
+                            :active="request()->routeIs('admin.crm.orders*')">
+                            Orders
+                        </x-sidebar.sub-link>
+                        <x-sidebar.sub-link href="{{ route('admin.crm.prospects') }}" icon="bi bi-person-lines-fill"
+                            :active="request()->routeIs('admin.crm.prospects*')">
+                            Prospects
+                        </x-sidebar.sub-link>
+                        <x-sidebar.sub-link href="{{ route('admin.crm.customers') }}" icon="bi bi-people"
+                            :active="request()->routeIs('admin.crm.customers*')">
+                            Customers
+                        </x-sidebar.sub-link>
+                        <x-sidebar.sub-link href="{{ route('admin.crm.segments') }}" icon="bi bi-diagram-3"
+                            :active="request()->routeIs('admin.crm.segments*')">
+                            Segments
+                        </x-sidebar.sub-link>
+                    </div>
                 </li>
             @endif
             <div class="sidebar-divider"></div>
@@ -826,60 +851,78 @@
             {{-- Produk Website --}}
             @if (($isAdmin || $isOwner) && $router->has('admin.catalog.products.index'))
                 <x-sidebar.label text="Website" />
-                <li class="simple-group">
-                    <x-sidebar.simple-link href="{{ route('admin.catalog.products.index') }}" icon="bi bi-box-seam"
-                        :active="request()->routeIs('admin.catalog.products.index') || request()->routeIs('admin.catalog.products.edit') || request()->routeIs('admin.catalog.products.create')">
-                        Produk Website
-                    </x-sidebar.simple-link>
-                    @if($router->has('admin.catalog.products.ranking'))
-                    <x-sidebar.simple-link href="{{ route('admin.catalog.products.ranking') }}" icon="bi bi-bar-chart-steps"
-                        :active="request()->routeIs('admin.catalog.products.ranking')">
-                        Ranking Produk
-                    </x-sidebar.simple-link>
-                    @endif
-                    @if($router->has('admin.website.settings'))
-                    <x-sidebar.simple-link href="{{ route('admin.website.settings') }}" icon="bi bi-sliders"
-                        :active="request()->routeIs('admin.website.settings')">
-                        Pengaturan Website
-                    </x-sidebar.simple-link>
-                    @endif
-                    @if($router->has('admin.catalog.categories.index'))
-                    <x-sidebar.simple-link href="{{ route('admin.catalog.categories.index') }}" icon="bi bi-tag"
-                        :active="request()->routeIs('admin.catalog.categories*')">
-                        Kategori Produk
-                    </x-sidebar.simple-link>
-                    @endif
+                <li class="mb-1">
+                    <button class="sidebar-link sidebar-toggle {{ $openWebsite ? 'is-open' : '' }}" type="button"
+                        data-bs-toggle="collapse" data-bs-target="#navWebsiteAdmin"
+                        aria-expanded="{{ $openWebsite ? 'true' : 'false' }}" aria-controls="navWebsiteAdmin">
+                        <span class="icon"><i class="bi bi-globe"></i></span>
+                        <span>Website</span>
+                        <span class="chevron">▸</span>
+                    </button>
+                    <div class="collapse {{ $openWebsite ? 'show' : '' }}" id="navWebsiteAdmin">
+                        <x-sidebar.sub-link href="{{ route('admin.catalog.products.index') }}" icon="bi bi-box-seam"
+                            :active="request()->routeIs('admin.catalog.products.index') || request()->routeIs('admin.catalog.products.edit') || request()->routeIs('admin.catalog.products.create')">
+                            Produk Website
+                        </x-sidebar.sub-link>
+                        @if($router->has('admin.catalog.products.ranking'))
+                        <x-sidebar.sub-link href="{{ route('admin.catalog.products.ranking') }}" icon="bi bi-bar-chart-steps"
+                            :active="request()->routeIs('admin.catalog.products.ranking')">
+                            Ranking Produk
+                        </x-sidebar.sub-link>
+                        @endif
+                        @if($router->has('admin.website.settings'))
+                        <x-sidebar.sub-link href="{{ route('admin.website.settings') }}" icon="bi bi-sliders"
+                            :active="request()->routeIs('admin.website.settings')">
+                            Pengaturan Website
+                        </x-sidebar.sub-link>
+                        @endif
+                        @if($router->has('admin.catalog.categories.index'))
+                        <x-sidebar.sub-link href="{{ route('admin.catalog.categories.index') }}" icon="bi bi-tag"
+                            :active="request()->routeIs('admin.catalog.categories*')">
+                            Kategori Produk
+                        </x-sidebar.sub-link>
+                        @endif
+                    </div>
                 </li>
             @endif
 
             {{-- CRM Storefront --}}
             @if ($isAdmin || $isOwner)
                 <x-sidebar.label text="CRM Storefront" />
-                <li class="simple-group">
-                    <x-sidebar.simple-link href="{{ route('admin.crm.dashboard') }}" icon="bi bi-bar-chart-line"
-                        :active="request()->routeIs('admin.crm.dashboard')">
-                        Dashboard
-                    </x-sidebar.simple-link>
-                    <x-sidebar.simple-link href="{{ route('admin.crm.visitors') }}" icon="bi bi-person-video3"
-                        :active="request()->routeIs('admin.crm.visitors*')">
-                        Visitors
-                    </x-sidebar.simple-link>
-                    <x-sidebar.simple-link href="{{ route('admin.crm.orders') }}" icon="bi bi-bag-check"
-                        :active="request()->routeIs('admin.crm.orders*')">
-                        Orders
-                    </x-sidebar.simple-link>
-                    <x-sidebar.simple-link href="{{ route('admin.crm.prospects') }}" icon="bi bi-person-lines-fill"
-                        :active="request()->routeIs('admin.crm.prospects*')">
-                        Prospects
-                    </x-sidebar.simple-link>
-                    <x-sidebar.simple-link href="{{ route('admin.crm.customers') }}" icon="bi bi-people"
-                        :active="request()->routeIs('admin.crm.customers*')">
-                        Customers
-                    </x-sidebar.simple-link>
-                    <x-sidebar.simple-link href="{{ route('admin.crm.segments') }}" icon="bi bi-diagram-3"
-                        :active="request()->routeIs('admin.crm.segments*')">
-                        Segments
-                    </x-sidebar.simple-link>
+                <li class="mb-1">
+                    <button class="sidebar-link sidebar-toggle {{ $openCrm ? 'is-open' : '' }}" type="button"
+                        data-bs-toggle="collapse" data-bs-target="#navCrmAdmin"
+                        aria-expanded="{{ $openCrm ? 'true' : 'false' }}" aria-controls="navCrmAdmin">
+                        <span class="icon"><i class="bi bi-people"></i></span>
+                        <span>CRM Storefront</span>
+                        <span class="chevron">▸</span>
+                    </button>
+                    <div class="collapse {{ $openCrm ? 'show' : '' }}" id="navCrmAdmin">
+                        <x-sidebar.sub-link href="{{ route('admin.crm.dashboard') }}" icon="bi bi-bar-chart-line"
+                            :active="request()->routeIs('admin.crm.dashboard')">
+                            Dashboard
+                        </x-sidebar.sub-link>
+                        <x-sidebar.sub-link href="{{ route('admin.crm.visitors') }}" icon="bi bi-person-video3"
+                            :active="request()->routeIs('admin.crm.visitors*')">
+                            Visitors
+                        </x-sidebar.sub-link>
+                        <x-sidebar.sub-link href="{{ route('admin.crm.orders') }}" icon="bi bi-bag-check"
+                            :active="request()->routeIs('admin.crm.orders*')">
+                            Orders
+                        </x-sidebar.sub-link>
+                        <x-sidebar.sub-link href="{{ route('admin.crm.prospects') }}" icon="bi bi-person-lines-fill"
+                            :active="request()->routeIs('admin.crm.prospects*')">
+                            Prospects
+                        </x-sidebar.sub-link>
+                        <x-sidebar.sub-link href="{{ route('admin.crm.customers') }}" icon="bi bi-people"
+                            :active="request()->routeIs('admin.crm.customers*')">
+                            Customers
+                        </x-sidebar.sub-link>
+                        <x-sidebar.sub-link href="{{ route('admin.crm.segments') }}" icon="bi bi-diagram-3"
+                            :active="request()->routeIs('admin.crm.segments*')">
+                            Segments
+                        </x-sidebar.sub-link>
+                    </div>
                 </li>
             @endif
 

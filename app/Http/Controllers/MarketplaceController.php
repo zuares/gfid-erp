@@ -1027,6 +1027,19 @@ class MarketplaceController extends Controller
         ]);
     }
 
+    public function autoMapByCode(Request $request): JsonResponse
+    {
+        set_time_limit(300);
+        $storeId = $request->input('store_id');
+        $result  = $this->issueService->autoMapByCode($storeId ? (int) $storeId : null);
+        return response()->json([
+            'message' => 'Auto-map selesai.',
+            'mapped'  => $result['mapped'],
+            'skipped' => $result['skipped'],
+            'errors'  => $result['errors'],
+        ]);
+    }
+
     /** [DEV ONLY] Hapus semua marketplace orders + fulfillments + mutations untuk reset testing. */
     public function devFreshOrders(): JsonResponse
     {

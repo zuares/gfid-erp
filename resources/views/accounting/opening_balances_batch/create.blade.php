@@ -91,6 +91,14 @@
     .saldo-hint { font-size: .58rem; color: var(--muted); font-weight: 700; text-align: right; margin-top: .12rem; }
     .auto-badge { font-size: .52rem; font-weight: 900; background: #dbeafe; color: #1d4ed8; border-radius: 999px; padding: .05rem .3rem; margin-left: .25rem; vertical-align: middle; }
     .acc-row.is-auto { border-color: rgba(37,99,235,.22); background: rgba(37,99,235,.025); }
+    .btn-detail {
+        flex: 0 0 auto; width: 22px; height: 22px; border-radius: 50%;
+        border: 1.5px solid rgba(37,99,235,.35); background: rgba(37,99,235,.07);
+        color: #2563eb; font-size: .65rem; font-weight: 900; cursor: pointer;
+        display: flex; align-items: center; justify-content: center;
+        transition: background .15s, border-color .15s; text-decoration: none;
+    }
+    .btn-detail:hover { background: rgba(37,99,235,.18); border-color: rgba(37,99,235,.6); }
 
     /* Note */
     .info-note {
@@ -122,6 +130,7 @@
     $liabilityAccounts = $accounts->where('type', 'liability')->values();
     $equityAccounts    = $accounts->where('type', 'equity')->values();
     $prefill           = $prefill ?? [];
+    $details           = $details ?? [];
     $hasPrefill        = collect($prefill)->sum() > 0;
 @endphp
 
@@ -206,6 +215,7 @@
                     $pval = $prefill[$acc->id] ?? 0;
                     $pdisp = $pval > 0 ? number_format($pval, 0, ',', '.') : '0';
                     $isAuto = $pval > 0;
+                    $det = $details[$acc->code] ?? null;
                 @endphp
                 <div class="acc-row {{ $isAuto ? 'is-auto' : '' }}">
                     <input type="hidden" name="account_id[]" value="{{ $acc->id }}">
@@ -217,6 +227,11 @@
                         </div>
                         <div class="acc-name">{{ $acc->name }}</div>
                     </div>
+                    @if($isAuto && $det)
+                    <a href="{{ route('accounting.opening-balances-batch.detail', $acc->code) }}"
+                       class="btn-detail"
+                       title="Lihat detail">?</a>
+                    @endif
                     <div class="saldo-wrap">
                         <input type="text" inputmode="numeric"
                                class="saldo-input" value="{{ $pdisp }}"
@@ -237,17 +252,30 @@
             </div>
             <div class="panel-b">
                 @foreach($liabilityAccounts as $acc)
-                <div class="acc-row">
+                @php
+                    $pval = $prefill[$acc->id] ?? 0;
+                    $pdisp = $pval > 0 ? number_format($pval, 0, ',', '.') : '0';
+                    $isAuto = $pval > 0;
+                    $det = $details[$acc->code] ?? null;
+                @endphp
+                <div class="acc-row {{ $isAuto ? 'is-auto' : '' }}">
                     <input type="hidden" name="account_id[]" value="{{ $acc->id }}">
                     <input type="hidden" class="js-debit" name="debit[]" value="0">
-                    <input type="hidden" class="js-credit" name="credit[]" value="0">
+                    <input type="hidden" class="js-credit" name="credit[]" value="{{ $pval }}">
                     <div class="acc-info">
-                        <div class="acc-code">{{ $acc->code }}</div>
+                        <div class="acc-code">{{ $acc->code }}
+                            @if($isAuto)<span class="auto-badge">auto</span>@endif
+                        </div>
                         <div class="acc-name">{{ $acc->name }}</div>
                     </div>
+                    @if($isAuto && $det)
+                    <a href="{{ route('accounting.opening-balances-batch.detail', $acc->code) }}"
+                       class="btn-detail"
+                       title="Lihat detail">?</a>
+                    @endif
                     <div class="saldo-wrap">
                         <input type="text" inputmode="numeric"
-                               class="saldo-input" value="0"
+                               class="saldo-input" value="{{ $pdisp }}"
                                data-type="liability"
                                placeholder="0">
                         <div class="saldo-hint">Kredit</div>
@@ -396,5 +424,6 @@
 
     recalc();
 })();
+
 </script>
 @endpush

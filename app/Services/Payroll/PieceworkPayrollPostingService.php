@@ -49,8 +49,8 @@ class PieceworkPayrollPostingService
             }
 
             $sourceTypes = match ((string) $period->module) {
-                'cutting' => [JournalService::SRC_CUTTING_WIP],
-                'sewing' => [JournalService::SRC_SEWING_RETURN_OK, JournalService::SRC_SEWING_REWORK_OK],
+                'cutting' => [JournalService::SRC_CUTTING_JOB_WAGE, JournalService::SRC_CUTTING_WIP],
+                'sewing' => [JournalService::SRC_SEWING_PICKUP_WAGE, JournalService::SRC_SEWING_RETURN_OK, JournalService::SRC_SEWING_REWORK_OK],
                 default => [],
             };
 

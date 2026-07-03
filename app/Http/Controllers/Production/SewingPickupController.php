@@ -400,9 +400,10 @@ class SewingPickupController extends Controller
                     $wagePerPcs = 0.0;
                 }
 
-                // unit_cost WIP-SEW = material cost SAJA (upah dicatat saat Setor Jahit OK)
-                // wage_per_pcs disimpan di pickup line untuk dipakai di SewingReturnController
+                // WIP-SEW membawa material + upah sejak Ambil Jahit.
+                // wage_per_pcs tetap disimpan untuk audit dan reversal per line.
                 $unitCostMaterial = $unitCostPerPiece;
+                $unitCostWithWage = round($unitCostMaterial + $wagePerPcs, 10);
 
                 // 🔹 Simpan detail sewing pickup (simpan unit_cost + wage_per_pcs)
                 $pickupLine = SewingPickupLine::create([
@@ -410,8 +411,8 @@ class SewingPickupController extends Controller
                     'cutting_job_bundle_id' => $bundle->id,
                     'finished_item_id' => $bundle->finished_item_id,
                     'qty_bundle' => $qty,
-                    'unit_cost' => $unitCostMaterial, // ✅ material only; upah di wage_per_pcs
-                    'wage_per_pcs' => $wagePerPcs,    // ✅ dipakai saat setor untuk nilai WIP-FIN
+                    'unit_cost' => $unitCostWithWage,
+                    'wage_per_pcs' => $wagePerPcs,
                     'status' => 'in_progress',
                 ]);
 
@@ -457,8 +458,7 @@ class SewingPickupController extends Controller
                     cuttingJobBundleId: $bundle->id,
                 );
 
-                // 2️⃣ IN ke gudang sewing (WIP-SEW) — material cost SAJA
-                // Upah jahit (wage_per_pcs) akan ditambahkan ke WIP-FIN saat Setor Jahit OK
+                // 2️⃣ IN ke gudang sewing (WIP-SEW) — material + upah
                 $this->inventory->stockIn(
                     warehouseId: $sewingWarehouseId,
                     itemId: $bundle->finished_item_id,
@@ -466,9 +466,9 @@ class SewingPickupController extends Controller
                     date: $date,
                     sourceType: SewingPickup::class,
                     sourceId: $pickup->id,
-                    notes: $notes . ($wagePerPcs > 0 ? " [upah @{$wagePerPcs}/pcs diakui saat setor]" : ''),
+                    notes: $notes . ($wagePerPcs > 0 ? " [upah @{$wagePerPcs}/pcs]" : ''),
                     lotId: null,
-                    unitCost: $unitCostMaterial,
+                    unitCost: $unitCostWithWage,
                     affectLotCost: false,
                     cuttingJobBundleId: $bundle->id,
                 );
@@ -570,6 +570,17 @@ class SewingPickupController extends Controller
                 'sewing_pickup_id' => $pickup->id,
                 'message' => $e->getMessage(),
             ]);
+        }
+
+        foreach ($pickup->lines()->where('status', '!=', 'void')->get() as $line) {
+            try {
+                $this->journal->postSewingPickupLineWage($line);
+            } catch (\Throwable $e) {
+                Log::warning('Gagal membuat jurnal upah sewing pickup line', [
+                    'sewing_pickup_line_id' => $line->id,
+                    'message' => $e->getMessage(),
+                ]);
+            }
         }
 
         try {
@@ -1721,9 +1732,11 @@ class SewingPickupController extends Controller
 
                 $notes = "VOID Sewing pickup {$pickup->code} - bundle {$bundle->bundle_code}";
 
-                $unitCost = (float) ($line->unit_cost ?? 0);
-                if ($unitCost < 0) {
-                    $unitCost = 0;
+                $unitCost = max((float) ($line->unit_cost ?? 0), 0);
+                $wagePerPcs = max((float) ($line->wage_per_pcs ?? 0), 0);
+                $materialUnitCost = max($unitCost - $wagePerPcs, 0);
+                if ($materialUnitCost <= 0) {
+                    $materialUnitCost = $unitCost;
                 }
 
                 $this->inventory->stockOut(
@@ -1750,7 +1763,7 @@ class SewingPickupController extends Controller
                     sourceId: $pickup->id,
                     notes: $notes,
                     lotId: null,
-                    unitCost: $unitCost,
+                    unitCost: $materialUnitCost,
                     affectLotCost: false,
                     cuttingJobBundleId: $bundle->id,
                 );
@@ -1798,6 +1811,17 @@ class SewingPickupController extends Controller
                 'sewing_pickup_id' => $pickupId,
                 'message' => $e->getMessage(),
             ]);
+        }
+
+        foreach (SewingPickupLine::query()->where('sewing_pickup_id', $pickupId)->pluck('id') as $lineId) {
+            try {
+                $this->journal->voidBySource(JournalService::SRC_SEWING_PICKUP_WAGE, (int) $lineId, 'VOID Upah Sewing Pickup Line');
+            } catch (\Throwable $e) {
+                Log::warning('Gagal void jurnal upah sewing pickup line', [
+                    'sewing_pickup_line_id' => $lineId,
+                    'message' => $e->getMessage(),
+                ]);
+            }
         }
 
         try {
@@ -1883,9 +1907,11 @@ class SewingPickupController extends Controller
 
             $notes = "VOID LINE Sewing pickup {$pickup->code} - bundle {$bundle->bundle_code} - line {$line->id}";
 
-            $unitCost = (float) ($line->unit_cost ?? 0);
-            if ($unitCost < 0) {
-                $unitCost = 0;
+            $unitCost = max((float) ($line->unit_cost ?? 0), 0);
+            $wagePerPcs = max((float) ($line->wage_per_pcs ?? 0), 0);
+            $materialUnitCost = max($unitCost - $wagePerPcs, 0);
+            if ($materialUnitCost <= 0) {
+                $materialUnitCost = $unitCost;
             }
 
             // OUT dari WIP-SEW
@@ -1914,7 +1940,7 @@ class SewingPickupController extends Controller
                 sourceId: $pickup->id,
                 notes: $notes,
                 lotId: null,
-                unitCost: $unitCost,
+                unitCost: $materialUnitCost,
                 affectLotCost: false,
                 cuttingJobBundleId: $bundle->id,
             );
@@ -2000,6 +2026,15 @@ class SewingPickupController extends Controller
             $this->journal->postSewingPickupLineVoid($line->fresh());
         } catch (\Throwable $e) {
             Log::warning('Gagal membuat jurnal void pickup line (WIP)', [
+                'sewing_pickup_line_id' => $lineId,
+                'message' => $e->getMessage(),
+            ]);
+        }
+
+        try {
+            $this->journal->voidBySource(JournalService::SRC_SEWING_PICKUP_WAGE, (int) $lineId, 'VOID Upah Sewing Pickup Line');
+        } catch (\Throwable $e) {
+            Log::warning('Gagal void jurnal upah sewing pickup line', [
                 'sewing_pickup_line_id' => $lineId,
                 'message' => $e->getMessage(),
             ]);

@@ -67,6 +67,7 @@ Route::middleware(['auth', 'access:accounting'])->prefix('accounting')->name('ac
 Route::middleware(['auth', 'access:accounting'])->prefix('accounting/opening-balances-batch')->name('accounting.opening-balances-batch.')->group(function () {
     Route::get('/', [OpeningBalanceBatchController::class, 'index'])->name('index');
     Route::get('/create', [OpeningBalanceBatchController::class, 'create'])->name('create');
+    Route::get('/detail/{code}', [OpeningBalanceBatchController::class, 'detail'])->name('detail');
     Route::post('/', [OpeningBalanceBatchController::class, 'store'])->name('store');
     Route::post('/{journal}/void', [OpeningBalanceBatchController::class, 'void'])->name('void');
 });

@@ -114,6 +114,8 @@ Route::middleware(['auth', 'access:marketplace'])->prefix('api/marketplace')->gr
     Route::get('/issue-summary',  [MarketplaceController::class, 'issueSummary']);
     Route::post('/remap-items',   [MarketplaceController::class, 'remapOrderItems'])
         ->withoutMiddleware([\Illuminate\Foundation\Http\Middleware\VerifyCsrfToken::class]);
+    Route::post('/auto-map-by-code', [MarketplaceController::class, 'autoMapByCode'])
+        ->withoutMiddleware([\Illuminate\Foundation\Http\Middleware\VerifyCsrfToken::class]);
     Route::get('/stores-summary',  [MarketplaceController::class, 'storesSummary']);
     Route::get('/items/search',    [MarketplaceController::class, 'searchInternalItems']);
     Route::get('/items/by-code',   [MarketplaceController::class, 'itemByCode']);

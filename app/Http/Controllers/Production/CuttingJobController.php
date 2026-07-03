@@ -967,6 +967,15 @@ class CuttingJobController extends Controller
             ]);
         }
 
+        try {
+            $this->journal->postCuttingJobWage($job);
+        } catch (\Throwable $e) {
+            Log::warning('Gagal membuat jurnal upah cutting_job', [
+                'cutting_job_id' => $job->id,
+                'message' => $e->getMessage(),
+            ]);
+        }
+
         return redirect()
             ->route('production.cutting_jobs.show', $job)
             ->with('success', 'Cutting job berhasil dibuat.');
@@ -1369,6 +1378,15 @@ class CuttingJobController extends Controller
             $this->journal->voidBySource(JournalService::SRC_CUTTING_JOB, (int) $cuttingJob->id, "VOID Cutting Job {$cuttingJob->code}");
         } catch (\Throwable $e) {
             Log::warning('Gagal void jurnal cutting_job', [
+                'cutting_job_id' => $cuttingJob->id,
+                'message' => $e->getMessage(),
+            ]);
+        }
+
+        try {
+            $this->journal->voidBySource(JournalService::SRC_CUTTING_JOB_WAGE, (int) $cuttingJob->id, "VOID Upah Cutting Job {$cuttingJob->code}");
+        } catch (\Throwable $e) {
+            Log::warning('Gagal void jurnal upah cutting_job', [
                 'cutting_job_id' => $cuttingJob->id,
                 'message' => $e->getMessage(),
             ]);
