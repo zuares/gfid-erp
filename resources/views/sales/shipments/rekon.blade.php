@@ -209,22 +209,6 @@ body[data-theme="dark"] .shp-scan-input {
 body[data-theme="dark"] .shp-scan-input::placeholder { color: #334155; }
 .shp-scan-input:focus { border-color: var(--shp-accent); box-shadow: 0 0 0 3px var(--shp-accent-ring); outline: none; }
 
-/* ── Ticker ── */
-.shp-ticker {
-    display: none; align-items: center; gap: .8rem;
-    margin-top: .8rem; padding: .8rem 1.1rem; border-radius: 14px;
-    animation: tickSlide .2s ease;
-}
-@keyframes tickSlide { from { opacity:0; transform:translateY(-5px); } to { opacity:1; transform:translateY(0); } }
-.shp-ticker-ok  { background: var(--shp-ok-bg);   border: 1.5px solid rgba(21,128,61,.25); }
-.shp-ticker-err { background: var(--shp-err-bg);  border: 1.5px solid rgba(185,28,28,.28); color: var(--shp-err); font-weight: 700; font-size: .88rem; }
-.shp-ticker-warn{ background: var(--shp-warn-bg); border: 1.5px solid rgba(245,158,11,.3);  color: var(--shp-warn); font-size: .86rem; font-weight: 600; }
-.shp-tick-code  { font-weight: 900; font-size: 1.1rem; font-family: monospace; color: var(--shp-ok); }
-body[data-theme="dark"] .shp-tick-code { color: #4ade80; }
-.shp-tick-store { font-size: .84rem; color: #374151; }
-body[data-theme="dark"] .shp-tick-store { color: #bbf7d0; }
-.shp-tick-right { margin-left: auto; flex-shrink: 0; }
-
 /* ══════════════════════════════════════════════════
    STATUS BADGES
 ══════════════════════════════════════════════════ */
@@ -238,7 +222,6 @@ body[data-theme="dark"] .shp-tick-store { color: #bbf7d0; }
 .sb-notfound { background: rgba(148,163,184,.1); color: #64748b; border: 1px solid rgba(148,163,184,.3); }
 .sb-pending  { background: var(--shp-accent-bg); color: var(--shp-accent); border: 1px solid rgba(37,99,235,.25); }
 .sb-skip     { background: rgba(148,163,184,.1); color: #9ca3af; border: 1px solid rgba(148,163,184,.25); }
-.sb-mp       { background: rgba(249,115,22,.08); color: #ea580c; border: 1px solid rgba(249,115,22,.3); }
 .sb-sub      { background: rgba(139,92,246,.09); color: #7c3aed; border: 1px solid rgba(139,92,246,.28); }
 .rk-sub-fulfilled {
     display: flex; align-items: center; flex-wrap: wrap; gap: .35rem;
@@ -756,12 +739,6 @@ body[data-theme="dark"] .shp-scan-card:focus-within {
 .shp-scan-input::placeholder {
     font-size: .92rem;
 }
-.shp-ticker {
-    margin-top: .55rem;
-    padding: .55rem .7rem;
-    border-radius: 8px;
-    animation: none;
-}
 .rk-order-card {
     margin-bottom: .5rem;
     border: 1px solid rgba(148,163,184,.18);
@@ -826,19 +803,9 @@ body[data-theme="dark"] .shp-scan-card:focus-within {
     border-radius: 8px;
     box-shadow: none;
 }
-#restoreBanner button,
 .rk-modal-footer button {
     border-radius: 7px !important;
     box-shadow: none !important;
-}
-#reAnalisisBtn {
-    background: #334155 !important;
-    border-color: #334155 !important;
-    color: #fff !important;
-}
-#reAnalisisBtn:hover {
-    background: #1f2937 !important;
-    border-color: #1f2937 !important;
 }
 @media (max-width: 768px) {
     .rk-wrap {
@@ -875,11 +842,6 @@ body[data-theme="dark"] .shp-scan-card:focus-within {
     .rk-phases,
     .rk-batch-bar {
         display: none;
-    }
-    #restoreBanner {
-        margin-top: .5rem !important;
-        padding: .55rem .65rem !important;
-        border-radius: 8px !important;
     }
     .shp-scan-card {
         padding: .7rem;
@@ -966,8 +928,7 @@ body[data-theme="dark"] .shp-scan-card:focus-within {
 @endphp
 
 <div class="shp-topbar">
-    <a href="{{ route('sales.shipments.edit', $shipment) }}" class="btn-shp-outline" style="text-decoration:none"
-       title="Data rekonsiliasi tersimpan otomatis dan akan dipulihkan saat kembali ke halaman ini">
+    <a href="{{ route('sales.shipments.edit', $shipment) }}" class="btn-shp-outline" style="text-decoration:none">
         Scan Barang
     </a>
     <span class="shp-topbar-code">{{ $shipment->code }}</span>
@@ -976,37 +937,18 @@ body[data-theme="dark"] .shp-scan-card:focus-within {
     <span class="shp-pill">Batch <b>{{ $totalLines }}</b> SKU</span>
     <span class="shp-pill shp-pill-accent">Qty <b>{{ number_format($totalQty, 0, ',', '.') }}</b></span>
     <span class="shp-pill" id="topPillOrders" style="display:none">Pesanan <b id="topOrderCount">0</b></span>
-    <button id="topConfirmBtn" class="btn-shp-submit" disabled>Konfirmasi</button>
+    <button id="topConfirmBtn" class="btn-shp-submit" disabled>Konfirmasi Pesanan</button>
 </div>
 
 <div class="rk-wrap">
 
-    {{-- RESTORE BANNER --}}
-    <div id="restoreBanner" style="display:none;align-items:center;gap:.65rem;flex-wrap:wrap;
-         margin-top:.75rem;padding:.65rem 1rem;border-radius:12px;
-         border:1.5px solid rgba(245,158,11,.35);">
-        <span id="restoreBannerText" style="font-size:.8rem;font-weight:600;"></span>
-        <button id="reAnalisisBtn" onclick="reAnalisis()"
-                style="border-radius:999px;border:1.5px solid;
-                       background:var(--shp-accent);border-color:var(--shp-accent);color:#fff;
-                       font-size:.75rem;font-weight:700;padding:.25rem .85rem;cursor:pointer;">
-            Re-Analisis Ulang
-        </button>
-        <button onclick="window.resetRekon()"
-                style="border-radius:999px;border:1.5px solid rgba(148,163,184,.4);
-                       background:transparent;color:#6b7280;
-                       font-size:.74rem;font-weight:700;padding:.25rem .75rem;cursor:pointer;">
-            Mulai Ulang
-        </button>
-    </div>
-
     {{-- PHASE BAR --}}
     <div class="rk-phases">
-        <span class="rk-phase done">① Scan Barang</span>
+        <span class="rk-phase done">Scan Barang</span>
         <span class="rk-sep">→</span>
-        <span class="rk-phase active">② Rekonsiliasi Pesanan</span>
+        <span class="rk-phase active">Scan Pesanan</span>
         <span class="rk-sep">→</span>
-        <span class="rk-phase" id="ph3">③ Konfirmasi</span>
+        <span class="rk-phase" id="ph3">Konfirmasi Pesanan</span>
     </div>
 
     {{-- BATCH SKU CHIPS --}}
@@ -1026,27 +968,14 @@ body[data-theme="dark"] .shp-scan-card:focus-within {
     {{-- HERO SCAN CARD --}}
     <div class="shp-scan-card">
         <div class="shp-scan-header">
-            <span class="shp-scan-label">Scan Nomor Pesanan</span>
+            <span class="shp-scan-label">Scan Pesanan</span>
             <span class="shp-scan-counter" id="scanCounter">0 pesanan</span>
         </div>
 
         <input type="text" id="orderInput" class="shp-scan-input"
-               placeholder="Scan barcode atau ketik nomor order, lalu Enter"
+               placeholder="Scan atau ketik nomor pesanan, lalu Enter"
                autocomplete="off" spellcheck="false">
 
-        <div class="shp-ticker shp-ticker-ok" id="tickerOk">
-            <div>
-                <div class="shp-tick-code" id="tickCode">—</div>
-                <div class="shp-tick-store" id="tickStore"></div>
-            </div>
-            <div class="shp-tick-right" id="tickStatus"></div>
-        </div>
-        <div class="shp-ticker shp-ticker-warn" id="tickerWarn">
-            <span id="tickWarnMsg">Pesanan tidak ditemukan.</span>
-        </div>
-        <div class="shp-ticker shp-ticker-err" id="tickerErr">
-            <span id="tickErrMsg">Terjadi kesalahan.</span>
-        </div>
     </div>
 
     {{-- ORDER LIST --}}
@@ -1055,7 +984,7 @@ body[data-theme="dark"] .shp-scan-card:focus-within {
     {{-- EMPTY STATE --}}
     <div class="rk-empty" id="emptyState">
         <div class="rk-empty-icon"></div>
-        <div class="rk-empty-title">Scan nomor pesanan untuk mulai rekonsiliasi</div>
+        <div class="rk-empty-title">Scan nomor pesanan</div>
         <div class="rk-empty-sub">Bisa dari barcode scanner atau ketik manual lalu tekan Enter</div>
     </div>
 
@@ -1148,8 +1077,11 @@ const CSRF       = document.querySelector('meta[name="csrf-token"]')?.content ||
 const MATCH_URL  = @json(parse_url(route('sales.shipments.rekon_match', $shipment), PHP_URL_PATH));
 const APPLY_URL  = @json(parse_url(route('sales.shipments.rekon_apply', $shipment), PHP_URL_PATH));
 const EDIT_URL   = @json(parse_url(route('sales.shipments.edit', $shipment), PHP_URL_PATH));
+const CONFIRM_URL = @json(parse_url(route('sales.shipments.confirm_orders', $shipment), PHP_URL_PATH));
 const FMT        = new Intl.NumberFormat('id-ID');
 const STORE_KEY  = 'rk_state_{{ $shipment->id }}';
+const RESTORE_ENABLED = true;
+const SERVER_ORDER_SCANS = @json($savedOrderScans ?? []);
 
 // Batch pool dari server — sumber kebenaran qty total per item
 const BATCH_POOL = @json(array_values($batchPool->toArray()));
@@ -1163,17 +1095,21 @@ let drawerPendingSub = null;   // item yang di-tap di list, belum dikonfirmasi
 let drawerPendingQty = 1;      // qty yang akan di-sub
 
 /* ── Persistence ── */
+function normalizeOrderNo(no) {
+    return String(no || '').trim().toUpperCase();
+}
 function batchFingerprint() {
     // Hash sederhana: sorted item_id:qty pairs
     return BATCH_POOL.map(p => p.item_id + ':' + p.qty).sort().join('|');
 }
 function saveState() {
+    if (!RESTORE_ENABLED) return;
     try {
         localStorage.setItem(STORE_KEY, JSON.stringify({
             batch_fp: batchFingerprint(),
             poolUsed,
             orders: orders.map(o => ({
-                no:       o.no,
+                no:       normalizeOrderNo(o.no),
                 found:    o.found,
                 order:    o.order,
                 pool_full:o.pool_full,
@@ -1184,13 +1120,27 @@ function saveState() {
     } catch {}
 }
 function loadState() {
+    if (!RESTORE_ENABLED) {
+        clearState();
+        return 'empty';
+    }
     try {
         const raw = localStorage.getItem(STORE_KEY);
-        if (!raw) return 'empty';
+        if (!raw) {
+            orders = Array.isArray(SERVER_ORDER_SCANS) ? SERVER_ORDER_SCANS : [];
+            return orders.length ? 'ok' : 'empty';
+        }
         const s = JSON.parse(raw);
         if (!s || !Array.isArray(s.orders) || !s.orders.length) return 'empty';
         poolUsed = s.poolUsed || {};
-        orders   = s.orders;
+        const seen = new Set();
+        orders = s.orders
+            .map(o => ({ ...o, no: normalizeOrderNo(o.no) }))
+            .filter(o => {
+                if (!o.no || seen.has(o.no)) return false;
+                seen.add(o.no);
+                return true;
+            });
         // Cek apakah batch sudah berubah sejak terakhir discan
         // Jika batch_fp tidak ada (data lama) → treat as stale agar re-analisis otomatis
         const fp = batchFingerprint();
@@ -1199,63 +1149,6 @@ function loadState() {
 }
 function clearState() {
     try { localStorage.removeItem(STORE_KEY); } catch {}
-}
-
-/* ── Re-Analisis Semua: scan ulang semua no pesanan ke server dengan batch terkini ── */
-window.reAnalisis = async function reAnalisis() {
-    if (!orders.length) return;
-    const btn = document.getElementById('reAnalisisBtn');
-    if (btn) { btn.disabled = true; btn.textContent = 'Re-analisis...'; }
-
-    const savedNos      = orders.map(o => o.no);
-    const savedDecisions= {};
-    orders.forEach(o => { if (o.decision) savedDecisions[o.no] = o.decision; });
-    const savedSubs     = {};
-    orders.forEach(o => { if (Object.keys(o.subs||{}).length) savedSubs[o.no] = o.subs; });
-
-    // Reset state
-    orders   = [];
-    poolUsed = {};
-
-    for (const no of savedNos) {
-        try {
-            const fd = new FormData();
-            fd.append('_token', CSRF);
-            fd.append('order_no', no);
-            fd.append('pool_used', JSON.stringify(poolUsed));
-
-            const res  = await fetch(MATCH_URL, {
-                method: 'POST',
-                headers: { 'Accept': 'application/json', 'X-Requested-With': 'XMLHttpRequest' },
-                body: fd,
-            });
-            const data = await res.json();
-            if (!res.ok || data.status !== 'ok') throw new Error(data.message);
-
-            const entry = {
-                no, found: data.found, order: data.order,
-                pool_full: data.pool_full,
-                decision: savedDecisions[no] || null,
-                subs:     savedSubs[no]     || {},
-            };
-            orders.push(entry);
-
-            if (data.found) {
-                const alloc = data.order?.allocated || {};
-                for (const [id, qty] of Object.entries(alloc)) {
-                    poolUsed[id] = (poolUsed[id] || 0) + qty;
-                }
-            }
-        } catch (err) {
-            orders.push({ no, found: false, order: null, pool_full: [], decision: savedDecisions[no] || null, subs: {} });
-        }
-    }
-
-    saveState();
-    renderAll();
-    document.getElementById('restoreBanner').style.display = 'none';
-    toast('ok', 'Re-analisis selesai — data diperbarui dengan batch terkini');
-    focusInput();
 }
 
 /* ── DOM ── */
@@ -1294,27 +1187,6 @@ function beep(ok) {
     } catch {}
 }
 
-/* ── Ticker ── */
-const tickerOk   = document.getElementById('tickerOk');
-const tickerWarn = document.getElementById('tickerWarn');
-const tickerErr  = document.getElementById('tickerErr');
-function showTicker(which, data) {
-    [tickerOk, tickerWarn, tickerErr].forEach(t => t.style.display = 'none');
-    const map = { ok: tickerOk, warn: tickerWarn, err: tickerErr };
-    const el = map[which]; if (!el) return;
-    if (which === 'ok') {
-        document.getElementById('tickCode').textContent  = data.no;
-        document.getElementById('tickStore').textContent = data.order?.store_name || '';
-        document.getElementById('tickStatus').innerHTML  = statusBadge(data.order?.status || 'ready') + (data.order?.source === 'marketplace_order' ? ' <span class="rk-sbadge sb-mp">MP</span>' : '');
-    } else if (which === 'warn') {
-        document.getElementById('tickWarnMsg').textContent = '"' + data.no + '" tidak ditemukan di sistem.';
-    } else {
-        document.getElementById('tickErrMsg').textContent = data.msg || 'Terjadi kesalahan.';
-    }
-    el.style.display = 'flex';
-    el.style.animation = 'none'; void el.offsetWidth; el.style.animation = '';
-}
-
 /* ── Status badge ── */
 function statusBadge(s) {
     const map = {
@@ -1323,7 +1195,7 @@ function statusBadge(s) {
         missing:  ['sb-missing', 'Stok Habis'],
         pending:  ['sb-pending', 'Ditunda'],
         skip:     ['sb-skip',    'Diabaikan'],
-        not_found:['sb-notfound','? Tidak Ditemukan'],
+        not_found:['sb-notfound','Belum Tertaut'],
     };
     const [cls, lbl] = map[s] || map['not_found'];
     return `<span class="rk-sbadge ${cls}">${lbl}</span>`;
@@ -1337,6 +1209,11 @@ function fmtDate(s) {
 
 /* ── Focus ── */
 function focusInput() { orderInput?.focus(); }
+function refocusScan() {
+    focusInput();
+    setTimeout(focusInput, 40);
+    setTimeout(focusInput, 160);
+}
 
 /* ── Auto-refocus ── */
 document.addEventListener('keydown', e => {
@@ -1359,10 +1236,11 @@ orderInput?.addEventListener('keydown', e => {
    PROCESS ONE ORDER
 ══════════════════════════════════════════════ */
 async function processOrder(no) {
+    no = normalizeOrderNo(no);
     if (!no) return;
-    if (orders.find(o => o.no === no)) {
+    if (orders.find(o => normalizeOrderNo(o.no) === no)) {
         toast('err', 'Pesanan ' + no + ' sudah ada dalam daftar.');
-        orderInput.value = ''; focusInput(); return;
+        orderInput.value = ''; refocusScan(); return;
     }
     orderInput.value = '';
 
@@ -1381,7 +1259,8 @@ async function processOrder(no) {
         if (!res.ok || data.status !== 'ok') throw new Error(data.message || 'Gagal memuat pesanan.');
 
         data.no = no;
-        orders.push({ no, found: data.found, order: data.order, pool_full: data.pool_full, decision: null, subs: {} });
+        const defaultDecision = data.order?.source === 'manual_scan' ? 'pending' : null;
+        orders.push({ no, found: data.found, order: data.order, pool_full: data.pool_full, decision: defaultDecision, subs: {} });
 
         if (data.found) {
             // Akumulasikan alokasi ke poolUsed
@@ -1390,24 +1269,21 @@ async function processOrder(no) {
                 poolUsed[id] = (poolUsed[id] || 0) + qty;
             }
             saveState();
-            showTicker('ok', data);
             beep(true);
             const s = data.order.status;
-            toast(s === 'ready' ? 'ok' : 'warn', no + (s === 'ready' ? ' - semua item tersedia' : s === 'partial' ? ' - stok kurang' : ' - item tidak ada di batch'));
+            toast(s === 'ready' ? 'ok' : 'warn', no + (data.order?.source === 'manual_scan' ? ' dicatat' : (s === 'ready' ? ' - semua item tersedia' : s === 'partial' ? ' - stok kurang' : ' - item tidak ada di batch')));
         } else {
             saveState();
-            showTicker('warn', data);
             beep(false);
-            toast('err', no + ' tidak ditemukan di sistem');
+            toast('warn', no + ' dicatat tanpa tautan');
         }
 
         renderAll();
-        focusInput();
+        refocusScan();
     } catch (err) {
-        showTicker('err', { msg: err.message });
         beep(false);
         toast('err', err.message);
-        focusInput();
+        refocusScan();
     }
 }
 
@@ -1454,16 +1330,40 @@ function renderCard(o, idx) {
           <div class="rk-order-hdr" onclick="toggleCard(${idx})">
             <span class="rk-order-no">${no}</span>
             ${statusBadge('not_found')}
-            <span class="rk-order-chev ${isLast?'open':''}" id="chev-${idx}">▼</span>
+            <span class="rk-order-chev" id="chev-${idx}">▼</span>
           </div>
-          <div id="obody-${idx}" style="display:${isLast?'':'none'}">
+          <div id="obody-${idx}" style="display:none">
             <div class="rk-order-body">
               <p style="color:#6b7280;font-size:.84rem;margin:0">
-                Nomor pesanan tidak ditemukan di sistem.<br>
-                <span style="color:#9ca3af;font-size:.78rem">Pastikan pesanan sudah di-import atau coba sync ulang dari marketplace.</span>
+                Nomor pesanan dicatat tanpa tautan.<br>
+                <span style="color:#9ca3af;font-size:.78rem">Pencocokan ke invoice/order dilakukan nanti.</span>
               </p>
               <div class="rk-action-strip">
                 <span style="font-size:.77rem;color:#9ca3af;font-weight:600">Aksi:</span>
+                <button class="rk-act-btn pending ${decision==='pending'?'on':''}" data-idx="${idx}" data-action="pending">Tunda</button>
+                <button class="rk-act-btn skip    ${decision==='skip'   ?'on':''}" data-idx="${idx}" data-action="skip">Abaikan</button>
+              </div>
+            </div>
+          </div>
+        </div>`;
+    }
+
+    if (order?.source === 'manual_scan') {
+        const decBadge = decision ? statusBadge(decision) : statusBadge('pending');
+        return `<div class="${cls}" id="ocard-${idx}">
+          <div class="rk-order-hdr" onclick="toggleCard(${idx})">
+            <span class="rk-order-no">${no}</span>
+            <span class="rk-order-store">Belum tertaut</span>
+            ${decBadge}
+            <span class="rk-order-chev" id="chev-${idx}">▼</span>
+          </div>
+          <div id="obody-${idx}" style="display:none">
+            <div class="rk-order-body">
+              <p style="color:#64748b;font-size:.84rem;margin:0">
+                Nomor pesanan sudah dicatat. Pencocokan ke invoice/order akan dilakukan nanti.
+              </p>
+              <div class="rk-action-strip">
+                <span style="font-size:.77rem;color:#9ca3af;font-weight:600">Status:</span>
                 <button class="rk-act-btn pending ${decision==='pending'?'on':''}" data-idx="${idx}" data-action="pending">Tunda</button>
                 <button class="rk-act-btn skip    ${decision==='skip'   ?'on':''}" data-idx="${idx}" data-action="skip">Abaikan</button>
               </div>
@@ -1542,7 +1442,7 @@ function renderCard(o, idx) {
     }
     linesHtml += '</tbody></table>';
 
-    const mpBadge = order.source === 'marketplace_order' ? '<span class="rk-sbadge sb-mp">Marketplace</span>' : '';
+    const mpBadge = '';
 
     // Hitung coverage substitusi — memperhitungkan partial qty
     const shortLines = (order.lines || []).filter(l => (l.qty_short || 0) > 0);
@@ -1578,9 +1478,9 @@ function renderCard(o, idx) {
         ${mpBadge}
         ${order.date ? `<span style="font-size:.73rem;color:#94a3b8">${fmtDate(order.date)}</span>` : ''}
         ${decBadge}
-        <span class="rk-order-chev ${isLast?'open':''}" id="chev-${idx}">▼</span>
+        <span class="rk-order-chev" id="chev-${idx}">▼</span>
       </div>
-      <div id="obody-${idx}" style="display:${isLast?'':'none'}">
+      <div id="obody-${idx}" style="display:none">
         <div class="rk-order-body">
           ${linesHtml}
           <div class="rk-action-strip">
@@ -1815,9 +1715,11 @@ function renderSisa() {
 
     const totalSisa = sisa.reduce((a, s) => a + s.qty_sisa, 0);
     const hasOrders = orders.length > 0;
+    const hasAllocation = Object.values(poolUsed).some(q => Number(q) > 0)
+        || Object.values(subsUsed).some(q => Number(q) > 0);
     const foundOrders = orders.filter(o => o.found);
     const allDecided = foundOrders.length > 0 && foundOrders.every(o => o.decision);
-    const isWarning  = hasOrders && allDecided && sisa.length > 0;
+    const isWarning  = hasAllocation && allDecided && sisa.length > 0;
 
     const rows = sisa.map(s => `
         <div class="rk-sisa-row">
@@ -1828,20 +1730,22 @@ function renderSisa() {
 
     const note = isWarning
         ? `<div class="rk-sisa-note">Masih ada <b>${FMT.format(totalSisa)} pcs</b> yang belum masuk pesanan mana pun. Scan pesanan tambahan atau abaikan jika memang lebih.</div>`
-        : hasOrders
-            ? `<div class="rk-sisa-note">Barang-barang ini ada di batch tapi belum dialokasikan ke pesanan yang discan.</div>`
+        : hasOrders && !hasAllocation
+            ? `<div class="rk-sisa-note">Pesanan sudah dicatat, tapi stok batch belum dialokasikan karena belum ditautkan ke invoice/order.</div>`
+            : hasOrders
+                ? `<div class="rk-sisa-note">Barang-barang ini ada di batch tapi belum dialokasikan ke pesanan yang discan.</div>`
             : `<div class="rk-sisa-note">Semua item batch masih belum dialokasikan. Scan pesanan untuk mulai mencocokkan stok.</div>`;
 
     sisaCard.innerHTML = `
         <div class="rk-sisa-card ${isWarning ? 'has-sisa' : ''}" id="sisaCardInner">
             <div class="rk-sisa-hdr" onclick="toggleSisa()">
-                <span class="rk-sisa-title">${hasOrders ? 'Sisa Stok Batch' : 'Stok Batch Belum Dialokasikan'}${isWarning ? ' — Ada Kelebihan' : ''}</span>
+                <span class="rk-sisa-title">${hasAllocation ? 'Sisa Stok Batch' : 'Stok Batch Belum Dialokasikan'}${isWarning ? ' — Ada Kelebihan' : ''}</span>
                 <span class="shp-pill" style="font-size:.7rem;padding:.12rem .55rem">
                     ${FMT.format(totalSisa)} pcs · ${sisa.length} SKU
                 </span>
                 <span style="margin-left:auto;color:#94a3b8;font-size:.75rem;transition:transform .2s" id="sisaChev">▼</span>
             </div>
-            <div id="sisaBody">
+            <div id="sisaBody" style="display:none">
                 <div class="rk-sisa-body">
                     ${rows}
                     ${note}
@@ -1850,7 +1754,7 @@ function renderSisa() {
         </div>`;
 }
 
-let sisaOpen = true;
+let sisaOpen = false;
 window.toggleSisa = function () {
     const body = document.getElementById('sisaBody');
     const chev = document.getElementById('sisaChev');
@@ -1866,97 +1770,20 @@ window.resetRekon = function () {
     orders = []; poolUsed = {};
     clearState();
     renderAll();
-    document.getElementById('restoreBanner').style.display = 'none';
-    [tickerOk, tickerWarn, tickerErr].forEach(t => t.style.display = 'none');
-    toast('ok', 'Rekonsiliasi direset.');
+    toast('ok', 'Pesanan direset.');
     focusInput();
 };
 
-/* ══════════════════════════════════════════════
-   KONFIRMASI
-══════════════════════════════════════════════ */
-topConfirmBtn.addEventListener('click', async function () {
-    const btn = this;
-    btn.disabled = true; btn.textContent = 'Menyimpan...';
-
-    try {
-        const fd = new FormData();
-        fd.append('_token', CSRF);
-        orders.forEach((o, i) => {
-            fd.append(`decisions[${i}][order_no]`,    o.no);
-            fd.append(`decisions[${i}][action]`,      o.decision || 'skip');
-            if (o.order?.invoice_id) fd.append(`decisions[${i}][invoice_id]`, o.order.invoice_id);
-        });
-
-        const res  = await fetch(APPLY_URL, {
-            method: 'POST',
-            headers: { 'Accept': 'application/json', 'X-Requested-With': 'XMLHttpRequest' },
-            body: fd,
-        });
-        const data = await res.json();
-        if (!res.ok || data.status !== 'ok') throw new Error(data.message || 'Gagal menyimpan.');
-
-        toast('ok', data.message);
-        clearState();
-
-        const pendingNos = data.pending_nos || [];
-        const pendingTxt = pendingNos.length
-            ? '\n\nPesanan pending (' + pendingNos.length + '):\n' + pendingNos.join('\n')
-            : '';
-
-        const goSubmit = confirm('Rekonsiliasi disimpan.' + pendingTxt + '\n\nLanjut submit shipment & potong stok sekarang?');
-
-        if (goSubmit) {
-            const sf = document.createElement('form');
-            sf.method = 'POST'; sf.action = data.submit_url;
-            sf.innerHTML = `<input type="hidden" name="_token" value="${CSRF}">`;
-            document.body.appendChild(sf); sf.submit();
-        } else {
-            window.location.href = data.edit_url || EDIT_URL;
-        }
-    } catch (err) {
-        toast('err', err.message);
-        btn.disabled = false;
-        btn.classList.add('active');
-        btn.textContent = 'Konfirmasi';
-    }
+topConfirmBtn.addEventListener('click', function () {
+    if (this.disabled) return;
+    saveState();
+    window.location.href = CONFIRM_URL;
 });
 
-/* ── init: restore state dari localStorage ── */
+/* ── init ── */
 window.addEventListener('load', async function () {
-    const status = loadState();
-    const banner = document.getElementById('restoreBanner');
-    const bannerText = document.getElementById('restoreBannerText');
-
-    if (status === 'stale') {
-        // Batch berubah sejak terakhir scan — data lama tidak bisa dipercaya
-        renderAll();
-        if (banner) {
-            banner.style.display = 'flex';
-            banner.style.background = 'rgba(185,28,28,.07)';
-            banner.style.borderColor = 'rgba(185,28,28,.3)';
-        }
-        if (bannerText) {
-            bannerText.style.color = 'var(--shp-err)';
-            bannerText.textContent = 'Batch berubah sejak scan terakhir - sedang re-analisis...';
-        }
-        // Auto re-analisis dan tunggu selesai sebelum lanjut
-        await window.reAnalisis();
-    } else if (status === 'ok') {
-        renderAll();
-        if (banner) {
-            banner.style.display = 'flex';
-            banner.style.background = 'var(--shp-warn-bg)';
-        }
-        if (bannerText) {
-            bannerText.style.color = 'var(--shp-warn)';
-            bannerText.textContent = orders.length + ' pesanan dipulihkan dari sesi sebelumnya.';
-        }
-        toast('warn', orders.length + ' pesanan dipulihkan');
-    } else {
-        renderAll();
-    }
-
+    loadState();
+    renderAll();
     focusInput();
 });
 

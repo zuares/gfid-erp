@@ -281,6 +281,10 @@ body[data-theme="dark"] .shp-topbar {
     background: rgba(148,163,184,.08) !important;
     color: #111827 !important;
 }
+.btn-shp-outline.is-disabled {
+    opacity: .45;
+    pointer-events: none;
+}
 #setupBtn,
 .shp-scan-btn,
 #submitForm button {
@@ -394,6 +398,27 @@ body[data-theme="dark"] .shp-topbar {
     padding: .25rem .45rem !important;
     font-size: .72rem !important;
 }
+.shp-draft-card {
+    display: flex;
+    align-items: center;
+    gap: .75rem;
+    justify-content: space-between;
+    border: 1px solid rgba(148,163,184,.22);
+    border-radius: 8px;
+    padding: .75rem .85rem;
+    margin-bottom: .65rem;
+    background: rgba(148,163,184,.06);
+}
+.shp-draft-code {
+    font-size: .95rem;
+    font-weight: 900;
+    color: #334155;
+}
+.shp-draft-meta {
+    margin-top: .12rem;
+    font-size: .74rem;
+    color: #64748b;
+}
 @media (max-width: 768px) {
     .shp-wrap {
         padding: .5rem .5rem 5rem;
@@ -456,6 +481,15 @@ body[data-theme="dark"] .shp-topbar {
     .shp-lines-scroll {
         max-height: 45vh;
     }
+    .shp-draft-card {
+        align-items: stretch;
+        flex-direction: column;
+        gap: .6rem;
+    }
+    .shp-draft-card .btn-shp-outline {
+        justify-content: center;
+        width: 100%;
+    }
 }
 </style>
 @endpush
@@ -463,10 +497,8 @@ body[data-theme="dark"] .shp-topbar {
 @section('content')
 <div class="shp-topbar">
     <span class="shp-topbar-code" id="topShipCode">Shipment Baru</span>
-    <span class="shp-badge" id="topStatus">Setup</span>
+    <span class="shp-badge" id="topStatus">Buat Draft</span>
     <span class="shp-topbar-spacer"></span>
-    <span class="shp-pill">Baris <b id="topLines">0</b></span>
-    <span class="shp-pill shp-pill-accent">Qty <b id="topQty">0</b></span>
     <a href="{{ route('sales.shipments.index') }}" class="btn-shp-outline" style="text-decoration:none">
         Daftar Shipment
     </a>
@@ -498,12 +530,21 @@ body[data-theme="dark"] .shp-topbar {
         </div>
     </div>
 
-    {{-- ── Phase bar ────────────────────────────────────────────────────── --}}
-    <div class="shp-phase-bar">
-        <span class="shp-step active" id="pStep1">Setup</span>
-        <span class="shp-step" id="pStep2">Scan Barang</span>
-        <span class="shp-step" id="pStep3">Selesai</span>
-    </div>
+    @if($latestDraft)
+        <div class="shp-draft-card">
+            <div>
+                <div class="shp-draft-code">{{ $latestDraft->code }}</div>
+                <div class="shp-draft-meta">
+                    Draft terakhir · {{ optional($latestDraft->store)->name ?: 'Belum ada store' }}
+                    · {{ number_format((int) ($latestDraft->total_qty_scanned ?? 0), 0, ',', '.') }} qty
+                    · {{ $latestDraft->lines_count }} baris
+                </div>
+            </div>
+            <a href="{{ route('sales.shipments.edit', $latestDraft) }}" class="btn-shp-outline" style="text-decoration:none">
+                Lanjutkan Draft
+            </a>
+        </div>
+    @endif
 
     {{-- ══════════════════════════════════════════════════════════════════ --}}
     {{-- PHASE 1 — Setup                                                    --}}
@@ -511,8 +552,8 @@ body[data-theme="dark"] .shp-topbar {
     <div class="shp-card" id="phase1Card">
 
         <div style="border-left:3px solid #6366f1;padding-left:1rem;margin-bottom:1.4rem">
-            <div style="color:#4338ca;font-weight:800;font-size:.9rem;margin-bottom:.15rem">Setup Shipment</div>
-            <div style="color:#94a3b8;font-size:.72rem">Isi data singkat, lalu lanjut scan barang</div>
+            <div style="color:#4338ca;font-weight:800;font-size:.9rem;margin-bottom:.15rem">Buat Draft Shipment</div>
+            <div style="color:#94a3b8;font-size:.72rem">Setelah draft dibuat, halaman scan akan terbuka otomatis</div>
         </div>
 
         <form id="setupForm" autocomplete="off">
@@ -596,7 +637,7 @@ body[data-theme="dark"] .shp-topbar {
                         style="background:#6366f1;border:none;border-radius:12px;padding:.6rem 1.6rem;
                                color:#fff;font-weight:800;font-size:.9rem;cursor:pointer;
                                box-shadow:0 3px 12px rgba(99,102,241,.35);transition:background .15s">
-                        Mulai Scan
+                        Buat Draft &amp; Scan
                     </button>
                 </div>
             </div>
@@ -695,18 +736,26 @@ body[data-theme="dark"] .shp-topbar {
                 </a>
             </div>
 
-            <form id="submitForm" method="POST" action=""
-                onsubmit="return confirm('Submit shipment ini dan potong stok WH-RTS?')">
-                @csrf
-                <button type="submit"
-                    style="background:#16a34a;border:none;border-radius:12px;padding:.6rem 1.6rem;
-                           color:#fff;font-size:.9rem;font-weight:800;cursor:pointer;
-                           box-shadow:0 3px 12px rgba(22,163,74,.35);transition:background .15s"
-                    onmouseover="this.style.background='#15803d'"
-                    onmouseout="this.style.background='#16a34a'">
-                    Simpan &amp; Kurangi Stok
-                </button>
-            </form>
+            <div style="margin-left:auto;display:flex;align-items:center;gap:.5rem;flex-wrap:wrap">
+                <a href="#" data-rekon-link class="btn-shp-outline is-disabled"
+                    aria-disabled="true"
+                    style="display:inline-flex;align-items:center;text-decoration:none">
+                    Rekonsiliasi
+                </a>
+
+                <form id="submitForm" method="POST" action=""
+                    onsubmit="return confirm('Submit shipment ini dan potong stok WH-RTS?')">
+                    @csrf
+                    <button type="submit"
+                        style="background:#16a34a;border:none;border-radius:12px;padding:.6rem 1.6rem;
+                               color:#fff;font-size:.9rem;font-weight:800;cursor:pointer;
+                               box-shadow:0 3px 12px rgba(22,163,74,.35);transition:background .15s"
+                        onmouseover="this.style.background='#15803d'"
+                        onmouseout="this.style.background='#16a34a'">
+                        Simpan &amp; Kurangi Stok
+                    </button>
+                </form>
+            </div>
         </div>
     </div>{{-- /phase2Card --}}
 
@@ -985,9 +1034,8 @@ body[data-theme="dark"] .shp-topbar {
                 }
 
                 _ship = data.shipment;
-                applyShipMeta(_ship);
-                resetLinesUI();
-                showP2();
+                if (spinner) spinner.textContent = 'Membuka halaman scan...';
+                window.location.assign(_ship.edit_url || _ship.show_url || '{{ parse_url(route("sales.shipments.index"), PHP_URL_PATH) }}');
 
             } catch (err) {
                 if (errEl) { errEl.textContent = err.message || 'Terjadi kesalahan, coba lagi.'; errEl.style.display = 'block'; }
@@ -1006,6 +1054,9 @@ body[data-theme="dark"] .shp-topbar {
         if (codeEl) codeEl.textContent = s.code || '—';
         const topCode = document.getElementById('topShipCode');
         if (topCode) topCode.textContent = s.code || 'Shipment Baru';
+        if (s.edit_url && window.location.pathname !== s.edit_url) {
+            window.history.replaceState({ shipmentId: s.id }, '', s.edit_url);
+        }
 
         if (storeEl) {
             const storeLabel = [s.store_code, s.store_name].filter(Boolean).join(' — ');
@@ -1035,6 +1086,14 @@ body[data-theme="dark"] .shp-topbar {
         // Export link
         const ea = document.getElementById('exportBtn');
         if (ea) ea.href = s.export_url;
+
+        // Rekonsiliasi links
+        document.querySelectorAll('[data-rekon-link]').forEach((el) => {
+            if (!s.rekon_url) return;
+            el.href = s.rekon_url;
+            el.classList.remove('is-disabled');
+            el.removeAttribute('aria-disabled');
+        });
     }
 
     function fmtDate(str) {

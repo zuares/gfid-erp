@@ -5,56 +5,58 @@
 
 @push('head')
 <style>
-    .page-wrap{ max-width:1150px; margin-inline:auto; padding:.9rem .9rem 3.5rem; }
+    .page-wrap{ max-width:1120px; margin-inline:auto; padding:.65rem .75rem 3.5rem; }
     body[data-theme="light"] .page-wrap{ background:#f8fafc; }
-    body[data-theme="dark"] .page-wrap{ background: radial-gradient(circle at top left, rgba(15, 23, 42, 0.9) 0, #020617 65%); }
+    body[data-theme="dark"] .page-wrap{ background:#020617; }
 
     .card-main{
         background: var(--card);
-        border-radius: 16px;
-        border: 1px solid rgba(148, 163, 184, 0.22);
-        box-shadow: 0 10px 26px rgba(15, 23, 42, 0.06), 0 0 0 1px rgba(148, 163, 184, 0.05);
+        border-radius: 8px;
+        border: 1px solid rgba(148, 163, 184, 0.20);
+        box-shadow: none;
     }
     body[data-theme="dark"] .card-main{
-        border-color: rgba(30, 64, 175, 0.55);
-        box-shadow: 0 16px 40px rgba(15, 23, 42, 0.82);
+        border-color: rgba(51, 65, 85, 0.85);
+        box-shadow: none;
     }
 
-    .title{ font-weight: 800; letter-spacing: -.02em; }
-    .sub{ color:#6b7280; font-size:.92rem; }
+    .title{ font-weight: 900; letter-spacing: 0; }
+    .sub{ color:#64748b; font-size:.84rem; }
     body[data-theme="dark"] .sub{ color:#9ca3af; }
 
-    .kpis{ display:flex; flex-wrap:wrap; gap:.5rem; margin-top:.65rem; }
+    .kpis{ display:flex; flex-wrap:wrap; gap:.38rem; margin-top:.55rem; }
     .kpi{
         display:inline-flex; align-items:baseline; gap:.45rem;
-        border-radius:999px; padding:.28rem .75rem;
+        border-radius:7px; padding:.2rem .48rem;
         border:1px solid rgba(148, 163, 184, 0.25);
-        background: rgba(248, 250, 252, 0.92);
-        font-size:.82rem;
+        background: transparent;
+        font-size:.76rem;
     }
     body[data-theme="dark"] .kpi{
         background: rgba(15, 23, 42, 0.96);
-        border-color: rgba(30, 64, 175, 0.7);
+        border-color: rgba(51, 65, 85, 0.85);
     }
-    .kpi .lbl{ text-transform:uppercase; letter-spacing:.08em; font-size:.64rem; color:#9ca3af; }
+    .kpi .lbl{ text-transform:none; letter-spacing:0; font-size:.68rem; color:#94a3b8; }
     body[data-theme="dark"] .kpi .lbl{ color:#6b7280; }
     .kpi .val{ font-weight:800; }
 
     .controls{ display:flex; gap:.5rem; align-items:center; flex-wrap:wrap; }
     .filter-label{ font-size:.8rem; color:#6b7280; }
     body[data-theme="dark"] .filter-label{ color:#9ca3af; }
-    .filter-select{ border-radius:999px; padding-left:.9rem; padding-right:2rem; font-size:.85rem; }
-    .btn-pill{ border-radius:999px; padding-inline:1rem; }
+    .filter-select{ border-radius:7px; padding-left:.75rem; padding-right:2rem; font-size:.82rem; }
+    .btn-pill{ border-radius:7px; padding-inline:.78rem; box-shadow:none!important; }
+    .btn-fresh{ border-color:#fecaca; color:#b91c1c; background:transparent; }
+    .btn-fresh:hover{ background:#fef2f2; color:#991b1b; border-color:#fca5a5; }
 
     .table-list{ margin-bottom:0; }
     .table-list thead th{
         border-bottom-width:1px;
-        font-size:.7rem;
-        text-transform:uppercase;
-        letter-spacing:.08em;
+        font-size:.68rem;
+        text-transform:none;
+        letter-spacing:0;
         color:#6b7280;
-        background: rgba(148, 163, 184, 0.06);
-        padding:.85rem .75rem;
+        background: rgba(148, 163, 184, 0.05);
+        padding:.58rem .62rem;
         white-space:nowrap;
     }
     body[data-theme="dark"] .table-list thead th{
@@ -65,7 +67,7 @@
     .table-list tbody td{
         vertical-align:middle;
         border-top-color: rgba(148, 163, 184, 0.16);
-        padding:.85rem .75rem;
+        padding:.56rem .62rem;
     }
     body[data-theme="dark"] .table-list tbody td{ border-top-color: rgba(51, 65, 85, 0.85); }
 
@@ -76,14 +78,16 @@
     .store-name{ font-weight:700; }
 
     .badge-status{
-        border-radius:999px; padding:.18rem .7rem;
-        font-size:.72rem; letter-spacing:.06em; text-transform:uppercase;
+        border-radius:7px; padding:.16rem .48rem;
+        font-size:.7rem; letter-spacing:0; text-transform:none;
         border:1px solid transparent;
         display:inline-flex; align-items:center; gap:.35rem;
         white-space:nowrap;
     }
     .badge-status::before{ content:''; width:7px; height:7px; border-radius:999px; display:inline-block; }
 
+    .st-draft{ background: rgba(148, 163, 184, 0.10); color:#475569; border-color: rgba(148, 163, 184, 0.30); }
+    .st-draft::before{ background: rgba(100, 116, 139, 0.95); }
     .st-submitted{ background: rgba(59, 130, 246, 0.10); color:#1d4ed8; border-color: rgba(59, 130, 246, 0.30); }
     .st-submitted::before{ background: rgba(59, 130, 246, 0.95); }
     .st-posted{ background: rgba(34, 197, 94, 0.10); color:#166534; border-color: rgba(34, 197, 94, 0.30); }
@@ -95,10 +99,60 @@
     body[data-theme="dark"] .st-posted{ background: rgba(34, 197, 94, 0.20); color:#dcfce7; border-color: rgba(34, 197, 94, 0.55); }
     body[data-theme="dark"] .st-cancelled{ background: rgba(239, 68, 68, 0.18); color:#fecaca; border-color: rgba(239, 68, 68, 0.55); }
 
-    .empty{ padding:2.2rem 1.25rem; text-align:center; color:#6b7280; }
+    .empty{ padding:2.2rem 1.25rem; text-align:center; color:#64748b; }
     body[data-theme="dark"] .empty{ color:#9ca3af; }
     .divider{ height:1px; background: rgba(148, 163, 184, 0.20); }
     body[data-theme="dark"] .divider{ background: rgba(51, 65, 85, 0.85); }
+    .flash-clean{ border-radius:8px; padding:.62rem .75rem; font-size:.84rem; border:1px solid rgba(148,163,184,.25); }
+
+    @media (max-width: 768px) {
+        .page-wrap{ padding:.5rem .5rem 4rem; }
+        .title{ font-size:1.05rem; }
+        .sub{ display:none; }
+        .controls{ width:100%; align-items:stretch; }
+        .controls form{ flex:1 1 100%; }
+        .filter-select{ width:100%; min-height:40px; }
+        .controls .btn,
+        .controls form button{ min-height:40px; }
+        .kpis{ display:none; }
+        .table-responsive{ overflow:visible; }
+        .table-list thead{ display:none; }
+        .table-list,
+        .table-list tbody,
+        .table-list tr,
+        .table-list td{ display:block; width:100%; }
+        .table-list tbody tr{
+            padding:.68rem;
+            border-top:1px solid rgba(148,163,184,.16);
+        }
+        .table-list tbody td{
+            border:0;
+            padding:0;
+        }
+        .table-list tbody td.mobile-hide{ display:none; }
+        .ship-row-main{
+            display:flex;
+            align-items:flex-start;
+            justify-content:space-between;
+            gap:.75rem;
+        }
+        .ship-row-meta{
+            display:flex;
+            align-items:center;
+            gap:.45rem;
+            flex-wrap:wrap;
+            margin-top:.35rem;
+            color:#64748b;
+            font-size:.78rem;
+        }
+        .ship-row-action{
+            margin-top:.55rem;
+        }
+        .ship-row-action .btn{
+            width:100%;
+            min-height:38px;
+        }
+    }
 </style>
 @endpush
 
@@ -119,15 +173,22 @@
 
         $statusFilter = $statusFilter ?? request('status', 'all');
         $canSeeNominal = $canSeeNominal ?? ((auth()->user()->role ?? null) !== 'admin');
+        $canFreshShipments = $canFreshShipments ?? false;
 
         $pageTotalQty = (int) $shipments->getCollection()->sum('total_qty_calc');
         $pageTotalRp  = $canSeeNominal ? (float) $shipments->getCollection()->sum('total_rp_calc') : 0;
     @endphp
 
+    @if(session('message'))
+        <div class="flash-clean alert alert-{{ session('status') === 'success' ? 'success' : 'danger' }} mb-2">
+            {{ session('message') }}
+        </div>
+    @endif
+
     <div class="d-flex justify-content-between align-items-start gap-3 flex-wrap mb-3">
         <div>
-            <div class="title h4 mb-1">Shipments Keluar Barang</div>
-            <div class="sub">Dokumen barang keluar dari gudang siap jual (WH-RTS).</div>
+            <div class="title h4 mb-1">Shipment</div>
+            <div class="sub">Dokumen barang keluar WH-RTS.</div>
 
             <div class="kpis">
                 <span class="kpi"><span class="lbl">Total</span><span class="val">{{ number_format($shipments->total(), 0, ',', '.') }}</span></span>
@@ -145,14 +206,24 @@
                 <span class="filter-label">Status</span>
                 <select name="status" class="form-select form-select-sm filter-select" onchange="this.form.submit()">
                     <option value="all" {{ $statusFilter === 'all' ? 'selected' : '' }}>All</option>
+                    <option value="draft" {{ $statusFilter === 'draft' ? 'selected' : '' }}>Draft</option>
                     <option value="submitted" {{ $statusFilter === 'submitted' ? 'selected' : '' }}>Submitted</option>
                     <option value="posted" {{ $statusFilter === 'posted' ? 'selected' : '' }}>Posted</option>
                     <option value="cancelled" {{ $statusFilter === 'cancelled' ? 'selected' : '' }}>Cancelled</option>
                 </select>
             </form>
 
-            <a href="{{ route('sales.shipments.create') }}" class="btn btn-primary btn-pill">
-                <i class="bi bi-upc-scan me-1"></i>
+            @if($canFreshShipments)
+                <form method="POST" action="{{ route('sales.shipments.dev_fresh') }}"
+                      onsubmit="return confirm('Fresh semua data shipment? Aksi ini hanya untuk database dev.');">
+                    @csrf
+                    <button type="submit" class="btn btn-sm btn-outline-danger btn-pill btn-fresh">
+                        Fresh Data
+                    </button>
+                </form>
+            @endif
+
+            <a href="{{ route('sales.shipments.create') }}" class="btn btn-sm btn-primary btn-pill">
                 Shipment Baru
             </a>
         </div>
@@ -170,7 +241,7 @@
                     <table class="table table-hover align-middle table-list">
                         <thead>
                             <tr>
-                                <th style="width: 52px;">#</th>
+                                <th style="width: 46px;">#</th>
                                 <th style="width: 120px;">Tanggal</th>
                                 <th style="width: 210px;">Shipment</th>
                                 <th>Store / Channel</th>
@@ -200,37 +271,47 @@
                                     $uiStatus = $isCancelled ? 'cancelled' : ($shipment->status ?? 'submitted');
 
                                     $statusClass = match ($uiStatus) {
+                                        'draft' => 'st-draft',
                                         'submitted' => 'st-submitted',
                                         'posted' => 'st-posted',
                                         'cancelled' => 'st-cancelled',
                                         default => 'st-submitted',
                                     };
 
-                                    $statusLabel = strtoupper($uiStatus);
+                                    $statusLabel = ucfirst($uiStatus);
+                                    $actionRoute = $uiStatus === 'draft'
+                                        ? route('sales.shipments.edit', $shipment)
+                                        : route('sales.shipments.show', $shipment);
+                                    $actionLabel = $uiStatus === 'draft' ? 'Lanjutkan' : 'Detail';
                                 @endphp
 
                                 <tr>
-                                    <td class="text-muted small">
+                                    <td class="text-muted small mobile-hide">
                                         {{ ($shipments->currentPage() - 1) * $shipments->perPage() + $loop->iteration }}
                                     </td>
 
-                                    <td class="small">{{ $fmtDate($shipment->date, 'd M Y') }}</td>
+                                    <td class="small mobile-hide">{{ $fmtDate($shipment->date, 'd M Y') }}</td>
 
                                     <td>
-                                        <a class="code-link" href="{{ route('sales.shipments.show', $shipment) }}">
-                                            {{ $shipment->code }}
-                                        </a>
+                                        <div class="ship-row-main">
+                                            <div>
+                                                <a class="code-link" href="{{ $actionRoute }}">
+                                                    {{ $shipment->code }}
+                                                </a>
 
-                                        <div class="muted mt-1">
-                                            @if ($isCancelled)
-                                                Cancelled {{ $fmtDate($shipment->cancelled_at, 'd M Y H:i') }}
-                                            @elseif (!empty($shipment->posted_at))
-                                                Posted {{ $fmtDate($shipment->posted_at, 'd M Y H:i') }}
-                                            @elseif (!empty($shipment->submitted_at))
-                                                Submitted {{ $fmtDate($shipment->submitted_at, 'd M Y H:i') }}
-                                            @else
-                                                Draft
-                                            @endif
+                                                <div class="muted mt-1">
+                                                    @if ($isCancelled)
+                                                        Cancelled {{ $fmtDate($shipment->cancelled_at, 'd M Y H:i') }}
+                                                    @elseif (!empty($shipment->posted_at))
+                                                        Posted {{ $fmtDate($shipment->posted_at, 'd M Y H:i') }}
+                                                    @elseif (!empty($shipment->submitted_at))
+                                                        Submitted {{ $fmtDate($shipment->submitted_at, 'd M Y H:i') }}
+                                                    @else
+                                                        Draft
+                                                    @endif
+                                                </div>
+                                            </div>
+                                            <span class="badge-status {{ $statusClass }} d-md-none">{{ $statusLabel }}</span>
                                         </div>
                                     </td>
 
@@ -239,29 +320,34 @@
                                         @if ($channelLabel)
                                             <div class="muted">{{ $channelLabel }}</div>
                                         @endif
+                                        <div class="ship-row-meta d-md-none">
+                                            <span>{{ $fmtDate($shipment->date, 'd M Y') }}</span>
+                                            <span>Qty {{ number_format($qty, 0, ',', '.') }}</span>
+                                            <span>{{ number_format($catCount, 0, ',', '.') }} kategori</span>
+                                        </div>
                                     </td>
 
-                                    <td class="text-end">
+                                    <td class="text-end mobile-hide">
                                         <span class="fw-semibold">{{ number_format($qty, 0, ',', '.') }}</span>
                                     </td>
 
                                     @if($canSeeNominal)
-                                        <td class="text-end">
+                                        <td class="text-end mobile-hide">
                                             <span class="fw-semibold">Rp {{ number_format($totalRp, 0, ',', '.') }}</span>
                                         </td>
                                     @endif
 
-                                    <td class="text-end">
+                                    <td class="text-end mobile-hide">
                                         <span class="fw-semibold">{{ number_format($catCount, 0, ',', '.') }}</span>
                                     </td>
 
-                                    <td>
+                                    <td class="mobile-hide">
                                         <span class="badge-status {{ $statusClass }}">{{ $statusLabel }}</span>
                                     </td>
 
-                                    <td class="text-end">
-                                        <a href="{{ route('sales.shipments.show', $shipment) }}" class="btn btn-sm btn-outline-primary btn-pill">
-                                            Detail
+                                    <td class="text-end ship-row-action">
+                                        <a href="{{ $actionRoute }}" class="btn btn-sm btn-outline-primary btn-pill">
+                                            {{ $actionLabel }}
                                         </a>
                                     </td>
                                 </tr>

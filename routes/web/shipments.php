@@ -27,6 +27,9 @@ Route::middleware(['web', 'auth', 'access:sales'])
                 Route::get('/', 'index')->name('index');
                 Route::get('create', 'create')->name('create');
                 Route::post('/', 'store')->name('store');
+                Route::post('dev-fresh', 'devFreshShipments')
+                    ->name('dev_fresh')
+                    ->middleware('role:owner');
 
                 Route::get('{shipment}', 'show')->name('show');
                 Route::get('{shipment}/edit', 'edit')->name('edit');
@@ -47,6 +50,7 @@ Route::middleware(['web', 'auth', 'access:sales'])
 
                 // ── Opsi C: Rekonsiliasi Pesanan ──────────────────────────
                 Route::get('/{shipment}/rekon',        'rekon')->name('rekon');
+                Route::get('/{shipment}/confirm',      'confirmOrders')->name('confirm_orders');
                 Route::post('/{shipment}/rekon/match', 'rekonMatch')->name('rekon_match');
                 Route::post('/{shipment}/rekon/apply', 'rekonApply')->name('rekon_apply');
 

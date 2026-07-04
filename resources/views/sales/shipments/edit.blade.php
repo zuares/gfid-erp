@@ -700,8 +700,7 @@ body[data-theme="dark"] .shp-pill-accent {
     border-color: #1f2937 !important;
 }
 .btn-shp-outline,
-.btn-shp-ghost,
-.btn-rekon {
+.btn-shp-ghost {
     padding: .28rem .62rem !important;
     font-size: .74rem !important;
     color: #475569 !important;
@@ -709,10 +708,66 @@ body[data-theme="dark"] .shp-pill-accent {
     border: 1px solid rgba(148,163,184,.35) !important;
 }
 .btn-shp-outline:hover,
-.btn-shp-ghost:hover,
-.btn-rekon:hover {
+.btn-shp-ghost:hover {
     background: rgba(148,163,184,.08) !important;
     color: #111827 !important;
+}
+.btn-rekon {
+    min-height: 40px;
+    padding: .42rem 1rem !important;
+    font-size: .82rem !important;
+    font-weight: 850;
+    color: #fff !important;
+    background: #334155 !important;
+    border: 1px solid #334155 !important;
+}
+.btn-rekon:hover {
+    background: #1f2937 !important;
+    border-color: #1f2937 !important;
+    color: #fff !important;
+}
+.btn-rekon.is-disabled {
+    color: #94a3b8 !important;
+    background: transparent !important;
+    border-color: rgba(148,163,184,.32) !important;
+    opacity: .75;
+    pointer-events: none;
+}
+.shp-flow {
+    display: flex;
+    align-items: center;
+    gap: .35rem;
+    flex-wrap: wrap;
+    margin: .55rem 0;
+    padding: .45rem .55rem;
+    border: 1px solid rgba(148,163,184,.18);
+    border-radius: 8px;
+    background: var(--card, #fff);
+}
+.shp-flow-step {
+    display: inline-flex;
+    align-items: center;
+    min-height: 28px;
+    padding: .18rem .5rem;
+    border-radius: 7px;
+    border: 1px solid rgba(148,163,184,.25);
+    color: #64748b;
+    font-size: .72rem;
+    font-weight: 700;
+    white-space: nowrap;
+}
+.shp-flow-step.active {
+    color: #fff;
+    background: #334155;
+    border-color: #334155;
+}
+.shp-flow-step.done {
+    color: #334155;
+    background: rgba(148,163,184,.08);
+}
+.shp-flow-sep {
+    color: #cbd5e1;
+    font-size: .72rem;
 }
 .shp-kpi-grid {
     gap: .45rem;
@@ -931,7 +986,7 @@ body[data-theme="dark"] .shp-scan-card:focus-within {
     }
     .btn-rekon {
         order: 3;
-        flex: 1 1 auto;
+        flex: 1 1 100%;
         text-align: center;
     }
     .btn-shp-submit,
@@ -942,17 +997,13 @@ body[data-theme="dark"] .shp-scan-card:focus-within {
         font-size: .82rem !important;
         padding: .42rem .72rem !important;
     }
-    #submitForm {
-        order: 4;
-        flex: 1 1 auto;
-    }
-    #submitForm .btn-shp-submit {
-        width: 100%;
-    }
     .shp-kpi-grid {
         display: none;
     }
     .shp-info-strip {
+        display: none;
+    }
+    .shp-flow {
         display: none;
     }
     .shp-scan-card {
@@ -1086,21 +1137,13 @@ body[data-theme="dark"] .shp-scan-card:focus-within {
         Qty <b id="summaryTotalQty">{{ number_format($totalQty, 0, ',', '.') }}</b>
     </span>
 
-    {{-- Rekonsiliasi Pesanan (Opsi C) --}}
-    <a href="{{ route('sales.shipments.rekon', $shipment) }}"
-       class="btn btn-rekon">
-        Rekonsiliasi
+    <a href="{{ $totalLines > 0 ? route('sales.shipments.rekon', $shipment) : '#' }}"
+       id="rekonBtn"
+       data-rekon-url="{{ route('sales.shipments.rekon', $shipment) }}"
+       class="btn btn-rekon {{ $totalLines > 0 ? '' : 'is-disabled' }}"
+       aria-disabled="{{ $totalLines > 0 ? 'false' : 'true' }}">
+        {{ $totalLines > 0 ? 'Lanjut Rekonsiliasi' : 'Scan Barang Dulu' }}
     </a>
-
-    <form id="submitForm"
-          action="{{ route('sales.shipments.submit', $shipment) }}"
-          method="POST"
-          onsubmit="return confirmSubmit(event)">
-        @csrf
-        <button type="submit" class="btn btn-shp-submit page-theme-{{ $scanTheme }}">
-            Simpan &amp; Kurangi Stok
-        </button>
-    </form>
 </div>
 
 <div class="shp-wrap page-theme-{{ $scanTheme }}">
@@ -1136,22 +1179,14 @@ body[data-theme="dark"] .shp-scan-card:focus-within {
         </div>
     </div>
 
-    {{-- ═════════════════ INFO STRIP ═════════════════ --}}
-    <div class="shp-info-strip">
-        <span class="shp-info-item"><b>{{ $shipment->code }}</b></span>
-        <span class="shp-info-item">Tgl: <b>{{ id_date($shipment->date) }}</b></span>
-        @if ($shipment->store)
-            <span class="shp-info-item">Toko: <b>{{ $storeName }}</b></span>
-        @endif
-        @if ($shipment->invoice)
-            <span class="shp-info-item">Invoice: <b>{{ $shipment->invoice->code ?? '-' }}</b></span>
-        @endif
-        @if ($shipment->notes)
-            <span class="shp-info-item">Catatan: <b>{{ $shipment->notes }}</b></span>
-        @endif
-        <span class="ms-auto"></span>
-        <a href="{{ route('sales.shipments.show', $shipment) }}"
-           class="btn btn-shp-ghost">Detail</a>
+    <div class="shp-flow">
+        <span class="shp-flow-step active">Scan Barang</span>
+        <span class="shp-flow-sep">→</span>
+        <span class="shp-flow-step">Scan Pesanan</span>
+        <span class="shp-flow-sep">→</span>
+        <span class="shp-flow-step">Konfirmasi Pesanan</span>
+        <span class="shp-flow-sep">→</span>
+        <span class="shp-flow-step">Simpan &amp; Kurangi Stok</span>
     </div>
 
     {{-- ═════════════════ HERO SCAN CARD ═════════════════ --}}
@@ -1200,7 +1235,7 @@ body[data-theme="dark"] .shp-scan-card:focus-within {
             <ul class="shp-error-list shp-error-copy mt-2">
                 <li>Retur belum masuk WH-RTS, atau GRN belum diposting</li>
                 <li>Qty yang discan melebihi stok yang tersedia</li>
-                <li>Kurangi qty item yang bermasalah, lalu coba submit lagi</li>
+                <li>Kurangi qty item yang bermasalah, lalu lanjutkan alur lagi</li>
             </ul>
             <div class="shp-stock-table-wrap">
                 <table class="table table-sm align-middle mb-0">
@@ -1208,7 +1243,7 @@ body[data-theme="dark"] .shp-scan-card:focus-within {
                         <tr>
                             <th>Kode</th><th>Nama</th>
                             <th class="text-end">Stok RTS</th>
-                            <th class="text-end">Butuh</th>
+                            <th class="text-end">Perlu</th>
                             <th class="text-end">Kurang</th>
                         </tr>
                     </thead>
@@ -1456,6 +1491,7 @@ body[data-theme="dark"] .shp-scan-card:focus-within {
     const linesTbody        = document.getElementById('linesTbody');
     const itemFilterInput   = document.getElementById('itemFilterInput');
     const btnJumpLast       = document.getElementById('btnJumpLast');
+    const rekonBtn          = document.getElementById('rekonBtn');
     const toastEl           = document.getElementById('scanToast');
     const summaryLines      = document.getElementById('summaryTotalLines');
     const summaryQty        = document.getElementById('summaryTotalQty');
@@ -1611,14 +1647,6 @@ body[data-theme="dark"] .shp-scan-card:focus-within {
         if (!document.hidden) scheduleFocusScan({ force: true, delay: 120 });
     });
 
-    /* Ctrl+Enter to submit */
-    document.addEventListener('keydown', function (e) {
-        if ((e.ctrlKey || e.metaKey) && e.key === 'Enter') {
-            const submitForm = document.getElementById('submitForm');
-            if (submitForm) submitForm.dispatchEvent(new Event('submit', { cancelable: true }));
-        }
-    });
-
     /* uppercase on input */
     if (scanInput) {
         scanInput.addEventListener('input', function () { this.value = this.value.toUpperCase(); });
@@ -1629,11 +1657,29 @@ body[data-theme="dark"] .shp-scan-card:focus-within {
         if (!totals) return;
         if (typeof totals.total_lines !== 'undefined' && summaryLines) {
             summaryLines.textContent = totals.total_lines;
+            syncRekonButton(totals.total_lines);
         }
         if (typeof totals.total_qty !== 'undefined') {
             const f = FMT.format(totals.total_qty);
             if (summaryQty) summaryQty.textContent = f;
             if (footerQty)  footerQty.textContent  = f;
+        }
+    }
+
+    function syncRekonButton(totalLines) {
+        if (!rekonBtn) return;
+        const count = parseInt(totalLines ?? summaryLines?.textContent ?? '0', 10) || 0;
+        const url = rekonBtn.dataset.rekonUrl || rekonBtn.href;
+        if (count > 0) {
+            rekonBtn.href = url;
+            rekonBtn.textContent = 'Lanjut Rekonsiliasi';
+            rekonBtn.classList.remove('is-disabled');
+            rekonBtn.setAttribute('aria-disabled', 'false');
+        } else {
+            rekonBtn.href = '#';
+            rekonBtn.textContent = 'Scan Barang Dulu';
+            rekonBtn.classList.add('is-disabled');
+            rekonBtn.setAttribute('aria-disabled', 'true');
         }
     }
 
@@ -1779,19 +1825,6 @@ body[data-theme="dark"] .shp-scan-card:focus-within {
         });
     }
 
-    /* ── submit confirm ── */
-    window.confirmSubmit = function (e) {
-        const lines = parseInt(summaryLines?.textContent || '0', 10);
-        const qty   = summaryQty?.textContent || '0';
-        if (!confirm(
-            'Submit shipment ini?\n\n' +
-            '• ' + lines + ' jenis barang\n' +
-            '• ' + qty + ' total qty\n\n' +
-            'Stok WH-RTS akan dikurangi. Tidak bisa di-scan lagi.'
-        )) { e.preventDefault(); scheduleFocusScan({ force: true }); return false; }
-        return true;
-    };
-
     /* ── scan AJAX ── */
     if (scanForm && scanInput && linesTbody) {
         scanForm.addEventListener('submit', function (e) {
@@ -1893,6 +1926,7 @@ body[data-theme="dark"] .shp-scan-card:focus-within {
 
     /* ── on load ── */
     window.addEventListener('load', function () {
+        syncRekonButton();
         focusScan();
         if (lastScannedLineId) scrollToRow(lastScannedLineId, false);
 
@@ -1939,7 +1973,7 @@ document.addEventListener('DOMContentLoaded', function () {
                         <th style="padding:6px 8px;text-align:left;font-size:.72rem;color:#64748b;text-transform:uppercase">Kode</th>
                         <th style="padding:6px 8px;text-align:left;font-size:.72rem;color:#64748b;text-transform:uppercase">Item</th>
                         <th style="padding:6px 8px;text-align:right;font-size:.72rem;color:#64748b;text-transform:uppercase">Stok</th>
-                        <th style="padding:6px 8px;text-align:right;font-size:.72rem;color:#64748b;text-transform:uppercase">Butuh</th>
+                        <th style="padding:6px 8px;text-align:right;font-size:.72rem;color:#64748b;text-transform:uppercase">Perlu</th>
                         <th style="padding:6px 8px;text-align:right;font-size:.72rem;color:#dc2626;text-transform:uppercase">Kurang</th>
                     </tr>
                 </thead>
