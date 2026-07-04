@@ -104,7 +104,7 @@ class ProductionJournalAuditService
             ],
             'sewing_return_ok' => [
                 'label' => 'Setoran Jahit OK',
-                'movement_source_type' => JournalService::SRC_SEWING_RETURN_OK,
+                'movement_source_type' => [JournalService::SRC_SEWING_RETURN_OK, 'sewing_qc_in'],
                 'journal_source_type' => JournalService::SRC_SEWING_RETURN_OK,
                 'model' => SewingReturn::class,
                 'method' => 'postSewingReturnOk',
@@ -113,11 +113,11 @@ class ProductionJournalAuditService
             ],
             'sewing_return_reject' => [
                 'label' => 'Reject Jahit',
-                'movement_source_type' => JournalService::SRC_SEWING_RETURN_REJECT,
+                'movement_source_type' => [JournalService::SRC_SEWING_RETURN_REJECT, 'sewing_qc_reject'],
                 'journal_source_type' => JournalService::SRC_SEWING_RETURN_REJECT,
                 'model' => SewingReturn::class,
                 'method' => 'postSewingReturnReject',
-                'direction' => 'out',
+                'direction' => 'in',
                 'effect' => 'Dr 1204 / Cr 1202',
             ],
             'sewing_rework_ok' => [
@@ -231,7 +231,7 @@ class ProductionJournalAuditService
         $definition = $this->definition($key);
 
         return DB::table('inventory_mutations')
-            ->where('source_type', $definition['movement_source_type'])
+            ->whereIn('source_type', $this->movementSourceTypes($definition))
             ->whereNotNull('source_id')
             ->distinct()
             ->orderBy('source_id')
@@ -282,7 +282,7 @@ class ProductionJournalAuditService
         $definition = $this->definition($key);
 
         return DB::table('inventory_mutations')
-            ->where('source_type', $definition['movement_source_type'])
+            ->whereIn('source_type', $this->movementSourceTypes($definition))
             ->count();
     }
 
@@ -301,7 +301,7 @@ class ProductionJournalAuditService
             $query->where('source_type', JournalService::SRC_FINISHING_BOM);
         } else {
             $definition = $this->definition($key);
-            $query->where('source_type', $definition['movement_source_type']);
+            $query->whereIn('source_type', $this->movementSourceTypes($definition));
         }
 
         if ($direction === 'in') {
@@ -311,6 +311,11 @@ class ProductionJournalAuditService
         }
 
         return round((float) $query->sum(DB::raw('ABS(total_cost)')), 2);
+    }
+
+    protected function movementSourceTypes(array $definition): array
+    {
+        return array_values((array) $definition['movement_source_type']);
     }
 
     protected function findModel(string $modelClass, int $id): ?Model

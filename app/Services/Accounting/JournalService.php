@@ -1101,28 +1101,60 @@ class JournalService
      * Setoran jahit OK: WIP-SEW → WIP-FIN.
      * Upah jahit sudah diakui saat Ambil Jahit.
      */
-    public function postSewingReturnOk(\App\Models\SewingReturn $return): ?Journal
+    public function postSewingReturnOk(\App\Models\SewingReturn $return, ?string $date = null): ?Journal
     {
+        if ($this->mutationAmount(self::SRC_SEWING_RETURN_OK, (int) $return->id, 'in') <= 0
+            && $this->mutationAmount(self::SRC_SEWING_RETURN_OK, (int) $return->id, 'out') <= 0
+        ) {
+            return $this->postInventoryMovementFromMutations(
+                journalSourceType: self::SRC_SEWING_RETURN_OK,
+                journalSourceId: (int) $return->id,
+                mutationSourceType: 'sewing_qc_in',
+                mutationSourceId: (int) $return->id,
+                date: $this->dateOnly($date ?: $return->date),
+                description: "QC Jahit {$return->code} — WIP-SEW → WIP-FIN",
+                debitAccountCode: self::CODE_INV_WIP,
+                creditAccountCode: self::CODE_INV_WIP,
+                direction: 'in'
+            );
+        }
+
         return $this->postValueAddedTransfer(
             journalSourceType: self::SRC_SEWING_RETURN_OK,
             journalSourceId: (int) $return->id,
             mutationSourceType: self::SRC_SEWING_RETURN_OK,
             mutationSourceId: (int) $return->id,
-            date: $this->dateOnly($return->date),
+            date: $this->dateOnly($date ?: $return->date),
             description: "Setoran Jahit {$return->code} — WIP-SEW → WIP-FIN + Upah",
             debitAccountCode: self::CODE_INV_WIP,
             creditAccountCode: self::CODE_INV_WIP,
         );
     }
 
-    public function postSewingReturnReject(\App\Models\SewingReturn $return): ?Journal
+    public function postSewingReturnReject(\App\Models\SewingReturn $return, ?string $date = null): ?Journal
     {
+        if ($this->mutationAmount(self::SRC_SEWING_RETURN_REJECT, (int) $return->id, 'in') <= 0
+            && $this->mutationAmount(self::SRC_SEWING_RETURN_REJECT, (int) $return->id, 'out') <= 0
+        ) {
+            return $this->postInventoryMovementFromMutations(
+                journalSourceType: self::SRC_SEWING_RETURN_REJECT,
+                journalSourceId: (int) $return->id,
+                mutationSourceType: 'sewing_qc_reject',
+                mutationSourceId: (int) $return->id,
+                date: $this->dateOnly($date ?: $return->date),
+                description: "QC Jahit {$return->code} — WIP-SEW → Barang Cacat",
+                debitAccountCode: self::CODE_INV_DEFECT,
+                creditAccountCode: self::CODE_INV_WIP,
+                direction: 'in'
+            );
+        }
+
         return $this->postValueAddedTransfer(
             journalSourceType: self::SRC_SEWING_RETURN_REJECT,
             journalSourceId: (int) $return->id,
             mutationSourceType: self::SRC_SEWING_RETURN_REJECT,
             mutationSourceId: (int) $return->id,
-            date: $this->dateOnly($return->date),
+            date: $this->dateOnly($date ?: $return->date),
             description: "Setoran Jahit {$return->code} — WIP-SEW → Barang Cacat",
             debitAccountCode: self::CODE_INV_DEFECT,
             creditAccountCode: self::CODE_INV_WIP,

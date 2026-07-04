@@ -59,7 +59,7 @@
 
         <select class="form-select" data-pj-type aria-label="Jenis">
             <option value="">Semua Jenis</option>
-            <option value="Ambil" selected>Ambil Jahit</option>
+            <option value="Ambil">Ambil Jahit</option>
             <option value="Setor">Setor Jahit</option>
         </select>
 

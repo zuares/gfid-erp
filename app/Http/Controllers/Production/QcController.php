@@ -762,6 +762,17 @@ class QcController extends Controller
             if ($sewingReturn->isFillable('status')) {
                 $sewingReturn->forceFill(['status' => 'posted'])->save();
             }
+
+            foreach (['postSewingReturnOk', 'postSewingReturnReject'] as $method) {
+                try {
+                    $this->journal->{$method}($sewingReturn->fresh(), $validated['qc_date']);
+                } catch (\Throwable $journalError) {
+                    Log::warning("Gagal membuat jurnal {$method} dari QC Jahit", [
+                        'sewing_return_id' => $sewingReturn->id,
+                        'message' => $journalError->getMessage(),
+                    ]);
+                }
+            }
         } catch (\Throwable $e) {
             return back()
                 ->withInput()
