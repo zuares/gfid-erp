@@ -544,15 +544,15 @@
             /* ── 2-row card per baris ── */
             .bundles-table tbody tr.bundle-row {
                 display: grid;
-                grid-template-columns: minmax(0, 1fr) 92px 38px;
-                column-gap: .5rem;
-                row-gap: .35rem;
+                grid-template-columns: minmax(0, 1fr) 76px 34px;
+                column-gap: .42rem;
+                row-gap: 0;
                 align-items: center;
                 border: 1px solid rgba(148, 163, 184, .25);
                 border-left: 3px solid rgba(148, 163, 184, .3);
-                border-radius: 14px;
-                padding: .62rem;
-                margin-bottom: .48rem;
+                border-radius: 12px;
+                padding: .44rem .48rem;
+                margin-bottom: .38rem;
                 background: var(--card);
                 box-shadow: 0 2px 8px rgba(15, 23, 42, .06);
                 overflow: visible;
@@ -594,7 +594,7 @@
                 position: relative;
                 display: flex;
                 flex-direction: column;
-                gap: .2rem;
+                gap: 0;
             }
 
             /* Qty — col 3 row 1 */
@@ -605,12 +605,12 @@
                 padding: 0;
                 display: flex;
                 flex-direction: column;
-                gap: .2rem;
+                gap: 0;
             }
 
             .bundles-table tbody td:nth-child(3)::before,
             .bundles-table tbody td:nth-child(4)::before {
-                display: block;
+                display: none;
                 font-size: .62rem;
                 font-weight: 800;
                 letter-spacing: .05em;
@@ -623,7 +623,7 @@
             .bundles-table tbody td:nth-child(4)::before { content: "Qty"; }
 
             .bundle-item-help {
-                display: block;
+                display: none;
             }
 
             /* Kain — hidden */
@@ -645,7 +645,7 @@
                 justify-content: center;
                 border: 0;
                 padding: 0;
-                align-self: end;
+                align-self: center;
             }
 
             /* Reset border/padding semua td */
@@ -656,28 +656,44 @@
 
             .bundles-table .form-control-sm,
             .bundles-table .form-select-sm {
-                min-height: 44px;
+                min-height: 40px;
                 border-radius: 10px;
-                font-size: .88rem;
-                padding: .38rem .52rem;
+                font-size: .84rem;
+                padding: .34rem .48rem;
+            }
+
+            .bundles-table .item-suggest-wrap {
+                width: 100%;
+                min-width: 0;
+            }
+
+            .bundles-table .js-item-suggest-input {
+                font-weight: 800;
+                letter-spacing: .01em;
+                text-transform: uppercase;
+            }
+
+            .bundles-table .item-suggest-dropdown {
+                min-width: min(92vw, 340px);
+                max-height: 48vh;
             }
 
             .bundle-qty-pcs {
                 text-align: center !important;
-                font-size: .96rem;
-                font-weight: 600;
+                font-size: .92rem !important;
+                font-weight: 900 !important;
+                padding-inline: .25rem !important;
             }
 
             .btn-remove-row {
-                width: 36px;
-                height: 36px;
-                font-size: 1rem;
+                width: 34px;
+                height: 34px;
+                font-size: 1.05rem;
                 background: rgba(254, 242, 242, .9);
             }
 
             /* Bundle row padding lebih besar untuk jarak label */
             .bundles-table tbody tr.bundle-row {
-                gap: .5rem;
                 align-items: center;
             }
 
@@ -933,8 +949,8 @@
 @push('scripts')
     <script>
         document.addEventListener('DOMContentLoaded', function() {
-            const lotRows = Array.from(document.querySelectorAll('.lot-row'));
-            const lotCheckboxes = Array.from(document.querySelectorAll('.lot-checkbox'));
+            let lotRows = Array.from(document.querySelectorAll('.lot-row'));
+            let lotCheckboxes = Array.from(document.querySelectorAll('.lot-checkbox'));
             const btnSelectAllLots = document.getElementById('btn-select-all-lots');
             const btnUnselectAllLots = document.getElementById('btn-unselect-all-lots');
             const btnConfirmLots = document.getElementById('btn-confirm-lots');
@@ -974,21 +990,32 @@
             }
 
             // map lot_id -> info (termasuk itemId biar bisa kunci 1 item kain)
-            const lotInfoMap = {};
-            lotRows.forEach(tr => {
-                const lotId = parseInt(tr.dataset.lotId, 10);
-                const itemId = parseInt(tr.dataset.itemId || '0', 10);
-                const balance = parseFloat(tr.dataset.balance ?? '0');
-                const code = tr.querySelector('.lot-code')?.textContent?.trim() ?? '';
-                const itemCode = (tr.dataset.itemCode || '').trim();
-                lotInfoMap[lotId] = {
-                    lotId,
-                    itemId,
-                    code,
-                    balance,
-                    itemCode,
-                };
-            });
+            let lotInfoMap = {};
+
+            function rebuildLotRuntimeFromDom() {
+                lotRows = Array.from(document.querySelectorAll('.lot-row'));
+                lotCheckboxes = Array.from(document.querySelectorAll('.lot-checkbox'));
+                lotInfoMap = {};
+
+                lotRows.forEach(tr => {
+                    const lotId = parseInt(tr.dataset.lotId, 10);
+                    const itemId = parseInt(tr.dataset.itemId || '0', 10);
+                    const balance = parseFloat(tr.dataset.balance ?? '0');
+                    const code = tr.querySelector('.lot-pill-lot')?.textContent?.trim()
+                        || tr.querySelector('.lot-code')?.textContent?.trim()
+                        || String(lotId);
+                    const itemCode = (tr.dataset.itemCode || '').trim();
+                    lotInfoMap[lotId] = {
+                        lotId,
+                        itemId,
+                        code,
+                        balance,
+                        itemCode,
+                    };
+                });
+            }
+
+            rebuildLotRuntimeFromDom();
 
             let bundleIndexCounter = 0;
             let lotsLocked = false;
@@ -1771,17 +1798,71 @@
                 return !!bundlesTbody.querySelector('.bundle-row[data-bom-exceed="1"]');
             }
 
-            function refreshSubmitStateForBom() {
+            function validateBundleItems(markInvalid = false) {
+                if (!bundlesTbody) return true;
+
+                let valid = true;
+                bundlesTbody.querySelectorAll('.bundle-row').forEach(tr => {
+                    const hiddenItem = tr.querySelector('[name*="finished_item_id"]');
+                    const itemInput = tr.querySelector('.js-item-suggest-input');
+                    const hasItem = !!(hiddenItem && hiddenItem.value);
+
+                    tr.classList.toggle('bundle-row-item-missing', !hasItem);
+                    if (itemInput) {
+                        if (hasItem) {
+                            itemInput.classList.remove('is-invalid');
+                        } else if (markInvalid) {
+                            itemInput.classList.add('is-invalid');
+                        }
+                    }
+
+                    if (!hasItem) valid = false;
+                });
+
+                return valid;
+            }
+
+            function refreshSubmitStateForBom(markMissingItems = false) {
                 const submitBtn = document.getElementById('btn-save-cutting');
-                if (!submitBtn) return;
-                if (hasBomExceedRows()) {
-                    submitBtn.disabled = true;
-                    submitBtn.title = 'Ada pemakaian kain melebihi standar BOM. Update BOM atau turunkan pemakaian dulu.';
-                } else {
-                    submitBtn.disabled = false;
-                    submitBtn.title = '';
+                const fabBtn = document.getElementById('cutting-save-fab');
+
+                const hasMissingItem = !validateBundleItems(markMissingItems);
+                let disabled = false;
+                let title = '';
+                if (hasMissingItem) {
+                    disabled = true;
+                    title = 'Pilih item jadi dulu di semua baris hasil cutting.';
+                } else if (hasBomExceedRows()) {
+                    disabled = true;
+                    title = 'Ada pemakaian kain melebihi standar BOM. Update BOM atau turunkan pemakaian dulu.';
+                }
+
+                if (submitBtn) {
+                    submitBtn.disabled = disabled;
+                    submitBtn.title = title;
+                }
+
+                if (fabBtn) {
+                    fabBtn.disabled = disabled;
+                    fabBtn.title = title;
                 }
             }
+
+            window.cuttingValidateBundleItems = function (markInvalid = true) {
+                const ok = validateBundleItems(markInvalid);
+                refreshSubmitStateForBom(markInvalid);
+
+                if (!ok) {
+                    const firstInvalid = bundlesTbody.querySelector('.bundle-row .js-item-suggest-input.is-invalid')
+                        || bundlesTbody.querySelector('.bundle-row .js-item-suggest-input');
+                    if (firstInvalid) {
+                        firstInvalid.scrollIntoView({ behavior: 'smooth', block: 'center' });
+                        setTimeout(() => firstInvalid.focus(), 120);
+                    }
+                }
+
+                return ok;
+            };
 
             function createBundleRow(autoFocusItem = false) {
                 const frag = bundleTemplate.content.cloneNode(true);
@@ -1836,7 +1917,7 @@
                         updateBundleRowIndices();
                         recalcLotSummary();
                         rebuildLotOptionsForAllRows();
-                        refreshSubmitStateForBom();
+                        refreshSubmitStateForBom(true);
                     });
                 }
 
@@ -1861,9 +1942,22 @@
                 const hiddenItemId = tr.querySelector('[name*="finished_item_id"]');
                 if (hiddenItemId) {
                     hiddenItemId.addEventListener('change', () => {
+                        const itemInput = tr.querySelector('.js-item-suggest-input');
+                        if (hiddenItemId.value && itemInput) {
+                            itemInput.classList.remove('is-invalid');
+                        }
                         autofillFabricQtyForRow(tr);
                         rebuildLotOptionsForAllRows(); // redistribusi setelah item dipilih & BOM diisi
                         recalcLotSummary();
+                        refreshSubmitStateForBom(true);
+
+                        if (hiddenItemId.value) {
+                            setTimeout(() => {
+                                const qty = tr.querySelector('.bundle-qty-pcs');
+                                qty?.focus();
+                                qty?.select?.();
+                            }, 40);
+                        }
                     });
                 }
 
@@ -1893,12 +1987,28 @@
 
                     itemInput.addEventListener('focus', handleItemFocus);
                     itemInput.addEventListener('click', handleItemFocus);
-                    itemInput.addEventListener('input', handleItemFocus);
+                    itemInput.addEventListener('input', () => {
+                        handleItemFocus();
+                        if (hiddenItemId) hiddenItemId.value = '';
+                        itemInput.classList.add('is-invalid');
+                        refreshSubmitStateForBom(true);
+                    });
+                    itemInput.addEventListener('blur', () => {
+                        if (!hiddenItemId?.value) {
+                            itemInput.classList.add('is-invalid');
+                        }
+                        refreshSubmitStateForBom(true);
+                    });
                     // Enter di item → pindah ke qty pcs
                     itemInput.addEventListener('keydown', (e) => {
                         if (e.key === 'Enter') {
                             e.preventDefault();
-                            tr.querySelector('.bundle-qty-pcs')?.focus();
+                            if (hiddenItemId?.value) {
+                                tr.querySelector('.bundle-qty-pcs')?.focus();
+                            } else {
+                                itemInput.classList.add('is-invalid');
+                                refreshSubmitStateForBom(true);
+                            }
                         }
                     });
                 }
@@ -1906,6 +2016,7 @@
                 updateBundleRowIndices();
                 rebuildLotOptionsForAllRows();
                 recalcLotSummary();
+                refreshSubmitStateForBom(true);
 
                 if (autoFocusItem) {
                     setTimeout(() => {
@@ -1921,8 +2032,12 @@
             // =======================
             // EVENT: pilih LOT
             // =======================
-            lotCheckboxes.forEach(cb => {
-                cb.addEventListener('change', () => {
+            function bindLotCheckboxEvents() {
+                lotCheckboxes.forEach(cb => {
+                    if (cb.dataset.boundForm === '1') return;
+                    cb.dataset.boundForm = '1';
+
+                    cb.addEventListener('change', () => {
                     if (lotsLocked) return;
 
                     const ok = enforceSingleFabricForCheckedLots(cb);
@@ -1932,8 +2047,20 @@
                     rebuildLotOptionsForAllRows();
                     recalcLotSummary();
 
+                    });
                 });
-            });
+            }
+
+            bindLotCheckboxEvents();
+
+            window.cuttingLotsDidRefresh = function () {
+                rebuildLotRuntimeFromDom();
+                bindLotCheckboxEvents();
+                enforceSingleFabricForCheckedLots();
+                recalcLotBalanceFromCheckedLots();
+                rebuildLotOptionsForAllRows();
+                recalcLotSummary();
+            };
 
             btnSelectAllLots?.addEventListener('click', () => {
                 if (lotsLocked) return;

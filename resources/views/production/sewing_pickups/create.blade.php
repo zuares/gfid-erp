@@ -314,6 +314,7 @@
             {{-- Modal pilih operator --}}
             @include('production.sewing_pickups._operator_modal', [
                 'operators' => $operators,
+                'wipSewWarehouse' => $wipSewWarehouse,
             ])
         </div>
     </div>

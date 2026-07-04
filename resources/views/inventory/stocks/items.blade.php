@@ -56,12 +56,12 @@
 
         $rowsNow = method_exists($stocks, 'getCollection') ? $stocks->getCollection() : collect($stocks);
 
-        $initTotalQty = (float) $rowsNow->sum(fn($r) => (float) ($r->total_qty ?? 0));
-        $initTotalVal = (float) $rowsNow->sum(fn($r) => (float) ($r->stock_value ?? 0));
+        $initTotalQty = (float) (($hppSummary['total_qty'] ?? null) ?? $rowsNow->sum(fn($r) => (float) ($r->total_qty ?? 0)));
+        $initTotalVal = (float) (($hppSummary['total_value'] ?? null) ?? $rowsNow->sum(fn($r) => (float) ($r->stock_value ?? 0)));
         $initAvgHpp = $initTotalQty > 0 ? $initTotalVal / $initTotalQty : 0;
-        $initAvgAds = $rowsNow->count() ? (float) $rowsNow->avg(fn($r) => (float) ($r->ads ?? 0)) : 0;
+        $initAvgAds = (float) (($hppSummary['avg_ads'] ?? null) ?? ($rowsNow->count() ? (float) $rowsNow->avg(fn($r) => (float) ($r->ads ?? 0)) : 0));
 
-        $initByCat = $rowsNow
+        $initByCat = $hppByCategory ?? $rowsNow
             ->groupBy(fn($r) => $r->category_name ?? 'Uncategorized')
             ->map(function ($grp, $catName) {
                 $qty = (float) $grp->sum('total_qty');
@@ -154,7 +154,7 @@
             <div class="cardx mb-2">
                 <div class="cardx-b">
                     <div class="d-flex align-items-center justify-content-between gap-2 flex-wrap">
-                        <div class="meta">Owner Insights (current page)</div>
+                        <div class="meta">Owner Insights</div>
 
                         <div class="d-flex align-items-center gap-2">
                             <form method="POST" action="{{ route('inventory.stocks.sync_hpp') }}"

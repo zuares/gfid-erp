@@ -98,6 +98,7 @@ Route::middleware(['web', 'auth', 'access:inventory'])->group(function () {
             Route::post('/{stockOpname}/finalize', [StockOpnameController::class, 'finalize'])->name('finalize');
 
             Route::post('/{stockOpname}/lines', [StockOpnameController::class, 'addLine'])->name('lines.store');
+            Route::post('/{stockOpname}/lines/{line}/unit-cost', [StockOpnameController::class, 'updateLineUnitCost'])->name('lines.unit_cost');
             Route::delete('/{stockOpname}/lines/{line}', [StockOpnameController::class, 'deleteLine'])->name('lines.destroy');
 
             Route::post('/{stockOpname}/reset-lines', [StockOpnameController::class, 'resetLines'])->name('reset_lines');

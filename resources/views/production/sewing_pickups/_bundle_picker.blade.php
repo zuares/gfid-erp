@@ -883,38 +883,7 @@
         <div class="card-section">
 
             <div class="bundle-picker-control-panel">
-                <div class="pickup-control-meta">
-                    <div class="row g-2 align-items-end">
-                        <div class="col-12 col-md-3">
-                            <div class="field-block">
-                                <div class="field-label">Tanggal ambil</div>
-                                <input type="date" name="date"
-                                    class="form-control form-control-sm field-input-sm @error('date') is-invalid @enderror"
-                                    value="{{ old('date', now()->format('Y-m-d')) }}">
-                                @error('date')
-                                    <div class="invalid-feedback">{{ $message }}</div>
-                                @enderror
-                            </div>
-                        </div>
-
-                        <div class="col-12 col-md-4 gudang-section">
-                            <div class="field-block">
-                                <div class="field-label">Gudang tujuan</div>
-                                <div class="field-static">
-                                    @if ($defaultWarehouse)
-                                        <span class="code">{{ $defaultWarehouse->code }}</span>
-                                        <span class="name">— {{ $defaultWarehouse->name }}</span>
-                                    @else
-                                        <span class="text-danger small">Gudang WIP-SEW belum diset.</span>
-                                    @endif
-                                </div>
-                                @error('warehouse_id')
-                                    <div class="invalid-feedback d-block">{{ $message }}</div>
-                                @enderror
-                            </div>
-                        </div>
-                    </div>
-                </div>
+                <input type="hidden" name="date" value="{{ old('date', now()->format('Y-m-d')) }}">
 
                 {{-- DESKTOP: toggle hanya baris yang ada pickup --}}
                 <div class="filter-header">

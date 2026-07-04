@@ -327,11 +327,14 @@
                     if (sumQty) sumQty.textContent = fmtQty(num0(s.total_qty));
                     if (sumValue) sumValue.textContent = fmtMoney(num0(s.total_value));
                     if (sumAvgHpp) sumAvgHpp.textContent = fmtMoney(num0(s.avg_hpp_weighted));
+                    if (sumAvgAds) sumAvgAds.textContent = fmtQty(num0(s.avg_ads));
                 }
 
-                const adsSum = rows.reduce((acc, r) => acc + num0(r.ads), 0);
-                const adsAvg = rows.length ? (adsSum / rows.length) : 0;
-                if (sumAvgAds) sumAvgAds.textContent = fmtQty(adsAvg);
+                if (!s && sumAvgAds) {
+                    const adsSum = rows.reduce((acc, r) => acc + num0(r.ads), 0);
+                    const adsAvg = rows.length ? (adsSum / rows.length) : 0;
+                    sumAvgAds.textContent = fmtQty(adsAvg);
+                }
 
                 if (hppByCategoryWrap) {
                     hppByCategoryWrap.innerHTML = buildHppByCategoryHtml(payload?.hpp_by_category ||

@@ -745,9 +745,12 @@
 
                                         $cfg = $sewStatusMap[$ret->status] ?? [strtoupper($ret->status ?? '-'), 'secondary'];
                                         $items = $sewItems($ret);
-                                        $href = Route::has('production.sewing.returns.show')
+                                        $detailHref = Route::has('production.sewing.returns.show')
                                             ? route('production.sewing.returns.show', $ret)
                                             : ($pickup && Route::has('production.sewing.pickups.show') ? route('production.sewing.pickups.show', $pickup) : null);
+                                        $href = Route::has('production.qc.sewing.edit')
+                                            ? route('production.qc.sewing.edit', $ret)
+                                            : $detailHref;
                                     @endphp
                                     <tr class="{{ $href ? 'qc-row' : '' }}" @if ($href) data-href="{{ $href }}" @endif>
                                         <td>
@@ -794,10 +797,20 @@
                                             </div>
                                         </td>
                                         <td>
-                                            @if ($href)
-                                                <a href="{{ $href }}" class="btn btn-sm btn-outline-primary"
+                                            <div class="d-flex gap-1 flex-wrap">
+                                            @if ($detailHref)
+                                                <a href="{{ $detailHref }}" class="btn btn-sm btn-outline-secondary"
                                                     onclick="event.stopPropagation();">Detail</a>
                                             @endif
+                                            @if (Route::has('production.qc.sewing.edit'))
+                                                <a href="{{ route('production.qc.sewing.edit', $ret) }}"
+                                                   class="btn btn-sm btn-outline-success"
+                                                   onclick="event.stopPropagation();"
+                                                   title="Form QC Jahit">
+                                                   ✓ QC
+                                                </a>
+                                            @endif
+                                            </div>
                                         </td>
                                     </tr>
                                 @empty
@@ -831,9 +844,12 @@
                                         $pickup = $firstLine?->pickupLine?->pickup;
                                         $cfg = $sewStatusMap[$ret->status] ?? [strtoupper($ret->status ?? '-'), 'secondary'];
                                         $items = $sewItems($ret);
-                                        $href = Route::has('production.sewing.returns.show')
+                                        $detailHref = Route::has('production.sewing.returns.show')
                                             ? route('production.sewing.returns.show', $ret)
                                             : ($pickup && Route::has('production.sewing.pickups.show') ? route('production.sewing.pickups.show', $pickup) : null);
+                                        $href = Route::has('production.qc.sewing.edit')
+                                            ? route('production.qc.sewing.edit', $ret)
+                                            : $detailHref;
                                     @endphp
                                     <div class="qc-mobile-card" @if ($href) data-href="{{ $href }}" @endif>
                                         <div class="qc-mobile-card-header">

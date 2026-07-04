@@ -77,7 +77,7 @@ class StockOpnameLine extends Model
      * HPP / unit yang dipakai untuk hitung nilai selisih:
      * 1. unit_cost di line (kalau diisi)
      * 2. snapshot aktif per item+gudang
-     * 3. base_unit_cost di master item
+     * 3. HPP / base_unit_cost di master item
      */
     public function getEffectiveUnitCostAttribute(): float
     {
@@ -102,6 +102,10 @@ class StockOpnameLine extends Model
         }
 
         // 3) fallback master item
+        if ($this->item && (float) ($this->item->hpp ?? 0) > 0) {
+            return (float) $this->item->hpp;
+        }
+
         if ($this->item && (float) $this->item->base_unit_cost > 0) {
             return (float) $this->item->base_unit_cost;
         }

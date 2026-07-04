@@ -38,6 +38,26 @@
             gap: .25rem;
         }
 
+        .lot-refresh-btn {
+            border: 1px solid rgba(37, 99, 235, .28);
+            background: rgba(37, 99, 235, .06);
+            color: #1d4ed8;
+            border-radius: 999px;
+            padding: .18rem .55rem;
+            font-size: .68rem;
+            font-weight: 700;
+            line-height: 1.35;
+        }
+
+        .lot-refresh-btn:disabled {
+            opacity: .62;
+        }
+
+        .lot-refresh-status {
+            font-size: .68rem;
+            color: var(--muted);
+        }
+
         /* === STEP INDICATOR BAR === */
         .lot-step-bar {
             display: flex;
@@ -965,9 +985,27 @@
         </div>
     </div>
 
+    <div class="d-flex justify-content-between align-items-center gap-2 mb-2" id="lot-live-tools">
+        <button type="button" class="lot-refresh-btn" id="btn-refresh-lots"
+            data-url="{{ route('production.cutting_jobs.lots.live') }}">
+            Update LOT
+        </button>
+        <span class="lot-refresh-status" id="lot-refresh-status"></span>
+    </div>
+
     @if ($lotStocks->isEmpty())
         <div class="lot-empty-hint">
             Belum ada LOT bahan baku utama yang siap dipakai. Cek stok kain utama di GRN / gudang RM.
+        </div>
+        <div id="lot-step1-panel" class="mt-2">
+            <div class="lot-item-select-list"></div>
+        </div>
+        <div id="lot-step2-panel" style="display:none;">
+            <div class="lot-step2-header">
+                <button type="button" id="lot-back-btn" class="lot-back-btn">← Pilih kain lain</button>
+                <div id="lot-step2-item-name" class="lot-step2-item-name"></div>
+            </div>
+            <div id="lot-grid"></div>
         </div>
     @else
         @php $groupedLots = $lotStocks->groupBy(fn($row) => $row->lot->item_id); @endphp
@@ -1142,9 +1180,11 @@
             const stepInd2   = document.getElementById('lstep-ind-2');
             const stepInd3   = document.getElementById('lstep-ind-3');
             const btnChangeLotsPicker = document.getElementById('btn-change-lots-picker');
+            const btnRefreshLots = document.getElementById('btn-refresh-lots');
+            const lotRefreshStatus = document.getElementById('lot-refresh-status');
 
-            const lotCards  = lotGrid ? Array.from(lotGrid.querySelectorAll('.lot-card-item')) : [];
-            const lotGroups = lotGrid ? Array.from(lotGrid.querySelectorAll('.lot-item-group')) : [];
+            let lotCards  = lotGrid ? Array.from(lotGrid.querySelectorAll('.lot-card-item')) : [];
+            let lotGroups = lotGrid ? Array.from(lotGrid.querySelectorAll('.lot-item-group')) : [];
 
             /* ── STEP NAVIGATION ─────────────────── */
             function setStepActive(n) {
@@ -1157,6 +1197,7 @@
             }
 
             function goToStep1() {
+                lotGroups = lotGrid ? Array.from(lotGrid.querySelectorAll('.lot-item-group')) : [];
                 if (step1Panel) step1Panel.style.display = '';
                 if (step2Panel) step2Panel.style.display = 'none';
                 if (step3Panel) step3Panel.style.display = 'none';
@@ -1170,6 +1211,7 @@
             }
 
             function goToStep2(itemId, itemName) {
+                lotGroups = lotGrid ? Array.from(lotGrid.querySelectorAll('.lot-item-group')) : [];
                 if (step1Panel) step1Panel.style.display = 'none';
                 if (step2Panel) step2Panel.style.display = '';
                 if (step3Panel) step3Panel.style.display = 'none';
@@ -1209,6 +1251,8 @@
             // Item pick buttons
             if (step1Panel) {
                 step1Panel.querySelectorAll('.lot-item-pick-btn').forEach(btn => {
+                    if (btn.dataset.bound === '1') return;
+                    btn.dataset.bound = '1';
                     btn.addEventListener('click', function () {
                         const itemId   = this.getAttribute('data-item-id');
                         const itemName = this.getAttribute('data-item-name');
@@ -1261,25 +1305,199 @@
             }
 
             /* ── CARD CLICK → toggle checkbox ──────── */
-            lotCards.forEach(card => {
-                const checkbox = card.querySelector('.lot-checkbox');
-                if (!checkbox) return;
+            function bindLotPickerCards() {
+                lotCards  = lotGrid ? Array.from(lotGrid.querySelectorAll('.lot-card-item')) : [];
+                lotGroups = lotGrid ? Array.from(lotGrid.querySelectorAll('.lot-item-group')) : [];
 
-                function syncCardState() {
-                    card.classList.toggle('lot-selected', checkbox.checked);
-                    const group = card.closest('.lot-item-group');
-                    if (group) updateGroupBadge(group);
+                if (step1Panel) {
+                    step1Panel.querySelectorAll('.lot-item-pick-btn').forEach(btn => {
+                        if (btn.dataset.bound === '1') return;
+                        btn.dataset.bound = '1';
+                        btn.addEventListener('click', function () {
+                            const itemId   = this.getAttribute('data-item-id');
+                            const itemName = this.getAttribute('data-item-name');
+                            goToStep2(itemId, itemName);
+                        });
+                    });
                 }
 
-                card.addEventListener('click', function () {
-                    checkbox.checked = !checkbox.checked;
-                    checkbox.dispatchEvent(new Event('change', { bubbles: true }));
+                lotCards.forEach(card => {
+                    const checkbox = card.querySelector('.lot-checkbox');
+                    if (!checkbox) return;
+
+                    function syncCardState() {
+                        card.classList.toggle('lot-selected', checkbox.checked);
+                        const group = card.closest('.lot-item-group');
+                        if (group) updateGroupBadge(group);
+                    }
+
+                    if (card.dataset.bound !== '1') {
+                        card.dataset.bound = '1';
+                        card.addEventListener('click', function () {
+                            checkbox.checked = !checkbox.checked;
+                            checkbox.dispatchEvent(new Event('change', { bubbles: true }));
+                            syncCardState();
+                        });
+                    }
+
+                    if (checkbox.dataset.boundPicker !== '1') {
+                        checkbox.dataset.boundPicker = '1';
+                        checkbox.addEventListener('change', syncCardState);
+                    }
+
                     syncCardState();
                 });
+            }
 
-                checkbox.addEventListener('change', syncCardState);
-                syncCardState();
-            });
+            function formatNumber(value) {
+                return Number(value || 0).toLocaleString('id-ID', {
+                    minimumFractionDigits: 0,
+                    maximumFractionDigits: 2
+                });
+            }
+
+            function escapeHtml(value) {
+                return String(value ?? '').replace(/[&<>"']/g, function (ch) {
+                    return ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#039;' })[ch];
+                });
+            }
+
+            function renderLotGroups(groups, selectedIds) {
+                if (!step1Panel || !lotGrid) return;
+
+                step1Panel.innerHTML = '<div class="lot-item-select-list"></div>';
+                const itemList = step1Panel.querySelector('.lot-item-select-list');
+                lotGrid.innerHTML = '';
+
+                groups.forEach(group => {
+                    const itemId = String(group.item_id);
+                    const selectedCount = (group.lots || []).filter(lot => selectedIds.has(String(lot.lot_id))).length;
+
+                    itemList.insertAdjacentHTML('beforeend', `
+                        <button type="button" class="lot-item-pick-btn ${selectedCount > 0 ? 'has-selected' : ''}"
+                            data-item-id="${escapeHtml(itemId)}"
+                            data-item-name="${escapeHtml(group.item_name)}">
+                            <div class="lipb-left">
+                                <span class="lipb-name">${escapeHtml(group.item_name)}</span>
+                                <div class="lipb-meta">
+                                    <span class="lipb-code">${escapeHtml(group.item_code)}</span>
+                                    <span class="lipb-dot">·</span>
+                                    <span>${formatNumber(group.lot_count)} LOT</span>
+                                </div>
+                            </div>
+                            <div class="lipb-qty">
+                                <span class="lipb-qty-num">${formatNumber(group.total_balance)}</span>
+                                <span class="lipb-qty-unit">kg stok</span>
+                            </div>
+                            <div class="lipb-right">
+                                <span class="lipb-selected ${selectedCount > 0 ? 'visible' : ''}" id="lipb-sel-${escapeHtml(itemId)}">${selectedCount > 0 ? selectedCount + ' dipilih' : ''}</span>
+                                <svg class="lipb-arrow" viewBox="0 0 20 20" fill="currentColor">
+                                    <path fill-rule="evenodd" d="M7.21 14.77a.75.75 0 01.02-1.06L11.168 10 7.23 6.29a.75.75 0 111.04-1.08l4.5 4.25a.75.75 0 010 1.08l-4.5 4.25a.75.75 0 01-1.06-.02z" clip-rule="evenodd"/>
+                                </svg>
+                            </div>
+                        </button>
+                    `);
+
+                    const cards = (group.lots || []).map(lot => {
+                        const checked = selectedIds.has(String(lot.lot_id));
+                        const supplier = lot.supplier_name ? `<div class="lot-supplier-name">${escapeHtml(lot.supplier_name)}</div>` : '';
+                        const date = lot.purchase_date ? `<span class="lot-pill lot-pill-lot mono">${escapeHtml(lot.purchase_date)}</span>` : '';
+
+                        return `
+                            <div class="lot-card-modern lot-row lot-card-item ${checked ? 'lot-selected' : ''}"
+                                data-lot-id="${escapeHtml(lot.lot_id)}"
+                                data-balance="${escapeHtml(lot.balance)}"
+                                data-item-id="${escapeHtml(lot.item_id)}"
+                                data-item-code="${escapeHtml(lot.item_code)}">
+                                <input type="checkbox" class="lot-checkbox lot-checkbox-hidden"
+                                    name="selected_lots[]" value="${escapeHtml(lot.lot_id)}"
+                                    data-item-id="${escapeHtml(lot.item_id)}"
+                                    autocomplete="off"
+                                    tabindex="-1"
+                                    ${checked ? 'checked' : ''}>
+                                <div class="lot-qty-main">
+                                    <span class="mono lot-balance">${formatNumber(lot.balance)}</span>
+                                    <span class="lot-qty-unit">kg</span>
+                                </div>
+                                ${supplier}
+                                <div class="lot-pills-row">
+                                    <span class="lot-pill lot-pill-item mono">${escapeHtml(lot.item_code)}</span>
+                                    <span class="lot-pill lot-pill-lot mono">${escapeHtml(lot.lot_code)}</span>
+                                    ${date}
+                                </div>
+                                <div class="lot-check-indicator">
+                                    <svg viewBox="0 0 20 20" fill="currentColor" width="10" height="10">
+                                        <path fill-rule="evenodd" d="M16.707 5.293a1 1 0 010 1.414l-8 8a1 1 0 01-1.414 0l-4-4a1 1 0 011.414-1.414L8 12.586l7.293-7.293a1 1 0 011.414 0z" clip-rule="evenodd"/>
+                                    </svg>
+                                </div>
+                            </div>
+                        `;
+                    }).join('');
+
+                    lotGrid.insertAdjacentHTML('beforeend', `
+                        <div class="lot-item-group" data-item-id="${escapeHtml(itemId)}" style="display:none;">
+                            <div class="lot-accordion-header lot-accordion-header-hidden">
+                                <button type="button" class="lot-accordion-toggle">
+                                    <div class="lot-accordion-header-left">
+                                        <div class="lot-item-header-row">
+                                            <span class="lot-item-name">${escapeHtml(group.item_name)}</span>
+                                            <span class="lot-item-code-pill mono">${escapeHtml(group.item_code)}</span>
+                                        </div>
+                                        <div class="lot-item-meta">
+                                            <span>${formatNumber(group.lot_count)} LOT</span>
+                                            <span class="mono">${formatNumber(group.total_balance)} kg</span>
+                                            <span class="lot-selected-badge ${selectedCount > 0 ? 'visible' : ''}" id="badge-item-${escapeHtml(itemId)}">${selectedCount > 0 ? selectedCount + ' dipilih' : ''}</span>
+                                        </div>
+                                    </div>
+                                </button>
+                            </div>
+                            <div class="lot-accordion-body">
+                                <div class="lot-grid">${cards}</div>
+                            </div>
+                        </div>
+                    `);
+                });
+
+                bindLotPickerCards();
+            }
+
+            async function refreshLotsLive(manual = false) {
+                if (!btnRefreshLots || !btnRefreshLots.dataset.url) return;
+
+                const selectedIds = new Set(Array.from(document.querySelectorAll('.lot-checkbox:checked')).map(cb => String(cb.value)));
+                btnRefreshLots.disabled = true;
+                if (lotRefreshStatus) lotRefreshStatus.textContent = 'Mengupdate...';
+
+                try {
+                    const resp = await fetch(btnRefreshLots.dataset.url, {
+                        headers: { 'Accept': 'application/json' },
+                    });
+                    const json = await resp.json();
+                    if (!json.ok) throw new Error(json.message || 'LOT gagal diupdate.');
+
+                    renderLotGroups(json.groups || [], selectedIds);
+                    window.cuttingLotsDidRefresh?.();
+
+                    const totalLots = (json.groups || []).reduce((sum, group) => sum + Number(group.lot_count || 0), 0);
+                    if (lotRefreshStatus) lotRefreshStatus.textContent = `${formatNumber(totalLots)} LOT · ${json.updated_at || ''}`;
+                } catch (e) {
+                    if (lotRefreshStatus) lotRefreshStatus.textContent = manual ? 'Gagal update LOT' : '';
+                } finally {
+                    btnRefreshLots.disabled = false;
+                }
+            }
+
+            window.cuttingLotPickerBind = bindLotPickerCards;
+            window.cuttingLotPickerRefresh = refreshLotsLive;
+            bindLotPickerCards();
+
+            btnRefreshLots?.addEventListener('click', () => refreshLotsLive(true));
+
+            setInterval(() => {
+                const pickerVisible = document.getElementById('cutting-pick-lot')?.offsetParent !== null;
+                const mainHidden = document.getElementById('cutting-main-content')?.classList.contains('d-none');
+                if (pickerVisible && mainHidden) refreshLotsLive(false);
+            }, 45000);
         });
     </script>
 @endpush

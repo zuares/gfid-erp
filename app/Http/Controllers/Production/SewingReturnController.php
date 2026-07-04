@@ -7,6 +7,7 @@ use App\Models\CuttingJobBundle;
 use App\Models\Employee;
 use App\Models\InventoryStock;
 use App\Models\Item;
+use App\Models\QcResult;
 use App\Models\SewingPickup;
 use App\Models\SewingPickupLine;
 use App\Models\SewingPickupLineSupplyLine;
@@ -21,6 +22,7 @@ use Illuminate\Http\RedirectResponse;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Log;
+use Illuminate\Support\Facades\Route;
 use Illuminate\Validation\ValidationException;
 use Illuminate\View\View;
 
@@ -199,16 +201,16 @@ class SewingReturnController extends Controller
             ->whereIn('code', ['WIP-SEW', 'WH-SEWING'])
             ->first();
 
-        // Sewing Return langsung masuk WH-PRD (tanpa WIP-FIN).
+        // Sewing Return normal masuk gate QC dulu: WIP-SEW tetap menjadi sumber,
+        // destination disiapkan ke WIP-FIN agar dokumen jelas menunggu QC jahit.
         $canChooseDestination = false;
 
         // ambil gudang tujuan pasca jahit
         $destinationWarehouses = Warehouse::query()
-            ->whereIn('code', ['WH-PRD'])
+            ->whereIn('code', Route::has('production.qc.sewing.edit') ? ['WIP-FIN'] : ['WH-PRD'])
             ->get(['id', 'code', 'name']);
 
-        $whPrdId = (int) optional($destinationWarehouses->firstWhere('code', 'WH-PRD'))->id;
-        $defaultDestWarehouseId = $whPrdId;
+        $defaultDestWarehouseId = (int) optional($destinationWarehouses->first())->id;
 
         $operatorIdsFromSewingReturns = DB::table('sewing_return_lines as rl')
             ->join('sewing_returns as r', 'r.id', '=', 'rl.sewing_return_id')
@@ -954,19 +956,27 @@ class SewingReturnController extends Controller
                 throw ValidationException::withMessages(['results' => 'Gudang WIP-SEW / WH-SEWING belum ada.']);
             }
 
-            // Hasil jahit OK langsung masuk WH-PRD.
-            $whPrd = Warehouse::query()->where('code', 'WH-PRD')->first();
+            $wipFinWarehouse = Warehouse::query()->where('code', 'WIP-FIN')->first();
+            $sewingQcFlowActive = Route::has('production.qc.sewing.edit') && $wipFinWarehouse;
 
-            if (!$whPrd) {
-                throw ValidationException::withMessages(['destination_warehouse_id' => 'Gudang WH-PRD belum ada.']);
+            if (!$wipFinWarehouse && $sewingQcFlowActive) {
+                throw ValidationException::withMessages(['destination_warehouse_id' => 'Gudang WIP-FIN belum ada.']);
             }
 
-            $requestedDestId = (int) $validated['destination_warehouse_id'];
-            if ($requestedDestId !== (int) $whPrd->id) {
-                throw ValidationException::withMessages(['destination_warehouse_id' => 'Sewing Return hanya boleh masuk ke WH-PRD.']);
-            }
+            if ($sewingQcFlowActive) {
+                $destWarehouse = $wipFinWarehouse;
+            } else {
+                $destWarehouse = Warehouse::query()->where('code', 'WH-PRD')->first();
 
-            $destWarehouse = $whPrd;
+                if (!$destWarehouse) {
+                    throw ValidationException::withMessages(['destination_warehouse_id' => 'Gudang WH-PRD belum ada.']);
+                }
+
+                $requestedDestId = (int) $validated['destination_warehouse_id'];
+                if ($requestedDestId !== (int) $destWarehouse->id) {
+                    throw ValidationException::withMessages(['destination_warehouse_id' => 'Sewing Return hanya boleh masuk ke WH-PRD.']);
+                }
+            }
 
             $rejectWarehouse = Warehouse::query()->where('code', 'REJ-SEW')->first();
 
@@ -990,7 +1000,7 @@ class SewingReturnController extends Controller
                 ->values();
 
             if ($rawResults->isEmpty()) {
-                throw ValidationException::withMessages(['results' => 'Minimal isi 1 baris (OK / Reject).']);
+                throw ValidationException::withMessages(['results' => 'Minimal isi 1 baris setoran.']);
             }
 
             // lock pickup lines
@@ -1015,6 +1025,12 @@ class SewingReturnController extends Controller
             $normalRows = $rawResults
                 ->filter(fn($r) => (int) ($r['source_reject_return_line_id'] ?? 0) <= 0 && (int) ($r['source_finishing_job_line_id'] ?? 0) <= 0)
                 ->values();
+
+            if ($sewingQcFlowActive && $normalRows->contains(fn($r) => (float) ($r['qty_reject'] ?? 0) > 0.000001)) {
+                throw ValidationException::withMessages([
+                    'results' => 'Reject jahit diisi lewat QC Jahit. Setoran Jahit normal hanya boleh mengisi qty setor.',
+                ]);
+            }
 
             $this->assertPickupSuppliesCompleteForReturn($normalRows, $pickupLines);
 
@@ -1139,7 +1155,7 @@ class SewingReturnController extends Controller
 
                 if ((float) $r['total'] > $remainingPickup + 0.000001) {
                     throw ValidationException::withMessages([
-                        'results' => "Qty OK+Reject melebihi sisa pickup (line #{$pl->id}). Sisa: {$remainingPickup}.",
+                        'results' => "Qty setor melebihi sisa pickup (line #{$pl->id}). Sisa: {$remainingPickup}.",
                     ]);
                 }
             }
@@ -1180,7 +1196,9 @@ class SewingReturnController extends Controller
                 'operator_id' => $operatorId,
                 'created_by_user_id' => auth()->id(),
                 'notes' => null,
-                'status' => (new SewingReturn())->isFillable('status') ? 'posted' : null,
+                'status' => (new SewingReturn())->isFillable('status')
+                    ? ($sewingQcFlowActive && $normalRows->isNotEmpty() ? 'pending_qc' : 'posted')
+                    : null,
             ]);
 
             // create lines + update pickup line counters
@@ -1222,6 +1240,11 @@ class SewingReturnController extends Controller
 
                 $sourceRejectLineId = (int) ($r['source_reject_return_line_id'] ?? 0);
                 $sourceFinishingLineId = (int) ($r['source_finishing_job_line_id'] ?? 0);
+
+                // Normal sewing return menunggu QC. Stok tetap di WIP-SEW sampai QC approve.
+                if ($sewingQcFlowActive && $sourceRejectLineId <= 0 && $sourceFinishingLineId <= 0) {
+                    continue;
+                }
 
                 // Reject jahit: OUT WIP-SEW lalu IN REJ-SEW.
                 if ($qtyRj > 0.000001) {
@@ -1308,7 +1331,7 @@ class SewingReturnController extends Controller
                     continue;
                 }
 
-                // OK: OUT WIP-SEW → IN WH-PRD.
+                // OK: OUT WIP-SEW → IN destination.
                 // WIP-SEW sudah membawa material + upah sejak Ambil Jahit.
                 if ($qtyOk > 0.000001) {
                     $unitCostWipSew = (float) $this->inventory->getItemIncomingUnitCost(
@@ -1357,7 +1380,7 @@ class SewingReturnController extends Controller
                     continue;
                 }
 
-                // Posisi hilir pasca-jahit → WH-PRD.
+                // Posisi hilir pasca-jahit mengikuti destination.
                 // ⚠️ JANGAN pernah menyentuh cut_wip_warehouse_id / cut_wip_qty di sini:
                 // kolom itu milik tahap cutting (otoritatif untuk Ambil Jahit) dan dijaga
                 // invarian di CuttingJobBundle::booted(). Menimpanya = bug "stok nyangkut".
@@ -1407,8 +1430,12 @@ class SewingReturnController extends Controller
             }
 
             if ($sewingReturn->isFillable('status') && empty($sewingReturn->status)) {
-                $sewingReturn->status = 'posted';
+                $sewingReturn->status = ($sewingQcFlowActive && $normalRows->isNotEmpty()) ? 'pending_qc' : 'posted';
                 $sewingReturn->save();
+            }
+
+            if ($sewingQcFlowActive && $normalRows->isNotEmpty()) {
+                $this->createPendingSewingQcResults($sewingReturn, $rawResults, $pickupLines, $bundlesMap, $date, $operatorId);
             }
 
             // ── DRY RUN: kumpulkan info lalu throw → transaction di-rollback ──
@@ -1423,7 +1450,7 @@ class SewingReturnController extends Controller
                 ->with('success', 'Sewing Return berhasil disimpan.');
         });
 
-        if ($postedSewingReturn) {
+        if ($postedSewingReturn && ($postedSewingReturn->status ?? null) !== 'pending_qc') {
             foreach ([
                 'postSewingReturnOk',
                 'postSewingReturnReject',
@@ -1457,6 +1484,52 @@ class SewingReturnController extends Controller
                     ])->toArray() ?? [],
                     'message' => 'Dry run selesai — validasi LOLOS, transaksi di-rollback. Data tidak tersimpan.',
                 ]);
+        }
+    }
+
+    private function createPendingSewingQcResults(
+        SewingReturn $sewingReturn,
+        $rawResults,
+        $pickupLines,
+        $bundlesMap,
+        string $date,
+        ?int $operatorId
+    ): void {
+        foreach ($rawResults as $row) {
+            if ((int) ($row['source_reject_return_line_id'] ?? 0) > 0 || (int) ($row['source_finishing_job_line_id'] ?? 0) > 0) {
+                continue;
+            }
+
+            $pickupLine = $pickupLines->get((int) ($row['sewing_pickup_line_id'] ?? 0));
+            if (!$pickupLine) {
+                continue;
+            }
+
+            $bundleId = (int) ($pickupLine->cutting_job_bundle_id ?? 0);
+            if ($bundleId <= 0) {
+                continue;
+            }
+
+            $bundle = $bundlesMap->get($bundleId);
+
+            QcResult::updateOrCreate(
+                [
+                    'stage' => QcResult::STAGE_SEWING,
+                    'sewing_job_id' => (int) $sewingReturn->id,
+                    'cutting_job_bundle_id' => $bundleId,
+                ],
+                [
+                    'cutting_job_id' => $bundle?->cutting_job_id,
+                    'finishing_job_id' => null,
+                    'qc_date' => $date,
+                    'qty_ok' => (float) ($row['qty_ok'] ?? 0),
+                    'qty_reject' => (float) ($row['qty_reject'] ?? 0),
+                    'reject_reason' => null,
+                    'operator_id' => $operatorId,
+                    'status' => 'pending',
+                    'notes' => trim((string) ($row['notes'] ?? '')) ?: 'Menunggu QC jahit',
+                ]
+            );
         }
     }
 

@@ -191,18 +191,288 @@
     .shp-kpi-grid { grid-template-columns: repeat(2, 1fr); }
     .shp-card { padding: 1rem 1.1rem; border-radius: 16px; }
 }
+
+/* Compact neutral layout, aligned with shipment edit */
+:root {
+    --shp-accent: #334155;
+    --shp-accent-2: #1f2937;
+    --shp-accent-bg: rgba(148,163,184,.08);
+    --shp-accent-ring: rgba(148,163,184,.18);
+}
+.shp-wrap {
+    max-width: 1040px;
+    margin-inline: auto;
+    padding: .75rem .75rem 4rem;
+    background: transparent !important;
+}
+.shp-topbar {
+    position: sticky;
+    top: 0;
+    z-index: 300;
+    display: flex;
+    align-items: center;
+    gap: .45rem;
+    flex-wrap: wrap;
+    padding: .45rem .75rem;
+    background: var(--card, #fff);
+    border-bottom: 1px solid rgba(148,163,184,.18);
+}
+body[data-theme="dark"] .shp-topbar {
+    background: var(--card, #0f172a);
+}
+.shp-topbar-code {
+    font-weight: 900;
+    font-size: .95rem;
+    letter-spacing: 0;
+    white-space: nowrap;
+}
+.shp-topbar-spacer {
+    flex: 1;
+    min-width: .5rem;
+}
+.shp-badge,
+.shp-pill,
+.shp-step,
+.shp-meta-store {
+    border-radius: 7px;
+    letter-spacing: 0;
+    text-transform: none;
+    box-shadow: none !important;
+}
+.shp-badge,
+.shp-pill {
+    padding: .18rem .48rem;
+    font-size: .68rem;
+    background: transparent !important;
+    color: #64748b !important;
+    border: 1px solid rgba(148,163,184,.28) !important;
+    white-space: nowrap;
+}
+.shp-pill-accent,
+.shp-step.active,
+.shp-step.done {
+    color: #334155 !important;
+    background: transparent !important;
+    border-color: rgba(148,163,184,.28) !important;
+}
+.btn-shp-outline,
+.shp-scan-btn,
+#setupBtn,
+#submitForm button,
+#phase2Card button,
+#exportBtn {
+    border-radius: 7px !important;
+    letter-spacing: 0;
+    text-transform: none;
+    box-shadow: none !important;
+}
+.btn-shp-outline,
+#phase2Card button,
+#exportBtn {
+    padding: .28rem .62rem !important;
+    font-size: .74rem !important;
+    color: #475569 !important;
+    background: transparent !important;
+    border: 1px solid rgba(148,163,184,.35) !important;
+}
+.btn-shp-outline:hover,
+#phase2Card button:hover,
+#exportBtn:hover {
+    background: rgba(148,163,184,.08) !important;
+    color: #111827 !important;
+}
+#setupBtn,
+.shp-scan-btn,
+#submitForm button {
+    background: #334155 !important;
+    border: 1px solid #334155 !important;
+    color: #fff !important;
+}
+#setupBtn:hover,
+.shp-scan-btn:hover,
+#submitForm button:hover {
+    background: #1f2937 !important;
+    border-color: #1f2937 !important;
+}
+.shp-kpi-grid {
+    gap: .45rem;
+    margin: .55rem 0;
+}
+.shp-kpi-card,
+.shp-card {
+    border-radius: 8px;
+    box-shadow: none !important;
+    background: var(--card, #fff);
+    border: 1px solid rgba(148,163,184,.18);
+}
+.shp-kpi-card {
+    padding: .55rem .7rem;
+}
+.shp-kpi-label {
+    font-size: .6rem;
+    letter-spacing: .02em;
+    margin-bottom: .18rem;
+}
+.shp-kpi-value {
+    font-size: 1.05rem;
+    color: #334155;
+}
+.shp-kpi-note {
+    display: none;
+}
+.shp-phase-bar {
+    margin: .55rem 0;
+    gap: .28rem;
+}
+.shp-step {
+    padding: .18rem .52rem;
+    font-size: .7rem;
+    background: transparent;
+    border: 1px solid rgba(148,163,184,.25);
+}
+.shp-card {
+    padding: .85rem;
+    margin-bottom: .65rem;
+}
+.shp-card [style*="border-left:3px"] {
+    border-left: 0 !important;
+    padding-left: 0 !important;
+    margin-bottom: .75rem !important;
+}
+.form-control,
+.form-control-sm {
+    border-radius: 8px;
+    border-color: rgba(148,163,184,.35);
+    box-shadow: none !important;
+}
+.form-control:focus,
+.form-control-sm:focus {
+    border-color: rgba(71,85,105,.75);
+    box-shadow: none !important;
+}
+.shp-scan-wrap {
+    background: transparent;
+    border: 1px solid rgba(148,163,184,.22);
+    border-radius: 8px;
+    padding: .45rem;
+}
+.shp-scan-wrap:focus-within {
+    border-color: rgba(100,116,139,.55);
+}
+.shp-scan-wrap input {
+    font-size: 1.25rem;
+    letter-spacing: .08em;
+}
+.shp-lines-scroll {
+    max-height: 50vh;
+}
+.shp-table thead th {
+    background: var(--card, #fff);
+    letter-spacing: .03em;
+}
+.shp-qty-pill {
+    border-radius: 7px;
+    box-shadow: none !important;
+}
+.shp-toast {
+    border-radius: 8px;
+    box-shadow: none;
+}
+.shp-card [style*="color:#4338ca"] {
+    color: #334155 !important;
+}
+.shp-card [style*="color:#94a3b8"] {
+    color: #64748b !important;
+}
+.del-btn,
+.qty-save {
+    border-radius: 7px !important;
+    box-shadow: none !important;
+}
+.del-btn {
+    min-width: 46px;
+    padding: .25rem .45rem !important;
+    font-size: .72rem !important;
+}
+@media (max-width: 768px) {
+    .shp-wrap {
+        padding: .5rem .5rem 5rem;
+    }
+    .shp-topbar {
+        padding: .5rem;
+        gap: .38rem;
+    }
+    .shp-topbar-code {
+        flex: 1 1 auto;
+        min-width: 145px;
+        font-size: 1.05rem;
+    }
+    .shp-topbar-spacer,
+    .shp-badge,
+    .shp-topbar > .shp-pill:not(.shp-pill-accent) {
+        display: none !important;
+    }
+    .shp-pill,
+    .btn-shp-outline {
+        min-height: 38px;
+        font-size: .82rem !important;
+    }
+    .shp-kpi-grid,
+    .shp-phase-bar {
+        display: none;
+    }
+    .shp-card {
+        padding: .7rem;
+        border-radius: 8px;
+        margin-bottom: .5rem;
+    }
+    #phase1Card label {
+        font-size: .72rem !important;
+        letter-spacing: .03em !important;
+    }
+    #setupBtn,
+    #submitForm button {
+        width: 100%;
+        min-height: 44px;
+    }
+    .shp-meta-bar {
+        gap: .4rem;
+        padding-bottom: .55rem;
+        margin-bottom: .65rem;
+    }
+    .shp-meta-code {
+        width: 100%;
+        font-size: 1rem;
+    }
+    .shp-scan-wrap input {
+        min-height: 46px;
+        font-size: 1.35rem;
+        letter-spacing: .06em;
+    }
+    .shp-scan-btn {
+        min-height: 42px;
+        padding-inline: .8rem;
+    }
+    .shp-lines-scroll {
+        max-height: 45vh;
+    }
+}
 </style>
 @endpush
 
 @section('content')
-<x-gf.page eyebrow="Penjualan" title="Shipment Baru"
-    description="Buat shipment dan scan barang keluar dari WH-RTS.">
+<div class="shp-topbar">
+    <span class="shp-topbar-code" id="topShipCode">Shipment Baru</span>
+    <span class="shp-badge" id="topStatus">Setup</span>
+    <span class="shp-topbar-spacer"></span>
+    <span class="shp-pill">Baris <b id="topLines">0</b></span>
+    <span class="shp-pill shp-pill-accent">Qty <b id="topQty">0</b></span>
+    <a href="{{ route('sales.shipments.index') }}" class="btn-shp-outline" style="text-decoration:none">
+        Daftar Shipment
+    </a>
+</div>
 
-    <x-slot:actions>
-        <a href="{{ route('sales.shipments.index') }}" class="btn btn-sm btn-outline-secondary">
-            ← Daftar Shipment
-        </a>
-    </x-slot:actions>
+<div class="shp-wrap">
 
     {{-- ── KPI ──────────────────────────────────────────────────────────── --}}
     <div class="shp-kpi-grid">
@@ -230,11 +500,9 @@
 
     {{-- ── Phase bar ────────────────────────────────────────────────────── --}}
     <div class="shp-phase-bar">
-        <span class="shp-step active" id="pStep1">① Setup</span>
-        <span style="color:#cbd5e1;font-size:.75rem">→</span>
-        <span class="shp-step" id="pStep2">② Scan Barang</span>
-        <span style="color:#cbd5e1;font-size:.75rem">→</span>
-        <span class="shp-step" id="pStep3">③ Selesai</span>
+        <span class="shp-step active" id="pStep1">Setup</span>
+        <span class="shp-step" id="pStep2">Scan Barang</span>
+        <span class="shp-step" id="pStep3">Selesai</span>
     </div>
 
     {{-- ══════════════════════════════════════════════════════════════════ --}}
@@ -243,8 +511,8 @@
     <div class="shp-card" id="phase1Card">
 
         <div style="border-left:3px solid #6366f1;padding-left:1rem;margin-bottom:1.4rem">
-            <div style="color:#4338ca;font-weight:800;font-size:.9rem;margin-bottom:.15rem">Buat Shipment Baru</div>
-            <div style="color:#94a3b8;font-size:.72rem">Masukkan no pesanan untuk link ke data order, lalu mulai scan barang</div>
+            <div style="color:#4338ca;font-weight:800;font-size:.9rem;margin-bottom:.15rem">Setup Shipment</div>
+            <div style="color:#94a3b8;font-size:.72rem">Isi data singkat, lalu lanjut scan barang</div>
         </div>
 
         <form id="setupForm" autocomplete="off">
@@ -263,12 +531,12 @@
                     <div style="position:relative">
                         <input type="text" id="orderInput"
                                class="form-control form-control-sm"
-                               placeholder="Ketik no order Shopee / TikTok / kode invoice…"
+                               placeholder="Ketik no order atau kode invoice"
                                autocomplete="off" spellcheck="false"
                                value="{{ !empty($invoice) ? ($invoice->channel_order_no ?? $invoice->code) : '' }}">
                         <span id="lookupSpinner"
                               style="display:none;position:absolute;right:.6rem;top:50%;transform:translateY(-50%);color:#94a3b8;font-size:.8rem">
-                            ⏳
+                            ...
                         </span>
                     </div>
 
@@ -277,7 +545,7 @@
                          style="display:none;margin-top:.55rem;padding:.6rem .85rem;border-radius:10px;
                                 background:#f0fdf4;border:1px solid #bbf7d0;font-size:.8rem">
                         <div style="font-weight:800;color:#15803d;margin-bottom:.2rem">
-                            ✅ <span id="lookupStoreName">—</span>
+                            <span id="lookupStoreName">—</span>
                         </div>
                         <div style="color:#374151">
                             <span id="lookupInvoiceCode" style="font-family:monospace;font-weight:700"></span>
@@ -290,14 +558,14 @@
                     <div id="lookupNotFound"
                          style="display:none;margin-top:.55rem;padding:.5rem .85rem;border-radius:10px;
                                 background:#fef9c3;border:1px solid #fde68a;font-size:.79rem;color:#78350f">
-                        ⚠️ No pesanan tidak ditemukan — shipment akan dibuat tanpa link order.
-                        <span style="color:#94a3b8">Bisa diisi nanti saat rekonsiliasi.</span>
+                        No pesanan tidak ditemukan. Shipment tetap bisa dibuat.
+                        <span style="color:#94a3b8">Rekonsiliasi bisa dilakukan nanti.</span>
                     </div>
 
                     {{-- Hint: no input --}}
                     <div id="lookupHint"
                          style="margin-top:.4rem;font-size:.72rem;color:#94a3b8">
-                        Kosongkan jika belum ada no pesanan — store akan diisi saat rekonsiliasi.
+                        Opsional, bisa rekonsiliasi nanti.
                     </div>
                 </div>
 
@@ -316,19 +584,19 @@
                         Catatan <span style="color:#94a3b8">(opsional)</span>
                     </label>
                     <input type="text" name="notes" class="form-control form-control-sm"
-                        placeholder="Catatan tambahan…">
+                        placeholder="Catatan tambahan">
                 </div>
             </div>
 
             <div style="display:flex;justify-content:space-between;align-items:center;margin-top:1.4rem;flex-wrap:wrap;gap:.5rem">
                 <div id="setupError" style="color:#dc2626;font-size:.8rem;display:none"></div>
                 <div style="margin-left:auto;display:flex;gap:.75rem;align-items:center">
-                    <span id="setupSpinner" style="display:none;color:#94a3b8;font-size:.78rem">⏳ Membuat shipment…</span>
+                    <span id="setupSpinner" style="display:none;color:#94a3b8;font-size:.78rem">Membuat shipment...</span>
                     <button type="submit" id="setupBtn"
                         style="background:#6366f1;border:none;border-radius:12px;padding:.6rem 1.6rem;
                                color:#fff;font-weight:800;font-size:.9rem;cursor:pointer;
                                box-shadow:0 3px 12px rgba(99,102,241,.35);transition:background .15s">
-                        Mulai Scan →
+                        Mulai Scan
                     </button>
                 </div>
             </div>
@@ -350,7 +618,7 @@
                 <button onclick="backToSetup()"
                     style="background:transparent;border:1px solid #e2e8f0;border-radius:999px;
                            padding:.25rem .8rem;color:#64748b;font-size:.73rem;font-weight:600;cursor:pointer">
-                    ← Ubah Setup
+                    Ubah Setup
                 </button>
             </div>
         </div>
@@ -358,10 +626,10 @@
         {{-- Scan box --}}
         <div style="border-left:3px solid #6366f1;padding-left:1rem;margin-bottom:1.1rem">
             <div style="color:#4338ca;font-weight:800;font-size:.88rem;margin-bottom:.15rem">
-                Scan Kode Item (SKU Internal)
+                Scan Barang
             </div>
             <div style="color:#94a3b8;font-size:.72rem;margin-bottom:.65rem">
-                Scan barcode atau ketik kode item, lalu tekan Enter
+                Scan atau ketik kode item
             </div>
             <div class="shp-scan-wrap">
                 <input id="scanInput" type="text"
@@ -369,7 +637,7 @@
                     autocomplete="off" autocorrect="off" autocapitalize="off" spellcheck="false"
                     onkeydown="if(event.key==='Enter'){event.preventDefault();doScan()}"
                     oninput="this.value=this.value.toUpperCase()">
-                <button class="shp-scan-btn" id="scanBtn" onclick="doScan()">+ Tambah</button>
+                <button class="shp-scan-btn" id="scanBtn" onclick="doScan()">Tambah</button>
             </div>
             <div id="scanStatus" style="margin-top:.4rem;font-size:.78rem;min-height:1.1rem;padding:0 .2rem;color:#94a3b8"></div>
         </div>
@@ -416,7 +684,7 @@
                 <button onclick="clearAllLines()"
                     style="background:transparent;border:1px solid #fca5a5;border-radius:999px;
                            padding:.3rem .85rem;color:#ef4444;font-size:.75rem;font-weight:700;cursor:pointer">
-                    🗑 Bersihkan
+                    Bersihkan
                 </button>
                 <a id="exportBtn" href="#" target="_blank"
                     style="display:inline-flex;align-items:center;
@@ -436,13 +704,13 @@
                            box-shadow:0 3px 12px rgba(22,163,74,.35);transition:background .15s"
                     onmouseover="this.style.background='#15803d'"
                     onmouseout="this.style.background='#16a34a'">
-                    ✓ Simpan &amp; Kurangi Stok
+                    Simpan &amp; Kurangi Stok
                 </button>
             </form>
         </div>
     </div>{{-- /phase2Card --}}
 
-</x-gf.page>
+</div>
 
 {{-- Toast --}}
 <div id="shpToast" class="shp-toast"></div>
@@ -510,8 +778,12 @@
     function updateTotals(lines, qty) {
         const lEl = document.getElementById('totalLines');
         const qEl = document.getElementById('totalQty');
+        const topLines = document.getElementById('topLines');
+        const topQty = document.getElementById('topQty');
         if (lEl) lEl.textContent = lines ?? 0;
         if (qEl) qEl.textContent = new Intl.NumberFormat('id-ID').format(qty ?? 0);
+        if (topLines) topLines.textContent = lines ?? 0;
+        if (topQty) topQty.textContent = new Intl.NumberFormat('id-ID').format(qty ?? 0);
     }
 
     function renumber() {
@@ -525,6 +797,10 @@
     // ── Phase stepper ──────────────────────────────────────────────────────
 
     function setPhase(n) {
+        const topStatus = document.getElementById('topStatus');
+        if (topStatus) {
+            topStatus.textContent = n === 1 ? 'Setup' : (n === 2 ? 'Scan' : 'Selesai');
+        }
         ['pStep1', 'pStep2', 'pStep3'].forEach((id, idx) => {
             const el = document.getElementById(id);
             if (!el) return;
@@ -558,7 +834,7 @@
         resetLinesUI();
         // Re-enable setup button
         const sb = document.getElementById('setupBtn');
-        if (sb) { sb.disabled = false; sb.style.background = '#6366f1'; }
+        if (sb) { sb.disabled = false; sb.style.background = ''; }
         const ss = document.getElementById('setupSpinner');
         if (ss) ss.style.display = 'none';
         showP1();
@@ -678,7 +954,7 @@
             const spinner = document.getElementById('setupSpinner');
             const errEl = document.getElementById('setupError');
 
-            if (btn) { btn.disabled = true; btn.style.background = '#c7d2fe'; }
+            if (btn) { btn.disabled = true; btn.style.background = ''; }
             if (spinner) spinner.style.display = 'inline';
             if (errEl) errEl.style.display = 'none';
 
@@ -703,7 +979,7 @@
                         msg = Object.values(data.errors).flat().join(' ');
                     }
                     if (errEl) { errEl.textContent = msg; errEl.style.display = 'block'; }
-                    if (btn) { btn.disabled = false; btn.style.background = '#6366f1'; }
+                    if (btn) { btn.disabled = false; btn.style.background = ''; }
                     if (spinner) spinner.style.display = 'none';
                     return;
                 }
@@ -715,7 +991,7 @@
 
             } catch (err) {
                 if (errEl) { errEl.textContent = err.message || 'Terjadi kesalahan, coba lagi.'; errEl.style.display = 'block'; }
-                if (btn) { btn.disabled = false; btn.style.background = '#6366f1'; }
+                if (btn) { btn.disabled = false; btn.style.background = ''; }
                 if (spinner) spinner.style.display = 'none';
             }
         });
@@ -728,6 +1004,8 @@
         const invoiceEl = document.getElementById('shipInvoice');
 
         if (codeEl) codeEl.textContent = s.code || '—';
+        const topCode = document.getElementById('topShipCode');
+        if (topCode) topCode.textContent = s.code || 'Shipment Baru';
 
         if (storeEl) {
             const storeLabel = [s.store_code, s.store_name].filter(Boolean).join(' — ');
@@ -797,7 +1075,7 @@
                 beepErr();
                 const msg = data.message || 'Item tidak ditemukan.';
                 showToast('err', msg);
-                setScanStatus('❌ ' + msg, '#ef4444');
+                setScanStatus(msg, '#ef4444');
                 if (input) { input.value = ''; input.focus(); }
                 return;
             }
@@ -808,7 +1086,7 @@
 
             addOrUpdateRow(line);
             updateTotals(totals.total_lines, totals.total_qty);
-            setScanStatus('✓ ' + (line.item_code || code) + ' ditambahkan', '#16a34a');
+            setScanStatus((line.item_code || code) + ' ditambahkan', '#16a34a');
             showToast('ok', data.message || '+1 ' + (line.item_code || code));
 
             if (input) { input.value = ''; input.focus(); }
@@ -816,7 +1094,7 @@
         } catch (err) {
             beepErr();
             showToast('err', err.message || 'Terjadi kesalahan.');
-            setScanStatus('❌ ' + (err.message || 'Error'), '#ef4444');
+            setScanStatus(err.message || 'Error', '#ef4444');
             if (input) { input.value = ''; input.focus(); }
         } finally {
             if (scanBtn) scanBtn.disabled = false;
@@ -851,11 +1129,11 @@
                     '<div class="d-none qty-edit-wrap" style="display:inline-flex;align-items:center;gap:.25rem">' +
                         '<input type="number" class="form-control form-control-sm qty-inp" min="0" style="width:78px;text-align:right"' +
                                ' data-qty-url="' + qtyUrl + '">' +
-                        '<button type="button" class="btn btn-primary btn-sm qty-save" style="border-radius:999px;padding-inline:.5rem;font-size:.72rem;line-height:1.4">✔</button>' +
+                        '<button type="button" class="btn btn-primary btn-sm qty-save" style="border-radius:999px;padding-inline:.5rem;font-size:.72rem;line-height:1.4">OK</button>' +
                     '</div>' +
                 '</td>' +
                 '<td class="text-end">' +
-                    '<button class="btn btn-sm btn-outline-danger del-btn" data-del-url="' + delUrl + '" title="Hapus baris">🗑</button>' +
+                    '<button class="btn btn-sm btn-outline-danger del-btn" data-del-url="' + delUrl + '" title="Hapus baris">Hapus</button>' +
                 '</td>';
 
             tbody.appendChild(row);

@@ -63,9 +63,7 @@ class FinishingJobController extends Controller
 
     private function defaultDestinationCodeForUser($user): string
     {
-        $role = strtolower(trim((string) ($user?->role ?? '')));
-
-        return in_array($role, ['admin', 'operating']) ? 'WH-PRD' : 'WH-RTS';
+        return 'WH-PRD';
     }
 
     private function defaultDestinationIdForUser($user, $destinationWarehouses): ?int
@@ -205,6 +203,7 @@ class FinishingJobController extends Controller
             ->join('sewing_returns as sr', 'sr.id', '=', 'srl.sewing_return_id')
             ->leftJoin('sewing_pickups as sp', 'sp.id', '=', 'spl.sewing_pickup_id')
             ->leftJoin('employees as e', 'e.id', '=', 'sr.operator_id')
+            ->where('sr.status', 'posted')
             ->where(function ($q) use ($wipFinWarehouseId) {
                 if ($this->readinessFromLedger()) {
                     $q->whereRaw($this->wipFinLedgerSql('b') . ' > 0.0001');
@@ -258,6 +257,7 @@ class FinishingJobController extends Controller
             ->join('sewing_pickup_lines as spl', 'spl.cutting_job_bundle_id', '=', 'b.id')
             ->join('sewing_return_lines as srl', 'srl.sewing_pickup_line_id', '=', 'spl.id')
             ->join('sewing_returns as sr', 'sr.id', '=', 'srl.sewing_return_id')
+            ->where('sr.status', 'posted')
             ->where(function ($q) use ($wipFinWarehouseId) {
                 if ($this->readinessFromLedger()) {
                     $q->whereRaw($this->wipFinLedgerSql('b') . ' > 0.0001');
@@ -426,6 +426,160 @@ class FinishingJobController extends Controller
         ]);
     }
 
+    public function readyBundles(Request $request): View
+    {
+        $wipFinWarehouseId = Warehouse::where('code', 'WIP-FIN')->value('id');
+        $q = trim((string) $request->query('q', ''));
+
+        if (!$wipFinWarehouseId) {
+            return view('production.finishing_jobs.bundles_ready', [
+                'bundles' => CuttingJobBundle::query()->whereRaw('1 = 0')->paginate(20),
+                'totalWipQty' => 0,
+                'totalBundles' => 0,
+            ])->withErrors(['warehouse' => 'Gudang WIP-FIN belum dikonfigurasi.']);
+        }
+
+        $query = CuttingJobBundle::query()
+            ->with(['finishedItem:id,code,name', 'lot.item:id,code,name,color'])
+            ->readyForFinishing($wipFinWarehouseId)
+            ->whereNotNull('finished_item_id')
+            ->select('cutting_job_bundles.*')
+            ->selectSub(function ($sub) {
+                $sub->from('sewing_return_lines as srl')
+                    ->join('sewing_returns as sr', 'sr.id', '=', 'srl.sewing_return_id')
+                    ->join('sewing_pickup_lines as spl', 'spl.id', '=', 'srl.sewing_pickup_line_id')
+                    ->whereColumn('spl.cutting_job_bundle_id', 'cutting_job_bundles.id')
+                    ->where('sr.status', 'posted')
+                    ->orderByDesc('sr.date')
+                    ->orderByDesc('sr.id')
+                    ->limit(1)
+                    ->select('sr.date');
+            }, 'last_return_date')
+            ->selectSub(function ($sub) {
+                $sub->from('sewing_return_lines as srl')
+                    ->join('sewing_returns as sr', 'sr.id', '=', 'srl.sewing_return_id')
+                    ->join('sewing_pickup_lines as spl', 'spl.id', '=', 'srl.sewing_pickup_line_id')
+                    ->join('employees as e', 'e.id', '=', 'sr.operator_id')
+                    ->whereColumn('spl.cutting_job_bundle_id', 'cutting_job_bundles.id')
+                    ->where('sr.status', 'posted')
+                    ->orderByDesc('sr.date')
+                    ->orderByDesc('sr.id')
+                    ->limit(1)
+                    ->select('e.code');
+            }, 'last_return_operator_code')
+            ->selectSub(function ($sub) {
+                $sub->from('sewing_return_lines as srl')
+                    ->join('sewing_returns as sr', 'sr.id', '=', 'srl.sewing_return_id')
+                    ->join('sewing_pickup_lines as spl', 'spl.id', '=', 'srl.sewing_pickup_line_id')
+                    ->join('employees as e', 'e.id', '=', 'sr.operator_id')
+                    ->whereColumn('spl.cutting_job_bundle_id', 'cutting_job_bundles.id')
+                    ->where('sr.status', 'posted')
+                    ->orderByDesc('sr.date')
+                    ->orderByDesc('sr.id')
+                    ->limit(1)
+                    ->select('e.name');
+            }, 'last_return_operator_name');
+
+        if ($this->readinessFromLedger()) {
+            $query->withLedgerBalances([config('inventory.warehouses.wip_fin', 'WIP-FIN')]);
+        }
+
+        if ($q !== '') {
+            $like = '%' . str_replace(['%', '_'], ['\\%', '\\_'], $q) . '%';
+            $query->where(function ($qq) use ($like) {
+                $qq->where('bundle_code', 'like', $like)
+                    ->orWhereHas('finishedItem', function ($itemQ) use ($like) {
+                        $itemQ->where('code', 'like', $like)
+                            ->orWhere('name', 'like', $like);
+                    })
+                    ->orWhereHas('lot', fn($lotQ) => $lotQ->where('code', 'like', $like));
+            });
+        }
+
+        $totalQuery = clone $query;
+        $totalWipQty = $this->readinessFromLedger()
+            ? (float) $totalQuery->sum(DB::raw($this->wipFinLedgerSql('cutting_job_bundles')))
+            : (float) $totalQuery->sum('wip_qty');
+
+        $bundles = $query
+            ->orderBy('finished_item_id')
+            ->orderBy('id')
+            ->paginate(30)
+            ->withQueryString();
+
+        if ($this->readinessFromLedger()) {
+            $wipFinCode = config('inventory.warehouses.wip_fin', 'WIP-FIN');
+            $bundles->getCollection()->transform(function (CuttingJobBundle $bundle) use ($wipFinCode) {
+                $bundle->setAttribute('wip_qty', $bundle->ledgerBalanceAt($wipFinCode));
+
+                return $bundle;
+            });
+        }
+
+        return view('production.finishing_jobs.bundles_ready', [
+            'bundles' => $bundles,
+            'totalWipQty' => $totalWipQty,
+            'totalBundles' => $bundles->total(),
+        ]);
+    }
+
+    public function bundle_row(Request $request): View
+    {
+        $index = max(0, (int) $request->query('index', 0));
+        $bundle = null;
+
+        if ($request->filled('bundle_id')) {
+            $wipFinWarehouseId = Warehouse::where('code', 'WIP-FIN')->value('id');
+            $bundle = CuttingJobBundle::query()
+                ->with('item:id,code,name')
+                ->when($wipFinWarehouseId, fn($q) => $q->readyForFinishing($wipFinWarehouseId))
+                ->whereKey((int) $request->query('bundle_id'))
+                ->first();
+        }
+
+        return view('production.finishing_jobs._bundle_row', [
+            'index' => $index,
+            'row' => [],
+            'bundle' => $bundle,
+        ]);
+    }
+
+    public function bundle_info(Request $request)
+    {
+        $bundleId = (int) $request->query('bundle_id');
+        $wipFinWarehouseId = Warehouse::where('code', 'WIP-FIN')->value('id');
+
+        if ($bundleId <= 0 || !$wipFinWarehouseId) {
+            return response()->json(['message' => 'Bundle WIP-FIN tidak ditemukan.'], 404);
+        }
+
+        $bundle = CuttingJobBundle::query()
+            ->with(['finishedItem:id,code,name', 'item:id,code,name', 'lot:id,code,item_id'])
+            ->readyForFinishing($wipFinWarehouseId)
+            ->whereKey($bundleId)
+            ->first();
+
+        if (!$bundle) {
+            return response()->json(['message' => 'Bundle tidak tersedia di WIP-FIN.'], 404);
+        }
+
+        $wipQty = $this->readinessFromLedger()
+            ? $bundle->ledgerBalanceAt(config('inventory.warehouses.wip_fin', 'WIP-FIN'))
+            : (float) ($bundle->wip_qty ?? 0);
+
+        $item = $bundle->finishedItem ?? $bundle->item;
+
+        return response()->json([
+            'id' => $bundle->id,
+            'bundle_code' => $bundle->bundle_code,
+            'item_id' => $item?->id,
+            'item_code' => $item?->code,
+            'item_name' => $item?->name,
+            'lot_code' => $bundle->lot?->code,
+            'wip_qty' => $wipQty,
+        ]);
+    }
+
     /* ============================================================
      * STORE (Draft)
      * ============================================================
@@ -534,6 +688,7 @@ class FinishingJobController extends Controller
                 ->join('sewing_pickup_lines as spl', 'spl.id', '=', 'srl.sewing_pickup_line_id')
                 ->where('spl.finished_item_id', $itemId)
                 ->where('sr.operator_id', $sewingOperatorId)
+                ->where('sr.status', 'posted')
                 ->whereRaw('(COALESCE(srl.qty_ok,0) - COALESCE(srl.finished_qty,0)) > 0');
 
             if ($hasSplVoided) {
@@ -639,6 +794,7 @@ class FinishingJobController extends Controller
                             ->whereColumn('spl.cutting_job_bundle_id', 'cutting_job_bundles.id')
                             ->where('spl.finished_item_id', $itemId)
                             ->where('sr.operator_id', $sewingOperatorId)
+                            ->where('sr.status', 'posted')
                             ->whereRaw('(COALESCE(srl.qty_ok,0) - COALESCE(srl.finished_qty,0)) > 0');
 
                         if ($hasSplVoided) {
@@ -680,6 +836,7 @@ class FinishingJobController extends Controller
                         ->where('spl.cutting_job_bundle_id', $bundle->id)
                         ->where('spl.finished_item_id', $itemId)
                         ->where('sr.operator_id', $sewingOperatorId)
+                        ->where('sr.status', 'posted')
                         ->whereRaw('(COALESCE(srl.qty_ok,0) - COALESCE(srl.finished_qty,0)) > 0');
 
                     if ($hasSplVoided) {
@@ -716,6 +873,7 @@ class FinishingJobController extends Controller
                         ->where('spl.cutting_job_bundle_id', $bundle->id)
                         ->where('spl.finished_item_id', $itemId)
                         ->where('sr.operator_id', $sewingOperatorId)
+                        ->where('sr.status', 'posted')
                         ->whereRaw('(COALESCE(srl.qty_ok,0) - COALESCE(srl.finished_qty,0)) > 0');
 
                     if ($hasSplVoided) {
@@ -944,6 +1102,7 @@ class FinishingJobController extends Controller
                         ->where('spl.cutting_job_bundle_id', $bundleId)
                         ->where('spl.finished_item_id', $itemId)
                         ->where('sr.operator_id', $opId)
+                        ->where('sr.status', 'posted')
                         ->whereRaw('COALESCE(srl.finished_qty,0) > 0');
 
                     if ($hasSplVoided) {

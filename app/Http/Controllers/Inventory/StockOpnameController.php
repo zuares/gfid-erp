@@ -3,6 +3,7 @@
 namespace App\Http\Controllers\Inventory;
 
 use App\Http\Controllers\Controller;
+use App\Models\Item;
 use App\Models\StockOpname;
 use App\Models\StockOpnameLine;
 use App\Models\Warehouse;
@@ -281,6 +282,9 @@ class StockOpnameController extends Controller
         $minusQty = 0.0;
         $plusValue = 0.0;
         $minusValue = 0.0;
+        $systemValue = 0.0;
+        $physicalValue = 0.0;
+        $missingCostCount = 0;
 
         foreach ($lines as $idx => $line) {
             $itemCode = $line->item?->code ?? '-';
@@ -303,11 +307,25 @@ class StockOpnameController extends Controller
                 $unitCost = (float) $line->unit_cost;
             } elseif ($line->item && (float) ($line->item->hpp ?? 0) > 0) {
                 $unitCost = (float) $line->item->hpp;
+            } elseif ((float) ($line->effective_unit_cost ?? 0) > 0) {
+                $unitCost = (float) $line->effective_unit_cost;
             }
 
             $value = null;
             if ($diff !== null && abs($diff) >= 0.0000001 && $unitCost > 0) {
                 $value = $diff * $unitCost;
+            }
+
+            $lineSystemValue = $unitCost > 0 ? $systemQty * $unitCost : null;
+            $linePhysicalValue = ($physicalQty !== null && $unitCost > 0) ? $physicalQty * $unitCost : null;
+
+            if ($unitCost > 0) {
+                $systemValue += (float) ($lineSystemValue ?? 0);
+                if ($physicalQty !== null) {
+                    $physicalValue += (float) ($linePhysicalValue ?? 0);
+                }
+            } else {
+                $missingCostCount++;
             }
 
             // update summary (filtered, counted only)
@@ -334,8 +352,16 @@ class StockOpnameController extends Controller
                 'physical_qty' => $physicalQty,
                 'diff_qty' => $diff,
                 'tone' => $tone,
+                'line_id' => $line->id,
+                'unit_cost' => $unitCost > 0 ? $unitCost : null,
+                'system_value' => $lineSystemValue,
+                'physical_value' => $linePhysicalValue,
                 'value' => $value,
                 'notes' => (string) ($line->notes ?? ''),
+                'set_cost_url' => route('inventory.stock_opnames.lines.unit_cost', [
+                    'stockOpname' => $stockOpname,
+                    'line' => $line,
+                ]),
             ];
         }
 
@@ -357,6 +383,9 @@ class StockOpnameController extends Controller
                     'minus_value' => $minusValue,
                     'net_qty' => $netQty,
                     'net_value' => $netValue,
+                    'system_value' => $systemValue,
+                    'physical_value' => $physicalValue,
+                    'missing_cost_count' => $missingCostCount,
                     'net_qty_class' => $netQtyClass,
                     'net_value_class' => $netValueClass,
                 ],
@@ -743,6 +772,66 @@ class StockOpnameController extends Controller
             ->route('inventory.stock_opnames.edit', $stockOpname)
             ->with('status', 'success')
             ->with('message', 'Item opname berhasil disimpan.');
+    }
+
+    public function updateLineUnitCost(Request $request, StockOpname $stockOpname, StockOpnameLine $line): RedirectResponse
+    {
+        if ((int) $line->stock_opname_id !== (int) $stockOpname->id) {
+            abort(404);
+        }
+
+        $adjustmentExists = \App\Models\InventoryAdjustment::query()
+            ->where('source_type', StockOpname::class)
+            ->where('source_id', $stockOpname->id)
+            ->exists();
+
+        if (
+            $adjustmentExists ||
+            $stockOpname->isCancelled() ||
+            $stockOpname->status === StockOpname::STATUS_FINALIZED
+        ) {
+            return redirect()
+                ->route('inventory.stock_opnames.show', $stockOpname)
+                ->with('status', 'error')
+                ->with('message', 'HPP tidak bisa diubah karena dokumen sudah final, dibatalkan, atau sudah punya adjustment.');
+        }
+
+        $validated = $request->validate([
+            'unit_cost' => ['required', 'numeric', 'gt:0'],
+        ]);
+
+        $unitCost = round((float) $validated['unit_cost'], 4);
+        $masterUpdated = false;
+
+        DB::transaction(function () use ($line, $unitCost, &$masterUpdated) {
+            $line->unit_cost = $unitCost;
+            $line->save();
+
+            if (!$line->item_id) {
+                return;
+            }
+
+            $item = Item::query()->whereKey($line->item_id)->lockForUpdate()->first();
+            if (!$item) {
+                return;
+            }
+
+            $item->hpp = $unitCost;
+
+            if ((float) ($item->base_unit_cost ?? 0) <= 0) {
+                $item->base_unit_cost = $unitCost;
+            }
+
+            $item->save();
+            $masterUpdated = true;
+        });
+
+        return redirect()
+            ->route('inventory.stock_opnames.show', $stockOpname)
+            ->with('status', 'success')
+            ->with('message', $masterUpdated
+                ? 'HPP baris disimpan dan HPP master item berhasil diperbarui.'
+                : 'HPP baris berhasil disimpan.');
     }
 
     public function deleteLine(Request $request, StockOpname $stockOpname, StockOpnameLine $line)

@@ -153,6 +153,7 @@
 
         .cardx-b { padding: 5px 10px 8px; display: grid; gap: .38rem; }
         .grid2 { display: grid; grid-template-columns: 1fr 1fr; gap: .4rem; }
+        .grid2.single { grid-template-columns: 1fr; }
 
         .field label { display: block; font-size: .65rem; font-weight: 900; color: var(--muted); text-transform: uppercase; letter-spacing: .07em; margin-bottom: .18rem; }
 
@@ -692,9 +693,11 @@
                 <span style="font-weight:800; color:#4ade80; min-width:80px;">{{ $dl['item'] ?? '-' }}</span>
                 <span style="color:#4b7a5e;">setor</span>
                 <strong style="color:#86efac;">{{ $dl['qty_ok'] }}</strong>
-                <span style="color:#334155;">•</span>
-                <span style="color:#4b7a5e;">reject</span>
-                <strong style="color:#fca5a5;">{{ $dl['qty_reject'] }}</strong>
+                @if (($dl['qty_reject'] ?? 0) > 0)
+                    <span style="color:#334155;">•</span>
+                    <span style="color:#4b7a5e;">reject</span>
+                    <strong style="color:#fca5a5;">{{ $dl['qty_reject'] }}</strong>
+                @endif
             </div>
             @endforeach
         </div>
@@ -862,7 +865,7 @@
                             <span class="pill">Total Iket: <span class="mono" id="stat-total-rows">0</span></span>
                             <span class="pill">Sudah Setor: <span class="mono" id="stat-returned">0,00</span></span>
                             <span class="pill">Di Setor: <span class="mono" id="stat-picked-rows">0</span></span>
-                            <span class="pill">{{ $isRejectReworkMode ? 'Total Setor' : 'Total OK' }}: <span class="mono" id="stat-total-ok">0,00</span></span>
+                            <span class="pill">Total Setor: <span class="mono" id="stat-total-ok">0,00</span></span>
                         </div>
 
                         <div class="d-flex gap-2 align-items-center">
@@ -1111,9 +1114,9 @@
                                 </div>
 
                                 <div class="cardx-b">
-                                    <div class="grid2">
+                                    <div class="grid2 {{ $isRejectLine ? '' : 'single' }}">
                                         <div class="field">
-                                            <label>{{ $isRejectLine ? 'Setor Ulang' : 'OK' }}</label>
+                                            <label>{{ $isRejectLine ? 'Setor Ulang' : 'Setor' }}</label>
                                             <input type="number" step="1" min="0"
                                                    inputmode="numeric"
                                                    class="form-control form-control-sm qty ok num-input select-all-on-focus {{ $supplyPartial ? 'border-warning' : '' }}"
@@ -1130,20 +1133,14 @@
                                                 </div>
                                             </div>
                                         @else
-                                            <div class="field">
-                                                <label>Reject</label>
-                                                <input type="number" step="0.01" min="0" inputmode="decimal"
-                                                       class="form-control form-control-sm qty rj num-input select-all-on-focus"
-                                                       name="results[{{ $idx }}][qty_reject]"
-                                                       value="{{ $rjVal }}" placeholder="0" {{ $isBlocked ? 'disabled' : '' }}>
-                                            </div>
+                                            <input type="hidden" name="results[{{ $idx }}][qty_reject]" value="0">
                                         @endif
                                     </div>
 
-                                    <div class="notes {{ (!$isRejectLine && $showNotes) ? 'is-show' : '' }}">
+                                    <div class="notes">
                                         <input type="text" class="form-control form-control-sm"
                                                name="results[{{ $idx }}][notes]"
-                                               placeholder="Catatan reject (opsional)" value="{{ $notes }}">
+                                               value="{{ $notes }}">
                                     </div>
 
                                     <input type="hidden" name="results[{{ $idx }}][sewing_pickup_line_id]" value="{{ $line->id }}">
@@ -1277,8 +1274,7 @@ foreach ($lines as $l) {
                     <div class="mt-2" style="font-size:.90rem;font-weight:800;color:var(--muted);">
                         Operator: <span class="mono" id="m-op">SEMUA</span><br>
                         Tujuan: <span class="mono" id="m-dest">-</span><br>
-                        Total OK: <span class="mono" id="m-ok">0,00</span>
-                        • Total Reject: <span class="mono" id="m-rj">0,00</span>
+                        Total Setor: <span class="mono" id="m-ok">0,00</span>
                     </div>
                 </div>
 
@@ -1293,8 +1289,8 @@ foreach ($lines as $l) {
                     <div class="border" style="border-radius:14px; overflow:hidden;">
                         <div class="px-3 py-2"
                              style="background:rgba(148,163,184,.06); border-bottom:1px solid rgba(148,163,184,.18); font-size:.72rem; font-weight:900; color:var(--muted); text-transform:uppercase; letter-spacing:.10em;">
-                            <div class="d-grid" style="grid-template-columns: 44px 1fr 120px 120px; gap:.5rem; align-items:center;">
-                                <div>No</div><div>Item</div><div class="text-end">OK / Setor</div><div class="text-end">Reject</div>
+                            <div class="d-grid" style="grid-template-columns: 44px 1fr 120px; gap:.5rem; align-items:center;">
+                                <div>No</div><div>Item</div><div class="text-end">Setor</div>
                             </div>
                         </div>
 
@@ -1815,11 +1811,10 @@ document.addEventListener('DOMContentLoaded', () => {
             row.className = 'px-3 py-2';
             row.style.borderBottom = '1px solid rgba(148,163,184,.12)';
             row.innerHTML = `
-                <div class="d-grid" style="grid-template-columns: 44px 1fr 120px 120px; gap:.5rem; align-items:center;">
+                <div class="d-grid" style="grid-template-columns: 44px 1fr 120px; gap:.5rem; align-items:center;">
                     <div class="text-muted" style="font-weight:900;">${i+1}</div>
                     <div style="font-weight:900;" class="mono">${esc(it.code)}</div>
                     <div class="text-end mono" style="font-weight:900;">${it.ok.toLocaleString('id-ID',{minimumFractionDigits:2,maximumFractionDigits:2})}</div>
-                    <div class="text-end mono" style="font-weight:900; color: var(--rj);">${it.rj.toLocaleString('id-ID',{minimumFractionDigits:2,maximumFractionDigits:2})}</div>
                 </div>
             `;
             mItems.appendChild(row);

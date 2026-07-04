@@ -47,18 +47,32 @@
     $totalMinusQty = 0.0;
     $totalPlusValue = 0.0;
     $totalMinusValue = 0.0;
+    $totalSystemValue = 0.0;
+    $totalPhysicalValue = 0.0;
+    $missingCostCount = 0;
 
     foreach ($lines as $line) {
-        if (!($line->is_counted ?? false)) continue;
-
         $system = (float)($line->system_qty ?? 0);
         $physical = $line->physical_qty !== null ? (float)$line->physical_qty : null;
+        $unitCost = (float)($line->unit_cost ?? 0);
+        if ($unitCost <= 0) $unitCost = (float)($line->item->hpp ?? 0);
+        if ($unitCost <= 0) $unitCost = (float)($line->effective_unit_cost ?? 0);
+
+        if ($unitCost > 0) {
+            $totalSystemValue += $system * $unitCost;
+            if ($physical !== null) {
+                $totalPhysicalValue += $physical * $unitCost;
+            }
+        } else {
+            $missingCostCount++;
+        }
+
+        if (!($line->is_counted ?? false)) continue;
         if ($physical === null) continue;
 
         $diff = (float)($line->difference_qty ?? ($physical - $system));
         if (abs($diff) < 0.0000001) continue;
 
-        $unitCost = (float)($line->effective_unit_cost ?? ($line->unit_cost ?? 0));
         $diffValue = $unitCost > 0 ? $diff * $unitCost : 0.0;
 
         if ($diff > 0) {
@@ -107,6 +121,12 @@
         && !$adjustment
         && in_array($opname->status, [StockOpname::STATUS_DRAFT, StockOpname::STATUS_COUNTING, StockOpname::STATUS_REVIEWED], true)
         && in_array($userRole, ['owner','admin'], true);
+
+    $canSetUnitCost =
+        !$isCancelled
+        && !$adjustment
+        && in_array($opname->status, [StockOpname::STATUS_DRAFT, StockOpname::STATUS_COUNTING, StockOpname::STATUS_REVIEWED], true)
+        && in_array($userRole, ['owner', 'admin', 'operating'], true);
 
     $canSeeAdjustmentLink = !$isOpOrAdmin;
 
@@ -238,6 +258,11 @@
     .table tbody td{ padding:.42rem .5rem; font-size:.78rem; white-space:nowrap; vertical-align:middle; }
     .col-notes-compact{ max-width:240px; }
     .col-notes-compact .note-text{ display:-webkit-box; -webkit-line-clamp:2; -webkit-box-orient:vertical; overflow:hidden; white-space:normal; line-height:1.2; }
+    .hpp-inline-form{ display:flex; align-items:center; justify-content:flex-end; gap:.25rem; min-width:155px; }
+    .hpp-inline-form .form-control{ max-width:105px; text-align:right; font-variant-numeric:tabular-nums; }
+    .hpp-save-btn{ padding:.24rem .42rem !important; line-height:1; font-weight:900; }
+    .hpp-missing{ color:#b91c1c; font-size:.68rem; font-weight:900; display:inline-flex; align-items:center; gap:.24rem; }
+    .hpp-muted{ color:rgba(100,116,139,1); font-size:.68rem; font-weight:800; }
 
     .sum-row{ display:none; margin-top:.55rem; border-radius:10px; border:1px solid rgba(148,163,184,.22); background:rgba(15,23,42,.01); padding:.55rem .65rem; }
     .sum-row .cell{ display:flex; align-items:baseline; justify-content:space-between; gap:.65rem; padding:.12rem 0; font-size:.86rem; }
@@ -462,6 +487,21 @@
                         @endif
                     </span>
                 </div>
+
+                <div class="so-summary-kpi">
+                    <span class="lbl">Nilai Sistem</span>
+                    <span class="val text-mono" id="sumSystemValue">Rp {{ number_format($totalSystemValue, 0, ',', '.') }}</span>
+                </div>
+
+                <div class="so-summary-kpi">
+                    <span class="lbl">Nilai Fisik</span>
+                    <span class="val text-mono" id="sumPhysicalValue">Rp {{ number_format($totalPhysicalValue, 0, ',', '.') }}</span>
+                </div>
+
+                <div class="so-summary-kpi {{ $missingCostCount > 0 ? '' : 'is-main' }}">
+                    <span class="lbl">HPP Kosong</span>
+                    <span class="val text-mono {{ $missingCostCount > 0 ? 'diff-danger' : 'diff-success' }}" id="sumMissingCost">{{ number_format($missingCostCount, 0, ',', '.') }}</span>
+                </div>
             </div>
 
             {{-- SUMMARY MOBILE --}}
@@ -602,9 +642,11 @@
                                 Selisih <span class="arr">{{ ($filters['sort'] ?? '') === 'diff' && ($filters['dir'] ?? 'asc') === 'desc' ? '↓' : '↑' }}</span>
                             </button>
                         </th>
+                        <th class="text-end">HPP</th>
+                        <th class="text-end">Nilai Fisik</th>
                         <th class="text-end">
                             <button type="button" class="so-sort-btn js-so-sort @if(($filters['sort'] ?? '') === 'value') is-active @endif" data-sort="value">
-                                Nilai <span class="arr">{{ ($filters['sort'] ?? '') === 'value' && ($filters['dir'] ?? 'asc') === 'desc' ? '↓' : '↑' }}</span>
+                                Nilai Selisih <span class="arr">{{ ($filters['sort'] ?? '') === 'value' && ($filters['dir'] ?? 'asc') === 'desc' ? '↓' : '↑' }}</span>
                             </button>
                         </th>
                         <th class="col-notes-compact">Catatan</th>
@@ -627,7 +669,11 @@
                                 $tone = $diff < 0 ? 'diff-danger' : ($diff > 0 ? 'diff-warning' : 'diff-success');
                             }
 
-                            $unitCost = (float) ($line->effective_unit_cost ?? ($line->unit_cost ?? 0));
+                            $unitCost = (float) ($line->unit_cost ?? 0);
+                            if ($unitCost <= 0) $unitCost = (float) ($line->item->hpp ?? 0);
+                            if ($unitCost <= 0) $unitCost = (float) ($line->effective_unit_cost ?? 0);
+                            $costMissing = $unitCost <= 0;
+                            $physicalValue = (!$costMissing && $physical !== null) ? $physical * $unitCost : null;
                             $value = null;
                             if ($diff !== null && abs($diff) >= 0.0000001 && $unitCost > 0) {
                                 $value = $diff * $unitCost;
@@ -654,6 +700,26 @@
                                     <span class="meta">-</span>
                                 @endif
                             </td>
+                            <td class="text-end">
+                                @if (!$costMissing)
+                                    <div class="text-mono fw-semibold">Rp {{ number_format($unitCost, 0, ',', '.') }}</div>
+                                @elseif ($canSetUnitCost)
+                                    <form method="POST" action="{{ route('inventory.stock_opnames.lines.unit_cost', ['stockOpname' => $opname, 'line' => $line]) }}" class="hpp-inline-form">
+                                        @csrf
+                                        <input type="number" name="unit_cost" class="form-control form-control-sm" min="1" step="0.01" placeholder="HPP" required>
+                                        <button type="submit" class="btn btn-sm btn-dark hpp-save-btn">OK</button>
+                                    </form>
+                                @else
+                                    <span class="hpp-missing">Belum ada</span>
+                                @endif
+                            </td>
+                            <td class="text-end text-mono">
+                                @if ($physicalValue !== null)
+                                    Rp {{ number_format($physicalValue, 0, ',', '.') }}
+                                @else
+                                    <span class="meta">-</span>
+                                @endif
+                            </td>
                             <td class="text-end text-mono {{ $value !== null ? $tone : '' }}">
                                 @if ($value !== null)
                                     {{ $value > 0 ? '+Rp' : '-Rp' }} {{ number_format(abs($value), 0, ',', '.') }}
@@ -665,7 +731,7 @@
                         </tr>
                     @empty
                         <tr>
-                            <td colspan="7" class="text-center py-4">
+                            <td colspan="9" class="text-center py-4">
                                 <div class="fw-semibold">Tidak ada item.</div>
                             </td>
                         </tr>
@@ -709,7 +775,11 @@
                                 $tone = $diff < 0 ? 'tone-danger' : ($diff > 0 ? 'tone-warning' : 'tone-success');
                             }
 
-                            $unitCost = (float) ($line->effective_unit_cost ?? ($line->unit_cost ?? 0));
+                            $unitCost = (float) ($line->unit_cost ?? 0);
+                            if ($unitCost <= 0) $unitCost = (float) ($line->item->hpp ?? 0);
+                            if ($unitCost <= 0) $unitCost = (float) ($line->effective_unit_cost ?? 0);
+                            $costMissing = $unitCost <= 0;
+                            $physicalValue = (!$costMissing && $physical !== null) ? $physical * $unitCost : null;
                             $value = null;
                             if ($diff !== null && abs($diff) >= 0.0000001 && $unitCost > 0) {
                                 $value = $diff * $unitCost;
@@ -726,6 +796,8 @@
                                 <div class="m-badges">
                                     <span class="mini-badge"><span class="k">Sys</span><span class="v">{{ number_format($system, 2) }}</span></span>
                                     <span class="mini-badge"><span class="k">F</span><span class="v">{{ $physical !== null && $counted ? number_format($physical, 2) : '-' }}</span></span>
+                                    <span class="mini-badge {{ $costMissing ? 'tone-danger' : '' }}"><span class="k">HPP</span><span class="v">{{ $costMissing ? '-' : number_format($unitCost, 0, ',', '.') }}</span></span>
+                                    <span class="mini-badge"><span class="k">Nilai</span><span class="v">{{ $physicalValue !== null ? number_format($physicalValue, 0, ',', '.') : '-' }}</span></span>
 
                                     <span class="mini-badge {{ $tone }}">
                                         <span class="k">Rp</span>
@@ -738,6 +810,14 @@
                                         </span>
                                     </span>
                                 </div>
+
+                                @if ($costMissing && $canSetUnitCost)
+                                    <form method="POST" action="{{ route('inventory.stock_opnames.lines.unit_cost', ['stockOpname' => $opname, 'line' => $line]) }}" class="hpp-inline-form mt-2" style="justify-content:flex-start;">
+                                        @csrf
+                                        <input type="number" name="unit_cost" class="form-control form-control-sm" min="1" step="0.01" placeholder="Isi HPP" required>
+                                        <button type="submit" class="btn btn-sm btn-dark hpp-save-btn">Simpan</button>
+                                    </form>
+                                @endif
                             </td>
 
                             <td class="text-end text-mono">
@@ -966,6 +1046,9 @@ document.addEventListener('DOMContentLoaded', function () {
         setText('mSumMinusQty', `${fmt2(s.minus_qty)}`);
         setText('mSumPlusValue', `+${fmt0abs(s.plus_value)}`);
         setText('mSumMinusValue', `${Number(s.minus_value) < 0 ? '-' : ''}${fmt0abs(s.minus_value)}`);
+        setText('sumSystemValue', `Rp ${fmt0abs(s.system_value)}`);
+        setText('sumPhysicalValue', `Rp ${fmt0abs(s.physical_value)}`);
+        setText('sumMissingCost', new Intl.NumberFormat('id-ID').format(Number(s.missing_cost_count || 0)));
 
         if(kpiNetQty){
             const v = Number(s.net_qty || 0);
@@ -981,14 +1064,18 @@ document.addEventListener('DOMContentLoaded', function () {
     function renderDesktopRows(lines){
         if(!desktopTbody) return;
         if(!lines || lines.length === 0){
-            desktopTbody.innerHTML = `<tr><td colspan="7" class="text-center py-4"><div class="fw-semibold">Tidak ada item.</div></td></tr>`;
+            desktopTbody.innerHTML = `<tr><td colspan="9" class="text-center py-4"><div class="fw-semibold">Tidak ada item.</div></td></tr>`;
             return;
         }
+
+        const csrf = @json(csrf_token());
+        const canSetUnitCost = @json($canSetUnitCost);
 
         desktopTbody.innerHTML = lines.map(r => {
             const itemCode = escapeHtml(r.item_code);
             const itemName = escapeHtml(r.item_name);
             const notes = escapeHtml(r.notes);
+            const setCostUrl = escapeHtml(r.set_cost_url || '#');
 
             const sys = fmt2(r.system_qty);
 
@@ -1004,6 +1091,24 @@ document.addEventListener('DOMContentLoaded', function () {
                 ? `<span class="meta">-</span>`
                 : `${Number(r.value) > 0 ? '+Rp' : '-Rp'} ${fmt0abs(r.value)}`;
 
+            const unitCost = (r.unit_cost === null || r.unit_cost === undefined)
+                ? null
+                : Number(r.unit_cost);
+
+            const hpp = unitCost && unitCost > 0
+                ? `<div class="text-mono fw-semibold">Rp ${fmt0abs(unitCost)}</div>`
+                : (canSetUnitCost
+                    ? `<form method="POST" action="${setCostUrl}" class="hpp-inline-form">
+                        <input type="hidden" name="_token" value="${csrf}">
+                        <input type="number" name="unit_cost" class="form-control form-control-sm" min="1" step="0.01" placeholder="HPP" required>
+                        <button type="submit" class="btn btn-sm btn-dark hpp-save-btn">OK</button>
+                      </form>`
+                    : `<span class="hpp-missing">Belum ada</span>`);
+
+            const physicalValue = (r.physical_value === null || r.physical_value === undefined)
+                ? `<span class="meta">-</span>`
+                : `Rp ${fmt0abs(r.physical_value)}`;
+
             const tone = escapeHtml(r.tone || '');
 
             return `
@@ -1016,6 +1121,8 @@ document.addEventListener('DOMContentLoaded', function () {
   <td class="text-end text-mono">${sys}</td>
   <td class="text-end text-mono">${fisik}</td>
   <td class="text-end text-mono ${tone}">${diff}</td>
+  <td class="text-end">${hpp}</td>
+  <td class="text-end text-mono">${physicalValue}</td>
   <td class="text-end text-mono ${tone}">${val}</td>
   <td class="col-notes-compact"><div class="note-text">${notes}</div></td>
 </tr>`;
@@ -1032,6 +1139,9 @@ document.addEventListener('DOMContentLoaded', function () {
         mobileTbody.innerHTML = lines.map(r => {
             const itemCode = escapeHtml(r.item_code);
             const itemName = escapeHtml(r.item_name);
+            const setCostUrl = escapeHtml(r.set_cost_url || '#');
+            const csrf = @json(csrf_token());
+            const canSetUnitCost = @json($canSetUnitCost);
 
             const sys = fmt2(r.system_qty);
             const fisik = (r.physical_qty === null || r.physical_qty === undefined) ? '-' : fmt2(r.physical_qty);
@@ -1043,6 +1153,17 @@ document.addEventListener('DOMContentLoaded', function () {
             const val = (r.value === null || r.value === undefined)
                 ? '-'
                 : `${Number(r.value) > 0 ? '+' : '-'}${fmt0abs(r.value)}`;
+
+            const unitCost = (r.unit_cost === null || r.unit_cost === undefined) ? null : Number(r.unit_cost);
+            const hpp = unitCost && unitCost > 0 ? fmt0abs(unitCost) : '-';
+            const physicalValue = (r.physical_value === null || r.physical_value === undefined) ? '-' : fmt0abs(r.physical_value);
+            const hppForm = (!unitCost || unitCost <= 0) && canSetUnitCost
+                ? `<form method="POST" action="${setCostUrl}" class="hpp-inline-form mt-2" style="justify-content:flex-start;">
+                    <input type="hidden" name="_token" value="${csrf}">
+                    <input type="number" name="unit_cost" class="form-control form-control-sm" min="1" step="0.01" placeholder="Isi HPP" required>
+                    <button type="submit" class="btn btn-sm btn-dark hpp-save-btn">Simpan</button>
+                  </form>`
+                : '';
 
             let tone = 'tone-success';
             if(r.diff_qty !== null && r.diff_qty !== undefined){
@@ -1059,8 +1180,11 @@ document.addEventListener('DOMContentLoaded', function () {
     <div class="m-badges">
       <span class="mini-badge"><span class="k">Sys</span><span class="v">${sys}</span></span>
       <span class="mini-badge"><span class="k">F</span><span class="v">${fisik}</span></span>
+      <span class="mini-badge ${(!unitCost || unitCost <= 0) ? 'tone-danger' : ''}"><span class="k">HPP</span><span class="v">${hpp}</span></span>
+      <span class="mini-badge"><span class="k">Nilai</span><span class="v">${physicalValue}</span></span>
       <span class="mini-badge ${tone}"><span class="k">Rp</span><span class="v">${val}</span></span>
     </div>
+    ${hppForm}
   </td>
   <td class="text-end text-mono">
     <span class="mini-badge ${tone}" style="justify-content:flex-end;"><span class="v">${diff}</span></span>

@@ -451,6 +451,10 @@
                     return;
                 }
 
+                if (window.cuttingValidateBundleItems && !window.cuttingValidateBundleItems(true)) {
+                    return;
+                }
+
                 updateModalSummary();
 
                 if (cuttingInfoModalInstance) {
@@ -464,6 +468,11 @@
 
             // Tombol di modal yang benar-benar submit form
             btnModalSaveCutting?.addEventListener('click', () => {
+                if (window.cuttingValidateBundleItems && !window.cuttingValidateBundleItems(true)) {
+                    cuttingInfoModalInstance?.hide?.();
+                    return;
+                }
+
                 if (!operatorSelect || !operatorSelect.value) {
                     alert('Operator Cutting wajib dipilih sebelum menyimpan.');
                     operatorSelect?.focus();

@@ -666,6 +666,113 @@ class QcController extends Controller
             ->with('success', 'QC bundle berhasil di-adjust.');
     }
 
+    /* ============================================================
+     * QC JAHIT (SEWING)
+     * ============================================================
+     */
+
+    /**
+     * Form QC Jahit — satu SewingReturn per form.
+     */
+    public function editSewing(SewingReturn $sewingReturn)
+    {
+        $sewingReturn->load([
+            'operator',
+            'lines.pickupLine.bundle.finishedItem',
+            'lines.pickupLine.bundle.cuttingJob',
+        ]);
+
+        // QC yang sudah tersimpan untuk return ini
+        $existingQc = QcResult::query()
+            ->where('stage', QcResult::STAGE_SEWING)
+            ->where('sewing_job_id', $sewingReturn->id)
+            ->get()
+            ->keyBy('cutting_job_bundle_id');
+
+        $rows = [];
+        foreach ($sewingReturn->lines as $line) {
+            $bundle = $line->pickupLine?->bundle;
+            if (! $bundle) {
+                continue;
+            }
+
+            $qc = $existingQc->get($bundle->id);
+
+            // Qty maksimal = qty yang dikirim penjahit (qty_bundle di pickup line)
+            $maxQty = (float) ($line->pickupLine->qty_bundle ?? 0);
+
+            $rows[] = [
+                'bundle_id'        => $bundle->id,
+                'bundle_code'      => $bundle->bundle_code,
+                'item_code'        => $bundle->finishedItem?->code,
+                'item_name'        => $bundle->finishedItem?->name,
+                'cutting_job_code' => $bundle->cuttingJob?->code,
+                'qty_max'          => $maxQty,
+                'qty_ok'           => $qc?->qty_ok ?? $maxQty,
+                'qty_reject'       => $qc?->qty_reject ?? 0,
+                'reject_reason'    => $qc?->reject_reason,
+                'notes'            => $qc?->notes,
+            ];
+        }
+
+        $loginOperator = Auth::user()->employee ?? null;
+        $hasQcSewing   = $existingQc->isNotEmpty();
+
+        return view('production.qc.sewing_edit', compact(
+            'sewingReturn',
+            'rows',
+            'loginOperator',
+            'hasQcSewing',
+        ));
+    }
+
+    /**
+     * Simpan QC Jahit — gerakkan stok WIP-SEW → WIP-FIN (OK) / REJ-SEW (Reject).
+     */
+    public function updateSewing(Request $request, SewingReturn $sewingReturn)
+    {
+        $validated = $request->validate([
+            'qc_date'                 => ['required', 'date'],
+            'operator_id'             => ['nullable', 'exists:employees,id'],
+            'results'                 => ['required', 'array', 'min:1'],
+            'results.*.bundle_id'     => ['required', 'exists:cutting_job_bundles,id'],
+            'results.*.qty_ok'        => ['nullable', 'numeric', 'min:0'],
+            'results.*.qty_reject'    => ['nullable', 'numeric', 'min:0'],
+            'results.*.reject_reason' => ['nullable', 'string', 'max:100'],
+            'results.*.notes'         => ['nullable', 'string'],
+        ]);
+
+        if (empty($validated['operator_id'])) {
+            $validated['operator_id'] = Auth::user()->employee?->id;
+        }
+
+        $alreadyMoved = DB::table('inventory_mutations')
+            ->where('source_type', 'sewing_qc_out')
+            ->where('source_id', (int) $sewingReturn->id)
+            ->exists();
+
+        if ($alreadyMoved) {
+            return back()
+                ->with('error', 'QC Jahit sudah pernah diposting dan stok sudah bergerak. Void / koreksi dulu sebelum QC ulang.');
+        }
+
+        try {
+            $this->qc->saveSewingQc($sewingReturn, $validated);
+
+            if ($sewingReturn->isFillable('status')) {
+                $sewingReturn->forceFill(['status' => 'posted'])->save();
+            }
+        } catch (\Throwable $e) {
+            return back()
+                ->withInput()
+                ->with('error', 'QC Jahit gagal: ' . $e->getMessage());
+        }
+
+        return redirect()
+            ->route('production.sewing.returns.show', $sewingReturn)
+            ->with('success', 'QC Jahit berhasil disimpan. Stok WIP-SEW → WIP-FIN sudah diperbarui.');
+    }
+
     public function overproductionCuttingBundle(Request $request, CuttingJob $cuttingJob, CuttingJobBundle $bundle)
     {
         // pastikan bundle memang milik cutting job ini

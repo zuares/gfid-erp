@@ -803,27 +803,31 @@ document.addEventListener('DOMContentLoaded', () => {
     function syncCheckFromInputs(card){
         const { qtyIn, qtyRj, cb } = getEls(card);
         if(!cb) return;
-        const ok = Math.max(0, parseInt(qtyIn?.value || 0,10) || 0);
+        const masuk = Math.max(0, parseInt(qtyIn?.value || 0,10) || 0);
         const rj = Math.max(0, parseInt(qtyRj?.value || 0,10) || 0);
-        cb.checked = ((ok + rj) > 0);
+        cb.checked = ((masuk + rj) > 0);
     }
 
     function clampCard(card, changed){
         const { qtyIn, qtyRj } = getEls(card);
         const W = getWip(card);
 
-        let ok = Math.max(0, parseInt(qtyIn?.value || 0,10) || 0);
+        let masuk = Math.max(0, parseInt(qtyIn?.value || 0,10) || 0);
         let rj = Math.max(0, parseInt(qtyRj?.value || 0,10) || 0);
 
-        if(ok > W) ok = W;
+        if(masuk > W) masuk = W;
         if(rj > W) rj = W;
 
-        if(ok + rj > W){
-            if(changed === 'qty_in') ok = Math.max(0, W - rj);
-            if(changed === 'qty_reject') rj = Math.max(0, W - ok);
+        if(changed === 'qty_reject' && masuk <= 0 && rj > 0){
+            masuk = W;
         }
 
-        if(qtyIn) qtyIn.value = ok === 0 ? '' : String(ok);
+        if(rj > masuk){
+            if(changed === 'qty_in') rj = masuk;
+            if(changed === 'qty_reject') masuk = Math.min(W, rj);
+        }
+
+        if(qtyIn) qtyIn.value = masuk === 0 ? '' : String(masuk);
         if(qtyRj) qtyRj.value = rj === 0 ? '' : String(rj);
     }
 
@@ -834,9 +838,7 @@ document.addEventListener('DOMContentLoaded', () => {
         let rj = Math.max(0, parseInt(qtyRj?.value || 0,10) || 0);
         if(rj > W) rj = W;
 
-        let ok = Math.max(0, W - rj);
-
-        if(qtyIn) qtyIn.value = ok === 0 ? '' : String(ok);
+        if(qtyIn) qtyIn.value = W === 0 ? '' : String(W);
         if(qtyRj) qtyRj.value = rj === 0 ? '' : String(rj);
 
         clampCard(card, 'qty_in');
@@ -850,8 +852,10 @@ document.addEventListener('DOMContentLoaded', () => {
         let rj = Math.max(0, parseInt(qtyRj?.value || 0,10) || 0);
         if(rj > W) rj = W;
 
-        const ok = Math.max(0, W - rj);
-        if(qtyIn) qtyIn.value = ok === 0 ? '' : String(ok);
+        let masuk = Math.max(0, parseInt(qtyIn?.value || 0,10) || 0);
+        if(masuk <= 0 || masuk < rj) masuk = W;
+
+        if(qtyIn) qtyIn.value = masuk === 0 ? '' : String(masuk);
         if(qtyRj) qtyRj.value = rj === 0 ? '' : String(rj);
 
         clampCard(card, 'qty_in');
@@ -1104,7 +1108,7 @@ document.addEventListener('DOMContentLoaded', () => {
 
     function buildModalByopDetail(){
         const rows = [];
-        let totalOk = 0, totalRj = 0;
+        let totalMasuk = 0, totalOk = 0, totalRj = 0;
 
         $$('.fin-item', listByOp).forEach(card => {
             const wip = parseInt(card.dataset.wip || '0',10) || 0;
@@ -1114,18 +1118,20 @@ document.addEventListener('DOMContentLoaded', () => {
             if(!cb?.checked) return;
 
             const code = (card.dataset.code || '').toString();
-            const ok = Math.max(0, parseInt(qtyIn?.value || 0,10) || 0);
+            const masuk = Math.max(0, parseInt(qtyIn?.value || 0,10) || 0);
             const rj = Math.max(0, parseInt(qtyRj?.value || 0,10) || 0);
+            const ok = Math.max(0, masuk - rj);
 
+            totalMasuk += masuk;
             totalOk += ok;
             totalRj += rj;
-            rows.push({ code, ok, rj });
+            rows.push({ code, masuk, ok, rj });
         });
 
         mRows.textContent = String(rows.length);
         mOk.textContent = nf(totalOk);
         mRj.textContent = nf(totalRj);
-        mTotal.textContent = nf(totalOk + totalRj);
+        mTotal.textContent = nf(totalMasuk);
 
         const sel = opFilter?.options?.[opFilter.selectedIndex];
         if(mOperator) mOperator.value = sel ? sel.textContent.trim() : '';

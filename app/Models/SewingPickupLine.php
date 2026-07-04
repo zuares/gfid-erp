@@ -31,6 +31,11 @@ class SewingPickupLine extends Model
         return $this->belongsTo(SewingPickup::class, 'sewing_pickup_id');
     }
 
+    public function pickup()
+    {
+        return $this->belongsTo(SewingPickup::class, 'sewing_pickup_id');
+    }
+
     public function bundle()
     {
         return $this->belongsTo(CuttingJobBundle::class, 'cutting_job_bundle_id');

@@ -1,247 +1,1196 @@
 {{-- resources/views/production/qc/cutting_edit.blade.php --}}
 @extends('layouts.app')
 
-@section('title', 'Produksi • QC Cutting ' . $cuttingJob->code)
+@section('title', 'QC Cutting · ' . $cuttingJob->code)
 
 @push('head')
-    <style>
-        .qc-cutting-page {
-            min-height: 100vh
-        }
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Plus+Jakarta+Sans:wght@500;600;700;800;900&display=swap" rel="stylesheet">
+<style>
+    /* ═══════════════════════════════════════════════════════
+     * QC CUTTING — Greatfit Storefront Design Language
+     * Selaras dengan sewing_edit.blade.php
+     * ═══════════════════════════════════════════════════════ */
 
+    :root {
+        --gf-ink:    #0a0a0a;
+        --gf-mid:    #64748b;
+        --gf-line:   #e5e7eb;
+        --gf-soft:   #f8fafc;
+        --gf-white:  #fff;
+        --gf-ok:     #16a34a;
+        --gf-ok-soft:#ecfdf5;
+        --gf-rej:    #dc2626;
+        --gf-rej-soft:#fef2f2;
+        --gf-warn:   #f59e0b;
+        --gf-warn-soft:#fffbeb;
+        --gf-accent: #6366f1;
+        --gf-accent-soft: rgba(99,102,241,.06);
+        --gf-blue:   #2563eb;
+        --gf-blue-soft: rgba(37,99,235,.06);
+        --gf-font:   'Plus Jakarta Sans', system-ui, -apple-system, sans-serif;
+        --gf-mono:   ui-monospace, SFMono-Regular, Menlo, Consolas, monospace;
+        --gf-radius: 16px;
+        --gf-radius-pill: 999px;
+    }
+
+    body[data-theme="dark"] {
+        --gf-ink:    #f0f0f0;
+        --gf-mid:    #94a3b8;
+        --gf-line:   #1e293b;
+        --gf-soft:   #0f172a;
+        --gf-white:  #020617;
+        --gf-ok-soft: rgba(22,163,74,.08);
+        --gf-rej-soft: rgba(220,38,38,.08);
+        --gf-warn-soft: rgba(245,158,11,.08);
+        --gf-accent-soft: rgba(99,102,241,.10);
+        --gf-blue-soft: rgba(37,99,235,.10);
+    }
+
+    .qc-cutting-page {
+        min-height: 100vh;
+        font-family: var(--gf-font);
+        -webkit-font-smoothing: antialiased;
+    }
+
+    .qc-cutting-page .page-wrap {
+        max-width: 780px;
+        margin-inline: auto;
+        padding: 0 16px 120px;
+    }
+
+    /* ── Breadcrumb ───────────────────────────────────── */
+    .qcs-breadcrumb {
+        display: flex;
+        align-items: center;
+        gap: 6px;
+        padding: 16px 0 0;
+        font-size: 12px;
+        font-weight: 600;
+        color: var(--gf-mid);
+    }
+    .qcs-breadcrumb a {
+        color: var(--gf-mid);
+        text-decoration: none;
+        transition: color .15s;
+    }
+    .qcs-breadcrumb a:hover { color: var(--gf-ink); }
+
+    /* ── Page Head ────────────────────────────────────── */
+    .qcs-page-head {
+        padding: 14px 0 18px;
+        display: flex;
+        align-items: flex-start;
+        justify-content: space-between;
+        gap: 12px;
+        flex-wrap: wrap;
+    }
+    .qcs-page-title {
+        font-size: 22px;
+        font-weight: 900;
+        letter-spacing: -.02em;
+        color: var(--gf-ink);
+        margin: 0;
+        line-height: 1.2;
+    }
+    .qcs-page-title code {
+        font-family: var(--gf-mono);
+        font-size: .82em;
+        font-weight: 800;
+        background: none;
+        color: inherit;
+    }
+    .qcs-page-meta {
+        display: flex;
+        align-items: center;
+        gap: 10px;
+        margin-top: 6px;
+        flex-wrap: wrap;
+    }
+    .qcs-meta-item {
+        font-size: 12px;
+        font-weight: 600;
+        color: var(--gf-mid);
+    }
+    .qcs-meta-dot {
+        width: 3px; height: 3px;
+        border-radius: 50%;
+        background: var(--gf-mid);
+        opacity: .5;
+    }
+    .qcs-head-actions {
+        display: flex;
+        align-items: center;
+        gap: 8px;
+        flex-shrink: 0;
+        flex-wrap: wrap;
+    }
+
+    /* ── Badges ───────────────────────────────────────── */
+    .qcs-badge {
+        display: inline-flex;
+        align-items: center;
+        gap: 4px;
+        height: 24px;
+        padding: 0 10px;
+        border-radius: var(--gf-radius-pill);
+        font-size: 10px;
+        font-weight: 900;
+        letter-spacing: .04em;
+        text-transform: uppercase;
+    }
+    .qcs-badge-done, .qcs-badge-success {
+        background: var(--gf-ok-soft);
+        color: var(--gf-ok);
+        border: 1px solid rgba(22,163,74,.18);
+    }
+    .qcs-badge-pending, .qcs-badge-warning {
+        background: var(--gf-warn-soft);
+        color: var(--gf-warn);
+        border: 1px solid rgba(245,158,11,.18);
+    }
+    .qcs-badge-info, .qcs-badge-primary {
+        background: var(--gf-blue-soft);
+        color: var(--gf-blue);
+        border: 1px solid rgba(37,99,235,.18);
+    }
+    .qcs-badge-danger {
+        background: var(--gf-rej-soft);
+        color: var(--gf-rej);
+        border: 1px solid rgba(220,38,38,.18);
+    }
+    .qcs-badge-secondary {
+        background: var(--gf-soft);
+        color: var(--gf-mid);
+        border: 1px solid var(--gf-line);
+    }
+
+    /* ── Link chips ──────────────────────────────────── */
+    .qcs-link-chip {
+        display: inline-flex;
+        align-items: center;
+        gap: 5px;
+        height: 32px;
+        padding: 0 14px;
+        border-radius: var(--gf-radius-pill);
+        background: var(--gf-ink);
+        color: var(--gf-white);
+        font-family: var(--gf-font);
+        font-size: 11px;
+        font-weight: 800;
+        letter-spacing: .02em;
+        text-decoration: none;
+        transition: opacity .15s;
+        white-space: nowrap;
+        flex-shrink: 0;
+        border: none;
+        cursor: pointer;
+    }
+    .qcs-link-chip:hover { opacity: .85; }
+    body[data-theme="dark"] .qcs-link-chip {
+        background: var(--gf-soft);
+        color: var(--gf-ink);
+        border: 1px solid var(--gf-line);
+    }
+    .qcs-link-chip-outline {
+        background: transparent;
+        color: var(--gf-mid);
+        border: 1.5px solid var(--gf-line);
+    }
+    .qcs-link-chip-outline:hover {
+        border-color: var(--gf-ink);
+        color: var(--gf-ink);
+    }
+    .qcs-link-chip-danger {
+        background: var(--gf-rej-soft);
+        color: var(--gf-rej);
+        border: 1px solid rgba(220,38,38,.18);
+    }
+    .qcs-link-chip-danger:hover {
+        background: var(--gf-rej);
+        color: #fff;
+    }
+
+    /* ── Section / Card ──────────────────────────────── */
+    .qcs-section {
+        background: var(--gf-white);
+        border: 1px solid var(--gf-line);
+        border-radius: var(--gf-radius);
+        padding: 16px;
+        margin-bottom: 10px;
+        box-shadow: 0 1px 3px rgba(0,0,0,.04);
+    }
+    .qcs-section-title {
+        font-size: 10px;
+        font-weight: 900;
+        letter-spacing: .10em;
+        text-transform: uppercase;
+        color: var(--gf-mid);
+        margin-bottom: 14px;
+        display: flex;
+        align-items: center;
+        gap: 8px;
+    }
+    .qcs-section-title-count {
+        font-weight: 600;
+        letter-spacing: 0;
+        text-transform: none;
+        font-size: 11px;
+    }
+
+    /* ── Status stepper ──────────────────────────────── */
+    .qcs-stepper {
+        display: flex;
+        align-items: center;
+        gap: 6px;
+        margin-top: 10px;
+    }
+    .qcs-step {
+        display: flex;
+        align-items: center;
+        gap: 5px;
+    }
+    .qcs-step-dot {
+        width: 18px;
+        height: 18px;
+        border-radius: var(--gf-radius-pill);
+        border: 2px solid var(--gf-line);
+        background: transparent;
+        display: grid;
+        place-items: center;
+        transition: .15s;
+        flex-shrink: 0;
+    }
+    .qcs-step-dot.is-done {
+        background: var(--gf-ok-soft);
+        border-color: var(--gf-ok);
+    }
+    .qcs-step-dot.is-done::after {
+        content: '';
+        width: 6px; height: 6px;
+        border-radius: 50%;
+        background: var(--gf-ok);
+    }
+    .qcs-step-dot.is-current {
+        background: var(--gf-blue-soft);
+        border-color: var(--gf-blue);
+        box-shadow: 0 0 0 3px rgba(37,99,235,.10);
+    }
+    .qcs-step-dot.is-current::after {
+        content: '';
+        width: 6px; height: 6px;
+        border-radius: 50%;
+        background: var(--gf-blue);
+    }
+    .qcs-step-label {
+        font-size: 10px;
+        font-weight: 800;
+        letter-spacing: .06em;
+        text-transform: uppercase;
+        color: var(--gf-mid);
+    }
+    .qcs-step-label.is-done { color: var(--gf-ok); }
+    .qcs-step-label.is-current { color: var(--gf-blue); }
+    .qcs-step-sep {
+        width: 20px;
+        height: 1px;
+        background: var(--gf-line);
+        flex-shrink: 0;
+    }
+
+    /* ── LOT pills ───────────────────────────────────── */
+    .qcs-lot-pill {
+        display: inline-flex;
+        align-items: center;
+        height: 22px;
+        padding: 0 8px;
+        border-radius: 8px;
+        font-family: var(--gf-mono);
+        font-size: 10px;
+        font-weight: 800;
+        background: var(--gf-soft);
+        color: var(--gf-mid);
+        border: 1px solid var(--gf-line);
+    }
+
+    /* ── Form fields ─────────────────────────────────── */
+    .qcs-field-grid {
+        display: grid;
+        grid-template-columns: 1fr 1fr;
+        gap: 14px;
+    }
+    .qcs-field-label {
+        display: block;
+        font-size: 10px;
+        font-weight: 900;
+        letter-spacing: .08em;
+        text-transform: uppercase;
+        color: var(--gf-mid);
+        margin-bottom: 6px;
+    }
+    .qcs-field-input {
+        width: 100%;
+        height: 42px;
+        padding: 0 12px;
+        border-radius: 12px;
+        border: 1.5px solid var(--gf-line);
+        background: var(--gf-soft);
+        color: var(--gf-ink);
+        font-family: var(--gf-font);
+        font-size: 14px;
+        font-weight: 700;
+        transition: border-color .15s, box-shadow .15s;
+    }
+    .qcs-field-input:focus {
+        outline: none;
+        border-color: var(--gf-ink);
+        box-shadow: 0 0 0 3px rgba(10,10,10,.06);
+    }
+    .qcs-field-static {
+        font-size: 14px;
+        font-weight: 800;
+        color: var(--gf-ink);
+        padding: 10px 0 0;
+    }
+
+    /* ── Alert banners ───────────────────────────────── */
+    .qcs-alert {
+        border-radius: 14px;
+        padding: 12px 14px;
+        font-size: 12px;
+        font-weight: 700;
+        margin-bottom: 10px;
+        line-height: 1.5;
+    }
+    .qcs-alert-success {
+        background: var(--gf-ok-soft);
+        border: 1px solid rgba(22,163,74,.18);
+        color: #166534;
+    }
+    body[data-theme="dark"] .qcs-alert-success { color: #4ade80; }
+    .qcs-alert-error {
+        background: var(--gf-rej-soft);
+        border: 1px solid rgba(220,38,38,.18);
+        color: #991b1b;
+    }
+    body[data-theme="dark"] .qcs-alert-error { color: #fca5a5; }
+    .qcs-alert-info {
+        background: rgba(99,102,241,.05);
+        border: 1px solid rgba(99,102,241,.15);
+        color: var(--gf-ink);
+    }
+    .qcs-alert-warning {
+        background: var(--gf-warn-soft);
+        border: 1px solid rgba(245,158,11,.18);
+        color: #92400e;
+    }
+    body[data-theme="dark"] .qcs-alert-warning { color: #fbbf24; }
+
+    /* ── QC Table ─────────────────────────────────────── */
+    .qcs-table-wrap { overflow-x: auto; }
+    .qcs-table {
+        width: 100%;
+        border-collapse: collapse;
+        font-size: 13px;
+    }
+    .qcs-table thead th {
+        font-size: 9px;
+        font-weight: 950;
+        letter-spacing: .08em;
+        text-transform: uppercase;
+        color: var(--gf-mid);
+        background: var(--gf-soft);
+        padding: 10px 12px;
+        white-space: nowrap;
+        border-bottom: 1.5px solid var(--gf-line);
+    }
+    .qcs-table thead th:first-child { border-radius: 10px 0 0 0; }
+    .qcs-table thead th:last-child { border-radius: 0 10px 0 0; }
+    .qcs-table tbody tr {
+        border-bottom: 1px solid rgba(229,231,235,.6);
+        transition: background .1s;
+    }
+    .qcs-table tbody tr:last-child { border-bottom: none; }
+    .qcs-table tbody tr:hover { background: rgba(99,102,241,.02); }
+    .qcs-table tbody td {
+        padding: 10px 12px;
+        vertical-align: middle;
+    }
+    .qcs-table tbody tr.row-has-reject { background: rgba(220,38,38,.02); }
+    .qcs-table tbody tr.row-has-reject:hover { background: rgba(220,38,38,.04); }
+
+    /* Bundle pill */
+    .qcs-bundle-pill {
+        display: inline-flex;
+        align-items: center;
+        height: 24px;
+        padding: 0 10px;
+        border-radius: 8px;
+        font-family: var(--gf-mono);
+        font-size: 11px;
+        font-weight: 800;
+        background: var(--gf-accent-soft);
+        color: var(--gf-accent);
+        border: 1px solid rgba(99,102,241,.12);
+    }
+    .qcs-item-code {
+        font-family: var(--gf-mono);
+        font-size: 11px;
+        font-weight: 800;
+        color: var(--gf-mid);
+    }
+    .qcs-item-name {
+        font-size: 12px;
+        font-weight: 700;
+        color: var(--gf-ink);
+        line-height: 1.3;
+    }
+    .qcs-lot-ref {
+        font-size: 10px;
+        font-weight: 600;
+        color: var(--gf-mid);
+        margin-top: 2px;
+    }
+    .qcs-qty-display {
+        font-family: var(--gf-mono);
+        font-size: 14px;
+        font-weight: 900;
+        color: var(--gf-ink);
+    }
+
+    /* Input fields for QC */
+    .qcs-qty-input {
+        width: 72px;
+        height: 36px;
+        padding: 0 8px;
+        border-radius: 10px;
+        text-align: right;
+        font-family: var(--gf-mono);
+        font-size: 14px;
+        font-weight: 900;
+        font-variant-numeric: tabular-nums;
+        border: 1.5px solid var(--gf-line);
+        background: var(--gf-white);
+        color: var(--gf-ink);
+        transition: border-color .12s, box-shadow .12s;
+    }
+    .qcs-qty-input:focus {
+        outline: none;
+        border-color: var(--gf-ink);
+        box-shadow: 0 0 0 3px rgba(10,10,10,.06);
+    }
+    .qcs-qty-input.is-reject {
+        color: var(--gf-rej);
+    }
+    .qcs-qty-input.is-reject:focus {
+        border-color: var(--gf-rej);
+        box-shadow: 0 0 0 3px rgba(220,38,38,.10);
+    }
+    .row-has-reject .qcs-qty-input.is-reject {
+        border-color: rgba(220,38,38,.5);
+        background: rgba(220,38,38,.04);
+    }
+
+    .qcs-notes-input {
+        width: 100%;
+        height: 34px;
+        padding: 0 10px;
+        border-radius: 10px;
+        font-family: var(--gf-font);
+        font-size: 12px;
+        font-weight: 600;
+        border: 1.5px solid var(--gf-line);
+        background: var(--gf-white);
+        color: var(--gf-ink);
+        transition: border-color .12s, box-shadow .12s;
+    }
+    .qcs-notes-input:focus {
+        outline: none;
+        border-color: var(--gf-warn);
+        box-shadow: 0 0 0 3px rgba(245,158,11,.10);
+    }
+    .qcs-notes-input::placeholder {
+        color: rgba(148,163,184,.6);
+        font-weight: 500;
+    }
+
+    /* LOT usage input */
+    .qcs-lot-input {
+        width: 100px;
+        height: 36px;
+        padding: 0 8px;
+        border-radius: 10px;
+        text-align: right;
+        font-family: var(--gf-mono);
+        font-size: 13px;
+        font-weight: 800;
+        border: 1.5px solid var(--gf-line);
+        background: var(--gf-white);
+        color: var(--gf-ink);
+        transition: border-color .12s, box-shadow .12s;
+    }
+    .qcs-lot-input:focus {
+        outline: none;
+        border-color: var(--gf-ink);
+        box-shadow: 0 0 0 3px rgba(10,10,10,.06);
+    }
+    .qcs-lot-input[readonly] {
+        background: var(--gf-soft);
+        border-color: var(--gf-line);
+        color: var(--gf-mid);
+        cursor: default;
+    }
+
+    /* ── Row action buttons ──────────────────────────── */
+    .qcs-row-btn {
+        width: 30px;
+        height: 30px;
+        border-radius: 10px;
+        border: 1.5px solid var(--gf-line);
+        background: var(--gf-white);
+        color: var(--gf-mid);
+        display: inline-grid;
+        place-items: center;
+        font-size: 13px;
+        cursor: pointer;
+        transition: .12s;
+        font-family: var(--gf-font);
+    }
+    .qcs-row-btn:hover { border-color: var(--gf-ink); color: var(--gf-ink); }
+    .qcs-row-btn-ok {
+        color: var(--gf-ok);
+        border-color: rgba(22,163,74,.25);
+    }
+    .qcs-row-btn-ok:hover {
+        background: var(--gf-ok);
+        color: #fff;
+        border-color: var(--gf-ok);
+    }
+    .qcs-row-btn-adjust {
+        color: var(--gf-warn);
+        border-color: rgba(245,158,11,.25);
+    }
+    .qcs-row-btn-adjust:hover {
+        background: var(--gf-warn);
+        color: #fff;
+        border-color: var(--gf-warn);
+    }
+
+    /* ── Summary card ────────────────────────────────── */
+    .qcs-summary {
+        margin-top: 16px;
+        padding: 14px 16px;
+        border-radius: 14px;
+        background: var(--gf-ok-soft);
+        border: 1px solid rgba(22,163,74,.12);
+        display: flex;
+        align-items: center;
+        justify-content: space-between;
+        gap: 16px;
+        flex-wrap: wrap;
+    }
+    .qcs-summary-label {
+        font-size: 10px;
+        font-weight: 900;
+        letter-spacing: .08em;
+        text-transform: uppercase;
+        color: var(--gf-mid);
+        margin-bottom: 4px;
+    }
+    .qcs-summary-values {
+        display: flex;
+        align-items: center;
+        gap: 20px;
+    }
+    .qcs-summary-stat { text-align: center; }
+    .qcs-summary-num {
+        font-family: var(--gf-mono);
+        font-size: 18px;
+        font-weight: 950;
+        line-height: 1;
+        letter-spacing: -.02em;
+    }
+    .qcs-summary-num.is-ok { color: var(--gf-ok); }
+    .qcs-summary-num.is-reject { color: var(--gf-rej); }
+    .qcs-summary-tag {
+        font-size: 9px;
+        font-weight: 800;
+        letter-spacing: .06em;
+        text-transform: uppercase;
+        color: var(--gf-mid);
+        margin-top: 3px;
+    }
+
+    /* ── Modal (styled over Bootstrap modal) ─────────── */
+    .qcs-modal .modal-content {
+        border-radius: var(--gf-radius);
+        border: 1px solid var(--gf-line);
+        background: var(--gf-white);
+        box-shadow: 0 24px 48px rgba(0,0,0,.14);
+        overflow: hidden;
+        font-family: var(--gf-font);
+    }
+    .qcs-modal .modal-header {
+        background: var(--gf-soft);
+        border-bottom: 1px solid var(--gf-line);
+        padding: 14px 16px;
+    }
+    .qcs-modal .modal-header .modal-title-main {
+        font-size: 14px;
+        font-weight: 900;
+        color: var(--gf-ink);
+    }
+    .qcs-modal .modal-header .modal-title-sub {
+        font-family: var(--gf-mono);
+        font-size: 11px;
+        font-weight: 700;
+        color: var(--gf-mid);
+        margin-top: 2px;
+    }
+    .qcs-modal .modal-body {
+        padding: 16px;
+    }
+    .qcs-modal .modal-footer {
+        border-top: 1px solid var(--gf-line);
+        padding: 12px 16px;
+        gap: 8px;
+    }
+    .qcs-modal .qcs-hint-box {
+        border: 1px solid var(--gf-line);
+        border-radius: 12px;
+        padding: 10px 12px;
+        background: var(--gf-soft);
+        font-size: 12px;
+        font-weight: 600;
+        color: var(--gf-mid);
+        line-height: 1.5;
+    }
+    .qcs-modal .qcs-hint-box b { color: var(--gf-ink); }
+    .qcs-modal .qcs-modal-btn {
+        height: 38px;
+        padding: 0 16px;
+        border-radius: 12px;
+        font-family: var(--gf-font);
+        font-size: 13px;
+        font-weight: 800;
+        border: none;
+        cursor: pointer;
+        display: inline-flex;
+        align-items: center;
+        justify-content: center;
+        gap: 6px;
+        transition: opacity .15s;
+    }
+    .qcs-modal .qcs-modal-btn-outline {
+        background: transparent;
+        color: var(--gf-mid);
+        border: 1.5px solid var(--gf-line);
+    }
+    .qcs-modal .qcs-modal-btn-outline:hover {
+        border-color: var(--gf-ink);
+        color: var(--gf-ink);
+    }
+    .qcs-modal .qcs-modal-btn-ok {
+        background: var(--gf-ok);
+        color: #fff;
+    }
+    .qcs-modal .qcs-modal-btn-ok:hover { opacity: .88; }
+    .qcs-modal .qcs-modal-btn-warn {
+        background: var(--gf-warn);
+        color: #fff;
+    }
+    .qcs-modal .qcs-modal-btn-warn:hover { opacity: .88; }
+    .qcs-modal .qcs-modal-field {
+        width: 100%;
+        height: 40px;
+        padding: 0 12px;
+        border-radius: 12px;
+        border: 1.5px solid var(--gf-line);
+        background: var(--gf-soft);
+        color: var(--gf-ink);
+        font-family: var(--gf-font);
+        font-size: 14px;
+        font-weight: 700;
+    }
+    .qcs-modal .qcs-modal-field:focus {
+        outline: none;
+        border-color: var(--gf-ink);
+        box-shadow: 0 0 0 3px rgba(10,10,10,.06);
+    }
+    .qcs-modal .qcs-modal-field::placeholder { color: rgba(148,163,184,.5); font-weight: 500; }
+
+    /* ── Action bar (sticky bottom) ──────────────────── */
+    .qcs-action-bar {
+        position: fixed;
+        left: 0; right: 0; bottom: 0;
+        z-index: 100;
+        background: rgba(255,255,255,.97);
+        backdrop-filter: blur(14px);
+        -webkit-backdrop-filter: blur(14px);
+        border-top: 1px solid var(--gf-line);
+        box-shadow: 0 -8px 24px rgba(0,0,0,.06);
+        padding: 12px 16px calc(12px + env(safe-area-inset-bottom, 0px));
+    }
+    body[data-theme="dark"] .qcs-action-bar {
+        background: rgba(2,6,23,.97);
+        box-shadow: 0 -8px 24px rgba(0,0,0,.3);
+    }
+    .qcs-action-inner {
+        max-width: 780px;
+        margin: 0 auto;
+        display: flex;
+        align-items: center;
+        justify-content: space-between;
+        gap: 14px;
+    }
+    .qcs-action-info {
+        display: flex;
+        flex-direction: column;
+        gap: 2px;
+        min-width: 0;
+    }
+    .qcs-action-label {
+        font-size: 10px;
+        font-weight: 800;
+        letter-spacing: .06em;
+        text-transform: uppercase;
+        color: var(--gf-mid);
+    }
+    .qcs-action-hint {
+        font-size: 11px;
+        font-weight: 600;
+        color: var(--gf-mid);
+    }
+    .qcs-btn-group {
+        display: flex;
+        align-items: center;
+        gap: 8px;
+        flex-shrink: 0;
+    }
+    .qcs-btn-save {
+        height: 44px;
+        min-width: 140px;
+        padding: 0 20px;
+        border-radius: 14px;
+        background: var(--gf-ok);
+        color: #fff;
+        border: none;
+        font-family: var(--gf-font);
+        font-size: 13px;
+        font-weight: 900;
+        cursor: pointer;
+        display: inline-flex;
+        align-items: center;
+        justify-content: center;
+        gap: 6px;
+        transition: opacity .15s, transform .08s;
+        box-shadow: 0 8px 20px rgba(22,163,74,.18);
+    }
+    .qcs-btn-save:hover { opacity: .9; }
+    .qcs-btn-save:active { transform: scale(.97); }
+    .qcs-btn-cancel {
+        height: 44px;
+        padding: 0 16px;
+        border-radius: 14px;
+        background: transparent;
+        color: var(--gf-mid);
+        border: 1.5px solid var(--gf-line);
+        font-family: var(--gf-font);
+        font-size: 13px;
+        font-weight: 700;
+        cursor: pointer;
+        display: inline-flex;
+        align-items: center;
+        justify-content: center;
+        text-decoration: none;
+        transition: border-color .15s, color .15s;
+    }
+    .qcs-btn-cancel:hover {
+        border-color: var(--gf-ink);
+        color: var(--gf-ink);
+    }
+
+    /* ── Warning text ────────────────────────────────── */
+    .qcs-warn-text {
+        font-size: 12px;
+        font-weight: 700;
+        color: var(--gf-warn);
+        margin-top: 8px;
+    }
+    .qcs-error-text {
+        font-size: 12px;
+        font-weight: 700;
+        color: var(--gf-rej);
+        margin-top: 8px;
+    }
+
+    /* ── Owner hint ──────────────────────────────────── */
+    .qcs-owner-hint {
+        font-size: 12px;
+        font-weight: 600;
+        color: var(--gf-mid);
+        max-width: 520px;
+    }
+    .qcs-owner-hint b { color: var(--gf-ink); font-weight: 800; }
+
+    /* ── Production detail style override ─────────────── */
+    :root {
+        --gf-ink: var(--text, #0f172a);
+        --gf-mid: var(--muted, #6b7280);
+        --gf-line: var(--line, #e5e7eb);
+        --gf-soft: rgba(148,163,184,.06);
+        --gf-white: var(--card, #fff);
+        --gf-accent: #2563eb;
+        --gf-accent-soft: rgba(37,99,235,.06);
+        --gf-blue: #2563eb;
+        --gf-blue-soft: rgba(37,99,235,.06);
+        --gf-radius: 14px;
+        --gf-font: system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
+    }
+
+    .qc-cutting-page {
+        font-family: inherit;
+    }
+    .qc-cutting-page .page-wrap {
+        max-width: 1100px;
+        padding: .75rem .75rem 5.25rem;
+    }
+    .qcs-breadcrumb {
+        padding-top: 0;
+        margin-bottom: .5rem;
+        font-size: .78rem;
+        font-weight: 600;
+    }
+    .qcs-page-head {
+        background: var(--card);
+        border: 1px solid var(--line);
+        border-radius: 14px;
+        padding: 1rem 1.25rem;
+        margin-bottom: .75rem;
+        align-items: center;
+    }
+    .qcs-page-title {
+        font-size: 1.02rem;
+        letter-spacing: -.01em;
+    }
+    .qcs-page-meta {
+        gap: .45rem;
+        margin-top: .25rem;
+    }
+    .qcs-meta-item {
+        font-size: .8rem;
+        font-weight: 500;
+    }
+    .qcs-badge,
+    .qcs-lot-pill,
+    .qcs-bundle-pill {
+        border-radius: 999px;
+        letter-spacing: 0;
+        text-transform: none;
+    }
+    .qcs-link-chip,
+    .qcs-link-chip-outline,
+    .qcs-link-chip-danger,
+    .qcs-btn-save,
+    .qcs-btn-cancel,
+    .qcs-modal .qcs-modal-btn {
+        border-radius: 999px;
+        font-family: inherit;
+        letter-spacing: 0;
+        box-shadow: none;
+    }
+    .qcs-link-chip {
+        height: 32px;
+        background: transparent;
+        color: var(--gf-mid);
+        border: 1px solid var(--gf-line);
+    }
+    .qcs-link-chip:hover,
+    .qcs-link-chip-outline:hover {
+        background: rgba(148,163,184,.08);
+        color: var(--gf-ink);
+        opacity: 1;
+    }
+    .qcs-section {
+        border-radius: 14px;
+        box-shadow: none;
+        padding: 1rem 1.25rem;
+        margin-bottom: .75rem;
+    }
+    .qcs-section-title {
+        font-size: .78rem;
+        font-weight: 700;
+        letter-spacing: .04em;
+        margin-bottom: .75rem;
+    }
+    .qcs-step-dot {
+        width: 18px;
+        height: 18px;
+    }
+    .qcs-step-dot.is-current {
+        box-shadow: none;
+    }
+    .qcs-field-input,
+    .qcs-qty-input,
+    .qcs-notes-input,
+    .qcs-lot-input,
+    .qcs-modal .qcs-modal-field {
+        border-radius: 8px;
+        border-width: 1px;
+        box-shadow: none !important;
+        font-family: inherit;
+    }
+    .qcs-qty-input,
+    .qcs-lot-input {
+        font-family: ui-monospace, SFMono-Regular, Menlo, Consolas, "Liberation Mono", monospace;
+    }
+    .qcs-table thead th {
+        font-size: .78rem;
+        font-weight: 600;
+        letter-spacing: .04em;
+        padding: .5rem .65rem;
+        background: transparent;
+    }
+    .qcs-table tbody td {
+        padding: .5rem .65rem;
+    }
+    .qcs-table tbody tr:hover,
+    .qcs-table tbody tr.row-has-reject:hover {
+        background: rgba(148,163,184,.04);
+    }
+    .qcs-bundle-pill {
+        height: 22px;
+        background: var(--card);
+        color: var(--gf-mid);
+        border: 1px solid rgba(148,163,184,.3);
+    }
+    .qcs-item-name {
+        font-size: .82rem;
+        font-weight: 600;
+    }
+    .qcs-summary {
+        margin-top: .75rem;
+        padding: .75rem 1rem;
+        border-radius: 14px;
+        background: transparent;
+        border: 1px solid var(--gf-line);
+    }
+    .qcs-action-bar {
+        background: var(--card);
+        backdrop-filter: none;
+        -webkit-backdrop-filter: none;
+        box-shadow: none;
+    }
+    .qcs-action-inner {
+        max-width: 1100px;
+    }
+    .qcs-btn-save {
+        height: 40px;
+        min-width: 132px;
+        background: #16a34a;
+    }
+    .qcs-btn-cancel {
+        height: 40px;
+    }
+    .qcs-alert {
+        border-radius: 14px;
+        font-weight: 600;
+    }
+    .qcs-modal .modal-content {
+        border-radius: 14px;
+        box-shadow: none;
+        font-family: inherit;
+    }
+
+    /* ── Mobile ──────────────────────────────────────── */
+    @media (max-width: 767.98px) {
         .qc-cutting-page .page-wrap {
-            max-width: 1080px;
-            margin-inline: auto;
-            padding: 1rem 1rem 4rem
+            padding: 0 8px 96px;
+        }
+        .qcs-breadcrumb,
+        .qcs-stepper,
+        .qcs-head-actions,
+        .qcs-page-meta + .qcs-page-meta,
+        .qcs-alert-info,
+        .qcs-action-info {
+            display: none !important;
+        }
+        .qcs-page-head {
+            position: sticky;
+            top: 0;
+            z-index: 50;
+            margin: 0 -8px 8px;
+            padding: 10px 10px;
+            background: var(--gf-white);
+            border-bottom: 1px solid var(--gf-line);
+        }
+        body[data-theme="dark"] .qcs-page-head {
+            background: var(--gf-white);
+        }
+        .qcs-page-title {
+            font-size: 16px;
+            letter-spacing: 0;
+        }
+        .qcs-page-title code {
+            font-size: .9em;
+        }
+        .qcs-page-meta {
+            gap: 6px;
+            margin-top: 5px;
+        }
+        .qcs-meta-item {
+            font-size: 11px;
+        }
+        .qcs-meta-dot {
+            display: none;
+        }
+        .qcs-badge {
+            height: 21px;
+            padding: 0 7px;
+            border-radius: 7px;
+            font-size: 9px;
+            letter-spacing: 0;
+        }
+        .qcs-field-grid { grid-template-columns: 1fr; gap: 10px; }
+        .qcs-section {
+            border-radius: 10px;
+            padding: 10px;
+            margin-bottom: 8px;
+            box-shadow: none;
+        }
+        .qcs-section[style*="padding:0"] {
+            padding: 0 !important;
+        }
+        .qcs-section-title {
+            margin-bottom: 8px;
+            font-size: 9px;
+            letter-spacing: .04em;
+        }
+        .qcs-section-title svg {
+            display: none;
         }
 
-        body[data-theme="light"] .qc-cutting-page .page-wrap {
-            background: radial-gradient(circle at top left, rgba(59, 130, 246, .12) 0, rgba(45, 212, 191, .10) 26%, #f9fafb 60%)
+        .qcs-hide-mobile { display: none !important; }
+
+        .qcs-table-wrap {
+            overflow-x: visible;
+        }
+        .qcs-table {
+            font-size: 12px;
+            white-space: normal;
+            table-layout: fixed;
+        }
+        .qcs-table thead th {
+            padding: 7px 5px;
+            font-size: 8px;
+            letter-spacing: .03em;
+        }
+        .qcs-table tbody td {
+            padding: 7px 5px;
+        }
+        .qcs-table tbody td:nth-child(5) {
+            text-align: right !important;
+            padding-right: 8px;
+        }
+        .qcs-table thead th:nth-child(6),
+        .qcs-table tbody td:nth-child(6),
+        .qcs-table thead th:nth-child(8),
+        .qcs-table tbody td:nth-child(8) {
+            display: none;
+        }
+        .qcs-table thead th:nth-child(1) { width: 42px; }
+        .qcs-table thead th:nth-child(2) { width: auto; }
+        .qcs-table thead th:nth-child(3),
+        .qcs-table thead th:nth-child(4) { width: 46px; }
+        .qcs-table thead th:nth-child(5) { width: 92px; }
+        .qcs-bundle-pill {
+            height: 24px;
+            padding: 0 7px;
+            border-radius: 7px;
+            font-size: 10px;
+        }
+        .qcs-item-code {
+            font-size: 11px;
+            white-space: normal;
+            overflow-wrap: anywhere;
+        }
+        .qcs-lot-ref {
+            display: none;
+        }
+        .qcs-qty-display {
+            font-size: 12px;
+        }
+        .qcs-qty-input {
+            width: 86px;
+            max-width: 100%;
+            height: 42px;
+            border-radius: 8px;
+            font-size: 16px;
+            text-align: center;
+        }
+        .qcs-qty-input.is-reject {
+            background: var(--gf-rej-soft);
+            border-color: rgba(220,38,38,.22);
+        }
+        .qcs-row-btn {
+            width: 34px;
+            height: 34px;
+            border-radius: 8px;
+        }
+        .qcs-lot-input { width: 80px; }
+
+        .qcs-summary {
+            margin-top: 8px;
+            padding: 10px 12px;
+            border-radius: 10px;
+            background: transparent;
+            gap: 6px;
+        }
+        .qcs-summary-label {
+            display: none;
+        }
+        .qcs-summary-values {
+            width: 100%;
+            justify-content: space-around;
+            gap: 8px;
+        }
+        .qcs-summary-num {
+            font-size: 17px;
         }
 
-        body[data-theme="dark"] .qc-cutting-page .page-wrap {
-            background: radial-gradient(circle at top left, rgba(59, 130, 246, .20) 0, rgba(45, 212, 191, .18) 30%, #020617 70%)
+        .qcs-lot-usage-section {
+            display: none;
         }
 
-        .card {
-            background: var(--card);
-            border-radius: 16px;
-            border: 1px solid rgba(148, 163, 184, .35);
-            box-shadow: 0 12px 30px rgba(15, 23, 42, .20)
+        .qcs-action-bar {
+            padding: 8px 10px calc(8px + env(safe-area-inset-bottom, 0px));
+            box-shadow: none;
         }
-
-        .card-soft {
-            background: color-mix(in srgb, var(--card) 84%, var(--line) 16%)
+        .qcs-action-inner {
+            display: block;
         }
-
-        .mono {
-            font-variant-numeric: tabular-nums;
-            font-family: ui-monospace, SFMono-Regular, Menlo, Consolas
+        .qcs-btn-group {
+            width: 100%;
         }
-
-        .pill {
-            display: inline-flex;
-            align-items: center;
-            gap: .25rem;
-            padding: .15rem .6rem;
-            border-radius: 999px;
-            font-size: .78rem;
-            border: 1px solid var(--line);
-            background: rgba(15, 23, 42, .01)
+        .qcs-btn-save {
+            width: 100%;
+            height: 46px;
+            border-radius: 10px;
+            box-shadow: none;
         }
-
-        .badge-soft {
-            border-radius: 999px;
-            padding: .2rem .6rem;
-            font-size: .75rem
+        .qcs-btn-save svg {
+            display: none;
         }
+        .qcs-btn-cancel { display: none; }
 
-        .section-title {
-            font-size: .88rem;
-            font-weight: 600;
-            text-transform: uppercase;
-            letter-spacing: .04em
+        .qcs-lot-input[readonly] {
+            background: var(--gf-soft);
+            border-color: var(--gf-line);
+            cursor: default;
         }
-
-        .field-label {
-            font-size: .8rem;
-            font-weight: 600;
-            text-transform: uppercase;
-            letter-spacing: .04em
-        }
-
-        .small-muted {
-            font-size: .8rem;
-            color: var(--muted)
-        }
-
-        .qc-table thead th {
-            font-size: .8rem;
-            text-transform: uppercase;
-            letter-spacing: .04em
-        }
-
-        /* STATUS STEPPER */
-        .status-stepper {
-            display: flex;
-            align-items: center;
-            gap: .75rem;
-            font-size: .78rem
-        }
-
-        .status-step {
-            display: flex;
-            align-items: center;
-            gap: .35rem
-        }
-
-        .status-dot {
-            width: 18px;
-            height: 18px;
-            border-radius: 999px;
-            border: 2px solid rgba(148, 163, 184, .7);
-            background: transparent
-        }
-
-        .status-dot.active {
-            background: #22c55e33;
-            border-color: #22c55e;
-            box-shadow: 0 0 0 1px #22c55e44
-        }
-
-        .status-dot.current {
-            background: #2563eb33;
-            border-color: #2563eb;
-            box-shadow: 0 0 0 1px #2563eb55
-        }
-
-        .status-label {
-            text-transform: uppercase;
-            letter-spacing: .08em;
-            font-size: .72rem;
-            color: #6b7280
-        }
-
-        .status-label.current {
-            color: #2563eb;
-            font-weight: 600
-        }
-
-        .status-label.done {
-            color: #16a34a;
-            font-weight: 600
-        }
-
-        .status-separator {
-            flex: 0 0 26px;
-            height: 1px;
-            background: linear-gradient(to right, rgba(148, 163, 184, .7), transparent)
-        }
-
-        /* Highlight baris yang ada reject */
-        .row-has-reject {
-            background: rgba(248, 113, 113, .03)
-        }
-
-        .row-has-reject .input-reject {
-            border-color: rgba(248, 113, 113, .8);
-            background-color: rgba(248, 113, 113, .08)
-        }
-
-        .row-has-reject .qc-card-header {
-            border-left: 3px solid rgba(248, 113, 113, .7);
-            padding-left: .45rem
-        }
-
-        .table-wrap {
-            overflow-x: auto
-        }
-
-        .lot-usage-table tbody tr {
-            background: #fff
-        }
-
-        /* Adjust modal helper */
-        .modal .help-soft {
-            font-size: .82rem;
-            color: var(--muted)
-        }
-
-        .modal .hint-box {
-            border: 1px solid rgba(148, 163, 184, .35);
-            border-radius: 12px;
-            padding: .6rem .75rem;
-            background: color-mix(in srgb, var(--card) 90%, var(--line) 10%)
-        }
-
-        @media (max-width: 767.98px) {
-            .qc-cutting-page .page-wrap {
-                padding-inline: .5rem
-            }
-
-            .qc-table-mobile {
-                font-size: .8rem;
-                white-space: nowrap
-            }
-
-            .qc-table-mobile th,
-            .qc-table-mobile td {
-                padding: .35rem .4rem
-            }
-
-            .qc-summary-inline {
-                display: flex;
-                flex-wrap: wrap;
-                gap: .25rem .6rem;
-                font-size: .78rem
-            }
-
-            .status-stepper {
-                flex-wrap: wrap;
-                gap: .4rem .75rem
-            }
-
-            .status-separator {
-                display: none
-            }
-
-            .lot-usage-table tbody tr {
-                background: #fff
-            }
-
-            .lot-usage-table .input-lot-used[readonly] {
-                background: #f3f4f6;
-                border-color: rgba(148, 163, 184, .9);
-                cursor: default
-            }
-
-            .lot-usage-table {
-                min-width: 0
-            }
-
-            .lot-usage-table th:first-child,
-            .lot-usage-table td:first-child {
-                min-width: 150px
-            }
-
-            .lot-mobile-item {
-                font-size: .78rem;
-                font-weight: 700;
-                line-height: 1.2;
-                white-space: normal
-            }
-
-            .lot-mobile-meta {
-                display: block;
-                margin-top: .12rem;
-                font-size: .66rem;
-                line-height: 1.2;
-                color: var(--muted);
-                font-weight: 500;
-                white-space: normal
-            }
-        }
-    </style>
+    }
+</style>
 @endpush
 
 @section('content')
@@ -261,18 +1210,19 @@
 
         $defaultQcDate = old('qc_date', optional($cuttingJob->qc_date ?? ($cuttingJob->date ?? now()))->toDateString());
 
-        $statusClass =
-            [
-                'draft' => 'secondary',
-                'cut' => 'primary',
-                'qc_ok' => 'success',
-                'qc_mixed' => 'warning',
-                'qc_reject' => 'danger',
-                'sent_to_qc' => 'info',
-                'qc_done' => 'success',
-            ][$cuttingJob->status] ?? 'secondary';
-
         $status = $cuttingJob->status;
+
+        $badgeClass = [
+            'draft' => 'secondary',
+            'cut' => 'primary',
+            'qc_ok' => 'success',
+            'qc_mixed' => 'warning',
+            'qc_reject' => 'danger',
+            'sent_to_qc' => 'info',
+            'cut_sent_to_qc' => 'info',
+            'qc_done' => 'success',
+        ][$status] ?? 'secondary';
+
         $stepCurrent = 1;
         if (in_array($status, ['draft', 'cut', 'cut_sent_to_qc', 'sent_to_qc'], true)) {
             $stepCurrent = 2;
@@ -299,15 +1249,6 @@
         }
 
         $canCancelQc = $isOwner && $hasExistingQc && Route::has('production.qc.cutting.cancel');
-
-        /**
-         * ✅ IMPORTANT: Route yang BENAR untuk view ini
-         * Pakai yang sudah kamu set:
-         * Route::post('/cutting/{cuttingJob}/bundles/{bundle}/adjust', ...)->name('production.qc.cutting.bundle_adjust');
-         *
-         * Maka Route::has(...) dan route(...) HARUS pakai:
-         *  - production.qc.cutting.bundle_adjust
-         */
         $canAdjustQc =
             $isOwner &&
             $hasExistingQc &&
@@ -318,127 +1259,90 @@
     <div class="qc-cutting-page">
         <div class="page-wrap">
 
-            {{-- HEADER JOB --}}
-            <div class="card card-soft p-3 mb-3">
-                {{-- DESKTOP --}}
-                <div class="d-none d-md-flex justify-content-between align-items-center gap-3">
-                    <div>
-                        <div class="section-title mb-1">QC Cutting</div>
-                        <h1 class="h5 mb-1 mono">{{ $cuttingJob->code }}</h1>
-                        <div class="small-muted">
-                            LOT {{ $lot?->code ?? '-' }} • {{ $lot?->item?->code ?? '-' }} • Gudang
-                            {{ $warehouse?->code ?? '-' }}
-                        </div>
+            {{-- BREADCRUMB --}}
+            <div class="qcs-breadcrumb">
+                <a href="{{ route('production.qc.index', ['stage' => 'cutting']) }}">QC</a>
+                <span>/</span>
+                <span>QC Cutting</span>
+            </div>
 
-                        @if ($jobLots->count() > 0)
-                            <div class="mt-1 small-muted">
-                                LOT dipakai:
-                                @foreach ($jobLots as $jl)
-                                    <span class="pill mono">
-                                        {{ $jl->lot?->code ?? 'LOT?' }}
-                                        (rencana {{ number_format($jl->planned_fabric_qty, 2, ',', '.') }})
-                                    </span>
-                                @endforeach
-                            </div>
-                        @endif
-
-                        <div class="status-stepper mt-2">
-                            <div class="status-step">
-                                <div
-                                    class="status-dot {{ $step1State === 'current' ? 'current' : ($step1State === 'done' ? 'active' : '') }}">
-                                </div>
-                                <div
-                                    class="status-label {{ $step1State === 'current' ? 'current' : ($step1State === 'done' ? 'done' : '') }}">
-                                    Cutting Selesai</div>
-                            </div>
-                            <div class="status-separator"></div>
-                            <div class="status-step">
-                                <div
-                                    class="status-dot {{ $step2State === 'current' ? 'current' : ($step2State === 'done' ? 'active' : '') }}">
-                                </div>
-                                <div
-                                    class="status-label {{ $step2State === 'current' ? 'current' : ($step2State === 'done' ? 'done' : '') }}">
-                                    Input QC</div>
-                            </div>
-                            <div class="status-separator"></div>
-                            <div class="status-step">
-                                <div
-                                    class="status-dot {{ $step3State === 'current' ? 'current' : ($step3State === 'done' ? 'active' : '') }}">
-                                </div>
-                                <div
-                                    class="status-label {{ $step3State === 'current' ? 'current' : ($step3State === 'done' ? 'done' : '') }}">
-                                    Hasil QC</div>
-                            </div>
-                        </div>
+            {{-- PAGE HEAD --}}
+            <div class="qcs-page-head">
+                <div>
+                    <h1 class="qcs-page-title">
+                        QC Cutting — <code>{{ $cuttingJob->code }}</code>
+                    </h1>
+                    <div class="qcs-page-meta">
+                        <span class="qcs-meta-item">LOT {{ $lot?->code ?? '-' }}</span>
+                        <span class="qcs-meta-dot"></span>
+                        <span class="qcs-meta-item">{{ $lot?->item?->code ?? '-' }}</span>
+                        <span class="qcs-meta-dot"></span>
+                        <span class="qcs-meta-item">Gudang {{ $warehouse?->code ?? '-' }}</span>
+                        <span class="qcs-meta-dot"></span>
+                        <span class="qcs-badge qcs-badge-{{ $badgeClass }}">{{ strtoupper($status) }}</span>
                     </div>
 
-                    <div class="d-flex flex-column align-items-end gap-2">
-                        <span class="badge bg-{{ $statusClass }} px-3 py-2">{{ strtoupper($cuttingJob->status) }}</span>
-
-                        <div class="d-flex gap-2 flex-wrap justify-content-end">
-                            <a href="{{ route('production.cutting_jobs.show', $cuttingJob) }}"
-                                class="btn btn-sm btn-outline-secondary">
-                                Kembali
-                            </a>
-
-                            @if ($canCancelQc)
-                                <form action="{{ route('production.qc.cutting.cancel', $cuttingJob) }}" method="post"
-                                    onsubmit="return confirm('Batalkan QC Cutting? Sistem akan reversal mutasi QC dan QC harus diinput ulang.')">
-                                    @csrf
-                                    <button type="submit" class="btn btn-sm btn-outline-danger">Batalkan QC</button>
-                                </form>
-                            @endif
+                    @if ($jobLots->count() > 0)
+                        <div class="qcs-page-meta" style="margin-top:4px;">
+                            <span class="qcs-meta-item">LOT dipakai:</span>
+                            @foreach ($jobLots as $jl)
+                                <span class="qcs-lot-pill">
+                                    {{ $jl->lot?->code ?? 'LOT?' }}
+                                    ({{ number_format($jl->planned_fabric_qty, 2, ',', '.') }})
+                                </span>
+                            @endforeach
                         </div>
+                    @endif
 
-                        @if ($hasExistingQc && !$isOwner)
-                            <div class="small-muted text-end" style="max-width:420px;">
-                                QC sudah tersimpan. Jika ada salah input setelah QC done, minta <b>OWNER</b> untuk
-                                <b>Batalkan QC</b> lalu input QC ulang.
-                            </div>
-                        @endif
+                    {{-- STEPPER --}}
+                    <div class="qcs-stepper">
+                        <div class="qcs-step">
+                            <div class="qcs-step-dot {{ $step1State === 'current' ? 'is-current' : ($step1State === 'done' ? 'is-done' : '') }}"></div>
+                            <div class="qcs-step-label {{ $step1State === 'current' ? 'is-current' : ($step1State === 'done' ? 'is-done' : '') }}">Cutting</div>
+                        </div>
+                        <div class="qcs-step-sep"></div>
+                        <div class="qcs-step">
+                            <div class="qcs-step-dot {{ $step2State === 'current' ? 'is-current' : ($step2State === 'done' ? 'is-done' : '') }}"></div>
+                            <div class="qcs-step-label {{ $step2State === 'current' ? 'is-current' : ($step2State === 'done' ? 'is-done' : '') }}">Input QC</div>
+                        </div>
+                        <div class="qcs-step-sep"></div>
+                        <div class="qcs-step">
+                            <div class="qcs-step-dot {{ $step3State === 'current' ? 'is-current' : ($step3State === 'done' ? 'is-done' : '') }}"></div>
+                            <div class="qcs-step-label {{ $step3State === 'current' ? 'is-current' : ($step3State === 'done' ? 'is-done' : '') }}">Hasil QC</div>
+                        </div>
                     </div>
                 </div>
 
-                {{-- MOBILE --}}
-                <div class="d-block d-md-none">
-                    {{-- Baris 1: code + badge + tombol --}}
-                    <div class="d-flex justify-content-between align-items-center gap-2 mb-2">
-                        <div>
-                            <div class="fw-semibold mono lh-1">{{ $cuttingJob->code }}</div>
-                            <div class="small-muted" style="font-size:.72rem">{{ $lot?->item?->code ?? '-' }} • {{ $warehouse?->code ?? '-' }}</div>
-                        </div>
-                        <div class="d-flex align-items-center gap-1">
-                            <span class="badge bg-{{ $statusClass }} px-2 py-1" style="font-size:.72rem">{{ strtoupper($cuttingJob->status) }}</span>
-                            <a href="{{ route('production.cutting_jobs.show', $cuttingJob) }}"
-                               class="btn btn-sm btn-outline-secondary px-2">←</a>
-                            @if ($canCancelQc)
-                                <form action="{{ route('production.qc.cutting.cancel', $cuttingJob) }}" method="post"
-                                    onsubmit="return confirm('Batalkan QC Cutting? Sistem akan reversal mutasi QC dan QC harus diinput ulang.')">
-                                    @csrf
-                                    <button type="submit" class="btn btn-sm btn-outline-danger px-2">✕</button>
-                                </form>
-                            @endif
-                        </div>
-                    </div>
-                    {{-- Baris 2: stepper --}}
-                    <div class="status-stepper">
-                        <div class="status-step">
-                            <div class="status-dot {{ $step1State === 'current' ? 'current' : ($step1State === 'done' ? 'active' : '') }}"></div>
-                            <div class="status-label {{ $step1State === 'current' ? 'current' : ($step1State === 'done' ? 'done' : '') }}">Cutting</div>
-                        </div>
-                        <div class="status-separator"></div>
-                        <div class="status-step">
-                            <div class="status-dot {{ $step2State === 'current' ? 'current' : ($step2State === 'done' ? 'active' : '') }}"></div>
-                            <div class="status-label {{ $step2State === 'current' ? 'current' : ($step2State === 'done' ? 'done' : '') }}">Input QC</div>
-                        </div>
-                        <div class="status-separator"></div>
-                        <div class="status-step">
-                            <div class="status-dot {{ $step3State === 'current' ? 'current' : ($step3State === 'done' ? 'active' : '') }}"></div>
-                            <div class="status-label {{ $step3State === 'current' ? 'current' : ($step3State === 'done' ? 'done' : '') }}">Hasil QC</div>
-                        </div>
-                    </div>
+                {{-- HEAD ACTIONS --}}
+                <div class="qcs-head-actions">
+                    <a href="{{ route('production.cutting_jobs.show', $cuttingJob) }}" class="qcs-link-chip">
+                        Lihat Job
+                        <svg width="11" height="11" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><path d="M7 17L17 7"/><path d="M9 7h8v8"/></svg>
+                    </a>
+                    @if ($canCancelQc)
+                        <form action="{{ route('production.qc.cutting.cancel', $cuttingJob) }}" method="post"
+                            onsubmit="return confirm('Batalkan QC Cutting? Sistem akan reversal mutasi QC dan QC harus diinput ulang.')">
+                            @csrf
+                            <button type="submit" class="qcs-link-chip qcs-link-chip-danger">
+                                <svg width="11" height="11" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><line x1="18" y1="6" x2="6" y2="18"/><line x1="6" y1="6" x2="18" y2="18"/></svg>
+                                Batalkan QC
+                            </button>
+                        </form>
+                    @endif
                 </div>
             </div>
+
+            {{-- ALERTS --}}
+            @if ($hasExistingQc && !$isOwner)
+                <div class="qcs-alert qcs-alert-info">
+                    QC sudah tersimpan. Jika ada salah input setelah QC done, minta <strong>OWNER</strong> untuk <strong>Batalkan QC</strong> lalu input QC ulang.
+                </div>
+            @endif
+            @if ($hasExistingQc && $isOwner)
+                <div class="qcs-alert qcs-alert-info">
+                    QC sudah tersimpan. Sebagai Owner, kamu bisa <strong>Batalkan QC</strong> atau <strong>Adjust</strong> per bundle.
+                </div>
+            @endif
 
             {{-- =========================
                  FORM QC NORMAL (PUT)
@@ -453,55 +1357,65 @@
                     <input type="hidden" name="notes_global" value="{{ old('notes_global') }}">
                 @endif
 
-                {{-- HEADER QC --}}
+                {{-- HEADER QC: Date & Operator --}}
                 @if (!in_array($userRole, ['operating', 'produksi'], true))
                     @php
                         $qcDateError  = $isErrorBag ? $errors->first('qc_date') : null;
                         $operatorError = $isErrorBag ? $errors->first('operator_id') : null;
                     @endphp
-                    <div class="card p-2 mb-3">
-                        <div class="d-flex align-items-center gap-2 flex-wrap">
-                            <div style="min-width:130px">
+                    <section class="qcs-section">
+                        <div class="qcs-section-title">
+                            <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><rect x="3" y="4" width="18" height="18" rx="2" ry="2"/><line x1="16" y1="2" x2="16" y2="6"/><line x1="8" y1="2" x2="8" y2="6"/><line x1="3" y1="10" x2="21" y2="10"/></svg>
+                            Info QC
+                        </div>
+                        <div class="qcs-field-grid">
+                            <div>
+                                <label class="qcs-field-label">Tanggal QC</label>
                                 <input type="date" name="qc_date" value="{{ $defaultQcDate }}"
-                                    class="form-control form-control-sm {{ $qcDateError ? 'is-invalid' : '' }}">
+                                    class="qcs-field-input {{ $qcDateError ? 'is-invalid' : '' }}">
+                                @if ($qcDateError)
+                                    <div class="qcs-error-text">{{ $qcDateError }}</div>
+                                @endif
                             </div>
-                            <input type="hidden" name="operator_id" value="{{ $defaultOperatorId }}">
-                            <div class="small-muted flex-fill">{{ $defaultOperatorLabel }}</div>
-                            <div class="d-flex gap-2 ms-auto">
-                                <div class="pill"><span>OK</span> <span class="mono" id="sum-ok">0</span></div>
-                                <div class="pill"><span>Reject</span> <span class="mono" id="sum-reject">0</span></div>
+                            <div>
+                                <label class="qcs-field-label">Operator QC</label>
+                                <input type="hidden" name="operator_id" value="{{ $defaultOperatorId }}">
+                                <div class="qcs-field-static">{{ $defaultOperatorLabel }}</div>
                             </div>
                         </div>
-                    </div>
+                    </section>
                 @endif
 
-                {{-- QC per bundle --}}
-                <div class="card p-3 mb-3">
-                    <div class="d-flex justify-content-between align-items-center mb-2">
-                        <div class="section-title mb-0">QC per Bundle</div>
+                {{-- QC per Bundle --}}
+                <section class="qcs-section" style="padding:0;overflow:hidden;">
+                    <div style="padding:16px 16px 0;">
+                        <div class="qcs-section-title" style="margin-bottom:0;">
+                            <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><path d="M16 4h2a2 2 0 012 2v14a2 2 0 01-2 2H6a2 2 0 01-2-2V6a2 2 0 012-2h2"/><rect x="8" y="2" width="8" height="4" rx="1" ry="1"/></svg>
+                            QC per Bundle
+                            <span class="qcs-section-title-count">({{ count($rows) }} bundle)</span>
+                        </div>
 
                         @if ($canAdjustQc)
-                            <div class="small-muted d-none d-md-block text-end" style="max-width:520px;">
-                                Owner dapat <b>Adjust</b> per bundle (buat audit trail adjustment). Adjustment seharusnya
-                                menolak jika WIP sudah kepakai sewing.
+                            <div class="qcs-owner-hint qcs-hide-mobile" style="margin:6px 0 12px;">
+                                Owner dapat <b>Adjust</b> per bundle (audit trail). Adjustment ditolak jika WIP sudah kepakai sewing.
                             </div>
                         @endif
                     </div>
 
-                    <div class="table-wrap">
+                    <div class="qcs-table-wrap">
                         @php $hasAnyReject = false; @endphp
 
-                        <table class="table table-sm align-middle mono qc-table qc-table-mobile">
+                        <table class="qcs-table">
                             <thead>
                                 <tr>
-                                    <th style="width:80px;">No</th>
-                                    <th>Item</th>
-                                    <th class="text-end" style="width:120px;">Cut</th>
-                                    <th class="text-end" style="width:120px;">OK</th>
-                                    <th class="text-center" style="width:120px;">Reject</th>
-                                    <th style="width:70px;"></th>
-                                    <th class="d-none d-md-table-cell" style="width:160px;">Catatan</th>
-                                    <th style="width:60px;"></th>
+                                    <th style="text-align:left">No</th>
+                                    <th style="text-align:left">Item</th>
+                                    <th style="text-align:right">Cut</th>
+                                    <th style="text-align:right">OK</th>
+                                    <th style="text-align:center;color:var(--gf-rej)">Reject</th>
+                                    <th></th>
+                                    <th class="qcs-hide-mobile" style="text-align:left">Catatan</th>
+                                    <th></th>
                                 </tr>
                             </thead>
 
@@ -538,14 +1452,13 @@
                                         $notesError = $isErrorBag ? $errors->first($fieldNotes) : null;
 
                                         $st = $row['status'] ?: 'cut';
-                                        $cls =
-                                            [
-                                                'cut' => 'secondary',
-                                                'qc_ok' => 'success',
-                                                'qc_reject' => 'danger',
-                                                'qc_mixed' => 'warning',
-                                                'qc_done' => 'success',
-                                            ][$st] ?? 'secondary';
+                                        $stBadge = [
+                                            'cut' => 'secondary',
+                                            'qc_ok' => 'success',
+                                            'qc_reject' => 'danger',
+                                            'qc_mixed' => 'warning',
+                                            'qc_done' => 'success',
+                                        ][$st] ?? 'secondary';
 
                                         $modalId = 'qcAdjustModal_' . $bundleId;
                                     @endphp
@@ -556,90 +1469,83 @@
                                         <input type="hidden" name="results[{{ $i }}][qty_ok]"
                                             class="input-ok-hidden" value="{{ old("results.$i.qty_ok", $qtyOkCalc) }}">
 
-                                        <td class="qc-card-header">
-                                            <div class="fw-semibold mono">#{{ $i + 1 }}</div>
-                                            <div class="small-muted mono d-none d-md-block">
+                                        <td>
+                                            <span class="qcs-bundle-pill">#{{ $i + 1 }}</span>
+                                            <div class="qcs-lot-ref qcs-hide-mobile">
                                                 Bundle #{{ $row['bundle_no'] ?? '-' }}
                                                 {{ $row['bundle_code'] ? '· ' . $row['bundle_code'] : '' }}
                                             </div>
                                         </td>
 
                                         <td>
-                                            <div class="d-none d-md-block">
-                                                <div class="fw-semibold mono">{{ $row['item_code'] }}</div>
-                                                @if (!empty($row['item_name']))
-                                                    <div class="small-muted">{{ $row['item_name'] }}</div>
-                                                @endif
-                                                @if (!empty($row['lot_code']))
-                                                    <div class="small-muted mono" style="font-size:.68rem;">{{ $row['lot_code'] }}</div>
-                                                @endif
-                                            </div>
-                                            <div class="d-block d-md-none">
-                                                <div>{{ $row['item_code'] }}</div>
-                                                @if (!empty($row['lot_code']))
-                                                    <div class="small-muted mono" style="font-size:.62rem;line-height:1.2;">{{ $row['lot_code'] }}</div>
-                                                @endif
-                                            </div>
+                                            <div class="qcs-item-code">{{ $row['item_code'] }}</div>
+                                            <div class="qcs-item-name qcs-hide-mobile">{{ $row['item_name'] ?? '' }}</div>
+                                            @if (!empty($row['lot_code']))
+                                                <div class="qcs-lot-ref">{{ $row['lot_code'] }}</div>
+                                            @endif
                                         </td>
 
-                                        <td class="text-end">{{ number_format($bundleQty, 0, ',', '.') }}</td>
-
-                                        <td class="text-end">
-                                            <span
-                                                class="cell-ok">{{ number_format(old("results.$i.qty_ok", $qtyOkCalc), 0, ',', '.') }}</span>
+                                        <td style="text-align:right">
+                                            <span class="qcs-qty-display">{{ number_format($bundleQty, 0, ',', '.') }}</span>
                                         </td>
 
-                                        <td class="text-center">
+                                        <td style="text-align:right">
+                                            <span class="qcs-qty-display cell-ok" style="color:var(--gf-ok)">{{ number_format(old("results.$i.qty_ok", $qtyOkCalc), 0, ',', '.') }}</span>
+                                        </td>
+
+                                        <td style="text-align:center">
                                             <input type="number" step="1" min="0" inputmode="numeric"
                                                 pattern="\d*" name="results[{{ $i }}][qty_reject]"
-                                                class="form-control form-control-sm text-center input-reject {{ $rejectError ? 'is-invalid' : '' }}"
+                                                class="qcs-qty-input is-reject input-reject {{ $rejectError ? 'is-invalid' : '' }}"
                                                 value="{{ old("results.$i.qty_reject", $qtyReject) }}"
                                                 data-bundle="{{ $bundleQty }}">
                                             @if ($rejectError)
-                                                <div class="invalid-feedback">{{ $rejectError }}</div>
+                                                <div class="qcs-error-text" style="font-size:10px;">{{ $rejectError }}</div>
                                             @endif
                                         </td>
 
                                         <td>
-                                            <span class="badge-soft bg-{{ $cls }}" style="font-size:.7rem;padding:.15rem .4rem">{{ $st }}</span>
+                                            <span class="qcs-badge qcs-badge-{{ $stBadge }}" style="font-size:8px;height:20px;padding:0 7px;">{{ $st }}</span>
                                         </td>
 
-                                        <td class="d-none d-md-table-cell">
+                                        <td class="qcs-hide-mobile">
                                             <input type="text" name="results[{{ $i }}][notes]"
-                                                class="form-control form-control-sm {{ $notesError ? 'is-invalid' : '' }}"
-                                                value="{{ old("results.$i.notes", $row['notes'] ?? '') }}">
+                                                class="qcs-notes-input {{ $notesError ? 'is-invalid' : '' }}"
+                                                value="{{ old("results.$i.notes", $row['notes'] ?? '') }}"
+                                                placeholder="catatan"
+                                                maxlength="200">
                                             @if ($notesError)
-                                                <div class="invalid-feedback">{{ $notesError }}</div>
+                                                <div class="qcs-error-text" style="font-size:10px;">{{ $notesError }}</div>
                                             @endif
                                         </td>
 
                                         {{-- AKSI: Simpan inline + Adjust (owner) --}}
-                                        <td class="text-end">
-                                            <div class="d-flex gap-1 justify-content-end align-items-center">
+                                        <td>
+                                            <div style="display:flex;gap:4px;justify-content:flex-end;align-items:center;">
                                                 <button type="button"
-                                                        class="btn btn-sm btn-success btn-save-bundle-edit px-2"
+                                                        class="qcs-row-btn qcs-row-btn-ok btn-save-bundle-edit"
                                                         title="Simpan"
                                                         data-id="{{ $bundleId }}"
                                                         data-code="{{ $row['bundle_code'] ?? '' }}">
                                                     ✓
                                                 </button>
                                                 @if ($canAdjustQc)
-                                                <button type="button" class="btn btn-sm btn-outline-warning px-2"
+                                                <button type="button" class="qcs-row-btn qcs-row-btn-adjust"
                                                     title="Adjust"
                                                     data-bs-toggle="modal" data-bs-target="#{{ $modalId }}">
                                                     ✏
                                                 </button>
 
-                                                <div class="modal fade" id="{{ $modalId }}" tabindex="-1"
+                                                {{-- Adjust Modal --}}
+                                                <div class="modal fade qcs-modal" id="{{ $modalId }}" tabindex="-1"
                                                     aria-hidden="true">
                                                     <div class="modal-dialog modal-dialog-centered">
                                                         <div class="modal-content">
                                                             <div class="modal-header">
                                                                 <div>
-                                                                    <div class="fw-semibold">QC Adjust • Bundle
-                                                                        #{{ $row['bundle_no'] ?? '-' }}</div>
-                                                                    <div class="small-muted mono">
-                                                                        {{ $row['bundle_code'] ?? '' }} • Cut
+                                                                    <div class="modal-title-main">QC Adjust · Bundle #{{ $row['bundle_no'] ?? '-' }}</div>
+                                                                    <div class="modal-title-sub">
+                                                                        {{ $row['bundle_code'] ?? '' }} · Cut
                                                                         {{ number_format($bundleQty, 0, ',', '.') }} pcs
                                                                     </div>
                                                                 </div>
@@ -647,75 +1553,66 @@
                                                                     data-bs-dismiss="modal" aria-label="Close"></button>
                                                             </div>
 
-                                                            {{-- ✅ route parameter HARUS Model binding: $bundle (CuttingJobBundle) --}}
                                                             <form
                                                                 action="{{ route('production.qc.cutting.bundle_adjust', [$cuttingJob, $bundleId]) }}"
                                                                 method="post" class="qc-adjust-form">
                                                                 @csrf
 
                                                                 <div class="modal-body">
-                                                                    <div class="hint-box mb-3">
-                                                                        <div class="help-soft">
-                                                                            Aturan: <b>OK + Reject ≤ Cut</b>.
-                                                                            Adjustment ini untuk koreksi QC yang sudah
-                                                                            terlanjur <b>qc_done</b>.
-                                                                            Sistem idealnya <b>menolak</b> jika WIP sudah
-                                                                            kepakai sewing.
-                                                                        </div>
+                                                                    <div class="qcs-hint-box" style="margin-bottom:14px;">
+                                                                        Aturan: <b>OK + Reject ≤ Cut</b>.
+                                                                        Adjustment ini untuk koreksi QC yang sudah
+                                                                        terlanjur <b>qc_done</b>.
+                                                                        Sistem idealnya <b>menolak</b> jika WIP sudah
+                                                                        kepakai sewing.
                                                                     </div>
 
                                                                     <input type="hidden" name="qc_date"
                                                                         value="{{ $defaultQcDate }}">
 
-                                                                    <div class="row g-3">
-                                                                        <div class="col-6">
-                                                                            <label class="field-label mb-1">Qty OK</label>
+                                                                    <div style="display:grid;grid-template-columns:1fr 1fr;gap:12px;">
+                                                                        <div>
+                                                                            <label class="qcs-field-label">Qty OK</label>
                                                                             <input type="number"
-                                                                                class="form-control input-adjust-ok"
+                                                                                class="qcs-modal-field input-adjust-ok"
                                                                                 name="qty_ok" min="0"
                                                                                 step="1" inputmode="numeric"
                                                                                 value="{{ (int) $qtyOkExisting }}"
                                                                                 data-max="{{ $bundleQty }}">
-                                                                            <div class="help-soft mt-1">Default dari QC
-                                                                                terakhir.</div>
+                                                                            <div style="font-size:10px;color:var(--gf-mid);font-weight:600;margin-top:4px;">Default dari QC terakhir.</div>
                                                                         </div>
 
-                                                                        <div class="col-6">
-                                                                            <label class="field-label mb-1">Qty
-                                                                                Reject</label>
+                                                                        <div>
+                                                                            <label class="qcs-field-label">Qty Reject</label>
                                                                             <input type="number"
-                                                                                class="form-control input-adjust-reject"
+                                                                                class="qcs-modal-field input-adjust-reject"
                                                                                 name="qty_reject" min="0"
                                                                                 step="1" inputmode="numeric"
                                                                                 value="{{ (int) $qtyRejectExisting }}"
                                                                                 data-max="{{ $bundleQty }}">
-                                                                            <div class="help-soft mt-1">Sisa dari Cut.
-                                                                            </div>
+                                                                            <div style="font-size:10px;color:var(--gf-mid);font-weight:600;margin-top:4px;">Sisa dari Cut.</div>
                                                                         </div>
                                                                     </div>
 
-                                                                    <div class="mt-3">
-                                                                        <label class="field-label mb-1">Catatan Adjust
-                                                                            (opsional)
-                                                                        </label>
-                                                                        <input type="text" class="form-control"
+                                                                    <div style="margin-top:14px;">
+                                                                        <label class="qcs-field-label">Catatan Adjust (opsional)</label>
+                                                                        <input type="text" class="qcs-modal-field"
                                                                             name="notes"
                                                                             placeholder="mis: salah input qty OK"
                                                                             value="">
                                                                     </div>
 
-                                                                    <div class="text-danger small mt-2 qc-adjust-warning"
+                                                                    <div class="qcs-warn-text qc-adjust-warning"
                                                                         style="display:none;">
-                                                                        ⚠️ Nilai OK+Reject melebihi Cut. Sistem akan
-                                                                        mengunci ke batas maksimum.
+                                                                        ⚠️ Nilai OK+Reject melebihi Cut. Sistem akan mengunci ke batas maksimum.
                                                                     </div>
                                                                 </div>
 
                                                                 <div class="modal-footer">
                                                                     <button type="button"
-                                                                        class="btn btn-outline-secondary"
+                                                                        class="qcs-modal-btn qcs-modal-btn-outline"
                                                                         data-bs-dismiss="modal">Batal</button>
-                                                                    <button type="submit" class="btn btn-warning"
+                                                                    <button type="submit" class="qcs-modal-btn qcs-modal-btn-warn"
                                                                         onclick="return confirm('Simpan QC Adjust untuk bundle ini? Pastikan WIP belum kepakai sewing.')">
                                                                         Simpan Adjust
                                                                     </button>
@@ -734,39 +1631,63 @@
                     </div>
 
                     @php $resultsError = $isErrorBag ? $errors->first('results') : null; @endphp
-                    @if ($resultsError)
-                        <div class="text-danger small mt-2">{{ $resultsError }}</div>
-                    @endif
 
-                    <div id="qc-warning" class="text-danger small mt-2" style="display:none;">
-                        ⚠️ Qty Reject tidak boleh melebihi Qty Cutting. Nilai otomatis dikunci ke batas maksimum.
+                    {{-- Warnings --}}
+                    <div style="padding:0 16px;">
+                        @if ($resultsError)
+                            <div class="qcs-error-text">{{ $resultsError }}</div>
+                        @endif
+
+                        <div id="qc-warning" class="qcs-warn-text" style="display:none;">
+                            ⚠️ Qty Reject tidak boleh melebihi Qty Cutting. Nilai otomatis dikunci ke batas maksimum.
+                        </div>
+
+                        @if ($hasAnyReject)
+                            <div class="qcs-warn-text">
+                                ⚠️ Terdapat bundle dengan reject. Pastikan alasan reject sudah terisi dengan jelas.
+                            </div>
+                        @endif
                     </div>
 
-                    @if ($hasAnyReject)
-                        <div class="text-warning small mt-2">
-                            ⚠️ Terdapat bundle dengan reject. Pastikan alasan reject sudah terisi dengan jelas (cek di
-                            desktop jika perlu).
+                    {{-- SUMMARY --}}
+                    <div style="padding:0 16px 16px;">
+                        <div class="qcs-summary">
+                            <div>
+                                <div class="qcs-summary-label">Ringkasan QC</div>
+                            </div>
+                            <div class="qcs-summary-values">
+                                <div class="qcs-summary-stat">
+                                    <div class="qcs-summary-num is-ok" id="sum-ok">0</div>
+                                    <div class="qcs-summary-tag">OK</div>
+                                </div>
+                                <div class="qcs-summary-stat">
+                                    <div class="qcs-summary-num is-reject" id="sum-reject">0</div>
+                                    <div class="qcs-summary-tag">Reject</div>
+                                </div>
+                            </div>
                         </div>
-                    @endif
-                </div>
+                    </div>
+                </section>
 
                 {{-- MULTI-LOT --}}
                 @if ($jobLots->count() > 0)
-                    <div class="card p-3 mb-4">
-                        <div class="d-flex justify-content-between align-items-center mb-2">
-                            <div class="section-title mb-0">Pemakaian Kain per LOT</div>
+                    <section class="qcs-section qcs-lot-usage-section" style="padding:0;overflow:hidden;">
+                        <div style="padding:16px 16px 0;">
+                            <div class="qcs-section-title" style="margin-bottom:0;">
+                                <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><path d="M21 16V8a2 2 0 00-1-1.73l-7-4a2 2 0 00-2 0l-7 4A2 2 0 003 8v8a2 2 0 001 1.73l7 4a2 2 0 002 0l7-4A2 2 0 0021 16z"/></svg>
+                                Pemakaian Kain per LOT
+                            </div>
                         </div>
 
-                        <div class="table-wrap">
-                            <table class="table table-sm align-middle mono lot-usage-table">
+                        <div class="qcs-table-wrap">
+                            <table class="qcs-table">
                                 <thead>
                                     <tr>
-                                        <th style="width: 150px;"><span class="d-none d-md-inline">LOT</span><span class="d-md-none">Bahan</span></th>
-                                        <th class="d-none d-md-table-cell">Item</th>
-                                        <th class="text-end" style="width: 130px;">Rencana</th>
-                                        <th class="text-end" style="width: 150px;">Dipakai (QC)</th>
-                                        <th class="text-end d-none d-md-table-cell" style="width: 130px;">Estimasi Sisa
-                                        </th>
+                                        <th style="text-align:left;width:150px;">LOT</th>
+                                        <th class="qcs-hide-mobile" style="text-align:left">Item</th>
+                                        <th style="text-align:right;width:130px;">Rencana</th>
+                                        <th style="text-align:right;width:150px;">Dipakai (QC)</th>
+                                        <th class="qcs-hide-mobile" style="text-align:right;width:130px;">Est. Sisa</th>
                                     </tr>
                                 </thead>
                                 <tbody>
@@ -797,35 +1718,37 @@
                                                 value="{{ $jobLot->id }}">
 
                                             <td>
-                                                <div class="fw-semibold d-none d-md-block">{{ $lotModel?->code ?? 'LOT ?' }}</div>
-                                                <div class="lot-mobile-item d-md-none">{{ $lotModel?->item?->name ?? '-' }}</div>
-                                                <span class="lot-mobile-meta d-md-none">
-                                                    {{ $lotModel?->code ?? '-' }} · {{ $lotModel?->item?->code ?? '-' }}
-                                                </span>
-                                                <div class="small-muted d-none d-md-block">
-                                                    {{ $lotModel?->item?->code ?? '-' }}</div>
+                                                <div class="qcs-item-code qcs-hide-mobile">{{ $lotModel?->code ?? 'LOT ?' }}</div>
+                                                <div style="display:none;" class="qcs-item-name" id="lot-mobile-{{ $j }}">{{ $lotModel?->item?->name ?? '-' }}</div>
+                                                <div class="qcs-lot-ref qcs-hide-mobile">{{ $lotModel?->item?->code ?? '-' }}</div>
+                                                {{-- Mobile --}}
+                                                <div class="qcs-item-name" style="display:none;" id="lot-mobile-name-{{ $j }}">{{ $lotModel?->item?->name ?? '-' }}</div>
+                                                <div class="qcs-lot-ref" style="font-size:10px;">
+                                                    <span class="qcs-hide-mobile" style="display:none;">{{ $lotModel?->code ?? '-' }} · {{ $lotModel?->item?->code ?? '-' }}</span>
+                                                </div>
                                             </td>
 
-                                            <td class="d-none d-md-table-cell">
-                                                <div>{{ $lotModel?->item?->name ?? '-' }}</div>
-                                                <div class="small-muted">Gudang {{ $warehouse?->code ?? '-' }}</div>
+                                            <td class="qcs-hide-mobile">
+                                                <div class="qcs-item-name">{{ $lotModel?->item?->name ?? '-' }}</div>
+                                                <div class="qcs-lot-ref">Gudang {{ $warehouse?->code ?? '-' }}</div>
                                             </td>
 
-                                            <td class="text-end">{{ number_format($planned, 2, ',', '.') }}</td>
+                                            <td style="text-align:right">
+                                                <span class="qcs-qty-display" style="font-size:13px;">{{ number_format($planned, 2, ',', '.') }}</span>
+                                            </td>
 
-                                            <td class="text-end">
+                                            <td style="text-align:right">
                                                 <x-number-input name="lots[{{ $j }}][used_fabric_qty]"
                                                     mode="decimal" :value="$used" decimals="2" min="0"
-                                                    class="form-control form-control-sm text-end input-lot-used {{ $usedError ? 'is-invalid' : '' }}"
+                                                    class="qcs-lot-input input-lot-used {{ $usedError ? 'is-invalid' : '' }}"
                                                     data-planned="{{ $planned }}" />
                                                 @if ($usedError)
-                                                    <div class="invalid-feedback">{{ $usedError }}</div>
+                                                    <div class="qcs-error-text" style="font-size:10px;">{{ $usedError }}</div>
                                                 @endif
                                             </td>
 
-                                            <td class="text-end d-none d-md-table-cell">
-                                                <span
-                                                    class="lot-balance-desktop">{{ number_format($balance, 2, ',', '.') }}</span>
+                                            <td class="qcs-hide-mobile" style="text-align:right">
+                                                <span class="qcs-qty-display lot-balance-desktop" style="font-size:13px;">{{ number_format($balance, 2, ',', '.') }}</span>
                                             </td>
                                         </tr>
                                     @endforeach
@@ -833,55 +1756,65 @@
                             </table>
                         </div>
 
-                        @php $lotsError = $isErrorBag ? $errors->first('lots') : null; @endphp
-                        @if ($lotsError)
-                            <div class="text-danger small mt-2">{{ $lotsError }}</div>
-                        @endif
+                        <div style="padding:0 16px 12px;">
+                            @php $lotsError = $isErrorBag ? $errors->first('lots') : null; @endphp
+                            @if ($lotsError)
+                                <div class="qcs-error-text">{{ $lotsError }}</div>
+                            @endif
 
-                        <div id="lot-warning" class="text-danger small mt-2" style="display:none;">
-                            ⚠️ Pemakaian per LOT tidak boleh melebihi qty rencana. Nilai otomatis dikunci ke batas maksimum.
+                            <div id="lot-warning" class="qcs-warn-text" style="display:none;">
+                                ⚠️ Pemakaian per LOT tidak boleh melebihi qty rencana. Nilai otomatis dikunci ke batas maksimum.
+                            </div>
                         </div>
-                    </div>
+                    </section>
                 @endif
 
-                {{-- ACTIONS --}}
-                <div class="d-none d-md-flex justify-content-end mb-5 gap-2 flex-wrap">
-                    <a href="{{ route('production.cutting_jobs.show', $cuttingJob) }}"
-                        class="btn btn-outline-secondary">Batal</a>
-                    <button type="submit" class="btn btn-primary">Simpan Hasil QC</button>
-                </div>
-
-                <div class="d-block d-md-none mb-5">
-                    <div class="d-grid gap-2">
-                        <a href="{{ route('production.cutting_jobs.show', $cuttingJob) }}"
-                            class="btn btn-outline-secondary w-100">Batal</a>
-                        <button type="submit" class="btn btn-primary w-100">Simpan Hasil QC</button>
+                {{-- ACTION BAR --}}
+                <div class="qcs-action-bar">
+                    <div class="qcs-action-inner">
+                        <div class="qcs-action-info">
+                            <div class="qcs-action-label">QC Cutting</div>
+                            <div class="qcs-action-hint">WIP-CUT → WIP-SEW / REJ-CUT</div>
+                        </div>
+                        <div class="qcs-btn-group">
+                            <a href="{{ route('production.cutting_jobs.show', $cuttingJob) }}" class="qcs-btn-cancel">Batal</a>
+                            <button type="submit" class="qcs-btn-save">
+                                <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><polyline points="20 6 9 17 4 12"/></svg>
+                                Simpan QC
+                            </button>
+                        </div>
                     </div>
                 </div>
+
             </form>
 
             {{-- Modal Alasan Reject (shared, per bundle via JS) --}}
-            <div class="modal fade" id="modalAlasanReject" tabindex="-1" aria-hidden="true">
+            <div class="modal fade qcs-modal" id="modalAlasanReject" tabindex="-1" aria-hidden="true">
                 <div class="modal-dialog modal-dialog-centered">
                     <div class="modal-content">
                         <div class="modal-header">
                             <div>
-                                <div class="fw-semibold" id="modalAlasanTitle">Simpan QC Bundle</div>
-                                <div class="small-muted mono" id="modalAlasanMeta"></div>
+                                <div class="modal-title-main" id="modalAlasanTitle">Simpan QC Bundle</div>
+                                <div class="modal-title-sub" id="modalAlasanMeta"></div>
                             </div>
                             <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
                         </div>
                         <div class="modal-body">
-                            <div class="mb-3">
-                                <div class="help mb-1">Reject: <span id="modalAlasanRejectQty" class="mono fw-semibold text-danger">0</span> pcs</div>
+                            <div style="margin-bottom:12px;">
+                                <span style="font-size:13px;font-weight:700;">Reject: </span>
+                                <span id="modalAlasanRejectQty" style="font-family:var(--gf-mono);font-weight:900;color:var(--gf-rej);">0</span>
+                                <span style="font-size:12px;font-weight:600;color:var(--gf-mid);"> pcs</span>
                             </div>
-                            <label class="field-label mb-1">Alasan Reject <span class="text-muted fw-normal">(opsional jika tidak ada reject)</span></label>
-                            <input type="text" id="modalAlasanInput" class="form-control"
+                            <label class="qcs-field-label">
+                                Alasan Reject
+                                <span style="font-weight:500;text-transform:none;letter-spacing:0;color:var(--gf-mid);">(opsional jika tidak ada reject)</span>
+                            </label>
+                            <input type="text" id="modalAlasanInput" class="qcs-modal-field"
                                    placeholder="mis: bolong, kotor, salah ukuran">
                         </div>
                         <div class="modal-footer">
-                            <button type="button" class="btn btn-outline-secondary" data-bs-dismiss="modal">Batal</button>
-                            <button type="button" class="btn btn-success" id="modalAlasanConfirm">Simpan</button>
+                            <button type="button" class="qcs-modal-btn qcs-modal-btn-outline" data-bs-dismiss="modal">Batal</button>
+                            <button type="button" class="qcs-modal-btn qcs-modal-btn-ok" id="modalAlasanConfirm">Simpan</button>
                         </div>
                     </div>
                 </div>

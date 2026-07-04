@@ -21,16 +21,16 @@
     --shp-warn:       #92400e;
 }
 .page-theme-shopee {
-    --shp-accent:     #f97316;
-    --shp-accent-2:   #ea580c;
-    --shp-accent-bg:  rgba(249,115,22,.08);
-    --shp-accent-ring:rgba(249,115,22,.22);
+    --shp-accent:     #334155;
+    --shp-accent-2:   #1f2937;
+    --shp-accent-bg:  rgba(148,163,184,.08);
+    --shp-accent-ring:rgba(148,163,184,.18);
 }
 .page-theme-tiktok {
-    --shp-accent:     #0f766e;
-    --shp-accent-2:   #0e7490;
-    --shp-accent-bg:  rgba(15,118,110,.08);
-    --shp-accent-ring:rgba(45,212,191,.22);
+    --shp-accent:     #334155;
+    --shp-accent-2:   #1f2937;
+    --shp-accent-bg:  rgba(148,163,184,.08);
+    --shp-accent-ring:rgba(148,163,184,.18);
 }
 
 /* ══════════════════════════════════════════════════
@@ -42,16 +42,16 @@
     padding: 0 .75rem 6rem;
 }
 body[data-theme="light"] .shp-wrap               { background: #f3f4f6; }
-body[data-theme="light"] .page-theme-shopee       { background: #fff7ed; }
-body[data-theme="light"] .page-theme-tiktok       { background: #ecfeff; }
+body[data-theme="light"] .page-theme-shopee       { background: #f3f4f6; }
+body[data-theme="light"] .page-theme-tiktok       { background: #f3f4f6; }
 body[data-theme="dark"]  .shp-wrap               {
-    background: radial-gradient(circle at top left, rgba(15,23,42,.9) 0, #020617 65%);
+    background: #020617;
 }
 body[data-theme="dark"]  .page-theme-shopee       {
-    background: radial-gradient(circle at top left, rgba(148,27,19,.9) 0, #020617 65%);
+    background: #020617;
 }
 body[data-theme="dark"]  .page-theme-tiktok       {
-    background: radial-gradient(circle at top left, rgba(8,47,73,.9) 0, #020617 65%);
+    background: #020617;
 }
 
 /* ══════════════════════════════════════════════════
@@ -106,8 +106,8 @@ body[data-theme="dark"] .shp-badge-draft {
     border: 1px solid rgba(148,163,184,.55);
     font-size: .73rem;
 }
-.page-theme-shopee .shp-badge-store { border-color: #f97316; color: #9a3412; background: rgba(254,215,170,.2); }
-.page-theme-tiktok .shp-badge-store { border-color: #06b6d4; color: #0f766e; background: rgba(207,250,254,.2); }
+.page-theme-shopee .shp-badge-store,
+.page-theme-tiktok .shp-badge-store { border-color: rgba(148,163,184,.55); color: #334155; background: transparent; }
 
 .shp-topbar-spacer { flex: 1; min-width: .5rem; }
 
@@ -147,7 +147,7 @@ body[data-theme="dark"] .shp-pill-accent { color: #93c5fd !important; }
     border: 1px solid var(--shp-accent);
     background: var(--shp-accent);
     color: #fff;
-    box-shadow: 0 4px 14px rgba(0,0,0,.2);
+    box-shadow: none;
     transition: background .12s, box-shadow .12s;
     white-space: nowrap;
 }
@@ -222,8 +222,8 @@ body[data-theme="dark"] .shp-kpi-card {
     color: var(--shp-accent);
 }
 body[data-theme="dark"] .shp-kpi-value { color: #93c5fd; }
-.page-theme-shopee .shp-kpi-value { color: #f97316; }
-.page-theme-tiktok .shp-kpi-value { color: #0d9488; }
+.page-theme-shopee .shp-kpi-value,
+.page-theme-tiktok .shp-kpi-value { color: #334155; }
 
 /* ══════════════════════════════════════════════════
    SHIPMENT INFO STRIP
@@ -261,16 +261,16 @@ body[data-theme="dark"] .shp-info-item b { color: #e2e8f0; }
     transition: border-color .15s, box-shadow .15s;
 }
 .shp-scan-card:focus-within {
-    border-color: var(--shp-accent);
-    box-shadow: 0 0 0 4px var(--shp-accent-ring), 0 8px 28px rgba(15,23,42,.1);
+    border-color: rgba(100,116,139,.55);
+    box-shadow: none;
 }
 body[data-theme="dark"] .shp-scan-card {
     border-color: rgba(30,64,175,.5);
     box-shadow: 0 12px 36px rgba(15,23,42,.85);
 }
 body[data-theme="dark"] .shp-scan-card:focus-within {
-    border-color: var(--shp-accent);
-    box-shadow: 0 0 0 4px var(--shp-accent-ring), 0 12px 36px rgba(15,23,42,.85);
+    border-color: rgba(148,163,184,.35);
+    box-shadow: none;
 }
 
 .shp-scan-header {
@@ -324,8 +324,8 @@ body[data-theme="dark"] .shp-scan-input {
 }
 body[data-theme="dark"] .shp-scan-input::placeholder { color: #334155; }
 .shp-scan-input:focus {
-    border-color: var(--shp-accent);
-    box-shadow: 0 0 0 3px var(--shp-accent-ring);
+    border-color: rgba(71,85,105,.75);
+    box-shadow: none;
     outline: none;
 }
 
@@ -539,10 +539,10 @@ body[data-theme="dark"] .item-name { color: #94a3b8; }
     user-select: none;
 }
 .qty-display:hover {
-    background: var(--shp-accent-bg);
-    border-color: var(--shp-accent);
-    box-shadow: 0 0 0 2.5px var(--shp-accent-ring);
-    transform: translateY(-1px);
+    background: rgba(148,163,184,.08);
+    border-color: rgba(100,116,139,.55);
+    box-shadow: none;
+    transform: none;
 }
 body[data-theme="dark"] .qty-display {
     background: rgba(15,23,42,.95);
@@ -550,9 +550,9 @@ body[data-theme="dark"] .qty-display {
     color: #e2e8f0;
 }
 body[data-theme="dark"] .qty-display:hover {
-    background: rgba(30,64,175,.45);
-    border-color: #38bdf8;
-    box-shadow: 0 0 0 2.5px rgba(56,189,248,.35);
+    background: rgba(148,163,184,.08);
+    border-color: rgba(148,163,184,.35);
+    box-shadow: none;
 }
 
 .qty-edit-form { display: inline-flex; align-items: center; gap: .3rem; }
@@ -619,6 +619,432 @@ body[data-theme="dark"] .btn-del:hover { background: rgba(127,29,29,.55); }
 }
 .shp-toast-ok  { background: #15803d; color: #f0fdf4; }
 .shp-toast-err { background: #b91c1c; color: #fee2e2; }
+
+/* Compact neutral override */
+.shp-wrap,
+.page-theme-shopee,
+.page-theme-tiktok,
+body[data-theme="light"] .shp-wrap,
+body[data-theme="light"] .page-theme-shopee,
+body[data-theme="light"] .page-theme-tiktok,
+body[data-theme="dark"] .shp-wrap,
+body[data-theme="dark"] .page-theme-shopee,
+body[data-theme="dark"] .page-theme-tiktok {
+    background: transparent !important;
+}
+.shp-wrap {
+    max-width: 1040px;
+    padding: .75rem .75rem 4rem;
+}
+.shp-topbar {
+    padding: .45rem .75rem;
+    gap: .45rem;
+    background: var(--card, #fff);
+    border-bottom: 1px solid rgba(148,163,184,.18);
+    box-shadow: none;
+    backdrop-filter: none;
+    -webkit-backdrop-filter: none;
+}
+body[data-theme="dark"] .shp-topbar {
+    background: var(--card, #0f172a);
+    border-bottom-color: rgba(148,163,184,.18);
+}
+.shp-topbar-code {
+    font-size: .95rem;
+    letter-spacing: 0;
+}
+.shp-badge,
+.shp-pill {
+    border-radius: 7px;
+    padding: .18rem .48rem;
+    font-size: .68rem;
+    letter-spacing: 0;
+    text-transform: none;
+    background: transparent !important;
+    color: #64748b !important;
+    border: 1px solid rgba(148,163,184,.28) !important;
+}
+.shp-badge-store,
+.page-theme-shopee .shp-badge-store,
+.page-theme-tiktok .shp-badge-store,
+.shp-pill-accent {
+    color: #334155 !important;
+    background: transparent !important;
+    border-color: rgba(148,163,184,.28) !important;
+}
+body[data-theme="dark"] .shp-badge,
+body[data-theme="dark"] .shp-pill,
+body[data-theme="dark"] .shp-badge-store,
+body[data-theme="dark"] .shp-pill-accent {
+    color: #cbd5e1 !important;
+    border-color: rgba(148,163,184,.25) !important;
+}
+.btn-shp-submit,
+.btn-shp-outline,
+.btn-shp-ghost,
+.btn-rekon {
+    border-radius: 7px !important;
+    letter-spacing: 0;
+    text-transform: none;
+    box-shadow: none !important;
+}
+.btn-shp-submit {
+    padding: .34rem .78rem;
+    font-size: .76rem;
+    font-weight: 700;
+    background: #334155 !important;
+    border-color: #334155 !important;
+}
+.btn-shp-submit:hover {
+    background: #1f2937 !important;
+    border-color: #1f2937 !important;
+}
+.btn-shp-outline,
+.btn-shp-ghost,
+.btn-rekon {
+    padding: .28rem .62rem !important;
+    font-size: .74rem !important;
+    color: #475569 !important;
+    background: transparent !important;
+    border: 1px solid rgba(148,163,184,.35) !important;
+}
+.btn-shp-outline:hover,
+.btn-shp-ghost:hover,
+.btn-rekon:hover {
+    background: rgba(148,163,184,.08) !important;
+    color: #111827 !important;
+}
+.shp-kpi-grid {
+    gap: .45rem;
+    margin-top: .55rem;
+}
+.shp-kpi-card {
+    border-radius: 8px;
+    padding: .55rem .7rem;
+    box-shadow: none !important;
+}
+.shp-kpi-label {
+    font-size: .6rem;
+    letter-spacing: .02em;
+    margin-bottom: .18rem;
+}
+.shp-kpi-value {
+    font-size: 1.05rem;
+    color: #334155 !important;
+}
+body[data-theme="dark"] .shp-kpi-value { color: #e2e8f0 !important; }
+.shp-info-strip {
+    margin-top: .55rem;
+    padding: .45rem .65rem;
+    border-radius: 8px;
+    background: transparent !important;
+    gap: .35rem .75rem;
+}
+.shp-scan-card,
+.shp-table-card,
+.shp-error-panel {
+    border-radius: 8px;
+    box-shadow: none !important;
+}
+.shp-scan-card {
+    margin-top: .55rem;
+    padding: .75rem;
+    border: 1px solid rgba(148,163,184,.22);
+}
+.shp-scan-card:focus-within,
+body[data-theme="dark"] .shp-scan-card:focus-within {
+    border-color: rgba(100,116,139,.55);
+    box-shadow: none !important;
+}
+.shp-scan-header {
+    margin-bottom: .42rem;
+}
+.shp-scan-label {
+    letter-spacing: .04em;
+}
+.shp-scan-counter {
+    color: #64748b !important;
+    font-weight: 600;
+}
+.shp-scan-input {
+    border-radius: 8px;
+    border: 1px solid rgba(148,163,184,.35);
+    padding: .48rem .7rem;
+    font-size: 1.25rem;
+    letter-spacing: .08em;
+}
+.shp-scan-input:focus {
+    border-color: rgba(71,85,105,.75);
+    box-shadow: none;
+}
+.shp-scan-input::placeholder {
+    font-size: .92rem;
+}
+.shp-last-scan,
+.shp-scan-error {
+    margin-top: .55rem;
+    padding: .55rem .7rem;
+    border-radius: 8px;
+    animation: none;
+}
+.shp-last-scan {
+    background: rgba(248,250,252,.88);
+    border: 1px solid rgba(148,163,184,.22);
+}
+.shp-ls-icon,
+.shp-scan-error-icon {
+    display: none;
+}
+.shp-ls-code {
+    font-size: .95rem;
+    color: #334155;
+}
+.shp-ls-name {
+    font-size: .78rem;
+}
+.shp-ls-qty {
+    font-size: 1.18rem;
+    color: #334155;
+}
+.shp-error-panel {
+    margin-top: .55rem;
+    padding: .75rem;
+    border: 1px solid rgba(148,163,184,.28);
+    background: transparent;
+    color: #475569;
+}
+.shp-stock-table-wrap {
+    border-radius: 8px;
+    border-color: rgba(148,163,184,.22);
+}
+.shp-stock-table-wrap th {
+    background: rgba(248,250,252,.92);
+    color: #64748b;
+}
+.shp-table-card {
+    margin-top: .55rem;
+    border: 1px solid rgba(148,163,184,.18);
+}
+.shp-table-head,
+.shp-table-actions {
+    padding: .5rem .75rem;
+    gap: .45rem;
+}
+.shp-table-title,
+.shp-table thead th {
+    letter-spacing: .03em;
+}
+.lines-wrapper {
+    max-height: 50vh;
+}
+.shp-table thead th {
+    padding: .42rem .6rem;
+}
+.shp-table tbody td {
+    padding: .42rem .6rem;
+}
+.shp-table tbody tr:nth-child(even) {
+    background: transparent;
+}
+.item-code {
+    font-size: .9rem;
+    letter-spacing: 0;
+}
+.item-name {
+    font-size: .78rem;
+}
+.qty-display {
+    min-width: 58px;
+    padding: .2rem .55rem;
+    border-radius: 7px;
+    border-width: 1px;
+    font-size: .9rem;
+    box-shadow: none !important;
+}
+.qty-display:hover {
+    background: rgba(148,163,184,.08);
+    border-color: rgba(100,116,139,.55);
+    transform: none;
+    box-shadow: none;
+}
+.last-scanned-row td {
+    background: rgba(241,245,249,.9) !important;
+}
+.last-scanned-row td:first-child {
+    border-left: 2px solid #64748b;
+}
+.row-flash td {
+    animation: none;
+}
+.btn-del {
+    width: 28px;
+    height: 28px;
+    border-radius: 7px;
+    font-size: .78rem;
+    color: #64748b;
+    border-color: rgba(148,163,184,.35);
+}
+.btn-del:hover {
+    background: rgba(148,163,184,.08);
+    color: #991b1b;
+    border-color: rgba(185,28,28,.35);
+}
+.shp-flash {
+    border-radius: 8px;
+    padding: .5rem .7rem;
+    margin-top: .55rem;
+}
+.shp-toast {
+    border-radius: 8px;
+    box-shadow: none;
+}
+@media (max-width: 768px) {
+    .shp-wrap {
+        padding: .5rem .5rem 5rem;
+    }
+    .shp-topbar {
+        position: sticky;
+        padding: .5rem;
+        gap: .38rem;
+    }
+    .shp-topbar-code {
+        width: auto;
+        flex: 1 1 auto;
+        font-size: 1.05rem;
+        min-width: 145px;
+    }
+    .shp-topbar-spacer {
+        display: none;
+    }
+    .shp-badge,
+    .shp-topbar > .shp-pill:not(.shp-pill-accent) {
+        display: none !important;
+    }
+    .shp-badge,
+    .shp-pill {
+        font-size: .75rem;
+        padding: .24rem .5rem;
+    }
+    .shp-pill-accent {
+        order: 2;
+        margin-left: auto;
+    }
+    .btn-rekon {
+        order: 3;
+        flex: 1 1 auto;
+        text-align: center;
+    }
+    .btn-shp-submit,
+    .btn-shp-outline,
+    .btn-shp-ghost,
+    .btn-rekon {
+        min-height: 38px;
+        font-size: .82rem !important;
+        padding: .42rem .72rem !important;
+    }
+    #submitForm {
+        order: 4;
+        flex: 1 1 auto;
+    }
+    #submitForm .btn-shp-submit {
+        width: 100%;
+    }
+    .shp-kpi-grid {
+        display: none;
+    }
+    .shp-info-strip {
+        display: none;
+    }
+    .shp-scan-card {
+        margin-top: 0;
+        padding: .7rem;
+    }
+    .shp-scan-label,
+    .shp-scan-counter {
+        font-size: .74rem;
+    }
+    .shp-scan-input {
+        min-height: 54px;
+        font-size: 1.42rem;
+        padding: .62rem .72rem;
+        letter-spacing: .06em;
+    }
+    .shp-scan-input::placeholder {
+        font-size: 1rem;
+    }
+    .shp-last-scan,
+    .shp-scan-error {
+        font-size: .9rem;
+        padding: .65rem .75rem;
+    }
+    .shp-ls-code {
+        font-size: 1.05rem;
+    }
+    .shp-ls-name {
+        font-size: .86rem;
+    }
+    .shp-ls-qty {
+        font-size: 1.3rem;
+    }
+    .shp-table-head,
+    .shp-table-actions {
+        padding: .62rem .65rem;
+    }
+    .shp-table-actions {
+        display: none;
+    }
+    .shp-table-title {
+        display: none;
+    }
+    .shp-table-head .input-group {
+        width: 100% !important;
+    }
+    .shp-table-head .input-group-text,
+    .shp-table-head .form-control {
+        min-height: 40px;
+        font-size: .9rem;
+    }
+    .lines-wrapper {
+        max-height: 52vh;
+    }
+    .shp-table thead th {
+        padding: .5rem .55rem;
+        font-size: .76rem;
+    }
+    .shp-table thead th:first-child,
+    .shp-table tbody td:first-child {
+        display: none;
+    }
+    .shp-table tbody td {
+        padding: .55rem .55rem;
+    }
+    .item-code {
+        font-size: 1rem;
+    }
+    .item-name {
+        font-size: .86rem;
+    }
+    .qty-display {
+        min-width: 64px;
+        min-height: 38px;
+        font-size: 1rem;
+        padding: .28rem .6rem;
+    }
+    .qty-edit-input {
+        width: 78px;
+        min-height: 38px;
+        font-size: 1rem;
+    }
+    .qty-edit-save-btn,
+    .btn-del {
+        min-height: 38px;
+    }
+    .btn-del {
+        width: 36px;
+        height: 36px;
+        font-size: .9rem;
+    }
+}
 </style>
 @endpush
 
@@ -662,13 +1088,8 @@ body[data-theme="dark"] .btn-del:hover { background: rgba(127,29,29,.55); }
 
     {{-- Rekonsiliasi Pesanan (Opsi C) --}}
     <a href="{{ route('sales.shipments.rekon', $shipment) }}"
-       class="btn"
-       style="border-radius:999px;font-size:.78rem;font-weight:700;letter-spacing:.04em;
-              padding:.38rem 1.1rem;border:1.5px solid #6366f1;color:#4338ca;background:rgba(99,102,241,.08);
-              white-space:nowrap;text-decoration:none;transition:background .12s"
-       onmouseover="this.style.background='rgba(99,102,241,.16)'"
-       onmouseout="this.style.background='rgba(99,102,241,.08)'">
-        ⇄ Rekonsiliasi Pesanan
+       class="btn btn-rekon">
+        Rekonsiliasi
     </a>
 
     <form id="submitForm"
@@ -677,7 +1098,7 @@ body[data-theme="dark"] .btn-del:hover { background: rgba(127,29,29,.55); }
           onsubmit="return confirmSubmit(event)">
         @csrf
         <button type="submit" class="btn btn-shp-submit page-theme-{{ $scanTheme }}">
-            Simpan &amp; Kurangi Stok ↗
+            Simpan &amp; Kurangi Stok
         </button>
     </form>
 </div>
@@ -730,13 +1151,13 @@ body[data-theme="dark"] .btn-del:hover { background: rgba(127,29,29,.55); }
         @endif
         <span class="ms-auto"></span>
         <a href="{{ route('sales.shipments.show', $shipment) }}"
-           class="btn btn-shp-ghost">← Detail</a>
+           class="btn btn-shp-ghost">Detail</a>
     </div>
 
     {{-- ═════════════════ HERO SCAN CARD ═════════════════ --}}
     <div class="shp-scan-card">
         <div class="shp-scan-header">
-            <span class="shp-scan-label">⚡ Scan Barang</span>
+            <span class="shp-scan-label">Scan Barang</span>
             <span class="shp-scan-counter" id="sessionCounter">0 scan sesi ini</span>
         </div>
 
@@ -745,13 +1166,13 @@ body[data-theme="dark"] .btn-del:hover { background: rgba(127,29,29,.55); }
             @csrf
             <input type="text" name="scan_code"
                    class="form-control shp-scan-input" id="scanInput"
-                   placeholder="Arahkan scanner ke sini…"
+                   placeholder="Arahkan scanner ke sini"
                    autocomplete="off" spellcheck="false" required>
         </form>
 
         {{-- last scanned ticker --}}
         <div class="shp-last-scan" id="lastScanBox">
-            <span class="shp-ls-icon">✅</span>
+            <span class="shp-ls-icon"></span>
             <div>
                 <div class="shp-ls-code" id="lastScanCode">—</div>
                 <div class="shp-ls-name" id="lastScanName"></div>
@@ -764,7 +1185,7 @@ body[data-theme="dark"] .btn-del:hover { background: rgba(127,29,29,.55); }
 
         {{-- scan error ticker --}}
         <div class="shp-scan-error" id="scanErrorBox">
-            <span class="shp-scan-error-icon">⚠️</span>
+            <span class="shp-scan-error-icon"></span>
             <span id="scanErrorMsg">Scan gagal.</span>
         </div>
     </div>
@@ -773,7 +1194,7 @@ body[data-theme="dark"] .btn-del:hover { background: rgba(127,29,29,.55); }
     @if ($hasStockError)
         <div class="shp-error-panel">
             <div class="d-flex justify-content-between align-items-start gap-3 flex-wrap">
-                <div class="shp-error-title">⚠️ Stok WH-RTS tidak mencukupi</div>
+                <div class="shp-error-title">Stok WH-RTS tidak mencukupi</div>
                 <span class="shp-pill">Kurang: <b>{{ $stockInsufficient->count() }} barang</b></span>
             </div>
             <ul class="shp-error-list shp-error-copy mt-2">
@@ -821,7 +1242,7 @@ body[data-theme="dark"] .btn-del:hover { background: rgba(127,29,29,.55); }
                 </div>
                 @if ($lastScannedLineId)
                     <button type="button" class="btn btn-sm btn-shp-outline" id="btnJumpLast">
-                        ⤵ Terakhir
+                        Terakhir
                     </button>
                 @endif
             </div>
@@ -911,7 +1332,7 @@ body[data-theme="dark"] .btn-del:hover { background: rgba(127,29,29,.55); }
                                            class="form-control form-control-sm qty-edit-input"
                                            min="0" value="{{ $line->qty_scanned }}">
                                     <button type="submit"
-                                            class="btn btn-primary btn-sm qty-edit-save-btn">✔</button>
+                                            class="btn btn-secondary btn-sm qty-edit-save-btn">OK</button>
                                 </form>
                             </td>
                             <td class="text-end">
@@ -921,7 +1342,7 @@ body[data-theme="dark"] .btn-del:hover { background: rgba(127,29,29,.55); }
                                       data-line-id="{{ $line->id }}">
                                     @csrf
                                     @method('DELETE')
-                                    <button type="submit" class="btn-del" title="Hapus">🗑</button>
+                                    <button type="submit" class="btn-del" title="Hapus">x</button>
                                 </form>
                             </td>
                         </tr>
@@ -1061,7 +1482,9 @@ body[data-theme="dark"] .btn-del:hover { background: rgba(127,29,29,.55); }
     if (importPreviewForm && importFileInput) {
         importFileInput.addEventListener('change', function () {
             if (this.files && this.files.length > 0) importPreviewForm.submit();
+            else scheduleFocusScan({ force: true });
         });
+        importFileInput.addEventListener('cancel', () => scheduleFocusScan({ force: true }));
     }
 
     /* ── auto-hide flash ── */
@@ -1137,20 +1560,55 @@ body[data-theme="dark"] .btn-del:hover { background: rgba(127,29,29,.55); }
     }
 
     /* ── focus helpers ── */
-    function focusScan() {
-        if (scanInput) { scanInput.focus(); }
+    function isTypingField(el = document.activeElement) {
+        if (!el) return false;
+        const tag = (el.tagName || '').toLowerCase();
+        return tag === 'input' || tag === 'select' || tag === 'textarea' || el.isContentEditable;
+    }
+
+    function shouldKeepCurrentFocus() {
+        const el = document.activeElement;
+        if (!el || el === document.body || el === scanInput) return false;
+        if (el.closest?.('.modal.show')) return true;
+        if (el.closest?.('.qty-edit-form')) return true;
+        if (el === itemFilterInput || el === importFileInput) return true;
+        return false;
+    }
+
+    function focusScan(options = {}) {
+        if (!scanInput || document.hidden) return;
+        if (!options.force && shouldKeepCurrentFocus()) return;
+        try {
+            scanInput.focus({ preventScroll: options.preventScroll !== false });
+        } catch (e) {
+            scanInput.focus();
+        }
+    }
+
+    function scheduleFocusScan(options = {}) {
+        window.setTimeout(() => focusScan(options), options.delay ?? 60);
     }
 
     /* ── auto-refocus: any keydown on doc redirects to scan input ── */
     document.addEventListener('keydown', function (e) {
         /* skip if inside an input/select/textarea/contenteditable */
-        const tag = (document.activeElement?.tagName || '').toLowerCase();
-        if (tag === 'input' || tag === 'select' || tag === 'textarea' ||
-            document.activeElement?.isContentEditable) return;
+        if (isTypingField()) return;
         /* skip modifier combos */
         if (e.ctrlKey || e.metaKey || e.altKey) return;
         if (e.key.length !== 1) return;
-        focusScan();
+        focusScan({ force: true });
+    });
+
+    document.addEventListener('pointerup', function (e) {
+        const target = e.target;
+        if (target?.closest?.('input, textarea, select, button, a, .qty-display, .modal')) return;
+        scheduleFocusScan();
+    });
+
+    window.addEventListener('pageshow', () => scheduleFocusScan({ force: true, delay: 120 }));
+    window.addEventListener('focus', () => scheduleFocusScan({ delay: 120 }));
+    document.addEventListener('visibilitychange', () => {
+        if (!document.hidden) scheduleFocusScan({ force: true, delay: 120 });
     });
 
     /* Ctrl+Enter to submit */
@@ -1263,7 +1721,7 @@ body[data-theme="dark"] .btn-del:hover { background: rgba(127,29,29,.55); }
         if (!form || form.dataset.boundDelete === '1') return;
         form.addEventListener('submit', function (e) {
             e.preventDefault();
-            if (!confirm('Hapus baris ini?')) return;
+            if (!confirm('Hapus baris ini?')) { scheduleFocusScan({ force: true }); return; }
             const lineId = form.dataset.lineId;
             fetch(form.action, {
                 method: 'POST',
@@ -1303,12 +1761,21 @@ body[data-theme="dark"] .btn-del:hover { background: rgba(127,29,29,.55); }
                 row.style.display = (!term || code.includes(term) || name.includes(term)) ? '' : 'none';
             });
         });
+        itemFilterInput.addEventListener('keydown', function (e) {
+            if (e.key === 'Enter' || e.key === 'Escape') {
+                e.preventDefault();
+                this.blur();
+                scheduleFocusScan({ force: true });
+            }
+        });
+        itemFilterInput.addEventListener('blur', () => scheduleFocusScan({ force: true }));
     }
 
     /* ── jump to last ── */
     if (btnJumpLast && linesWrapper) {
         btnJumpLast.addEventListener('click', () => {
             if (lastScannedLineId) scrollToRow(lastScannedLineId, true);
+            scheduleFocusScan({ force: true });
         });
     }
 
@@ -1321,7 +1788,7 @@ body[data-theme="dark"] .btn-del:hover { background: rgba(127,29,29,.55); }
             '• ' + lines + ' jenis barang\n' +
             '• ' + qty + ' total qty\n\n' +
             'Stok WH-RTS akan dikurangi. Tidak bisa di-scan lagi.'
-        )) { e.preventDefault(); return false; }
+        )) { e.preventDefault(); scheduleFocusScan({ force: true }); return false; }
         return true;
     };
 
@@ -1383,14 +1850,14 @@ body[data-theme="dark"] .btn-del:hover { background: rgba(127,29,29,.55); }
                                     '<input type="hidden" name="_token" value="' + csrf + '">' +
                                     '<input type="hidden" name="_method" value="PATCH">' +
                                     '<input type="number" name="qty" class="form-control form-control-sm qty-edit-input" min="0" value="' + (line.qty_scanned || 0) + '">' +
-                                    '<button type="submit" class="btn btn-primary btn-sm qty-edit-save-btn">✔</button>' +
+                                    '<button type="submit" class="btn btn-secondary btn-sm qty-edit-save-btn">OK</button>' +
                                 '</form>' +
                             '</td>' +
                             '<td class="text-end">' +
                                 '<form action="' + delUrl + '" method="POST" class="d-inline js-delete-line-form" data-line-id="' + line.id + '">' +
                                     '<input type="hidden" name="_token" value="' + csrf + '">' +
                                     '<input type="hidden" name="_method" value="DELETE">' +
-                                    '<button type="submit" class="btn-del" title="Hapus">🗑</button>' +
+                                    '<button type="submit" class="btn-del" title="Hapus">x</button>' +
                                 '</form>' +
                             '</td>';
                         linesTbody.appendChild(row);
@@ -1434,6 +1901,7 @@ body[data-theme="dark"] .btn-del:hover { background: rgba(127,29,29,.55); }
         if (previewModalEl && shouldShowPreview && window.bootstrap?.Modal) {
             new bootstrap.Modal(previewModalEl).show();
         }
+        previewModalEl?.addEventListener('hidden.bs.modal', () => scheduleFocusScan({ force: true, delay: 120 }));
     });
 })();
 </script>

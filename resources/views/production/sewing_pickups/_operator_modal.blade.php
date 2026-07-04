@@ -61,6 +61,52 @@ $isOwner = auth()->user()?->isOwner()
 
         #btn-confirm-submit,
         #btn-confirm-submit * { color: #fff !important; }
+
+        .sp-meta-grid {
+            display:grid;
+            grid-template-columns:1fr 1fr;
+            gap:.55rem;
+            margin-bottom:.75rem;
+        }
+        .sp-meta-card {
+            border:1px solid rgba(148,163,184,.22);
+            background:rgba(148,163,184,.06);
+            border-radius:12px;
+            padding:.55rem .65rem;
+            min-width:0;
+        }
+        .sp-meta-label {
+            font-size:.62rem;
+            font-weight:900;
+            color:var(--muted);
+            text-transform:uppercase;
+            letter-spacing:.05em;
+            margin-bottom:.28rem;
+        }
+        .sp-meta-value {
+            min-height:31px;
+            display:flex;
+            align-items:center;
+            font-size:.82rem;
+            font-weight:900;
+            line-height:1.2;
+        }
+        .sp-meta-sub {
+            color:var(--muted);
+            font-size:.66rem;
+            font-weight:700;
+            margin-top:.1rem;
+            line-height:1.2;
+        }
+        #modal_pickup_date {
+            border-radius:10px;
+            font-size:.82rem;
+            font-weight:900;
+        }
+        @media (max-width:575.98px) {
+            .sp-meta-grid { grid-template-columns:1fr; gap:.4rem; }
+            .sp-meta-card { padding:.48rem .55rem; }
+        }
     </style>
 @endpush
 
@@ -78,6 +124,22 @@ $isOwner = auth()->user()?->isOwner()
 
                 {{-- ══ PHASE 1: Konfirmasi ══ --}}
                 <div id="phase-confirm">
+
+                    <div class="sp-meta-grid">
+                        <div class="sp-meta-card">
+                            <div class="sp-meta-label">Tanggal Ambil</div>
+                            <input type="date" id="modal_pickup_date" class="form-control form-control-sm">
+                        </div>
+                        <div class="sp-meta-card">
+                            <div class="sp-meta-label">WIP Tujuan</div>
+                            <div class="sp-meta-value">
+                                {{ $wipSewWarehouse?->code ?? 'WIP-SEW' }}
+                            </div>
+                            <div class="sp-meta-sub">
+                                {{ $wipSewWarehouse?->name ?? 'Sedang Jahit' }}
+                            </div>
+                        </div>
+                    </div>
 
                     {{-- Operator --}}
                     <x-modal-confirm-operator title="Operator Jahit" label="Pilih Operator" :required="true"
@@ -146,6 +208,7 @@ document.addEventListener('DOMContentLoaded', function () {
     const confirmLabel       = document.getElementById('btn-confirm-label');
     const backBtn            = document.getElementById('btn-step-back');
     const simpanCetakBtn     = document.getElementById('btn-simpan-cetak');
+    const modalPickupDate    = document.getElementById('modal_pickup_date');
 
     function setConfirmState(isLast) {
         if (confirmIcon) {
@@ -172,6 +235,15 @@ document.addEventListener('DOMContentLoaded', function () {
     const stepProg           = document.getElementById('sc-step-prog');
 
     const modal = new bootstrap.Modal(modalEl);
+    const formDateInput = form.querySelector('input[name="date"]');
+
+    if (modalPickupDate && formDateInput) {
+        modalPickupDate.value = formDateInput.value || new Date().toISOString().slice(0, 10);
+        modalPickupDate.addEventListener('change', () => {
+            formDateInput.value = modalPickupDate.value;
+            formDateInput.dispatchEvent(new Event('change', { bubbles: true }));
+        });
+    }
 
     /* ── state ── */
     let phase            = 'confirm';   // 'confirm' | 'supply'
@@ -216,6 +288,10 @@ document.addEventListener('DOMContentLoaded', function () {
         phase         = 'confirm';
         selectedLines = lines;
 
+        if (modalPickupDate && formDateInput) {
+            modalPickupDate.value = formDateInput.value || new Date().toISOString().slice(0, 10);
+        }
+
         phaseConfirm.style.display = '';
         phaseSupply.style.display  = 'none';
         modalTitle.textContent     = 'Konfirmasi Sewing Pickup';
@@ -224,7 +300,7 @@ document.addEventListener('DOMContentLoaded', function () {
         confirmBtn.disabled        = !operatorSelect.value;
 
         // Tanggal ambil dari input form utama
-        const dateRaw = form.querySelector('input[name="date"]')?.value || '';
+        const dateRaw = modalPickupDate?.value || form.querySelector('input[name="date"]')?.value || '';
         let dateFormatted = '';
         if (dateRaw) {
             const [y, m, d] = dateRaw.split('-');

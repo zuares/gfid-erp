@@ -6,7 +6,7 @@ use App\Models\CuttingJob;
 use App\Models\CuttingJobBundle;
 use App\Models\FinishingJob;
 use App\Models\QcResult;
-use App\Models\SewingJob;
+use App\Models\SewingReturn;
 use App\Models\Warehouse;
 use App\Services\Costing\FinishingRmHppService;
 use App\Services\Inventory\InventoryService;
@@ -127,9 +127,9 @@ class QcService
      * 2) QC SEWING
      * ============================================================
      */
-    public function saveSewingQc(SewingJob $job, array $payload): void
+    public function saveSewingQc(SewingReturn $sewingReturn, array $payload): void
     {
-        DB::transaction(function () use ($job, $payload) {
+        DB::transaction(function () use ($sewingReturn, $payload) {
 
             $qcDate = $payload['qc_date'];
             $operatorId = $payload['operator_id'] ?? null;
@@ -146,8 +146,15 @@ class QcService
                 throw new \RuntimeException('Warehouse WIP-SEW / WIP-FIN / REJ-SEW belum dikonfigurasi.');
             }
 
+            // Load bundles via return lines → pickup lines
+            $bundleIds = $sewingReturn->lines()
+                ->join('sewing_pickup_lines', 'sewing_return_lines.sewing_pickup_line_id', '=', 'sewing_pickup_lines.id')
+                ->pluck('sewing_pickup_lines.cutting_job_bundle_id')
+                ->filter()
+                ->unique();
+
             /** @var \Illuminate\Support\Collection<int, CuttingJobBundle> $bundleMap */
-            $bundleMap = $job->bundles()->get()->keyBy('id');
+            $bundleMap = CuttingJobBundle::whereIn('id', $bundleIds)->get()->keyBy('id');
 
             $totalProcessedByItem = []; // [item_id => total (OK+Reject)]
             $totalOkByItem = []; // [item_id => total OK]
@@ -214,7 +221,7 @@ class QcService
                     notes: $notes,
                     rejectReason: $rejectReason,
                     cuttingJobId: $bundle->cutting_job_id,
-                    sewingJobId: $job->id,
+                    sewingJobId: $sewingReturn->id,
                     finishingJobId: null,
                 );
 
@@ -278,8 +285,8 @@ class QcService
                         qty: $qtyProcessed,
                         date: $qcDate,
                         sourceType: 'sewing_qc_out',
-                        sourceId: $job->id,
-                        notes: "QC Sewing OUT {$qtyProcessed} pcs dari WIP-SEW untuk job {$job->code} (bundle #{$bundleId})",
+                        sourceId: $sewingReturn->id,
+                        notes: "QC Sewing OUT {$qtyProcessed} pcs dari WIP-SEW untuk return {$sewingReturn->code} (bundle #{$bundleId})",
                         allowNegative: false,
                         lotId: null,
                         unitCostOverride: $unitCostWipSewPerItem[$itemId] ?? null,
@@ -302,8 +309,8 @@ class QcService
                         qty: $qtyOkItem,
                         date: $qcDate,
                         sourceType: 'sewing_qc_in',
-                        sourceId: $job->id,
-                        notes: "QC Sewing IN WIP-FIN {$qtyOkItem} pcs untuk job {$job->code} (bundle #{$bundleId})",
+                        sourceId: $sewingReturn->id,
+                        notes: "QC Sewing IN WIP-FIN {$qtyOkItem} pcs untuk return {$sewingReturn->code} (bundle #{$bundleId})",
                         lotId: null,
                         unitCost: $unitCostWipSewPerItem[$itemId] ?? null,
                         affectLotCost: false,
@@ -325,14 +332,30 @@ class QcService
                         qty: $qtyRejectItem,
                         date: $qcDate,
                         sourceType: 'sewing_qc_reject',
-                        sourceId: $job->id,
-                        notes: "QC Sewing REJECT {$qtyRejectItem} pcs untuk job {$job->code} (bundle #{$bundleId})",
+                        sourceId: $sewingReturn->id,
+                        notes: "QC Sewing REJECT {$qtyRejectItem} pcs untuk return {$sewingReturn->code} (bundle #{$bundleId})",
                         lotId: null,
                         unitCost: $unitCostWipSewPerItem[$itemId] ?? null,
                         affectLotCost: false,
                         cuttingJobBundleId: $bundleId,
                     );
                 }
+            }
+
+            foreach ($okByBundleItem as $bundleId => $byItem) {
+                $qtyOkBundle = array_sum($byItem);
+                if ($qtyOkBundle <= 0) {
+                    continue;
+                }
+
+                $bundle = $bundleMap->get((int) $bundleId);
+                if (!$bundle) {
+                    continue;
+                }
+
+                $bundle->wip_warehouse_id = (int) $wipFinWarehouseId;
+                $bundle->wip_qty = (float) ($bundle->wip_qty ?? 0) + (float) $qtyOkBundle;
+                $bundle->save();
             }
         });
     }

@@ -231,42 +231,9 @@ class CuttingJobController extends Controller
         }
 
         // 2️⃣ Ambil LOT di gudang RM yang masih ada saldo (> 0)
-        //    LOT dengan saldo kurang dari kebutuhan BOM tetap bisa menyebabkan minus di RM
-        $lotStocks = $this->inventory->getAvailableLots(
-            warehouseId: $rmWarehouseId,
-            itemId: null,          // filter per item kain dilakukan di front-end (JS)
-            includeZeroBalance: false,
-        );
-        $lotStocks = $this->onlyMainRawMaterialLots($lotStocks);
-
-        // 2b️⃣ Cari supplier dari GRN pertama per LOT
-        $lotIds = $lotStocks->pluck('lot_id')->filter()->unique()->values()->all();
-        $lotSupplierMap = [];
-        if (!empty($lotIds)) {
-            $firstGrnPerLot = \DB::table('inventory_mutations')
-                ->select('lot_id', \DB::raw('MIN(source_id) as grn_id'))
-                ->whereIn('lot_id', $lotIds)
-                ->where('source_type', 'purchase_receipt')
-                ->where('direction', 'in')
-                ->groupBy('lot_id')
-                ->get()
-                ->keyBy('lot_id');
-
-            $grnIds = $firstGrnPerLot->pluck('grn_id')->filter()->unique()->values()->all();
-            if (!empty($grnIds)) {
-                $supplierByGrn = \DB::table('purchase_receipts')
-                    ->join('suppliers', 'purchase_receipts.supplier_id', '=', 'suppliers.id')
-                    ->whereIn('purchase_receipts.id', $grnIds)
-                    ->pluck('suppliers.name', 'purchase_receipts.id');
-
-                foreach ($firstGrnPerLot as $lotId => $row) {
-                    $supplierName = $supplierByGrn[$row->grn_id] ?? null;
-                    if ($supplierName) {
-                        $lotSupplierMap[$lotId] = $supplierName;
-                    }
-                }
-            }
-        }
+        //    LOT dengan saldo kurang dari kebutuhan BOM tetap bisa menyebabkan minus di RM.
+        $lotStocks = $this->availableCuttingLotStocks($rmWarehouseId);
+        $lotSupplierMap = $this->lotSupplierMap($lotStocks->pluck('lot_id')->filter()->unique()->values()->all());
 
         // 3️⃣ Data master item jadi (finished_good) untuk combobox di bundle
         $items = Item::query()
@@ -371,6 +338,63 @@ class CuttingJobController extends Controller
             'bomEditUrls'    => $bomEditUrls,
             'bomQuickUrls'   => $bomQuickUrls,
             'lastUsage'      => $lastUsage,
+        ]);
+    }
+
+    public function liveLots(Request $request)
+    {
+        $rmWarehouseId = Warehouse::where('code', 'RM')->value('id');
+        if (!$rmWarehouseId) {
+            return response()->json([
+                'ok' => false,
+                'message' => 'Warehouse RM belum dikonfigurasi.',
+            ], 422);
+        }
+
+        $lotStocks = $this->availableCuttingLotStocks((int) $rmWarehouseId);
+        $supplierMap = $this->lotSupplierMap($lotStocks->pluck('lot_id')->filter()->unique()->values()->all());
+
+        $groups = $lotStocks
+            ->groupBy(fn($row) => (int) $row->lot->item_id)
+            ->map(function ($rows, $itemId) use ($supplierMap) {
+                $first = $rows->first();
+                $item = $first->lot->item;
+                $warehouses = $rows->pluck('warehouse.code')->filter()->unique()->values();
+
+                return [
+                    'item_id' => (int) $itemId,
+                    'item_code' => (string) $item->code,
+                    'item_name' => (string) $item->name,
+                    'total_balance' => (float) $rows->sum('qty_balance'),
+                    'lot_count' => $rows->count(),
+                    'warehouses' => $warehouses,
+                    'lots' => $rows->map(function ($row) use ($supplierMap, $item) {
+                        $lot = $row->lot;
+                        $date = $lot?->purchased_at
+                            ?? $lot?->purchase_date
+                            ?? $lot?->received_at
+                            ?? $lot?->created_at;
+
+                        return [
+                            'lot_id' => (int) $row->lot_id,
+                            'lot_code' => (string) ($lot?->code ?? ('LOT#' . $row->lot_id)),
+                            'item_id' => (int) $item->id,
+                            'item_code' => (string) $item->code,
+                            'balance' => (float) $row->qty_balance,
+                            'warehouse_code' => (string) ($row->warehouse?->code ?? ''),
+                            'supplier_name' => $supplierMap[$row->lot_id] ?? null,
+                            'purchase_date' => $date ? \Illuminate\Support\Carbon::parse($date)->format('d/m/y') : null,
+                        ];
+                    })->values(),
+                ];
+            })
+            ->sortBy('item_code')
+            ->values();
+
+        return response()->json([
+            'ok' => true,
+            'updated_at' => now()->format('H:i:s'),
+            'groups' => $groups,
         ]);
     }
 
@@ -1177,6 +1201,51 @@ class CuttingJobController extends Controller
                 return $item && $item->role_code === ItemRole::RM;
             })
             ->values();
+    }
+
+    private function availableCuttingLotStocks(int $warehouseId)
+    {
+        return $this->onlyMainRawMaterialLots($this->inventory->getAvailableLots(
+            warehouseId: $warehouseId,
+            itemId: null,
+            includeZeroBalance: false,
+        ));
+    }
+
+    private function lotSupplierMap(array $lotIds): array
+    {
+        if (empty($lotIds)) {
+            return [];
+        }
+
+        $firstGrnPerLot = \DB::table('inventory_mutations')
+            ->select('lot_id', \DB::raw('MIN(source_id) as grn_id'))
+            ->whereIn('lot_id', $lotIds)
+            ->where('source_type', 'purchase_receipt')
+            ->where('direction', 'in')
+            ->groupBy('lot_id')
+            ->get()
+            ->keyBy('lot_id');
+
+        $grnIds = $firstGrnPerLot->pluck('grn_id')->filter()->unique()->values()->all();
+        if (empty($grnIds)) {
+            return [];
+        }
+
+        $supplierByGrn = \DB::table('purchase_receipts')
+            ->join('suppliers', 'purchase_receipts.supplier_id', '=', 'suppliers.id')
+            ->whereIn('purchase_receipts.id', $grnIds)
+            ->pluck('suppliers.name', 'purchase_receipts.id');
+
+        $map = [];
+        foreach ($firstGrnPerLot as $lotId => $row) {
+            $supplierName = $supplierByGrn[$row->grn_id] ?? null;
+            if ($supplierName) {
+                $map[$lotId] = $supplierName;
+            }
+        }
+
+        return $map;
     }
 
     private function capLotBalancesToOnHand(array $lotBalances, float $onHandQty): array

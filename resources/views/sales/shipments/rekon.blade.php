@@ -589,6 +589,373 @@ body[data-theme="dark"] .rk-sisa-name { color: #9ca3af; }
 .rk-empty-title { font-size: .92rem; font-weight: 600; color: #6b7280; }
 body[data-theme="dark"] .rk-empty-title { color: #94a3b8; }
 .rk-empty-sub { font-size: .8rem; margin-top: .3rem; }
+
+/* Compact neutral override, aligned with shipment edit */
+.page-theme-shopee,
+.page-theme-tiktok {
+    --shp-accent: #334155;
+    --shp-accent-2: #1f2937;
+    --shp-accent-bg: rgba(148,163,184,.08);
+    --shp-accent-ring: rgba(148,163,184,.18);
+}
+.rk-wrap,
+body[data-theme="light"] .rk-wrap,
+body[data-theme="dark"] .rk-wrap {
+    background: transparent !important;
+}
+.rk-wrap {
+    max-width: 1040px;
+    padding: .75rem .75rem 4rem;
+}
+.shp-topbar {
+    padding: .45rem .75rem;
+    gap: .45rem;
+    background: var(--card, #fff);
+    border-bottom: 1px solid rgba(148,163,184,.18);
+    box-shadow: none;
+    backdrop-filter: none;
+    -webkit-backdrop-filter: none;
+}
+body[data-theme="dark"] .shp-topbar {
+    background: var(--card, #0f172a);
+    border-bottom-color: rgba(148,163,184,.18);
+}
+.shp-topbar-code {
+    font-size: .95rem;
+    letter-spacing: 0;
+}
+.shp-badge,
+.shp-pill,
+.rk-phase,
+.rk-sku-chip,
+.rk-sbadge {
+    border-radius: 7px;
+    letter-spacing: 0;
+    text-transform: none;
+    box-shadow: none !important;
+}
+.shp-badge,
+.shp-pill {
+    padding: .18rem .48rem;
+    font-size: .68rem;
+    background: transparent !important;
+    color: #64748b !important;
+    border: 1px solid rgba(148,163,184,.28) !important;
+}
+.shp-pill-accent,
+.rk-phase.active,
+.rk-phase.done {
+    color: #334155 !important;
+    background: transparent !important;
+    border-color: rgba(148,163,184,.28) !important;
+}
+.btn-shp-submit,
+.btn-shp-outline,
+.rk-act-btn,
+.rk-sub-btn-pick {
+    border-radius: 7px !important;
+    letter-spacing: 0;
+    text-transform: none;
+    box-shadow: none !important;
+}
+.btn-shp-submit {
+    padding: .34rem .78rem;
+    font-size: .76rem;
+    font-weight: 700;
+    background: #334155 !important;
+    border-color: #334155 !important;
+}
+.btn-shp-submit:hover,
+.btn-shp-submit.active:hover {
+    background: #1f2937 !important;
+    border-color: #1f2937 !important;
+}
+.btn-shp-outline,
+.rk-act-btn,
+.rk-sub-btn-pick {
+    padding: .28rem .62rem !important;
+    font-size: .74rem !important;
+    color: #475569 !important;
+    background: transparent !important;
+    border: 1px solid rgba(148,163,184,.35) !important;
+}
+.btn-shp-outline:hover,
+.rk-act-btn:hover,
+.rk-act-btn.on,
+.rk-sub-btn-pick:hover {
+    background: rgba(148,163,184,.08) !important;
+    color: #111827 !important;
+}
+.rk-phases {
+    margin: .55rem 0;
+    gap: .28rem;
+}
+.rk-phase {
+    padding: .18rem .52rem;
+    font-size: .7rem;
+    background: transparent;
+    border: 1px solid rgba(148,163,184,.25);
+}
+.rk-sep {
+    display: none;
+}
+.rk-batch-bar,
+.shp-scan-card,
+.rk-order-card,
+.rk-sisa-card,
+.rk-modal {
+    border-radius: 8px;
+    box-shadow: none !important;
+}
+.rk-batch-bar {
+    padding: .5rem .65rem;
+    margin-bottom: .55rem;
+    gap: .32rem;
+}
+.rk-sku-chip {
+    padding: .16rem .45rem;
+    font-size: .72rem;
+    background: transparent;
+}
+.rk-sku-chip .q,
+.rk-sub-lbl,
+.rk-qty-val {
+    color: #334155;
+}
+.shp-scan-card {
+    padding: .75rem;
+    margin-bottom: .55rem;
+    border: 1px solid rgba(148,163,184,.22);
+}
+.shp-scan-card:focus-within,
+body[data-theme="dark"] .shp-scan-card:focus-within {
+    border-color: rgba(100,116,139,.55);
+    box-shadow: none !important;
+}
+.shp-scan-header {
+    margin-bottom: .42rem;
+}
+.shp-scan-label {
+    letter-spacing: .04em;
+}
+.shp-scan-counter {
+    color: #64748b !important;
+    font-weight: 600;
+}
+.shp-scan-input {
+    border-radius: 8px;
+    border: 1px solid rgba(148,163,184,.35);
+    padding: .48rem .7rem;
+    font-size: 1.25rem;
+    letter-spacing: .08em;
+}
+.shp-scan-input:focus {
+    border-color: rgba(71,85,105,.75);
+    box-shadow: none;
+}
+.shp-scan-input::placeholder {
+    font-size: .92rem;
+}
+.shp-ticker {
+    margin-top: .55rem;
+    padding: .55rem .7rem;
+    border-radius: 8px;
+    animation: none;
+}
+.rk-order-card {
+    margin-bottom: .5rem;
+    border: 1px solid rgba(148,163,184,.18);
+}
+.rk-order-card.decided-fulfill,
+.rk-order-card.decided-pending,
+.rk-order-card.decided-skip {
+    border-left-width: 2px;
+}
+.rk-order-hdr {
+    padding: .58rem .75rem;
+}
+.rk-order-body {
+    padding: .6rem .75rem .75rem;
+}
+.rk-order-no {
+    font-size: .9rem;
+}
+.rk-order-store {
+    border-radius: 7px;
+}
+.rk-tbl th {
+    padding: .34rem .45rem;
+}
+.rk-tbl td {
+    padding: .42rem .45rem;
+}
+.rk-action-strip {
+    margin-top: .55rem;
+    padding-top: .55rem;
+}
+.rk-sub-row,
+.rk-sub-fulfilled,
+.rk-sub-partial-row,
+.rk-sisa-row,
+.rk-modal-target {
+    border-radius: 8px;
+}
+.rk-modal-overlay {
+    backdrop-filter: none;
+}
+.rk-modal {
+    max-width: 480px;
+    animation: none;
+}
+.rk-modal-close {
+    border-radius: 7px;
+}
+.rk-modal-search input {
+    border-radius: 8px;
+}
+.rk-pool-item {
+    border-radius: 8px;
+}
+.rk-empty {
+    padding: 2.25rem 1rem;
+}
+.rk-empty-icon {
+    display: none;
+}
+.shp-toast {
+    border-radius: 8px;
+    box-shadow: none;
+}
+#restoreBanner button,
+.rk-modal-footer button {
+    border-radius: 7px !important;
+    box-shadow: none !important;
+}
+#reAnalisisBtn {
+    background: #334155 !important;
+    border-color: #334155 !important;
+    color: #fff !important;
+}
+#reAnalisisBtn:hover {
+    background: #1f2937 !important;
+    border-color: #1f2937 !important;
+}
+@media (max-width: 768px) {
+    .rk-wrap {
+        padding: .5rem .5rem 4.75rem;
+    }
+    .shp-topbar {
+        position: sticky;
+        padding: .5rem;
+        gap: .38rem;
+    }
+    .shp-topbar-code {
+        flex: 1 1 auto;
+        min-width: 145px;
+        font-size: 1.05rem;
+    }
+    .shp-topbar-spacer,
+    .shp-badge,
+    .shp-topbar > .shp-pill:not(.shp-pill-accent) {
+        display: none !important;
+    }
+    .shp-pill,
+    .btn-shp-outline,
+    .btn-shp-submit {
+        min-height: 38px;
+        font-size: .82rem !important;
+    }
+    .shp-pill-accent {
+        margin-left: auto;
+    }
+    .btn-shp-submit {
+        width: 100%;
+        order: 5;
+    }
+    .rk-phases,
+    .rk-batch-bar {
+        display: none;
+    }
+    #restoreBanner {
+        margin-top: .5rem !important;
+        padding: .55rem .65rem !important;
+        border-radius: 8px !important;
+    }
+    .shp-scan-card {
+        padding: .7rem;
+        margin-bottom: .5rem;
+    }
+    .shp-scan-label,
+    .shp-scan-counter {
+        font-size: .74rem;
+    }
+    .shp-scan-input {
+        min-height: 54px;
+        font-size: 1.42rem;
+        padding: .62rem .72rem;
+        letter-spacing: .06em;
+    }
+    .shp-scan-input::placeholder {
+        font-size: 1rem;
+    }
+    .rk-order-hdr {
+        padding: .62rem .65rem;
+    }
+    .rk-order-body {
+        padding: .55rem .65rem .7rem;
+    }
+    .rk-order-no {
+        width: 100%;
+    }
+    .rk-order-store,
+    .rk-order-chev {
+        display: none;
+    }
+    .rk-tbl th {
+        display: none;
+    }
+    .rk-tbl,
+    .rk-tbl tbody,
+    .rk-tbl tr,
+    .rk-tbl td {
+        display: block;
+        width: 100%;
+    }
+    .rk-tbl tr {
+        padding: .45rem 0;
+        border-bottom: 1px solid rgba(148,163,184,.12);
+    }
+    .rk-tbl td {
+        border: 0;
+        padding: .16rem 0;
+        font-size: .84rem;
+    }
+    .rk-action-strip {
+        gap: .4rem;
+    }
+    .rk-act-btn {
+        min-height: 36px;
+        flex: 1 1 auto;
+    }
+    .rk-modal-overlay {
+        align-items: flex-end;
+        padding: .5rem;
+    }
+    .rk-modal {
+        max-height: 86vh;
+        border-radius: 10px;
+    }
+    .rk-modal-hdr {
+        padding: .85rem .9rem .7rem;
+    }
+    .rk-modal-search,
+    .rk-modal-footer {
+        padding-inline: .85rem;
+    }
+    .rk-empty-title {
+        font-size: .9rem;
+    }
+}
 </style>
 @endpush
 
@@ -601,7 +968,7 @@ body[data-theme="dark"] .rk-empty-title { color: #94a3b8; }
 <div class="shp-topbar">
     <a href="{{ route('sales.shipments.edit', $shipment) }}" class="btn-shp-outline" style="text-decoration:none"
        title="Data rekonsiliasi tersimpan otomatis dan akan dipulihkan saat kembali ke halaman ini">
-        ← Scan Barang
+        Scan Barang
     </a>
     <span class="shp-topbar-code">{{ $shipment->code }}</span>
     <span class="shp-badge shp-badge-draft">Draft</span>
@@ -609,7 +976,7 @@ body[data-theme="dark"] .rk-empty-title { color: #94a3b8; }
     <span class="shp-pill">Batch <b>{{ $totalLines }}</b> SKU</span>
     <span class="shp-pill shp-pill-accent">Qty <b>{{ number_format($totalQty, 0, ',', '.') }}</b></span>
     <span class="shp-pill" id="topPillOrders" style="display:none">Pesanan <b id="topOrderCount">0</b></span>
-    <button id="topConfirmBtn" class="btn-shp-submit" disabled>✓ Konfirmasi</button>
+    <button id="topConfirmBtn" class="btn-shp-submit" disabled>Konfirmasi</button>
 </div>
 
 <div class="rk-wrap">
@@ -623,13 +990,13 @@ body[data-theme="dark"] .rk-empty-title { color: #94a3b8; }
                 style="border-radius:999px;border:1.5px solid;
                        background:var(--shp-accent);border-color:var(--shp-accent);color:#fff;
                        font-size:.75rem;font-weight:700;padding:.25rem .85rem;cursor:pointer;">
-            🔄 Re-Analisis Ulang
+            Re-Analisis Ulang
         </button>
         <button onclick="window.resetRekon()"
                 style="border-radius:999px;border:1.5px solid rgba(148,163,184,.4);
                        background:transparent;color:#6b7280;
                        font-size:.74rem;font-weight:700;padding:.25rem .75rem;cursor:pointer;">
-            ✕ Mulai Ulang
+            Mulai Ulang
         </button>
     </div>
 
@@ -659,16 +1026,15 @@ body[data-theme="dark"] .rk-empty-title { color: #94a3b8; }
     {{-- HERO SCAN CARD --}}
     <div class="shp-scan-card">
         <div class="shp-scan-header">
-            <span class="shp-scan-label">📷 Ketik atau Scan Nomor Pesanan, lalu tekan Enter</span>
+            <span class="shp-scan-label">Scan Nomor Pesanan</span>
             <span class="shp-scan-counter" id="scanCounter">0 pesanan</span>
         </div>
 
         <input type="text" id="orderInput" class="shp-scan-input"
-               placeholder="Scan barcode atau ketik nomor order, lalu Enter…"
+               placeholder="Scan barcode atau ketik nomor order, lalu Enter"
                autocomplete="off" spellcheck="false">
 
         <div class="shp-ticker shp-ticker-ok" id="tickerOk">
-            <span style="font-size:1.5rem;flex-shrink:0">📦</span>
             <div>
                 <div class="shp-tick-code" id="tickCode">—</div>
                 <div class="shp-tick-store" id="tickStore"></div>
@@ -676,10 +1042,10 @@ body[data-theme="dark"] .rk-empty-title { color: #94a3b8; }
             <div class="shp-tick-right" id="tickStatus"></div>
         </div>
         <div class="shp-ticker shp-ticker-warn" id="tickerWarn">
-            ⚠️ &nbsp;<span id="tickWarnMsg">Pesanan tidak ditemukan.</span>
+            <span id="tickWarnMsg">Pesanan tidak ditemukan.</span>
         </div>
         <div class="shp-ticker shp-ticker-err" id="tickerErr">
-            ⚠️ &nbsp;<span id="tickErrMsg">Terjadi kesalahan.</span>
+            <span id="tickErrMsg">Terjadi kesalahan.</span>
         </div>
     </div>
 
@@ -688,7 +1054,7 @@ body[data-theme="dark"] .rk-empty-title { color: #94a3b8; }
 
     {{-- EMPTY STATE --}}
     <div class="rk-empty" id="emptyState">
-        <div class="rk-empty-icon">📋</div>
+        <div class="rk-empty-icon"></div>
         <div class="rk-empty-title">Scan nomor pesanan untuk mulai rekonsiliasi</div>
         <div class="rk-empty-sub">Bisa dari barcode scanner atau ketik manual lalu tekan Enter</div>
     </div>
@@ -702,7 +1068,7 @@ body[data-theme="dark"] .rk-empty-title { color: #94a3b8; }
 <div class="rk-modal-overlay" id="drawerOverlay">
     <div class="rk-modal">
         <div class="rk-modal-hdr">
-            <span class="rk-modal-icon">⇄</span>
+            <span class="rk-modal-icon"></span>
             <div style="flex:1;min-width:0">
                 <div class="rk-modal-title">Pilih Item Pengganti</div>
                 <div class="rk-modal-sub">Dari sisa stok batch yang belum dialokasikan</div>
@@ -712,10 +1078,10 @@ body[data-theme="dark"] .rk-empty-title { color: #94a3b8; }
                     <span class="rk-modal-target-qty">−<span id="drawerNeedQty"></span> pcs</span>
                 </div>
             </div>
-            <button class="rk-modal-close" onclick="closeDrawer()">✕</button>
+            <button class="rk-modal-close" onclick="closeDrawer()">x</button>
         </div>
         <div class="rk-modal-search">
-            <input type="text" id="drawerSearch" placeholder="🔍  Cari kode atau nama barang…"
+            <input type="text" id="drawerSearch" placeholder="Cari kode atau nama barang"
                    oninput="filterDrawer(this.value)">
         </div>
         <div class="rk-modal-list" id="drawerList"></div>
@@ -762,7 +1128,7 @@ body[data-theme="dark"] .rk-empty-title { color: #94a3b8; }
                         style="flex:2;border-radius:999px;border:none;
                                background:var(--shp-accent,#2563eb);color:#fff;font-size:.82rem;
                                font-weight:800;padding:.38rem .9rem;cursor:pointer;">
-                    ✓ Konfirmasi Substitusi
+                    Konfirmasi Substitusi
                 </button>
             </div>
         </div>
@@ -839,7 +1205,7 @@ function clearState() {
 window.reAnalisis = async function reAnalisis() {
     if (!orders.length) return;
     const btn = document.getElementById('reAnalisisBtn');
-    if (btn) { btn.disabled = true; btn.textContent = '⏳ Re-analisis…'; }
+    if (btn) { btn.disabled = true; btn.textContent = 'Re-analisis...'; }
 
     const savedNos      = orders.map(o => o.no);
     const savedDecisions= {};
@@ -952,11 +1318,11 @@ function showTicker(which, data) {
 /* ── Status badge ── */
 function statusBadge(s) {
     const map = {
-        ready:    ['sb-ready',   '✓ Stok Cukup'],
-        partial:  ['sb-partial', '⚡ Stok Kurang'],
-        missing:  ['sb-missing', '✗ Stok Habis'],
-        pending:  ['sb-pending', '⏸ Ditunda'],
-        skip:     ['sb-skip',    '— Diabaikan'],
+        ready:    ['sb-ready',   'Stok Cukup'],
+        partial:  ['sb-partial', 'Stok Kurang'],
+        missing:  ['sb-missing', 'Stok Habis'],
+        pending:  ['sb-pending', 'Ditunda'],
+        skip:     ['sb-skip',    'Diabaikan'],
         not_found:['sb-notfound','? Tidak Ditemukan'],
     };
     const [cls, lbl] = map[s] || map['not_found'];
@@ -1027,7 +1393,7 @@ async function processOrder(no) {
             showTicker('ok', data);
             beep(true);
             const s = data.order.status;
-            toast(s === 'ready' ? 'ok' : 'warn', no + (s === 'ready' ? ' — semua item tersedia ✓' : s === 'partial' ? ' — stok kurang' : ' — item tidak ada di batch'));
+            toast(s === 'ready' ? 'ok' : 'warn', no + (s === 'ready' ? ' - semua item tersedia' : s === 'partial' ? ' - stok kurang' : ' - item tidak ada di batch'));
         } else {
             saveState();
             showTicker('warn', data);
@@ -1049,7 +1415,15 @@ async function processOrder(no) {
    RENDER
 ══════════════════════════════════════════════ */
 function renderAll() {
-    if (!orders.length) { emptyState.style.display = ''; orderList.innerHTML = ''; return; }
+    if (!orders.length) {
+        emptyState.style.display = '';
+        orderList.innerHTML = '';
+        topPillOrders.style.display = 'none';
+        scanCounter.textContent = '0 pesanan';
+        renderSisa();
+        updateConfirmBtn();
+        return;
+    }
     emptyState.style.display = 'none';
 
     orderList.innerHTML = orders.map((o, i) => renderCard(o, i)).join('');
@@ -1090,8 +1464,8 @@ function renderCard(o, idx) {
               </p>
               <div class="rk-action-strip">
                 <span style="font-size:.77rem;color:#9ca3af;font-weight:600">Aksi:</span>
-                <button class="rk-act-btn pending ${decision==='pending'?'on':''}" data-idx="${idx}" data-action="pending">⏸ Tunda Dulu</button>
-                <button class="rk-act-btn skip    ${decision==='skip'   ?'on':''}" data-idx="${idx}" data-action="skip">— Abaikan</button>
+                <button class="rk-act-btn pending ${decision==='pending'?'on':''}" data-idx="${idx}" data-action="pending">Tunda</button>
+                <button class="rk-act-btn skip    ${decision==='skip'   ?'on':''}" data-idx="${idx}" data-action="skip">Abaikan</button>
               </div>
             </div>
           </div>
@@ -1122,9 +1496,9 @@ function renderCard(o, idx) {
 
         // Kolom status
         const statusCell = (ok || fullyCovered)
-            ? '<span style="color:var(--shp-ok);font-size:1.1rem;font-weight:900">✓</span>'
+            ? '<span style="color:var(--shp-ok);font-size:.78rem;font-weight:800">OK</span>'
             : partiallyCov
-                ? '<span class="rk-sbadge sb-sub" style="opacity:.75">⇄ Sebagian</span>'
+                ? '<span class="rk-sbadge sb-sub" style="opacity:.75">Sebagian</span>'
                 : statusBadge(line.status);
 
         // Kolom "Barang Pengganti"
@@ -1139,7 +1513,7 @@ function renderCard(o, idx) {
                   <span class="sf-qty">×${FMT.format(subQty)}</span>
                   ${remaining > 0 ? `<span class="rk-still-short">Masih −${FMT.format(remaining)}</span>` : ''}
                   <button class="rk-sub-btn-pick sf-change" data-idx="${idx}" data-item="${line.item_id}" data-qty="${short}"
-                          style="margin-left:auto;font-size:.7rem;padding:.15rem .5rem">🔄 Ganti</button>
+                          style="margin-left:auto;font-size:.7rem;padding:.15rem .5rem">Ganti</button>
                 </div>
                 <span style="font-size:.7rem;color:#9ca3af;line-height:1.3">${sub.sub_name}</span>
               </div>
@@ -1148,7 +1522,7 @@ function renderCard(o, idx) {
             subCell = `<td>
               <button class="rk-sub-btn-pick rk-act-btn"
                       style="border-color:var(--shp-accent);color:var(--shp-accent);font-size:.72rem;white-space:nowrap;padding:.25rem .6rem"
-                      data-idx="${idx}" data-item="${line.item_id}" data-qty="${short}">⇄ Pilih Pengganti</button>
+                      data-idx="${idx}" data-item="${line.item_id}" data-qty="${short}">Pilih Pengganti</button>
             </td>`;
         }
 
@@ -1161,7 +1535,7 @@ function renderCard(o, idx) {
           </td>
           <td style="text-align:right">${FMT.format(line.qty_need)}</td>
           <td style="text-align:right" class="${ok?'rk-qty-ok':'rk-qty-dim'}">${FMT.format(line.qty_alloc)}</td>
-          <td style="text-align:right" class="${remaining>0?'rk-qty-short':'rk-qty-dim'}">${remaining>0?'-'+FMT.format(remaining):short>0?'<span style="color:var(--shp-ok);font-weight:800">✓</span>':'—'}</td>
+          <td style="text-align:right" class="${remaining>0?'rk-qty-short':'rk-qty-dim'}">${remaining>0?'-'+FMT.format(remaining):short>0?'<span style="color:var(--shp-ok);font-weight:800">OK</span>':'-'}</td>
           <td style="text-align:center">${statusCell}</td>
           ${subCell}
         </tr>`;
@@ -1190,9 +1564,9 @@ function renderCard(o, idx) {
     if (decision) {
         decBadge = statusBadge(decision);
     } else if (allFullyCovered) {
-        decBadge = '<span class="rk-sbadge sb-sub">⇄ Semua Diganti</span>';
+        decBadge = '<span class="rk-sbadge sb-sub">Semua Diganti</span>';
     } else if (partialCoverage) {
-        decBadge = '<span class="rk-sbadge sb-sub" style="opacity:.8">⇄ Diganti Sebagian</span>';
+        decBadge = '<span class="rk-sbadge sb-sub" style="opacity:.8">Diganti Sebagian</span>';
     } else {
         decBadge = statusBadge(order.status || 'ready');
     }
@@ -1211,9 +1585,9 @@ function renderCard(o, idx) {
           ${linesHtml}
           <div class="rk-action-strip">
             <span style="font-size:.77rem;color:#9ca3af;font-weight:600">Keputusan:</span>
-            <button class="rk-act-btn fulfill ${decision==='fulfill'?'on':''}" data-idx="${idx}" data-action="fulfill">✓ Siap Kirim</button>
-            <button class="rk-act-btn pending ${decision==='pending'?'on':''}" data-idx="${idx}" data-action="pending">⏸ Tunda Dulu</button>
-            <button class="rk-act-btn skip    ${decision==='skip'   ?'on':''}" data-idx="${idx}" data-action="skip">— Abaikan</button>
+            <button class="rk-act-btn fulfill ${decision==='fulfill'?'on':''}" data-idx="${idx}" data-action="fulfill">Siap Kirim</button>
+            <button class="rk-act-btn pending ${decision==='pending'?'on':''}" data-idx="${idx}" data-action="pending">Tunda</button>
+            <button class="rk-act-btn skip    ${decision==='skip'   ?'on':''}" data-idx="${idx}" data-action="skip">Abaikan</button>
           </div>
         </div>
       </div>
@@ -1380,7 +1754,7 @@ function renderDrawer(q) {
     if (!all.length) {
         drawerListEl.innerHTML = `
             <div class="rk-pool-empty">
-                <div class="rk-pool-empty-icon">📦</div>
+                <div class="rk-pool-empty-icon"></div>
                 Tidak ada sisa stok di batch.<br>
                 <span style="font-size:.76rem">Semua item sudah teralokasi ke pesanan.</span>
             </div>`;
@@ -1389,7 +1763,7 @@ function renderDrawer(q) {
     if (!items.length) {
         drawerListEl.innerHTML = `
             <div class="rk-pool-empty">
-                <div class="rk-pool-empty-icon">🔍</div>
+                <div class="rk-pool-empty-icon"></div>
                 Tidak ada item yang cocok dengan "<b>${q}</b>"
             </div>`;
         return;
@@ -1419,8 +1793,6 @@ function renderSisa() {
     const sisaCard = document.getElementById('sisaCard');
     if (!sisaCard) return;
 
-    if (!orders.length) { sisaCard.style.display = 'none'; return; }
-
     // Hitung sisa: batchQty - poolUsed - subsUsed
     const subsUsed = computeSubsUsed();
     const sisa = BATCH_POOL
@@ -1442,8 +1814,10 @@ function renderSisa() {
     sisaCard.style.display = '';
 
     const totalSisa = sisa.reduce((a, s) => a + s.qty_sisa, 0);
-    const allDecided = orders.filter(o => o.found).every(o => o.decision);
-    const isWarning  = allDecided && sisa.length > 0;
+    const hasOrders = orders.length > 0;
+    const foundOrders = orders.filter(o => o.found);
+    const allDecided = foundOrders.length > 0 && foundOrders.every(o => o.decision);
+    const isWarning  = hasOrders && allDecided && sisa.length > 0;
 
     const rows = sisa.map(s => `
         <div class="rk-sisa-row">
@@ -1453,14 +1827,15 @@ function renderSisa() {
         </div>`).join('');
 
     const note = isWarning
-        ? `<div class="rk-sisa-note">⚠️ Masih ada <b>${FMT.format(totalSisa)} pcs</b> yang belum masuk pesanan mana pun. Scan pesanan tambahan atau abaikan jika memang lebih.</div>`
-        : `<div class="rk-sisa-note">Barang-barang ini ada di batch tapi belum dialokasikan ke pesanan yang discan.</div>`;
+        ? `<div class="rk-sisa-note">Masih ada <b>${FMT.format(totalSisa)} pcs</b> yang belum masuk pesanan mana pun. Scan pesanan tambahan atau abaikan jika memang lebih.</div>`
+        : hasOrders
+            ? `<div class="rk-sisa-note">Barang-barang ini ada di batch tapi belum dialokasikan ke pesanan yang discan.</div>`
+            : `<div class="rk-sisa-note">Semua item batch masih belum dialokasikan. Scan pesanan untuk mulai mencocokkan stok.</div>`;
 
     sisaCard.innerHTML = `
         <div class="rk-sisa-card ${isWarning ? 'has-sisa' : ''}" id="sisaCardInner">
             <div class="rk-sisa-hdr" onclick="toggleSisa()">
-                <span style="font-size:1.1rem">${isWarning ? '⚠️' : '📦'}</span>
-                <span class="rk-sisa-title">Sisa Stok Batch${isWarning ? ' — Ada Kelebihan' : ''}</span>
+                <span class="rk-sisa-title">${hasOrders ? 'Sisa Stok Batch' : 'Stok Batch Belum Dialokasikan'}${isWarning ? ' — Ada Kelebihan' : ''}</span>
                 <span class="shp-pill" style="font-size:.7rem;padding:.12rem .55rem">
                     ${FMT.format(totalSisa)} pcs · ${sisa.length} SKU
                 </span>
@@ -1502,7 +1877,7 @@ window.resetRekon = function () {
 ══════════════════════════════════════════════ */
 topConfirmBtn.addEventListener('click', async function () {
     const btn = this;
-    btn.disabled = true; btn.textContent = '⏳ Menyimpan…';
+    btn.disabled = true; btn.textContent = 'Menyimpan...';
 
     try {
         const fd = new FormData();
@@ -1529,7 +1904,7 @@ topConfirmBtn.addEventListener('click', async function () {
             ? '\n\nPesanan pending (' + pendingNos.length + '):\n' + pendingNos.join('\n')
             : '';
 
-        const goSubmit = confirm('Rekonsiliasi disimpan ✓' + pendingTxt + '\n\nLanjut submit shipment & potong stok sekarang?');
+        const goSubmit = confirm('Rekonsiliasi disimpan.' + pendingTxt + '\n\nLanjut submit shipment & potong stok sekarang?');
 
         if (goSubmit) {
             const sf = document.createElement('form');
@@ -1543,7 +1918,7 @@ topConfirmBtn.addEventListener('click', async function () {
         toast('err', err.message);
         btn.disabled = false;
         btn.classList.add('active');
-        btn.textContent = '✓ Konfirmasi';
+        btn.textContent = 'Konfirmasi';
     }
 });
 
@@ -1563,7 +1938,7 @@ window.addEventListener('load', async function () {
         }
         if (bannerText) {
             bannerText.style.color = 'var(--shp-err)';
-            bannerText.textContent = '⚠️ Batch berubah sejak scan terakhir — sedang re-analisis…';
+            bannerText.textContent = 'Batch berubah sejak scan terakhir - sedang re-analisis...';
         }
         // Auto re-analisis dan tunggu selesai sebelum lanjut
         await window.reAnalisis();
@@ -1575,9 +1950,11 @@ window.addEventListener('load', async function () {
         }
         if (bannerText) {
             bannerText.style.color = 'var(--shp-warn)';
-            bannerText.textContent = '🔄 ' + orders.length + ' pesanan dipulihkan dari sesi sebelumnya.';
+            bannerText.textContent = orders.length + ' pesanan dipulihkan dari sesi sebelumnya.';
         }
         toast('warn', orders.length + ' pesanan dipulihkan');
+    } else {
+        renderAll();
     }
 
     focusInput();

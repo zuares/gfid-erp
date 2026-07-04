@@ -225,26 +225,25 @@ class InventoryStockController extends Controller
                 break;
         }
 
-        $stocks = $q->paginate(50)->appends($request->query());
-        $rows = $stocks->getCollection();
-
         // =========================
-        // Owner summary
+        // Owner summary (all filtered rows, not only current page)
         // =========================
         $hppSummary = null;
         $hppByCategory = [];
 
         if ($isOwner) {
-            $totalQty = (float) $rows->sum('total_qty');
-            $totalValue = (float) $rows->sum('stock_value');
+            $summaryRows = (clone $q)->get();
+            $totalQty = (float) $summaryRows->sum('total_qty');
+            $totalValue = (float) $summaryRows->sum('stock_value');
 
             $hppSummary = [
                 'total_qty' => $totalQty,
                 'total_value' => $totalValue,
                 'avg_hpp_weighted' => $totalQty > 0 ? ($totalValue / $totalQty) : 0.0,
+                'avg_ads' => $summaryRows->count() ? (float) $summaryRows->avg(fn($r) => (float) ($r->ads ?? 0)) : 0.0,
             ];
 
-            $hppByCategory = $rows
+            $hppByCategory = $summaryRows
                 ->groupBy(fn($r) => $r->category_name ?? 'Uncategorized')
                 ->map(function ($grp, $catName) {
                     $qty = (float) $grp->sum('total_qty');
@@ -259,6 +258,9 @@ class InventoryStockController extends Controller
                 ->values()
                 ->all();
         }
+
+        $stocks = $q->paginate(50)->appends($request->query());
+        $rows = $stocks->getCollection();
 
         // =========================
         // JSON (AJAX)
@@ -322,6 +324,8 @@ class InventoryStockController extends Controller
                 'warehouse_id' => $warehouseId,
             ],
             'warehouses' => $warehouses,
+            'hppSummary' => $hppSummary,
+            'hppByCategory' => $hppByCategory,
         ]);
     }
 

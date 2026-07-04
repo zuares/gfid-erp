@@ -48,6 +48,7 @@ Route::middleware(['web', 'auth', 'access:production'])
         Route::prefix('cutting-jobs')->name('cutting_jobs.')->group(function () {
             Route::get('/', [CuttingJobController::class, 'index'])->name('index');
             Route::get('/create', [CuttingJobController::class, 'create'])->name('create');
+            Route::get('/lots/live', [CuttingJobController::class, 'liveLots'])->name('lots.live');
             Route::post('/', [CuttingJobController::class, 'store'])->name('store');
 
             Route::get('/{cuttingJob}', [CuttingJobController::class, 'show'])->name('show');
@@ -102,6 +103,13 @@ Route::middleware(['web', 'auth', 'access:production'])
             Route::post('/cutting/{cuttingJob}/bundles/{bundle}/adjust', [QcController::class, 'adjustCuttingBundle'])
                 ->middleware('role:owner')
                 ->name('cutting.bundle_adjust');
+
+            // ===== QC Jahit (Sewing) =====
+            Route::get('/sewing/{sewingReturn}/edit', [QcController::class, 'editSewing'])
+                ->name('sewing.edit');
+
+            Route::put('/sewing/{sewingReturn}', [QcController::class, 'updateSewing'])
+                ->name('sewing.update');
         });
 
         /*
@@ -166,6 +174,9 @@ Route::middleware(['web', 'auth', 'access:production'])
 
             Route::get('/reject-returns', [SewingRejectReturnController::class, 'index'])
                 ->name('reject_returns.index');
+
+            Route::post('/reject-returns/convert', [SewingRejectReturnController::class, 'convert'])
+                ->name('reject_returns.convert');
         });
 
         /*

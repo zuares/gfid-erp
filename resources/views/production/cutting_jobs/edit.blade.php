@@ -110,7 +110,44 @@
 
         .bundles-table {
             border-collapse: separate;
-            border-spacing: 0
+            border-spacing: 0;
+            margin-bottom: 0;
+            font-size: .82rem
+        }
+
+        .bundles-table thead th {
+            color: var(--muted);
+            font-size: .72rem;
+            font-weight: 800;
+            letter-spacing: .05em;
+            text-transform: uppercase;
+            border-bottom: 2px solid rgba(148, 163, 184, .18);
+            white-space: nowrap
+        }
+
+        .bundles-table tbody td {
+            vertical-align: middle
+        }
+
+        .bundle-row-item-missing .js-item-suggest-input {
+            border-color: #dc2626 !important;
+            box-shadow: 0 0 0 .15rem rgba(220, 38, 38, .12) !important
+        }
+
+        .btn-remove-row {
+            width: 28px;
+            height: 28px;
+            border: 1px solid rgba(220, 38, 38, .18) !important;
+            border-radius: 999px;
+            background: rgba(254, 242, 242, .6);
+            line-height: 1;
+            padding: 0 !important;
+            text-decoration: none;
+            font-size: .9rem;
+            color: rgba(220, 38, 38, .75);
+            display: inline-flex;
+            align-items: center;
+            justify-content: center
         }
 
         .bundle-notes-cell {
@@ -154,6 +191,164 @@
         }
 
         @media(max-width:767.98px) {
+            .page-wrap {
+                padding: .65rem .65rem 5rem
+            }
+
+            .cutting-card {
+                border-radius: 14px
+            }
+
+            .cutting-card-header {
+                padding: .68rem .85rem;
+                align-items: flex-start;
+                flex-direction: column;
+                gap: .35rem
+            }
+
+            .cutting-card-header h5 {
+                font-size: .82rem;
+                letter-spacing: .03em;
+                text-transform: uppercase
+            }
+
+            .cutting-card-body {
+                padding: .7rem .85rem .85rem
+            }
+
+            .bundles-table-wrap {
+                overflow-x: visible
+            }
+
+            .bundles-table,
+            .bundles-table tbody,
+            .bundles-table tfoot {
+                display: block;
+                width: 100%
+            }
+
+            .bundles-table thead {
+                display: none
+            }
+
+            .bundles-table tbody tr.bundle-row {
+                display: grid;
+                grid-template-columns: minmax(0, 1fr) 76px 34px;
+                column-gap: .42rem;
+                row-gap: 0;
+                align-items: center;
+                border: 1px solid rgba(148, 163, 184, .25);
+                border-left: 3px solid rgba(37, 99, 235, .32);
+                border-radius: 12px;
+                padding: .44rem .48rem;
+                margin-bottom: .38rem;
+                background: var(--card);
+                box-shadow: 0 2px 8px rgba(15, 23, 42, .06);
+                overflow: visible;
+                position: relative
+            }
+
+            .bundles-table tbody td {
+                border: 0 !important;
+                padding: 0 !important
+            }
+
+            .bundles-table tbody .bundle-index-cell {
+                display: none !important
+            }
+
+            .bundles-table tbody .bundle-lot-cell {
+                display: none !important
+            }
+
+            .bundles-table tbody .bundle-item-cell {
+                grid-column: 1;
+                grid-row: 1;
+                min-width: 0;
+                overflow: visible
+            }
+
+            .bundles-table tbody .bundle-qty-cell {
+                grid-column: 2;
+                grid-row: 1
+            }
+
+            .bundles-table tbody .bundle-notes-cell {
+                display: none !important
+            }
+
+            .bundles-table tbody .bundle-action-cell {
+                grid-column: 3;
+                grid-row: 1;
+                display: flex !important;
+                align-items: center;
+                justify-content: center
+            }
+
+            .bundles-table .form-control-sm,
+            .bundles-table .form-select-sm {
+                min-height: 40px;
+                border-radius: 10px;
+                font-size: .84rem;
+                padding: .34rem .48rem
+            }
+
+            .bundles-table .item-suggest-wrap {
+                width: 100%;
+                min-width: 0
+            }
+
+            .bundles-table .js-item-suggest-input {
+                font-weight: 800;
+                letter-spacing: .01em;
+                text-transform: uppercase
+            }
+
+            .bundles-table .item-suggest-dropdown {
+                min-width: min(92vw, 340px);
+                max-height: 48vh
+            }
+
+            .bundle-qty {
+                text-align: center !important;
+                font-size: .92rem !important;
+                font-weight: 900 !important;
+                padding-inline: .25rem !important
+            }
+
+            .bundle-used-preview,
+            .bundle-qty + .help {
+                display: none
+            }
+
+            .btn-remove-row {
+                width: 34px;
+                height: 34px;
+                font-size: 1.05rem
+            }
+
+            .bundles-table tfoot tr,
+            .bundles-table tfoot td {
+                display: block;
+                width: 100%
+            }
+
+            .bundles-table tfoot td {
+                border: 0 !important;
+                padding: .2rem 0 0 !important
+            }
+
+            #btn-add-row {
+                width: 100%;
+                min-height: 46px;
+                border-radius: 12px
+            }
+
+            #used-total-label {
+                display: inline-block;
+                margin-top: .45rem
+            }
+
             .cutting-actions {
                 flex-direction: column-reverse;
                 align-items: stretch
@@ -361,8 +556,8 @@
                 {{-- BUNDLES --}}
                 <div class="cutting-card">
                     <div class="cutting-card-header">
-                        <h5>Bundles</h5>
-                        <span class="badge-soft">Qty pcs integer • Used = planned ÷ baris/LOT</span>
+                        <h5>Hasil Cutting</h5>
+                        <span class="badge-soft">Item jadi & qty</span>
                     </div>
 
                     <div class="cutting-card-body">
@@ -370,7 +565,7 @@
                             <div class="text-danger small mb-2">{{ $message }}</div>
                         @enderror
 
-                        <div class="table-responsive mb-2">
+                        <div class="table-responsive bundles-table-wrap mb-2">
                             <table class="bundles-table table table-sm" id="bundles-table">
                                 <thead>
                                     <tr>
@@ -408,9 +603,9 @@
                                                 name="bundles[{{ $i }}][qty_used_fabric]"
                                                 value="{{ old("bundles.$i.qty_used_fabric", $r['qty_used_fabric'] ?? 0) }}">
 
-                                            <td class="bundle-index mono">{{ $i + 1 }}</td>
+                                            <td class="bundle-index-cell bundle-index mono">{{ $i + 1 }}</td>
 
-                                            <td>
+                                            <td class="bundle-lot-cell">
                                                 <select class="form-select form-select-sm bundle-lot-select"
                                                     name="bundles[{{ $i }}][lot_id]">
                                                     <option value="">- Pilih LOT -</option>
@@ -423,7 +618,7 @@
                                                     value="{{ old("bundles.$i.lot_id", $r['lot_id'] ?? '') }}">
                                             </td>
 
-                                            <td>
+                                            <td class="bundle-item-cell">
                                                 <x-item-suggest idName="bundles[{{ $i }}][finished_item_id]"
                                                     categoryName="bundles[{{ $i }}][item_category_id]"
                                                     displayName="bundles[{{ $i }}][finished_item_display]"
@@ -436,7 +631,7 @@
                                                 @enderror
                                             </td>
 
-                                            <td>
+                                            <td class="bundle-qty-cell">
                                                 <input type="number" step="1" min="0" inputmode="numeric"
                                                     pattern="[0-9]*" name="bundles[{{ $i }}][qty_pcs]"
                                                     class="form-control form-control-sm text-end bundle-qty @error("bundles.$i.qty_pcs") is-invalid @enderror"
@@ -458,9 +653,10 @@
                                                     value="{{ old("bundles.$i.notes", $r['notes'] ?? '') }}">
                                             </td>
 
-                                            <td class="text-center">
-                                                <button type="button"
-                                                    class="btn btn-sm btn-link text-danger btn-remove-row">&times;</button>
+                                            <td class="bundle-action-cell text-center">
+                                            <button type="button"
+                                                    class="btn btn-sm btn-link text-danger btn-remove-row"
+                                                    aria-label="Hapus baris">&times;</button>
                                             </td>
                                         </tr>
                                     @endforeach
@@ -497,7 +693,7 @@
 
                 {{-- ACTIONS --}}
                 <div class="d-flex justify-content-between align-items-center mt-3 cutting-actions">
-                    <button type="submit" class="btn btn-primary btn-sm">Update Cutting Job</button>
+                    <button type="submit" class="btn btn-primary btn-sm" id="btn-update-cutting">Update Cutting Job</button>
                     <a href="{{ route('production.cutting_jobs.show', $job) }}"
                         class="btn btn-outline-secondary btn-sm">Batal</a>
                 </div>
@@ -508,16 +704,16 @@
                 <tr class="bundle-row">
                     <input type="hidden" class="bundle-used-fabric" name="bundles[__INDEX__][qty_used_fabric]"
                         value="0">
-                    <td class="bundle-index mono">__NO__</td>
+                    <td class="bundle-index-cell bundle-index mono">__NO__</td>
 
-                    <td>
+                    <td class="bundle-lot-cell">
                         <select class="form-select form-select-sm bundle-lot-select" name="bundles[__INDEX__][lot_id]">
                             <option value="">- Pilih LOT -</option>
                         </select>
                         <input type="hidden" class="bundle-lot-selected" value="">
                     </td>
 
-                    <td>
+                    <td class="bundle-item-cell">
                         <x-item-suggest idName="bundles[__INDEX__][finished_item_id]"
                             categoryName="bundles[__INDEX__][item_category_id]"
                             displayName="bundles[__INDEX__][finished_item_display]" :items="collect()" displayValue=""
@@ -525,7 +721,7 @@
                             :minChars="1" :maxResults="5" variant="mini" :required="true" :skipSubmitValidation="true" />
                     </td>
 
-                    <td>
+                    <td class="bundle-qty-cell">
                         <input type="number" step="1" min="0" inputmode="numeric" pattern="[0-9]*"
                             name="bundles[__INDEX__][qty_pcs]" class="form-control form-control-sm text-end bundle-qty"
                             value="">
@@ -537,8 +733,9 @@
                             value="">
                     </td>
 
-                    <td class="text-center">
-                        <button type="button" class="btn btn-sm btn-link text-danger btn-remove-row">&times;</button>
+                    <td class="bundle-action-cell text-center">
+                        <button type="button" class="btn btn-sm btn-link text-danger btn-remove-row"
+                            aria-label="Hapus baris">&times;</button>
                     </td>
                 </tr>
             </template>
@@ -565,6 +762,7 @@
 
             const bundlesTbody = document.getElementById('bundle-rows');
             const btnAddRow = document.getElementById('btn-add-row');
+            const submitBtn = document.getElementById('btn-update-cutting');
 
             const usedTotalLabel = document.getElementById('used-total-label');
 
@@ -832,12 +1030,55 @@
                 qtyInput.value = qty ? String(qty) : '';
             }
 
+            function validateBundleItems(markInvalid = false) {
+                if (!bundlesTbody) return true;
+
+                let valid = true;
+                Array.from(bundlesTbody.querySelectorAll('.bundle-row')).forEach(tr => {
+                    const hiddenItem = tr.querySelector('input[name*="[finished_item_id]"]');
+                    const itemInput = tr.querySelector('.js-item-suggest-input');
+                    const hasItem = !!(hiddenItem && hiddenItem.value);
+
+                    tr.classList.toggle('bundle-row-item-missing', !hasItem);
+                    if (itemInput) {
+                        if (hasItem) {
+                            itemInput.classList.remove('is-invalid');
+                        } else if (markInvalid) {
+                            itemInput.classList.add('is-invalid');
+                        }
+                    }
+
+                    if (!hasItem) valid = false;
+                });
+
+                return valid;
+            }
+
+            function refreshSubmitState(markInvalid = false) {
+                const ok = validateBundleItems(markInvalid);
+                if (submitBtn) {
+                    submitBtn.disabled = !ok;
+                    submitBtn.title = ok ? '' : 'Pilih item jadi dulu di semua baris hasil cutting.';
+                }
+                return ok;
+            }
+
+            function focusFirstMissingItem() {
+                const firstInvalid = bundlesTbody?.querySelector('.bundle-row .js-item-suggest-input.is-invalid')
+                    || bundlesTbody?.querySelector('.bundle-row-item-missing .js-item-suggest-input');
+                if (!firstInvalid) return;
+
+                firstInvalid.scrollIntoView({ behavior: 'smooth', block: 'center' });
+                setTimeout(() => firstInvalid.focus(), 120);
+            }
+
             function attachRowListeners(tr) {
                 tr.querySelector('.btn-remove-row')?.addEventListener('click', () => {
                     tr.remove();
                     updateBundleRowIndices();
                     rebuildLotOptionsForAllRows();
                     redistributeUsedByLot();
+                    refreshSubmitState(true);
                 });
 
                 tr.querySelector('.bundle-qty')?.addEventListener('input', () => {
@@ -852,9 +1093,49 @@
                 // perubahan item-suggest biasanya update hidden finished_item_id
                 tr.addEventListener('change', (e) => {
                     if (e.target && String(e.target.name || '').includes('[finished_item_id]')) {
+                        const itemInput = tr.querySelector('.js-item-suggest-input');
+                        if (e.target.value && itemInput) {
+                            itemInput.classList.remove('is-invalid');
+                        }
                         redistributeUsedByLot();
+                        refreshSubmitState(true);
+
+                        if (e.target.value) {
+                            setTimeout(() => {
+                                const qty = tr.querySelector('.bundle-qty');
+                                qty?.focus();
+                                qty?.select?.();
+                            }, 40);
+                        }
                     }
                 }, true);
+
+                const hiddenItem = tr.querySelector('input[name*="[finished_item_id]"]');
+                const itemInput = tr.querySelector('.js-item-suggest-input');
+                if (itemInput) {
+                    itemInput.addEventListener('input', () => {
+                        if (hiddenItem) hiddenItem.value = '';
+                        itemInput.classList.add('is-invalid');
+                        refreshSubmitState(true);
+                    });
+
+                    itemInput.addEventListener('blur', () => {
+                        if (!hiddenItem?.value) itemInput.classList.add('is-invalid');
+                        refreshSubmitState(true);
+                    });
+
+                    itemInput.addEventListener('keydown', (e) => {
+                        if (e.key !== 'Enter') return;
+                        e.preventDefault();
+
+                        if (hiddenItem?.value) {
+                            tr.querySelector('.bundle-qty')?.focus();
+                        } else {
+                            itemInput.classList.add('is-invalid');
+                            refreshSubmitState(true);
+                        }
+                    });
+                }
 
                 // init
                 clampQtyInteger(tr);
@@ -884,6 +1165,11 @@
                 updateBundleRowIndices();
                 rebuildLotOptionsForAllRows();
                 redistributeUsedByLot();
+                refreshSubmitState(true);
+
+                setTimeout(() => {
+                    tr.querySelector('.js-item-suggest-input')?.focus();
+                }, 60);
             }
 
             // =========================
@@ -957,9 +1243,16 @@
 
             // hitung used awal (planned ÷ baris)
             redistributeUsedByLot();
+            refreshSubmitState(true);
 
             // safety sebelum submit
-            form?.addEventListener('submit', () => {
+            form?.addEventListener('submit', (e) => {
+                if (!refreshSubmitState(true)) {
+                    e.preventDefault();
+                    focusFirstMissingItem();
+                    return;
+                }
+
                 // pastikan selected_lots[] kebentuk
                 setSelectedLotsHidden(getCheckedLots());
                 // pastikan used sesuai
