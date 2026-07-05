@@ -381,6 +381,160 @@
                 touch-action: pan-y;
             }
         }
+
+        /* === GreatFit / Shipments aligned header override === */
+        :root{
+            --shp-accent:#334155;
+            --shp-accent-2:#1f2937;
+            --shp-border:rgba(148,163,184,.18);
+            --shp-border-strong:rgba(148,163,184,.30);
+            --shp-muted:#64748b;
+        }
+
+        .qc-overview-page{ min-height:100vh; background:transparent!important; }
+
+        .page-wrap{
+            max-width:1040px!important;
+            margin-inline:auto;
+            padding:.75rem .75rem 4rem!important;
+            background:transparent!important;
+        }
+
+        body[data-theme="light"] .page-wrap,
+        body[data-theme="dark"] .page-wrap{ background:transparent!important; }
+
+        .qc-main-card{
+            border-radius:8px!important;
+            border:1px solid var(--shp-border)!important;
+            box-shadow:none!important;
+            background:var(--card)!important;
+        }
+
+        body[data-theme="dark"] .qc-main-card{ border-color:rgba(51,65,85,.85)!important; }
+
+        .ship-topbar{
+            position:sticky;
+            top:0;
+            z-index:300;
+            display:flex;
+            justify-content:space-between;
+            align-items:center;
+            gap:.6rem;
+            flex-wrap:wrap;
+            padding:.45rem .75rem;
+            margin-inline:-.75rem;
+            margin-bottom:.65rem;
+            background:var(--card,#fff);
+            border-bottom:1px solid var(--shp-border);
+        }
+
+        body[data-theme="dark"] .ship-topbar{ background:var(--card,#0f172a); }
+
+        .title{ font-weight:750; font-size:1rem; letter-spacing:0; margin:0; }
+        .sub{ color:var(--shp-muted); font-size:.78rem; }
+        body[data-theme="dark"] .sub{ color:#9ca3af; }
+
+        .kpis{ display:flex; flex-wrap:wrap; gap:.32rem; margin-top:.35rem; }
+
+        .kpi{
+            display:inline-flex;
+            align-items:baseline;
+            gap:.45rem;
+            border-radius:7px;
+            padding:.2rem .48rem;
+            border:1px solid rgba(148,163,184,.28);
+            background:transparent;
+            font-size:.72rem;
+        }
+
+        body[data-theme="dark"] .kpi{
+            background:rgba(15,23,42,.96);
+            border-color:rgba(51,65,85,.85);
+        }
+
+        .kpi .lbl{
+            text-transform:none;
+            letter-spacing:0;
+            font-size:.66rem;
+            color:#94a3b8;
+        }
+
+        .kpi .val{ font-weight:650; color:var(--shp-accent); }
+        body[data-theme="dark"] .kpi .val{ color:#e5e7eb; }
+
+        .controls{
+            display:flex;
+            gap:.5rem;
+            align-items:center;
+            flex-wrap:wrap;
+            justify-content:flex-end;
+        }
+
+        .nav-qc{
+            display:flex;
+            gap:.35rem;
+            flex-wrap:wrap;
+            margin:0!important;
+        }
+
+        .nav-qc .nav-link{
+            border-radius:7px!important;
+            padding:.34rem .75rem!important;
+            font-size:.82rem;
+            font-weight:600;
+            color:#475569;
+            border:1px solid rgba(148,163,184,.35);
+            background:transparent;
+        }
+
+        .nav-qc .nav-link:hover{
+            background:rgba(148,163,184,.08);
+            color:#111827;
+        }
+
+        .nav-qc .nav-link.active{
+            background:var(--shp-accent)!important;
+            border-color:var(--shp-accent)!important;
+            color:#fff!important;
+        }
+
+        body[data-theme="dark"] .nav-qc .nav-link{
+            color:#cbd5e1;
+            border-color:rgba(51,65,85,.85);
+        }
+
+        @media (max-width:767.98px){
+            .page-wrap{ padding:.5rem .5rem 4rem!important; }
+            .ship-topbar{ margin-inline:-.5rem; padding:.5rem .65rem; }
+            .title{ font-size:1.05rem; }
+            .sub{ display:none; }
+
+            .controls{
+                width:100%;
+                justify-content:flex-start;
+                overflow-x:auto;
+                flex-wrap:nowrap;
+                padding-bottom:.1rem;
+            }
+
+            .nav-qc{
+                flex-wrap:nowrap!important;
+                overflow-x:auto;
+                width:100%;
+                padding-bottom:.1rem;
+            }
+
+            .nav-qc .nav-link{
+                white-space:nowrap;
+                min-height:38px;
+                display:inline-flex;
+                align-items:center;
+            }
+
+            .kpis{ display:none; }
+            .qc-main-card{ border-radius:8px!important; }
+        }
+
     </style>
 @endpush
 
@@ -389,70 +543,63 @@
         <div class="page-wrap">
 
             {{-- HEADER --}}
-            <div class="card p-3 mb-3">
-                <div class="qc-header">
-                    <div class="qc-header-title">
-                        <h1>
-                            QC Overview
-                        </h1>
-                        <div class="qc-header-sub">
-                            Monitoring QC untuk Cutting, Sewing, dan Packing.
-                        </div>
-                    </div>
+            @php
+                $stageLabel = $stage === \App\Models\QcResult::STAGE_CUTTING
+                    ? 'QC Cutting'
+                    : ($stage === \App\Models\QcResult::STAGE_SEWING ? 'QC Sewing' : 'QC Packing');
 
-                    {{-- Info stage aktif --}}
-                    <div class="d-none d-md-block qc-header-stage text-end">
-                        @if ($stage === \App\Models\QcResult::STAGE_CUTTING)
-                            Stage: QC Cutting
-                        @elseif ($stage === \App\Models\QcResult::STAGE_SEWING)
-                            Stage: QC Sewing
-                        @else
-                            Stage: QC Packing
-                        @endif
-                    </div>
+                $totalRows = method_exists($records, 'total')
+                    ? (int) $records->total()
+                    : (method_exists($records, 'count') ? (int) $records->count() : 0);
 
-                    <div class="d-block d-md-none">
-                        <div class="qc-header-pill">
-                            @if ($stage === \App\Models\QcResult::STAGE_CUTTING)
-                                Stage: QC Cutting
-                            @elseif ($stage === \App\Models\QcResult::STAGE_SEWING)
-                                Stage: QC Sewing
-                            @else
-                                Stage: QC Packing
-                            @endif
-                        </div>
+                $pageRows = method_exists($records, 'count') ? (int) $records->count() : 0;
+            @endphp
+
+            <div class="ship-topbar">
+                <div>
+                    <div class="title">QC Produksi</div>
+                    <div class="sub">Monitoring QC Cutting, Sewing, dan Packing.</div>
+
+                    <div class="kpis">
+                        <span class="kpi"><span class="lbl">Stage</span><span class="val">{{ $stageLabel }}</span></span>
+                        <span class="kpi"><span class="lbl">Total</span><span class="val">{{ number_format($totalRows, 0, ',', '.') }}</span></span>
+                        <span class="kpi"><span class="lbl">Halaman</span><span class="val">{{ number_format($pageRows, 0, ',', '.') }}</span></span>
+                        <span class="kpi"><span class="lbl">Role</span><span class="val">{{ strtoupper($userRole ?? '-') }}</span></span>
                     </div>
                 </div>
 
-                {{-- TAB STAGE --}}
-                <ul class="nav nav-pills nav-qc mt-3">
-                    @if (($userRole ?? null) !== 'admin')
+                <div class="controls">
+                    <ul class="nav nav-pills nav-qc">
+                        @if (($userRole ?? null) !== 'admin')
+                            <li class="nav-item">
+                                <a class="nav-link {{ $stage === 'cutting' ? 'active' : '' }}"
+                                    href="{{ route('production.qc.index', ['stage' => 'cutting']) }}">
+                                    QC Cutting
+                                </a>
+                            </li>
+                        @endif
+
                         <li class="nav-item">
-                            <a class="nav-link {{ $stage === 'cutting' ? 'active' : '' }}"
-                                href="{{ route('production.qc.index', ['stage' => 'cutting']) }}">
-                                QC Cutting
+                            <a class="nav-link {{ $stage === 'sewing' ? 'active' : '' }}"
+                                href="{{ route('production.qc.index', ['stage' => 'sewing']) }}">
+                                QC Sewing
                             </a>
                         </li>
-                    @endif
-                    <li class="nav-item">
-                        <a class="nav-link {{ $stage === 'sewing' ? 'active' : '' }}"
-                            href="{{ route('production.qc.index', ['stage' => 'sewing']) }}">
-                            QC Sewing
-                        </a>
-                    </li>
-                    @if (($userRole ?? null) !== 'admin')
-                        <li class="nav-item">
-                            <a class="nav-link {{ $stage === 'packing' ? 'active' : '' }}"
-                                href="{{ route('production.qc.index', ['stage' => 'packing']) }}">
-                                QC Packing
-                            </a>
-                        </li>
-                    @endif
-                </ul>
+
+                        @if (($userRole ?? null) !== 'admin')
+                            <li class="nav-item">
+                                <a class="nav-link {{ $stage === 'packing' ? 'active' : '' }}"
+                                    href="{{ route('production.qc.index', ['stage' => 'packing']) }}">
+                                    QC Packing
+                                </a>
+                            </li>
+                        @endif
+                    </ul>
+                </div>
             </div>
 
             {{-- ISI TABEL PER STAGE --}}
-            <div class="card p-3">
+            <div class="card qc-main-card p-3">
 
                 {{-- =======================
                      TAB QC CUTTING

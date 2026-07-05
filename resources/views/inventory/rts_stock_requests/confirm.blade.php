@@ -299,6 +299,309 @@
                 text-align: left;
             }
         }
+    
+        /* === Shipment-aligned UI override: RTS Stock Requests === */
+        :root{
+            --shp-accent:#334155;
+            --shp-accent-2:#1f2937;
+            --shp-border:rgba(148,163,184,.18);
+            --shp-border-strong:rgba(148,163,184,.30);
+            --shp-muted:#64748b;
+        }
+
+        .page-wrap{
+            max-width:1040px!important;
+            margin-inline:auto!important;
+            padding:.75rem .75rem 4rem!important;
+            background:transparent!important;
+            border-radius:0!important;
+        }
+
+        body[data-theme="light"] .page-wrap,
+        body[data-theme="dark"] .page-wrap{
+            background:transparent!important;
+        }
+
+        .card,
+        .card-main,
+        .gf-card{
+            border-radius:8px!important;
+            border:1px solid var(--shp-border)!important;
+            box-shadow:none!important;
+            background:var(--card)!important;
+        }
+
+        body[data-theme="dark"] .card,
+        body[data-theme="dark"] .card-main,
+        body[data-theme="dark"] .gf-card{
+            border-color:rgba(51,65,85,.85)!important;
+        }
+
+        .ship-topbar{
+            position:sticky;
+            top:0;
+            z-index:300;
+            display:flex;
+            justify-content:space-between;
+            align-items:center;
+            gap:.6rem;
+            flex-wrap:wrap;
+            padding:.45rem .75rem;
+            margin-inline:-.75rem;
+            margin-bottom:.65rem;
+            background:var(--card,#fff);
+            border-bottom:1px solid var(--shp-border);
+        }
+
+        body[data-theme="dark"] .ship-topbar{
+            background:var(--card,#0f172a);
+        }
+
+        .ship-title,
+        .title{
+            font-weight:750!important;
+            font-size:1rem!important;
+            letter-spacing:0!important;
+            margin:0!important;
+            line-height:1.25!important;
+        }
+
+        .ship-sub,
+        .sub,
+        .meta{
+            color:var(--shp-muted)!important;
+            font-size:.78rem!important;
+            opacity:1!important;
+        }
+
+        body[data-theme="dark"] .ship-sub,
+        body[data-theme="dark"] .sub,
+        body[data-theme="dark"] .meta{
+            color:#9ca3af!important;
+        }
+
+        .ship-kpis,
+        .kpis{
+            display:flex;
+            flex-wrap:wrap;
+            gap:.32rem;
+            margin-top:.35rem;
+        }
+
+        .ship-kpi,
+        .kpi{
+            display:inline-flex;
+            align-items:baseline;
+            gap:.45rem;
+            border-radius:7px;
+            padding:.2rem .48rem;
+            border:1px solid rgba(148,163,184,.28);
+            background:transparent;
+            font-size:.72rem;
+        }
+
+        body[data-theme="dark"] .ship-kpi,
+        body[data-theme="dark"] .kpi{
+            background:rgba(15,23,42,.96);
+            border-color:rgba(51,65,85,.85);
+        }
+
+        .ship-kpi .lbl,
+        .kpi .lbl{
+            text-transform:none;
+            letter-spacing:0;
+            font-size:.66rem;
+            color:#94a3b8;
+        }
+
+        .ship-kpi .val,
+        .kpi .val{
+            font-weight:650;
+            color:var(--shp-accent);
+        }
+
+        body[data-theme="dark"] .ship-kpi .val,
+        body[data-theme="dark"] .kpi .val{
+            color:#e5e7eb;
+        }
+
+        .ship-controls,
+        .actions,
+        .btns{
+            display:flex!important;
+            gap:.5rem!important;
+            align-items:center!important;
+            flex-wrap:wrap!important;
+            justify-content:flex-end!important;
+        }
+
+        .btn,
+        .btn-outline,
+        .btn-primary{
+            border-radius:7px!important;
+            padding:.34rem .78rem!important;
+            box-shadow:none!important;
+            font-weight:600!important;
+            font-size:.82rem!important;
+            min-height:32px;
+            display:inline-flex;
+            align-items:center;
+            justify-content:center;
+            text-decoration:none!important;
+        }
+
+        .btn-primary,
+        .btn-ship-primary{
+            background:var(--shp-accent)!important;
+            border-color:var(--shp-accent)!important;
+            color:#fff!important;
+        }
+
+        .btn-primary:hover,
+        .btn-ship-primary:hover{
+            background:var(--shp-accent-2)!important;
+            border-color:var(--shp-accent-2)!important;
+            color:#fff!important;
+        }
+
+        .btn-outline,
+        .btn-ship-outline{
+            color:#475569!important;
+            background:transparent!important;
+            border:1px solid rgba(148,163,184,.35)!important;
+        }
+
+        .btn-outline:hover,
+        .btn-ship-outline:hover{
+            background:rgba(148,163,184,.08)!important;
+            color:#111827!important;
+        }
+
+        .header-row{
+            position:sticky!important;
+            top:0!important;
+            z-index:300!important;
+            display:flex!important;
+            justify-content:space-between!important;
+            align-items:center!important;
+            gap:.6rem!important;
+            flex-wrap:wrap!important;
+            padding:.45rem .75rem!important;
+            margin-inline:-.75rem!important;
+            margin-bottom:.65rem!important;
+            background:var(--card,#fff)!important;
+            border-bottom:1px solid var(--shp-border)!important;
+        }
+
+        body[data-theme="dark"] .header-row{
+            background:var(--card,#0f172a)!important;
+        }
+
+        .stats{
+            gap:.42rem!important;
+        }
+
+        .stat{
+            border-radius:8px!important;
+            box-shadow:none!important;
+            background:transparent!important;
+            border:1px solid rgba(148,163,184,.22)!important;
+            padding:.42rem .55rem!important;
+        }
+
+        .stat .k{
+            font-size:.68rem!important;
+            color:#94a3b8!important;
+            opacity:1!important;
+        }
+
+        .stat .v{
+            font-size:.95rem!important;
+            font-weight:700!important;
+            color:var(--shp-accent)!important;
+        }
+
+        .table-wrap{
+            border-radius:8px!important;
+            border:1px solid var(--shp-border)!important;
+            background:transparent!important;
+        }
+
+        .tbl thead th,
+        table thead th,
+        th{
+            font-size:.68rem!important;
+            text-transform:none!important;
+            letter-spacing:0!important;
+            font-weight:650!important;
+            color:#64748b!important;
+        }
+
+        .tbl th,
+        .tbl td,
+        th,
+        td{
+            padding:.52rem .62rem!important;
+        }
+
+        .item-code{
+            font-weight:700!important;
+            letter-spacing:0!important;
+        }
+
+        input[type="date"],
+        input[type="number"],
+        input[type="text"],
+        textarea,
+        select{
+            border-radius:7px!important;
+            font-size:.86rem!important;
+        }
+
+        @media(max-width:767.98px){
+            .page-wrap{
+                padding:.5rem .5rem 4rem!important;
+            }
+
+            .ship-topbar,
+            .header-row{
+                margin-inline:-.5rem!important;
+                padding:.5rem .65rem!important;
+            }
+
+            .ship-title,
+            .title{
+                font-size:1.05rem!important;
+            }
+
+            .ship-sub,
+            .sub{
+                display:none!important;
+            }
+
+            .ship-kpis,
+            .kpis{
+                display:none!important;
+            }
+
+            .ship-controls,
+            .actions,
+            .btns{
+                width:100%!important;
+                justify-content:flex-start!important;
+            }
+
+            .ship-controls .btn,
+            .actions .btn,
+            .btns .btn{
+                min-height:40px!important;
+            }
+
+            .card{
+                border-radius:8px!important;
+            }
+        }
+
     </style>
 @endpush
 

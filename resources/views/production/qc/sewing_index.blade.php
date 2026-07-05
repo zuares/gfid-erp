@@ -160,6 +160,109 @@
             min-height:38px;
         }
     }
+
+    /* === GreatFit / Shipments aligned header for QC Jahit === */
+    :root{
+        --shp-accent:#334155;
+        --shp-accent-2:#1f2937;
+        --shp-border:rgba(148,163,184,.18);
+        --shp-muted:#64748b;
+    }
+
+    .ship-topbar{
+        position:sticky;
+        top:0;
+        z-index:300;
+        display:flex;
+        justify-content:space-between;
+        align-items:center;
+        gap:.6rem;
+        flex-wrap:wrap;
+        padding:.45rem .75rem;
+        margin-inline:-.75rem;
+        margin-bottom:.65rem;
+        background:var(--card,#fff);
+        border-bottom:1px solid var(--shp-border);
+    }
+
+    body[data-theme="dark"] .ship-topbar{
+        background:var(--card,#0f172a);
+    }
+
+    .title{
+        font-weight:750!important;
+        font-size:1rem!important;
+        letter-spacing:0!important;
+        margin:0!important;
+    }
+
+    .sub{
+        color:var(--shp-muted)!important;
+        font-size:.78rem!important;
+    }
+
+    body[data-theme="dark"] .sub{
+        color:#9ca3af!important;
+    }
+
+    .kpis{
+        display:flex;
+        flex-wrap:wrap;
+        gap:.32rem;
+        margin-top:.35rem;
+    }
+
+    .kpi{
+        display:inline-flex;
+        align-items:baseline;
+        gap:.45rem;
+        border-radius:7px;
+        padding:.2rem .48rem;
+        border:1px solid rgba(148,163,184,.28);
+        background:transparent;
+        font-size:.72rem;
+    }
+
+    body[data-theme="dark"] .kpi{
+        background:rgba(15,23,42,.96);
+        border-color:rgba(51,65,85,.85);
+    }
+
+    .kpi .lbl{
+        text-transform:none;
+        letter-spacing:0;
+        font-size:.66rem;
+        color:#94a3b8;
+    }
+
+    .kpi .val{
+        font-weight:650;
+        color:var(--shp-accent);
+    }
+
+    body[data-theme="dark"] .kpi .val{
+        color:#e5e7eb;
+    }
+
+    @media(max-width:767.98px){
+        .ship-topbar{
+            margin-inline:-.5rem;
+            padding:.5rem .65rem;
+        }
+
+        .title{
+            font-size:1.05rem!important;
+        }
+
+        .sub{
+            display:none;
+        }
+
+        .kpis{
+            display:none;
+        }
+    }
+
 </style>
 @endpush
 
@@ -217,18 +320,19 @@
         <div class="flash-clean alert alert-danger mb-2">{{ session('error') }}</div>
     @endif
 
-    <div class="d-flex justify-content-between align-items-start gap-3 flex-wrap mb-3">
+    <div class="ship-topbar">
         <div>
-            <div class="title h4 mb-1">QC Jahit</div>
+            <div class="title">QC Jahit</div>
             <div class="sub">Daftar setor jahit untuk di-QC.</div>
 
             <div class="kpis">
-                <span class="kpi"><span class="lbl">Total</span><span class="val">{{ number_format($totalRecords, 0, ',', '.') }}</span></span>
-                <span class="kpi"><span class="lbl">Halaman</span><span class="val">{{ number_format($pageCount, 0, ',', '.') }}</span></span>
-                <span class="kpi"><span class="lbl">Qty OK</span><span class="val">{{ number_format($pageTotalQtyOk, 0, ',', '.') }}</span></span>
+                <span class="kpi"><span class="lbl">Total</span><span class="val">{{ number_format($records->total(), 0, ',', '.') }}</span></span>
+                <span class="kpi"><span class="lbl">Halaman</span><span class="val">{{ number_format($records->count(), 0, ',', '.') }}</span></span>
+                <span class="kpi"><span class="lbl">Qty OK</span><span class="val">{{ number_format($records->getCollection()->sum('total_ok_qty'), 0, ',', '.') }}</span></span>
             </div>
         </div>
     </div>
+
 
     <div class="card card-main">
         <div class="card-body p-0">

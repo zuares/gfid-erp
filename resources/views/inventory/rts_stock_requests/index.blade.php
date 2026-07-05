@@ -221,6 +221,1030 @@
 
     /* flatpickr override */
     .flatpickr-input { background: var(--card) !important; color: inherit !important; }
+
+        /* === Shipment-aligned UI override: RTS Stock Requests === */
+        :root{
+            --shp-accent:#334155;
+            --shp-accent-2:#1f2937;
+            --shp-border:rgba(148,163,184,.18);
+            --shp-border-strong:rgba(148,163,184,.30);
+            --shp-muted:#64748b;
+        }
+
+        .page-wrap{
+            max-width:1040px!important;
+            margin-inline:auto!important;
+            padding:.75rem .75rem 4rem!important;
+            background:transparent!important;
+            border-radius:0!important;
+        }
+
+        body[data-theme="light"] .page-wrap,
+        body[data-theme="dark"] .page-wrap{
+            background:transparent!important;
+        }
+
+        .card,
+        .card-main,
+        .gf-card{
+            border-radius:8px!important;
+            border:1px solid var(--shp-border)!important;
+            box-shadow:none!important;
+            background:var(--card)!important;
+        }
+
+        body[data-theme="dark"] .card,
+        body[data-theme="dark"] .card-main,
+        body[data-theme="dark"] .gf-card{
+            border-color:rgba(51,65,85,.85)!important;
+        }
+
+        .ship-topbar{
+            position:sticky;
+            top:0;
+            z-index:300;
+            display:flex;
+            justify-content:space-between;
+            align-items:center;
+            gap:.6rem;
+            flex-wrap:wrap;
+            padding:.45rem .75rem;
+            margin-inline:-.75rem;
+            margin-bottom:.65rem;
+            background:var(--card,#fff);
+            border-bottom:1px solid var(--shp-border);
+        }
+
+        body[data-theme="dark"] .ship-topbar{
+            background:var(--card,#0f172a);
+        }
+
+        .ship-title,
+        .title{
+            font-weight:750!important;
+            font-size:1rem!important;
+            letter-spacing:0!important;
+            margin:0!important;
+            line-height:1.25!important;
+        }
+
+        .ship-sub,
+        .sub,
+        .meta{
+            color:var(--shp-muted)!important;
+            font-size:.78rem!important;
+            opacity:1!important;
+        }
+
+        body[data-theme="dark"] .ship-sub,
+        body[data-theme="dark"] .sub,
+        body[data-theme="dark"] .meta{
+            color:#9ca3af!important;
+        }
+
+        .ship-kpis,
+        .kpis{
+            display:flex;
+            flex-wrap:wrap;
+            gap:.32rem;
+            margin-top:.35rem;
+        }
+
+        .ship-kpi,
+        .kpi{
+            display:inline-flex;
+            align-items:baseline;
+            gap:.45rem;
+            border-radius:7px;
+            padding:.2rem .48rem;
+            border:1px solid rgba(148,163,184,.28);
+            background:transparent;
+            font-size:.72rem;
+        }
+
+        body[data-theme="dark"] .ship-kpi,
+        body[data-theme="dark"] .kpi{
+            background:rgba(15,23,42,.96);
+            border-color:rgba(51,65,85,.85);
+        }
+
+        .ship-kpi .lbl,
+        .kpi .lbl{
+            text-transform:none;
+            letter-spacing:0;
+            font-size:.66rem;
+            color:#94a3b8;
+        }
+
+        .ship-kpi .val,
+        .kpi .val{
+            font-weight:650;
+            color:var(--shp-accent);
+        }
+
+        body[data-theme="dark"] .ship-kpi .val,
+        body[data-theme="dark"] .kpi .val{
+            color:#e5e7eb;
+        }
+
+        .ship-controls,
+        .actions,
+        .btns{
+            display:flex!important;
+            gap:.5rem!important;
+            align-items:center!important;
+            flex-wrap:wrap!important;
+            justify-content:flex-end!important;
+        }
+
+        .btn,
+        .btn-outline,
+        .btn-primary{
+            border-radius:7px!important;
+            padding:.34rem .78rem!important;
+            box-shadow:none!important;
+            font-weight:600!important;
+            font-size:.82rem!important;
+            min-height:32px;
+            display:inline-flex;
+            align-items:center;
+            justify-content:center;
+            text-decoration:none!important;
+        }
+
+        .btn-primary,
+        .btn-ship-primary{
+            background:var(--shp-accent)!important;
+            border-color:var(--shp-accent)!important;
+            color:#fff!important;
+        }
+
+        .btn-primary:hover,
+        .btn-ship-primary:hover{
+            background:var(--shp-accent-2)!important;
+            border-color:var(--shp-accent-2)!important;
+            color:#fff!important;
+        }
+
+        .btn-outline,
+        .btn-ship-outline{
+            color:#475569!important;
+            background:transparent!important;
+            border:1px solid rgba(148,163,184,.35)!important;
+        }
+
+        .btn-outline:hover,
+        .btn-ship-outline:hover{
+            background:rgba(148,163,184,.08)!important;
+            color:#111827!important;
+        }
+
+        .header-row{
+            position:sticky!important;
+            top:0!important;
+            z-index:300!important;
+            display:flex!important;
+            justify-content:space-between!important;
+            align-items:center!important;
+            gap:.6rem!important;
+            flex-wrap:wrap!important;
+            padding:.45rem .75rem!important;
+            margin-inline:-.75rem!important;
+            margin-bottom:.65rem!important;
+            background:var(--card,#fff)!important;
+            border-bottom:1px solid var(--shp-border)!important;
+        }
+
+        body[data-theme="dark"] .header-row{
+            background:var(--card,#0f172a)!important;
+        }
+
+        .stats{
+            gap:.42rem!important;
+        }
+
+        .stat{
+            border-radius:8px!important;
+            box-shadow:none!important;
+            background:transparent!important;
+            border:1px solid rgba(148,163,184,.22)!important;
+            padding:.42rem .55rem!important;
+        }
+
+        .stat .k{
+            font-size:.68rem!important;
+            color:#94a3b8!important;
+            opacity:1!important;
+        }
+
+        .stat .v{
+            font-size:.95rem!important;
+            font-weight:700!important;
+            color:var(--shp-accent)!important;
+        }
+
+        .table-wrap{
+            border-radius:8px!important;
+            border:1px solid var(--shp-border)!important;
+            background:transparent!important;
+        }
+
+        .tbl thead th,
+        table thead th,
+        th{
+            font-size:.68rem!important;
+            text-transform:none!important;
+            letter-spacing:0!important;
+            font-weight:650!important;
+            color:#64748b!important;
+        }
+
+        .tbl th,
+        .tbl td,
+        th,
+        td{
+            padding:.52rem .62rem!important;
+        }
+
+        .item-code{
+            font-weight:700!important;
+            letter-spacing:0!important;
+        }
+
+        input[type="date"],
+        input[type="number"],
+        input[type="text"],
+        textarea,
+        select{
+            border-radius:7px!important;
+            font-size:.86rem!important;
+        }
+
+        @media(max-width:767.98px){
+            .page-wrap{
+                padding:.5rem .5rem 4rem!important;
+            }
+
+            .ship-topbar,
+            .header-row{
+                margin-inline:-.5rem!important;
+                padding:.5rem .65rem!important;
+            }
+
+            .ship-title,
+            .title{
+                font-size:1.05rem!important;
+            }
+
+            .ship-sub,
+            .sub{
+                display:none!important;
+            }
+
+            .ship-kpis,
+            .kpis{
+                display:none!important;
+            }
+
+            .ship-controls,
+            .actions,
+            .btns{
+                width:100%!important;
+                justify-content:flex-start!important;
+            }
+
+            .ship-controls .btn,
+            .actions .btn,
+            .btns .btn{
+                min-height:40px!important;
+            }
+
+            .card{
+                border-radius:8px!important;
+            }
+        }
+
+    
+    /* === FINAL Shipment-consistent index: RTS Stock Requests === */
+    :root{
+        --ship-ink:#334155;
+        --ship-ink-2:#1f2937;
+        --ship-muted:#64748b;
+        --ship-line:rgba(148,163,184,.18);
+        --ship-line-2:rgba(148,163,184,.30);
+    }
+
+    .page-wrap{
+        max-width:1040px!important;
+        margin-inline:auto!important;
+        padding:.75rem .75rem 4rem!important;
+        background:transparent!important;
+        border-radius:0!important;
+    }
+
+    body[data-theme="light"] .page-wrap,
+    body[data-theme="dark"] .page-wrap{
+        background:transparent!important;
+    }
+
+    .ship-topbar{
+        position:sticky!important;
+        top:0!important;
+        z-index:310!important;
+        display:flex!important;
+        align-items:center!important;
+        justify-content:space-between!important;
+        gap:.6rem!important;
+        flex-wrap:wrap!important;
+        padding:.45rem .75rem!important;
+        margin-inline:-.75rem!important;
+        margin-bottom:.65rem!important;
+        background:var(--card,#fff)!important;
+        border-bottom:1px solid var(--ship-line)!important;
+        border-radius:0!important;
+        box-shadow:none!important;
+    }
+
+    body[data-theme="dark"] .ship-topbar{
+        background:var(--card,#0f172a)!important;
+        border-bottom-color:rgba(51,65,85,.85)!important;
+    }
+
+    .ship-title,
+    .title{
+        font-size:1rem!important;
+        line-height:1.25!important;
+        font-weight:750!important;
+        letter-spacing:0!important;
+        margin:0!important;
+        color:inherit!important;
+    }
+
+    .ship-sub,
+    .sub,
+    .meta{
+        font-size:.78rem!important;
+        line-height:1.35!important;
+        color:var(--ship-muted)!important;
+        opacity:1!important;
+        margin-top:.12rem!important;
+    }
+
+    .ship-kpis,
+    .kpis{
+        display:flex!important;
+        flex-wrap:wrap!important;
+        gap:.32rem!important;
+        margin-top:.35rem!important;
+    }
+
+    .ship-kpi,
+    .kpi{
+        display:inline-flex!important;
+        align-items:baseline!important;
+        gap:.45rem!important;
+        border-radius:7px!important;
+        padding:.2rem .48rem!important;
+        border:1px solid rgba(148,163,184,.28)!important;
+        background:transparent!important;
+        font-size:.72rem!important;
+        font-weight:500!important;
+        line-height:1.2!important;
+        color:inherit!important;
+    }
+
+    .ship-kpi .lbl,
+    .kpi .lbl{
+        font-size:.66rem!important;
+        color:#94a3b8!important;
+        letter-spacing:0!important;
+        text-transform:none!important;
+        font-weight:500!important;
+    }
+
+    .ship-kpi .val,
+    .kpi .val{
+        color:var(--ship-ink)!important;
+        font-weight:650!important;
+    }
+
+    .ship-controls,
+    .actions,
+    .btns{
+        display:flex!important;
+        align-items:center!important;
+        justify-content:flex-end!important;
+        gap:.5rem!important;
+        flex-wrap:wrap!important;
+    }
+
+    .btn,
+    .btn-primary,
+    .btn-outline,
+    .btn-reset{
+        border-radius:7px!important;
+        min-height:32px!important;
+        padding:.34rem .78rem!important;
+        font-size:.82rem!important;
+        font-weight:600!important;
+        line-height:1.15!important;
+        box-shadow:none!important;
+        text-decoration:none!important;
+        display:inline-flex!important;
+        align-items:center!important;
+        justify-content:center!important;
+        gap:.35rem!important;
+    }
+
+    .btn-primary{
+        background:var(--ship-ink)!important;
+        border-color:var(--ship-ink)!important;
+        color:#fff!important;
+    }
+
+    .btn-primary:hover{
+        background:var(--ship-ink-2)!important;
+        border-color:var(--ship-ink-2)!important;
+        color:#fff!important;
+    }
+
+    .btn-outline,
+    .btn-reset{
+        background:transparent!important;
+        color:#475569!important;
+        border:1px solid rgba(148,163,184,.35)!important;
+        opacity:1!important;
+    }
+
+    .btn-outline:hover,
+    .btn-reset:hover{
+        background:rgba(148,163,184,.08)!important;
+        color:#111827!important;
+        border-color:rgba(148,163,184,.45)!important;
+    }
+
+    .filter-bar{
+        display:flex!important;
+        flex-wrap:wrap!important;
+        gap:.45rem!important;
+        align-items:center!important;
+        margin:.65rem 0!important;
+        padding:.55rem!important;
+        border:1px solid var(--ship-line)!important;
+        border-radius:8px!important;
+        background:var(--card,#fff)!important;
+        box-shadow:none!important;
+    }
+
+    body[data-theme="dark"] .filter-bar{
+        background:var(--card,#0f172a)!important;
+        border-color:rgba(51,65,85,.85)!important;
+    }
+
+    .f-input,
+    .f-select,
+    #inp-date,
+    .date-section{
+        height:32px!important;
+        min-height:32px!important;
+        border-radius:7px!important;
+        font-size:.82rem!important;
+        border-color:rgba(148,163,184,.32)!important;
+        background:var(--card,#fff)!important;
+        color:inherit!important;
+        box-shadow:none!important;
+    }
+
+    .f-input:focus,
+    .f-select:focus,
+    #inp-date:focus{
+        border-color:rgba(100,116,139,.55)!important;
+        box-shadow:0 0 0 2px rgba(100,116,139,.10)!important;
+    }
+
+    .ds-preset-btn{
+        height:32px!important;
+        font-size:.7rem!important;
+        font-weight:600!important;
+        opacity:.72!important;
+    }
+
+    .ds-preset-btn:hover,
+    .ds-preset-btn.active{
+        background:rgba(148,163,184,.10)!important;
+        color:var(--ship-ink)!important;
+        opacity:1!important;
+    }
+
+    .tbl-wrap,
+    .table-wrap{
+        border-radius:8px!important;
+        border:1px solid var(--ship-line)!important;
+        background:var(--card,#fff)!important;
+        box-shadow:none!important;
+        max-height:calc(100vh - 190px)!important;
+        overflow:auto!important;
+    }
+
+    body[data-theme="dark"] .tbl-wrap,
+    body[data-theme="dark"] .table-wrap{
+        background:var(--card,#0f172a)!important;
+        border-color:rgba(51,65,85,.85)!important;
+    }
+
+    table{
+        width:100%!important;
+        border-collapse:collapse!important;
+    }
+
+    thead tr{
+        background:transparent!important;
+        border-bottom:1px solid var(--ship-line)!important;
+    }
+
+    th{
+        position:sticky!important;
+        top:0!important;
+        z-index:2!important;
+        background:var(--card,#fff)!important;
+        padding:.48rem .62rem!important;
+        font-size:.68rem!important;
+        font-weight:650!important;
+        color:#64748b!important;
+        opacity:1!important;
+        text-transform:none!important;
+        letter-spacing:0!important;
+        box-shadow:none!important;
+        white-space:nowrap!important;
+    }
+
+    body[data-theme="dark"] th{
+        background:var(--card,#0f172a)!important;
+        color:#94a3b8!important;
+    }
+
+    td{
+        padding:.50rem .62rem!important;
+        font-size:.84rem!important;
+        border-bottom:1px solid rgba(148,163,184,.12)!important;
+        vertical-align:middle!important;
+    }
+
+    tbody tr{
+        border-bottom:0!important;
+        cursor:pointer!important;
+        transition:background .10s ease!important;
+    }
+
+    tbody tr:hover{
+        background:rgba(148,163,184,.06)!important;
+    }
+
+    .doc-label{
+        font-size:.64rem!important;
+        font-weight:600!important;
+        opacity:.55!important;
+        letter-spacing:0!important;
+        margin-bottom:.12rem!important;
+        text-transform:none!important;
+    }
+
+    .ic,
+    .more-btn,
+    .badge{
+        border-radius:7px!important;
+        font-size:.70rem!important;
+        font-weight:650!important;
+        padding:.13rem .42rem!important;
+        letter-spacing:0!important;
+    }
+
+    .badge{
+        border:1px solid rgba(148,163,184,.28)!important;
+        background:rgba(148,163,184,.08)!important;
+    }
+
+    .badge.ok{
+        border-color:rgba(16,185,129,.30)!important;
+        background:rgba(16,185,129,.08)!important;
+    }
+
+    .badge.warn{
+        border-color:rgba(245,158,11,.34)!important;
+        background:rgba(245,158,11,.08)!important;
+    }
+
+    .badge.danger{
+        border-color:rgba(239,68,68,.34)!important;
+        background:rgba(239,68,68,.07)!important;
+    }
+
+    @media(max-width:767.98px){
+        .page-wrap{
+            padding:.5rem .5rem 4rem!important;
+        }
+
+        .ship-topbar{
+            margin-inline:-.5rem!important;
+            padding:.5rem .65rem!important;
+            align-items:flex-start!important;
+        }
+
+        .ship-title,
+        .title{
+            font-size:1.05rem!important;
+        }
+
+        .ship-sub,
+        .sub{
+            display:none!important;
+        }
+
+        .ship-kpis,
+        .kpis{
+            display:none!important;
+        }
+
+        .ship-controls,
+        .actions,
+        .btns{
+            width:100%!important;
+            justify-content:flex-start!important;
+        }
+
+        .ship-controls .btn,
+        .actions .btn,
+        .btns .btn{
+            min-height:40px!important;
+            flex:1 1 auto!important;
+        }
+
+        .filter-bar{
+            padding:.5rem!important;
+            gap:.4rem!important;
+        }
+
+        #inp-search,
+        .f-input,
+        .f-select,
+        .date-section{
+            width:100%!important;
+            min-width:0!important;
+        }
+
+        .tbl-wrap,
+        .table-wrap{
+            max-height:none!important;
+            border-radius:8px!important;
+        }
+    }
+
+
+    /* === Header Shipment style: RTS Stock Requests index === */
+    .ship-topbar{
+        position:sticky!important;
+        top:0!important;
+        z-index:310!important;
+        display:flex!important;
+        justify-content:space-between!important;
+        align-items:center!important;
+        gap:.6rem!important;
+        flex-wrap:wrap!important;
+        padding:.45rem .75rem!important;
+        margin-inline:-.75rem!important;
+        margin-bottom:.65rem!important;
+        background:var(--card,#fff)!important;
+        border-bottom:1px solid rgba(148,163,184,.18)!important;
+        border-radius:0!important;
+        box-shadow:none!important;
+    }
+
+    body[data-theme="dark"] .ship-topbar{
+        background:var(--card,#0f172a)!important;
+        border-bottom-color:rgba(51,65,85,.85)!important;
+    }
+
+    .ship-title{
+        font-size:1rem!important;
+        line-height:1.25!important;
+        font-weight:750!important;
+        letter-spacing:0!important;
+        margin:0!important;
+    }
+
+    .ship-sub{
+        color:#64748b!important;
+        font-size:.78rem!important;
+        line-height:1.35!important;
+        margin-top:.12rem!important;
+        opacity:1!important;
+    }
+
+    .ship-kpis{
+        display:flex!important;
+        flex-wrap:wrap!important;
+        gap:.32rem!important;
+        margin-top:.35rem!important;
+    }
+
+    .ship-kpi{
+        display:inline-flex!important;
+        align-items:baseline!important;
+        gap:.45rem!important;
+        border-radius:7px!important;
+        padding:.2rem .48rem!important;
+        border:1px solid rgba(148,163,184,.28)!important;
+        background:transparent!important;
+        font-size:.72rem!important;
+    }
+
+    .ship-kpi .lbl{
+        font-size:.66rem!important;
+        color:#94a3b8!important;
+        font-weight:500!important;
+    }
+
+    .ship-kpi .val{
+        color:#334155!important;
+        font-weight:650!important;
+    }
+
+    body[data-theme="dark"] .ship-kpi .val{
+        color:#e5e7eb!important;
+    }
+
+    .ship-controls{
+        display:flex!important;
+        align-items:center!important;
+        justify-content:flex-end!important;
+        gap:.5rem!important;
+        flex-wrap:wrap!important;
+    }
+
+    .btn-ship-primary{
+        border-radius:7px!important;
+        min-height:32px!important;
+        padding:.34rem .78rem!important;
+        font-size:.82rem!important;
+        font-weight:600!important;
+        background:#334155!important;
+        border-color:#334155!important;
+        color:#fff!important;
+        box-shadow:none!important;
+        display:inline-flex!important;
+        align-items:center!important;
+        justify-content:center!important;
+        text-decoration:none!important;
+    }
+
+    .btn-ship-primary:hover{
+        background:#1f2937!important;
+        border-color:#1f2937!important;
+        color:#fff!important;
+    }
+
+    @media(max-width:767.98px){
+        .ship-topbar{
+            margin-inline:-.5rem!important;
+            padding:.5rem .65rem!important;
+            align-items:flex-start!important;
+        }
+
+        .ship-title{
+            font-size:1.05rem!important;
+        }
+
+        .ship-sub,
+        .ship-kpis{
+            display:none!important;
+        }
+
+        .ship-controls{
+            width:100%!important;
+            justify-content:flex-start!important;
+        }
+
+        .ship-controls .btn{
+            width:100%!important;
+            min-height:40px!important;
+        }
+    }
+
+
+    /* === Fix RTS date picker double input === */
+    #inp-date.rts-date-picker{
+        width:150px!important;
+        min-width:150px!important;
+        height:32px!important;
+        border:0!important;
+        background:transparent!important;
+        border-radius:0!important;
+        padding:0 .6rem!important;
+        font-size:.82rem!important;
+        box-shadow:none!important;
+        cursor:pointer!important;
+    }
+
+    .date-section .flatpickr-input:not(#inp-date){
+        display:none!important;
+    }
+
+    @media(max-width:767.98px){
+        #inp-date.rts-date-picker{
+            width:100%!important;
+            min-width:0!important;
+        }
+
+        .date-section{
+            width:100%!important;
+        }
+    }
+
+
+    /* === CLEAN FINAL RTS index, closest to Shipments === */
+    .page-wrap{
+        max-width:1040px!important;
+        padding:.65rem .75rem 4rem!important;
+        background:transparent!important;
+    }
+
+    .ship-topbar{
+        position:sticky!important;
+        top:0!important;
+        z-index:340!important;
+        margin:-.65rem -.75rem .65rem!important;
+        padding:.52rem .78rem!important;
+        background:var(--card,#fff)!important;
+        border-bottom:1px solid rgba(148,163,184,.18)!important;
+        border-radius:0!important;
+        box-shadow:none!important;
+    }
+
+    .ship-title{
+        font-size:1rem!important;
+        font-weight:700!important;
+        letter-spacing:0!important;
+        line-height:1.25!important;
+    }
+
+    .ship-sub{
+        font-size:.76rem!important;
+        color:#64748b!important;
+        opacity:1!important;
+        margin-top:.1rem!important;
+    }
+
+    .ship-kpis{
+        margin-top:.32rem!important;
+        gap:.3rem!important;
+    }
+
+    .ship-kpi{
+        border-radius:7px!important;
+        padding:.18rem .45rem!important;
+        font-size:.7rem!important;
+        background:transparent!important;
+        border:1px solid rgba(148,163,184,.24)!important;
+    }
+
+    .ship-kpi .lbl{
+        font-size:.64rem!important;
+        color:#94a3b8!important;
+        font-weight:500!important;
+    }
+
+    .ship-kpi .val{
+        color:#334155!important;
+        font-weight:650!important;
+    }
+
+    .btn-ship-primary,
+    .btn-primary{
+        background:#334155!important;
+        border-color:#334155!important;
+        color:#fff!important;
+        border-radius:7px!important;
+        font-size:.8rem!important;
+        font-weight:600!important;
+        min-height:32px!important;
+        padding:.34rem .75rem!important;
+        box-shadow:none!important;
+    }
+
+    .filter-bar{
+        margin:.55rem 0 .65rem!important;
+        padding:.48rem!important;
+        border:1px solid rgba(148,163,184,.18)!important;
+        border-radius:8px!important;
+        background:var(--card,#fff)!important;
+        box-shadow:none!important;
+    }
+
+    .date-section{
+        height:32px!important;
+        min-height:32px!important;
+        border-radius:7px!important;
+        overflow:hidden!important;
+    }
+
+    #inp-date.rts-date-picker{
+        display:block!important;
+        width:145px!important;
+        min-width:145px!important;
+        height:32px!important;
+        border:0!important;
+        background:transparent!important;
+        border-radius:0!important;
+        padding:0 .58rem!important;
+        font-size:.8rem!important;
+        cursor:pointer!important;
+    }
+
+    .date-section .flatpickr-input:not(#inp-date){
+        display:none!important;
+        width:0!important;
+        height:0!important;
+        padding:0!important;
+        border:0!important;
+        opacity:0!important;
+        pointer-events:none!important;
+    }
+
+    .f-input,
+    .f-select{
+        height:32px!important;
+        min-height:32px!important;
+        border-radius:7px!important;
+        font-size:.8rem!important;
+        box-shadow:none!important;
+    }
+
+    .tbl-wrap{
+        border-radius:8px!important;
+        border:1px solid rgba(148,163,184,.18)!important;
+        background:var(--card,#fff)!important;
+        box-shadow:none!important;
+    }
+
+    th{
+        font-size:.67rem!important;
+        font-weight:650!important;
+        letter-spacing:0!important;
+        text-transform:none!important;
+        color:#64748b!important;
+        background:var(--card,#fff)!important;
+    }
+
+    td{
+        font-size:.83rem!important;
+    }
+
+    @media(max-width:767.98px){
+        .ship-topbar{
+            margin:-.5rem -.5rem .55rem!important;
+            padding:.55rem .65rem!important;
+        }
+
+        .ship-sub,
+        .ship-kpis{
+            display:none!important;
+        }
+
+        .ship-controls{
+            width:100%!important;
+        }
+
+        .ship-controls .btn{
+            width:100%!important;
+            min-height:40px!important;
+        }
+
+        #inp-date.rts-date-picker,
+        .date-section{
+            width:100%!important;
+            min-width:0!important;
+        }
+    }
+
+
+    /* === Force hide RTS hidden date fields === */
+    #hid-from,
+    #hid-to,
+    input[name="date_from"]#hid-from,
+    input[name="date_to"]#hid-to{
+        display:none!important;
+        width:0!important;
+        height:0!important;
+        min-width:0!important;
+        min-height:0!important;
+        padding:0!important;
+        margin:0!important;
+        border:0!important;
+        opacity:0!important;
+        position:absolute!important;
+        pointer-events:none!important;
+    }
+
 </style>
 @endpush
 
@@ -240,25 +1264,39 @@
 <div class="page-wrap">
 
     {{-- Header --}}
-    <div style="display:flex;justify-content:space-between;align-items:center;gap:.6rem;flex-wrap:wrap;margin-bottom:.75rem">
+    <div class="ship-topbar">
         <div>
-            <h1 style="font-size:1.1rem;font-weight:900;margin:0">Permintaan RTS</h1>
-            <div style="font-size:.74rem;opacity:.52;margin-top:.06rem">
-                {{ $stats['total'] ?? 0 }} total
-                @if(($stats['submitted'] ?? 0) > 0)
-                    · <span style="color:#f59e0b;font-weight:700">{{ $stats['submitted'] }} menunggu</span>
-                @endif
+            <div class="ship-title">RTS • Permintaan Stok</div>
+            <div class="ship-sub">Permintaan barang jadi dari PRD ke RTS.</div>
+
+            <div class="ship-kpis">
+                <span class="ship-kpi">
+                    <span class="lbl">Total</span>
+                    <span class="val">{{ number_format(isset($stockRequests) && method_exists($stockRequests, 'total') ? $stockRequests->total() : (isset($stockRequests) ? $stockRequests->count() : 0), 0, ',', '.') }}</span>
+                </span>
+                <span class="ship-kpi">
+                    <span class="lbl">Halaman</span>
+                    <span class="val">{{ number_format(isset($stockRequests) ? $stockRequests->count() : 0, 0, ',', '.') }}</span>
+                </span>
+                <span class="ship-kpi">
+                    <span class="lbl">Gudang</span>
+                    <span class="val">RTS</span>
+                </span>
             </div>
         </div>
-        @if($canManage)
-            <a href="{{ route('rts.stock-requests.create') }}" class="btn btn-primary btn-sm">+ Buat</a>
+
+        @if ($canManage)
+            <div class="ship-controls">
+                <a href="{{ route('rts.stock-requests.create') }}" class="btn btn-sm btn-ship-primary">+ Buat Permintaan</a>
+            </div>
         @endif
     </div>
 
+
     {{-- Filter bar --}}
     <form method="GET" action="{{ route('rts.stock-requests.index') }}" id="filterForm">
-        <input type="hidden" name="date_from"  id="hid-from"   value="{{ $dateFromNow }}">
-        <input type="hidden" name="date_to"    id="hid-to"     value="{{ $dateToNow }}">
+        <input type="hidden" name="date_from" id="hid-from" value="{{ $dateFromNow }}">
+        <input type="hidden" name="date_to" id="hid-to" value="{{ $dateToNow }}">
         <input type="hidden" name="period"     id="hid-period" value="{{ $periodNow }}">
 
         <div class="filter-bar">
@@ -278,7 +1316,7 @@
                         data-period="month">Bulan ini</button>
                 </div>
                 <div class="ds-divider"></div>
-                <input type="text" id="inp-date" placeholder="Pilih tanggal…" readonly autocomplete="off">
+                <input type="text" id="inp-date" class="f-input rts-date-picker" placeholder="Pilih tanggal…" readonly autocomplete="off">
                 @if($dateFromNow || $dateToNow || $periodNow !== 'all')
                     <button type="button" class="ds-clear" id="btn-clear-date" title="Hapus filter tanggal">✕</button>
                 @endif
@@ -388,7 +1426,7 @@ const fp = flatpickr('#inp-date', {
     mode: 'range',
     dateFormat: 'Y-m-d',
     locale: 'id',
-    altInput: true,
+    altInput: false,
     altFormat: 'j M Y',
     defaultDate: [hidFrom.value, hidTo.value].filter(Boolean),
     onChange(dates) {
@@ -422,15 +1460,10 @@ document.getElementById('btn-clear-date')?.addEventListener('click', () => {
 const periodNow = hidPeriod.value;
 if (periodNow && periodNow !== 'all') {
     const labels = { today: 'Hari ini', week: 'Minggu ini', month: 'Bulan ini' };
-    const alt = fp.altInput || document.querySelector('#inp-date + input');
-    if (alt) alt.value = labels[periodNow] || '';
+    const pickerInput = document.getElementById('inp-date');
+    if (pickerInput) pickerInput.value = labels[periodNow] || '';
 }
 
-// clear date button
-document.getElementById('btn-clear-date')?.addEventListener('click', () => {
-    hidFrom.value = hidTo.value = hidPeriod.value = '';
-    form.submit();
-});
 
 // search: submit on Enter
 document.getElementById('inp-search')?.addEventListener('keydown', e => {

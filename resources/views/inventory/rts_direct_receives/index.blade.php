@@ -209,6 +209,237 @@
                 padding: 12px 10px 92px;
             }
         }
+
+        /* === GreatFit / Shipments aligned header override === */
+        :root{
+            --shp-accent:#334155;
+            --shp-accent-2:#1f2937;
+            --shp-border:rgba(148,163,184,.18);
+            --shp-border-strong:rgba(148,163,184,.30);
+            --shp-muted:#64748b;
+        }
+
+        .page-wrap{
+            max-width:1040px!important;
+            margin-inline:auto;
+            padding:.75rem .75rem 4rem!important;
+            background:transparent!important;
+            border-radius:0!important;
+        }
+
+        body[data-theme="light"] .page-wrap,
+        body[data-theme="dark"] .page-wrap{
+            background:transparent!important;
+        }
+
+        .card-main{
+            border-radius:8px!important;
+            border:1px solid var(--shp-border)!important;
+            box-shadow:none!important;
+            background:var(--card)!important;
+        }
+
+        body[data-theme="dark"] .card-main{
+            border-color:rgba(51,65,85,.85)!important;
+        }
+
+        .ship-topbar{
+            position:sticky;
+            top:0;
+            z-index:300;
+            display:flex;
+            justify-content:space-between;
+            align-items:center;
+            gap:.6rem;
+            flex-wrap:wrap;
+            padding:.45rem .75rem;
+            margin-inline:-.75rem;
+            margin-bottom:.65rem;
+            background:var(--card,#fff);
+            border-bottom:1px solid var(--shp-border);
+        }
+
+        body[data-theme="dark"] .ship-topbar{
+            background:var(--card,#0f172a);
+        }
+
+        .title{
+            font-weight:750;
+            font-size:1rem;
+            letter-spacing:0;
+            margin:0;
+        }
+
+        .sub{
+            color:var(--shp-muted);
+            font-size:.78rem;
+        }
+
+        body[data-theme="dark"] .sub{
+            color:#9ca3af;
+        }
+
+        .kpis{
+            display:flex;
+            flex-wrap:wrap;
+            gap:.32rem;
+            margin-top:.35rem;
+        }
+
+        .kpi{
+            display:inline-flex;
+            align-items:baseline;
+            gap:.45rem;
+            border-radius:7px;
+            padding:.2rem .48rem;
+            border:1px solid rgba(148,163,184,.28);
+            background:transparent;
+            font-size:.72rem;
+        }
+
+        body[data-theme="dark"] .kpi{
+            background:rgba(15,23,42,.96);
+            border-color:rgba(51,65,85,.85);
+        }
+
+        .kpi .lbl{
+            text-transform:none;
+            letter-spacing:0;
+            font-size:.66rem;
+            color:#94a3b8;
+        }
+
+        .kpi .val{
+            font-weight:650;
+            color:var(--shp-accent);
+        }
+
+        body[data-theme="dark"] .kpi .val{
+            color:#e5e7eb;
+        }
+
+        .controls{
+            display:flex;
+            gap:.5rem;
+            align-items:center;
+            flex-wrap:wrap;
+            justify-content:flex-end;
+        }
+
+        .btn-pill{
+            border-radius:7px!important;
+            padding-inline:.78rem!important;
+            box-shadow:none!important;
+            font-weight:600!important;
+        }
+
+        .btn-ship-primary{
+            background:var(--shp-accent)!important;
+            border-color:var(--shp-accent)!important;
+            color:#fff!important;
+        }
+
+        .btn-ship-primary:hover{
+            background:var(--shp-accent-2)!important;
+            border-color:var(--shp-accent-2)!important;
+            color:#fff!important;
+        }
+
+        .btn-ship-outline{
+            color:#475569!important;
+            background:transparent!important;
+            border:1px solid rgba(148,163,184,.35)!important;
+        }
+
+        .btn-ship-outline:hover{
+            background:rgba(148,163,184,.08)!important;
+            color:#111827!important;
+        }
+
+        .search-input{
+            min-height:32px!important;
+            border-radius:7px!important;
+            font-size:.82rem!important;
+            padding:.35rem .65rem!important;
+            min-width:220px;
+        }
+
+        table.table-rts thead th{
+            font-size:.68rem!important;
+            text-transform:none!important;
+            letter-spacing:0!important;
+            font-weight:650!important;
+            color:#64748b!important;
+            padding:.52rem .62rem!important;
+        }
+
+        table.table-rts tbody td{
+            padding:.52rem .62rem!important;
+        }
+
+        .rts-code{
+            font-weight:700!important;
+            letter-spacing:0!important;
+        }
+
+        .route-pill,
+        .item-chip{
+            border-radius:7px!important;
+        }
+
+        @media(max-width:768px){
+            .page-wrap{
+                padding:.5rem .5rem 4rem!important;
+            }
+
+            .ship-topbar{
+                margin-inline:-.5rem;
+                padding:.5rem .65rem;
+            }
+
+            .title{
+                font-size:1.05rem;
+            }
+
+            .sub{
+                display:none;
+            }
+
+            .kpis{
+                display:none;
+            }
+
+            .controls{
+                width:100%;
+                align-items:stretch;
+                justify-content:flex-start;
+            }
+
+            .controls form{
+                width:100%;
+                display:flex;
+                gap:.45rem;
+            }
+
+            .search-input{
+                flex:1 1 auto;
+                min-width:0;
+                min-height:40px!important;
+            }
+
+            .controls .btn{
+                min-height:40px;
+            }
+
+            .controls > a.btn{
+                width:100%;
+            }
+
+            .card-main{
+                border-radius:8px!important;
+            }
+        }
+
     </style>
 @endpush
 
@@ -227,26 +458,51 @@
                 ->sortByDesc('qty')
                 ->values();
         };
+
+        $pageTotalQty = 0;
+        foreach ($rows as $row) {
+            $pageTotalQty += (float) $rtsItems($row)->sum('qty');
+        }
     @endphp
 
     <div class="page-wrap">
 
-        {{-- HEADER CARD --}}
-        <div class="card-main p-3 mb-3">
-            <div class="header-stack">
-                <div>
-                    <h1 class="h5 mb-1 fw-semibold">RTS • Dadakan</h1>
-                    <p class="text-muted small mb-0">
-                        Penerimaan barang jadi langsung ke RTS • detail barang & jumlah pcs
-                    </p>
+        {{-- HEADER --}}
+        <div class="ship-topbar">
+            <div>
+                <div class="title">RTS • Dadakan</div>
+                <div class="sub">Penerimaan barang jadi langsung ke RTS.</div>
+
+                <div class="kpis">
+                    <span class="kpi">
+                        <span class="lbl">Total</span>
+                        <span class="val">{{ number_format($rows->total(), 0, ',', '.') }}</span>
+                    </span>
+                    <span class="kpi">
+                        <span class="lbl">Halaman</span>
+                        <span class="val">{{ number_format($rows->count(), 0, ',', '.') }}</span>
+                    </span>
+                    <span class="kpi">
+                        <span class="lbl">Qty</span>
+                        <span class="val">{{ number_format($pageTotalQty, 0, ',', '.') }}</span>
+                    </span>
+                    <span class="kpi">
+                        <span class="lbl">Gudang</span>
+                        <span class="val">RTS</span>
+                    </span>
                 </div>
-                <a class="btn btn-primary btn-pill" href="{{ route('rts.direct-receives.create') }}">+ Buat Dadakan</a>
             </div>
 
-            <form method="GET" class="mt-3 d-flex gap-2 align-items-center flex-wrap">
-                <input name="q" value="{{ $q }}" placeholder="Cari code / notes" class="search-input">
-                <button class="btn btn-outline-secondary btn-pill">Cari</button>
-            </form>
+            <div class="controls">
+                <form method="GET" class="d-flex gap-2 align-items-center flex-wrap m-0">
+                    <input name="q" value="{{ $q }}" placeholder="Cari code / notes" class="search-input">
+                    <button class="btn btn-sm btn-ship-outline btn-pill">Cari</button>
+                </form>
+
+                <a class="btn btn-sm btn-ship-primary btn-pill" href="{{ route('rts.direct-receives.create') }}">
+                    + Buat Dadakan
+                </a>
+            </div>
         </div>
 
         {{-- LIST CARD --}}
