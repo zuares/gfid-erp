@@ -24,6 +24,20 @@ use Illuminate\Support\Facades\Schema;
 
 class ShipmentController extends Controller
 {
+    private function isShipmentNextCommand(?string $code): bool
+    {
+        $code = mb_strtoupper(trim((string) $code));
+
+        return in_array($code, [
+            'ORDER BARU',
+            'BARU',
+            'NEXT',
+            'NEXT ORDER',
+            'ORDER NEXT',
+        ], true);
+    }
+
+
     protected ?Warehouse $whRtsCached = null;
 
     public function __construct(
@@ -403,6 +417,7 @@ class ShipmentController extends Controller
             'date'             => ['required', 'date'],
             'notes'            => ['nullable', 'string'],
             'sales_invoice_id' => ['nullable', 'exists:sales_invoices,id'],
+            'scan_mode'        => ['nullable', 'in:item_first,order_first'],
         ]);
 
         // Store boleh null — diisi nanti saat rekonsiliasi dengan no pesanan
@@ -458,7 +473,10 @@ class ShipmentController extends Controller
                     'submit_url'       => $path('sales.shipments.submit', $shipment),
                     'clear_url'        => $path('sales.shipments.clear_lines', $shipment),
                     'show_url'         => $path('sales.shipments.show', $shipment),
+                    'scan_order_url'   => $path('sales.shipments.scan_order', $shipment),
+                    // edit_url tetap scanner item-first lama.
                     'edit_url'         => $path('sales.shipments.edit', $shipment),
+                    'legacy_edit_url'  => $path('sales.shipments.edit', $shipment),
                     'rekon_url'        => $path('sales.shipments.rekon', $shipment),
                     'rekon_apply_url'  => $path('sales.shipments.rekon_apply', $shipment),
                     'export_url'       => $path('sales.shipments.export_lines', $shipment),
@@ -468,10 +486,18 @@ class ShipmentController extends Controller
             ]);
         }
 
+        $redirectRoute = ($data['scan_mode'] ?? 'item_first') === 'order_first'
+            ? 'sales.shipments.scan_order'
+            : 'sales.shipments.edit';
+
+        $message = ($data['scan_mode'] ?? 'item_first') === 'order_first'
+            ? 'Shipment dibuat. Scan nomor order terlebih dahulu.'
+            : 'Shipment dibuat. Silakan scan barang.';
+
         return redirect()
-            ->route('sales.shipments.edit', $shipment)
+            ->route($redirectRoute, $shipment)
             ->with('status', 'success')
-            ->with('message', 'Shipment dibuat. Silakan scan barang.');
+            ->with('message', $message);
     }
 
     public function edit(Shipment $shipment)
@@ -499,8 +525,102 @@ class ShipmentController extends Controller
         return view('sales.shipments.edit', compact('shipment', 'importPreview', 'importPreviewSummary', 'kpi'));
     }
 
+
+    public function editOrderFirst(Shipment $shipment)
+    {
+        $shipment->load([
+            'store',
+            'lines.item',
+            'orderScans',
+        ]);
+
+        $savedOrderScans = $shipment->orderScans
+            ->sortBy('id')
+            ->map(function ($scan) {
+                return [
+                    'id' => $scan->id,
+                    'code' => $scan->order_number ?: $scan->order_no,
+                    'order_number' => $scan->order_number ?: $scan->order_no,
+                    'order_no' => $scan->order_no ?: $scan->order_number,
+                    'status' => $scan->status,
+                    'match_status' => $scan->match_status,
+                    'items' => [],
+                ];
+            })
+            ->values();
+
+        return view('sales.shipments.edit_order_first', compact('shipment', 'savedOrderScans'));
+    }
+
+
+    public function scanLookup(Request $request, Shipment $shipment)
+    {
+        $code = mb_strtoupper(trim((string) $request->query('code', '')));
+
+        if ($code === '') {
+            return response()->json([
+                'type' => 'empty',
+            ]);
+        }
+
+        $item = Item::query()
+            ->where('type', 'finished_good')
+            ->where(function ($query) use ($code) {
+                $query->where('barcode', $code)
+                    ->orWhere('code', $code)
+                    ->orWhereHas('barcodes', function ($barcodeQuery) use ($code) {
+                        $barcodeQuery->where('barcode', $code)
+                            ->where('is_active', true);
+                    });
+            })
+            ->first(['id', 'code', 'name']);
+
+        if ($item) {
+            return response()->json([
+                'type' => 'item',
+                'item' => [
+                    'id' => $item->id,
+                    'code' => $item->code,
+                    'name' => $item->name,
+                ],
+            ]);
+        }
+
+        $order = Shipment::with('store:id,code,name')
+            ->where('code', $code)
+            ->first(['id', 'code', 'store_id', 'date']);
+
+        if ($order) {
+            return response()->json([
+                'type' => 'order',
+                'order' => [
+                    'id' => $order->id,
+                    'code' => $order->code,
+                    'store_code' => $order->store?->code,
+                    'store_name' => $order->store?->name,
+                ],
+            ]);
+        }
+
+        return response()->json([
+            'type' => 'unknown',
+        ]);
+    }
+
     public function scanItem(Request $request, Shipment $shipment)
     {
+
+        $code = mb_strtoupper(trim((string) ($request->input('code') ?? $request->input('barcode') ?? $request->input('item_code') ?? $request->input('scan') ?? '')));
+
+        if ($this->isShipmentNextCommand($code)) {
+            return response()->json([
+                'status' => 'ok',
+                'type' => 'next_order',
+                'message' => 'Order baru. Scan nomor order berikutnya.',
+            ]);
+        }
+
+
         if ($shipment->status !== 'draft') {
             $message = 'Shipment sudah tidak bisa discan (bukan draft).';
 

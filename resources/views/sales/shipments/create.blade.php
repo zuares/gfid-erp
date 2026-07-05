@@ -639,7 +639,7 @@ body[data-theme="dark"] .shp-topbar {
                     · {{ $latestDraft->lines_count }} baris
                 </div>
             </div>
-            <a href="{{ route('sales.shipments.edit', $latestDraft) }}" class="btn-shp-outline" style="text-decoration:none">
+            <a href="{{ route('sales.shipments.scan_order', $latestDraft) }}" class="btn-shp-outline" style="text-decoration:none">
                 Lanjutkan Draft
             </a>
         </div>
@@ -1337,18 +1337,41 @@ body[data-theme="dark"] .shp-topbar {
 
                 _ship = data.shipment;
 
-                if (selectedScanMode === 'order_first') {
-                    if (spinner) spinner.style.display = 'none';
-                    if (btn) { btn.disabled = false; btn.style.background = ''; }
-                    applyShipMeta(_ship);
-                    useOrderScannerMode();
-                    showP2();
-                    showToast('ok', 'Draft dibuat. Scan order dulu.');
-                    return;
+                let targetUrl = selectedScanMode === 'order_first'
+                    ? (_ship.scan_order_url || '')
+                    : (_ship.legacy_edit_url || _ship.edit_url || '');
+
+                // Fallback kuat kalau response URL kosong / tidak valid.
+                if (!targetUrl && _ship.id) {
+                    targetUrl = selectedScanMode === 'order_first'
+                        ? `/sales/shipments/${_ship.id}/scan-order`
+                        : `/sales/shipments/${_ship.id}/edit`;
                 }
 
-                if (spinner) spinner.textContent = 'Membuka halaman scan...';
-                window.location.assign(_ship.edit_url || _ship.show_url || '{{ parse_url(route("sales.shipments.index"), PHP_URL_PATH) }}');
+                if (!targetUrl) {
+                    targetUrl = _ship.show_url || '{{ parse_url(route("sales.shipments.index"), PHP_URL_PATH) }}';
+                }
+
+                if (spinner) spinner.textContent = selectedScanMode === 'order_first'
+                    ? 'Membuka halaman scan order...'
+                    : 'Membuka halaman scan barang...';
+
+                // Debug ringan kalau masih stuck, bisa lihat di browser Console.
+                console.log('[Shipment Create] redirect mode=', selectedScanMode, 'target=', targetUrl, 'ship=', _ship);
+
+                try {
+                    window.location.assign(targetUrl);
+                } catch (redirectError) {
+                    console.warn('[Shipment Create] assign gagal, pakai href fallback', redirectError);
+                    window.location.href = targetUrl;
+                }
+
+                // Guard: kalau browser tetap di halaman create, paksa pindah ulang.
+                window.setTimeout(function () {
+                    if (window.location.pathname.includes('/sales/shipments/create')) {
+                        window.location.href = targetUrl;
+                    }
+                }, 1000);
 
             } catch (err) {
                 if (errEl) { errEl.textContent = err.message || 'Terjadi kesalahan, coba lagi.'; errEl.style.display = 'block'; }
@@ -1367,9 +1390,8 @@ body[data-theme="dark"] .shp-topbar {
         if (codeEl) codeEl.textContent = s.code || '—';
         const topCode = document.getElementById('topShipCode');
         if (topCode) topCode.textContent = s.code || 'Shipment Baru';
-        if (s.edit_url && window.location.pathname !== s.edit_url) {
-            window.history.replaceState({ shipmentId: s.id }, '', s.edit_url);
-        }
+        // Jangan replace URL create ke scan_order tanpa reload.
+        // Redirect resmi sudah dilakukan oleh window.location.assign() setelah draft dibuat.
 
         if (storeEl) {
             const storeLabel = [s.store_code, s.store_name].filter(Boolean).join(' — ');

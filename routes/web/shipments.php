@@ -32,10 +32,12 @@ Route::middleware(['web', 'auth', 'access:sales'])
                     ->middleware('role:owner');
 
                 Route::get('{shipment}', 'show')->name('show');
+                Route::get('{shipment}/scan-order', 'editOrderFirst')->name('scan_order');
                 Route::get('{shipment}/edit', 'edit')->name('edit');
                 Route::delete('{shipment}', 'destroy')->name('destroy');
 
                 Route::post('{shipment}/clear-lines', 'clearLines')->name('clear_lines');
+                Route::get('{shipment}/scan-lookup', 'scanLookup')->name('scan_lookup');
                 Route::post('{shipment}/scan-item', 'scanItem')->name('scan_item');
 
                 Route::post('{shipment}/submit', 'submit')->name('submit');

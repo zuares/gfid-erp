@@ -1137,6 +1137,11 @@ body[data-theme="dark"] .shp-scan-card:focus-within {
         Qty <b id="summaryTotalQty">{{ number_format($totalQty, 0, ',', '.') }}</b>
     </span>
 
+    <a href="{{ route('sales.shipments.scan_order', $shipment) }}"
+       class="btn btn-shp-outline">
+        Scan Order Dulu
+    </a>
+
     <a href="{{ $totalLines > 0 ? route('sales.shipments.rekon', $shipment) : '#' }}"
        id="rekonBtn"
        data-rekon-url="{{ route('sales.shipments.rekon', $shipment) }}"
