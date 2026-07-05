@@ -220,7 +220,7 @@
         $hasSupplierItemsIndex = false;
     }
 
-    if (!$canModule('marketplace')) {
+    if (!$isAdmin && !$canModule('marketplace')) {
         $hasMarketplaceToko = $hasMarketplaceOrders = $hasMarketplacePemenuhan = false;
         $hasMarketplacePickingBarang = $hasMarketplaceSkuMapping = $hasMarketplaceSync = false;
         $hasMarketplacePencairanDana = $hasMarketplaceProfit = $hasMarketplaceAds = false;

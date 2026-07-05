@@ -285,6 +285,32 @@ body[data-theme="dark"] .shp-topbar {
     opacity: .45;
     pointer-events: none;
 }
+.btn-shp-print {
+    background: #0f172a !important;
+    border-color: #0f172a !important;
+    color: #fff !important;
+    font-weight: 800 !important;
+    min-height: 38px;
+    padding: .42rem .9rem !important;
+}
+.btn-shp-print:hover {
+    background: #111827 !important;
+    border-color: #111827 !important;
+    color: #fff !important;
+}
+#phase2Card .btn-shp-print {
+    background: #0f172a !important;
+    border-color: #0f172a !important;
+    color: #fff !important;
+    font-weight: 800 !important;
+    min-height: 38px;
+    padding: .42rem .9rem !important;
+}
+#phase2Card .btn-shp-print:hover {
+    background: #111827 !important;
+    border-color: #111827 !important;
+    color: #fff !important;
+}
 #setupBtn,
 .shp-scan-btn,
 #submitForm button {
@@ -858,6 +884,9 @@ body[data-theme="dark"] .shp-topbar {
                            text-decoration:none;background:transparent">
                     Export CSV
                 </a>
+                <button type="button" class="btn-shp-print" onclick="printPickingList()">
+                    Cetak Picking List
+                </button>
             </div>
 
             <div style="margin-left:auto;display:flex;align-items:center;gap:.5rem;flex-wrap:wrap">
@@ -899,6 +928,7 @@ body[data-theme="dark"] .shp-topbar {
 
     let _ship = null; // shipment JSON from server after create
     let selectedScanMode = 'item_first';
+    const pickingLines = new Map();
     const orderScanner = {
         mode: 'order',
         current: null,
@@ -984,6 +1014,37 @@ body[data-theme="dark"] .shp-topbar {
         if (qEl) qEl.textContent = new Intl.NumberFormat('id-ID').format(qty ?? 0);
         if (topLines) topLines.textContent = lines ?? 0;
         if (topQty) topQty.textContent = new Intl.NumberFormat('id-ID').format(qty ?? 0);
+    }
+
+    function syncPickingLine(line) {
+        if (!line?.id) return;
+        pickingLines.set(String(line.id), {
+            id: line.id,
+            code: line.item_code || '-',
+            name: line.item_name || '',
+            category: line.category_name || 'Tanpa Kategori',
+            qty: Number(line.qty_scanned || 0),
+        });
+    }
+
+    function removePickingLine(lineId) {
+        pickingLines.delete(String(lineId));
+    }
+
+    function collectPrintableLines() {
+        const cached = Array.from(pickingLines.values()).filter((line) => Number(line.qty || 0) > 0);
+        if (cached.length) return cached;
+
+        return Array.from(document.querySelectorAll('#linesTbody tr[data-line-id]')).map((row) => {
+            const qtyText = row.querySelector('.shp-qty-pill')?.textContent || '0';
+            return {
+                id: row.getAttribute('data-line-id'),
+                code: row.querySelector('.item-code')?.textContent?.trim() || '-',
+                name: row.querySelector('.item-name')?.textContent?.trim() || '',
+                category: 'Tanpa Kategori',
+                qty: Number(qtyText.replace(/\./g, '').replace(/,/g, '').trim() || 0),
+            };
+        }).filter((line) => Number(line.qty || 0) > 0);
     }
 
     function renumber() {
@@ -1520,6 +1581,7 @@ body[data-theme="dark"] .shp-topbar {
     function addOrUpdateRow(line) {
         const tbody = document.getElementById('linesTbody');
         if (!tbody || !line.id) return;
+        syncPickingLine(line);
 
         // Remove empty state
         const empty = document.getElementById('emptyRow');
@@ -1590,6 +1652,7 @@ body[data-theme="dark"] .shp-topbar {
                     });
                     const data = await res.json().catch(() => ({}));
                     if (!res.ok) { showToast('err', data.message || 'Gagal hapus.'); return; }
+                    removePickingLine(row.getAttribute('data-line-id'));
                     row.remove();
                     renumber();
                     if (!document.querySelector('#linesTbody tr[data-line-id]')) {
@@ -1632,12 +1695,18 @@ body[data-theme="dark"] .shp-topbar {
                     if (!res.ok) { beepErr(); showToast('err', data.message || 'Gagal update.'); return; }
                     beepOk();
                     if (data.deleted || newQty === 0) {
+                        removePickingLine(row.getAttribute('data-line-id'));
                         row.remove(); renumber();
                         if (!document.querySelector('#linesTbody tr[data-line-id]')) {
                             document.getElementById('linesTbody').innerHTML = emptyRowHtml();
                         }
                     } else {
                         qpill.textContent = new Intl.NumberFormat('id-ID').format(newQty);
+                        const cached = pickingLines.get(String(row.getAttribute('data-line-id')));
+                        if (cached) {
+                            cached.qty = newQty;
+                            pickingLines.set(String(cached.id), cached);
+                        }
                         editWrap.style.display = 'none';
                         qpill.classList.remove('d-none');
                     }
@@ -1654,6 +1723,179 @@ body[data-theme="dark"] .shp-topbar {
         }
     }
 
+    window.printPickingList = function () {
+        const lines = collectPrintableLines();
+        if (!lines.length) {
+            showToast('err', 'Belum ada item untuk dicetak.');
+            focusScanInput();
+            return;
+        }
+
+        const grouped = new Map();
+        lines
+            .sort((a, b) => {
+                const cat = String(a.category || '').localeCompare(String(b.category || ''), 'id');
+                if (cat !== 0) return cat;
+                return String(a.code || '').localeCompare(String(b.code || ''), 'id');
+            })
+            .forEach((line) => {
+                const category = line.category || 'Tanpa Kategori';
+                if (!grouped.has(category)) grouped.set(category, []);
+                grouped.get(category).push(line);
+            });
+
+        const totalQty = lines.reduce((sum, line) => sum + Number(line.qty || 0), 0);
+        const today = new Date().toLocaleDateString('id-ID', { weekday: 'long', day: 'numeric', month: 'long', year: 'numeric' });
+        const timeNow = new Date().toLocaleTimeString('id-ID', { hour: '2-digit', minute: '2-digit' });
+        const shipCode = _ship?.code || 'Shipment Draft';
+
+        let rowsHtml = '';
+        grouped.forEach((items, category) => {
+            rowsHtml += `<tr class="category-row"><td colspan="4">${escapeHtml(category)}</td></tr>`;
+            rowsHtml += items.map((line) => `
+                <tr>
+                    <td class="chk"><input type="checkbox"></td>
+                    <td>
+                        <strong class="sku-code">${escapeHtml(line.code || '-')}</strong>
+                        ${line.name ? `<span class="variant-text"> — ${escapeHtml(line.name)}</span>` : ''}
+                    </td>
+                    <td class="qty">${Number(line.qty || 0)}</td>
+                    <td class="picked-qty"></td>
+                </tr>
+            `).join('');
+        });
+
+        const html = `<!DOCTYPE html><html><head>
+            <meta charset="UTF-8">
+            <title>Picking List — ${escapeHtml(shipCode)}</title>
+            <style>
+                *, *::before, *::after {
+                    box-sizing: border-box;
+                    color: #000 !important;
+                    border-color: #000 !important;
+                    box-shadow: none !important;
+                    text-shadow: none !important;
+                    filter: none !important;
+                    opacity: 1 !important;
+                }
+                @page { size: 100mm 150mm; margin: 3.5mm; }
+                html, body {
+                    margin: 0;
+                    padding: 0;
+                    background: #fff !important;
+                    color: #000 !important;
+                    font-family: Arial, Helvetica, sans-serif;
+                    font-size: 6.5pt;
+                    line-height: 1.05;
+                    -webkit-print-color-adjust: economy;
+                    print-color-adjust: economy;
+                    color-scheme: light only;
+                }
+                #toolbar {
+                    position: fixed; top: 0; left: 0; right: 0; z-index: 99;
+                    background: #0f172a !important; color: #fff !important; padding: .75rem 1rem;
+                    display: flex; align-items: center; justify-content: space-between; gap: 1rem;
+                }
+                #toolbar * { color: #fff !important; }
+                #toolbar button {
+                    background: #000 !important; color: #fff !important; border: 1px solid #fff; border-radius: 8px;
+                    padding: .75rem 1.5rem; font-weight: 900; font-size: 1rem; cursor: pointer; min-width: 132px;
+                }
+                #content { padding-top: 58px; }
+                @media print { #toolbar { display: none; } #content { padding-top: 0; } }
+                .page-header {
+                    display: flex; justify-content: space-between; align-items: flex-end;
+                    border-bottom: .3mm solid #000; padding-bottom: .8mm; margin-bottom: 1.1mm;
+                }
+                .header-left { display: flex; align-items: center; gap: 1.5mm; min-width: 0; }
+                .print-logo { width: 7mm; height: 7mm; object-fit: contain; flex: 0 0 auto; display: block; filter: grayscale(1) contrast(1.4) !important; }
+                .page-title { font-size: 6.5pt; font-weight: 900; letter-spacing: 0; }
+                .page-date { font-size: 6pt; color: #000 !important; font-weight: 800; margin-top: .2mm; }
+                .page-meta { font-size: 6.5pt; color: #000 !important; text-align: right; font-weight: 900; }
+                .section-title {
+                    font-size: 6.5pt; font-weight: 900; text-transform: uppercase;
+                    letter-spacing: .02em; color: #000 !important; margin: 1mm 0 .7mm;
+                    border-bottom: .25mm solid #000; padding-bottom: .5mm;
+                }
+                table { width: 100%; border-collapse: collapse; }
+                thead { display: table-row-group; }
+                table td, table th { padding: .62mm .8mm; border: .24mm solid #000; vertical-align: middle; }
+                table th { font-size: 6.5pt; color: #000 !important; text-transform: uppercase; font-weight: 900; }
+                .category-row td {
+                    padding: .45mm .8mm; font-size: 6pt; font-weight: 900;
+                    text-transform: uppercase; letter-spacing: .03em;
+                    color: #fff !important; background: #000 !important;
+                    -webkit-print-color-adjust: exact; print-color-adjust: exact;
+                }
+                .chk { width: 5.5mm; text-align: center; }
+                .chk input { width: 2.8mm; height: 2.8mm; accent-color: #000; }
+                .qty { width: 9mm; text-align: center; font-weight: 900 !important; font-size: 6.5pt; }
+                .picked-qty { width: 14mm; text-align: center; font-weight: 900 !important; font-size: 6.5pt; }
+                .sku-code { font-size: 6.5pt; font-weight: 900 !important; line-height: 1; }
+                .variant-text { display: inline; margin-top: 0; font-size: 6pt; font-weight: 900; color: #000 !important; }
+                .footer {
+                    display: flex; justify-content: space-between; font-weight: 900;
+                    font-size: 6.5pt; border-top: .3mm solid #000; padding-top: .7mm; margin-top: 1mm;
+                }
+                @media screen {
+                    body { width: 100mm; min-height: 150mm; margin: 0 auto; padding: 0; overflow-x: hidden; background: #fff !important; }
+                    #content { width: 100mm; min-height: 150mm; margin: 0; padding-left: 3.5mm; padding-right: 3.5mm; padding-bottom: 3.5mm; }
+                }
+                @media print {
+                    *, *::before, *::after { color: #000 !important; border-color: #000 !important; box-shadow: none !important; text-shadow: none !important; filter: none !important; opacity: 1 !important; }
+                    html, body, #content { width: 93mm; background: #fff !important; }
+                    thead { display: table-row-group !important; }
+                    .category-row td { color: #fff !important; background: #000 !important; -webkit-print-color-adjust: exact; print-color-adjust: exact; }
+                }
+            </style>
+        </head>
+        <body>
+            <div id="toolbar">
+                <span style="font-size:.85rem;font-weight:600">Picking List — ${escapeHtml(shipCode)} · ${lines.length} item · ${totalQty} qty</span>
+                <button onclick="window.print()">Print</button>
+            </div>
+            <div id="content">
+                <div class="page-header">
+                    <div class="header-left">
+                        <img class="print-logo" src="/images/logo-mark.svg" alt="GF">
+                        <div>
+                            <div class="page-title">PICKING LIST</div>
+                            <div class="page-date">${today} · ${timeNow}</div>
+                        </div>
+                    </div>
+                    <div class="page-meta">
+                        <div>${escapeHtml(shipCode)}</div>
+                        <div>${totalQty} total qty</div>
+                    </div>
+                </div>
+                <div class="section-title">Item yang Harus Diambil</div>
+                <table>
+                    <thead><tr>
+                        <th class="chk"></th>
+                        <th style="text-align:left">Kode Item — Varian</th>
+                        <th class="qty">Qty</th>
+                        <th class="picked-qty">Diambil</th>
+                    </tr></thead>
+                    <tbody>${rowsHtml}</tbody>
+                </table>
+                <div class="footer">
+                    <span>TOTAL ${lines.length} ITEM</span>
+                    <span>${totalQty} QTY</span>
+                </div>
+            </div>
+        </body></html>`;
+
+        const win = window.open('', '_blank', 'width=430,height=680');
+        if (!win) {
+            showToast('err', 'Popup print diblokir browser.');
+            return;
+        }
+        win.document.open();
+        win.document.write(html);
+        win.document.close();
+        win.focus();
+    };
+
     // ── Clear all lines ───────────────────────────────────────────────────
 
     window.clearAllLines = async function () {
@@ -1669,6 +1911,7 @@ body[data-theme="dark"] .shp-topbar {
             const data = await res.json().catch(() => ({}));
             if (!res.ok) { showToast('err', data.message || 'Gagal bersihkan.'); return; }
             document.getElementById('linesTbody').innerHTML = emptyRowHtml();
+            pickingLines.clear();
             updateTotals(0, 0);
             setScanStatus('');
             showToast('ok', 'Semua baris dibersihkan.');

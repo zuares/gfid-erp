@@ -509,7 +509,7 @@ class ShipmentController extends Controller
                 ->with('message', 'Shipment bukan draft, tidak bisa di-edit / discan lagi.');
         }
 
-        $shipment->load(['store', 'lines.item', 'creator', 'invoice']);
+        $shipment->load(['store', 'lines.item.category', 'creator', 'invoice']);
 
         $importPreview = session('shipment_import_preview.' . $shipment->id . '.rows') ?? null;
         $importPreviewSummary = session('shipment_import_preview.' . $shipment->id . '.summary') ?? null;
@@ -643,6 +643,7 @@ class ShipmentController extends Controller
         $orderNo = mb_strtoupper(trim((string) ($data['order_no'] ?? '')));
 
         $item = Item::query()
+            ->with('category:id,name')
             ->where('type', 'finished_good')
             ->where(fn($q) => $q->where('barcode', $scanCode)->orWhere('code', $scanCode))
             ->first();
@@ -724,6 +725,7 @@ class ShipmentController extends Controller
                     'id' => $line->id,
                     'item_code' => $item->code,
                     'item_name' => $item->name,
+                    'category_name' => $item->category?->name ?: 'Tanpa Kategori',
                     'remarks' => $line->remarks ?? null,
                     'qty_scanned' => (int) $line->qty_scanned,
                     'update_qty_url' => route('sales.shipments.update_line_qty', $line),

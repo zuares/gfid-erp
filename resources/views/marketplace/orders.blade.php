@@ -268,6 +268,34 @@
 .process-toolbar-info { font-size: .75rem; color: #64748b; font-weight: 600; }
 .process-toolbar-info strong { color: #0f172a; }
 .process-toolbar-actions { display: flex; gap: .4rem; flex-shrink: 0; }
+.picking-print-strip {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: .6rem;
+    margin: -.35rem 0 .85rem;
+    padding: .55rem .7rem;
+    border: 1.5px solid #e2e8f0;
+    border-radius: 9px;
+    background: #fff;
+}
+.picking-print-strip-info {
+    font-size: .74rem;
+    color: #64748b;
+    font-weight: 600;
+}
+.picking-print-strip-info strong { color: #0f172a; }
+@media (max-width: 640px) {
+    .picking-print-strip {
+        align-items: stretch;
+        flex-direction: column;
+    }
+    .picking-print-strip .btn-toolbar {
+        justify-content: center;
+        width: 100%;
+        min-height: 38px;
+    }
+}
 .btn-toolbar {
     display: inline-flex; align-items: center; gap: .3rem;
     font-size: .73rem; font-weight: 700; padding: .28rem .65rem;
@@ -589,6 +617,15 @@
             </button>
         </div>
 
+        <div class="picking-print-strip" id="pickingPrintStrip">
+            <div class="picking-print-strip-info" id="pickingPrintInfo">
+                <strong>0</strong> order siap dicetak
+            </div>
+            <button class="btn-toolbar primary" type="button" id="btnPrintPickingTop" onclick="printPickingList()">
+                🖨 Cetak Picking List
+            </button>
+        </div>
+
         {{-- Toolbar: tab Perlu Diproses --}}
         <div class="process-toolbar" id="processToolbar">
             <div class="process-toolbar-info" id="toolbarInfo">
@@ -863,6 +900,8 @@
         document.querySelectorAll('.ord-tab').forEach(b => b.classList.remove('active'));
         btn.classList.add('active');
         renderTable();
+        updateToolbar();
+        updatePickingPrintStrip();
     };
 
     window.switchTabByName = function (tab) {
@@ -932,12 +971,42 @@
                     || (i.model_sku||i.item_sku||'').toLowerCase().includes(search)));
     }
 
-    window.render = function () { renderKpi(); renderBadges(); renderTable(); updateToolbar(); };
+    window.render = function () { renderKpi(); renderBadges(); renderTable(); updateToolbar(); updatePickingPrintStrip(); };
 
     // ── Process Toolbar ───────────────────────────────────────────────────
     function getProcessRows() {
         return applyFilters(orders.filter(inRange))
             .filter(TAB_FILTERS.process);
+    }
+
+    function getPackingRows() {
+        return applyFilters(orders.filter(inRange))
+            .filter(TAB_FILTERS.packing);
+    }
+
+    function getPrintablePickingRows() {
+        const filtered = applyFilters(orders.filter(inRange));
+        const rows = filtered.filter(o => TAB_FILTERS.process(o) || TAB_FILTERS.packing(o));
+        const unique = new Map();
+        rows.forEach(o => unique.set(o.id, o));
+        return Array.from(unique.values());
+    }
+
+    function updatePickingPrintStrip() {
+        const rows = getPrintablePickingRows();
+        const processCount = rows.filter(TAB_FILTERS.process).length;
+        const packingCount = rows.filter(TAB_FILTERS.packing).length;
+        const info = $('pickingPrintInfo');
+        const btn = $('btnPrintPickingTop');
+
+        if (info) {
+            info.innerHTML = `<strong>${rows.length}</strong> order siap dicetak <span style="color:#94a3b8">(${processCount} perlu proses · ${packingCount} sedang proses)</span>`;
+        }
+        if (btn) {
+            btn.disabled = rows.length === 0;
+            btn.style.opacity = rows.length === 0 ? '.45' : '1';
+            btn.style.pointerEvents = rows.length === 0 ? 'none' : '';
+        }
     }
 
     function updateToolbar() {
@@ -947,22 +1016,34 @@
         const isUnresolved = activeTab === 'unresolved';
         $('toolbarActionsProcess').style.display  = isUnresolved ? 'none' : '';
         $('toolbarActionsUnresolved').style.display = isUnresolved ? '' : 'none';
+        const btnBelumProses = $('btnBelumProses');
+        const btnBulkFulfill = $('btnBulkFulfill');
 
         if (isUnresolved) {
             const rows = filterByTab(applyFilters(orders.filter(inRange)), 'unresolved');
             toolbar.classList.toggle('visible', rows.length > 0);
             $('toolbarInfo').innerHTML = `<strong>${rows.length}</strong> order perlu diperbaiki`;
+            if (btnBelumProses) btnBelumProses.style.display = '';
+            if (btnBulkFulfill) btnBulkFulfill.style.display = '';
+        } else if (activeTab === 'packing') {
+            const rows = getPackingRows();
+            toolbar.classList.toggle('visible', rows.length > 0);
+            $('toolbarInfo').innerHTML = `<strong>${rows.length}</strong> order sedang proses`;
+            if (btnBelumProses) btnBelumProses.style.display = 'none';
+            if (btnBulkFulfill) btnBulkFulfill.style.display = 'none';
         } else {
             const rows = getProcessRows();
             toolbar.classList.toggle('visible', rows.length > 0);
             $('toolbarInfo').innerHTML = `<strong id="toolbarCount">${rows.length}</strong> order perlu diproses hari ini`;
+            if (btnBelumProses) btnBelumProses.style.display = '';
+            if (btnBulkFulfill) btnBulkFulfill.style.display = '';
         }
     }
 
     // ── Print Picking List ────────────────────────────────────────────────
     window.printPickingList = function () {
-        // Gunakan rows yang sudah terfilter (termasuk filterBelumProses jika aktif)
-        const rows = getProcessRows();
+        // Cetak gabungan Perlu Proses + Sedang Proses sesuai filter toko/tanggal/search aktif.
+        const rows = getPrintablePickingRows();
         if (!rows.length) { alert('Tidak ada order untuk dicetak.'); return; }
 
         // Tandai semua order ini sebagai sudah dicetak
@@ -979,113 +1060,188 @@
                 const code    = i.internal_item?.code || '';
                 const variant = i.variant_name || '';
                 const mSku    = i.model_sku || i.item_sku || '';
-                const key     = (code || mSku) + '||' + variant;
-                if (!itemMap[key]) itemMap[key] = { code, variant, mSku, qty: 0, mapped: !!code };
+                const category = code
+                    ? (i.internal_item?.category?.name || i.internal_item?.item_category?.name || i.internal_item?.category_name || 'Tanpa Kategori')
+                    : 'Belum Mapping';
+                const categoryOrder = code ? (category === 'Tanpa Kategori' ? 2 : 1) : 3;
+                const key     = category + '||' + (code || mSku) + '||' + variant;
+                if (!itemMap[key]) itemMap[key] = { code, variant, mSku, category, categoryOrder, qty: 0, mapped: !!code };
                 itemMap[key].qty += (i.qty || 1);
             });
         });
 
-        // Urutkan: mapped dulu, lalu unmapped; dalam group urut qty desc
+        // Urutkan per kategori: kategori normal, Tanpa Kategori, Belum Mapping.
         const sortedItems = Object.values(itemMap).sort((a, b) => {
-            if (a.mapped !== b.mapped) return b.mapped - a.mapped;
-            return b.qty - a.qty;
+            if (a.categoryOrder !== b.categoryOrder) return a.categoryOrder - b.categoryOrder;
+            if (a.category !== b.category) return a.category.localeCompare(b.category, 'id');
+            return (a.code || a.mSku || '').localeCompare((b.code || b.mSku || ''), 'id');
         });
 
+        let currentCategory = null;
         const itemRows = sortedItems.map(it => {
+            const groupRow = currentCategory !== it.category
+                ? `<tr class="category-row"><td colspan="4">${esc(it.category)}</td></tr>`
+                : '';
+            currentCategory = it.category;
+
             const label = it.mapped
-                ? `<strong style="font-family:monospace">${it.code}</strong>${it.variant ? `<span style="color:#555"> — ${it.variant}</span>` : ''}`
-                : `<span style="color:#aaa;font-family:monospace">${it.mSku || '—'} <em>(belum mapping)</em></span>`;
-            return `<tr>
+                ? `<strong class="sku-code">${it.code}</strong>${it.variant ? `<span class="variant-text"> — ${it.variant}</span>` : ''}`
+                : `<span class="unmapped-text">${it.mSku || '—'} <em>(belum mapping)</em></span>`;
+            return `${groupRow}<tr>
                 <td class="chk"><input type="checkbox"></td>
                 <td>${label}</td>
                 <td class="qty">${it.qty}</td>
+                <td class="picked-qty"></td>
             </tr>`;
         }).join('');
 
-        // ── Detail per order (halaman kedua / lanjutan) ───────────────
-        const orderCards = rows.map((o, idx) => {
-            const itemLines = (o.items || []).map(i => {
-                const code    = i.internal_item?.code || '';
-                const variant = i.variant_name || '';
-                const mSku    = i.model_sku || i.item_sku || '';
-                const label   = code
-                    ? `<strong style="font-family:monospace">${code}</strong>${variant ? ` <span style="color:#555">— ${variant}</span>` : ''}`
-                    : `<span style="color:#999;font-family:monospace">${mSku} <em>(belum mapping)</em></span>`;
-                return `<div class="item-line">
-                    <span>${label}</span>
-                    <strong>${i.qty || 1}×</strong>
-                </div>`;
-            }).join('');
-
-            return `<div class="order-card">
-                <div class="order-header">
-                    <span class="order-no">${idx + 1}. ${o.channel_order_id || '—'}</span>
-                    <span class="order-meta">${o.store?.name || '—'} · ${fmtRp(o.total_amount)}</span>
-                </div>
-                <div class="order-body">${itemLines || '<em style="color:#999">Tidak ada item</em>'}</div>
-            </div>`;
-        }).join('');
-
         const totalQty    = sortedItems.reduce((s, i) => s + i.qty, 0);
-        const totalAmount = rows.reduce((s, o) => s + (parseFloat(o.total_amount) || 0), 0);
 
         const html = `<!DOCTYPE html><html><head>
             <meta charset="UTF-8">
             <title>Picking List — ${today}</title>
             <style>
-                *, *::before, *::after { box-sizing: border-box; }
-                @page { size: A4; margin: 12mm 12mm 10mm; }
-                body { font-family: -apple-system, Arial, sans-serif; margin: 0; color: #000; font-size: 11px; line-height: 1.4; }
+                *, *::before, *::after {
+                    box-sizing: border-box;
+                    color: #000 !important;
+                    border-color: #000 !important;
+                    box-shadow: none !important;
+                    text-shadow: none !important;
+                    filter: none !important;
+                    opacity: 1 !important;
+                }
+                @page { size: 100mm 150mm; margin: 3.5mm; }
+                html, body {
+                    margin: 0;
+                    padding: 0;
+                    background: #fff !important;
+                    color: #000 !important;
+                    font-family: Arial, Helvetica, sans-serif;
+                    font-size: 6.5pt;
+                    line-height: 1.05;
+                    -webkit-print-color-adjust: economy;
+                    print-color-adjust: economy;
+                    color-scheme: light only;
+                }
                 /* Toolbar (hanya tampil di layar, tidak dicetak) */
                 #toolbar {
                     position: fixed; top: 0; left: 0; right: 0; z-index: 99;
-                    background: #0f172a; color: #fff; padding: .6rem 1rem;
+                    background: #0f172a !important; color: #fff !important; padding: .75rem 1rem;
                     display: flex; align-items: center; justify-content: space-between;
+                    gap: 1rem;
                 }
+                #toolbar * { color: #fff !important; }
                 #toolbar button {
-                    background: #6366f1; color: #fff; border: none; border-radius: 8px;
-                    padding: .4rem 1rem; font-weight: 700; font-size: .85rem; cursor: pointer;
+                    background: #000 !important; color: #fff !important; border: 1px solid #fff; border-radius: 8px;
+                    padding: .75rem 1.5rem; font-weight: 900; font-size: 1rem; cursor: pointer;
+                    min-width: 132px;
                 }
-                #toolbar button:hover { background: #4f46e5; }
-                #content { padding-top: 44px; }
+                #toolbar button:hover { background: #111 !important; }
+                #content { padding-top: 58px; }
                 @media print { #toolbar { display: none; } #content { padding-top: 0; } }
                 /* Header */
                 .page-header {
                     display: flex; justify-content: space-between; align-items: flex-end;
-                    border-bottom: 2.5px solid #000; padding-bottom: 5px; margin-bottom: 10px;
+                    border-bottom: .3mm solid #000; padding-bottom: .8mm; margin-bottom: 1.1mm;
                 }
-                .page-title { font-size: 18px; font-weight: 900; letter-spacing: -.03em; }
-                .page-meta  { font-size: 9px; color: #555; text-align: right; }
+                .header-left { display: flex; align-items: center; gap: 1.5mm; min-width: 0; }
+                .print-logo {
+                    width: 7mm;
+                    height: 7mm;
+                    object-fit: contain;
+                    flex: 0 0 auto;
+                    display: block;
+                    filter: grayscale(1) contrast(1.4) !important;
+                }
+                .page-title { font-size: 6.5pt; font-weight: 900; letter-spacing: 0; }
+                .page-date { font-size: 6pt; color: #000 !important; font-weight: 800; margin-top: .2mm; }
+                .page-meta  { font-size: 6.5pt; color: #000 !important; text-align: right; font-weight: 900; }
                 /* Ringkasan */
                 .section-title {
-                    font-size: 9px; font-weight: 800; text-transform: uppercase;
-                    letter-spacing: .08em; color: #333; margin: 10px 0 4px;
-                    border-bottom: 1.5px solid #000; padding-bottom: 3px;
+                    font-size: 6.5pt; font-weight: 900; text-transform: uppercase;
+                    letter-spacing: .02em; color: #000 !important; margin: 1mm 0 .7mm;
+                    border-bottom: .25mm solid #000; padding-bottom: .5mm;
                 }
                 table { width: 100%; border-collapse: collapse; }
-                table td, table th { padding: 3px 4px; border-bottom: 1px solid #eee; vertical-align: middle; }
-                table th { font-size: 9px; color: #999; text-transform: uppercase; font-weight: 700; border-bottom: 1px solid #ddd; }
-                .chk  { width: 20px; }
-                .qty  { width: 36px; text-align: center; font-weight: 900; font-size: 12px; }
-                .total-row td { border-top: 2px solid #000; font-weight: 900; padding: 4px; }
-                /* Detail order */
-                .order-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 6px; margin-top: 4px; }
-                .order-card { border: 1px solid #ddd; border-radius: 4px; overflow: hidden; page-break-inside: avoid; }
-                .order-header {
-                    display: flex; justify-content: space-between; align-items: center;
-                    background: #f4f4f4; padding: 4px 6px; border-bottom: 1px solid #ddd;
+                thead { display: table-row-group; }
+                table td, table th { padding: .62mm .8mm; border: .24mm solid #000; vertical-align: middle; }
+                table th { font-size: 6.5pt; color: #000 !important; text-transform: uppercase; font-weight: 900; }
+                .category-row td {
+                    padding: .45mm .8mm;
+                    font-size: 6pt;
+                    font-weight: 900;
+                    text-transform: uppercase;
+                    letter-spacing: .03em;
+                    color: #fff !important;
+                    background: #000 !important;
+                    -webkit-print-color-adjust: exact;
+                    print-color-adjust: exact;
                 }
-                .order-no   { font-family: monospace; font-weight: 900; font-size: 11px; }
-                .order-meta { font-size: 9px; color: #555; text-align: right; }
-                .order-body { padding: 4px 6px; }
-                .item-line  {
-                    display: flex; justify-content: space-between; align-items: center;
-                    padding: 2px 0; border-bottom: 1px dashed #eee; font-size: 11px;
+                .chk  { width: 5.5mm; text-align: center; }
+                .chk input { width: 2.8mm; height: 2.8mm; accent-color: #000; }
+                .qty  { width: 9mm; text-align: center; font-weight: 900 !important; font-size: 6.5pt; }
+                .picked-qty { width: 14mm; text-align: center; font-weight: 900 !important; font-size: 6.5pt; }
+                .sku-code,
+                .unmapped-text {
+                    font-family: Arial, Helvetica, sans-serif;
+                    font-size: 6.5pt;
+                    font-weight: 900 !important;
+                    color: #000 !important;
+                    line-height: 1;
                 }
-                .item-line:last-child { border-bottom: none; }
+                .variant-text {
+                    display: inline;
+                    margin-top: 0;
+                    font-size: 6pt;
+                    font-weight: 900;
+                    color: #000 !important;
+                }
+                .unmapped-text em { color: #000 !important; font-style: normal; font-weight: 900; }
+                .empty-text { color: #000 !important; font-style: normal; font-weight: 900; font-size: 6.5pt; }
                 .footer {
                     display: flex; justify-content: space-between; font-weight: 900;
-                    font-size: 11px; border-top: 2px solid #000; padding-top: 4px; margin-top: 6px;
+                    font-size: 6.5pt; border-top: .3mm solid #000; padding-top: .7mm; margin-top: 1mm;
+                    color: #000 !important;
+                }
+                @media screen {
+                    body {
+                        width: 100mm;
+                        min-height: 150mm;
+                        margin: 0 auto;
+                        padding: 0;
+                        overflow-x: hidden;
+                        background: #fff !important;
+                    }
+                    #content {
+                        width: 100mm;
+                        min-height: 150mm;
+                        margin: 0;
+                        padding-left: 3.5mm;
+                        padding-right: 3.5mm;
+                        padding-bottom: 3.5mm;
+                    }
+                }
+                @media print {
+                    *, *::before, *::after {
+                        color: #000 !important;
+                        border-color: #000 !important;
+                        box-shadow: none !important;
+                        text-shadow: none !important;
+                        filter: none !important;
+                        opacity: 1 !important;
+                    }
+                    html, body, #content { width: 93mm; background: #fff !important; }
+                    thead { display: table-row-group !important; }
+                    .qty,
+                    .sku-code {
+                        font-weight: 900 !important;
+                    }
+                    .category-row td {
+                        color: #fff !important;
+                        background: #000 !important;
+                        -webkit-print-color-adjust: exact;
+                        print-color-adjust: exact;
+                    }
                 }
             </style>
         </head>
@@ -1096,9 +1252,12 @@
             </div>
             <div id="content">
                 <div class="page-header">
-                    <div>
-                        <div class="page-title">PICKING LIST</div>
-                        <div style="font-size:9px;color:#666;margin-top:1px">${today} · ${timeNow}</div>
+                    <div class="header-left">
+                        <img class="print-logo" src="/images/logo-mark.svg" alt="GF">
+                        <div>
+                            <div class="page-title">PICKING LIST</div>
+                            <div class="page-date">${today} · ${timeNow}</div>
+                        </div>
                     </div>
                     <div class="page-meta">
                         <div><strong>${rows.length}</strong> order</div>
@@ -1112,24 +1271,19 @@
                         <th class="chk"></th>
                         <th style="text-align:left">Kode Item — Varian</th>
                         <th class="qty">Qty</th>
+                        <th class="picked-qty">Diambil</th>
                     </tr></thead>
                     <tbody>${itemRows}</tbody>
-                    <tfoot><tr class="total-row">
-                        <td></td><td>TOTAL</td><td class="qty">${totalQty}</td>
-                    </tr></tfoot>
                 </table>
-
-                <div class="section-title" style="margin-top:14px">Detail Pesanan</div>
-                <div class="order-grid">${orderCards}</div>
 
                 <div class="footer">
                     <span>TOTAL ${rows.length} PESANAN</span>
-                    <span>${fmtRp(totalAmount)}</span>
+                    <span>${totalQty} ITEM</span>
                 </div>
             </div>
         </body></html>`;
 
-        const win = window.open('', '_blank', 'width=900,height=1000');
+        const win = window.open('', '_blank', 'width=430,height=680');
         if (!win) { alert('Popup diblokir. Izinkan popup untuk halaman ini.'); return; }
         win.document.write(html);
         win.document.close();

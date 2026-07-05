@@ -207,6 +207,9 @@ Route::middleware(['auth', 'access:marketplace'])->prefix('api/sku-mappings')->g
         ->withoutMiddleware([\Illuminate\Foundation\Http\Middleware\VerifyCsrfToken::class]);
     Route::get('/search-items',      [SkuMappingController::class, 'searchItems']);
     Route::get('/unmapped-skus',     [SkuMappingController::class, 'unmappedSkus']);
+    Route::get('/categories',        [SkuMappingController::class, 'categories']);
+    Route::post('/quick-create-category', [SkuMappingController::class, 'quickCreateCategory'])
+        ->withoutMiddleware([\Illuminate\Foundation\Http\Middleware\VerifyCsrfToken::class]);
     Route::post('/quick-create-item', [SkuMappingController::class, 'quickCreateItem'])
         ->withoutMiddleware([\Illuminate\Foundation\Http\Middleware\VerifyCsrfToken::class]);
 });

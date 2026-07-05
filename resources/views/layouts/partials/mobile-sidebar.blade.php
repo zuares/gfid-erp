@@ -310,6 +310,10 @@
     $hasMarketplaceAds = $router->has('marketplace.ads');
     $hasMarketplaceAnalytics = $router->has('marketplace.analytics');
     $hasMarketplaceIssues = $router->has('marketplace.issues');
+    $hasMarketplaceIndex = $router->has('marketplace.orders');
+    $hasMarketplaceSalesReport = $router->has('marketplace.reports.sales');
+    $hasMarketplaceReconcileQueue = $router->has('marketplace.reconcile.queue');
+    $hasMarketplaceReconcileItemsIndex = $router->has('marketplace.reconcile.items');
 
     // Sales
     $hasSalesInvoicesIndex = $router->has('sales.invoices.index');
@@ -410,12 +414,14 @@
         $hasSupplierItemsIndex = false;
     }
 
-    if (!$canModule('marketplace')) {
+    if (!$isAdmin && !$canModule('marketplace')) {
         $hasMarketplaceCreate = false;
         $hasMarketplaceToko = $hasMarketplaceOrders = $hasMarketplacePemenuhan = false;
         $hasMarketplacePickingBarang = $hasMarketplaceSkuMapping = $hasMarketplaceSync = false;
         $hasMarketplacePencairanDana = $hasMarketplaceProfit = $hasMarketplaceAds = false;
         $hasMarketplaceAnalytics = $hasMarketplaceIssues = false;
+        $hasMarketplaceIndex = $hasMarketplaceSalesReport = false;
+        $hasMarketplaceReconcileQueue = $hasMarketplaceReconcileItemsIndex = false;
     }
 
     if (!$canModule('sales')) {
@@ -697,6 +703,50 @@
                                     <a href="{{ route('admin.crm.segments') }}"
                                        class="mobile-sidebar-link mobile-sidebar-link-sub {{ request()->routeIs('admin.crm.segments*') ? 'active' : '' }}">
                                         <span class="icon">🔖</span><span>Segmentasi</span>
+                                    </a>
+                                @endif
+                            </div>
+                        </li>
+                    @endif
+
+                    @if ($isAdmin && ($hasMarketplaceIndex || $hasMarketplaceSalesReport || $hasMarketplaceReconcileQueue || $hasMarketplaceReconcileItemsIndex))
+                        <div class="mobile-sidebar-section-label">Toko Online</div>
+                        <li class="mb-1">
+                            <button class="mobile-sidebar-link mobile-sidebar-toggle {{ $marketplaceOpen ? 'is-open' : '' }}"
+                                    type="button"
+                                    data-bs-toggle="collapse"
+                                    data-bs-target="#navMarketplaceAdminMobile"
+                                    aria-expanded="{{ $marketplaceOpen ? 'true' : 'false' }}"
+                                    aria-controls="navMarketplaceAdminMobile">
+                                <span class="icon">🛒</span><span>Toko Online</span><span class="chevron">▸</span>
+                            </button>
+
+                            <div class="collapse {{ $marketplaceOpen ? 'show' : '' }}" id="navMarketplaceAdminMobile">
+                                @if ($hasMarketplaceIndex)
+                                    <a href="{{ route('marketplace.orders') }}"
+                                       class="mobile-sidebar-link mobile-sidebar-link-sub {{ request()->routeIs('marketplace.orders') || request()->routeIs('marketplace.orders.*') ? 'active' : '' }}">
+                                        <span class="icon">📋</span><span>Orders</span>
+                                    </a>
+                                @endif
+
+                                @if ($hasMarketplaceSalesReport)
+                                    <a href="{{ route('marketplace.reports.sales') }}"
+                                       class="mobile-sidebar-link mobile-sidebar-link-sub {{ request()->routeIs('marketplace.reports.sales') ? 'active' : '' }}">
+                                        <span class="icon">📈</span><span>Sales Summary</span>
+                                    </a>
+                                @endif
+
+                                @if ($hasMarketplaceReconcileQueue)
+                                    <a href="{{ route('marketplace.reconcile.queue') }}"
+                                       class="mobile-sidebar-link mobile-sidebar-link-sub {{ request()->routeIs('marketplace.reconcile.*') || request()->routeIs('marketplace.reconciliations.*') ? 'active' : '' }}">
+                                        <span class="icon">🧩</span><span>Reconcile Queue</span>
+                                    </a>
+                                @endif
+
+                                @if ($hasMarketplaceReconcileItemsIndex)
+                                    <a href="{{ route('marketplace.reconcile.items') }}"
+                                       class="mobile-sidebar-link mobile-sidebar-link-sub {{ request()->routeIs('marketplace.reconcile.items*') ? 'active' : '' }}">
+                                        <span class="icon">🧾</span><span>Reconcile Items</span>
                                     </a>
                                 @endif
                             </div>

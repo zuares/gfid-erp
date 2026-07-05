@@ -309,6 +309,128 @@
 </div>
 
 {{-- ════════════════════════════════════════════════════════════
+     Modal 2b: Buat Item & Mapping
+════════════════════════════════════════════════════════════ --}}
+<div class="modal fade" id="modalCreateItem" tabindex="-1">
+    <div class="modal-dialog modal-dialog-centered" style="max-width:460px">
+        <div class="modal-content" style="border-radius:20px">
+            <div class="modal-header border-0 pb-0">
+                <div>
+                    <h5 class="modal-title fw-black">Buat Item &amp; Mapping</h5>
+                    <div class="text-muted" style="font-size:.8rem" id="ciSub">—</div>
+                </div>
+                <button class="btn-close" data-bs-dismiss="modal"></button>
+            </div>
+            <div class="modal-body">
+                <input type="hidden" id="ciOrderItemId">
+
+                <div class="mb-3">
+                    <label class="form-label fw-bold" style="font-size:.75rem;color:#64748b">SKU MARKETPLACE</label>
+                    <input type="text" class="form-control" id="ciSku" style="border-radius:12px;text-transform:uppercase" autocomplete="off"
+                        onfocus="this.select()" onclick="this.select()">
+                </div>
+
+                <div class="mb-3">
+                    <label class="form-label fw-bold" style="font-size:.75rem;color:#64748b">KODE ITEM BARU</label>
+                    <input type="text" class="form-control" id="ciCode" style="border-radius:12px;text-transform:uppercase" autocomplete="off"
+                        onfocus="this.select()" onclick="this.select()">
+                </div>
+
+                <div class="mb-3">
+                    <label class="form-label fw-bold" style="font-size:.75rem;color:#64748b">NAMA ITEM</label>
+                    <input type="text" class="form-control" id="ciName" style="border-radius:12px" autocomplete="off"
+                        onfocus="this.select()" onclick="this.select()">
+                </div>
+
+                <div class="mb-3">
+                    <label class="form-label fw-bold" style="font-size:.75rem;color:#64748b">SATUAN</label>
+                    <input type="text" class="form-control" id="ciUnit" value="pcs" style="border-radius:12px;max-width:120px" autocomplete="off"
+                        onfocus="this.select()" onclick="this.select()">
+                </div>
+
+                <div class="row g-2 mb-3">
+                    <div class="col-md-6">
+                        <label class="form-label fw-bold" style="font-size:.75rem;color:#64748b">TIPE ITEM</label>
+                        <select class="form-select" id="ciType" style="border-radius:12px" onchange="refreshCreateItemCategoryOptions()">
+                            <option value="finished_good" selected>Finished Good</option>
+                            <option value="wip">WIP</option>
+                            <option value="material">Material</option>
+                        </select>
+                    </div>
+                    <div class="col-md-6">
+                        <label class="form-label fw-bold" style="font-size:.75rem;color:#64748b">SUMBER PRODUKSI</label>
+                        <select class="form-select" id="ciProductionSource" style="border-radius:12px">
+                            <option value="buy" selected>Beli jadi</option>
+                            <option value="in_house">Produksi sendiri</option>
+                            <option value="outsource">Makloon / Outsource</option>
+                        </select>
+                    </div>
+                </div>
+
+                <div class="mb-3">
+                    <div class="d-flex align-items-center justify-content-between gap-2 mb-1">
+                        <label class="form-label fw-bold mb-0" style="font-size:.75rem;color:#64748b">KATEGORI</label>
+                        <button type="button" class="btn btn-link p-0 fw-bold" style="font-size:.72rem;text-decoration:none"
+                            onclick="toggleCreateCategoryForm()">+ Kategori</button>
+                    </div>
+                    <select class="form-select" id="ciCategory" style="border-radius:12px">
+                        <option value="">Memuat kategori…</option>
+                    </select>
+                </div>
+
+                <div id="ciCategoryForm" class="mb-3" style="display:none;border:1.5px dashed #cbd5e1;border-radius:14px;padding:.75rem;background:#f8fafc">
+                    <div class="row g-2">
+                        <div class="col-4">
+                            <label class="form-label fw-bold" style="font-size:.7rem;color:#64748b">Kode</label>
+                            <input type="text" class="form-control form-control-sm" id="ciCatCode" style="border-radius:10px;text-transform:uppercase">
+                        </div>
+                        <div class="col-8">
+                            <label class="form-label fw-bold" style="font-size:.7rem;color:#64748b">Nama Kategori</label>
+                            <input type="text" class="form-control form-control-sm" id="ciCatName" style="border-radius:10px">
+                        </div>
+                        <div class="col-12">
+                            <label class="form-label fw-bold" style="font-size:.7rem;color:#64748b">Jenis</label>
+                            <select class="form-select form-select-sm" id="ciCatKind" style="border-radius:10px">
+                                <option value="product" selected>Kategori Produk Jadi</option>
+                                <option value="material">Bahan Baku</option>
+                                <option value="support">Bahan Pendukung</option>
+                                <option value="accessory">Accessories</option>
+                                <option value="packaging">Packaging & Shipping</option>
+                                <option value="other">Lainnya</option>
+                            </select>
+                        </div>
+                    </div>
+                    <div id="ciCatAlert" class="alert d-none mt-2 mb-0" style="border-radius:10px;font-size:.78rem;padding:.45rem .7rem"></div>
+                    <button type="button" class="btn btn-outline-dark btn-sm fw-bold mt-2" style="border-radius:999px;font-size:.74rem"
+                        onclick="submitCreateCategory()">Buat Kategori</button>
+                </div>
+
+                <div class="mb-3">
+                    <label class="form-label fw-bold" style="font-size:.75rem;color:#64748b">HPP</label>
+                    <input type="number" class="form-control" id="ciHpp" min="0" step="1" placeholder="0"
+                        style="border-radius:12px" autocomplete="off">
+                </div>
+
+                <div class="form-check mb-3">
+                    <input type="checkbox" class="form-check-input" id="ciApplyAll" checked>
+                    <label class="form-check-label" for="ciApplyAll" style="font-size:.8rem">
+                        Hubungkan semua order dengan SKU marketplace yang sama
+                    </label>
+                </div>
+
+                <div id="ciAlert" class="alert d-none mb-3" style="border-radius:12px;font-size:.85rem"></div>
+
+                <div class="d-flex justify-content-end gap-2">
+                    <button class="btn btn-light border" style="border-radius:999px" data-bs-dismiss="modal">Batal</button>
+                    <button class="btn btn-dark fw-bold" style="border-radius:999px" id="ciSaveBtn"
+                        onclick="submitCreateItem()">Buat &amp; Mapping</button>
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+
+{{-- ════════════════════════════════════════════════════════════
      Modal 3: Isi HPP
 ════════════════════════════════════════════════════════════ --}}
 <div class="modal fade" id="modalHpp" tabindex="-1">
@@ -382,6 +504,10 @@
     }
 
     const $ = id => document.getElementById(id);
+    const jsArg = value => String(value ?? '')
+        .replace(/\\/g, '\\\\')
+        .replace(/'/g, "\\'")
+        .replace(/\r?\n/g, ' ');
 
     // ── Init ──────────────────────────────────────────────────────────────
     async function init() {
@@ -574,9 +700,15 @@
             </button>`);
         } else if (issue === 'mapping_not_found') {
             btns.push(`<button class="btn btn-warning btn-sm fw-bold" style="border-radius:999px;font-size:.72rem"
-                onclick="openMapping(${item.id},'${esc(item.marketplace_sku||'')}','${esc(item.item_name||'')}','${esc(item.variant_name||'')}')">
+                onclick="openMapping(${item.id},'${jsArg(item.marketplace_sku)}','${jsArg(item.item_name)}','${jsArg(item.variant_name)}')">
                 🔗 Mapping Sekarang
             </button>`);
+            if (!item.recommended_item) {
+                btns.push(`<button class="btn btn-dark btn-sm fw-bold" style="border-radius:999px;font-size:.72rem"
+                    onclick="openCreateItem(${item.id},'${jsArg(item.marketplace_sku)}','${jsArg(item.item_name)}','${jsArg(item.variant_name)}')">
+                    + Buat Item
+                </button>`);
+            }
         } else if (issue === 'missing_hpp') {
             btns.push(`<button class="btn btn-primary btn-sm fw-bold" style="border-radius:999px;font-size:.72rem"
                 onclick="openIsiHpp(${item.id},'${esc(item.internal_item_name||'—')}',${item.hpp_current||0})">
@@ -799,6 +931,184 @@
         } catch (e) {
             showModalAlert('mapAlert', e.message, 'danger');
             btn.disabled = false; btn.textContent = 'Simpan';
+        }
+    };
+
+    // ── Modal: Buat Item & Mapping ────────────────────────────────────────
+    let createItemCategories = [];
+
+    function allowedCategoryKinds(type) {
+        if (type === 'finished_good' || type === 'wip') return ['product'];
+        if (type === 'material') return ['material', 'support', 'accessory', 'packaging', 'other'];
+        return ['product', 'material', 'support', 'accessory', 'packaging', 'other'];
+    }
+
+    async function loadCreateItemCategories() {
+        if (createItemCategories.length) return;
+        createItemCategories = await api('/api/sku-mappings/categories').catch(() => []);
+    }
+
+    window.refreshCreateItemCategoryOptions = function (selectedId = null) {
+        const type = $('ciType').value || 'finished_good';
+        const allowed = allowedCategoryKinds(type);
+        const select = $('ciCategory');
+        const previous = selectedId || select.value;
+        const productionSource = $('ciProductionSource');
+
+        productionSource.disabled = !['finished_good', 'wip'].includes(type);
+        if (productionSource.disabled) productionSource.value = 'buy';
+
+        const filtered = createItemCategories.filter(c => allowed.includes(c.kind));
+        select.innerHTML = '<option value="">- Pilih Kategori -</option>' + filtered.map(c =>
+            `<option value="${c.id}" data-kind="${esc(c.kind)}">${esc(c.code)} — ${esc(c.name)} (${esc(c.kind_label || c.kind)})</option>`
+        ).join('');
+
+        if (previous && filtered.some(c => String(c.id) === String(previous))) {
+            select.value = previous;
+        }
+
+        Array.from($('ciCatKind').options).forEach(option => {
+            option.disabled = !allowed.includes(option.value);
+        });
+        $('ciCatKind').value = allowed[0] || 'product';
+    };
+
+    function suggestItemCode(sku, itemName, variant) {
+        const source = (sku || itemName || variant || '').toString().trim();
+        return source
+            .replace(/\([^)]*\)/g, '')
+            .replace(/[^a-zA-Z0-9]+/g, '-')
+            .replace(/^-+|-+$/g, '')
+            .replace(/-{2,}/g, '-')
+            .toUpperCase()
+            .slice(0, 40);
+    }
+
+    function suggestItemName(itemName, variant, sku) {
+        const base = (itemName || '').toString().trim();
+        const varName = (variant || '').toString().trim();
+        if (base && varName && !base.toLowerCase().includes(varName.toLowerCase())) {
+            return `${base} - ${varName}`;
+        }
+        return base || varName || sku || '';
+    }
+
+    window.openCreateItem = async function (itemId, sku, itemName, variant) {
+        const suggestedCode = suggestItemCode(sku, itemName, variant);
+        const suggestedName = suggestItemName(itemName, variant, sku);
+
+        $('ciOrderItemId').value = itemId;
+        $('ciSub').textContent = sku ? `SKU ${sku}` : `Item ID #${itemId}`;
+        $('ciSku').value = (sku || '').toUpperCase();
+        $('ciCode').value = suggestedCode;
+        $('ciName').value = suggestedName;
+        $('ciUnit').value = 'pcs';
+        $('ciType').value = 'finished_good';
+        $('ciProductionSource').value = 'buy';
+        $('ciHpp').value = '';
+        $('ciCategoryForm').style.display = 'none';
+        $('ciCatCode').value = '';
+        $('ciCatName').value = '';
+        $('ciCatKind').value = 'product';
+        $('ciCatAlert').className = 'alert d-none mt-2 mb-0';
+        $('ciApplyAll').checked = true;
+        $('ciAlert').className = 'alert d-none';
+        $('ciSaveBtn').disabled = false;
+        $('ciSaveBtn').textContent = 'Buat & Mapping';
+        await loadCreateItemCategories();
+        refreshCreateItemCategoryOptions();
+        new bootstrap.Modal($('modalCreateItem')).show();
+    };
+
+    window.toggleCreateCategoryForm = function () {
+        const form = $('ciCategoryForm');
+        const open = form.style.display !== 'none';
+        form.style.display = open ? 'none' : 'block';
+        if (!open && !$('ciCatName').value && $('ciName').value) {
+            $('ciCatName').value = $('ciName').value.split('-')[0].trim();
+            $('ciCatCode').value = suggestItemCode($('ciCatName').value).slice(0, 20);
+        }
+    };
+
+    window.submitCreateCategory = async function () {
+        const code = $('ciCatCode').value.trim().toUpperCase();
+        const name = $('ciCatName').value.trim();
+        const kind = $('ciCatKind').value || 'product';
+        if (!code || !name) {
+            showModalAlert('ciCatAlert', 'Kode dan nama kategori wajib diisi.', 'danger');
+            return;
+        }
+
+        try {
+            const category = await api('/api/sku-mappings/quick-create-category', {
+                method: 'POST',
+                body: JSON.stringify({ code, name, kind }),
+            });
+            createItemCategories.push(category);
+            $('ciCategoryForm').style.display = 'none';
+            $('ciCatAlert').className = 'alert d-none mt-2 mb-0';
+            refreshCreateItemCategoryOptions(category.id);
+            toast(`Kategori ${category.code} dibuat.`, 'ok');
+        } catch (e) {
+            showModalAlert('ciCatAlert', e.message, 'danger');
+        }
+    };
+
+    window.submitCreateItem = async function () {
+        const orderItemId = $('ciOrderItemId').value;
+        const sku = $('ciSku').value.trim().toUpperCase();
+        const code = $('ciCode').value.trim().toUpperCase();
+        const name = $('ciName').value.trim();
+        const unit = $('ciUnit').value.trim() || 'pcs';
+        const type = $('ciType').value || 'finished_good';
+        const itemCategoryId = $('ciCategory').value || null;
+        const productionSource = $('ciProductionSource').value || 'buy';
+        const hpp = parseFloat($('ciHpp').value || '0') || 0;
+
+        if (!sku || !code || !name || !unit) {
+            showModalAlert('ciAlert', 'SKU, kode item, nama item, dan satuan wajib diisi.', 'danger');
+            return;
+        }
+        if (!itemCategoryId) {
+            showModalAlert('ciAlert', 'Pilih kategori item atau buat kategori baru.', 'danger');
+            return;
+        }
+
+        const btn = $('ciSaveBtn');
+        btn.disabled = true;
+        btn.textContent = 'Membuat…';
+
+        try {
+            const item = await api('/api/sku-mappings/quick-create-item', {
+                method: 'POST',
+                body: JSON.stringify({
+                    code,
+                    name,
+                    unit,
+                    type,
+                    item_category_id: parseInt(itemCategoryId),
+                    production_source: productionSource,
+                    hpp,
+                }),
+            });
+
+            btn.textContent = 'Mapping…';
+            await api('/api/marketplace/order-items/' + orderItemId + '/map-sku', {
+                method: 'PATCH',
+                body: JSON.stringify({
+                    internal_item_id: parseInt(item.id),
+                    apply_to_all: $('ciApplyAll').checked,
+                }),
+            });
+
+            bootstrap.Modal.getInstance($('modalCreateItem')).hide();
+            toast(`Item ${item.code} dibuat dan SKU berhasil di-mapping.`, 'ok');
+            loadItems(currentPage);
+            loadSummary();
+        } catch (e) {
+            showModalAlert('ciAlert', e.message, 'danger');
+            btn.disabled = false;
+            btn.textContent = 'Buat & Mapping';
         }
     };
 

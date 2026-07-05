@@ -184,7 +184,7 @@ class MarketplaceController extends Controller
         $orders = MarketplaceOrder::with([
                 'store.channel',
                 'items',
-                'items.internalItem' => fn ($q) => $q->select('id', 'code'),
+                'items.internalItem' => fn ($q) => $q->select('id', 'code', 'item_category_id')->with('category:id,code,name'),
                 'fulfillment:' . $fulfillmentSelect,
                 'fulfillment.lines',
                 'fulfillment.lines.item:id,code,name',

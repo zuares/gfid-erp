@@ -359,6 +359,9 @@
                 <strong id="readyCount">0</strong> order siap dikirim
             </div>
             <div class="pk-toolbar-right">
+                <button class="pk-btn" onclick="printPickingList()">
+                    Cetak Picking List
+                </button>
                 <button class="pk-btn success" id="btnProcessShipping" onclick="processShippingDummy()">
                     🚀 Proses Kirim Semua
                 </button>
@@ -743,6 +746,9 @@ function renderReadyToShip() {
             </div>
             ${linesHtml}
             <div class="pk-ship-footer" style="display:flex;align-items:center;gap:.75rem;flex-wrap:wrap">
+                <button class="pk-btn" onclick="printPickingList(${o.id})">
+                    Cetak
+                </button>
                 <button class="pk-btn success" onclick="processShippingDummy(${o.id})"
                     ${hasProblem ? 'disabled title="Ada baris bermasalah — selesaikan dulu"' : ''}>
                     🚀 Proses Kirim
@@ -1261,6 +1267,233 @@ function toast(msg, type) {
 function esc(str) {
     if (str === null || str === undefined) return '';
     return String(str).replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/"/g,'&quot;');
+}
+
+function printPickingList(orderId = null) {
+    const targets = orderId
+        ? S.readyToShip.filter(o => o.id === orderId)
+        : S.readyToShip;
+
+    if (!targets.length) {
+        toast('Tidak ada picking list untuk dicetak', 'warn');
+        return;
+    }
+
+    const printedAt = new Date().toLocaleString('id-ID', {
+        day: '2-digit',
+        month: '2-digit',
+        year: '2-digit',
+        hour: '2-digit',
+        minute: '2-digit',
+    });
+
+    const pages = targets.map((order) => {
+        const lines = Array.isArray(order.lines) ? order.lines : [];
+        const rows = lines.length
+            ? lines.map((line, idx) => {
+                const sku = line.sku || '-';
+                const name = line.name || '';
+                const isUnmapped = sku === '?' || sku === '-' || /belum|mapping|tidak/i.test(`${sku} ${name}`);
+
+                return `
+                <tr class="${isUnmapped ? 'is-unmapped' : ''}">
+                    <td class="num">${idx + 1}</td>
+                    <td>
+                        <div class="sku">${esc(sku)}</div>
+                        <div class="name">${esc(name)}</div>
+                    </td>
+                    <td class="qty">${Number(line.qty || 0)}</td>
+                    <td class="check"></td>
+                </tr>
+            `;
+            }).join('')
+            : `<tr><td colspan="4" class="empty">Detail item belum tersedia.</td></tr>`;
+
+        return `
+            <section class="pick-page">
+                <header class="pick-head">
+                    <div>
+                        <div class="doc-title">PICKING LIST</div>
+                        <div class="doc-sub">${esc(printedAt)}</div>
+                    </div>
+                    <div class="doc-code">${esc(order.orderNo || '-')}</div>
+                </header>
+
+                <div class="meta-grid">
+                    <div>
+                        <div class="meta-label">Toko</div>
+                        <div class="meta-value">${esc(order.store || '-')}</div>
+                    </div>
+                    <div>
+                        <div class="meta-label">Channel</div>
+                        <div class="meta-value">${esc(order.channel || '-')}</div>
+                    </div>
+                    <div>
+                        <div class="meta-label">Item</div>
+                        <div class="meta-value">${Number(order.items || lines.length || 0)}</div>
+                    </div>
+                    <div>
+                        <div class="meta-label">Qty</div>
+                        <div class="meta-value">${Number(order.totalQty || 0)}</div>
+                    </div>
+                </div>
+
+                <table class="pick-table">
+                    <thead>
+                        <tr>
+                            <th class="num">#</th>
+                            <th>Barang</th>
+                            <th class="qty">Qty</th>
+                            <th class="check">OK</th>
+                        </tr>
+                    </thead>
+                    <tbody>${rows}</tbody>
+                </table>
+
+                <footer class="pick-foot">
+                    <div>
+                        <div class="sign-line"></div>
+                        <div>Picker</div>
+                    </div>
+                    <div>
+                        <div class="sign-line"></div>
+                        <div>Checker</div>
+                    </div>
+                </footer>
+            </section>
+        `;
+    }).join('');
+
+    const html = `<!doctype html>
+<html>
+<head>
+<meta charset="utf-8">
+<title>Picking List</title>
+<style>
+@page { size: 100mm 150mm; margin: 0; }
+*,
+*::before,
+*::after { box-sizing: border-box; color: #000 !important; background: #fff !important; box-shadow: none !important; text-shadow: none !important; border-color: #000 !important; filter: none !important; opacity: 1 !important; }
+html, body { margin: 0; padding: 0; font-family: Arial, Helvetica, sans-serif; color: #000 !important; background: #fff !important; font-size: 10.5pt; }
+body { -webkit-print-color-adjust: economy; print-color-adjust: economy; color-scheme: light only; }
+.pick-page {
+    width: 100mm;
+    min-height: 150mm;
+    padding: 4.5mm;
+    page-break-after: always;
+    background: #fff !important;
+}
+.pick-page:last-child { page-break-after: auto; }
+.pick-head {
+    display: flex;
+    justify-content: space-between;
+    gap: 4mm;
+    align-items: flex-start;
+    border-bottom: .45mm solid #000;
+    padding-bottom: 2.2mm;
+    margin-bottom: 2.7mm;
+}
+.doc-title { font-size: 17pt; font-weight: 900; letter-spacing: .12mm; color: #000 !important; }
+.doc-sub { font-size: 10pt; margin-top: .6mm; font-weight: 900; color: #000 !important; }
+.doc-code {
+    max-width: 45mm;
+    text-align: right;
+    font-size: 18pt;
+    font-weight: 900;
+    word-break: break-word;
+    line-height: 1.05;
+    color: #fff !important;
+    background: #000 !important;
+    border: .45mm solid #000;
+    padding: 1.8mm 2.2mm;
+}
+.meta-grid {
+    display: grid;
+    grid-template-columns: 1fr 1fr;
+    gap: 1.8mm 3mm;
+    border: .35mm solid #000;
+    padding: 2mm;
+    margin-bottom: 2.7mm;
+}
+.meta-label { font-size: 9.5pt; text-transform: uppercase; letter-spacing: .08mm; font-weight: 900; color: #000 !important; }
+.meta-value { font-size: 12.5pt; font-weight: 900; margin-top: .4mm; word-break: break-word; color: #000 !important; }
+.pick-table { width: 100%; border-collapse: collapse; table-layout: fixed; }
+.pick-table th,
+.pick-table td { border: .35mm solid #000; padding: 1.8mm 1.5mm; vertical-align: top; }
+.pick-table th { font-size: 10pt; text-transform: uppercase; text-align: left; font-weight: 900; border: .35mm solid #000; padding: 1.6mm 1.5mm; color: #000 !important; }
+.pick-table td { font-size: 11.5pt; font-weight: 900; color: #000 !important; }
+.pick-table .num { width: 8mm; text-align: center; }
+.pick-table .qty { width: 15mm; text-align: center; font-weight: 900; font-size: 16pt; color: #000 !important; }
+.pick-table .check { width: 12mm; text-align: center; }
+.sku { font-size: 16pt; font-weight: 900; line-height: 1.02; color: #000 !important; }
+.name { font-size: 10.5pt; line-height: 1.12; margin-top: .7mm; font-weight: 900; color: #000 !important; }
+.is-unmapped,
+.is-unmapped *,
+.unmapped,
+.unmapped *,
+.muted,
+.text-muted {
+    color: #000 !important;
+    background: #fff !important;
+    opacity: 1 !important;
+    font-weight: 900 !important;
+}
+.empty { text-align: center; padding: 6mm 2mm !important; font-size: 11pt; font-weight: 900; }
+.pick-foot {
+    display: grid;
+    grid-template-columns: 1fr 1fr;
+    gap: 10mm;
+    margin-top: 7mm;
+    font-size: 8.5pt;
+    font-weight: 800;
+    text-align: center;
+}
+.sign-line { border-top: .35mm solid #000; height: 9mm; }
+@media screen {
+    body { background: #fff !important; padding: 6mm; }
+    .pick-page { margin: 0 auto 8mm; border: .35mm solid #000; }
+}
+@media print {
+    *,
+    *::before,
+    *::after {
+        color: #000 !important;
+        background: #fff !important;
+        border-color: #000 !important;
+        box-shadow: none !important;
+        text-shadow: none !important;
+        filter: none !important;
+        opacity: 1 !important;
+    }
+    html,
+    body,
+    .pick-page {
+        width: 100mm;
+        background: #fff !important;
+    }
+    .doc-code {
+        color: #fff !important;
+        background: #000 !important;
+        border-color: #000 !important;
+        -webkit-print-color-adjust: exact;
+        print-color-adjust: exact;
+    }
+}
+</style>
+</head>
+<body>${pages}</body>
+</html>`;
+
+    const printWindow = window.open('', '_blank', 'width=420,height=640');
+    if (!printWindow) {
+        toast('Popup print diblokir browser', 'warn');
+        return;
+    }
+    printWindow.document.open();
+    printWindow.document.write(html);
+    printWindow.document.close();
+    printWindow.focus();
+    setTimeout(() => printWindow.print(), 250);
 }
 
 // ══════════════════════════════════════════════════════════════════════
