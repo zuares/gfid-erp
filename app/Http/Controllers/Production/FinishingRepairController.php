@@ -79,9 +79,10 @@ class FinishingRepairController extends Controller
         return DB::transaction(function () use ($rows, $date, $validated): RedirectResponse {
             $rejFin = Warehouse::query()->where('code', 'REJ-FIN')->first();
             $whPrd = Warehouse::query()->where('code', 'WH-PRD')->first();
+            $whRts = Warehouse::query()->where('code', 'WH-RTS')->first();
 
-            if (!$rejFin || !$whPrd) {
-                throw ValidationException::withMessages(['results' => 'Gudang REJ-FIN / WH-PRD belum lengkap.']);
+            if (!$rejFin || !$whPrd || !$whRts) {
+                throw ValidationException::withMessages(['results' => 'Gudang REJ-FIN / WH-PRD / WH-RTS belum lengkap.']);
             }
 
             $lineIds = $rows->pluck('finishing_job_line_id')->unique()->values()->all();
@@ -179,13 +180,13 @@ class FinishingRepairController extends Controller
                     );
 
                     $this->inventory->stockIn(
-                        warehouseId: $rejFin->id,
+                        warehouseId: $whRts->id,
                         itemId: (int) $rejectItem->id,
                         qty: $qtyReject,
                         date: $date,
                         sourceType: 'finishing_reject_convert',
                         sourceId: (int) $available->finishing_job_line_id,
-                        notes: "Tidak bisa diperbaiki {$repair->code} IN {$rejectItem->code}",
+                        notes: "Tidak bisa diperbaiki {$repair->code} IN WH-RTS {$rejectItem->code}",
                         lotId: null,
                         unitCost: $unitCost > 0 ? $unitCost : null,
                         affectLotCost: false,
@@ -196,7 +197,7 @@ class FinishingRepairController extends Controller
 
             return redirect()
                 ->route('production.finishing_repairs.show', $repair)
-                ->with('status', "Perbaikan {$repair->code} berhasil disimpan.");
+                ->with('status', "Perbaikan {$repair->code} berhasil disimpan. Qty tidak bisa masuk WH-RTS sebagai SKU reject kategori.");
         });
     }
 

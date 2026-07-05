@@ -39,6 +39,41 @@
         .panel-b { padding: 10px 12px; }
 
         .h-title { font-weight: 900; font-size: .95rem; margin: 0; }
+        .return-mode-switch {
+            display: inline-flex;
+            align-items: center;
+            gap: 3px;
+            padding: 3px;
+            border: 1px solid rgba(148, 163, 184, .22);
+            border-radius: 10px;
+            background: rgba(148, 163, 184, .06);
+        }
+        .return-mode-link {
+            display: inline-flex;
+            align-items: center;
+            justify-content: center;
+            min-height: 30px;
+            padding: .25rem .7rem;
+            border-radius: 8px;
+            color: var(--muted);
+            font-size: .75rem;
+            font-weight: 700;
+            text-decoration: none;
+            white-space: nowrap;
+        }
+        .return-mode-link:hover { color: var(--bs-body-color); background: rgba(148, 163, 184, .1); }
+        .return-mode-link.active {
+            color: #fff;
+            background: #334155;
+        }
+        .return-mode-link.reject.active { background: #7f1d1d; }
+        .return-head-actions {
+            display: flex;
+            align-items: center;
+            gap: .45rem;
+            flex-wrap: wrap;
+            justify-content: flex-end;
+        }
 
         .meta { border: 1px solid rgba(148, 163, 184, .18); border-radius: var(--r); padding: 8px; background: var(--soft2); }
         body[data-theme="dark"] .meta { background: rgba(15, 23, 42, .35); }
@@ -95,6 +130,16 @@
             .return-dest-name { display: none; }
             .return-dest-pill { justify-content: center; padding-left: .35rem; padding-right: .35rem; }
             #q { font-size: .86rem; }
+            .return-head-actions {
+                width: 100%;
+                justify-content: stretch;
+            }
+            .return-mode-switch {
+                flex: 1;
+                display: grid;
+                grid-template-columns: 1fr 1fr;
+            }
+            .return-mode-link { padding-inline: .35rem; }
         }
 
         @media(min-width:768px) and (max-width:991.98px) {
@@ -494,6 +539,13 @@
     $pageTitle = $isRejectReworkMode ? 'Setor Ulang Reject Jahit' : 'Setoran Jahit';
     $sourceStockLabel = $isRejectReworkMode ? 'REJ-SEW' : ($hasRejectRows ? 'STOK' : 'WIP');
     $remainingLabel = $isRejectReworkMode ? 'SISA REJECT' : ($hasRejectRows ? 'SISA' : 'BELUM');
+    $modeBaseParams = collect([
+        'operator_id' => $selectedOperatorId !== '' && $selectedOperatorId !== '0' ? $selectedOperatorId : null,
+        'pickup_date' => $selectedPickupDate !== '' ? $selectedPickupDate : null,
+        'item' => $selectedItemCode !== '' ? $selectedItemCode : null,
+    ])->filter(fn($value) => filled($value))->all();
+    $normalModeUrl = route('production.sewing.returns.create', $modeBaseParams);
+    $rejectModeUrl = route('production.sewing.returns.create', array_merge($modeBaseParams, ['source' => 'reject-sewing']));
 
     $itemOptions = $lines
         ->map(fn($l) => strtoupper(optional($l->finishedItem)->code ?? ''))
@@ -731,11 +783,24 @@
                     @endif
                 </div>
 
-                <a href="{{ $isRejectReworkMode ? route('production.sewing.reject_returns.index') : route('production.sewing.pickups.create') }}"
-                   class="btn btn-sm btn-outline-success"
-                   style="border-radius:999px;">
-                    {{ $isRejectReworkMode ? 'List Reject Jahit' : 'Sewing Pickup' }}
-                </a>
+                <div class="return-head-actions">
+                    <div class="return-mode-switch" aria-label="Mode setoran jahit">
+                        <a href="{{ $normalModeUrl }}"
+                           class="return-mode-link {{ $isRejectReworkMode ? '' : 'active' }}">
+                            Setor Normal
+                        </a>
+                        <a href="{{ $rejectModeUrl }}"
+                           class="return-mode-link reject {{ $isRejectReworkMode ? 'active' : '' }}">
+                            Setor Reject
+                        </a>
+                    </div>
+
+                    <a href="{{ $isRejectReworkMode ? route('production.sewing.reject_returns.index') : route('production.sewing.pickups.create') }}"
+                       class="btn btn-sm btn-outline-success"
+                       style="border-radius:8px;">
+                        {{ $isRejectReworkMode ? 'List Reject' : 'Ambil Jahit' }}
+                    </a>
+                </div>
             </div>
         </div>
     </div>

@@ -80,8 +80,12 @@ Route::middleware(['web', 'auth', 'access:sales'])
                 Route::get('create', 'create')->name('create');
                 Route::post('/', 'store')->name('store');
 
+                Route::get('{shipmentReturn}/scan-lookup', 'scanLookup')->name('scan_lookup');
+                Route::get('{shipmentReturn}/edit', 'edit')->name('edit');
                 Route::get('{shipmentReturn}', 'show')->name('show');
 
+                Route::post('{shipmentReturn}/orders/bulk', 'bulkOrders')->name('bulk_orders');
+                Route::post('{shipmentReturn}/orders/clear', 'clearOrders')->name('clear_orders');
                 Route::post('{shipmentReturn}/scan-item', 'scanItem')->name('scan_item');
                 Route::post('{shipmentReturn}/submit', 'submit')->name('submit');
                 Route::post('{shipmentReturn}/post', 'post')->name('post');

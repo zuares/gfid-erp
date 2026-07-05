@@ -40,24 +40,6 @@
 
         .prod-filter-busy { opacity: .55; pointer-events: none; }
 
-        /* Select filter pill (operator / kategori / sku) — selaras header marketplace */
-        .gf-header-select {
-            min-height: 38px;
-            max-width: 168px;
-            border-radius: 999px !important;
-            font-size: .78rem;
-            font-weight: 700;
-            padding-left: .85rem;
-            padding-right: 1.9rem;
-            border-color: rgba(15, 23, 42, .10);
-            box-shadow: none !important;
-            text-overflow: ellipsis;
-        }
-
-        @media (max-width: 576px) {
-            .gf-header-select { max-width: 100%; width: 100%; }
-        }
-
         .prod-empty {
             text-align: center;
             color: var(--gf-muted);
@@ -110,22 +92,139 @@
             .gf-table-scroll-sticky .gf-clean-table { min-width: 0 !important; font-size: .76rem; }
             .gf-table-scroll-sticky .gf-clean-table th,
             .gf-table-scroll-sticky .gf-clean-table td { padding-left: .4rem; padding-right: .4rem; }
-            .gf-table-scroll.gf-table-scroll-sticky { overflow-x: hidden; }
+            .gf-table-scroll.gf-table-scroll-sticky { overflow: visible; }
         }
 
         /* Scroll vertikal + thead sticky */
         .gf-table-scroll.gf-table-scroll-sticky {
-            max-height: calc(100vh - 360px);
+            max-height: none;
             min-height: 220px;
-            overflow: auto;
+            overflow: visible;
             -webkit-overflow-scrolling: touch;
         }
         .gf-table-scroll-sticky .gf-sticky-table thead th {
             position: sticky;
             top: 0;
-            z-index: 5;
-            background: #f8fafc;
+            z-index: 20;
+            background: #f8fafc !important;
             box-shadow: inset 0 -1px 0 #e6eaf0;
+        }
+
+        .gf-table-scroll-sticky .gf-sticky-table .gf-sticky-thead,
+        .gf-table-scroll-sticky .gf-sticky-table .gf-sticky-head-row {
+            position: sticky;
+            top: 0;
+            z-index: 30;
+            background: #f8fafc;
+        }
+
+        .gf-table-scroll-sticky .gf-sticky-table .gf-sticky-head-row th {
+            position: sticky;
+            top: 0;
+            z-index: 33;
+        }
+
+        .pj-head-filters {
+            display: grid;
+            grid-template-columns: minmax(180px, 1.25fr) minmax(112px, .6fr) minmax(150px, .8fr) auto;
+            align-items: center;
+            gap: .42rem;
+            width: min(100%, 760px);
+        }
+
+        .gf-head-control {
+            min-height: 32px;
+            width: 100%;
+            border-radius: 7px;
+            border-color: rgba(148, 163, 184, .26);
+            background-color: #fff;
+            color: #334155;
+            font-size: .76rem;
+            font-weight: 750;
+            box-shadow: none !important;
+        }
+
+        .gf-head-control:focus {
+            border-color: rgba(37, 99, 235, .48);
+            box-shadow: 0 0 0 2px rgba(37, 99, 235, .10) !important;
+        }
+
+        .gf-head-count {
+            color: #64748b !important;
+            font-size: .74rem !important;
+            font-weight: 850 !important;
+            text-align: right;
+            text-transform: none !important;
+            letter-spacing: 0 !important;
+            white-space: nowrap;
+        }
+
+        .gf-sort-th {
+            border: 0;
+            background: transparent;
+            color: inherit;
+            display: inline-flex;
+            align-items: center;
+            justify-content: flex-start;
+            gap: .28rem;
+            width: 100%;
+            padding: 0;
+            font: inherit;
+            font-weight: inherit;
+            letter-spacing: inherit;
+            text-transform: inherit;
+            text-align: inherit;
+            cursor: pointer;
+        }
+
+        .gf-num .gf-sort-th {
+            justify-content: flex-end;
+        }
+
+        .gf-sort-th::after {
+            content: "↕";
+            color: #94a3b8;
+            font-size: .78em;
+            line-height: 1;
+        }
+
+        th[aria-sort="ascending"] .gf-sort-th::after {
+            content: "↑";
+            color: #334155;
+        }
+
+        th[aria-sort="descending"] .gf-sort-th::after {
+            content: "↓";
+            color: #334155;
+        }
+
+        .gf-sort-th:hover {
+            color: #334155;
+        }
+
+        th[aria-sort="ascending"],
+        th[aria-sort="descending"] {
+            color: #334155 !important;
+            background: #eef2f7 !important;
+        }
+
+        .gf-doc-code {
+            display: block;
+            margin-top: .16rem;
+            color: #94a3b8;
+            font-size: .68rem;
+            font-weight: 750;
+            font-variant-numeric: tabular-nums;
+            white-space: nowrap;
+        }
+
+        .gf-sticky-table tbody tr[data-pj-row] {
+            cursor: pointer;
+        }
+
+        .gf-sticky-table tbody tr.is-selected td {
+            background: rgba(37, 99, 235, .07) !important;
+            box-shadow: inset 3px 0 0 #2563eb;
         }
 
         /* Badges & chips dipakai partial */
@@ -171,11 +270,556 @@
         .gf-table-foot { display: flex; align-items: center; justify-content: flex-end; gap: .75rem;
             margin-top: .85rem; padding-top: .75rem; border-top: 1px solid #eef0f4; }
         .gf-table-foot-hint { font-size: .8rem; color: #94a3b8; }
+
+        /* Payroll skin: diselaraskan dengan halaman shipment edit */
+        .payroll-shipment-skin {
+            max-width: 1100px;
+            margin-inline: auto;
+            padding: 0 .75rem 5rem;
+            min-width: 0;
+            width: 100%;
+        }
+
+        .payroll-shipment-skin > *,
+        .payroll-shipment-skin .gf-marketplace-dashboard,
+        .payroll-shipment-skin .gf-marketplace-tab-panel,
+        .payroll-shipment-skin .gf-panel,
+        .payroll-shipment-skin .gf-panel-body,
+        .payroll-shipment-skin .gf-overview-kpi-grid,
+        .payroll-shipment-skin .gf-table-scroll {
+            min-width: 0;
+            max-width: 100%;
+        }
+
+        body[data-theme="light"] .payroll-shipment-skin {
+            background: #f3f4f6;
+        }
+
+        body[data-theme="dark"] .payroll-shipment-skin {
+            background: #020617;
+        }
+
+        .payroll-shipment-skin .gf-master-header {
+            position: static;
+            top: 0;
+            z-index: 310;
+            margin-inline: -.75rem;
+            padding: .5rem .85rem;
+            border: 0;
+            border-bottom: 1px solid rgba(148, 163, 184, .22);
+            border-radius: 0;
+            background: rgba(248, 250, 252, .97);
+            box-shadow: none;
+            backdrop-filter: blur(14px);
+            -webkit-backdrop-filter: blur(14px);
+        }
+
+        body[data-theme="dark"] .payroll-shipment-skin .gf-master-header {
+            background: rgba(2, 6, 23, .96);
+            border-bottom-color: rgba(71, 85, 105, .72);
+        }
+
+        .payroll-shipment-skin .gf-master-header-layout {
+            gap: .6rem;
+            align-items: center;
+        }
+
+        .payroll-shipment-skin .gf-master-header-copy {
+            display: flex;
+            align-items: center;
+            gap: .45rem;
+            flex-wrap: wrap;
+            min-width: 180px;
+        }
+
+        .payroll-shipment-skin .gf-master-eyebrow {
+            margin: 0;
+            border-radius: 999px;
+            padding: .15rem .62rem;
+            border: 1px solid rgba(148, 163, 184, .32);
+            background: rgba(148, 163, 184, .08);
+            color: #475569;
+            font-size: .68rem;
+            letter-spacing: .08em;
+        }
+
+        .payroll-shipment-skin .gf-master-title {
+            margin: 0;
+            font-size: 1.05rem;
+            font-weight: 900;
+            letter-spacing: .01em;
+            color: #111827;
+            white-space: nowrap;
+        }
+
+        body[data-theme="dark"] .payroll-shipment-skin .gf-master-title {
+            color: #e5e7eb;
+        }
+
+        .payroll-shipment-skin .gf-master-desc {
+            display: none;
+        }
+
+        .payroll-shipment-skin .gf-master-actions {
+            flex: 1 1 620px;
+        }
+
+        .payroll-shipment-skin .gf-dashboard-header-actions,
+        .payroll-shipment-skin .gf-dashboard-header-filter {
+            width: 100%;
+        }
+
+        .payroll-shipment-skin .gf-dashboard-header-filter {
+            display: grid;
+            grid-template-columns: 92px minmax(190px, 240px) 54px;
+            align-items: center;
+            justify-content: flex-end;
+            gap: .45rem;
+        }
+
+        .payroll-shipment-skin .gf-dashboard-header-filter [data-date-from],
+        .payroll-shipment-skin .gf-dashboard-header-filter [data-date-to] {
+            display: none !important;
+        }
+
+        .payroll-shipment-skin .gf-dashboard-header-filter .form-control,
+        .payroll-shipment-skin .gf-dashboard-header-filter .form-select,
+        .payroll-shipment-skin .gf-header-period-select,
+        .payroll-shipment-skin .gf-header-date-input {
+            min-height: 34px;
+            border-radius: 999px !important;
+            border-color: rgba(148, 163, 184, .32);
+            background: rgba(248, 250, 252, .96);
+            color: #334155;
+            font-size: .76rem;
+            font-weight: 750;
+            padding-top: .22rem;
+            padding-bottom: .22rem;
+            padding-left: .7rem;
+            box-shadow: none !important;
+            min-width: 0;
+        }
+
+        .payroll-shipment-skin .gf-header-date-input {
+            width: 100%;
+            max-width: none;
+            font-variant-numeric: tabular-nums;
+        }
+
+        .payroll-shipment-skin .gf-header-period-select {
+            width: 100%;
+            max-width: none;
+            padding-right: 1.55rem;
+        }
+
+        .payroll-shipment-skin .gf-header-icon-btn {
+            min-height: 34px;
+            width: 54px;
+            border-radius: 999px;
+            padding-inline: .55rem;
+            font-size: .75rem;
+            font-weight: 800;
+            color: #64748b;
+            background: transparent;
+        }
+
+        .payroll-shipment-skin .gf-marketplace-dashboard {
+            gap: .75rem;
+        }
+
+        .payroll-shipment-skin .gf-marketplace-clean-ui .gf-marketplace-sticky-head {
+            position: static;
+            top: 52px;
+            z-index: 260;
+            margin: 0 -.1rem;
+            padding: .55rem 0 .5rem;
+            background: linear-gradient(180deg, rgba(243, 244, 246, .98), rgba(243, 244, 246, .92));
+            border-bottom: 0;
+        }
+
+        .payroll-shipment-skin .gf-marketplace-tabs {
+            width: max-content;
+            max-width: 100%;
+            border-radius: 999px;
+            padding: .22rem;
+            background: rgba(255, 255, 255, .96);
+            border-color: rgba(148, 163, 184, .22);
+            box-shadow: none;
+        }
+
+        .payroll-shipment-skin .gf-marketplace-tab {
+            border-radius: 999px;
+            padding: .4rem .85rem;
+            color: #64748b;
+            font-size: .76rem;
+            font-weight: 850;
+        }
+
+        .payroll-shipment-skin .gf-marketplace-tab.is-active {
+            background: #334155;
+            color: #fff;
+            box-shadow: none;
+        }
+
+        .payroll-shipment-skin .gf-overview-kpi-grid {
+            grid-template-columns: repeat(4, 1fr);
+            gap: .65rem;
+            margin-top: .1rem;
+            width: 100%;
+        }
+
+        .payroll-shipment-skin .gf-overview-kpi-card {
+            min-height: 92px;
+            border-radius: 8px;
+            border: 1px solid rgba(148, 163, 184, .16);
+            background: var(--card, #fff);
+            box-shadow: none;
+            padding: .82rem .95rem;
+        }
+
+        .payroll-shipment-skin .gf-overview-kpi-card-strong {
+            border-color: rgba(51, 65, 85, .24);
+            background: #fff;
+        }
+
+        .payroll-shipment-skin .gf-overview-kpi-label {
+            font-size: .64rem;
+            letter-spacing: .08em;
+            color: #94a3b8;
+        }
+
+        .payroll-shipment-skin .gf-overview-kpi-value {
+            margin-top: .24rem;
+            color: #334155;
+            font-size: 1.3rem;
+            font-weight: 900;
+            line-height: 1.05;
+        }
+
+        .payroll-shipment-skin .gf-overview-kpi-note {
+            margin-top: .25rem;
+            font-size: .73rem;
+            color: #64748b;
+        }
+
+        .payroll-shipment-skin .gf-panel {
+            border-radius: 8px;
+            border-color: rgba(148, 163, 184, .18);
+            box-shadow: none;
+            background: var(--card, #fff);
+            overflow: visible;
+        }
+
+        .payroll-shipment-skin .gf-marketplace-tab-panel,
+        .payroll-shipment-skin .gf-panel-body {
+            overflow: visible;
+        }
+
+        .payroll-shipment-skin .gf-panel-header {
+            padding: .72rem .85rem;
+            border-bottom-color: rgba(148, 163, 184, .12);
+            background: transparent;
+        }
+
+        .payroll-shipment-skin .gf-panel-title {
+            color: #334155;
+            font-size: .95rem;
+            font-weight: 900;
+        }
+
+        .payroll-shipment-skin .gf-subtext {
+            display: none;
+        }
+
+        .payroll-shipment-skin .gf-panel-body {
+            padding: .75rem .85rem .85rem;
+        }
+
+        .payroll-shipment-skin .sj-toolbar {
+            margin-bottom: .7rem;
+            gap: .45rem;
+        }
+
+        .payroll-shipment-skin .sj-toolbar .form-control,
+        .payroll-shipment-skin .sj-toolbar .form-select {
+            min-height: 34px;
+            border-radius: 7px;
+            border-color: rgba(148, 163, 184, .26);
+            background: rgba(248, 250, 252, .82);
+            color: #334155;
+            font-size: .78rem;
+        }
+
+        .payroll-shipment-skin .sj-count {
+            color: #64748b;
+            font-size: .75rem;
+        }
+
+        .payroll-shipment-skin .gf-table-scroll.gf-table-scroll-sticky {
+            max-height: none;
+            min-height: 260px;
+            width: 100%;
+            border: 1px solid rgba(148, 163, 184, .14);
+            border-radius: 8px;
+            background: #fff;
+            overflow: visible;
+        }
+
+        .payroll-shipment-skin .gf-clean-table {
+            margin: 0;
+            border-collapse: separate;
+            border-spacing: 0;
+        }
+
+            .payroll-shipment-skin .gf-clean-table thead th {
+                background: #f8fafc;
+                color: #64748b;
+            font-size: .7rem;
+            font-weight: 900;
+            text-transform: uppercase;
+            letter-spacing: .04em;
+            border-bottom: 1px solid rgba(148, 163, 184, .16);
+            padding: .55rem .65rem;
+        }
+
+        .payroll-shipment-skin .gf-clean-table tbody td {
+            color: #334155;
+            font-size: .82rem;
+            border-bottom-color: rgba(148, 163, 184, .10);
+            padding: .55rem .65rem;
+            vertical-align: middle;
+        }
+
+        .payroll-shipment-skin .table-hover tbody tr:hover td {
+            background: rgba(148, 163, 184, .06);
+        }
+
+        .payroll-shipment-skin .gf-chip,
+        .payroll-shipment-skin .gf-badge {
+            border-radius: 7px;
+        }
+
+        .payroll-shipment-skin .gf-chip {
+            background: rgba(148, 163, 184, .10);
+            border-color: rgba(148, 163, 184, .18);
+            color: #334155;
+            font-size: .72rem;
+        }
+
+        .payroll-shipment-skin .gf-badge-green,
+        .payroll-shipment-skin .gf-badge-blue {
+            background: rgba(51, 65, 85, .08);
+            color: #334155;
+        }
+
+        .payroll-shipment-skin .gf-badge-amber {
+            background: rgba(245, 158, 11, .08);
+            color: #92400e;
+        }
+
+        .payroll-shipment-skin .gf-total-row td {
+            background: #f8fafc;
+            border-top: 1px solid rgba(148, 163, 184, .18);
+            box-shadow: none;
+        }
+
+        .payroll-shipment-skin .gf-table-foot {
+            justify-content: flex-end;
+            margin-top: .65rem;
+            padding-top: .65rem;
+            border-top-color: rgba(148, 163, 184, .14);
+        }
+
+        .payroll-shipment-skin .gf-slip-btn {
+            border-radius: 999px;
+            background: #334155;
+            border-color: #334155;
+            box-shadow: none;
+            font-size: .76rem;
+            font-weight: 850;
+        }
+
+        .payroll-shipment-skin .gf-table-foot-hint {
+            margin-right: auto;
+            color: #64748b;
+            font-weight: 700;
+        }
+
+        .payroll-shipment-skin .gf-slip-btn:hover {
+            background: #1f2937;
+            border-color: #1f2937;
+        }
+
+        @media (max-width: 860px) {
+            .payroll-shipment-skin {
+                padding: 0 .5rem 5rem;
+                overflow-x: clip;
+            }
+
+            .payroll-shipment-skin .gf-master-header {
+                margin-inline: -.5rem;
+                padding: .5rem;
+            }
+
+            .payroll-shipment-skin .gf-master-header-copy {
+                min-width: 0;
+                flex: 1 1 100%;
+            }
+
+            .payroll-shipment-skin .gf-master-eyebrow {
+                display: none;
+            }
+
+            .payroll-shipment-skin .gf-master-title {
+                font-size: 1.02rem;
+            }
+
+            .payroll-shipment-skin .gf-master-actions {
+                flex: 1 1 100%;
+                width: 100%;
+            }
+
+            .payroll-shipment-skin .gf-dashboard-header-filter {
+                display: grid;
+                grid-template-columns: 78px 1fr 42px;
+                gap: .35rem;
+            }
+
+            .payroll-shipment-skin .gf-header-date-input,
+            .payroll-shipment-skin .gf-header-period-select,
+            .payroll-shipment-skin .gf-header-icon-btn {
+                width: 100%;
+                max-width: none;
+            }
+
+            .payroll-shipment-skin .gf-header-date-input { grid-column: 2 / 3; }
+            .payroll-shipment-skin .gf-header-period-select { grid-column: 1 / 2; }
+            .payroll-shipment-skin .gf-header-icon-btn {
+                grid-column: 3 / 4;
+                width: 42px;
+                overflow: hidden;
+                color: transparent;
+                position: relative;
+            }
+            .payroll-shipment-skin .gf-header-icon-btn::after {
+                content: "↺";
+                color: #64748b;
+                position: absolute;
+                inset: 0;
+                display: grid;
+                place-items: center;
+                font-size: .95rem;
+            }
+            .payroll-shipment-skin .gf-marketplace-clean-ui .gf-marketplace-sticky-head {
+                top: 96px;
+                margin-inline: 0;
+                padding-top: .45rem;
+                overflow: hidden;
+            }
+
+            .payroll-shipment-skin .gf-marketplace-tabs {
+                width: 100%;
+            }
+
+            .payroll-shipment-skin .gf-marketplace-tab {
+                flex: 1 0 auto;
+                text-align: center;
+            }
+
+            .payroll-shipment-skin .gf-overview-kpi-grid {
+                grid-template-columns: repeat(2, minmax(0, 1fr));
+                gap: .45rem;
+            }
+
+            .payroll-shipment-skin .gf-overview-kpi-card {
+                min-height: 84px;
+                padding: .68rem .72rem;
+            }
+
+            .payroll-shipment-skin .gf-overview-kpi-value {
+                font-size: 1.08rem;
+                overflow-wrap: anywhere;
+            }
+
+            .payroll-shipment-skin .gf-panel-header,
+            .payroll-shipment-skin .gf-panel-body {
+                padding-left: .7rem;
+                padding-right: .7rem;
+            }
+
+            .payroll-shipment-skin .gf-panel-header {
+                align-items: stretch;
+                flex-direction: column;
+            }
+
+            .payroll-shipment-skin .gf-panel-actions {
+                width: 100%;
+            }
+
+            .payroll-shipment-skin .pj-head-filters {
+                grid-template-columns: 1fr 1fr;
+                width: 100%;
+            }
+
+            .payroll-shipment-skin .pj-head-search,
+            .payroll-shipment-skin .gf-head-count {
+                grid-column: 1 / -1;
+            }
+
+            .payroll-shipment-skin .gf-head-count {
+                text-align: left;
+                white-space: normal;
+            }
+
+            .payroll-shipment-skin .sj-toolbar {
+                display: grid;
+                grid-template-columns: 1fr 1fr;
+                align-items: stretch;
+            }
+
+            .payroll-shipment-skin .sj-toolbar .sj-search {
+                grid-column: 1 / -1;
+                max-width: none;
+                min-width: 0;
+            }
+
+            .payroll-shipment-skin .sj-toolbar .form-select {
+                width: 100%;
+                min-width: 0;
+            }
+
+            .payroll-shipment-skin .sj-count {
+                grid-column: 1 / -1;
+                white-space: normal;
+            }
+
+            .payroll-shipment-skin .gf-table-scroll.gf-table-scroll-sticky {
+                max-height: none;
+                min-height: 0;
+                overflow: visible;
+            }
+
+            .payroll-shipment-skin .gf-clean-table {
+                min-width: 720px !important;
+                font-size: .78rem;
+            }
+
+            .payroll-shipment-skin .gf-table-foot {
+                align-items: stretch;
+                flex-direction: column;
+            }
+
+            .payroll-shipment-skin .gf-slip-btn {
+                justify-content: center;
+                width: 100%;
+            }
+        }
     </style>
 @endpush
 
 @section('content')
     <x-gf.page
+        class="payroll-shipment-skin"
         eyebrow="Payroll"
         title="Dashboard Payroll"
         description="Borongan jahit &amp; cutting · upah per operator">
@@ -197,30 +841,6 @@
                     <input type="text" class="form-control gf-header-date-input" autocomplete="off"
                         data-date-range aria-label="Rentang tanggal"
                         value="{{ $filters['date_from'] }} — {{ $filters['date_to'] }}">
-
-                    <select name="operator_id" class="form-select gf-header-select" data-filter aria-label="Operator">
-                        <option value="">Semua Operator</option>
-                        @foreach ($operatorOptions as $op)
-                            <option value="{{ $op->id }}" @selected($filters['operator_id'] == $op->id)>
-                                {{ $op->code }} — {{ $op->name }}</option>
-                        @endforeach
-                    </select>
-
-                    <select name="category_id" class="form-select gf-header-select" data-filter aria-label="Kategori">
-                        <option value="">Semua Kategori</option>
-                        @foreach ($categoryOptions as $cat)
-                            <option value="{{ $cat->id }}" @selected($filters['category_id'] == $cat->id)>
-                                {{ $cat->name }}</option>
-                        @endforeach
-                    </select>
-
-                    <select name="item_id" class="form-select gf-header-select" data-filter aria-label="Varian (SKU)">
-                        <option value="">Semua SKU</option>
-                        @foreach ($itemOptions as $it)
-                            <option value="{{ $it->id }}" @selected($filters['item_id'] == $it->id)>
-                                {{ $it->code }} — {{ $it->name }}</option>
-                        @endforeach
-                    </select>
 
                     <a href="{{ route('payroll.dashboard') }}" class="btn btn-light border gf-header-icon-btn"
                         data-filter-reset data-from="{{ $defaults['date_from'] }}" data-to="{{ $defaults['date_to'] }}"
@@ -405,16 +1025,12 @@
                 applyFilters();
             });
 
-            form.querySelectorAll('select[data-filter]').forEach(sel =>
-                sel.addEventListener('change', applyFilters));
-
             const resetLink = form.querySelector('[data-filter-reset]');
             if (resetLink) resetLink.addEventListener('click', (e) => {
                 e.preventDefault();
                 fromEl.value = resetLink.dataset.from;
                 toEl.value = resetLink.dataset.to;
                 if (fp) fp.setDate([resetLink.dataset.from, resetLink.dataset.to], false);
-                form.querySelectorAll('select[data-filter]').forEach(s => s.value = '');
                 if (periodSel) periodSel.value = 'custom';
                 detectPeriod();
                 applyFilters();
@@ -423,6 +1039,22 @@
             const idFmt = (n) => (n || 0).toLocaleString('id-ID');
             const idRp = (n) => 'Rp ' + idFmt(Math.round(n || 0));
 
+            function gfCompareText(a, b, key) {
+                return (a.dataset[key] || '').localeCompare(b.dataset[key] || '', 'id', {
+                    numeric: true,
+                    sensitivity: 'base'
+                });
+            }
+
+            function gfApplySortState(root, headerSelector, sortValue) {
+                root.querySelectorAll(headerSelector).forEach(th => {
+                    const active = th.dataset.pjSortKey && sortValue.startsWith(th.dataset.pjSortKey + '-');
+                    th.setAttribute('aria-sort', active
+                        ? (sortValue.endsWith('-asc') ? 'ascending' : 'descending')
+                        : 'none');
+                });
+            }
+
             // Tombol "Cetak Slip": tampil saat satu operator + modul terpilih.
             function gfUpdateSlip(linkEl, operatorCode, module, basis = '') {
                 if (!linkEl) return;
@@ -430,7 +1062,7 @@
                 const hint = foot?.querySelector('.gf-table-foot-hint');
                 const syncHint = () => {
                     if (!hint || !foot) return;
-                    hint.hidden = Array.from(foot.querySelectorAll('.gf-slip-btn')).some((a) => !a.hidden);
+                    hint.hidden = false;
                 };
                 if (operatorCode && operatorCode !== '-' && module) {
                     const p = new URLSearchParams(currentFilters());
@@ -448,6 +1080,21 @@
                     linkEl.removeAttribute('href');
                     syncHint();
                 }
+            }
+
+            function pjSelectOperator(root, row) {
+                if (!root || !row) return;
+                root.dataset.pjOperator = row.dataset.operator || '';
+                root.dataset.pjOperatorLabel = row.dataset.operatorLabel || row.dataset.operator || '';
+                root.querySelectorAll('[data-pj-row]').forEach(r => {
+                    r.classList.toggle('is-selected', r === row);
+                });
+                const hint = root.querySelector('[data-pj-slip-hint]');
+                if (hint && root.dataset.pjOperatorLabel) {
+                    hint.textContent = root.dataset.pjOperatorLabel;
+                }
+                gfUpdateSlip(root.querySelector('[data-pj-slip-setor]'), root.dataset.pjOperator, 'sewing', 'setor');
+                gfUpdateSlip(root.querySelector('[data-pj-slip-ambil]'), root.dataset.pjOperator, 'sewing', 'ambil');
             }
 
             // ---- Tab "Keseluruhan" (gabungan jahit + cutting) ----
@@ -530,7 +1177,7 @@
                 const q = (root.querySelector('[data-pj-search]')?.value || '').trim().toLowerCase();
                 const operator = root.querySelector('[data-pj-operator]')?.value || '';
                 const type = root.querySelector('[data-pj-type]')?.value || '';
-                const sort = root.querySelector('[data-pj-sort]')?.value || 'date-desc';
+                const sort = root.dataset.pjSort || root.querySelector('[data-pj-sort]')?.value || 'date-desc';
 
                 const rows = Array.from(tbody.querySelectorAll('[data-pj-row]'));
                 let shown = 0, sumAmount = 0, sumProj = 0, sumQty = 0, sumOk = 0, sumReject = 0; const ops = new Set();
@@ -554,12 +1201,27 @@
                 });
 
                 const cmp = {
-                    'date-desc': (a, b) => (a.dataset.date < b.dataset.date ? 1 : -1),
+                    'date-desc': (a, b) => gfCompareText(b, a, 'date'),
+                    'date-asc': (a, b) => gfCompareText(a, b, 'date'),
+                    'operator-asc': (a, b) => gfCompareText(a, b, 'operator') || gfCompareText(a, b, 'operatorName'),
+                    'operator-desc': (a, b) => gfCompareText(b, a, 'operator') || gfCompareText(b, a, 'operatorName'),
+                    'type-asc': (a, b) => gfCompareText(a, b, 'type'),
+                    'type-desc': (a, b) => gfCompareText(b, a, 'type'),
+                    'sku-asc': (a, b) => gfCompareText(a, b, 'sku'),
+                    'sku-desc': (a, b) => gfCompareText(b, a, 'sku'),
+                    'product-asc': (a, b) => gfCompareText(a, b, 'product'),
+                    'product-desc': (a, b) => gfCompareText(b, a, 'product'),
                     'qty-desc': (a, b) => (+b.dataset.qty) - (+a.dataset.qty),
-                    'amount-desc': (a, b) => (+b.dataset.amount) - (+a.dataset.amount),
+                    'qty-asc': (a, b) => (+a.dataset.qty) - (+b.dataset.qty),
+                    'amount-desc': (a, b) => (+b.dataset.proj) - (+a.dataset.proj),
+                    'amount-asc': (a, b) => (+a.dataset.proj) - (+b.dataset.proj),
                     'reject-desc': (a, b) => (+b.dataset.reject) - (+a.dataset.reject),
+                    'reject-asc': (a, b) => (+a.dataset.reject) - (+b.dataset.reject),
+                    'rate-desc': (a, b) => (+b.dataset.rate) - (+a.dataset.rate),
+                    'rate-asc': (a, b) => (+a.dataset.rate) - (+b.dataset.rate),
                 }[sort];
                 if (cmp) rows.sort(cmp).forEach(r => tbody.appendChild(r));
+                gfApplySortState(root, '[data-pj-sort-key]', sort);
 
                 const cnt = root.querySelector('[data-pj-count]');
                 if (cnt) cnt.textContent = idFmt(shown) + ' transaksi · ' + idFmt(ops.size) + ' penjahit · ' + idRp(sumProj);
@@ -575,8 +1237,9 @@
                 setKpi('[data-pj-kpi-upah]', idRp(sumAmount));
                 setKpi('[data-pj-kpi-reject]', idFmt(sumReject));
 
-                gfUpdateSlip(root.querySelector('[data-pj-slip-setor]'), operator, 'sewing', 'setor');
-                gfUpdateSlip(root.querySelector('[data-pj-slip-ambil]'), operator, 'sewing', 'ambil');
+                const selectedOperator = operator || root.dataset.pjOperator || '';
+                gfUpdateSlip(root.querySelector('[data-pj-slip-setor]'), selectedOperator, 'sewing', 'setor');
+                gfUpdateSlip(root.querySelector('[data-pj-slip-ambil]'), selectedOperator, 'sewing', 'ambil');
 
                 const empty = root.querySelector('[data-pj-empty]');
                 if (empty) empty.hidden = (shown !== 0) || rows.length === 0;
@@ -589,7 +1252,26 @@
             });
             document.addEventListener('change', (e) => {
                 if (!e.target.matches(PJ_SEL)) return;
-                applyPjFilters(e.target.closest('[data-tab-panel]'));
+                const pane = e.target.closest('[data-tab-panel]');
+                if (e.target.matches('[data-pj-sort]') && pane) delete pane.dataset.pjSort;
+                applyPjFilters(pane);
+            });
+            document.addEventListener('click', (e) => {
+                const th = e.target.closest('[data-pj-sort-key]');
+                if (!th) return;
+                const pane = th.closest('[data-tab-panel]');
+                if (!pane) return;
+                const key = th.dataset.pjSortKey;
+                const current = pane.dataset.pjSort || pane.querySelector('[data-pj-sort]')?.value || 'date-desc';
+                const nextDir = current === key + '-asc' ? 'desc' : current === key + '-desc' ? 'asc' : (key === 'date' ? 'desc' : 'asc');
+                pane.dataset.pjSort = key + '-' + nextDir;
+                applyPjFilters(pane);
+            });
+            document.addEventListener('click', (e) => {
+                if (e.target.closest('[data-pj-sort-key]')) return;
+                const row = e.target.closest('[data-pj-row]');
+                if (!row) return;
+                pjSelectOperator(row.closest('[data-tab-panel]'), row);
             });
 
             // ---- Tab "Cutting" ----

@@ -231,7 +231,10 @@
                 ? route('production.cutting_jobs.create')
                 : '#';
 
-            $qcIndexHref = Route::has('production.qc.index') ? route('production.qc.index') : '#';
+            $qcIndexHref = Route::has('production.qc.index')
+                ? route('production.qc.index', (auth()->user()?->role ?? null) === 'admin' ? ['stage' => 'sewing'] : [])
+                : '#';
+            $qcLabel = $userRole === 'admin' ? 'QC Jahit' : 'QC';
 
             $sewingCreateHref = Route::has('production.sewing.returns.create')
                 ? route('production.sewing.returns.create')
@@ -265,7 +268,7 @@
                     <path d="M9 12.5 11 14.5 15 10.5" />
                 </svg>
             </span>
-            <span class="label">QC</span>
+            <span class="label">{{ $qcLabel }}</span>
         </a>
 
         {{-- HOME (Dashboard / Operator Summary) --}}

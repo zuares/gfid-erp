@@ -4,8 +4,6 @@ namespace App\Http\Controllers\Payroll;
 
 use App\Http\Controllers\Controller;
 use App\Models\Employee;
-use App\Models\Item;
-use App\Models\ItemCategory;
 use App\Services\Payroll\PieceRateService;
 use Carbon\Carbon;
 use Illuminate\Http\Request;
@@ -61,9 +59,6 @@ class PayrollDashboardController extends Controller
                 'initialTab' => $initialTab,
                 'initialPartial' => $this->partialFor($initialTab),
                 'periodLabel' => $this->periodLabel($filters),
-                'operatorOptions' => Employee::whereIn('role', ['sewing', 'cutting'])->orderBy('code')->get(),
-                'itemOptions' => Item::where('type', 'finished_good')->orderBy('code')->get(),
-                'categoryOptions' => ItemCategory::where('active', 1)->orderBy('name')->get(),
             ],
             $this->tabData($initialTab, $filters),
         ));
@@ -233,9 +228,9 @@ class PayrollDashboardController extends Controller
         return [
             'date_from' => $dateFrom,
             'date_to' => $dateTo,
-            'operator_id' => $request->input('operator_id') ?: null,
-            'item_id' => $request->input('item_id') ?: null,
-            'category_id' => $request->input('category_id') ?: null,
+            'operator_id' => null,
+            'item_id' => null,
+            'category_id' => null,
         ];
     }
 

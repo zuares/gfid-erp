@@ -13,7 +13,6 @@
     // Total upah termasuk estimasi Ambil (rate × qty) — HANYA utk footer & area filter, bukan KPI.
     $totalUpahProj = (float) $rows->sum(fn($r) => $r->type === 'Setor' ? $r->amount : $r->rate * $r->qty);
 
-    // Opsi filter penjahit (kode → nama)
     $penjahitOptions = $rows
         ->map(fn($r) => ['code' => $r->operator_code, 'name' => $r->operator_name])
         ->unique('code')
@@ -45,33 +44,31 @@
 </div>
 
 <x-gf.panel title="Aktivitas Penjahit" subtitle="Rincian per transaksi — ambil &amp; setor jahit + upah borongan">
-    {{-- Filter realtime (client-side, instan) --}}
-    <div class="sj-toolbar" data-pj-toolbar>
-        <input type="search" class="form-control sj-search" data-pj-search
-            placeholder="Cari penjahit / SKU / dokumen…" autocomplete="off">
+    @if (!$rows->isEmpty())
+        <x-slot:actions>
+            <div class="pj-head-filters">
+                <input type="search" class="form-control gf-head-control pj-head-search" data-pj-search
+                    placeholder="Cari penjahit / SKU / dokumen" autocomplete="off">
 
-        <select class="form-select" data-pj-operator aria-label="Penjahit">
-            <option value="">Semua Penjahit</option>
-            @foreach ($penjahitOptions as $op)
-                <option value="{{ $op['code'] }}">{{ $op['code'] }} — {{ $op['name'] }}</option>
-            @endforeach
-        </select>
+                <select class="form-select gf-head-control" data-pj-type aria-label="Jenis">
+                    <option value="">Semua Jenis</option>
+                    <option value="Ambil">Ambil</option>
+                    <option value="Setor">Setor</option>
+                </select>
 
-        <select class="form-select" data-pj-type aria-label="Jenis">
-            <option value="">Semua Jenis</option>
-            <option value="Ambil">Ambil Jahit</option>
-            <option value="Setor">Setor Jahit</option>
-        </select>
+                <select class="form-select gf-head-control" data-pj-operator aria-label="Penjahit">
+                    <option value="">Semua Penjahit</option>
+                    @foreach ($penjahitOptions as $op)
+                        <option value="{{ $op['code'] }}">{{ $op['code'] }} — {{ $op['name'] }}</option>
+                    @endforeach
+                </select>
 
-        <select class="form-select" data-pj-sort aria-label="Urutkan">
-            <option value="date-desc">Terbaru</option>
-            <option value="qty-desc">Qty terbanyak</option>
-            <option value="amount-desc">Upah terbesar</option>
-            <option value="reject-desc">Reject terbanyak</option>
-        </select>
-
-        <span class="sj-count" data-pj-count>{{ $fmt($txCount) }} transaksi · {{ $fmt($penjahitCount) }} penjahit · {{ $rp($totalUpahProj) }}</span>
-    </div>
+                <span class="gf-head-count" data-pj-count>
+                    {{ $fmt($txCount) }} transaksi · {{ $fmt($penjahitCount) }} penjahit · {{ $rp($totalUpahProj) }}
+                </span>
+            </div>
+        </x-slot:actions>
+    @endif
 
     @if ($rows->isEmpty())
         <div class="prod-empty">Tidak ada aktivitas penjahit pada periode ini.</div>
@@ -79,17 +76,17 @@
 
         <div class="gf-table-scroll gf-table-scroll-sticky">
             <table class="table table-hover align-middle mb-0 gf-clean-table gf-sticky-table" data-pj-table>
-                <thead>
-                    <tr>
-                        <th>Tanggal</th>
-                        <th>Penjahit</th>
-                        <th>Jenis</th>
-                        <th>SKU</th>
+                <thead class="gf-sticky-thead">
+                    <tr class="gf-sticky-head-row">
+                        <th data-pj-sort-key="date" aria-sort="descending"><button type="button" class="gf-sort-th">Tanggal</button></th>
+                        <th data-pj-sort-key="operator"><button type="button" class="gf-sort-th">Penjahit</button></th>
+                        <th data-pj-sort-key="type"><button type="button" class="gf-sort-th">Jenis</button></th>
+                        <th data-pj-sort-key="sku"><button type="button" class="gf-sort-th">SKU</button></th>
                         <th class="gf-hide-mobile">Produk</th>
-                        <th class="gf-num">Qty / OK</th>
-                        <th class="gf-num gf-hide-mobile">Reject</th>
+                        <th class="gf-num" data-pj-sort-key="qty"><button type="button" class="gf-sort-th">Qty / OK</button></th>
+                        <th class="gf-num gf-hide-mobile" data-pj-sort-key="reject"><button type="button" class="gf-sort-th">Reject</button></th>
                         <th class="gf-num gf-hide-mobile">Piece Rate</th>
-                        <th class="gf-num">Total Upah</th>
+                        <th class="gf-num" data-pj-sort-key="amount"><button type="button" class="gf-sort-th">Total Upah</button></th>
                     </tr>
                 </thead>
                 <tbody>
@@ -97,13 +94,21 @@
                         <tr data-pj-row
                             data-search="{{ strtolower(trim($r->operator_code . ' ' . $r->operator_name . ' ' . $r->sku . ' ' . $r->product_name . ' ' . $r->category . ' ' . $r->code)) }}"
                             data-operator="{{ $r->operator_code }}"
+                            data-operator-name="{{ strtolower($r->operator_name) }}"
+                            data-operator-label="{{ $r->operator_code }} — {{ $r->operator_name }}"
                             data-type="{{ $r->type }}"
                             data-date="{{ $r->date }}"
+                            data-sku="{{ strtolower($r->sku) }}"
+                            data-product="{{ strtolower($r->product_name) }}"
                             data-qty="{{ (float) $r->qty }}"
                             data-reject="{{ (float) $r->qty_reject }}"
+                            data-rate="{{ (float) $r->rate }}"
                             data-amount="{{ (float) $r->amount }}"
                             data-proj="{{ (float) ($r->type === 'Setor' ? $r->amount : $r->rate * $r->qty) }}">
-                            <td><x-gf.datecell :date="$r->date" :time="$r->created_at" /></td>
+                            <td>
+                                <x-gf.datecell :date="$r->date" :time="$r->created_at" />
+                                <span class="gf-doc-code">{{ $r->code }}</span>
+                            </td>
                             <td>
                                 <span class="gf-chip" title="{{ $r->operator_name }}"><b>{{ $r->operator_code }}</b></span>
                                 <span class="text-muted small d-block">{{ $r->operator_name }}</span>
@@ -139,7 +144,6 @@
         </div>
         <div class="prod-empty" data-pj-empty hidden>Tidak ada transaksi yang cocok dengan filter.</div>
         <div class="gf-table-foot">
-            <span class="gf-table-foot-hint" data-pj-slip-hint hidden>Pilih satu penjahit untuk mencetak slip upah.</span>
             <a class="gf-slip-btn" data-pj-slip-setor hidden target="_blank" rel="noopener">Slip Setor</a>
             <a class="gf-slip-btn" data-pj-slip-ambil hidden target="_blank" rel="noopener">Slip Ambil</a>
         </div>

@@ -42,6 +42,29 @@ class QcController extends Controller
         $user = Auth::user();
         $userRole = $user->role ?? null;
 
+        // Admin: langsung ke QC Sewing dengan view khusus + sidebar
+        if ($userRole === 'admin') {
+            if ($request->query('stage') !== QcResult::STAGE_SEWING) {
+                return redirect()->route('production.qc.index', ['stage' => QcResult::STAGE_SEWING]);
+            }
+
+            $stage = QcResult::STAGE_SEWING;
+
+            $records = SewingReturn::query()
+                ->with([
+                    'operator',
+                    'lines.pickupLine.pickup',
+                    'lines.pickupLine.bundle.finishedItem',
+                    'lines.pickupLine.bundle.cuttingJob.lot.item',
+                ])
+                ->orderByDesc('date')
+                ->orderByDesc('id')
+                ->paginate(20)
+                ->withQueryString();
+
+            return view('production.qc.sewing_index', compact('records', 'userRole'));
+        }
+
         $records = collect();
 
         switch ($stage) {
@@ -72,7 +95,7 @@ class QcController extends Controller
                 $records = SewingReturn::query()
                     ->with([
                         'operator',
-                        'lines.pickupLine.pickup.warehouse',
+                        'lines.pickupLine.pickup',
                         'lines.pickupLine.bundle.finishedItem',
                         'lines.pickupLine.bundle.cuttingJob.lot.item',
                     ])
@@ -698,10 +721,11 @@ class QcController extends Controller
 
             $qc = $existingQc->get($bundle->id);
 
-            // Qty maksimal = qty yang dikirim penjahit (qty_bundle di pickup line)
-            $maxQty = (float) ($line->pickupLine->qty_bundle ?? 0);
+            // Qty maksimal = total yang disetor penjahit. Setelah QC, line dipecah OK + reject.
+            $maxQty = (float) ($line->qty_ok ?? 0) + (float) ($line->qty_reject ?? 0);
 
             $rows[] = [
+                'sewing_return_line_id' => $line->id,
                 'bundle_id'        => $bundle->id,
                 'bundle_code'      => $bundle->bundle_code,
                 'item_code'        => $bundle->finishedItem?->code,
@@ -735,6 +759,7 @@ class QcController extends Controller
             'qc_date'                 => ['required', 'date'],
             'operator_id'             => ['nullable', 'exists:employees,id'],
             'results'                 => ['required', 'array', 'min:1'],
+            'results.*.sewing_return_line_id' => ['nullable', 'exists:sewing_return_lines,id'],
             'results.*.bundle_id'     => ['required', 'exists:cutting_job_bundles,id'],
             'results.*.qty_ok'        => ['nullable', 'numeric', 'min:0'],
             'results.*.qty_reject'    => ['nullable', 'numeric', 'min:0'],
@@ -781,7 +806,7 @@ class QcController extends Controller
 
         return redirect()
             ->route('production.sewing.returns.show', $sewingReturn)
-            ->with('success', 'QC Jahit berhasil disimpan. Stok WIP-SEW → WIP-FIN sudah diperbarui.');
+            ->with('success', 'QC Jahit berhasil disimpan. Stok WIP-SEW → WH-PRD sudah diperbarui.');
     }
 
     public function overproductionCuttingBundle(Request $request, CuttingJob $cuttingJob, CuttingJobBundle $bundle)

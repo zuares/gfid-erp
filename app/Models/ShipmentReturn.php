@@ -52,6 +52,11 @@ class ShipmentReturn extends Model
         return $this->hasMany(ShipmentReturnLine::class);
     }
 
+    public function orderScans()
+    {
+        return $this->hasMany(ShipmentReturnOrderScan::class);
+    }
+
     public function creator()
     {
         return $this->belongsTo(User::class, 'created_by');

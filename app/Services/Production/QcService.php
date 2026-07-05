@@ -139,17 +139,22 @@ class QcService
             // 0) WAREHOUSE SETUP
             // ===========================
             $wipSewWarehouseId = Warehouse::where('code', 'WIP-SEW')->value('id');
-            $wipFinWarehouseId = Warehouse::where('code', 'WIP-FIN')->value('id');
+            $whPrdWarehouseId  = Warehouse::where('code', 'WH-PRD')->value('id');
             $rejSewWarehouseId = Warehouse::where('code', 'REJ-SEW')->value('id');
 
-            if (!$wipSewWarehouseId || !$wipFinWarehouseId || !$rejSewWarehouseId) {
-                throw new \RuntimeException('Warehouse WIP-SEW / WIP-FIN / REJ-SEW belum dikonfigurasi.');
+            if (!$wipSewWarehouseId || !$whPrdWarehouseId || !$rejSewWarehouseId) {
+                throw new \RuntimeException('Warehouse WIP-SEW / WH-PRD / REJ-SEW belum dikonfigurasi.');
             }
 
-            // Load bundles via return lines → pickup lines
-            $bundleIds = $sewingReturn->lines()
-                ->join('sewing_pickup_lines', 'sewing_return_lines.sewing_pickup_line_id', '=', 'sewing_pickup_lines.id')
-                ->pluck('sewing_pickup_lines.cutting_job_bundle_id')
+            $returnLines = $sewingReturn->lines()
+                ->with('pickupLine')
+                ->lockForUpdate()
+                ->get()
+                ->keyBy('id');
+
+            // Load bundles via return lines -> pickup lines.
+            $bundleIds = $returnLines
+                ->pluck('pickupLine.cutting_job_bundle_id')
                 ->filter()
                 ->unique();
 
@@ -165,6 +170,7 @@ class QcService
             $okByBundleItem = []; // [bundle_id => [item_id => qty OK]]
             $rejectByBundleItem = []; // [bundle_id => [item_id => qty Reject]]
             $hasAnyMovement = false;
+            $touchedPickupIds = [];
 
             // ===========================
             // 1) LOOP HASIL QC PER BUNDLE
@@ -176,6 +182,8 @@ class QcService
                 }
 
                 $bundleId = (int) $row['bundle_id'];
+                $returnLineId = (int) ($row['sewing_return_line_id'] ?? 0);
+                $returnLine = $returnLineId > 0 ? $returnLines->get($returnLineId) : null;
 
                 /** @var CuttingJobBundle|null $bundle */
                 $bundle = $bundleMap->get($bundleId);
@@ -183,7 +191,9 @@ class QcService
                     continue;
                 }
 
-                $bundleQtyBase = (float) ($bundle->qty_qc_ok ?? $bundle->qty_pcs ?? 0);
+                $bundleQtyBase = $returnLine
+                    ? (float) ((float) ($returnLine->qty_ok ?? 0) + (float) ($returnLine->qty_reject ?? 0))
+                    : (float) ($bundle->qty_qc_ok ?? $bundle->qty_pcs ?? 0);
 
                 $qtyOk = (float) ($row['qty_ok'] ?? 0);
                 $qtyReject = (float) ($row['qty_reject'] ?? 0);
@@ -224,6 +234,34 @@ class QcService
                     sewingJobId: $sewingReturn->id,
                     finishingJobId: null,
                 );
+
+                if ($returnLine) {
+                    $oldOk = (float) ($returnLine->qty_ok ?? 0);
+                    $oldReject = (float) ($returnLine->qty_reject ?? 0);
+
+                    $returnLine->qty_ok = $qtyOk;
+                    $returnLine->qty_reject = $qtyReject;
+                    $returnLine->save();
+
+                    $pickupLine = $returnLine->pickupLine;
+                    if ($pickupLine) {
+                        // Reject hasil QC masuk REJ-SEW dan ditutup dari pickup normal.
+                        // Setor ulangnya memakai flow reject rework, bukan membuka WIP-SEW lagi.
+                        $pickupLine->qty_returned_ok = max(
+                            (float) ($pickupLine->qty_returned_ok ?? 0) - $oldOk + $qtyOk,
+                            0
+                        );
+                        $pickupLine->qty_returned_reject = max(
+                            (float) ($pickupLine->qty_returned_reject ?? 0) - $oldReject + $qtyReject,
+                            0
+                        );
+                        $pickupLine->save();
+
+                        if ($pickupLine->sewing_pickup_id) {
+                            $touchedPickupIds[(int) $pickupLine->sewing_pickup_id] = true;
+                        }
+                    }
+                }
 
                 // 1.b Akumulasi untuk mutasi stok
                 if ($bundle->finished_item_id) {
@@ -296,7 +334,7 @@ class QcService
                 }
             }
 
-            // 2.b IN ke WIP-FIN (OK, per bundle)
+            // 2.b IN ke WH-PRD (OK, per bundle)
             foreach ($okByBundleItem as $bundleId => $byItem) {
                 foreach ($byItem as $itemId => $qtyOkItem) {
                     if ($qtyOkItem <= 0) {
@@ -304,13 +342,13 @@ class QcService
                     }
 
                     $this->inventory->stockIn(
-                        warehouseId: $wipFinWarehouseId,
+                        warehouseId: $whPrdWarehouseId,
                         itemId: $itemId,
                         qty: $qtyOkItem,
                         date: $qcDate,
                         sourceType: 'sewing_qc_in',
                         sourceId: $sewingReturn->id,
-                        notes: "QC Sewing IN WIP-FIN {$qtyOkItem} pcs untuk return {$sewingReturn->code} (bundle #{$bundleId})",
+                        notes: "QC Sewing IN WH-PRD {$qtyOkItem} pcs untuk return {$sewingReturn->code} (bundle #{$bundleId})",
                         lotId: null,
                         unitCost: $unitCostWipSewPerItem[$itemId] ?? null,
                         affectLotCost: false,
@@ -353,9 +391,22 @@ class QcService
                     continue;
                 }
 
-                $bundle->wip_warehouse_id = (int) $wipFinWarehouseId;
+                $bundle->wip_warehouse_id = (int) $whPrdWarehouseId;
                 $bundle->wip_qty = (float) ($bundle->wip_qty ?? 0) + (float) $qtyOkBundle;
                 $bundle->save();
+            }
+
+            if (!empty($touchedPickupIds)) {
+                foreach (array_keys($touchedPickupIds) as $pickupId) {
+                    $pickup = \App\Models\SewingPickup::with('lines')
+                        ->lockForUpdate()
+                        ->find($pickupId);
+
+                    if ($pickup && $pickup->isFillable('status')) {
+                        $pickup->status = $pickup->recalcStatus();
+                        $pickup->save();
+                    }
+                }
             }
         });
     }

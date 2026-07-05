@@ -1,652 +1,568 @@
 {{-- resources/views/sales/shipment_returns/show.blade.php --}}
 @extends('layouts.app')
 
-@section('title', 'Sales • ' . $shipmentReturn->code)
+@section('title', 'Retur ' . $shipmentReturn->code)
 
 @push('head')
-    <style>
-        :root {
-            --ret-main: rgba(59, 130, 246, 1);
-            --ret-soft: rgba(59, 130, 246, .12);
-            --warn-soft: rgba(245, 158, 11, .14);
-            --danger-soft: rgba(239, 68, 68, .12);
+<style>
+    .sr-show-page {
+        max-width: 980px;
+        margin: 0 auto;
+        padding: .75rem .75rem 5rem;
+        color: #111827;
+    }
+
+    .sr-topbar {
+        position: sticky;
+        top: 0;
+        z-index: 20;
+        display: flex;
+        align-items: center;
+        justify-content: space-between;
+        gap: .75rem;
+        margin: 0 -.75rem;
+        padding: .55rem .75rem;
+        border-bottom: 1px solid rgba(148, 163, 184, .24);
+        background: rgba(248, 250, 252, .98);
+        backdrop-filter: blur(14px);
+    }
+
+    .sr-title {
+        margin: 0;
+        color: #111827;
+        font-size: 1.05rem;
+        font-weight: 900;
+        font-family: ui-monospace, SFMono-Regular, Menlo, Consolas, monospace;
+    }
+
+    .sr-sub {
+        color: #64748b;
+        font-size: .78rem;
+        font-weight: 650;
+    }
+
+    .sr-shell {
+        display: grid;
+        gap: .65rem;
+        margin-top: .65rem;
+    }
+
+    .sr-btn {
+        display: inline-flex;
+        align-items: center;
+        justify-content: center;
+        min-height: 38px;
+        border-radius: 8px;
+        padding: .45rem .85rem;
+        border: 1px solid rgba(148, 163, 184, .35);
+        background: #fff;
+        color: #334155;
+        font-size: .82rem;
+        font-weight: 850;
+        text-decoration: none;
+        cursor: pointer;
+        box-shadow: none;
+    }
+
+    .sr-btn-primary {
+        border-color: #111827;
+        background: #111827;
+        color: #fff;
+    }
+
+    .sr-btn:disabled {
+        opacity: .45;
+        cursor: not-allowed;
+    }
+
+    .sr-panel {
+        border: 1px solid rgba(148, 163, 184, .22);
+        border-radius: 8px;
+        background: #fff;
+        overflow: hidden;
+    }
+
+    .sr-panel-body {
+        padding: .75rem;
+    }
+
+    .sr-meta {
+        display: grid;
+        grid-template-columns: repeat(4, minmax(0, 1fr));
+        gap: .5rem;
+    }
+
+    .sr-meta-item,
+    .sr-stat {
+        border: 1px solid rgba(148, 163, 184, .22);
+        border-radius: 8px;
+        padding: .55rem .65rem;
+        background: #fff;
+        min-width: 0;
+    }
+
+    .sr-meta-item {
+        background: #f8fafc;
+    }
+
+    .sr-meta-label,
+    .sr-stat-label {
+        color: #64748b;
+        font-size: .68rem;
+        font-weight: 850;
+        text-transform: uppercase;
+    }
+
+    .sr-meta-value,
+    .sr-stat-value {
+        margin-top: .12rem;
+        color: #111827;
+        font-size: .86rem;
+        font-weight: 900;
+        overflow-wrap: anywhere;
+    }
+
+    .sr-stat-value {
+        font-size: 1.12rem;
+        font-variant-numeric: tabular-nums;
+    }
+
+    .sr-status {
+        display: inline-flex;
+        align-items: center;
+        gap: .35rem;
+        border-radius: 999px;
+        padding: .2rem .58rem;
+        border: 1px solid rgba(148, 163, 184, .28);
+        color: #475569;
+        background: rgba(148, 163, 184, .10);
+        font-size: .76rem;
+        font-weight: 900;
+    }
+
+    .sr-status::before {
+        content: "";
+        width: 7px;
+        height: 7px;
+        border-radius: 999px;
+        background: #64748b;
+    }
+
+    .sr-status-submitted {
+        color: #1d4ed8;
+        background: rgba(59, 130, 246, .10);
+        border-color: rgba(59, 130, 246, .28);
+    }
+
+    .sr-status-submitted::before { background: #3b82f6; }
+
+    .sr-status-posted {
+        color: #166534;
+        background: rgba(34, 197, 94, .10);
+        border-color: rgba(34, 197, 94, .28);
+    }
+
+    .sr-status-posted::before { background: #22c55e; }
+
+    .sr-summary {
+        display: grid;
+        grid-template-columns: repeat(3, minmax(0, 1fr));
+        gap: .5rem;
+    }
+
+    .sr-note {
+        color: #475569;
+        font-size: .84rem;
+        font-weight: 650;
+        white-space: pre-line;
+    }
+
+    .sr-orders {
+        display: grid;
+        gap: .5rem;
+    }
+
+    .sr-order {
+        border: 1px solid rgba(148, 163, 184, .22);
+        border-radius: 8px;
+        background: #fff;
+        overflow: hidden;
+    }
+
+    .sr-order-head {
+        display: flex;
+        align-items: center;
+        justify-content: space-between;
+        gap: .5rem;
+        padding: .62rem .7rem;
+        border-bottom: 1px solid rgba(148, 163, 184, .16);
+        background: #f8fafc;
+    }
+
+    .sr-order-no {
+        color: #94a3b8;
+        font-size: .72rem;
+        font-weight: 900;
+        text-transform: uppercase;
+    }
+
+    .sr-order-code,
+    .sr-item-code,
+    .sr-mono {
+        font-family: ui-monospace, SFMono-Regular, Menlo, Consolas, monospace;
+    }
+
+    .sr-order-code,
+    .sr-item-code {
+        color: #111827;
+        font-weight: 950;
+    }
+
+    .sr-order-info,
+    .sr-item-name {
+        color: #64748b;
+        font-size: .76rem;
+        font-weight: 650;
+    }
+
+    .sr-order-qty,
+    .sr-item-qty {
+        min-width: 42px;
+        text-align: center;
+        border-radius: 999px;
+        padding: .16rem .5rem;
+        font-weight: 950;
+        font-variant-numeric: tabular-nums;
+    }
+
+    .sr-order-qty {
+        background: #111827;
+        color: #fff;
+    }
+
+    .sr-item-list {
+        display: grid;
+        padding: .2rem 0;
+    }
+
+    .sr-item-row {
+        display: grid;
+        grid-template-columns: 28px 1fr auto;
+        align-items: center;
+        gap: .55rem;
+        padding: .48rem .7rem;
+    }
+
+    .sr-item-num {
+        color: #64748b;
+        font-weight: 900;
+        text-align: right;
+        font-variant-numeric: tabular-nums;
+    }
+
+    .sr-item-qty {
+        border: 1px solid rgba(148, 163, 184, .28);
+    }
+
+    .sr-empty {
+        padding: 1.4rem .9rem;
+        text-align: center;
+        color: #94a3b8;
+        font-size: .85rem;
+        font-weight: 750;
+    }
+
+    .sr-actions {
+        display: flex;
+        justify-content: space-between;
+        gap: .5rem;
+        flex-wrap: wrap;
+    }
+
+    .sr-actions-group {
+        display: flex;
+        gap: .5rem;
+        flex-wrap: wrap;
+    }
+
+    .sr-inline-form {
+        margin: 0;
+    }
+
+    @media (max-width: 720px) {
+        .sr-show-page {
+            padding: .5rem .5rem 5.5rem;
         }
 
-        .page-wrap {
-            max-width: 1150px;
-            margin-inline: auto;
-            padding: 1rem .9rem 4.5rem;
+        .sr-topbar {
+            margin: 0 -.5rem;
+            padding: .5rem;
         }
 
-        /* ========= GLOBAL BACKGROUND (LIGHT) ========= */
-        body[data-theme="light"] .page-wrap {
-            background: radial-gradient(circle at top left,
-                    rgba(59, 130, 246, .10) 0,
-                    rgba(45, 212, 191, .10) 28%,
-                    #f9fafb 65%);
+        .sr-topbar > .sr-btn,
+        .sr-sub {
+            display: none;
         }
 
-        body[data-theme="light"] .page-wrap.page-theme-shopee {
-            background: #fff7ed;
+        .sr-meta {
+            grid-template-columns: repeat(2, minmax(0, 1fr));
         }
 
-        body[data-theme="light"] .page-wrap.page-theme-tiktok {
-            background: #ecfeff;
-        }
-
-        /* ========= GLOBAL BACKGROUND (DARK) ========= */
-        body[data-theme="dark"] .page-wrap {
-            background: radial-gradient(circle at top left,
-                    rgba(15, 23, 42, 0.9) 0,
-                    #020617 65%);
-        }
-
-        body[data-theme="dark"] .page-wrap.page-theme-shopee {
-            background: radial-gradient(circle at top left,
-                    rgba(148, 27, 19, 0.8) 0,
-                    #020617 65%);
-        }
-
-        body[data-theme="dark"] .page-wrap.page-theme-tiktok {
-            background: radial-gradient(circle at top left,
-                    rgba(8, 47, 73, 0.85) 0,
-                    #020617 65%);
-        }
-
-        .card {
-            background: var(--card);
-            border-radius: 14px;
-            border: 1px solid var(--line);
-            box-shadow:
-                0 18px 45px rgba(15, 23, 42, 0.08),
-                0 0 0 1px rgba(15, 23, 42, 0.02);
-        }
-
-        body[data-theme="light"] .card {
-            background: #ffffff;
-        }
-
-        .card-section {
-            padding: .9rem 1rem;
-            border-bottom: 1px solid rgba(148, 163, 184, .25);
-        }
-
-        .card-section:last-child {
-            border-bottom: none;
-        }
-
-        .header-main {
-            display: flex;
-            flex-wrap: wrap;
-            gap: .6rem 1rem;
-            justify-content: space-between;
-            align-items: center;
-        }
-
-        .code-label {
-            font-size: .78rem;
-            letter-spacing: .16em;
-            text-transform: uppercase;
-            color: var(--muted);
-        }
-
-        .code-text {
-            font-size: 1.2rem;
-            font-weight: 600;
-            font-variant-numeric: tabular-nums;
-        }
-
-        .badge-status {
-            display: inline-flex;
-            align-items: center;
+        .sr-summary {
+            grid-template-columns: repeat(3, minmax(0, 1fr));
             gap: .35rem;
-            border-radius: 999px;
-            padding: .2rem .7rem;
-            font-size: .78rem;
-            font-weight: 500;
         }
 
-        .badge-draft {
-            background: rgba(148, 163, 184, .18);
-            color: #475569;
+        .sr-panel-body {
+            padding: .6rem;
         }
 
-        .badge-submitted {
-            background: rgba(59, 130, 246, .18);
-            color: #1d4ed8;
-        }
-
-        .badge-posted {
-            background: rgba(16, 185, 129, .18);
-            color: #047857;
-        }
-
-        .badge-store {
-            border-radius: 999px;
-            padding: .18rem .6rem;
-            font-size: .78rem;
-            background: rgba(59, 130, 246, .14);
-            color: #1d4ed8;
-        }
-
-        .badge-shipment {
-            border-radius: 999px;
-            padding: .18rem .6rem;
-            font-size: .78rem;
-            background: rgba(234, 179, 8, .14);
-            color: #92400e;
-        }
-
-        .stats-row {
-            display: flex;
-            flex-wrap: wrap;
-            gap: .75rem;
-        }
-
-        .stat-pill {
-            min-width: 140px;
-            padding: .55rem .75rem;
-            border-radius: 12px;
-            background: rgba(15, 23, 42, .02);
-            border: 1px dashed rgba(148, 163, 184, .6);
+        .sr-meta-value {
             font-size: .8rem;
         }
 
-        .stat-label {
-            color: var(--muted);
-            margin-bottom: .1rem;
+        .sr-stat {
+            padding: .45rem .5rem;
         }
 
-        .stat-value {
-            font-variant-numeric: tabular-nums;
-            font-weight: 500;
+        .sr-stat-value {
+            font-size: 1rem;
         }
 
-        .mono {
-            font-variant-numeric: tabular-nums;
-            font-family: ui-monospace, SFMono-Regular, Menlo, Consolas, "Liberation Mono";
+        .sr-item-row {
+            grid-template-columns: 24px 1fr auto;
+            padding: .55rem .6rem;
         }
 
-        .scan-form-row {
-            display: flex;
-            flex-wrap: wrap;
-            gap: .6rem;
-            align-items: center;
+        .sr-actions {
+            position: fixed;
+            left: 0;
+            right: 0;
+            bottom: 0;
+            z-index: 30;
+            display: grid;
+            grid-template-columns: 1fr 1fr;
+            padding: .55rem;
+            border-top: 1px solid rgba(148, 163, 184, .24);
+            background: rgba(248, 250, 252, .98);
+            backdrop-filter: blur(14px);
         }
 
-        .scan-form-row .form-control {
-            border-radius: 999px;
-            font-size: .9rem;
-        }
-
-        .input-scan-code {
-            min-width: 0;
-            flex: 1 1 210px;
-        }
-
-        .input-scan-qty {
-            width: 90px;
-        }
-
-        .btn-scan {
-            border-radius: 999px;
-            border: 1px solid transparent;
-            padding: .45rem 1.1rem;
-            font-size: .88rem;
-            font-weight: 500;
-            background: linear-gradient(135deg, var(--ret-main), #22c55e);
-            color: #ffffff;
-            display: inline-flex;
-            align-items: center;
-            gap: .35rem;
-        }
-
-        .btn-scan:hover {
-            filter: brightness(1.05);
-            color: #ffffff;
-        }
-
-        .scan-help {
-            font-size: .78rem;
-            color: var(--muted);
-            margin-top: .35rem;
-        }
-
-        .table-wrap {
+        .sr-actions-group,
+        .sr-inline-form,
+        .sr-actions .sr-btn {
             width: 100%;
-            overflow-x: auto;
         }
 
-        table.lines-table {
-            width: 100%;
-            border-collapse: collapse;
-            font-size: .9rem;
+        .sr-actions .sr-btn {
+            min-height: 46px;
         }
-
-        table.lines-table th,
-        table.lines-table td {
-            padding: .5rem .6rem;
-            border-bottom: 1px solid rgba(148, 163, 184, .24);
-            white-space: nowrap;
-        }
-
-        table.lines-table th {
-            text-align: left;
-            font-size: .78rem;
-            letter-spacing: .12em;
-            text-transform: uppercase;
-            color: var(--muted);
-        }
-
-        table.lines-table tbody tr:hover {
-            background: rgba(15, 23, 42, .02);
-        }
-
-        tr.is-last-scanned {
-            background: rgba(59, 130, 246, .10);
-        }
-
-        .qty-input-inline {
-            width: 80px;
-            font-size: .85rem;
-            border-radius: 999px;
-        }
-
-        .btn-qty-save {
-            border-radius: 999px;
-            padding: .2rem .6rem;
-            font-size: .75rem;
-        }
-
-        .actions-footer {
-            display: flex;
-            flex-wrap: wrap;
-            gap: .5rem;
-            justify-content: space-between;
-            align-items: center;
-        }
-
-        .btn-outline-soft {
-            border-radius: 999px;
-            padding: .45rem 1.1rem;
-            font-size: .86rem;
-        }
-
-        .btn-submit {
-            border-radius: 999px;
-            padding: .45rem 1.1rem;
-            font-size: .86rem;
-            border: none;
-            background: linear-gradient(135deg, #f97316, #f59e0b);
-            color: #ffffff;
-        }
-
-        .btn-post {
-            border-radius: 999px;
-            padding: .45rem 1.1rem;
-            font-size: .86rem;
-            border: none;
-            background: linear-gradient(135deg, #16a34a, #22c55e);
-            color: #ffffff;
-        }
-
-        .btn-submit[disabled],
-        .btn-post[disabled] {
-            opacity: .5;
-            cursor: not-allowed;
-        }
-
-        @media (max-width: 768px) {
-            .card-section {
-                padding: .8rem .75rem;
-            }
-
-            table.lines-table th,
-            table.lines-table td {
-                padding: .45rem .45rem;
-            }
-        }
-    </style>
+    }
+</style>
 @endpush
 
 @section('content')
-    @php
-        $status = $shipmentReturn->status;
-        $lastScannedId = session('last_scanned_return_line_id');
+@php
+    $status = $shipmentReturn->status ?? 'draft';
+    $statusClass = match ($status) {
+        'submitted' => 'sr-status-submitted',
+        'posted' => 'sr-status-posted',
+        default => '',
+    };
 
-        $store = $shipmentReturn->store;
-        $platform = $store->platform ?? ($store->sales_channel ?? null);
+    $lines = $shipmentReturn->lines ?? collect();
+    $totalQty = (int) $lines->sum('qty');
+    $groupedOrders = $shipmentReturn->orderScans->isNotEmpty()
+        ? $shipmentReturn->orderScans->map(fn ($scan) => [
+            'code' => ($scan->order_number ?: $scan->order_no) ?: 'MANUAL',
+            'qty' => (int) $scan->items->sum(fn ($scanItem) => (int) ($scanItem->qty_scanned ?: $scanItem->qty)),
+            'items' => $scan->items->map(fn ($scanItem) => [
+                'code' => $scanItem->item->code ?? '-',
+                'name' => $scanItem->item->name ?? '',
+                'qty' => (int) ($scanItem->qty_scanned ?: $scanItem->qty),
+            ])->values(),
+        ])->values()
+        : $lines
+            ->groupBy(fn ($line) => trim((string) ($line->remarks ?: 'MANUAL')) ?: 'MANUAL')
+            ->map(function ($group, $orderCode) {
+                return [
+                    'code' => $orderCode,
+                    'qty' => (int) $group->sum('qty'),
+                    'items' => $group->map(fn ($line) => [
+                        'code' => $line->item->code ?? '-',
+                        'name' => $line->item->name ?? '',
+                        'qty' => (int) $line->qty,
+                    ])->values(),
+                ];
+            })
+            ->values();
+@endphp
 
-        $pageTheme = match (strtolower((string) $platform)) {
-            'shopee' => 'page-theme-shopee',
-            'tiktok', 'tiktok_shop', 'tiktokshop' => 'page-theme-tiktok',
-            default => '',
-        };
-    @endphp
+<div class="sr-show-page">
+    <div class="sr-topbar">
+        <div>
+            <h1 class="sr-title">{{ $shipmentReturn->code }}</h1>
+            <div class="sr-sub">Detail retur shipment</div>
+        </div>
+        <a href="{{ route('sales.shipment_returns.index') }}" class="sr-btn">Daftar</a>
+    </div>
 
-    <div class="page-wrap {{ $pageTheme }}">
-        <div class="card">
-            {{-- HEADER --}}
-            <div class="card-section">
-                <div class="header-main">
-                    <div>
-                        <div class="code-label">Retur Shipment</div>
-                        <div class="code-text mono">{{ $shipmentReturn->code }}</div>
-                    </div>
-
-                    <div style="text-align:right;">
-                        <div class="mb-1">
-                            @if ($status === 'draft')
-                                <span class="badge-status badge-draft">Draft</span>
-                            @elseif ($status === 'submitted')
-                                <span class="badge-status badge-submitted">Submitted</span>
-                            @elseif ($status === 'posted')
-                                <span class="badge-status badge-posted">Posted</span>
-                            @else
-                                <span class="badge-status badge-draft">{{ ucfirst($status) }}</span>
-                            @endif
-                        </div>
-                        <div class="mono" style="font-size:.8rem; color:var(--muted);">
-                            {{ optional($shipmentReturn->date)->format('d M Y') }}
-                        </div>
-                    </div>
-                </div>
+    <div class="sr-shell">
+        @if (session('status') && session('message'))
+            <div class="alert alert-{{ session('status') === 'error' ? 'danger' : 'success' }} mb-0" style="border-radius:8px;font-size:.84rem;">
+                {{ session('message') }}
             </div>
+        @endif
 
-            {{-- STORE + SHIPMENT INFO --}}
-            <div class="card-section">
-                <div class="row g-3">
-                    <div class="col-md-6">
-                        <div style="font-size:.78rem; color:var(--muted); margin-bottom:.15rem;">Store</div>
-                        @if ($shipmentReturn->store)
-                            <div class="badge-store mono">
-                                {{ $shipmentReturn->store->code ?? '-' }} — {{ $shipmentReturn->store->name ?? '-' }}
-                            </div>
-                        @else
-                            <div style="font-size:.85rem; color:var(--muted);">-</div>
-                        @endif>
-                    </div>
-
-                    <div class="col-md-6">
-                        <div style="font-size:.78rem; color:var(--muted); margin-bottom:.15rem;">Shipment Asal</div>
-                        @if ($shipmentReturn->shipment)
-                            <div class="badge-shipment">
-                                <span>Retur dari</span>
-                                <span class="mono">{{ $shipmentReturn->shipment->code }}</span>
-                            </div>
-                        @else
-                            <div style="font-size:.85rem; color:var(--muted);">Manual (tanpa link shipment)</div>
-                        @endif
-                    </div>
-
-                    @if ($shipmentReturn->reason)
-                        <div class="col-md-12">
-                            <div style="font-size:.78rem; color:var(--muted); margin-bottom:.15rem;">Alasan Retur</div>
-                            <div style="font-size:.86rem;">{{ $shipmentReturn->reason }}</div>
-                        </div>
-                    @endif
-
-                    @if ($shipmentReturn->notes)
-                        <div class="col-md-12">
-                            <div style="font-size:.78rem; color:var(--muted); margin-bottom:.15rem;">Catatan</div>
-                            <div style="font-size:.86rem;">{{ $shipmentReturn->notes }}</div>
-                        </div>
-                    @endif
-
-                    <div class="col-md-12">
-                        <div class="stats-row">
-                            <div class="stat-pill">
-                                <div class="stat-label">Total Qty Retur</div>
-                                <div class="stat-value mono">
-                                    {{ number_format((int) $shipmentReturn->total_qty) }}
-                                </div>
-                            </div>
-
-                            @if ($shipmentReturn->submitted_at)
-                                <div class="stat-pill">
-                                    <div class="stat-label">Submitted</div>
-                                    <div class="stat-value mono">
-                                        {{ optional($shipmentReturn->submitted_at)->format('d M Y H:i') }}
-                                        @if ($shipmentReturn->submittedBy)
-                                            <span style="font-size:.78rem; color:var(--muted);">
-                                                • {{ $shipmentReturn->submittedBy->name }}
-                                            </span>
-                                        @endif
-                                    </div>
-                                </div>
-                            @endif
-
-                            @if ($shipmentReturn->posted_at)
-                                <div class="stat-pill">
-                                    <div class="stat-label">Posted</div>
-                                    <div class="stat-value mono">
-                                        {{ optional($shipmentReturn->posted_at)->format('d M Y H:i') }}
-                                        @if ($shipmentReturn->postedBy)
-                                            <span style="font-size:.78rem; color:var(--muted);">
-                                                • {{ $shipmentReturn->postedBy->name }}
-                                            </span>
-                                        @endif
-                                    </div>
-                                </div>
-                            @endif
-                        </div>
-                    </div>
-                </div>
+        @if ($errors->any())
+            <div class="alert alert-danger mb-0" style="border-radius:8px;font-size:.84rem;">
+                @foreach ($errors->all() as $error)
+                    <div>{{ $error }}</div>
+                @endforeach
             </div>
+        @endif
 
-            {{-- SCAN SECTION (hanya draft) --}}
-            @if ($status === 'draft')
-                <div class="card-section">
-                    <div style="font-size:.85rem; font-weight:500; margin-bottom:.35rem;">
-                        Scan Barang Retur
-                    </div>
-
-                    @if (session('status') && session('message'))
-                        <div class="alert alert-{{ session('status') === 'error' ? 'danger' : 'success' }} py-1 mb-2"
-                            style="font-size:.8rem;">
-                            {{ session('message') }}
+        <div class="sr-panel">
+            <div class="sr-panel-body">
+                <div class="sr-meta">
+                    <div class="sr-meta-item">
+                        <div class="sr-meta-label">Status</div>
+                        <div class="sr-meta-value">
+                            <span class="sr-status {{ $statusClass }}">{{ ucfirst($status) }}</span>
                         </div>
-                    @endif
-
-                    @if ($errors->any())
-                        <div class="alert alert-danger small py-1 mb-2">
-                            @foreach ($errors->all() as $error)
-                                <div>{{ $error }}</div>
-                            @endforeach
-                        </div>
-                    @endif
-
-                    <form action="{{ route('sales.shipment_returns.scan_item', $shipmentReturn) }}" method="POST"
-                        class="scan-form-row" id="scan-form">
-                        @csrf
-
-                        <input type="text" name="scan_code" id="scan_code" class="form-control input-scan-code mono"
-                            placeholder="Scan barcode / masukkan kode item..." required autofocus>
-
-                        <input type="number" name="qty" class="form-control input-scan-qty mono" min="1"
-                            value="1">
-
-                        <button type="submit" class="btn-scan">
-                            <span>+ Tambah</span>
-                        </button>
-                    </form>
-
-                    <div class="scan-help">
-                        Enter / klik tombol tambah untuk scan. Qty default 1, bisa diubah sebelum scan.
                     </div>
-                </div>
-            @endif
-
-            {{-- LINES TABLE --}}
-            <div class="card-section">
-                <div style="display:flex; justify-content:space-between; align-items:center; margin-bottom:.4rem;">
-                    <div style="font-size:.85rem; font-weight:500;">
-                        Detail Barang Retur
+                    <div class="sr-meta-item">
+                        <div class="sr-meta-label">Marketplace</div>
+                        <div class="sr-meta-value">{{ $shipmentReturn->store->code ?? '-' }} - {{ $shipmentReturn->store->name ?? '-' }}</div>
                     </div>
-                    <div style="font-size:.78rem; color:var(--muted);">
-                        Total baris:
-                        <span class="mono">{{ $shipmentReturn->lines->count() }}</span>
+                    <div class="sr-meta-item">
+                        <div class="sr-meta-label">Tanggal</div>
+                        <div class="sr-meta-value">{{ optional($shipmentReturn->date)->format('d M Y') ?: '-' }}</div>
                     </div>
-                </div>
-
-                <div class="table-wrap">
-                    <table class="lines-table">
-                        <thead>
-                            <tr>
-                                <th>#</th>
-                                <th>Item</th>
-                                <th>Qty</th>
-                                <th>Shipment Line</th>
-                                <th style="width:120px;">Aksi</th>
-                            </tr>
-                        </thead>
-                        <tbody>
-                            @forelse ($shipmentReturn->lines as $idx => $line)
-                                @php
-                                    $isLast = $lastScannedId && $lastScannedId == $line->id;
-                                @endphp
-                                <tr @class(['is-last-scanned' => $isLast])>
-                                    <td class="mono" style="font-size:.8rem;">
-                                        {{ $idx + 1 }}
-                                    </td>
-                                    <td>
-                                        <div class="mono" style="font-size:.85rem;">
-                                            {{ $line->item->code ?? '-' }}
-                                        </div>
-                                        <div style="font-size:.82rem;">
-                                            {{ $line->item->name ?? '' }}
-                                        </div>
-                                    </td>
-                                    <td>
-                                        @if ($status === 'draft')
-                                            <form action="{{ route('sales.shipment_returns.update_line_qty', $line) }}"
-                                                method="POST" class="d-inline-flex align-items-center gap-1">
-                                                @csrf
-                                                @method('PATCH')
-                                                <input type="number" name="qty"
-                                                    class="form-control qty-input-inline mono" min="0"
-                                                    value="{{ (int) $line->qty }}">
-                                                <button type="submit"
-                                                    class="btn btn-sm btn-outline-secondary btn-qty-save">
-                                                    Simpan
-                                                </button>
-                                            </form>
-                                        @else
-                                            <span class="mono">{{ (int) $line->qty }}</span>
-                                        @endif
-                                    </td>
-                                    <td>
-                                        @if ($line->shipmentLine && $shipmentReturn->shipment)
-                                            <span class="mono" style="font-size:.8rem;">
-                                                {{ $shipmentReturn->shipment->code }} / Line
-                                                #{{ $line->shipmentLine->id }}
-                                            </span>
-                                        @else
-                                            <span style="font-size:.78rem; color:var(--muted);">-</span>
-                                        @endif
-                                    </td>
-                                    <td>
-                                        @if ($status === 'draft')
-                                            <form action="{{ route('sales.shipment_returns.update_line_qty', $line) }}"
-                                                method="POST" onsubmit="return confirm('Hapus baris ini?');">
-                                                @csrf
-                                                @method('PATCH')
-                                                <input type="hidden" name="qty" value="0">
-                                                <button type="submit" class="btn btn-sm btn-outline-danger"
-                                                    style="font-size:.75rem; border-radius:999px;">
-                                                    Hapus
-                                                </button>
-                                            </form>
-                                        @else
-                                            <span style="font-size:.78rem; color:var(--muted);">Terkunci</span>
-                                        @endif
-                                    </td>
-                                </tr>
-                            @empty
-                                <tr>
-                                    <td colspan="5" style="padding:.8rem; font-size:.86rem; color:var(--muted);">
-                                        Belum ada item retur.
-                                        {{ $status === 'draft' ? 'Scan atau tambah item terlebih dahulu.' : '' }}
-                                    </td>
-                                </tr>
-                            @endforelse
-                        </tbody>
-                    </table>
-                </div>
-            </div>
-
-            {{-- FOOTER ACTIONS --}}
-            <div class="card-section">
-                <div class="actions-footer">
-                    <div class="d-flex flex-wrap gap-2">
-                        <a href="{{ route('sales.shipment_returns.index') }}"
-                            class="btn btn-outline-soft btn-sm btn-outline-secondary">
-                            ← Kembali ke daftar
-                        </a>
-
-                        @if ($shipmentReturn->shipment)
-                            <a href="{{ route('sales.shipments.show', $shipmentReturn->shipment) }}"
-                                class="btn btn-outline-soft btn-sm btn-outline-secondary">
-                                Lihat Shipment Asal
-                            </a>
-                        @endif
-                    </div>
-
-                    <div class="d-flex flex-wrap gap-2">
-                        {{-- Submit draft -> submitted --}}
-                        <form action="{{ route('sales.shipment_returns.submit', $shipmentReturn) }}" method="POST"
-                            onsubmit="return confirm('Submit retur ini? Setelah submit tidak bisa scan / edit qty.');">
-                            @csrf
-                            <button type="submit" class="btn-submit" @disabled($status !== 'draft' || $shipmentReturn->lines->count() === 0)>
-                                Submit Retur
-                            </button>
-                        </form>
-
-                        {{-- Post submitted -> posted (stock in WH-RTS) --}}
-                        <form action="{{ route('sales.shipment_returns.post', $shipmentReturn) }}" method="POST"
-                            onsubmit="return confirm('Posting retur ini dan tambah stok FG ke WH-RTS?');">
-                            @csrf
-                            <button type="submit" class="btn-post" @disabled($status !== 'submitted' || $shipmentReturn->lines->count() === 0)>
-                                Posting ke WH-RTS
-                            </button>
-                        </form>
+                    <div class="sr-meta-item">
+                        <div class="sr-meta-label">Shipment Asal</div>
+                        <div class="sr-meta-value">{{ $shipmentReturn->shipment->code ?? 'Manual' }}</div>
                     </div>
                 </div>
             </div>
         </div>
+
+        <div class="sr-summary">
+            <div class="sr-stat">
+                <div class="sr-stat-label">Pesanan</div>
+                <div class="sr-stat-value">{{ number_format($groupedOrders->count(), 0, ',', '.') }}</div>
+            </div>
+            <div class="sr-stat">
+                <div class="sr-stat-label">Item</div>
+                <div class="sr-stat-value">{{ number_format($lines->count(), 0, ',', '.') }}</div>
+            </div>
+            <div class="sr-stat">
+                <div class="sr-stat-label">Qty</div>
+                <div class="sr-stat-value">{{ number_format($totalQty, 0, ',', '.') }}</div>
+            </div>
+        </div>
+
+        @if ($shipmentReturn->reason || $shipmentReturn->notes || $shipmentReturn->submitted_at || $shipmentReturn->posted_at)
+            <div class="sr-panel">
+                <div class="sr-panel-body">
+                    <div class="sr-meta">
+                        @if ($shipmentReturn->reason)
+                            <div class="sr-meta-item">
+                                <div class="sr-meta-label">Alasan</div>
+                                <div class="sr-meta-value">{{ $shipmentReturn->reason }}</div>
+                            </div>
+                        @endif
+                        @if ($shipmentReturn->submitted_at)
+                            <div class="sr-meta-item">
+                                <div class="sr-meta-label">Submitted</div>
+                                <div class="sr-meta-value">
+                                    {{ optional($shipmentReturn->submitted_at)->format('d M Y H:i') }}
+                                    @if ($shipmentReturn->submittedBy)
+                                        <div class="sr-order-info">{{ $shipmentReturn->submittedBy->name }}</div>
+                                    @endif
+                                </div>
+                            </div>
+                        @endif
+                        @if ($shipmentReturn->posted_at)
+                            <div class="sr-meta-item">
+                                <div class="sr-meta-label">Posted</div>
+                                <div class="sr-meta-value">
+                                    {{ optional($shipmentReturn->posted_at)->format('d M Y H:i') }}
+                                    @if ($shipmentReturn->postedBy)
+                                        <div class="sr-order-info">{{ $shipmentReturn->postedBy->name }}</div>
+                                    @endif
+                                </div>
+                            </div>
+                        @endif
+                        @if ($shipmentReturn->notes)
+                            <div class="sr-meta-item" style="grid-column:1 / -1;">
+                                <div class="sr-meta-label">Catatan</div>
+                                <div class="sr-note">{{ $shipmentReturn->notes }}</div>
+                            </div>
+                        @endif
+                    </div>
+                </div>
+            </div>
+        @endif
+
+        <div class="sr-panel">
+            <div class="sr-panel-body">
+                <div class="sr-orders">
+                    @forelse ($groupedOrders as $order)
+                        <div class="sr-order">
+                            <div class="sr-order-head">
+                                <div>
+                                    <div class="sr-order-no">No Order</div>
+                                    <div class="sr-order-code">{{ $order['code'] }}</div>
+                                    <div class="sr-order-info">{{ $order['code'] === 'MANUAL' ? 'Tanpa order' : 'Retur pesanan' }}</div>
+                                </div>
+                                <div class="sr-order-qty">{{ number_format($order['qty'], 0, ',', '.') }}</div>
+                            </div>
+                            <div class="sr-item-list">
+                                @foreach ($order['items'] as $line)
+                                    <div class="sr-item-row">
+                                        <div class="sr-item-num">{{ $loop->iteration }}.</div>
+                                        <div>
+                                            <div class="sr-item-code">{{ $line['code'] ?? '-' }}</div>
+                                            <div class="sr-item-name">{{ $line['name'] ?? '' }}</div>
+                                        </div>
+                                        <div class="sr-item-qty">{{ number_format((int) ($line['qty'] ?? 0), 0, ',', '.') }}</div>
+                                    </div>
+                                @endforeach
+                            </div>
+                        </div>
+                    @empty
+                        <div class="sr-empty">Belum ada item retur.</div>
+                    @endforelse
+                </div>
+            </div>
+        </div>
+
+        <div class="sr-actions">
+            <div class="sr-actions-group">
+                <a href="{{ route('sales.shipment_returns.index') }}" class="sr-btn">Kembali</a>
+                @if ($shipmentReturn->shipment)
+                    <a href="{{ route('sales.shipments.show', $shipmentReturn->shipment) }}" class="sr-btn">Shipment Asal</a>
+                @endif
+            </div>
+
+            <div class="sr-actions-group">
+                @if ($status === 'draft')
+                    <a href="{{ route('sales.shipment_returns.edit', $shipmentReturn) }}" class="sr-btn">Scan Retur</a>
+                    <form action="{{ route('sales.shipment_returns.submit', $shipmentReturn) }}" method="POST" class="sr-inline-form" onsubmit="return confirm('Submit retur ini?');">
+                        @csrf
+                        <button type="submit" class="sr-btn sr-btn-primary" @disabled($lines->count() === 0)>Submit</button>
+                    </form>
+                @elseif ($status === 'submitted')
+                    <form action="{{ route('sales.shipment_returns.post', $shipmentReturn) }}" method="POST" class="sr-inline-form" onsubmit="return confirm('Posting retur ini dan tambah stok ke WH-RTS?');">
+                        @csrf
+                        <button type="submit" class="sr-btn sr-btn-primary" @disabled($lines->count() === 0)>Posting WH-RTS</button>
+                    </form>
+                @else
+                    <a href="{{ route('sales.shipment_returns.index') }}" class="sr-btn sr-btn-primary">Selesai</a>
+                @endif
+            </div>
+        </div>
     </div>
-
-    @push('scripts')
-        <script>
-            (function() {
-                const scanInput = document.getElementById('scan_code');
-                if (scanInput) {
-                    scanInput.addEventListener('focus', function() {
-                        this.select();
-                    });
-                }
-
-                const form = document.getElementById('scan-form');
-                if (form) {
-                    form.addEventListener('submit', function() {
-                        if (scanInput && scanInput.value.trim() !== '') {
-                            setTimeout(function() {
-                                scanInput.focus();
-                                scanInput.select();
-                            }, 150);
-                        }
-                    });
-                }
-
-                // Scroll ke baris terakhir yang discan (mirip Shipments)
-                const lastRow = document.querySelector('tr.is-last-scanned');
-                if (lastRow) {
-                    lastRow.scrollIntoView({
-                        behavior: 'smooth',
-                        block: 'center'
-                    });
-                }
-            })();
-        </script>
-    @endpush
+</div>
 @endsection

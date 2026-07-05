@@ -248,8 +248,9 @@ class SewingReturnController extends Controller
             ->all();
 
         $operatorIds = collect($isRejectReworkMode ? [] : $operatorIdsFromPickups)
-            ->merge($operatorIdsFromSewingReturns)
-            ->merge($operatorIdsFromFinishing)
+            ->when($isRejectReworkMode, fn($ids) => $ids
+                ->merge($operatorIdsFromSewingReturns)
+                ->merge($operatorIdsFromFinishing))
             ->unique()
             ->values()
             ->all();
@@ -458,10 +459,6 @@ class SewingReturnController extends Controller
 
             return $l;
         })->filter(fn($l) => (float) $l->wip_stock > 0.000001)->values();
-
-        $rejectWarehouse = Warehouse::query()->where('code', 'REJ-SEW')->first();
-        $rejectReworkLines = $this->buildRejectReworkLines($operatorId, null, $rejectWarehouse?->id, null);
-        $lines = $lines->concat($rejectReworkLines)->values();
 
         return view('production.sewing_returns.create', compact(
             'operators',

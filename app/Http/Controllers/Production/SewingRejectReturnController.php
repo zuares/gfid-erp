@@ -91,6 +91,10 @@ class SewingRejectReturnController extends Controller
             if (!$rejSew) {
                 throw ValidationException::withMessages(['qty' => 'Gudang REJ-SEW belum tersedia.']);
             }
+            $whRts = Warehouse::query()->where('code', 'WH-RTS')->first();
+            if (!$whRts) {
+                throw ValidationException::withMessages(['qty' => 'Gudang WH-RTS belum tersedia.']);
+            }
 
             $source = $this->resolveConversionSource($sourceRejectLineId, $sourceFinishingLineId, (int) $rejSew->id, true);
             if (!$source) {
@@ -137,13 +141,13 @@ class SewingRejectReturnController extends Controller
             );
 
             $this->inventory->stockIn(
-                warehouseId: (int) $rejSew->id,
+                warehouseId: (int) $whRts->id,
                 itemId: (int) $rejectItem->id,
                 qty: $qty,
                 date: $date,
                 sourceType: 'sewing_reject_convert',
                 sourceId: (int) $conversion->id,
-                notes: "Tidak bisa diperbaiki {$conversion->code} IN {$rejectItem->code}",
+                notes: "Tidak bisa diperbaiki {$conversion->code} IN WH-RTS {$rejectItem->code}",
                 lotId: null,
                 unitCost: $unitCost > 0 ? $unitCost : null,
                 affectLotCost: false,
@@ -152,7 +156,7 @@ class SewingRejectReturnController extends Controller
 
             return redirect()
                 ->route('production.sewing.reject_returns.index')
-                ->with('status', "{$source->sku} {$qty} pcs dikonversi ke {$rejectItem->code}.");
+                ->with('status', "{$source->sku} {$qty} pcs dikonversi ke {$rejectItem->code} dan masuk WH-RTS.");
         });
     }
 
@@ -223,6 +227,7 @@ class SewingRejectReturnController extends Controller
                 it.id as item_id,
                 it.code as sku,
                 it.name as product_name,
+                COALESCE(cat.code,'REJECT') as category_code,
                 COALESCE(cat.name,'-') as category,
                 COALESCE(NULLIF(rl.notes,''),'-') as notes
             ")
@@ -272,6 +277,7 @@ class SewingRejectReturnController extends Controller
                 it.id as item_id,
                 it.code as sku,
                 it.name as product_name,
+                COALESCE(cat.code,'REJECT') as category_code,
                 COALESCE(cat.name,'-') as category,
                 COALESCE(NULLIF(fl.reject_notes,''), 'Dari finishing') as notes
             ")
@@ -311,6 +317,9 @@ class SewingRejectReturnController extends Controller
         $row->source_badge = ($row->source_kind ?? '') === 'finishing'
             ? 'FIN'
             : 'SR';
+
+        $categoryCode = Str::upper(Str::slug((string) ($row->category_code ?: 'REJECT'), '-'));
+        $row->reject_sku = trim($categoryCode, '-') . '-RJCT';
 
         $reworked = (float) ($row->qty_reworked ?? 0);
         $converted = (float) ($row->qty_converted ?? 0);

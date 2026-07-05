@@ -26,7 +26,7 @@
     <div class="card-section d-flex justify-content-between align-items-start flex-wrap gap-2">
       <div>
         <div class="fw-bold">Perbaikan Reject Finishing</div>
-        <div class="small text-muted">Riwayat barang REJ-FIN: OK ke WH-PRD, tidak bisa diperbaiki jadi SKU kategori-RJCT.</div>
+        <div class="small text-muted">Riwayat barang REJ-FIN: OK ke WH-PRD, tidak bisa diperbaiki jadi SKU kategori-RJCT dan masuk WH-RTS.</div>
       </div>
       <a href="{{ route('production.finishing_repairs.create') }}" class="btn btn-primary btn-sm btn-pill">Input Perbaikan</a>
     </div>

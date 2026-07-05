@@ -40,7 +40,7 @@
       <div class="card-section d-flex justify-content-between align-items-start flex-wrap gap-2">
         <div>
           <div class="fw-bold">Input Perbaikan Reject Finishing</div>
-          <div class="small text-muted">Qty OK masuk WH-PRD. Qty Tidak Bisa berubah menjadi SKU kategori-RJCT di REJ-FIN.</div>
+          <div class="small text-muted">Qty OK masuk WH-PRD. Qty Tidak Bisa menjadi SKU kategori-RJCT dan otomatis masuk WH-RTS.</div>
         </div>
         <a href="{{ route('production.finishing_repairs.index') }}" class="btn btn-outline-secondary btn-sm btn-pill">Kembali</a>
       </div>
@@ -110,7 +110,9 @@
                     <input type="number" step="0.01" min="0" max="{{ (float) $line->remaining_qty }}"
                       name="results[{{ $idx }}][qty_reject]" class="form-control form-control-sm qty mono"
                       value="{{ old("results.$idx.qty_reject") }}" placeholder="0">
-                    <div class="small text-muted mono mt-1">{{ \Illuminate\Support\Str::upper(\Illuminate\Support\Str::slug($line->category_code ?: 'REJECT', '-')) }}-RJCT</div>
+                    <div class="small text-muted mono mt-1">
+                      {{ \Illuminate\Support\Str::upper(\Illuminate\Support\Str::slug($line->category_code ?: 'REJECT', '-')) }}-RJCT -> WH-RTS
+                    </div>
                   </td>
                   <td>
                     <input type="text" name="results[{{ $idx }}][notes]" class="form-control form-control-sm"

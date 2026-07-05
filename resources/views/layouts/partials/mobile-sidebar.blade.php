@@ -5,6 +5,14 @@
        MOBILE SIDEBAR (DRAWER)
     ============================ */
 
+    .mobile-sidebar-panel {
+        --sidebar-active-blue: #2563eb;
+    }
+
+    body[data-theme="dark"] .mobile-sidebar-panel {
+        --sidebar-active-blue: #60a5fa;
+    }
+
     .mobile-sidebar-overlay {
         position: fixed;
         inset: 0;
@@ -127,6 +135,7 @@
 
     .mobile-sidebar-link.active {
         background: color-mix(in srgb, var(--accent-soft) 80%, var(--card) 20%);
+        box-shadow: inset 3px 0 0 var(--sidebar-active-blue);
         color: var(--accent);
         font-weight: 600;
     }
@@ -197,6 +206,7 @@
 
     .mobile-sidebar-link-sub.active {
         background: transparent;
+        box-shadow: inset 3px 0 0 var(--sidebar-active-blue);
         font-weight: 600;
         color: var(--accent);
     }
@@ -210,7 +220,7 @@
         width: 6px;
         height: 6px;
         border-radius: 999px;
-        background: var(--accent);
+        background: var(--sidebar-active-blue);
     }
 
     /* dot badge (warn) */
@@ -349,6 +359,10 @@
     $hasProdFinishingRepairsIndex = $router->has('production.finishing_repairs.index');
 
     $hasProdQcIndex = $router->has('production.qc.index');
+    $prodQcHref = $hasProdQcIndex
+        ? route('production.qc.index', (auth()->user()?->role ?? null) === 'admin' ? ['stage' => 'sewing'] : [])
+        : '#';
+    $prodQcLabel = ($role ?? null) === 'admin' ? 'QC Jahit' : 'QC Produksi';
     $hasProdPackingIndex = $router->has('production.packing_jobs.index');
     $hasProdPriorityIndex = $router->has('production.priority.index');
     $hasProdReportsIndex = $router->has('production.reports.index');
@@ -631,50 +645,6 @@
                         </li>
                     @endif
 
-                    @if ($isAdmin && ($hasAdminCatalogProducts || $hasAdminCatalogCategories))
-                        <div class="mobile-sidebar-section-label">Website</div>
-                        <li class="mb-1">
-                            <button class="mobile-sidebar-link mobile-sidebar-toggle {{ $websiteOpen ? 'is-open' : '' }}"
-                                    type="button"
-                                    data-bs-toggle="collapse"
-                                    data-bs-target="#navWebsiteAdminMobile"
-                                    aria-expanded="{{ $websiteOpen ? 'true' : 'false' }}"
-                                    aria-controls="navWebsiteAdminMobile">
-                                <span class="icon">🛍️</span><span>Produk Website</span><span class="chevron">▸</span>
-                            </button>
-
-                            <div class="collapse {{ $websiteOpen ? 'show' : '' }}" id="navWebsiteAdminMobile">
-                                @if ($hasAdminCatalogProducts)
-                                    <a href="{{ route('admin.catalog.products.index') }}"
-                                       class="mobile-sidebar-link mobile-sidebar-link-sub {{ (request()->routeIs('admin.catalog.products.index') || request()->routeIs('admin.catalog.products.edit') || request()->routeIs('admin.catalog.products.create')) ? 'active' : '' }}">
-                                        <span class="icon">📦</span><span>Katalog Produk</span>
-                                    </a>
-                                @endif
-
-                                @if ($router->has('admin.catalog.products.ranking'))
-                                    <a href="{{ route('admin.catalog.products.ranking') }}"
-                                       class="mobile-sidebar-link mobile-sidebar-link-sub {{ request()->routeIs('admin.catalog.products.ranking') ? 'active' : '' }}">
-                                        <span class="icon">📊</span><span>Ranking Produk</span>
-                                    </a>
-                                @endif
-
-                                @if ($router->has('admin.website.settings'))
-                                    <a href="{{ route('admin.website.settings') }}"
-                                       class="mobile-sidebar-link mobile-sidebar-link-sub {{ request()->routeIs('admin.website.settings') ? 'active' : '' }}">
-                                        <span class="icon">⚙️</span><span>Pengaturan Website</span>
-                                    </a>
-                                @endif
-
-                                @if ($hasAdminCatalogCategories)
-                                    <a href="{{ route('admin.catalog.categories.index') }}"
-                                       class="mobile-sidebar-link mobile-sidebar-link-sub {{ request()->routeIs('admin.catalog.categories*') ? 'active' : '' }}">
-                                        <span class="icon">🏷️</span><span>Kategori Produk</span>
-                                    </a>
-                                @endif
-                            </div>
-                        </li>
-                    @endif
-
                     @if ($isAdmin && ($hasAdminCrmDashboard || $hasAdminCrmOrders || $hasAdminCrmCustomers || $hasAdminCrmProspects || $hasAdminCrmVisitors || $hasAdminCrmSegments))
                         <div class="mobile-sidebar-section-label">CRM Storefront</div>
                         <li class="mb-1">
@@ -753,7 +723,7 @@
                         </li>
                     @endif
 
-                    @if ($hasInvWipAdjIndex)
+                    @if (!$isAdmin && $hasInvWipAdjIndex)
                         <li>
                             <a href="{{ route('inventory.wip_adjustments.index') }}"
                                class="mobile-sidebar-link {{ request()->routeIs('inventory.wip_adjustments.*') ? 'active' : '' }}">
@@ -763,7 +733,7 @@
                     @endif
 
                     {{-- RTS (view for operating, manage for admin/owner) --}}
-                    @if ($canViewRts && ($hasRtsStockReqIndex || $hasRtsDirectReceiveIndex))
+                    @if ($canViewRts && ($hasRtsStockReqIndex || (!$isAdmin && $hasRtsDirectReceiveIndex)))
                         <div class="mobile-sidebar-section-label">Permintaan Stok</div>
 
                         @if ($hasRtsStockReqIndex)
@@ -780,7 +750,7 @@
                             </li>
                         @endif
 
-                        @if ($canManageRts && $hasRtsDirectReceiveIndex)
+                        @if (!$isAdmin && $canManageRts && $hasRtsDirectReceiveIndex)
                             <li>
                                 <a href="{{ route('rts.direct-receives.index') }}"
                                    class="mobile-sidebar-link {{ request()->routeIs('rts.direct-receives.*') ? 'active' : '' }}">
@@ -824,6 +794,48 @@
                                 </li>
                             @endif
                         @endif
+                    @endif
+
+                    {{-- Produksi (admin) --}}
+                    @if ($isAdmin && ($hasProdSewReturnsCreate || $hasRtsDirectReceiveIndex || $hasProdSewRejectReturnsIndex || $hasProdQcIndex))
+                        <div class="mobile-sidebar-section-label">Produksi</div>
+
+                        @if ($hasProdSewReturnsCreate)
+                            <li>
+                                <a href="{{ route('production.sewing.returns.create') }}"
+                                   class="mobile-sidebar-link {{ request()->routeIs('production.sewing.returns.*') ? 'active' : '' }}">
+                                    <span class="icon">📥</span><span>Setor Jahit</span>
+                                </a>
+                            </li>
+                        @endif
+
+                        @if ($hasRtsDirectReceiveIndex)
+                            <li>
+                                <a href="{{ route('rts.direct-receives.index') }}"
+                                   class="mobile-sidebar-link {{ request()->routeIs('rts.direct-receives.*') ? 'active' : '' }}">
+                                    <span class="icon">⚡</span><span>Setor Jahit Dadakan</span>
+                                </a>
+                            </li>
+                        @endif
+
+                        @if ($hasProdSewRejectReturnsIndex)
+                            <li>
+                                <a href="{{ route('production.sewing.reject_returns.index') }}"
+                                   class="mobile-sidebar-link {{ request()->routeIs('production.sewing.reject_returns.*') ? 'active' : '' }}">
+                                    <span class="icon">♻️</span><span>Setor Reject Jahit</span>
+                                </a>
+                            </li>
+                        @endif
+
+                        @if ($hasProdQcIndex)
+                            <li>
+                                <a href="{{ $prodQcHref }}"
+                                   class="mobile-sidebar-link {{ request()->routeIs('production.qc.*') ? 'active' : '' }}">
+                                    <span class="icon">✅</span><span>{{ $prodQcLabel }}</span>
+                                </a>
+                            </li>
+                        @endif
+
                     @endif
 
                     {{-- Produksi (operating) --}}
@@ -895,9 +907,9 @@
 
                         @if ($hasProdQcIndex)
                             <li>
-                                <a href="{{ route('production.qc.index') }}"
+                                <a href="{{ $prodQcHref }}"
                                    class="mobile-sidebar-link {{ request()->routeIs('production.qc.*') ? 'active' : '' }}">
-                                    <span class="icon">✅</span><span>QC Produksi</span>
+                                    <span class="icon">✅</span><span>{{ $prodQcLabel }}</span>
                                 </a>
                             </li>
                         @endif
@@ -1634,9 +1646,9 @@
                             @endif
 
                             @if ($hasProdQcIndex)
-                                <a href="{{ route('production.qc.index') }}"
+                                <a href="{{ $prodQcHref }}"
                                    class="mobile-sidebar-link mobile-sidebar-link-sub {{ request()->routeIs('production.qc.*') ? 'active' : '' }}">
-                                    <span class="icon">✅</span><span>QC Produksi</span>
+                                    <span class="icon">✅</span><span>{{ $prodQcLabel }}</span>
                                 </a>
                             @endif
 

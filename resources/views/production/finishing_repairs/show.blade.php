@@ -70,7 +70,7 @@
         </div>
         <div>
           <div class="summary-label">Alur Stok</div>
-          <div class="summary-value">OK ke WH-PRD</div>
+          <div class="summary-value">OK ke WH-PRD · Tidak Bisa ke WH-RTS</div>
         </div>
       </div>
     </div>
@@ -108,6 +108,7 @@
                 @if((float) $line->qty_reject > 0 && $line->rejectItem)
                   <div class="fw-bold mono">{{ $line->rejectItem->code }}</div>
                   <div class="small text-muted">{{ $line->rejectItem->name }}</div>
+                  <div class="small text-muted mono">-> WH-RTS</div>
                 @else
                   <span class="text-muted">-</span>
                 @endif

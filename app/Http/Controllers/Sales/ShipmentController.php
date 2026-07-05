@@ -460,6 +460,7 @@ class ShipmentController extends Controller
                     'show_url'         => $path('sales.shipments.show', $shipment),
                     'edit_url'         => $path('sales.shipments.edit', $shipment),
                     'rekon_url'        => $path('sales.shipments.rekon', $shipment),
+                    'rekon_apply_url'  => $path('sales.shipments.rekon_apply', $shipment),
                     'export_url'       => $path('sales.shipments.export_lines', $shipment),
                     'destroy_line_url' => $path('sales.shipments.destroy_line', ['line' => '__LINE_ID__']),
                     'update_qty_url'   => $path('sales.shipments.update_line_qty', ['line' => '__LINE_ID__']),
@@ -514,10 +515,12 @@ class ShipmentController extends Controller
         $data = $request->validate([
             'scan_code' => ['required', 'string', 'max:255'],
             'qty' => ['nullable', 'integer', 'min:1'],
+            'order_no' => ['nullable', 'string', 'max:200'],
         ]);
 
         $scanCode = mb_strtoupper(trim($data['scan_code']));
         $qty = max(1, (int) ($data['qty'] ?? 1));
+        $orderNo = mb_strtoupper(trim((string) ($data['order_no'] ?? '')));
 
         $item = Item::query()
             ->where('type', 'finished_good')
@@ -535,7 +538,7 @@ class ShipmentController extends Controller
                 ->with('status', 'error')->with('message', $message)->withInput();
         }
 
-        $result = DB::transaction(function () use ($shipment, $item, $qty) {
+        $result = DB::transaction(function () use ($shipment, $item, $qty, $orderNo) {
             /** @var ShipmentLine|null $line */
             $line = ShipmentLine::query()
                 ->where('shipment_id', $shipment->id)
@@ -561,6 +564,27 @@ class ShipmentController extends Controller
 
             session()->put('last_scanned_line_id', $line->id);
 
+            if ($orderNo !== '') {
+                ShipmentOrderScan::updateOrCreate(
+                    [
+                        'shipment_id' => $shipment->id,
+                        'order_no' => $orderNo,
+                    ],
+                    [
+                        'status' => 'pending',
+                        'source' => 'manual_scan',
+                        'raw_payload' => [
+                            'order_no' => $orderNo,
+                            'source' => 'order_first_scanner',
+                            'last_item_id' => $item->id,
+                            'last_item_code' => $item->code,
+                            'last_qty' => $qty,
+                            'scanned_at' => now()->toIso8601String(),
+                        ],
+                    ]
+                );
+            }
+
             return [
                 'line' => $line,
                 'total_qty' => (int) ($totals->total_qty ?? 0),
@@ -575,6 +599,7 @@ class ShipmentController extends Controller
                 'status' => 'ok',
                 'message' => 'Berhasil scan ' . $item->code . ' (+' . $qty . ')',
                 'last_scanned_line_id' => $line->id,
+                'order_no' => $orderNo !== '' ? $orderNo : null,
                 'line' => [
                     'id' => $line->id,
                     'item_code' => $item->code,

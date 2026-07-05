@@ -419,6 +419,99 @@ body[data-theme="dark"] .shp-topbar {
     font-size: .74rem;
     color: #64748b;
 }
+.shp-mode-grid {
+    display: grid;
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+    gap: .55rem;
+    margin-bottom: .8rem;
+}
+.shp-mode-card {
+    border: 1px solid rgba(148,163,184,.22);
+    border-radius: 8px;
+    background: transparent;
+    padding: .7rem .8rem;
+    text-align: left;
+    color: #475569;
+    cursor: pointer;
+    transition: border-color .15s ease, background .15s ease;
+}
+.shp-mode-card:hover {
+    background: rgba(148,163,184,.06);
+}
+.shp-mode-card.active {
+    border-color: rgba(51,65,85,.55);
+    background: rgba(148,163,184,.08);
+}
+.shp-mode-title {
+    font-size: .88rem;
+    font-weight: 700;
+    color: #334155;
+}
+.shp-mode-sub {
+    margin-top: .15rem;
+    font-size: .72rem;
+    color: #64748b;
+}
+.shp-order-modebar {
+    display: none;
+    align-items: center;
+    justify-content: space-between;
+    gap: .55rem;
+    flex-wrap: wrap;
+    margin-bottom: .65rem;
+    padding: .5rem .6rem;
+    border: 1px solid rgba(148,163,184,.18);
+    border-radius: 8px;
+    background: rgba(148,163,184,.05);
+}
+.shp-order-modebar.is-visible {
+    display: flex;
+}
+.shp-scan-mode {
+    font-size: .68rem;
+    font-weight: 700;
+    color: #334155;
+    border: 1px solid rgba(148,163,184,.28);
+    border-radius: 7px;
+    padding: .16rem .45rem;
+}
+.shp-current-order {
+    font-size: .78rem;
+    color: #64748b;
+}
+.shp-order-list {
+    display: none;
+    margin-top: .65rem;
+    border: 1px solid rgba(148,163,184,.18);
+    border-radius: 8px;
+    overflow: hidden;
+}
+.shp-order-list.is-visible {
+    display: block;
+}
+.shp-order-item {
+    padding: .55rem .65rem;
+    border-top: 1px solid rgba(148,163,184,.14);
+}
+.shp-order-item:first-child {
+    border-top: 0;
+}
+.shp-order-head {
+    display: flex;
+    justify-content: space-between;
+    gap: .55rem;
+    align-items: center;
+    font-size: .78rem;
+}
+.shp-order-code {
+    font-weight: 700;
+    color: #334155;
+}
+.shp-order-lines {
+    margin-top: .28rem;
+    font-size: .74rem;
+    color: #64748b;
+}
 @media (max-width: 768px) {
     .shp-wrap {
         padding: .5rem .5rem 5rem;
@@ -490,6 +583,12 @@ body[data-theme="dark"] .shp-topbar {
         justify-content: center;
         width: 100%;
     }
+    .shp-mode-grid {
+        grid-template-columns: 1fr;
+    }
+    .shp-order-modebar .btn-shp-outline {
+        min-height: 34px;
+    }
 }
 </style>
 @endpush
@@ -558,10 +657,22 @@ body[data-theme="dark"] .shp-topbar {
 
         <form id="setupForm" autocomplete="off">
             @csrf
+            <input type="hidden" name="scan_mode" id="scanModeInput" value="item_first">
             {{-- hidden: diisi JS dari hasil lookup --}}
             <input type="hidden" name="store_id"         id="hiddenStoreId">
             <input type="hidden" name="sales_invoice_id" id="hiddenInvoiceId"
                    value="{{ !empty($invoice) ? $invoice->id : '' }}">
+
+            <div class="shp-mode-grid" role="radiogroup" aria-label="Mode Scan Shipment">
+                <button type="button" class="shp-mode-card active" data-scan-mode="item_first" role="radio" aria-checked="true">
+                    <div class="shp-mode-title">Scan Barang Dulu</div>
+                    <div class="shp-mode-sub">Flow sekarang: buat draft lalu scan item.</div>
+                </button>
+                <button type="button" class="shp-mode-card" data-scan-mode="order_first" role="radio" aria-checked="false">
+                    <div class="shp-mode-title">Scan Order Dulu</div>
+                    <div class="shp-mode-sub">Scanner seperti retur: order aktif lalu item.</div>
+                </button>
+            </div>
 
             <div class="row g-3">
                 {{-- No Pesanan lookup --}}
@@ -665,11 +776,22 @@ body[data-theme="dark"] .shp-topbar {
         </div>
 
         {{-- Scan box --}}
+        <div class="shp-order-modebar" id="orderModeBar">
+            <div>
+                <span class="shp-scan-mode" id="scanModeBadge">SCAN ORDER</span>
+                <span class="shp-current-order" id="currentOrderLabel">Belum ada order aktif</span>
+            </div>
+            <div style="display:flex;gap:.4rem;flex-wrap:wrap">
+                <button type="button" class="btn-shp-outline" id="newOrderBtn">Order Baru</button>
+                <a href="#" data-rekon-link class="btn-shp-outline is-disabled" aria-disabled="true" style="text-decoration:none">Cek Pesanan</a>
+            </div>
+        </div>
+
         <div style="border-left:3px solid #6366f1;padding-left:1rem;margin-bottom:1.1rem">
             <div style="color:#4338ca;font-weight:800;font-size:.88rem;margin-bottom:.15rem">
-                Scan Barang
+                <span id="scanTitle">Scan Barang</span>
             </div>
-            <div style="color:#94a3b8;font-size:.72rem;margin-bottom:.65rem">
+            <div id="scanHelp" style="color:#94a3b8;font-size:.72rem;margin-bottom:.65rem">
                 Scan atau ketik kode item
             </div>
             <div class="shp-scan-wrap">
@@ -682,6 +804,8 @@ body[data-theme="dark"] .shp-topbar {
             </div>
             <div id="scanStatus" style="margin-top:.4rem;font-size:.78rem;min-height:1.1rem;padding:0 .2rem;color:#94a3b8"></div>
         </div>
+
+        <div class="shp-order-list" id="orderList"></div>
 
         {{-- Items table --}}
         <div>
@@ -774,6 +898,33 @@ body[data-theme="dark"] .shp-topbar {
               || @json(csrf_token());
 
     let _ship = null; // shipment JSON from server after create
+    let selectedScanMode = 'item_first';
+    const orderScanner = {
+        mode: 'order',
+        current: null,
+        orders: [],
+    };
+
+    function normalizeOrderNo(value) {
+        return String(value || '').trim().toUpperCase();
+    }
+
+    function escapeHtml(value) {
+        return String(value ?? '').replace(/[&<>"']/g, (ch) => ({
+            '&': '&amp;',
+            '<': '&lt;',
+            '>': '&gt;',
+            '"': '&quot;',
+            "'": '&#039;',
+        })[ch]);
+    }
+
+    function focusScanInput() {
+        setTimeout(() => {
+            const si = document.getElementById('scanInput');
+            if (si) { si.focus(); si.select(); }
+        }, 80);
+    }
 
     // ── Audio feedback ─────────────────────────────────────────────────────
 
@@ -869,8 +1020,159 @@ body[data-theme="dark"] .shp-topbar {
         document.getElementById('phase1Card').style.display = 'none';
         document.getElementById('phase2Card').style.display = '';
         setPhase(2);
-        setTimeout(() => { const si = document.getElementById('scanInput'); if (si) { si.focus(); si.select(); } }, 80);
+        focusScanInput();
     }
+
+    function setSetupMode(mode) {
+        selectedScanMode = mode === 'order_first' ? 'order_first' : 'item_first';
+        const input = document.getElementById('scanModeInput');
+        if (input) input.value = selectedScanMode;
+
+        document.querySelectorAll('[data-scan-mode]').forEach((btn) => {
+            const active = btn.dataset.scanMode === selectedScanMode;
+            btn.classList.toggle('active', active);
+            btn.setAttribute('aria-checked', active ? 'true' : 'false');
+        });
+
+        const setupBtn = document.getElementById('setupBtn');
+        if (setupBtn) {
+            setupBtn.textContent = selectedScanMode === 'order_first'
+                ? 'Buat Draft & Buka Scanner'
+                : 'Buat Draft & Scan';
+        }
+    }
+
+    document.querySelectorAll('[data-scan-mode]').forEach((btn) => {
+        btn.addEventListener('click', () => setSetupMode(btn.dataset.scanMode));
+    });
+    setSetupMode('item_first');
+
+    function setOrderScannerMode(mode) {
+        orderScanner.mode = mode === 'item' ? 'item' : 'order';
+        const badge = document.getElementById('scanModeBadge');
+        const label = document.getElementById('currentOrderLabel');
+        const title = document.getElementById('scanTitle');
+        const help = document.getElementById('scanHelp');
+        const input = document.getElementById('scanInput');
+
+        if (badge) badge.textContent = orderScanner.mode === 'order' ? 'SCAN ORDER' : 'SCAN ITEM';
+        if (label) label.textContent = orderScanner.current ? 'Order aktif: ' + orderScanner.current : 'Belum ada order aktif';
+        if (title) title.textContent = orderScanner.mode === 'order' ? 'Scan Order' : 'Scan Barang';
+        if (help) help.textContent = orderScanner.mode === 'order'
+            ? 'Scan nomor pesanan terlebih dahulu'
+            : 'Scan item untuk order aktif';
+        if (input) {
+            input.placeholder = orderScanner.mode === 'order' ? 'Scan nomor pesanan' : 'Scan kode item';
+            input.value = '';
+        }
+        focusScanInput();
+    }
+
+    function useOrderScannerMode() {
+        const bar = document.getElementById('orderModeBar');
+        const list = document.getElementById('orderList');
+        if (bar) bar.classList.add('is-visible');
+        if (list) list.classList.add('is-visible');
+        orderScanner.mode = 'order';
+        orderScanner.current = null;
+        orderScanner.orders = [];
+        renderOrderScannerList();
+        setOrderScannerMode('order');
+    }
+
+    function getActiveOrder() {
+        if (!orderScanner.current) return null;
+        return orderScanner.orders.find((o) => o.no === orderScanner.current) || null;
+    }
+
+    async function saveOrderScan(orderNo) {
+        if (!_ship?.rekon_apply_url || !orderNo) return;
+        try {
+            await fetch(_ship.rekon_apply_url, {
+                method: 'POST',
+                headers: {
+                    'Accept': 'application/json',
+                    'Content-Type': 'application/json',
+                    'X-CSRF-TOKEN': CSRF,
+                    'X-Requested-With': 'XMLHttpRequest',
+                },
+                body: JSON.stringify({
+                    decisions: [{ order_no: orderNo, action: 'pending' }],
+                    submit_after: false,
+                }),
+            });
+        } catch {}
+    }
+
+    async function activateOrder(orderNo) {
+        const no = normalizeOrderNo(orderNo);
+        if (!no) return;
+        let order = orderScanner.orders.find((o) => o.no === no);
+        if (!order) {
+            order = { no, items: [], qty: 0 };
+            orderScanner.orders.push(order);
+        }
+        orderScanner.current = no;
+        await saveOrderScan(no);
+        renderOrderScannerList();
+        setOrderScannerMode('item');
+        showToast('ok', 'Order aktif: ' + no);
+        beepOk();
+    }
+
+    function addLineToActiveOrder(line) {
+        const order = getActiveOrder();
+        if (!order || !line) return;
+        const code = line.item_code || '-';
+        const qty = Number(line.qty_delta || 1);
+        let item = order.items.find((it) => it.code === code);
+        if (!item) {
+            item = { code, name: line.item_name || '', qty: 0 };
+            order.items.push(item);
+        }
+        item.qty += qty;
+        order.qty += qty;
+        renderOrderScannerList();
+    }
+
+    function renderOrderScannerList() {
+        const wrap = document.getElementById('orderList');
+        if (!wrap) return;
+        if (!orderScanner.orders.length) {
+            wrap.innerHTML = '<div class="shp-order-item" style="color:#94a3b8;font-size:.78rem">Belum ada order discan.</div>';
+            return;
+        }
+        wrap.innerHTML = orderScanner.orders.map((order, index) => {
+            const active = order.no === orderScanner.current;
+            const lines = order.items.length
+                ? order.items.map((it, i) => `${i + 1}. ${escapeHtml(it.code)} <span style="color:#94a3b8">x${it.qty}</span>`).join('<br>')
+                : '<span style="color:#94a3b8">Belum ada item.</span>';
+            const safeNo = escapeHtml(order.no);
+            return `
+                <div class="shp-order-item" style="${active ? 'background:rgba(148,163,184,.06)' : ''}">
+                    <div class="shp-order-head">
+                        <button type="button" data-use-order="${safeNo}" class="shp-order-code mono" style="border:0;background:transparent;padding:0;text-align:left;cursor:pointer">${index + 1}. ${safeNo}</button>
+                        <span style="color:#64748b;font-size:.72rem">${order.qty || 0} qty</span>
+                    </div>
+                    <div class="shp-order-lines">${lines}</div>
+                </div>
+            `;
+        }).join('');
+
+        wrap.querySelectorAll('[data-use-order]').forEach((btn) => {
+            btn.addEventListener('click', () => {
+                orderScanner.current = btn.dataset.useOrder;
+                setOrderScannerMode('item');
+                renderOrderScannerList();
+            });
+        });
+    }
+
+    document.getElementById('newOrderBtn')?.addEventListener('click', () => {
+        orderScanner.current = null;
+        setOrderScannerMode('order');
+        renderOrderScannerList();
+    });
 
     // ── Back to setup ──────────────────────────────────────────────────────
 
@@ -1034,6 +1336,17 @@ body[data-theme="dark"] .shp-topbar {
                 }
 
                 _ship = data.shipment;
+
+                if (selectedScanMode === 'order_first') {
+                    if (spinner) spinner.style.display = 'none';
+                    if (btn) { btn.disabled = false; btn.style.background = ''; }
+                    applyShipMeta(_ship);
+                    useOrderScannerMode();
+                    showP2();
+                    showToast('ok', 'Draft dibuat. Scan order dulu.');
+                    return;
+                }
+
                 if (spinner) spinner.textContent = 'Membuka halaman scan...';
                 window.location.assign(_ship.edit_url || _ship.show_url || '{{ parse_url(route("sales.shipments.index"), PHP_URL_PATH) }}');
 
@@ -1113,6 +1426,21 @@ body[data-theme="dark"] .shp-topbar {
         const code  = (input?.value || '').trim().toUpperCase();
         if (!code) { beepErr(); setScanStatus('Kode kosong.', '#ef4444'); input?.focus(); return; }
 
+        if (selectedScanMode === 'order_first' && orderScanner.mode === 'order') {
+            await activateOrder(code);
+            setScanStatus('Order ' + code + ' aktif. Scan item.', '#16a34a');
+            return;
+        }
+
+        if (selectedScanMode === 'order_first' && !orderScanner.current) {
+            beepErr();
+            setScanStatus('Scan order dulu.', '#ef4444');
+            showToast('err', 'Scan order dulu.');
+            input.value = '';
+            input.focus();
+            return;
+        }
+
         const scanBtn = document.getElementById('scanBtn');
         if (scanBtn) scanBtn.disabled = true;
 
@@ -1120,6 +1448,9 @@ body[data-theme="dark"] .shp-topbar {
             const fd = new FormData();
             fd.append('scan_code', code);
             fd.append('_token', CSRF);
+            if (selectedScanMode === 'order_first' && orderScanner.current) {
+                fd.append('order_no', orderScanner.current);
+            }
 
             const res = await fetch(_ship.scan_url, {
                 method: 'POST',
@@ -1142,8 +1473,10 @@ body[data-theme="dark"] .shp-topbar {
             beepOk();
             const line   = data.line   || {};
             const totals = data.totals || {};
+            line.qty_delta = 1;
 
             addOrUpdateRow(line);
+            if (selectedScanMode === 'order_first') addLineToActiveOrder(line);
             updateTotals(totals.total_lines, totals.total_qty);
             setScanStatus((line.item_code || code) + ' ditambahkan', '#16a34a');
             showToast('ok', data.message || '+1 ' + (line.item_code || code));

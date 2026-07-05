@@ -156,6 +156,10 @@
     $hasProdFinishingJobsIndex = $router->has('production.finishing_jobs.index');
     $hasProdFinishingRepairsIndex = $router->has('production.finishing_repairs.index');
     $hasProdQcIndex = $router->has('production.qc.index');
+    $prodQcHref = $hasProdQcIndex
+        ? route('production.qc.index', (auth()->user()?->role ?? null) === 'admin' ? ['stage' => 'sewing'] : [])
+        : '#';
+    $prodQcLabel = ($role ?? null) === 'admin' ? 'QC Jahit' : 'QC Produksi';
     $hasProdPackingIndex = $router->has('production.packing_jobs.index');
     $hasProdPriorityIndex = $router->has('production.priority.index');
     $hasProdReportsIndex = $router->has('production.reports.index');
@@ -410,6 +414,14 @@
 @endphp
 
 <style>
+    .sidebar-modern {
+        --sidebar-active-blue: #2563eb;
+    }
+
+    body[data-theme="dark"] .sidebar-modern {
+        --sidebar-active-blue: #60a5fa;
+    }
+
     /* Tablet (768px–991px): sidebar 180px — sempit tapi full navigasi */
     @media (min-width: 768px) {
         .sidebar-modern {
@@ -572,7 +584,7 @@
     .sidebar-link.active {
         background: transparent;
         font-weight: 700;
-        box-shadow: inset 2px 0 0 var(--accent);
+        box-shadow: inset 3px 0 0 var(--sidebar-active-blue);
         color: var(--accent);
     }
 
@@ -606,7 +618,7 @@
     .sidebar-link-sub.active {
         background: transparent;
         font-weight: 700;
-        box-shadow: inset 2px 0 0 var(--accent);
+        box-shadow: inset 3px 0 0 var(--sidebar-active-blue);
         opacity: 1;
         color: var(--accent);
     }
@@ -620,7 +632,7 @@
         width: 6px;
         height: 6px;
         border-radius: 999px;
-        background: var(--accent);
+        background: var(--sidebar-active-blue);
     }
 
     .sidebar-subhead{
@@ -783,7 +795,7 @@
                     </x-sidebar.simple-link>
                 @endif
 
-                @if ($hasInvWipAdjIndex)
+                @if (!$isAdmin && $hasInvWipAdjIndex)
                     <x-sidebar.simple-link href="{{ route('inventory.wip_adjustments.index') }}" icon="bi bi-receipt"
                         :active="request()->routeIs('inventory.wip_adjustments.*')">
                         Koreksi WIP
@@ -792,7 +804,7 @@
             </li>
 
             {{-- Permintaan Stok (RTS) --}}
-            @if ($canViewRts && ($hasRtsStockReqIndex || $hasRtsDirectReceiveIndex))
+            @if ($canViewRts && ($hasRtsStockReqIndex || (!$isAdmin && $hasRtsDirectReceiveIndex)))
                 <x-sidebar.label text="Permintaan Stok" />
                 <li class="simple-group">
                     @if ($hasRtsStockReqIndex)
@@ -805,7 +817,7 @@
                         </x-sidebar.simple-link>
                     @endif
 
-                    @if ($canManageRts && $hasRtsDirectReceiveIndex)
+                    @if (!$isAdmin && $canManageRts && $hasRtsDirectReceiveIndex)
                         <x-sidebar.simple-link href="{{ route('rts.direct-receives.index') }}" icon="bi bi-lightning"
                             :active="request()->routeIs('rts.direct-receives.*')">
                             RTS Dadakan
@@ -845,44 +857,6 @@
                             Reconcile Items
                         </x-sidebar.simple-link>
                     @endif
-                </li>
-            @endif
-
-            {{-- Produk Website --}}
-            @if (($isAdmin || $isOwner) && $router->has('admin.catalog.products.index'))
-                <x-sidebar.label text="Website" />
-                <li class="mb-1">
-                    <button class="sidebar-link sidebar-toggle {{ $openWebsite ? 'is-open' : '' }}" type="button"
-                        data-bs-toggle="collapse" data-bs-target="#navWebsiteAdmin"
-                        aria-expanded="{{ $openWebsite ? 'true' : 'false' }}" aria-controls="navWebsiteAdmin">
-                        <span class="icon"><i class="bi bi-globe"></i></span>
-                        <span>Website</span>
-                        <span class="chevron">▸</span>
-                    </button>
-                    <div class="collapse {{ $openWebsite ? 'show' : '' }}" id="navWebsiteAdmin">
-                        <x-sidebar.sub-link href="{{ route('admin.catalog.products.index') }}" icon="bi bi-box-seam"
-                            :active="request()->routeIs('admin.catalog.products.index') || request()->routeIs('admin.catalog.products.edit') || request()->routeIs('admin.catalog.products.create')">
-                            Produk Website
-                        </x-sidebar.sub-link>
-                        @if($router->has('admin.catalog.products.ranking'))
-                        <x-sidebar.sub-link href="{{ route('admin.catalog.products.ranking') }}" icon="bi bi-bar-chart-steps"
-                            :active="request()->routeIs('admin.catalog.products.ranking')">
-                            Ranking Produk
-                        </x-sidebar.sub-link>
-                        @endif
-                        @if($router->has('admin.website.settings'))
-                        <x-sidebar.sub-link href="{{ route('admin.website.settings') }}" icon="bi bi-sliders"
-                            :active="request()->routeIs('admin.website.settings')">
-                            Pengaturan Website
-                        </x-sidebar.sub-link>
-                        @endif
-                        @if($router->has('admin.catalog.categories.index'))
-                        <x-sidebar.sub-link href="{{ route('admin.catalog.categories.index') }}" icon="bi bi-tag"
-                            :active="request()->routeIs('admin.catalog.categories*')">
-                            Kategori Produk
-                        </x-sidebar.sub-link>
-                        @endif
-                    </div>
                 </li>
             @endif
 
@@ -987,12 +961,14 @@
                 </li>
             @endif
 
-            {{-- Produksi (admin only) — Setor Jahit + Beres Packing --}}
+            {{-- Produksi (admin only) — Setor Jahit + Dadakan + Reject Jahit + QC Jahit --}}
             @php
                 $adminHasSewReturns  = $isAdmin && $router->has('production.sewing.returns.create');
-                $adminHasFinishing   = $isAdmin && $router->has('production.finishing_jobs.create');
+                $adminHasRtsDirectReceive = $isAdmin && $hasRtsDirectReceiveIndex;
+                $adminHasRejectReturns = $isAdmin && $hasProdSewRejectReturnsIndex;
+                $adminHasQc          = $isAdmin && $hasProdQcIndex;
             @endphp
-            @if ($adminHasSewReturns || $adminHasFinishing)
+            @if ($adminHasSewReturns || $adminHasRtsDirectReceive || $adminHasRejectReturns || $adminHasQc)
                 <x-sidebar.label text="Produksi" />
                 <li class="simple-group">
                     @if ($adminHasSewReturns)
@@ -1002,12 +978,27 @@
                         </x-sidebar.simple-link>
                     @endif
 
-                    @if ($adminHasFinishing)
-                        <x-sidebar.simple-link href="{{ route('production.finishing_jobs.create') }}" icon="bi bi-patch-check"
-                            :active="request()->routeIs('production.finishing_jobs.*')">
-                            Beres Packing
+                    @if ($adminHasRtsDirectReceive)
+                        <x-sidebar.simple-link href="{{ route('rts.direct-receives.index') }}" icon="bi bi-lightning"
+                            :active="request()->routeIs('rts.direct-receives.*')">
+                            Setor Jahit Dadakan
                         </x-sidebar.simple-link>
                     @endif
+
+                    @if ($adminHasRejectReturns)
+                        <x-sidebar.simple-link href="{{ route('production.sewing.reject_returns.index') }}" icon="bi bi-arrow-clockwise"
+                            :active="request()->routeIs('production.sewing.reject_returns.*')">
+                            Setor Reject Jahit
+                        </x-sidebar.simple-link>
+                    @endif
+
+                    @if ($adminHasQc)
+                        <x-sidebar.simple-link href="{{ $prodQcHref }}" icon="bi bi-check-circle"
+                            :active="request()->routeIs('production.qc.*')">
+                            {{ $prodQcLabel }}
+                        </x-sidebar.simple-link>
+                    @endif
+
                 </li>
             @endif
 
@@ -1099,9 +1090,9 @@
                     @endif
 
                     @if ($hasProdQcIndex)
-                        <x-sidebar.simple-link href="{{ route('production.qc.index') }}" icon="bi bi-check-circle"
+                        <x-sidebar.simple-link href="{{ $prodQcHref }}" icon="bi bi-check-circle"
                             :active="request()->routeIs('production.qc.*')">
-                            QC Produksi
+                            {{ $prodQcLabel }}
                         </x-sidebar.simple-link>
                     @endif
 
@@ -1795,9 +1786,9 @@
                             </x-sidebar.sub-link>
                         @endif
                         @if ($hasProdQcIndex)
-                            <x-sidebar.sub-link href="{{ route('production.qc.index') }}" icon="bi bi-check-circle"
+                            <x-sidebar.sub-link href="{{ $prodQcHref }}" icon="bi bi-check-circle"
                                 :active="request()->routeIs('production.qc.*')">
-                                QC Produksi
+                                {{ $prodQcLabel }}
                             </x-sidebar.sub-link>
                         @endif
                         @if ($hasProdFinishingJobsIndex)

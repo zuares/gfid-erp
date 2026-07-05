@@ -5,1365 +5,838 @@
 
 @push('head')
 <style>
-    /* ═══════════════════════════════════════════════════════
-     * QC JAHIT — Production detail layout
-     * ═══════════════════════════════════════════════════════ */
-
-    :root {
-        --gf-ink:    #0a0a0a;
-        --gf-mid:    #64748b;
-        --gf-line:   #e5e7eb;
-        --gf-soft:   #f8fafc;
-        --gf-white:  #fff;
-        --gf-ok:     #16a34a;
-        --gf-ok-soft:#ecfdf5;
-        --gf-rej:    #dc2626;
-        --gf-rej-soft:#fef2f2;
-        --gf-warn:   #f59e0b;
-        --gf-warn-soft:#fffbeb;
-        --gf-accent: #6366f1;
-        --gf-accent-soft: rgba(99,102,241,.06);
-        --gf-font:   'Plus Jakarta Sans', system-ui, -apple-system, sans-serif;
-        --gf-mono:   ui-monospace, SFMono-Regular, Menlo, Consolas, monospace;
-        --gf-radius: 16px;
-        --gf-radius-pill: 999px;
+:root {
+    --qcs-accent: #334155;
+    --qcs-ok: #15803d;
+    --qcs-reject: #b91c1c;
+    --qcs-line-soft: rgba(148,163,184,.22);
+}
+.qcs-topbar {
+    position: sticky;
+    top: 0;
+    z-index: 300;
+    display: flex;
+    align-items: center;
+    gap: .45rem;
+    flex-wrap: wrap;
+    padding: .45rem .75rem;
+    background: var(--card, #fff);
+    border-bottom: 1px solid rgba(148,163,184,.18);
+}
+body[data-theme="dark"] .qcs-topbar { background: var(--card, #0f172a); }
+.qcs-topbar-code {
+    font-weight: 900;
+    font-size: .95rem;
+    color: var(--text, #0f172a);
+}
+.qcs-topbar-spacer { flex: 1; min-width: .5rem; }
+.qcs-badge,
+.qcs-pill {
+    display: inline-flex;
+    align-items: center;
+    min-height: 24px;
+    border-radius: 7px;
+    padding: .18rem .48rem;
+    font-size: .68rem;
+    color: #64748b;
+    background: transparent;
+    border: 1px solid rgba(148,163,184,.28);
+    white-space: nowrap;
+}
+body[data-theme="dark"] .qcs-badge,
+body[data-theme="dark"] .qcs-pill {
+    color: #cbd5e1;
+    border-color: rgba(148,163,184,.25);
+}
+.qcs-pill b { margin-left: .25rem; color: var(--text, #0f172a); }
+body[data-theme="dark"] .qcs-pill b { color: #e2e8f0; }
+.qcs-wrap {
+    max-width: 1040px;
+    margin-inline: auto;
+    padding: .75rem .75rem 5.75rem;
+}
+.qcs-btn {
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    min-height: 34px;
+    padding: .34rem .78rem;
+    border-radius: 7px;
+    border: 1px solid rgba(148,163,184,.35);
+    background: transparent;
+    color: #475569;
+    font-size: .76rem;
+    font-weight: 700;
+    text-decoration: none;
+    white-space: nowrap;
+}
+.qcs-btn:hover { background: rgba(148,163,184,.08); color: #111827; }
+body[data-theme="dark"] .qcs-btn { color: #cbd5e1; }
+body[data-theme="dark"] .qcs-btn:hover { color: #f8fafc; }
+.qcs-btn-primary {
+    color: #fff !important;
+    background: var(--qcs-accent);
+    border-color: var(--qcs-accent);
+}
+.qcs-btn-primary:hover { background: #1f2937; border-color: #1f2937; }
+.qcs-flow {
+    display: flex;
+    align-items: center;
+    gap: .35rem;
+    flex-wrap: wrap;
+    margin: .55rem 0;
+    padding: .45rem .55rem;
+    border: 1px solid rgba(148,163,184,.18);
+    border-radius: 8px;
+    background: var(--card, #fff);
+}
+.qcs-flow-step {
+    display: inline-flex;
+    align-items: center;
+    min-height: 28px;
+    padding: .18rem .5rem;
+    border-radius: 7px;
+    border: 1px solid rgba(148,163,184,.25);
+    color: #64748b;
+    font-size: .72rem;
+    font-weight: 700;
+}
+.qcs-flow-step.active { color: #fff; background: #334155; border-color: #334155; }
+.qcs-flow-step.done { color: #334155; background: rgba(148,163,184,.08); }
+.qcs-flow-sep { color: #cbd5e1; font-size: .72rem; }
+.qcs-kpi-grid {
+    display: grid;
+    grid-template-columns: repeat(4, 1fr);
+    gap: .45rem;
+    margin-top: .55rem;
+}
+.qcs-kpi-card {
+    background: var(--card, #fff);
+    border-radius: 8px;
+    border: 1px solid rgba(148,163,184,.16);
+    padding: .55rem .7rem;
+}
+.qcs-kpi-label {
+    font-size: .6rem;
+    text-transform: uppercase;
+    letter-spacing: .02em;
+    color: #9ca3af;
+    margin-bottom: .18rem;
+}
+.qcs-kpi-value {
+    font-size: 1.05rem;
+    font-weight: 900;
+    line-height: 1;
+    color: #334155;
+}
+body[data-theme="dark"] .qcs-kpi-value { color: #e2e8f0; }
+.qcs-info-strip {
+    display: flex;
+    flex-wrap: wrap;
+    gap: .35rem .75rem;
+    margin-top: .55rem;
+    padding: .45rem .65rem;
+    border-radius: 8px;
+    background: transparent;
+    border: 1px solid rgba(148,163,184,.18);
+    font-size: .82rem;
+}
+.qcs-info-item { color: #6b7280; }
+.qcs-info-item b { color: #1e293b; }
+body[data-theme="dark"] .qcs-info-item b { color: #e2e8f0; }
+.qcs-panel,
+.qcs-table-card {
+    background: var(--card, #fff);
+    border-radius: 8px;
+    border: 1px solid rgba(148,163,184,.18);
+}
+.qcs-panel {
+    margin-top: .55rem;
+    padding: .75rem;
+}
+.qcs-field-grid {
+    display: grid;
+    grid-template-columns: 180px minmax(180px, 1fr) minmax(120px, auto);
+    gap: .65rem;
+    align-items: end;
+}
+.qcs-label {
+    font-size: .64rem;
+    text-transform: uppercase;
+    letter-spacing: .04em;
+    color: #9ca3af;
+    font-weight: 700;
+    margin-bottom: .25rem;
+}
+.qcs-input {
+    width: 100%;
+    min-height: 38px;
+    border-radius: 8px;
+    border: 1px solid rgba(148,163,184,.35);
+    background: transparent;
+    color: var(--text, #0f172a);
+    padding: .42rem .62rem;
+    font-size: .9rem;
+}
+.qcs-input:focus {
+    outline: none;
+    border-color: rgba(71,85,105,.75);
+}
+.qcs-static {
+    min-height: 38px;
+    display: flex;
+    align-items: center;
+    font-weight: 750;
+    color: var(--text, #0f172a);
+}
+.qcs-mono {
+    font-family: ui-monospace, SFMono-Regular, Menlo, Consolas, "Liberation Mono", monospace;
+    font-variant-numeric: tabular-nums;
+}
+.qcs-table-card {
+    margin-top: .55rem;
+    overflow: hidden;
+}
+.qcs-table-head {
+    display: flex;
+    align-items: center;
+    gap: .65rem;
+    flex-wrap: wrap;
+    padding: .5rem .75rem;
+    border-bottom: 1px solid rgba(148,163,184,.14);
+}
+.qcs-table-title {
+    font-size: .68rem;
+    text-transform: uppercase;
+    letter-spacing: .03em;
+    color: #9ca3af;
+    font-weight: 700;
+}
+.qcs-table-subtitle {
+    font-size: .78rem;
+    color: #64748b;
+}
+.qcs-lines-wrapper {
+    max-height: 52vh;
+    overflow-y: auto;
+    overscroll-behavior: contain;
+    scrollbar-width: thin;
+    scrollbar-color: rgba(148,163,184,.65) transparent;
+}
+.qcs-table {
+    width: 100%;
+    margin-bottom: 0;
+    border-collapse: collapse;
+}
+.qcs-table thead th {
+    position: sticky;
+    top: 0;
+    z-index: 6;
+    padding: .42rem .6rem;
+    border-bottom: 1px solid rgba(148,163,184,.18);
+    background: rgba(248,250,252,.98);
+    color: #9ca3af;
+    font-size: .7rem;
+    font-weight: 700;
+    text-transform: uppercase;
+    letter-spacing: .03em;
+    white-space: nowrap;
+}
+body[data-theme="dark"] .qcs-table thead th {
+    background: rgba(15,23,42,.98);
+    border-bottom-color: rgba(51,65,85,.8);
+    color: #6b7280;
+}
+.qcs-table tbody td {
+    padding: .42rem .6rem;
+    border-top: 1px solid rgba(148,163,184,.12);
+    vertical-align: middle;
+}
+body[data-theme="dark"] .qcs-table tbody td { border-top-color: rgba(51,65,85,.65); }
+.qcs-bundle {
+    display: inline-flex;
+    align-items: center;
+    max-width: 170px;
+    padding: .18rem .5rem;
+    border-radius: 7px;
+    border: 1px solid rgba(148,163,184,.28);
+    color: #64748b;
+    font-size: .76rem;
+    font-weight: 800;
+}
+.qcs-cut-ref {
+    margin-top: .18rem;
+    color: #94a3b8;
+    font-size: .7rem;
+}
+.qcs-item-code {
+    font-size: .9rem;
+    font-weight: 850;
+    color: var(--text, #0f172a);
+}
+.qcs-item-name {
+    font-size: .78rem;
+    color: #64748b;
+}
+.qcs-qty-display {
+    display: inline-flex;
+    justify-content: center;
+    min-width: 54px;
+    padding: .2rem .5rem;
+    border-radius: 7px;
+    border: 1px solid rgba(148,163,184,.3);
+    font-weight: 850;
+}
+.qcs-qty-input {
+    width: 72px;
+    min-height: 34px;
+    padding: .25rem .45rem;
+    border-radius: 7px;
+    border: 1px solid rgba(148,163,184,.35);
+    background: transparent;
+    color: var(--text, #0f172a);
+    text-align: right;
+    font-weight: 850;
+}
+.qcs-qty-input:focus,
+.qcs-reason-input:focus {
+    outline: none;
+    border-color: rgba(71,85,105,.75);
+}
+.qcs-qty-input.is-ok { color: var(--qcs-ok); }
+.qcs-qty-input.is-reject { color: var(--qcs-reject); }
+.qcs-reason-input {
+    width: 100%;
+    min-width: 160px;
+    min-height: 34px;
+    border-radius: 7px;
+    border: 1px solid rgba(148,163,184,.35);
+    background: transparent;
+    color: var(--text, #0f172a);
+    padding: .25rem .5rem;
+    font-size: .82rem;
+}
+.qcs-summary {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: .75rem;
+    flex-wrap: wrap;
+    padding: .5rem .75rem;
+    border-top: 1px solid rgba(148,163,184,.14);
+}
+.qcs-summary-label {
+    color: #9ca3af;
+    font-size: .66rem;
+    font-weight: 800;
+    text-transform: uppercase;
+    letter-spacing: .03em;
+}
+.qcs-summary-values {
+    display: flex;
+    align-items: center;
+    gap: .55rem;
+}
+.qcs-summary-pill {
+    display: inline-flex;
+    align-items: center;
+    gap: .32rem;
+    border: 1px solid rgba(148,163,184,.28);
+    border-radius: 7px;
+    padding: .22rem .5rem;
+    font-size: .76rem;
+    color: #64748b;
+}
+.qcs-summary-pill b { font-size: .9rem; color: #334155; }
+.qcs-summary-pill.is-ok b { color: var(--qcs-ok); }
+.qcs-summary-pill.is-reject b { color: var(--qcs-reject); }
+.qcs-mobile-cards { display: none; }
+.qcs-empty {
+    padding: 2rem 1rem;
+    color: #64748b;
+    text-align: center;
+}
+.qcs-action-bar {
+    position: fixed;
+    left: 0;
+    right: 0;
+    bottom: 0;
+    z-index: 250;
+    padding: .65rem .75rem calc(.65rem + env(safe-area-inset-bottom, 0px));
+    background: var(--card, #fff);
+    border-top: 1px solid rgba(148,163,184,.18);
+}
+.qcs-action-inner {
+    max-width: 1040px;
+    margin-inline: auto;
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: .75rem;
+}
+.qcs-action-title {
+    color: #64748b;
+    font-size: .68rem;
+    font-weight: 800;
+    text-transform: uppercase;
+    letter-spacing: .03em;
+}
+.qcs-action-hint {
+    color: #94a3b8;
+    font-size: .78rem;
+}
+.qcs-action-buttons {
+    display: flex;
+    align-items: center;
+    gap: .45rem;
+}
+.qcs-save-btn {
+    min-height: 40px;
+    padding: .42rem 1rem;
+    border-radius: 7px;
+    border: 1px solid #15803d;
+    background: #15803d;
+    color: #fff;
+    font-size: .82rem;
+    font-weight: 850;
+}
+.qcs-save-btn:hover { background: #166534; border-color: #166534; }
+.qcs-alert {
+    border-radius: 8px;
+    padding: .5rem .7rem;
+    margin-top: .55rem;
+}
+@media (max-width: 768px) {
+    .qcs-topbar { padding: .5rem; gap: .38rem; }
+    .qcs-topbar-code {
+        flex: 1 1 auto;
+        min-width: 145px;
+        font-size: 1.05rem;
     }
-
-    body[data-theme="dark"] {
-        --gf-ink:    #f0f0f0;
-        --gf-mid:    #94a3b8;
-        --gf-line:   #1e293b;
-        --gf-soft:   #0f172a;
-        --gf-white:  #020617;
-        --gf-ok-soft: rgba(22,163,74,.08);
-        --gf-rej-soft: rgba(220,38,38,.08);
-        --gf-warn-soft: rgba(245,158,11,.08);
-        --gf-accent-soft: rgba(99,102,241,.10);
+    .qcs-topbar-spacer,
+    .qcs-badge,
+    .qcs-topbar > .qcs-pill:not(.qcs-pill-main) {
+        display: none !important;
     }
-
-    .qc-sewing-page {
-        min-height: 100vh;
-        font-family: var(--gf-font);
-        -webkit-font-smoothing: antialiased;
+    .qcs-pill-main { margin-left: auto; font-size: .75rem; padding: .24rem .5rem; }
+    .qcs-wrap { padding: .5rem .5rem 5.25rem; }
+    .qcs-kpi-grid,
+    .qcs-info-strip,
+    .qcs-flow,
+    .qcs-panel {
+        display: none;
     }
-
-    .qc-sewing-page .page-wrap {
-        max-width: 780px;
-        margin-inline: auto;
-        padding: 0 16px 120px;
-    }
-
-    /* ── Breadcrumb ───────────────────────────────────── */
-    .qcs-breadcrumb {
-        display: flex;
-        align-items: center;
-        gap: 6px;
-        padding: 16px 0 0;
-        font-size: 12px;
-        font-weight: 600;
-        color: var(--gf-mid);
-    }
-    .qcs-breadcrumb a {
-        color: var(--gf-mid);
-        text-decoration: none;
-        transition: color .15s;
-    }
-    .qcs-breadcrumb a:hover { color: var(--gf-ink); }
-
-    /* ── Page Head ────────────────────────────────────── */
-    .qcs-page-head {
-        padding: 14px 0 18px;
-        display: flex;
-        align-items: flex-start;
-        justify-content: space-between;
-        gap: 12px;
-        flex-wrap: wrap;
-    }
-    .qcs-page-title {
-        font-size: 22px;
-        font-weight: 900;
-        letter-spacing: -.02em;
-        color: var(--gf-ink);
-        margin: 0;
-        line-height: 1.2;
-    }
-    .qcs-page-title code {
-        font-family: var(--gf-mono);
-        font-size: .82em;
-        font-weight: 800;
-        background: none;
-        color: inherit;
-    }
-    .qcs-page-meta {
-        display: flex;
-        align-items: center;
-        gap: 10px;
-        margin-top: 6px;
-        flex-wrap: wrap;
-    }
-    .qcs-meta-item {
-        font-size: 12px;
-        font-weight: 600;
-        color: var(--gf-mid);
-    }
-    .qcs-meta-dot {
-        width: 3px; height: 3px;
-        border-radius: 50%;
-        background: var(--gf-mid);
-        opacity: .5;
-    }
-
-    /* ── Badges ───────────────────────────────────────── */
-    .qcs-badge {
-        display: inline-flex;
-        align-items: center;
-        gap: 4px;
-        height: 24px;
-        padding: 0 10px;
-        border-radius: var(--gf-radius-pill);
-        font-size: 10px;
-        font-weight: 900;
-        letter-spacing: .04em;
-        text-transform: uppercase;
-    }
-    .qcs-badge-done {
-        background: var(--gf-ok-soft);
-        color: var(--gf-ok);
-        border: 1px solid rgba(22,163,74,.18);
-    }
-    .qcs-badge-pending {
-        background: var(--gf-warn-soft);
-        color: var(--gf-warn);
-        border: 1px solid rgba(245,158,11,.18);
-    }
-
-    /* ── Link chip (like storefront checkout-chip) ──── */
-    .qcs-link-chip {
-        display: inline-flex;
-        align-items: center;
-        gap: 5px;
-        height: 32px;
-        padding: 0 14px;
-        border-radius: var(--gf-radius-pill);
-        background: var(--gf-ink);
-        color: var(--gf-white);
-        font-size: 11px;
-        font-weight: 800;
-        letter-spacing: .02em;
-        text-decoration: none;
-        transition: opacity .15s;
-        white-space: nowrap;
-        flex-shrink: 0;
-    }
-    .qcs-link-chip:hover { opacity: .85; }
-    body[data-theme="dark"] .qcs-link-chip {
-        background: var(--gf-soft);
-        color: var(--gf-ink);
-        border: 1px solid var(--gf-line);
-    }
-
-    /* ── Section / Card ──────────────────────────────── */
-    .qcs-section {
-        background: var(--gf-white);
-        border: 1px solid var(--gf-line);
-        border-radius: var(--gf-radius);
-        padding: 16px;
-        margin-bottom: 10px;
-        box-shadow: 0 1px 3px rgba(0,0,0,.04);
-    }
-    .qcs-section-title {
-        font-size: 10px;
-        font-weight: 900;
-        letter-spacing: .10em;
-        text-transform: uppercase;
-        color: var(--gf-mid);
-        margin-bottom: 14px;
-        display: flex;
-        align-items: center;
-        gap: 8px;
-    }
-
-    /* ── Form fields ─────────────────────────────────── */
-    .qcs-field-grid {
-        display: grid;
-        grid-template-columns: 1fr 1fr;
-        gap: 14px;
-    }
-    .qcs-field-label {
-        display: block;
-        font-size: 10px;
-        font-weight: 900;
-        letter-spacing: .08em;
-        text-transform: uppercase;
-        color: var(--gf-mid);
-        margin-bottom: 6px;
-    }
-    .qcs-field-input {
-        width: 100%;
-        height: 42px;
-        padding: 0 12px;
-        border-radius: 12px;
-        border: 1.5px solid var(--gf-line);
-        background: var(--gf-soft);
-        color: var(--gf-ink);
-        font-family: var(--gf-font);
-        font-size: 14px;
-        font-weight: 700;
-        transition: border-color .15s, box-shadow .15s;
-    }
-    .qcs-field-input:focus {
-        outline: none;
-        border-color: var(--gf-ink);
-        box-shadow: 0 0 0 3px rgba(10,10,10,.06);
-    }
-    .qcs-field-static {
-        font-size: 14px;
-        font-weight: 800;
-        color: var(--gf-ink);
-        padding: 10px 0 0;
-    }
-
-    /* ── Alert banners ───────────────────────────────── */
-    .qcs-alert {
-        border-radius: 14px;
-        padding: 12px 14px;
-        font-size: 12px;
-        font-weight: 700;
-        margin-bottom: 10px;
-        line-height: 1.5;
-    }
-    .qcs-alert-success {
-        background: var(--gf-ok-soft);
-        border: 1px solid rgba(22,163,74,.18);
-        color: #166534;
-    }
-    body[data-theme="dark"] .qcs-alert-success { color: #4ade80; }
-    .qcs-alert-error {
-        background: var(--gf-rej-soft);
-        border: 1px solid rgba(220,38,38,.18);
-        color: #991b1b;
-    }
-    body[data-theme="dark"] .qcs-alert-error { color: #fca5a5; }
-    .qcs-alert-info {
-        background: rgba(99,102,241,.05);
-        border: 1px solid rgba(99,102,241,.15);
-        color: var(--gf-ink);
-    }
-
-    /* ── QC Table ─────────────────────────────────────── */
-    .qcs-table-wrap { overflow-x: auto; }
-    .qcs-table {
-        width: 100%;
-        border-collapse: collapse;
-        font-size: 13px;
-    }
-    .qcs-table thead th {
-        font-size: 9px;
-        font-weight: 950;
-        letter-spacing: .08em;
-        text-transform: uppercase;
-        color: var(--gf-mid);
-        background: var(--gf-soft);
-        padding: 10px 12px;
-        white-space: nowrap;
-        border-bottom: 1.5px solid var(--gf-line);
-    }
-    .qcs-table thead th:first-child { border-radius: 10px 0 0 0; }
-    .qcs-table thead th:last-child { border-radius: 0 10px 0 0; }
-    .qcs-table tbody tr {
-        border-bottom: 1px solid rgba(229,231,235,.6);
-        transition: background .1s;
-    }
-    .qcs-table tbody tr:last-child { border-bottom: none; }
-    .qcs-table tbody tr:hover { background: rgba(99,102,241,.02); }
-    .qcs-table tbody td {
-        padding: 10px 12px;
-        vertical-align: middle;
-    }
-
-    /* Bundle pill */
-    .qcs-bundle-pill {
-        display: inline-flex;
-        align-items: center;
-        height: 24px;
-        padding: 0 10px;
-        border-radius: 8px;
-        font-family: var(--gf-mono);
-        font-size: 11px;
-        font-weight: 800;
-        background: var(--gf-accent-soft);
-        color: var(--gf-accent);
-        border: 1px solid rgba(99,102,241,.12);
-    }
-    .qcs-item-code {
-        font-family: var(--gf-mono);
-        font-size: 11px;
-        font-weight: 800;
-        color: var(--gf-mid);
-    }
-    .qcs-item-name {
-        font-size: 12px;
-        font-weight: 700;
-        color: var(--gf-ink);
-        line-height: 1.3;
-    }
-    .qcs-cut-ref {
-        font-size: 10px;
-        font-weight: 600;
-        color: var(--gf-mid);
-        margin-top: 2px;
-    }
-    .qcs-qty-display {
-        font-family: var(--gf-mono);
-        font-size: 14px;
-        font-weight: 900;
-        color: var(--gf-ink);
-    }
-
-    /* Input fields for QC */
-    .qcs-qty-input {
-        width: 72px;
-        height: 36px;
-        padding: 0 8px;
-        border-radius: 10px;
-        text-align: right;
-        font-family: var(--gf-mono);
-        font-size: 14px;
-        font-weight: 900;
-        font-variant-numeric: tabular-nums;
-        border: 1.5px solid var(--gf-line);
-        background: var(--gf-white);
-        color: var(--gf-ink);
-        transition: border-color .12s, box-shadow .12s;
-    }
-    .qcs-qty-input:focus {
-        outline: none;
-        border-color: var(--gf-ink);
-        box-shadow: 0 0 0 3px rgba(10,10,10,.06);
-    }
-    .qcs-qty-input.is-ok {
-        color: var(--gf-ok);
-    }
-    .qcs-qty-input.is-ok:focus {
-        border-color: var(--gf-ok);
-        box-shadow: 0 0 0 3px rgba(22,163,74,.10);
-    }
-    .qcs-qty-input.is-reject {
-        color: var(--gf-rej);
-    }
-    .qcs-qty-input.is-reject:focus {
-        border-color: var(--gf-rej);
-        box-shadow: 0 0 0 3px rgba(220,38,38,.10);
-    }
-
-    .qcs-reason-input {
-        width: 100%;
-        height: 34px;
-        padding: 0 10px;
-        border-radius: 10px;
-        font-family: var(--gf-font);
-        font-size: 12px;
-        font-weight: 600;
-        border: 1.5px solid var(--gf-line);
-        background: var(--gf-white);
-        color: var(--gf-ink);
-        transition: border-color .12s, box-shadow .12s;
-    }
-    .qcs-reason-input:focus {
-        outline: none;
-        border-color: var(--gf-warn);
-        box-shadow: 0 0 0 3px rgba(245,158,11,.10);
-    }
-    .qcs-reason-input::placeholder {
-        color: rgba(148,163,184,.6);
-        font-weight: 500;
-    }
-
-    /* ── Summary card ────────────────────────────────── */
-    .qcs-summary {
-        margin-top: 16px;
-        padding: 14px 16px;
-        border-radius: 14px;
-        background: var(--gf-ok-soft);
-        border: 1px solid rgba(22,163,74,.12);
-        display: flex;
-        align-items: center;
-        justify-content: space-between;
-        gap: 16px;
-        flex-wrap: wrap;
-    }
-    .qcs-summary-label {
-        font-size: 10px;
-        font-weight: 900;
-        letter-spacing: .08em;
-        text-transform: uppercase;
-        color: var(--gf-mid);
-        margin-bottom: 4px;
-    }
-    .qcs-summary-values {
-        display: flex;
-        align-items: center;
-        gap: 20px;
-    }
-    .qcs-summary-stat {
-        text-align: center;
-    }
-    .qcs-summary-num {
-        font-family: var(--gf-mono);
-        font-size: 18px;
-        font-weight: 950;
-        line-height: 1;
-        letter-spacing: -.02em;
-    }
-    .qcs-summary-num.is-ok { color: var(--gf-ok); }
-    .qcs-summary-num.is-reject { color: var(--gf-rej); }
-    .qcs-summary-tag {
-        font-size: 9px;
-        font-weight: 800;
-        letter-spacing: .06em;
-        text-transform: uppercase;
-        color: var(--gf-mid);
-        margin-top: 3px;
-    }
-
-    /* ── Action bar (sticky bottom) ──────────────────── */
-    .qcs-action-bar {
-        position: fixed;
-        left: 0; right: 0; bottom: 0;
-        z-index: 100;
-        background: rgba(255,255,255,.97);
-        backdrop-filter: blur(14px);
-        -webkit-backdrop-filter: blur(14px);
-        border-top: 1px solid var(--gf-line);
-        box-shadow: 0 -8px 24px rgba(0,0,0,.06);
-        padding: 12px 16px calc(12px + env(safe-area-inset-bottom, 0px));
-    }
-    body[data-theme="dark"] .qcs-action-bar {
-        background: rgba(2,6,23,.97);
-        box-shadow: 0 -8px 24px rgba(0,0,0,.3);
-    }
-    .qcs-action-inner {
-        max-width: 780px;
-        margin: 0 auto;
-        display: flex;
-        align-items: center;
-        justify-content: space-between;
-        gap: 14px;
-    }
-    .qcs-action-info {
+    .qcs-table-head { padding: .62rem .65rem; }
+    .qcs-table-title { display: none; }
+    .qcs-table-subtitle { font-size: .86rem; font-weight: 750; }
+    .qcs-lines-wrapper { max-height: none; overflow: visible; }
+    .qcs-table { display: none; }
+    .qcs-mobile-cards {
         display: flex;
         flex-direction: column;
-        gap: 2px;
-        min-width: 0;
-    }
-    .qcs-action-label {
-        font-size: 10px;
-        font-weight: 800;
-        letter-spacing: .06em;
-        text-transform: uppercase;
-        color: var(--gf-mid);
-    }
-    .qcs-action-hint {
-        font-size: 11px;
-        font-weight: 600;
-        color: var(--gf-mid);
-    }
-    .qcs-btn-group {
-        display: flex;
-        align-items: center;
-        gap: 8px;
-        flex-shrink: 0;
-    }
-    .qcs-btn-save {
-        height: 44px;
-        min-width: 140px;
-        padding: 0 20px;
-        border-radius: 14px;
-        background: var(--gf-ok);
-        color: #fff;
-        border: none;
-        font-family: var(--gf-font);
-        font-size: 13px;
-        font-weight: 900;
-        cursor: pointer;
-        display: inline-flex;
-        align-items: center;
-        justify-content: center;
-        gap: 6px;
-        transition: opacity .15s, transform .08s;
-        box-shadow: 0 8px 20px rgba(22,163,74,.18);
-    }
-    .qcs-btn-save:hover { opacity: .9; }
-    .qcs-btn-save:active { transform: scale(.97); }
-
-    .qcs-btn-cancel {
-        height: 44px;
-        padding: 0 16px;
-        border-radius: 14px;
-        background: transparent;
-        color: var(--gf-mid);
-        border: 1.5px solid var(--gf-line);
-        font-family: var(--gf-font);
-        font-size: 13px;
-        font-weight: 700;
-        cursor: pointer;
-        display: inline-flex;
-        align-items: center;
-        justify-content: center;
-        text-decoration: none;
-        transition: border-color .15s, color .15s;
-    }
-    .qcs-btn-cancel:hover {
-        border-color: var(--gf-ink);
-        color: var(--gf-ink);
-    }
-
-    /* ── Empty state ─────────────────────────────────── */
-    .qcs-empty {
-        text-align: center;
-        padding: 48px 20px;
-        color: var(--gf-mid);
-        font-size: 14px;
-        font-weight: 600;
-    }
-
-    /* ── Production detail style override ─────────────── */
-    :root {
-        --gf-ink: var(--text, #0f172a);
-        --gf-mid: var(--muted, #6b7280);
-        --gf-line: var(--line, #e5e7eb);
-        --gf-soft: rgba(148,163,184,.06);
-        --gf-white: var(--card, #fff);
-        --gf-accent: #2563eb;
-        --gf-accent-soft: rgba(37,99,235,.06);
-        --gf-radius: 14px;
-        --gf-font: system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
-    }
-
-    .qc-sewing-page {
-        font-family: inherit;
-    }
-    .qc-sewing-page .card {
-        background: var(--card);
-        border: 1px solid var(--line);
-        border-radius: 14px;
-        box-shadow: none;
-    }
-    .qc-sewing-page .card-section {
-        padding: 1rem 1.25rem;
-    }
-    .qc-sewing-page .mono {
-        font-variant-numeric: tabular-nums;
-        font-family: ui-monospace, SFMono-Regular, Menlo, Consolas, "Liberation Mono", monospace;
-    }
-    .qc-sewing-page .help {
-        color: var(--muted);
-        font-size: .85rem;
-    }
-    .qc-sewing-page .small-muted {
-        color: var(--muted);
-        font-size: .8rem;
-    }
-    .qc-sewing-page .hdr {
-        display: flex;
-        justify-content: space-between;
-        gap: .75rem;
-        flex-wrap: wrap;
-        align-items: center;
-    }
-    .qc-sewing-page .hdr h1 {
-        font-size: 1.02rem;
-        font-weight: 900;
-        margin: 0;
-        letter-spacing: -.01em;
-    }
-    .qc-sewing-page .sub {
-        color: var(--muted);
-        font-size: .8rem;
-        line-height: 1.35;
-        margin-top: .15rem;
-    }
-    .qc-sewing-page .hdr-right {
-        display: flex;
-        align-items: center;
-        gap: .5rem;
-        flex-wrap: wrap;
-    }
-    .qc-sewing-page .btn-header-link {
-        border-radius: 999px;
-        padding: .32rem .9rem;
-        font-size: .78rem;
-        font-weight: 600;
-    }
-    .qc-sewing-page .status-stepper {
-        display: flex;
-        align-items: center;
-        gap: .75rem;
-        font-size: .78rem;
-        margin-top: .6rem;
-    }
-    .qc-sewing-page .status-step {
-        display: flex;
-        align-items: center;
         gap: .35rem;
+        padding: .45rem;
     }
-    .qc-sewing-page .status-dot {
-        width: 18px;
-        height: 18px;
-        border-radius: 999px;
-        border: 2px solid rgba(148,163,184,.7);
-        background: transparent;
-    }
-    .qc-sewing-page .status-dot.active {
-        background: rgba(34,197,94,.18);
-        border-color: #22c55e;
-    }
-    .qc-sewing-page .status-dot.current {
-        background: rgba(37,99,235,.18);
-        border-color: #2563eb;
-    }
-    .qc-sewing-page .status-label {
-        text-transform: uppercase;
-        letter-spacing: .08em;
-        font-size: .72rem;
-        color: #6b7280;
-    }
-    .qc-sewing-page .status-label.current {
-        color: #2563eb;
-        font-weight: 700;
-    }
-    .qc-sewing-page .status-label.done {
-        color: #16a34a;
-        font-weight: 700;
-    }
-    .qc-sewing-page .status-separator {
-        flex: 0 0 26px;
-        height: 1px;
-        background: linear-gradient(to right, rgba(148,163,184,.7), transparent);
-    }
-    .qc-sewing-page .page-wrap {
-        max-width: 1100px;
-        padding: .75rem .75rem 5.25rem;
-    }
-    .qcs-breadcrumb {
-        padding-top: 0;
-        margin-bottom: .5rem;
-        font-size: .78rem;
-        font-weight: 600;
-    }
-    .qcs-page-head {
-        background: var(--card);
-        border: 1px solid var(--line);
-        border-radius: 14px;
-        padding: 1rem 1.25rem;
-        margin-bottom: .75rem;
-        align-items: center;
-    }
-    .qcs-page-title {
-        font-size: 1.02rem;
-        letter-spacing: -.01em;
-    }
-    .qcs-page-meta {
-        gap: .45rem;
-        margin-top: .25rem;
-    }
-    .qcs-meta-item {
-        font-size: .8rem;
-        font-weight: 500;
-    }
-    .qcs-badge,
-    .qcs-bundle-pill {
-        border-radius: 999px;
-        letter-spacing: 0;
-        text-transform: none;
-    }
-    .qcs-link-chip,
-    .qcs-btn-save,
-    .qcs-btn-cancel {
-        border-radius: 999px;
-        font-family: inherit;
-        letter-spacing: 0;
-        box-shadow: none;
-    }
-    .qcs-link-chip {
-        height: 32px;
-        background: transparent;
-        color: var(--gf-mid);
-        border: 1px solid var(--gf-line);
-    }
-    .qcs-link-chip:hover {
-        background: rgba(148,163,184,.08);
-        color: var(--gf-ink);
-        opacity: 1;
-    }
-    .qcs-section {
-        border-radius: 14px;
-        box-shadow: none;
-        padding: 1rem 1.25rem;
-        margin-bottom: .75rem;
-    }
-    .qcs-section-title {
-        font-size: .78rem;
-        font-weight: 700;
-        letter-spacing: .04em;
-        margin-bottom: .75rem;
-    }
-    .qcs-field-input,
-    .qcs-qty-input,
-    .qcs-reason-input,
-    .qcs-mobile-input,
-    .qcs-mobile-reason-input {
+    .qcs-mobile-card {
+        border: 1px solid rgba(148,163,184,.22);
         border-radius: 8px;
-        border-width: 1px;
-        box-shadow: none !important;
-        font-family: inherit;
+        padding: .5rem;
+        background: var(--card, #fff);
     }
-    .qcs-qty-input,
+    .qcs-mobile-row {
+        display: grid;
+        grid-template-columns: minmax(0, 1.3fr) 56px 68px 68px;
+        gap: .4rem;
+        align-items: end;
+    }
+    .qcs-mobile-item {
+        min-width: 0;
+        overflow-wrap: anywhere;
+    }
+    .qcs-mobile-code {
+        font-size: 1rem;
+        font-weight: 900;
+        line-height: 1.1;
+    }
+    .qcs-mobile-name {
+        margin-top: .12rem;
+        color: #64748b;
+        font-size: .72rem;
+        line-height: 1.2;
+    }
+    .qcs-mobile-qty {
+        text-align: center;
+        font-weight: 900;
+        font-size: .95rem;
+    }
+    .qcs-mobile-small-label {
+        display: block;
+        margin-bottom: .12rem;
+        color: #94a3b8;
+        font-size: .58rem;
+        font-weight: 850;
+        text-transform: uppercase;
+    }
     .qcs-mobile-input {
-        font-family: ui-monospace, SFMono-Regular, Menlo, Consolas, "Liberation Mono", monospace;
-    }
-    .qcs-table thead th {
-        font-size: .78rem;
-        font-weight: 600;
-        letter-spacing: .04em;
-        padding: .5rem .65rem;
+        width: 100%;
+        min-height: 38px;
+        border-radius: 7px;
+        border: 1px solid rgba(148,163,184,.35);
         background: transparent;
+        text-align: center;
+        font-weight: 900;
     }
-    .qcs-table tbody td {
-        padding: .5rem .65rem;
+    .qcs-mobile-input.is-ok { color: var(--qcs-ok); }
+    .qcs-mobile-input.is-reject { color: var(--qcs-reject); }
+    .qcs-mobile-reason {
+        display: none;
+        margin-top: .45rem;
     }
-    .qcs-table tbody tr:hover {
-        background: rgba(148,163,184,.04);
-    }
-    .qcs-bundle-pill {
-        height: 22px;
-        background: var(--card);
-        color: var(--gf-mid);
-        border: 1px solid rgba(148,163,184,.3);
-    }
-    .qcs-item-name {
-        font-size: .82rem;
-        font-weight: 600;
-    }
-    .qcs-summary {
-        margin-top: .75rem;
-        padding: .75rem 1rem;
-        border-radius: 14px;
+    .qcs-mobile-reason.is-visible { display: block; }
+    .qcs-mobile-reason-input {
+        width: 100%;
+        min-height: 38px;
+        border-radius: 7px;
+        border: 1px solid rgba(148,163,184,.35);
         background: transparent;
-        border: 1px solid var(--gf-line);
+        padding: .38rem .5rem;
     }
-    .qcs-action-bar {
-        background: var(--card);
-        backdrop-filter: none;
-        -webkit-backdrop-filter: none;
-        box-shadow: none;
+    .qcs-summary { display: none; }
+    .qcs-action-info { display: none; }
+    .qcs-action-inner,
+    .qcs-action-buttons {
+        display: block;
+        width: 100%;
     }
-    .qcs-action-inner {
-        max-width: 1100px;
+    .qcs-action-buttons .qcs-btn { display: none; }
+    .qcs-save-btn {
+        width: 100%;
+        min-height: 46px;
+        font-size: .9rem;
     }
-    .qcs-btn-save {
-        height: 40px;
-        min-width: 132px;
-        background: #16a34a;
-    }
-    .qcs-btn-cancel {
-        height: 40px;
-    }
-    .qcs-alert {
-        border-radius: 14px;
-        font-weight: 600;
-    }
-
-    /* ── Mobile Cards ────────────────────────────────── */
-    .qcs-mobile-cards { display: none; }
-
-    @media (max-width: 767.98px) {
-        .qc-sewing-page .hdr {
-            align-items: center;
-            gap: .4rem;
-        }
-        .qc-sewing-page .hdr h1 {
-            font-size: .95rem;
-        }
-        .qc-sewing-page .hdr-right {
-            width: auto;
-            gap: .4rem;
-            margin-left: auto;
-        }
-        .qc-sewing-page .btn-header-link {
-            padding: .28rem .58rem;
-            font-size: .75rem;
-        }
-        .qc-sewing-page .status-stepper {
-            display: none;
-        }
-        .qc-sewing-page .status-separator {
-            display: none;
-        }
-        .qc-sewing-page .page-wrap {
-            padding: 0 6px 88px;
-        }
-        .qc-sewing-page > .page-wrap > .card:first-child {
-            position: sticky;
-            top: 0;
-            z-index: 60;
-            margin: 0 -6px 6px;
-            border-radius: 0;
-            border-left: 0;
-            border-right: 0;
-        }
-        .qc-sewing-page .card-section {
-            padding: .55rem .65rem;
-        }
-        .qc-sewing-page .sub,
-        .qc-sewing-page .hdr .badge,
-        .qc-sewing-page .hdr-right .btn-outline-primary {
-            display: none !important;
-        }
-        .qc-sewing-page .hdr-right .btn-outline-secondary {
-            border-color: transparent;
-            padding-inline: .25rem;
-        }
-        .qcs-breadcrumb,
-        .qcs-page-head > .qcs-link-chip,
-        .qcs-alert-info,
-        .qc-sewing-page .alert-info,
-        .qcs-action-info {
-            display: none !important;
-        }
-        .qcs-page-head {
-            position: sticky;
-            top: 0;
-            z-index: 50;
-            margin: 0 -8px 8px;
-            padding: 10px;
-            background: var(--gf-white);
-            border-bottom: 1px solid var(--gf-line);
-        }
-        .qcs-page-title {
-            font-size: 16px;
-            letter-spacing: 0;
-        }
-        .qcs-page-title code { font-size: .9em; }
-        .qcs-page-meta {
-            gap: 6px;
-            margin-top: 5px;
-        }
-        .qcs-meta-item { font-size: 11px; }
-        .qcs-meta-dot { display: none; }
-        .qcs-badge {
-            height: 21px;
-            padding: 0 7px;
-            border-radius: 7px;
-            font-size: 9px;
-            letter-spacing: 0;
-        }
-
-        .qcs-field-grid { grid-template-columns: 1fr; gap: 10px; }
-        .qc-sewing-page form > section.card:first-of-type {
-            display: none;
-        }
-        .qc-sewing-page form > section.card.mb-3 {
-            margin-bottom: 0 !important;
-            border-radius: 10px;
-        }
-        .qc-sewing-page form > section.card.mb-3 > .card-section {
-            display: none;
-        }
-
-        .qcs-section {
-            border-radius: 10px;
-            padding: 10px;
-            margin-bottom: 8px;
-            box-shadow: none;
-        }
-        .qcs-section:first-of-type {
-            display: none;
-        }
-        .qcs-section[style*="padding:0"] {
-            padding: 0 !important;
-        }
-        .qcs-section-title {
-            margin-bottom: 8px !important;
-            font-size: 9px;
-            letter-spacing: .04em;
-        }
-        .qcs-section-title svg { display: none; }
-
-        /* Hide desktop table on mobile */
-        .qcs-table-wrap { display: none; }
-        .qc-sewing-page section.card > .card-section .badge {
-            display: none;
-        }
-
-        /* Show mobile cards */
-        .qcs-mobile-cards {
-            display: flex;
-            flex-direction: column;
-            gap: 4px;
-            padding: 6px !important;
-        }
-
-        .qcs-mobile-card {
-            border: 1px solid var(--gf-line);
-            border-radius: 8px;
-            padding: 7px;
-            background: var(--gf-white);
-        }
-        .qcs-mobile-row {
-            display: grid;
-            grid-template-columns: minmax(0, 1.4fr) 54px 64px 64px;
-            gap: 6px;
-            align-items: end;
-        }
-        .qcs-mobile-card-item {
-            font-family: var(--gf-mono);
-            font-size: 14px;
-            font-weight: 900;
-            color: var(--gf-ink);
-            line-height: 1.15;
-            min-width: 0;
-            overflow-wrap: anywhere;
-        }
-        .qcs-mobile-card-item small {
-            display: none;
-        }
-        .qcs-mobile-card-qty {
-            font-family: var(--gf-mono);
-            font-size: 13px;
-            font-weight: 900;
-            color: var(--gf-ink);
-            white-space: nowrap;
-            text-align: center;
-        }
-        .qcs-mobile-card-qty span {
-            display: block;
-            color: var(--gf-mid);
-            font-family: inherit;
-            font-size: 8px;
-            font-weight: 800;
-            letter-spacing: 0;
-            text-transform: uppercase;
-        }
-        .qcs-mobile-card-inputs {
-            display: contents;
-        }
-        .qcs-mobile-field-label {
-            font-size: 8px;
-            font-weight: 900;
-            letter-spacing: 0;
-            text-transform: uppercase;
-            color: var(--gf-mid);
-            margin-bottom: 2px;
-        }
-        .qcs-mobile-input {
-            width: 100%;
-            height: 34px;
-            padding: 0 6px;
-            border-radius: 7px;
-            font-family: var(--gf-mono);
-            font-size: 14px;
-            font-weight: 900;
-            border: 1px solid var(--gf-line);
-            background: var(--gf-soft);
-            color: var(--gf-ink);
-            text-align: center;
-        }
-        .qcs-mobile-input:focus {
-            outline: none;
-            border-color: var(--gf-ink);
-            box-shadow: 0 0 0 3px rgba(10,10,10,.06);
-        }
-        .qcs-mobile-input.is-ok { color: var(--gf-ok); }
-        .qcs-mobile-input.is-ok:focus {
-            border-color: var(--gf-ok);
-            box-shadow: 0 0 0 3px rgba(22,163,74,.10);
-        }
-        .qcs-mobile-input.is-reject {
-            color: var(--gf-rej);
-            background: var(--gf-rej-soft);
-            border-color: rgba(220,38,38,.22);
-            text-align: center;
-        }
-        .qcs-mobile-input.is-reject:focus {
-            border-color: var(--gf-rej);
-            box-shadow: 0 0 0 3px rgba(220,38,38,.10);
-        }
-        .qcs-mobile-reason {
-            display: none;
-            margin-top: 8px;
-        }
-        .qcs-mobile-reason.is-visible {
-            display: block;
-        }
-        .qcs-mobile-reason-input {
-            width: 100%;
-            height: 36px;
-            padding: 0 10px;
-            border-radius: 10px;
-            font-family: var(--gf-font);
-            font-size: 12px;
-            font-weight: 600;
-            border: 1.5px solid var(--gf-line);
-            background: var(--gf-soft);
-            color: var(--gf-ink);
-        }
-        .qcs-mobile-reason-input:focus {
-            outline: none;
-            border-color: var(--gf-warn);
-            box-shadow: 0 0 0 3px rgba(245,158,11,.10);
-        }
-        .qcs-mobile-reason-input::placeholder {
-            color: rgba(148,163,184,.6);
-            font-weight: 500;
-        }
-
-        .qcs-summary {
-            display: none;
-        }
-        .qcs-summary-label { display: none; }
-        .qcs-summary-values {
-            width: 100%;
-            justify-content: space-around;
-            gap: 8px;
-        }
-        .qcs-summary-num {
-            font-size: 17px;
-        }
-
-        .qcs-action-bar {
-            padding: 8px 10px calc(8px + env(safe-area-inset-bottom, 0px));
-            box-shadow: none;
-        }
-        .qcs-action-inner { display: block; }
-        .qcs-btn-group { width: 100%; }
-        .qcs-btn-save {
-            width: 100%;
-            height: 46px;
-            border-radius: 10px;
-            box-shadow: none;
-        }
-        .qcs-btn-save svg { display: none; }
-        .qcs-btn-cancel { display: none; }
-    }
+}
 </style>
 @endpush
 
 @section('content')
 @php
-    $statusLabel = $hasQcSewing ? 'QC JAHIT SELESAI' : 'BELUM QC';
-    $statusClass = $hasQcSewing ? 'success' : 'warning';
+    $statusLabel = $hasQcSewing ? 'QC selesai' : 'Belum QC';
+    $totalBundles = count($rows);
+    $totalIn = 0;
+    $totalOk = 0;
+    $totalReject = 0;
+
+    foreach ($rows as $idx => $row) {
+        $totalIn += (float) $row['qty_max'];
+        $totalOk += (float) old("results.{$idx}.qty_ok", $row['qty_ok']);
+        $totalReject += (float) old("results.{$idx}.qty_reject", $row['qty_reject']);
+    }
 @endphp
-<div class="qc-sewing-page">
-<div class="page-wrap">
 
-    {{-- HEADER --}}
-    <div class="card mb-3">
-        <div class="card-section">
-            <div class="hdr">
-                <div>
-                    <div class="d-flex align-items-center gap-2 w-100">
-                        <h1>{{ $sewingReturn->code }}</h1>
-                        <span class="badge bg-{{ $statusClass }} d-md-none"
-                              style="font-size:.68rem;white-space:normal;line-height:1.3;max-width:110px;text-align:center;margin-left:auto">
-                            {{ $statusLabel }}
-                        </span>
-                    </div>
-                    <div class="sub">
-                        QC Jahit
-                        @if($sewingReturn->date) • {{ $sewingReturn->date->format('d/m/Y') }} @endif
-                        @if($sewingReturn->operator) • {{ $sewingReturn->operator->name }} @endif
-                    </div>
-                </div>
-                <div class="hdr-right">
-                    <span class="badge bg-{{ $statusClass }} d-none d-md-inline-flex">{{ $statusLabel }}</span>
-                    <a href="{{ route('production.qc.index', ['stage' => 'sewing']) }}"
-                       class="btn btn-sm btn-outline-secondary btn-header-link">Kembali</a>
-                    <a href="{{ route('production.sewing.returns.show', $sewingReturn) }}"
-                       class="btn btn-sm btn-outline-primary btn-header-link">Lihat Setor Jahit</a>
-                </div>
-            </div>
+<div class="qcs-topbar">
+    <span class="qcs-topbar-code">{{ $sewingReturn->code }}</span>
+    <span class="qcs-badge">{{ $statusLabel }}</span>
+    @if($sewingReturn->operator)
+        <span class="qcs-badge">{{ $sewingReturn->operator->name }}</span>
+    @endif
 
-            <div class="status-stepper">
-                <div class="status-step">
-                    <div class="status-dot active"></div>
-                    <div class="status-label done">Setor Jahit</div>
-                </div>
-                <div class="status-separator"></div>
-                <div class="status-step">
-                    <div class="status-dot current"></div>
-                    <div class="status-label current">Input QC</div>
-                </div>
-                <div class="status-separator"></div>
-                <div class="status-step">
-                    <div class="status-dot {{ $hasQcSewing ? 'active' : '' }}"></div>
-                    <div class="status-label {{ $hasQcSewing ? 'done' : '' }}">QC Jahit</div>
-                </div>
-            </div>
+    <span class="qcs-topbar-spacer"></span>
+
+    <span class="qcs-pill">Bundle <b>{{ $totalBundles }}</b></span>
+    <span class="qcs-pill qcs-pill-main">Masuk <b>{{ number_format($totalIn, 0, ',', '.') }}</b></span>
+
+    <a href="{{ route('production.qc.index', ['stage' => 'sewing']) }}" class="qcs-btn">Kembali</a>
+    <a href="{{ route('production.sewing.returns.show', $sewingReturn) }}" class="qcs-btn qcs-btn-primary">Setor Jahit</a>
+</div>
+
+<div class="qcs-wrap">
+    @if(session('success'))
+        <div class="qcs-alert alert alert-success">{{ session('success') }}</div>
+    @endif
+    @if(session('error'))
+        <div class="qcs-alert alert alert-danger">{{ session('error') }}</div>
+    @endif
+    @if($hasQcSewing)
+        <div class="qcs-alert alert alert-info">
+            QC Jahit untuk Setor Jahit ini sudah pernah diinput. Simpan ulang akan menimpa hasil QC sebelumnya.
+        </div>
+    @endif
+
+    <div class="qcs-kpi-grid">
+        <div class="qcs-kpi-card">
+            <div class="qcs-kpi-label">Bundle</div>
+            <div class="qcs-kpi-value">{{ $totalBundles }}</div>
+        </div>
+        <div class="qcs-kpi-card">
+            <div class="qcs-kpi-label">Qty masuk</div>
+            <div class="qcs-kpi-value">{{ number_format($totalIn, 0, ',', '.') }}</div>
+        </div>
+        <div class="qcs-kpi-card">
+            <div class="qcs-kpi-label">OK</div>
+            <div class="qcs-kpi-value" id="kpi-ok">{{ number_format($totalOk, 0, ',', '.') }}</div>
+        </div>
+        <div class="qcs-kpi-card">
+            <div class="qcs-kpi-label">Reject</div>
+            <div class="qcs-kpi-value" id="kpi-reject">{{ number_format($totalReject, 0, ',', '.') }}</div>
         </div>
     </div>
 
-    {{-- ALERTS --}}
-    @if(session('success'))
-        <div class="alert alert-success">{{ session('success') }}</div>
-    @endif
-    @if(session('error'))
-        <div class="alert alert-danger">{{ session('error') }}</div>
-    @endif
-    @if($hasQcSewing)
-        <div class="alert alert-info">
-            QC Jahit untuk Setor Jahit ini sudah pernah diinput. Simpan ulang akan <strong>menimpa</strong> hasil QC sebelumnya dan membuat mutasi stok koreksi.
-        </div>
-    @endif
+    <div class="qcs-flow">
+        <span class="qcs-flow-step done">Setor Jahit</span>
+        <span class="qcs-flow-sep">/</span>
+        <span class="qcs-flow-step active">Input QC</span>
+        <span class="qcs-flow-sep">/</span>
+        <span class="qcs-flow-step {{ $hasQcSewing ? 'done' : '' }}">QC Jahit</span>
+    </div>
+
+    <div class="qcs-info-strip">
+        <span class="qcs-info-item">Tanggal setor <b>{{ $sewingReturn->date?->format('d/m/Y') ?? '-' }}</b></span>
+        <span class="qcs-info-item">Operator jahit <b>{{ $sewingReturn->operator?->name ?? '-' }}</b></span>
+        <span class="qcs-info-item">Pergerakan <b>WIP-SEW ke WH-PRD / REJ-SEW</b></span>
+    </div>
 
     @if(empty($rows))
-        <div class="card p-3">
+        <div class="qcs-table-card">
             <div class="qcs-empty">Tidak ada bundle yang bisa di-QC pada Setor Jahit ini.</div>
         </div>
     @else
+        <form method="POST" action="{{ route('production.qc.sewing.update', $sewingReturn) }}">
+            @csrf
+            @method('PUT')
 
-    <form method="POST" action="{{ route('production.qc.sewing.update', $sewingReturn) }}">
-        @csrf
-        @method('PUT')
-
-        {{-- INFO QC --}}
-        <section class="card p-3 mb-3">
-            <div class="d-flex gap-4 flex-wrap align-items-start">
-                <div>
-                    <div class="help mb-1">Tanggal QC</div>
-                    <input type="date"
-                           name="qc_date"
-                           value="{{ old('qc_date', now()->toDateString()) }}"
-                           required
-                           class="qcs-field-input">
-                </div>
-                <div>
-                    <div class="help mb-1">Operator QC</div>
-                    <input type="hidden" name="operator_id" value="{{ $loginOperator?->id }}">
-                    <div class="mono" style="padding-top:.55rem">
-                        {{ $loginOperator?->name ?? '(Operator tidak ditemukan)' }}
-                    </div>
-                </div>
-                <div>
-                    <div class="help mb-1">Bundle</div>
-                    <div class="mono" style="padding-top:.55rem">{{ count($rows) }} bundle</div>
-                </div>
-            </div>
-        </section>
-
-        {{-- TABEL BUNDLE --}}
-        <section class="card mb-3" style="overflow:hidden;">
-            <div class="card-section pb-2">
-                <div class="d-flex justify-content-between align-items-center gap-2 flex-wrap">
+            <div class="qcs-panel">
+                <div class="qcs-field-grid">
                     <div>
-                        <div class="fw-semibold">Hasil QC</div>
-                        <div class="small-muted">Fokus item dan qty.</div>
+                        <div class="qcs-label">Tanggal QC</div>
+                        <input type="date"
+                               name="qc_date"
+                               value="{{ old('qc_date', now()->toDateString()) }}"
+                               required
+                               class="qcs-input">
                     </div>
-                    <span class="badge bg-secondary">{{ count($rows) }} bundle</span>
+                    <div>
+                        <div class="qcs-label">Operator QC</div>
+                        <input type="hidden" name="operator_id" value="{{ $loginOperator?->id }}">
+                        <div class="qcs-static">{{ $loginOperator?->name ?? '(Operator tidak ditemukan)' }}</div>
+                    </div>
+                    <div>
+                        <div class="qcs-label">Status</div>
+                        <div class="qcs-static">{{ $statusLabel }}</div>
+                    </div>
                 </div>
             </div>
 
-            {{-- DESKTOP TABLE --}}
-            <div class="qcs-table-wrap">
-                <table class="qcs-table">
-                    <thead>
-                        <tr>
-                            <th style="text-align:left">Bundle</th>
-                            <th style="text-align:left">Barang</th>
-                            <th style="text-align:right">Masuk</th>
-                            <th style="text-align:right;color:var(--gf-ok)">OK</th>
-                            <th style="text-align:right;color:var(--gf-rej)">Reject</th>
-                            <th style="text-align:left">Alasan</th>
-                        </tr>
-                    </thead>
-                    <tbody>
+            <div class="qcs-table-card">
+                <div class="qcs-table-head">
+                    <div>
+                        <div class="qcs-table-title">Hasil QC</div>
+                        <div class="qcs-table-subtitle">Input qty OK dan reject per bundle</div>
+                    </div>
+                    <span class="qcs-topbar-spacer"></span>
+                    <span class="qcs-pill">Baris <b>{{ $totalBundles }}</b></span>
+                </div>
+
+                <div class="qcs-lines-wrapper">
+                    <table class="qcs-table">
+                        <thead>
+                            <tr>
+                                <th style="text-align:left">Bundle</th>
+                                <th style="text-align:left">Barang</th>
+                                <th style="text-align:right">Masuk</th>
+                                <th style="text-align:right">OK</th>
+                                <th style="text-align:right">Reject</th>
+                                <th style="text-align:left">Alasan</th>
+                            </tr>
+                        </thead>
+                        <tbody>
+                            @foreach($rows as $i => $row)
+                                <tr>
+                                    <td>
+                                        <span class="qcs-bundle qcs-mono">{{ $row['bundle_code'] }}</span>
+                                        @if($row['cutting_job_code'])
+                                            <div class="qcs-cut-ref qcs-mono">{{ $row['cutting_job_code'] }}</div>
+                                        @endif
+                                        <input type="hidden" name="results[{{ $i }}][sewing_return_line_id]" value="{{ $row['sewing_return_line_id'] }}">
+                                        <input type="hidden" name="results[{{ $i }}][bundle_id]" value="{{ $row['bundle_id'] }}">
+                                    </td>
+                                    <td>
+                                        <div class="qcs-item-code qcs-mono">{{ $row['item_code'] }}</div>
+                                        <div class="qcs-item-name">{{ $row['item_name'] }}</div>
+                                    </td>
+                                    <td style="text-align:right">
+                                        <span class="qcs-qty-display qcs-mono">{{ number_format($row['qty_max'], 0, ',', '.') }}</span>
+                                    </td>
+                                    <td style="text-align:right">
+                                        <input type="number"
+                                               name="results[{{ $i }}][qty_ok]"
+                                               class="qcs-qty-input qcs-mono is-ok qty-ok"
+                                               value="{{ old("results.{$i}.qty_ok", $row['qty_ok']) }}"
+                                               min="0"
+                                               max="{{ $row['qty_max'] }}"
+                                               step="1"
+                                               inputmode="numeric"
+                                               pattern="[0-9]*"
+                                               onfocus="this.select()"
+                                               oninput="syncReject(this, {{ $i }}, {{ $row['qty_max'] }})">
+                                    </td>
+                                    <td style="text-align:right">
+                                        <input type="number"
+                                               name="results[{{ $i }}][qty_reject]"
+                                               class="qcs-qty-input qcs-mono is-reject qty-reject"
+                                               id="reject_{{ $i }}"
+                                               value="{{ old("results.{$i}.qty_reject", $row['qty_reject']) }}"
+                                               min="0"
+                                               max="{{ $row['qty_max'] }}"
+                                               step="1"
+                                               inputmode="numeric"
+                                               pattern="[0-9]*"
+                                               onfocus="this.select()">
+                                    </td>
+                                    <td>
+                                        <input type="text"
+                                               name="results[{{ $i }}][reject_reason]"
+                                               class="qcs-reason-input"
+                                               value="{{ old("results.{$i}.reject_reason", $row['reject_reason']) }}"
+                                               placeholder="opsional"
+                                               maxlength="100">
+                                    </td>
+                                </tr>
+                            @endforeach
+                        </tbody>
+                    </table>
+
+                    <div class="qcs-mobile-cards">
                         @foreach($rows as $i => $row)
-                        <tr>
-                            <td>
-                                <span class="qcs-bundle-pill">{{ $row['bundle_code'] }}</span>
-                                @if($row['cutting_job_code'])
-                                    <div class="qcs-cut-ref">{{ $row['cutting_job_code'] }}</div>
-                                @endif
-                                <input type="hidden"
-                                       name="results[{{ $i }}][bundle_id]"
-                                       value="{{ $row['bundle_id'] }}">
-                            </td>
-                            <td>
-                                <div class="qcs-item-code">{{ $row['item_code'] }}</div>
-                                <div class="qcs-item-name">{{ $row['item_name'] }}</div>
-                            </td>
-                            <td style="text-align:right">
-                                <span class="qcs-qty-display">{{ number_format($row['qty_max'], 0) }}</span>
-                            </td>
-                            <td style="text-align:right">
-                                <input type="number"
-                                       name="results[{{ $i }}][qty_ok]"
-                                       class="qcs-qty-input is-ok qty-ok"
-                                       value="{{ old("results.{$i}.qty_ok", $row['qty_ok']) }}"
-                                       min="0"
-                                       max="{{ $row['qty_max'] }}"
-                                       step="1"
-                                       oninput="syncReject(this, {{ $i }}, {{ $row['qty_max'] }})">
-                            </td>
-                            <td style="text-align:right">
-                                <input type="number"
-                                       name="results[{{ $i }}][qty_reject]"
-                                       class="qcs-qty-input is-reject qty-reject"
-                                       id="reject_{{ $i }}"
-                                       value="{{ old("results.{$i}.qty_reject", $row['qty_reject']) }}"
-                                       min="0"
-                                       max="{{ $row['qty_max'] }}"
-                                       step="1">
-                            </td>
-                            <td>
-                                <input type="text"
-                                       name="results[{{ $i }}][reject_reason]"
-                                       class="qcs-reason-input"
-                                       value="{{ old("results.{$i}.reject_reason", $row['reject_reason']) }}"
-                                       placeholder="opsional"
-                                       maxlength="100">
-                            </td>
-                        </tr>
+                            <div class="qcs-mobile-card">
+                                <div class="qcs-mobile-row">
+                                    <div class="qcs-mobile-item">
+                                        <div class="qcs-mobile-code qcs-mono">{{ $row['item_code'] }}</div>
+                                        <div class="qcs-mobile-name">{{ $row['bundle_code'] }}</div>
+                                    </div>
+                                    <div class="qcs-mobile-qty qcs-mono">
+                                        <span class="qcs-mobile-small-label">Masuk</span>
+                                        {{ number_format($row['qty_max'], 0, ',', '.') }}
+                                    </div>
+                                    <div>
+                                        <span class="qcs-mobile-small-label">OK</span>
+                                        <input type="number"
+                                               class="qcs-mobile-input qcs-mono is-ok qty-ok"
+                                               data-idx="{{ $i }}"
+                                               data-max="{{ $row['qty_max'] }}"
+                                               data-target="results[{{ $i }}][qty_ok]"
+                                               value="{{ old("results.{$i}.qty_ok", $row['qty_ok']) }}"
+                                               min="0"
+                                               max="{{ $row['qty_max'] }}"
+                                               step="1"
+                                               inputmode="numeric"
+                                               pattern="[0-9]*"
+                                               onfocus="this.select()"
+                                               oninput="syncMobile(this)">
+                                    </div>
+                                    <div>
+                                        <span class="qcs-mobile-small-label">Reject</span>
+                                        <input type="number"
+                                               class="qcs-mobile-input qcs-mono is-reject qty-reject"
+                                               id="m_reject_{{ $i }}"
+                                               data-target="results[{{ $i }}][qty_reject]"
+                                               value="{{ old("results.{$i}.qty_reject", $row['qty_reject']) }}"
+                                               min="0"
+                                               max="{{ $row['qty_max'] }}"
+                                               step="1"
+                                               inputmode="numeric"
+                                               pattern="[0-9]*"
+                                               onfocus="this.select()">
+                                    </div>
+                                </div>
+                                <div class="qcs-mobile-reason {{ (float) old("results.{$i}.qty_reject", $row['qty_reject']) > 0 ? 'is-visible' : '' }}">
+                                    <span class="qcs-mobile-small-label">Alasan Reject</span>
+                                    <input type="text"
+                                           class="qcs-mobile-reason-input"
+                                           data-target="results[{{ $i }}][reject_reason]"
+                                           value="{{ old("results.{$i}.reject_reason", $row['reject_reason']) }}"
+                                           placeholder="opsional"
+                                           maxlength="100">
+                                </div>
+                            </div>
                         @endforeach
-                    </tbody>
-                </table>
-            </div>
-
-            {{-- MOBILE CARDS --}}
-            <div class="qcs-mobile-cards" style="padding:12px;">
-                @foreach($rows as $i => $row)
-                <div class="qcs-mobile-card">
-                    <div class="qcs-mobile-row">
-                        <div class="qcs-mobile-card-item">
-                            {{ $row['item_code'] }}
-                        </div>
-                        <div class="qcs-mobile-card-qty">
-                            <span>Masuk</span>
-                            {{ number_format($row['qty_max'], 0) }}
-                        </div>
-
-                        <div class="qcs-mobile-card-inputs">
-                            <div>
-                            <div class="qcs-mobile-field-label">OK</div>
-                            <input type="number"
-                                   class="qcs-mobile-input is-ok qty-ok"
-                                   data-idx="{{ $i }}"
-                                   data-max="{{ $row['qty_max'] }}"
-                                   data-target="results[{{ $i }}][qty_ok]"
-                                   value="{{ old("results.{$i}.qty_ok", $row['qty_ok']) }}"
-                                   min="0" max="{{ $row['qty_max'] }}" step="1"
-                                   oninput="syncMobile(this)">
-                            </div>
-                            <div>
-                            <div class="qcs-mobile-field-label">Reject</div>
-                            <input type="number"
-                                   class="qcs-mobile-input is-reject qty-reject"
-                                   id="m_reject_{{ $i }}"
-                                   data-target="results[{{ $i }}][qty_reject]"
-                                   value="{{ old("results.{$i}.qty_reject", $row['qty_reject']) }}"
-                                   min="0" max="{{ $row['qty_max'] }}" step="1">
-                            </div>
-                        </div>
-                    </div>
-                    <div class="qcs-mobile-reason {{ (float) old("results.{$i}.qty_reject", $row['qty_reject']) > 0 ? 'is-visible' : '' }}">
-                        <div class="qcs-mobile-field-label">Alasan Reject</div>
-                        <input type="text"
-                               class="qcs-mobile-reason-input"
-                               data-target="results[{{ $i }}][reject_reason]"
-                               value="{{ old("results.{$i}.reject_reason", $row['reject_reason']) }}"
-                               placeholder="opsional"
-                               maxlength="100">
                     </div>
                 </div>
-                @endforeach
-            </div>
 
-            {{-- SUMMARY --}}
-            <div style="padding:0 1rem 1rem;">
                 <div class="qcs-summary">
-                    <div>
-                        <div class="qcs-summary-label">Ringkasan QC</div>
-                    </div>
+                    <div class="qcs-summary-label">Ringkasan QC</div>
                     <div class="qcs-summary-values">
-                        <div class="qcs-summary-stat">
-                            <div class="qcs-summary-num is-ok" id="sum-ok">–</div>
-                            <div class="qcs-summary-tag">OK</div>
-                        </div>
-                        <div class="qcs-summary-stat">
-                            <div class="qcs-summary-num is-reject" id="sum-reject">–</div>
-                            <div class="qcs-summary-tag">Reject</div>
-                        </div>
+                        <span class="qcs-summary-pill is-ok">OK <b id="sum-ok">{{ number_format($totalOk, 0, ',', '.') }}</b></span>
+                        <span class="qcs-summary-pill is-reject">Reject <b id="sum-reject">{{ number_format($totalReject, 0, ',', '.') }}</b></span>
                     </div>
                 </div>
             </div>
-        </section>
 
-        {{-- ACTION BAR --}}
-        <div class="qcs-action-bar">
-            <div class="qcs-action-inner">
-                <div class="qcs-action-info">
-                    <div class="qcs-action-label">QC Jahit</div>
-                    <div class="qcs-action-hint">WIP-SEW ke WIP-FIN / REJ-SEW</div>
-                </div>
-                <div class="qcs-btn-group">
-                    <a href="{{ route('production.sewing.returns.show', $sewingReturn) }}" class="qcs-btn-cancel">Batal</a>
-                    <button type="submit" class="qcs-btn-save">
-                        <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><polyline points="20 6 9 17 4 12"/></svg>
-                        Simpan QC
-                    </button>
+            <div class="qcs-action-bar">
+                <div class="qcs-action-inner">
+                    <div class="qcs-action-info">
+                        <div class="qcs-action-title">QC Jahit</div>
+                        <div class="qcs-action-hint">Simpan akan memproses stok WIP-SEW ke WIP-FIN / REJ-SEW.</div>
+                    </div>
+                    <div class="qcs-action-buttons">
+                        <a href="{{ route('production.sewing.returns.show', $sewingReturn) }}" class="qcs-btn">Batal</a>
+                        <button type="submit" class="qcs-save-btn">Simpan QC</button>
+                    </div>
                 </div>
             </div>
-        </div>
-
-    </form>
+        </form>
     @endif
-
-</div>
 </div>
 @endsection
 
 @push('scripts')
 <script>
-    /* ── Desktop: sync reject from OK input ───────────── */
+    function numberValue(input) {
+        return parseFloat(input.value) || 0;
+    }
+
     function syncReject(okInput, idx, max) {
-        const ok = parseFloat(okInput.value) || 0;
+        const ok = numberValue(okInput);
         const rejectField = document.getElementById('reject_' + idx);
         const suggestedReject = Math.max(0, max - ok);
+
         if (rejectField && rejectField.dataset.manual !== '1') {
             rejectField.value = suggestedReject;
         }
-        // sync mobile inputs
+
         syncToMobile(idx, ok, suggestedReject);
         updateSummary();
     }
 
-    /* ── Mobile: sync reject from OK input ────────────── */
     function syncMobile(okInput) {
         const idx = okInput.dataset.idx;
         const max = parseFloat(okInput.dataset.max) || 0;
-        const ok = parseFloat(okInput.value) || 0;
+        const ok = numberValue(okInput);
         const rejectField = document.getElementById('m_reject_' + idx);
         const suggestedReject = Math.max(0, max - ok);
+
         if (rejectField && rejectField.dataset.manual !== '1') {
             rejectField.value = suggestedReject;
         }
-        toggleMobileReason(idx);
-        // sync desktop inputs
+
         syncToDesktop(idx, ok, suggestedReject);
+        toggleMobileReason(idx);
         updateSummary();
     }
 
-    /* ── Cross-sync desktop ↔ mobile ──────────────────── */
     function syncToMobile(idx, ok, reject) {
         const mobileOk = document.querySelector('.qcs-mobile-input.is-ok[data-idx="' + idx + '"]');
         const mobileReject = document.getElementById('m_reject_' + idx);
+
         if (mobileOk) mobileOk.value = ok;
         if (mobileReject && mobileReject.dataset.manual !== '1') mobileReject.value = reject;
+
         toggleMobileReason(idx);
     }
+
     function syncToDesktop(idx, ok, reject) {
-        const desktopOk = document.querySelectorAll('.qcs-qty-input.is-ok');
+        const desktopOk = document.querySelectorAll('.qcs-table .qcs-qty-input.is-ok');
         const desktopReject = document.getElementById('reject_' + idx);
+
         if (desktopOk[idx]) desktopOk[idx].value = ok;
         if (desktopReject && desktopReject.dataset.manual !== '1') desktopReject.value = reject;
     }
@@ -1371,75 +844,60 @@
     function toggleMobileReason(idx) {
         const rejectField = document.getElementById('m_reject_' + idx);
         const reasonWrap = rejectField?.closest('.qcs-mobile-card')?.querySelector('.qcs-mobile-reason');
+
         if (!reasonWrap || !rejectField) return;
-        const rejectQty = parseFloat(rejectField.value) || 0;
-        reasonWrap.classList.toggle('is-visible', rejectQty > 0);
+
+        reasonWrap.classList.toggle('is-visible', numberValue(rejectField) > 0);
     }
 
-    /* ── Update summary ──────────────────────────────── */
+    function visibleInputs(selector) {
+        return Array.from(document.querySelectorAll(selector)).filter((el) => el.offsetParent !== null);
+    }
+
     function updateSummary() {
-        let totalOk = 0, totalReject = 0;
-        document.querySelectorAll('.qcs-table .qty-ok, .qcs-mobile-cards .qty-ok').forEach(el => {
-            // avoid double-counting — only count if visible
-            if (el.offsetParent !== null) {
-                totalOk += parseFloat(el.value) || 0;
-            }
-        });
-        document.querySelectorAll('.qcs-table .qty-reject, .qcs-mobile-cards .qty-reject').forEach(el => {
-            if (el.offsetParent !== null) {
-                totalReject += parseFloat(el.value) || 0;
-            }
-        });
-        // fallback: if no visible (unusual), count desktop
-        if (totalOk === 0 && totalReject === 0) {
-            document.querySelectorAll('.qcs-qty-input.is-ok').forEach(el => {
-                totalOk += parseFloat(el.value) || 0;
-            });
-            document.querySelectorAll('.qcs-qty-input.is-reject').forEach(el => {
-                totalReject += parseFloat(el.value) || 0;
-            });
-        }
-        const sumOk = document.getElementById('sum-ok');
-        const sumReject = document.getElementById('sum-reject');
-        if (sumOk) sumOk.textContent = totalOk.toLocaleString('id-ID');
-        if (sumReject) sumReject.textContent = totalReject.toLocaleString('id-ID');
+        const okInputs = visibleInputs('.qcs-table .qty-ok, .qcs-mobile-cards .qty-ok');
+        const rejectInputs = visibleInputs('.qcs-table .qty-reject, .qcs-mobile-cards .qty-reject');
+        const activeOkInputs = okInputs.length ? okInputs : Array.from(document.querySelectorAll('.qcs-table .qty-ok'));
+        const activeRejectInputs = rejectInputs.length ? rejectInputs : Array.from(document.querySelectorAll('.qcs-table .qty-reject'));
+        const totalOk = activeOkInputs.reduce((sum, el) => sum + numberValue(el), 0);
+        const totalReject = activeRejectInputs.reduce((sum, el) => sum + numberValue(el), 0);
+
+        const formattedOk = totalOk.toLocaleString('id-ID');
+        const formattedReject = totalReject.toLocaleString('id-ID');
+
+        document.getElementById('sum-ok')?.replaceChildren(document.createTextNode(formattedOk));
+        document.getElementById('sum-reject')?.replaceChildren(document.createTextNode(formattedReject));
+        document.getElementById('kpi-ok')?.replaceChildren(document.createTextNode(formattedOk));
+        document.getElementById('kpi-reject')?.replaceChildren(document.createTextNode(formattedReject));
     }
 
-    /* ── Mark reject fields as manual-edited ─────────── */
-    document.querySelectorAll('.qty-reject').forEach(el => {
-        el.addEventListener('input', () => {
-            el.dataset.manual = '1';
-            const idx = el.id?.replace('m_reject_', '') ?? null;
-            if (idx !== null) toggleMobileReason(idx);
-            updateSummary();
-        });
-    });
-
-    /* ── Mobile → Desktop form sync on submit ────────── */
     document.addEventListener('DOMContentLoaded', function() {
-        document.querySelectorAll('[id^="m_reject_"]').forEach(el => {
+        document.querySelectorAll('.qty-reject').forEach((el) => {
+            el.addEventListener('input', () => {
+                el.dataset.manual = '1';
+                const idx = el.id?.replace('m_reject_', '').replace('reject_', '');
+                if (idx !== undefined) toggleMobileReason(idx);
+                updateSummary();
+            });
+        });
+
+        document.querySelectorAll('[id^="m_reject_"]').forEach((el) => {
             toggleMobileReason(el.id.replace('m_reject_', ''));
         });
-        updateSummary();
 
-        // On mobile, sync values to hidden desktop form inputs before submit
         const form = document.querySelector('form[method="POST"]');
         if (form) {
             form.addEventListener('submit', function() {
-                // Desktop inputs are the "official" ones — update them from mobile if mobile is visible
-                const isMobile = window.innerWidth < 768;
-                if (isMobile) {
-                    document.querySelectorAll('.qcs-mobile-input[data-target]').forEach(mInput => {
-                        const target = form.querySelector('[name="' + mInput.dataset.target + '"]');
-                        if (target) target.value = mInput.value;
-                    });
-                    document.querySelectorAll('.qcs-mobile-reason-input[data-target]').forEach(mInput => {
-                        const target = form.querySelector('[name="' + mInput.dataset.target + '"]');
-                        if (target) target.value = mInput.value;
-                    });
-                }
+                if (window.innerWidth >= 769) return;
+
+                document.querySelectorAll('.qcs-mobile-input[data-target], .qcs-mobile-reason-input[data-target]').forEach((mobileInput) => {
+                    const target = form.querySelector('[name="' + mobileInput.dataset.target + '"]');
+                    if (target) target.value = mobileInput.value;
+                });
             });
         }
+
+        updateSummary();
     });
 </script>
 @endpush

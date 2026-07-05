@@ -114,6 +114,24 @@ body[data-theme="dark"] .shp-pill-accent { color: #93c5fd !important; }
 }
 .btn-shp-outline:hover { background: rgba(226,232,240,.7); color: #374151; }
 body[data-theme="dark"] .btn-shp-outline { color: #d1d5db; border-color: rgba(71,85,105,.8); }
+.btn-return-scan {
+    display: inline-flex;
+    align-items: center;
+    gap: .38rem;
+    font-weight: 800;
+    border-color: var(--shp-accent) !important;
+    background: var(--shp-accent-bg) !important;
+    color: var(--shp-accent) !important;
+}
+.btn-return-scan:hover {
+    background: rgba(37,99,235,.14) !important;
+    color: var(--shp-accent-2) !important;
+}
+body[data-theme="dark"] .btn-return-scan {
+    color: #bfdbfe !important;
+    background: rgba(37,99,235,.16) !important;
+    border-color: rgba(147,197,253,.55) !important;
+}
 
 /* ══════════════════════════════════════════════════
    PHASE BAR
@@ -669,6 +687,17 @@ body[data-theme="dark"] .shp-topbar {
     background: rgba(148,163,184,.08) !important;
     color: #111827 !important;
 }
+.btn-return-scan {
+    padding: .34rem .78rem !important;
+    font-weight: 800 !important;
+    color: #1d4ed8 !important;
+    background: rgba(37,99,235,.08) !important;
+    border-color: rgba(37,99,235,.32) !important;
+}
+.btn-return-scan:hover {
+    background: rgba(37,99,235,.14) !important;
+    color: #1e3a8a !important;
+}
 .rk-phases {
     margin: .55rem 0;
     gap: .28rem;
@@ -835,6 +864,10 @@ body[data-theme="dark"] .shp-scan-card:focus-within {
     .shp-pill-accent {
         margin-left: auto;
     }
+    .btn-return-scan {
+        width: 100%;
+        justify-content: center;
+    }
     .btn-shp-submit {
         width: 100%;
         order: 5;
@@ -928,8 +961,9 @@ body[data-theme="dark"] .shp-scan-card:focus-within {
 @endphp
 
 <div class="shp-topbar">
-    <a href="{{ route('sales.shipments.edit', $shipment) }}" class="btn-shp-outline" style="text-decoration:none">
-        Scan Barang
+    <a href="{{ route('sales.shipments.edit', $shipment) }}" class="btn-shp-outline btn-return-scan" style="text-decoration:none">
+        <span aria-hidden="true">&larr;</span>
+        <span>Kembali ke Scan Barang</span>
     </a>
     <span class="shp-topbar-code">{{ $shipment->code }}</span>
     <span class="shp-badge shp-badge-draft">Draft</span>
@@ -1175,17 +1209,69 @@ function toast(type, msg) {
 }
 
 /* ── Beep (AudioContext) ── */
-function beep(ok) {
+let audioCtx = null;
+
+function getAudioContext() {
     try {
-        const ac = new (window.AudioContext || window.webkitAudioContext)();
-        const o  = ac.createOscillator(); const g = ac.createGain();
-        o.connect(g); g.connect(ac.destination);
-        o.frequency.value = ok ? 880 : 280;
-        g.gain.setValueAtTime(.4, ac.currentTime);
-        g.gain.exponentialRampToValueAtTime(.001, ac.currentTime + (ok ? .14 : .28));
-        o.start(ac.currentTime); o.stop(ac.currentTime + (ok ? .14 : .28));
-    } catch {}
+        const Ctx = window.AudioContext || window.webkitAudioContext;
+        if (!Ctx) return null;
+        if (!audioCtx) audioCtx = new Ctx();
+        return audioCtx;
+    } catch {
+        return null;
+    }
 }
+
+function unlockAudio() {
+    const ctx = getAudioContext();
+    if (ctx && ctx.state === 'suspended') {
+        ctx.resume().catch(() => {});
+    }
+}
+
+function tone(freq, dur = 0.14, vol = 0.2, delay = 0, type = 'sine') {
+    try {
+        const ctx = getAudioContext();
+        if (!ctx) return;
+        const play = () => {
+            const start = ctx.currentTime + delay;
+            const osc = ctx.createOscillator();
+            const gain = ctx.createGain();
+            osc.type = type;
+            osc.frequency.value = freq;
+            osc.connect(gain);
+            gain.connect(ctx.destination);
+            gain.gain.setValueAtTime(vol, start);
+            gain.gain.exponentialRampToValueAtTime(0.001, start + dur);
+            osc.start(start);
+            osc.stop(start + dur);
+        };
+
+        if (ctx.state === 'suspended') {
+            ctx.resume().then(play).catch(() => {});
+            return;
+        }
+
+        play();
+    } catch {
+    }
+}
+
+function beep(ok) {
+    if (ok) {
+        tone(1900, 0.08, 0.62, 0, 'square');
+        tone(2600, 0.08, 0.58, 0.09, 'square');
+        return;
+    }
+
+    tone(240, 0.16, 0.72, 0, 'sawtooth');
+    tone(150, 0.2, 0.72, 0.16, 'sawtooth');
+    tone(110, 0.24, 0.7, 0.36, 'sawtooth');
+}
+
+['pointerdown', 'keydown', 'touchstart'].forEach(eventName => {
+    document.addEventListener(eventName, unlockAudio, { once: true, passive: true });
+});
 
 /* ── Status badge ── */
 function statusBadge(s) {
@@ -1236,9 +1322,11 @@ orderInput?.addEventListener('keydown', e => {
    PROCESS ONE ORDER
 ══════════════════════════════════════════════ */
 async function processOrder(no) {
+    unlockAudio();
     no = normalizeOrderNo(no);
     if (!no) return;
     if (orders.find(o => normalizeOrderNo(o.no) === no)) {
+        setTimeout(() => beep(false), 20);
         toast('err', 'Pesanan ' + no + ' sudah ada dalam daftar.');
         orderInput.value = ''; refocusScan(); return;
     }

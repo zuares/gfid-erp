@@ -426,24 +426,28 @@
 
                 {{-- TAB STAGE --}}
                 <ul class="nav nav-pills nav-qc mt-3">
-                    <li class="nav-item">
-                        <a class="nav-link {{ $stage === 'cutting' ? 'active' : '' }}"
-                            href="{{ route('production.qc.index', ['stage' => 'cutting']) }}">
-                            QC Cutting
-                        </a>
-                    </li>
+                    @if (($userRole ?? null) !== 'admin')
+                        <li class="nav-item">
+                            <a class="nav-link {{ $stage === 'cutting' ? 'active' : '' }}"
+                                href="{{ route('production.qc.index', ['stage' => 'cutting']) }}">
+                                QC Cutting
+                            </a>
+                        </li>
+                    @endif
                     <li class="nav-item">
                         <a class="nav-link {{ $stage === 'sewing' ? 'active' : '' }}"
                             href="{{ route('production.qc.index', ['stage' => 'sewing']) }}">
                             QC Sewing
                         </a>
                     </li>
-                    <li class="nav-item">
-                        <a class="nav-link {{ $stage === 'packing' ? 'active' : '' }}"
-                            href="{{ route('production.qc.index', ['stage' => 'packing']) }}">
-                            QC Packing
-                        </a>
-                    </li>
+                    @if (($userRole ?? null) !== 'admin')
+                        <li class="nav-item">
+                            <a class="nav-link {{ $stage === 'packing' ? 'active' : '' }}"
+                                href="{{ route('production.qc.index', ['stage' => 'packing']) }}">
+                                QC Packing
+                            </a>
+                        </li>
+                    @endif
                 </ul>
             </div>
 
@@ -706,14 +710,20 @@
                         // chip barang per return (group by finished item code, qty = qty_ok)
                         $sewItems = function ($ret) {
                             return collect($ret->lines)
-                                ->groupBy(fn($l) => optional(optional($l->pickupLine)->bundle?->finishedItem)->code ?: '—')
+                                ->groupBy(fn($l) => optional(optional($l->pickupLine)?->bundle?->finishedItem)->code ?: '—')
                                 ->map(fn($g) => [
-                                    'code' => optional(optional($g->first()->pickupLine)->bundle?->finishedItem)->code ?: '—',
-                                    'name' => optional(optional($g->first()->pickupLine)->bundle?->finishedItem)->name ?: '',
+                                    'code' => optional(optional($g->first()->pickupLine)?->bundle?->finishedItem)->code ?: '—',
+                                    'name' => optional(optional($g->first()->pickupLine)?->bundle?->finishedItem)->name ?: '',
                                     'qty' => (int) $g->sum(fn($l) => (int) ($l->qty_ok ?? 0)),
                                 ])
                                 ->sortByDesc('qty')
                                 ->values();
+                        };
+
+                        // Helper: ambil pickup date dari return
+                        $getPickupDate = function ($ret) {
+                            $firstLine = $ret->lines->first();
+                            return $firstLine?->pickupLine?->pickup?->date ?? null;
                         };
                     @endphp
 
@@ -722,11 +732,12 @@
                         <table class="table table-sm align-middle mono">
                             <thead>
                                 <tr>
-                                    <th style="width: 180px;">Return</th>
-                                    <th style="width: 110px;">Status</th>
-                                    <th>Barang (OK)</th>
-                                    <th style="width: 200px;">Yield OK</th>
-                                    <th style="width: 90px;"></th>
+                                    <th>Operator</th>
+                                    <th style="width: 100px;">Tgl Ambil</th>
+                                    <th style="width: 100px;">Tgl Setor</th>
+                                    <th>Barang</th>
+                                    <th style="width: 100px;">Status</th>
+                                    <th style="width: 100px;"></th>
                                 </tr>
                             </thead>
                             <tbody>
@@ -736,15 +747,18 @@
                                         $totalBundles = $lines->count();
                                         $qtyOk = (int) $lines->sum('qty_ok');
                                         $qtyReject = (int) $lines->sum('qty_reject');
-                                        $base = $qtyOk + $qtyReject;
-                                        $pct = $base > 0 ? (int) round($qtyOk / $base * 100) : 0;
-                                        $fill = $base <= 0 ? 'fill-zero' : ($pct >= 100 ? 'fill-done' : 'fill-part');
 
                                         $firstLine = $lines->first();
                                         $pickup = $firstLine?->pickupLine?->pickup;
+                                        $pickupDate = $getPickupDate($ret);
 
                                         $cfg = $sewStatusMap[$ret->status] ?? [strtoupper($ret->status ?? '-'), 'secondary'];
                                         $items = $sewItems($ret);
+
+                                        $isVoided = !empty($ret->voided_at);
+                                        $hasQc = \App\Models\QcResult::where('stage', \App\Models\QcResult::STAGE_SEWING)
+                                            ->where('sewing_job_id', $ret->id)->exists();
+
                                         $detailHref = Route::has('production.sewing.returns.show')
                                             ? route('production.sewing.returns.show', $ret)
                                             : ($pickup && Route::has('production.sewing.pickups.show') ? route('production.sewing.pickups.show', $pickup) : null);
@@ -754,21 +768,14 @@
                                     @endphp
                                     <tr class="{{ $href ? 'qc-row' : '' }}" @if ($href) data-href="{{ $href }}" @endif>
                                         <td>
-                                            <div class="fw-bold">{{ $ret->code }}</div>
-                                            <div class="text-muted" style="font-size:.74rem;">
-                                                {{ $ret->date?->format('d M Y') ?? $ret->date }}
-                                                @if ($ret->operator)
-                                                    • {{ $ret->operator->code }}
-                                                @endif
-                                            </div>
+                                            <div class="fw-semibold">{{ $ret->operator?->name ?? '-' }}</div>
+                                            <div class="text-muted" style="font-size:.72rem;">{{ $ret->code }} · {{ $totalBundles }} bundle</div>
                                         </td>
                                         <td>
-                                            <div class="d-flex flex-wrap gap-1">
-                                                <span class="badge bg-{{ $cfg[1] }}">{{ $cfg[0] }}</span>
-                                                @if ($qtyReject > 0)
-                                                    <span class="badge bg-danger">R {{ $qtyReject }}</span>
-                                                @endif
-                                            </div>
+                                            <span class="text-muted" style="font-size:.82rem;">{{ $pickupDate?->format('d M Y') ?? '-' }}</span>
+                                        </td>
+                                        <td>
+                                            <span style="font-size:.82rem;">{{ $ret->date?->format('d M Y') ?? '-' }}</span>
                                         </td>
                                         <td>
                                             @if ($items->isEmpty())
@@ -788,26 +795,21 @@
                                             @endif
                                         </td>
                                         <td>
-                                            <div class="prog-wrap">
-                                                <div class="prog"><span class="{{ $fill }}" style="width: {{ $pct }}%"></span></div>
-                                                <div class="prog-num">
-                                                    <span><b>{{ $pct }}%</b></span>
-                                                    <span>OK {{ $qtyOk }} / R {{ $qtyReject }} • {{ $totalBundles }} bundle</span>
-                                                </div>
+                                            <div class="d-flex flex-wrap gap-1">
+                                                <span class="badge bg-{{ $cfg[1] }}">{{ $cfg[0] }}</span>
+                                                @if ($qtyReject > 0)
+                                                    <span class="badge bg-danger">R {{ $qtyReject }}</span>
+                                                @endif
                                             </div>
                                         </td>
                                         <td>
                                             <div class="d-flex gap-1 flex-wrap">
-                                            @if ($detailHref)
-                                                <a href="{{ $detailHref }}" class="btn btn-sm btn-outline-secondary"
-                                                    onclick="event.stopPropagation();">Detail</a>
-                                            @endif
                                             @if (Route::has('production.qc.sewing.edit'))
                                                 <a href="{{ route('production.qc.sewing.edit', $ret) }}"
-                                                   class="btn btn-sm btn-outline-success"
+                                                   class="btn btn-sm {{ $hasQc ? 'btn-outline-secondary' : 'btn-outline-primary' }}"
                                                    onclick="event.stopPropagation();"
                                                    title="Form QC Jahit">
-                                                   ✓ QC
+                                                   {{ $hasQc ? 'Lihat' : 'Input QC' }}
                                                 </a>
                                             @endif
                                             </div>
@@ -815,7 +817,7 @@
                                     </tr>
                                 @empty
                                     <tr>
-                                        <td colspan="5" class="text-center text-muted small">
+                                        <td colspan="6" class="text-center text-muted small">
                                             Belum ada data QC Sewing.
                                         </td>
                                     </tr>
@@ -836,14 +838,17 @@
                                         $totalBundles = $lines->count();
                                         $qtyOk = (int) $lines->sum('qty_ok');
                                         $qtyReject = (int) $lines->sum('qty_reject');
-                                        $base = $qtyOk + $qtyReject;
-                                        $pct = $base > 0 ? (int) round($qtyOk / $base * 100) : 0;
-                                        $fill = $base <= 0 ? 'fill-zero' : ($pct >= 100 ? 'fill-done' : 'fill-part');
 
                                         $firstLine = $lines->first();
                                         $pickup = $firstLine?->pickupLine?->pickup;
+                                        $pickupDate = $getPickupDate($ret);
                                         $cfg = $sewStatusMap[$ret->status] ?? [strtoupper($ret->status ?? '-'), 'secondary'];
                                         $items = $sewItems($ret);
+
+                                        $isVoided = !empty($ret->voided_at);
+                                        $hasQc = \App\Models\QcResult::where('stage', \App\Models\QcResult::STAGE_SEWING)
+                                            ->where('sewing_job_id', $ret->id)->exists();
+
                                         $detailHref = Route::has('production.sewing.returns.show')
                                             ? route('production.sewing.returns.show', $ret)
                                             : ($pickup && Route::has('production.sewing.pickups.show') ? route('production.sewing.pickups.show', $pickup) : null);
@@ -853,7 +858,10 @@
                                     @endphp
                                     <div class="qc-mobile-card" @if ($href) data-href="{{ $href }}" @endif>
                                         <div class="qc-mobile-card-header">
-                                            <div class="qc-mobile-date-pill">{{ $ret->date?->format('d M Y') ?? $ret->date }}</div>
+                                            <div>
+                                                <div class="fw-semibold" style="font-size:.88rem;">{{ $ret->operator?->name ?? '-' }}</div>
+                                                <div class="text-muted" style="font-size:.7rem;">{{ $ret->code }} · {{ $totalBundles }} bundle</div>
+                                            </div>
                                             <div class="d-flex gap-1 align-items-center">
                                                 <span class="badge qc-mobile-status-pill bg-{{ $cfg[1] }}">{{ $cfg[0] }}</span>
                                                 @if ($qtyReject > 0)
@@ -862,15 +870,15 @@
                                             </div>
                                         </div>
                                         <div class="qc-mobile-card-body">
-                                            <div class="qc-mobile-row-line">
-                                                <div class="fw-bold">{{ $ret->code }}</div>
-                                                <div class="qc-mobile-metadata text-muted">
-                                                    {{ $ret->operator?->code ?? '-' }} • {{ $totalBundles }} bundle
-                                                </div>
+                                            {{-- Tanggal Ambil & Setor --}}
+                                            <div class="qc-mobile-row-line" style="font-size:.76rem; color:#64748b;">
+                                                <span>Ambil {{ $pickupDate?->format('d M Y') ?? '-' }}</span>
+                                                <span>Setor {{ $ret->date?->format('d M Y') ?? '-' }}</span>
                                             </div>
 
+                                            {{-- Barang --}}
                                             @if ($items->isNotEmpty())
-                                                <div class="item-chips">
+                                                <div class="item-chips" style="margin-top:.18rem;">
                                                     @foreach ($items->take(4) as $it)
                                                         <span class="item-chip" title="{{ $it['name'] }}">
                                                             <b>{{ $it['code'] }}</b>
@@ -882,14 +890,6 @@
                                                     @endif
                                                 </div>
                                             @endif
-
-                                            <div class="prog-wrap" style="min-width:0;">
-                                                <div class="prog"><span class="{{ $fill }}" style="width: {{ $pct }}%"></span></div>
-                                                <div class="prog-num">
-                                                    <span><b>{{ $pct }}%</b> Yield OK</span>
-                                                    <span>OK {{ $qtyOk }} / R {{ $qtyReject }}</span>
-                                                </div>
-                                            </div>
                                         </div>
                                     </div>
                                 @endforeach

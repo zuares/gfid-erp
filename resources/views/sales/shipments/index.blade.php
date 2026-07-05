@@ -5,46 +5,72 @@
 
 @push('head')
 <style>
-    .page-wrap{ max-width:1120px; margin-inline:auto; padding:.65rem .75rem 3.5rem; }
-    body[data-theme="light"] .page-wrap{ background:#f8fafc; }
-    body[data-theme="dark"] .page-wrap{ background:#020617; }
+    :root{
+        --shp-accent:#334155;
+        --shp-accent-2:#1f2937;
+        --shp-border:rgba(148,163,184,.18);
+        --shp-border-strong:rgba(148,163,184,.30);
+        --shp-muted:#64748b;
+    }
+    .page-wrap{ max-width:1040px; margin-inline:auto; padding:.75rem .75rem 4rem; background:transparent!important; }
 
     .card-main{
         background: var(--card);
         border-radius: 8px;
-        border: 1px solid rgba(148, 163, 184, 0.20);
+        border: 1px solid var(--shp-border);
         box-shadow: none;
+        overflow:hidden;
     }
     body[data-theme="dark"] .card-main{
-        border-color: rgba(51, 65, 85, 0.85);
+        border-color: rgba(51,65,85,.85);
         box-shadow: none;
     }
 
-    .title{ font-weight: 900; letter-spacing: 0; }
-    .sub{ color:#64748b; font-size:.84rem; }
+    .ship-topbar{
+        position:sticky;
+        top:0;
+        z-index:300;
+        display:flex;
+        justify-content:space-between;
+        align-items:center;
+        gap:.6rem;
+        flex-wrap:wrap;
+        padding:.45rem .75rem;
+        margin-inline:-.75rem;
+        margin-bottom:.65rem;
+        background:var(--card,#fff);
+        border-bottom:1px solid var(--shp-border);
+    }
+    body[data-theme="dark"] .ship-topbar{ background:var(--card,#0f172a); }
+    .title{ font-weight: 750; font-size:1rem; letter-spacing: 0; margin:0; }
+    .sub{ color:var(--shp-muted); font-size:.78rem; }
     body[data-theme="dark"] .sub{ color:#9ca3af; }
 
-    .kpis{ display:flex; flex-wrap:wrap; gap:.38rem; margin-top:.55rem; }
+    .kpis{ display:flex; flex-wrap:wrap; gap:.32rem; margin-top:.35rem; }
     .kpi{
         display:inline-flex; align-items:baseline; gap:.45rem;
         border-radius:7px; padding:.2rem .48rem;
-        border:1px solid rgba(148, 163, 184, 0.25);
+        border:1px solid rgba(148,163,184,.28);
         background: transparent;
-        font-size:.76rem;
+        font-size:.72rem;
     }
     body[data-theme="dark"] .kpi{
         background: rgba(15, 23, 42, 0.96);
         border-color: rgba(51, 65, 85, 0.85);
     }
-    .kpi .lbl{ text-transform:none; letter-spacing:0; font-size:.68rem; color:#94a3b8; }
+    .kpi .lbl{ text-transform:none; letter-spacing:0; font-size:.66rem; color:#94a3b8; }
     body[data-theme="dark"] .kpi .lbl{ color:#6b7280; }
-    .kpi .val{ font-weight:800; }
+    .kpi .val{ font-weight:650; color:var(--shp-accent); }
 
     .controls{ display:flex; gap:.5rem; align-items:center; flex-wrap:wrap; }
     .filter-label{ font-size:.8rem; color:#6b7280; }
     body[data-theme="dark"] .filter-label{ color:#9ca3af; }
     .filter-select{ border-radius:7px; padding-left:.75rem; padding-right:2rem; font-size:.82rem; }
-    .btn-pill{ border-radius:7px; padding-inline:.78rem; box-shadow:none!important; }
+    .btn-pill{ border-radius:7px; padding-inline:.78rem; box-shadow:none!important; font-weight:600; }
+    .btn-ship-primary{ background:var(--shp-accent)!important; border-color:var(--shp-accent)!important; color:#fff!important; }
+    .btn-ship-primary:hover{ background:var(--shp-accent-2)!important; border-color:var(--shp-accent-2)!important; color:#fff!important; }
+    .btn-ship-outline{ color:#475569!important; background:transparent!important; border:1px solid rgba(148,163,184,.35)!important; }
+    .btn-ship-outline:hover{ background:rgba(148,163,184,.08)!important; color:#111827!important; }
     .btn-fresh{ border-color:#fecaca; color:#b91c1c; background:transparent; }
     .btn-fresh:hover{ background:#fef2f2; color:#991b1b; border-color:#fca5a5; }
 
@@ -54,9 +80,9 @@
         font-size:.68rem;
         text-transform:none;
         letter-spacing:0;
-        color:#6b7280;
-        background: rgba(148, 163, 184, 0.05);
-        padding:.58rem .62rem;
+        color:#64748b;
+        background: var(--card,#fff);
+        padding:.52rem .62rem;
         white-space:nowrap;
     }
     body[data-theme="dark"] .table-list thead th{
@@ -67,19 +93,19 @@
     .table-list tbody td{
         vertical-align:middle;
         border-top-color: rgba(148, 163, 184, 0.16);
-        padding:.56rem .62rem;
+        padding:.52rem .62rem;
     }
     body[data-theme="dark"] .table-list tbody td{ border-top-color: rgba(51, 65, 85, 0.85); }
 
-    .code-link{ font-weight:800; text-decoration:none; color:inherit; }
+    .code-link{ font-weight:700; text-decoration:none; color:inherit; }
     .code-link:hover{ text-decoration:underline; }
     .muted{ font-size:.82rem; color:#6b7280; }
     body[data-theme="dark"] .muted{ color:#9ca3af; }
-    .store-name{ font-weight:700; }
+    .store-name{ font-weight:600; }
 
     .badge-status{
         border-radius:7px; padding:.16rem .48rem;
-        font-size:.7rem; letter-spacing:0; text-transform:none;
+        font-size:.68rem; letter-spacing:0; text-transform:none;
         border:1px solid transparent;
         display:inline-flex; align-items:center; gap:.35rem;
         white-space:nowrap;
@@ -107,6 +133,7 @@
 
     @media (max-width: 768px) {
         .page-wrap{ padding:.5rem .5rem 4rem; }
+        .ship-topbar{ margin-inline:-.5rem; padding:.5rem .65rem; }
         .title{ font-size:1.05rem; }
         .sub{ display:none; }
         .controls{ width:100%; align-items:stretch; }
@@ -122,7 +149,7 @@
         .table-list tr,
         .table-list td{ display:block; width:100%; }
         .table-list tbody tr{
-            padding:.68rem;
+            padding:.66rem;
             border-top:1px solid rgba(148,163,184,.16);
         }
         .table-list tbody td{
@@ -185,9 +212,9 @@
         </div>
     @endif
 
-    <div class="d-flex justify-content-between align-items-start gap-3 flex-wrap mb-3">
+    <div class="ship-topbar">
         <div>
-            <div class="title h4 mb-1">Shipment</div>
+            <div class="title">Shipment</div>
             <div class="sub">Dokumen barang keluar WH-RTS.</div>
 
             <div class="kpis">
@@ -223,7 +250,7 @@
                 </form>
             @endif
 
-            <a href="{{ route('sales.shipments.create') }}" class="btn btn-sm btn-primary btn-pill">
+            <a href="{{ route('sales.shipments.create') }}" class="btn btn-sm btn-ship-primary btn-pill">
                 Shipment Baru
             </a>
         </div>
@@ -346,7 +373,7 @@
                                     </td>
 
                                     <td class="text-end ship-row-action">
-                                        <a href="{{ $actionRoute }}" class="btn btn-sm btn-outline-primary btn-pill">
+                                        <a href="{{ $actionRoute }}" class="btn btn-sm btn-ship-outline btn-pill">
                                             {{ $actionLabel }}
                                         </a>
                                     </td>

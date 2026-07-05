@@ -1533,24 +1533,57 @@ body[data-theme="dark"] .shp-scan-card:focus-within {
     });
 
     /* ── audio beeps ── */
-    function beep(freq, dur = 0.14, vol = 0.2) {
+    let audioCtx = null;
+
+    function getAudioContext() {
         try {
             const Ctx = window.AudioContext || window.webkitAudioContext;
-            if (!Ctx) return;
-            const ctx  = new Ctx();
+            if (!Ctx) return null;
+            if (!audioCtx) audioCtx = new Ctx();
+            return audioCtx;
+        } catch (e) {
+            return null;
+        }
+    }
+
+    function unlockAudio() {
+        const ctx = getAudioContext();
+        if (ctx && ctx.state === 'suspended') {
+            ctx.resume().catch(() => {});
+        }
+    }
+
+    function beep(freq, dur = 0.14, vol = 0.2, delay = 0, type = 'sine') {
+        try {
+            const ctx = getAudioContext();
+            if (!ctx) return;
+            if (ctx.state === 'suspended') unlockAudio();
+            const start = ctx.currentTime + delay;
             const osc  = ctx.createOscillator();
             const gain = ctx.createGain();
-            osc.type = 'sine';
+            osc.type = type;
             osc.frequency.value = freq;
             osc.connect(gain);
             gain.connect(ctx.destination);
-            gain.gain.setValueAtTime(vol, ctx.currentTime);
-            gain.gain.exponentialRampToValueAtTime(0.001, ctx.currentTime + dur);
-            osc.start(); osc.stop(ctx.currentTime + dur);
+            gain.gain.setValueAtTime(vol, start);
+            gain.gain.exponentialRampToValueAtTime(0.001, start + dur);
+            osc.start(start);
+            osc.stop(start + dur);
         } catch (e) {}
     }
-    const beepOk  = () => beep(1046);
-    const beepErr = () => beep(220, 0.18, 0.25);
+    const beepOk  = () => {
+        beep(1900, 0.08, 0.62, 0, 'square');
+        beep(2600, 0.08, 0.58, 0.09, 'square');
+    };
+    const beepErr = () => {
+        beep(240, 0.16, 0.72, 0, 'sawtooth');
+        beep(150, 0.2, 0.72, 0.16, 'sawtooth');
+        beep(110, 0.24, 0.7, 0.36, 'sawtooth');
+    };
+
+    ['pointerdown', 'keydown', 'touchstart'].forEach(eventName => {
+        document.addEventListener(eventName, unlockAudio, { once: true, passive: true });
+    });
 
     /* ── toast ── */
     let toastTimer = null;
@@ -1728,7 +1761,7 @@ body[data-theme="dark"] .shp-scan-card:focus-within {
         form.addEventListener('submit', function (e) {
             e.preventDefault();
             const newQty = input.value.trim();
-            if (newQty === '' || Number(newQty) < 0) { beepErr(); showToast('err', 'Qty tidak valid.'); return; }
+            if (newQty === '' || Number(newQty) < 0) { showToast('err', 'Qty tidak valid.'); return; }
 
             fetch(form.action, {
                 method: 'POST',
@@ -1738,9 +1771,8 @@ body[data-theme="dark"] .shp-scan-card:focus-within {
                 let data = null;
                 try { data = await res.json(); } catch { form.submit(); return; }
                 if (!res.ok || !data || data.status !== 'ok') {
-                    beepErr(); showToast('err', data?.message || 'Gagal update qty.'); return;
+                    showToast('err', data?.message || 'Gagal update qty.'); return;
                 }
-                beepOk();
                 if (data.deleted) {
                     row.remove(); renumberRows();
                 } else {
@@ -1777,9 +1809,8 @@ body[data-theme="dark"] .shp-scan-card:focus-within {
                 let data = null;
                 try { data = await res.json(); } catch { form.submit(); return; }
                 if (!res.ok || !data || data.status !== 'ok') {
-                    beepErr(); showToast('err', data?.message || 'Gagal hapus.'); return;
+                    showToast('err', data?.message || 'Gagal hapus.'); return;
                 }
-                beepOk();
                 const row = linesTbody.querySelector('tr[data-line-id="' + lineId + '"]');
                 if (row) row.remove();
                 renumberRows();
@@ -1829,6 +1860,7 @@ body[data-theme="dark"] .shp-scan-card:focus-within {
     if (scanForm && scanInput && linesTbody) {
         scanForm.addEventListener('submit', function (e) {
             e.preventDefault();
+            unlockAudio();
             const code = scanInput.value.trim();
             if (!code) { beepErr(); showScanError('Kode kosong.'); focusScan(); return; }
 
