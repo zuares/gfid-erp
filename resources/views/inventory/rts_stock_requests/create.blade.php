@@ -981,6 +981,10 @@
 
                 if (window.initItemSuggestInputs) window.initItemSuggestInputs(tr);
 
+                // ✅ FIX: dropdown pakai position:fixed, wajib di-patch per baris baru
+                // kalau tidak, dropdown baris 2+ ke-render di luar viewport (seolah tidak muncul)
+                patchFixedDropdown(tr);
+
                 // ✅ anti duplicate: merge qty ke row existing
                 const hiddenId = tr.querySelector('.js-item-suggest-id');
                 if (hiddenId) {
