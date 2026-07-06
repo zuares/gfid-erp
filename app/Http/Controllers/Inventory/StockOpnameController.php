@@ -187,7 +187,7 @@ class StockOpnameController extends Controller
 
     public function show(Request $request, StockOpname $stockOpname): View | JsonResponse
     {
-        $stockOpname->load(['warehouse', 'creator', 'reviewer', 'finalizer']);
+        $stockOpname->load(['warehouse', 'creator', 'reviewer', 'finalizer', 'lines.item']);
 
         // ==========================================================
         // Lines query (filter + sorting)
@@ -540,7 +540,9 @@ class StockOpnameController extends Controller
             // 2) Mark reviewed validation (harus semua counted)
             // ==========================================================
             if ($markReviewed) {
-                $notCountedExists = $stockOpname->lines->contains(fn($line) => !$line->is_counted);
+                $notCountedExists = $stockOpname->lines->contains(
+                    fn($line) => !$line->is_counted || $line->physical_qty === null
+                );
 
                 if ($notCountedExists) {
                     throw ValidationException::withMessages([
