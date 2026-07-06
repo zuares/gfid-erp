@@ -1403,7 +1403,7 @@
 
     // ── Badges ────────────────────────────────────────────────────────────
     function renderBadges() {
-        const rows = orders.filter(inRange);
+        const rows = applyFilters(orders.filter(inRange));
         [...Object.keys(TAB_STATUSES), 'packing'].forEach(tab => {
             const el = $('badge-' + tab);
             if (!el) return;

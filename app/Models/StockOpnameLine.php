@@ -66,11 +66,15 @@ class StockOpnameLine extends Model
      */
     public function getDifferenceAttribute(): float
     {
+        if (! $this->is_counted || is_null($this->physical_qty)) {
+            return 0.0;
+        }
+
         if (!is_null($this->difference_qty)) {
             return (float) $this->difference_qty;
         }
 
-        return (float) ($this->physical_qty ?? 0) - (float) ($this->system_qty ?? 0);
+        return (float) $this->physical_qty - (float) ($this->system_qty ?? 0);
     }
 
     /**

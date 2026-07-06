@@ -426,7 +426,8 @@ class StockOpnameController extends Controller
      * Update hasil counting (physical_qty / unit_cost / notes).
      *
      * PERIODIK:
-     * - Baris yang tidak diisi di UI dianggap Qty Fisik = 0 (dan is_counted = true).
+     * - Baris yang tidak diisi tetap physical_qty = null, is_counted = false.
+     * - Tidak ada auto-fill 0 saat simpan / selesai hitung.
      *
      * OPENING:
      * - Baris yang tidak diisi tetap physical_qty = null, is_counted = false.
@@ -450,8 +451,6 @@ class StockOpnameController extends Controller
             'lines.*.unit_cost' => ['nullable', 'numeric', 'gte:0'],
             'lines.*.notes' => ['nullable', 'string'],
             'mark_reviewed' => ['nullable', 'boolean'],
-            // optional kalau nanti kamu pakai (buat beda "Simpan" vs "Selesai")
-            // 'force_auto_fill' => ['nullable', 'boolean'],
         ]);
 
         $markReviewed = $request->boolean('mark_reviewed');
@@ -488,25 +487,28 @@ class StockOpnameController extends Controller
                     continue;
                 }
 
-                $systemQty = (float) ($line->system_qty ?? 0);
+                if (array_key_exists('physical_qty', $data)) {
+                    $systemQty = (float) ($line->system_qty ?? 0);
 
-                // normalize physical qty
-                $rawPhysical = $data['physical_qty'] ?? null;
+                    // normalize physical qty
+                    $rawPhysical = $data['physical_qty'];
 
-                if ($rawPhysical === '' || $rawPhysical === null) {
-                    $physicalQty = $isOpening ? null : 0.0;
-                } else {
-                    $physicalQty = (float) $rawPhysical;
+                    if ($rawPhysical === '' || $rawPhysical === null) {
+                        $physicalQty = null;
+                    } else {
+                        $physicalQty = (float) $rawPhysical;
+                    }
+
+                    // counted rule (simple & benar)
+                    $isCounted = ($physicalQty !== null);
+
+                    $difference = $isCounted ? ($physicalQty - $systemQty) : 0.0;
+
+                    $line->physical_qty = $physicalQty;
+                    $line->difference_qty = $difference;
+                    $line->is_counted = $isCounted;
                 }
 
-                // counted rule (simple & benar)
-                $isCounted = ($physicalQty !== null);
-
-                $difference = $isCounted ? ($physicalQty - $systemQty) : 0.0;
-
-                $line->physical_qty = $physicalQty;
-                $line->difference_qty = $difference;
-                $line->is_counted = $isCounted;
                 $line->notes = $data['notes'] ?? $line->notes;
 
                 // unit cost (kalau key ada, set; kalau tidak ada, biarkan)
@@ -535,35 +537,7 @@ class StockOpnameController extends Controller
             }
 
             // ==========================================================
-            // 2) Saat mark reviewed: PERIODIC auto-fill yang belum counted jadi 0
-            // ==========================================================
-            if ($markReviewed && !$isOpening) {
-                foreach ($stockOpname->lines as $line) {
-                    if ($line->is_counted) {
-                        continue;
-                    }
-
-                    $systemQty = (float) ($line->system_qty ?? 0);
-
-                    $line->physical_qty = 0.0;
-                    $line->difference_qty = 0.0 - $systemQty;
-                    $line->is_counted = true;
-
-                    if ($line->unit_cost === null || (float) $line->unit_cost <= 0) {
-                        $fallback = (float) ($line->item->hpp ?? 0);
-                        // atau base_unit_cost kalau itu standar kamu
-                        if ($fallback > 0) {
-                            $line->unit_cost = $fallback;
-                        }
-
-                    }
-
-                    $line->save();
-                }
-            }
-
-            // ==========================================================
-            // 3) Mark reviewed validation (harus semua counted)
+            // 2) Mark reviewed validation (harus semua counted)
             // ==========================================================
             if ($markReviewed) {
                 $notCountedExists = $stockOpname->lines->contains(fn($line) => !$line->is_counted);
@@ -695,15 +669,11 @@ class StockOpnameController extends Controller
             }
 
             // PERLAKUAN physical_qty sama seperti di update():
-            // - Opening: boleh null (belum dihitung)
-            // - Periodik: kalau kosong, jadikan 0 dan counted
+            // - Opening & periodic: kosong tetap null (belum dihitung)
+            // - Tidak ada auto-0 saat simpan / selesai hitung
             $rawPhysical = $validated['physical_qty'] ?? null;
             if ($rawPhysical === '' || $rawPhysical === null) {
-                if ($isOpening) {
-                    $physicalQty = null;
-                } else {
-                    $physicalQty = 0.0;
-                }
+                $physicalQty = null;
             } else {
                 $physicalQty = (float) $rawPhysical;
             }

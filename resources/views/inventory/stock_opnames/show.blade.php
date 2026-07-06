@@ -107,7 +107,11 @@
         : false;
 
     $canEdit = !$adjustment && !$isCancelled && in_array($opname->status, [StockOpname::STATUS_DRAFT, StockOpname::STATUS_COUNTING], true);
-    $canFinalize = !$isCancelled && ($opname->status === StockOpname::STATUS_REVIEWED) && $isOwner;
+    $canFinalize = !$isCancelled
+        && $isOwner
+        && (method_exists($opname, 'canFinalize')
+            ? $opname->canFinalize()
+            : $opname->status === StockOpname::STATUS_REVIEWED);
 
     $canMarkReviewed =
         !$isCancelled &&
@@ -365,12 +369,11 @@
 
                     @if($canMarkReviewed)
                         <form action="{{ route('inventory.stock_opnames.update', $opname) }}" method="POST"
-                              onsubmit="return confirm('Tandai selesai hitung? Item yang belum diisi akan dianggap 0.');"
+                              onsubmit="return confirm('Tandai selesai hitung? Pastikan semua Qty Fisik sudah terisi.');"
                               class="d-inline">
                             @csrf
                             @method('PUT')
                             <input type="hidden" name="mark_reviewed" value="1">
-                            <input type="hidden" name="force_auto_fill" value="1">
                             <button type="submit" class="btn btn-sm btn-primary">Selesai</button>
                         </form>
                     @endif

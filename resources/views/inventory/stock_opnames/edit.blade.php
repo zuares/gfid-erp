@@ -450,7 +450,6 @@
 
             {{-- kontrol mode submit --}}
             <input type="hidden" name="mark_reviewed" id="mark_reviewed" value="0">
-            <input type="hidden" name="force_auto_fill" id="force_auto_fill" value="0">
 
             <div class="mobile-stack">
                 {{-- ================= META ================= --}}
@@ -771,6 +770,7 @@
                                                     @if ($canModifyLines && !$isOpening)
                                                         {{-- PERIODIC + bisa edit: inline input --}}
                                                         <input type="text" inputmode="decimal" autocomplete="off"
+                                                            name="{{ $inputNamePrefix }}[physical_qty]"
                                                             class="form-control form-control-sm so-inline-qty"
                                                             value="{{ $hasPhysicalValue ? number_format((float)$rawPhysical, 2, '.', '') : '' }}"
                                                             placeholder="-"
@@ -867,8 +867,7 @@
                                     @if ($isOpening)
                                         Mode Opening • Tambah / edit item di atas, lalu simpan di sini.
                                     @else
-                                        Mode Periodik • Isi Qty Fisik untuk item yang dihitung. Saat “Tandai Selesai”, item
-                                        yang belum diisi akan otomatis dianggap 0.
+                                        Mode Periodik • Isi Qty Fisik untuk item yang dihitung. Selesai hitung hanya bisa jika semua item sudah terisi.
                                     @endif
                                 </div>
 
@@ -979,7 +978,6 @@
 
             const soForm = document.getElementById('soUpdateForm');
             const markReviewedEl = document.getElementById('mark_reviewed');
-            const forceAutoFillEl = document.getElementById('force_auto_fill');
 
             if (soForm) {
                 soForm.addEventListener('submit', function() {
@@ -987,8 +985,8 @@
                 });
             }
 
-            // ✅ tombol finish: mark_reviewed=1 + force_auto_fill=1
-            if (soForm && markReviewedEl && forceAutoFillEl) {
+            // tombol finish: mark_reviewed=1 tanpa auto-fill 0
+            if (soForm && markReviewedEl) {
                 const strictBtn = document.querySelector('[data-action="finish-counting-strict"]');
                 if (strictBtn) {
                     strictBtn.addEventListener('click', function(e) {
@@ -996,7 +994,6 @@
                         disableOpeningAddInputsBeforeSubmit();
 
                         markReviewedEl.value = '1';
-                        forceAutoFillEl.value = '1';
                         soForm.submit();
                     });
                 }

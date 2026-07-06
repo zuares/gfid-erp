@@ -153,11 +153,21 @@ class StockOpname extends Model
 
     /**
      * Boleh finalize?
-     * → status wajib reviewed, belum finalized.
+     * → status wajib reviewed, belum finalized, dan semua line sudah counted.
      */
     public function canFinalize(): bool
     {
-        return $this->status === self::STATUS_REVIEWED;
+        if ($this->status !== self::STATUS_REVIEWED) {
+            return false;
+        }
+
+        return ! $this->lines()
+            ->where(function ($query) {
+                $query->whereNull('is_counted')
+                    ->orWhere('is_counted', false)
+                    ->orWhereNull('physical_qty');
+            })
+            ->exists();
     }
 
     // ==========================

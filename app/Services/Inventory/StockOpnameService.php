@@ -170,6 +170,14 @@ class StockOpnameService
             $date = $opname->date ?? now()->toDateString();
             $warehouseId = (int) $opname->warehouse_id;
 
+            $notCounted = $opname->lines->contains(
+                fn (StockOpnameLine $line) => ! $line->is_counted || $line->physical_qty === null
+            );
+
+            if ($notCounted) {
+                throw new \RuntimeException('Masih ada item stock opname yang belum diisi Qty Fisik.');
+            }
+
             // ==========================================================
             // OPENING
             // ==========================================================
