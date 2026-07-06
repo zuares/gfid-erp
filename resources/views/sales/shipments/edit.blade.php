@@ -1627,14 +1627,22 @@ body[data-theme="dark"] .shp-scan-card:focus-within {
             osc.stop(start + dur);
         } catch (e) {}
     }
+    /* scan item OK — 2-nada pendek naik */
     const beepOk  = () => {
-        beep(1900, 0.08, 0.62, 0, 'square');
-        beep(2600, 0.08, 0.58, 0.09, 'square');
+        beep(1900, 0.07, 0.55, 0,    'square');
+        beep(2600, 0.07, 0.50, 0.08, 'square');
     };
+    /* scan item GAGAL — 3-nada turun sawtooth */
     const beepErr = () => {
-        beep(240, 0.16, 0.72, 0, 'sawtooth');
-        beep(150, 0.2, 0.72, 0.16, 'sawtooth');
-        beep(110, 0.24, 0.7, 0.36, 'sawtooth');
+        beep(240,  0.16, 0.72, 0,    'sawtooth');
+        beep(150,  0.20, 0.72, 0.16, 'sawtooth');
+        beep(110,  0.24, 0.70, 0.36, 'sawtooth');
+    };
+    /* pindah mode (NEXT) — 3-nada sweep naik halus */
+    const beepNav = () => {
+        beep(700,  0.06, 0.38, 0,    'sine');
+        beep(1100, 0.06, 0.38, 0.07, 'sine');
+        beep(1700, 0.10, 0.38, 0.14, 'sine');
     };
 
     ['pointerdown', 'keydown', 'touchstart'].forEach(eventName => {
@@ -2109,6 +2117,14 @@ body[data-theme="dark"] .shp-scan-card:focus-within {
             unlockAudio();
             const code = scanInput.value.trim();
             if (!code) { beepErr(); showScanError('Kode kosong.'); focusScan(); return; }
+
+            /* ── Barcode navigasi: scan NEXT → pindah ke Rekon ── */
+            if (code.toUpperCase() === 'NEXT') {
+                scanInput.value = '';
+                const _rekonUrl = rekonBtn?.dataset?.rekonUrl;
+                if (_rekonUrl) { beepNav(); window.location.href = _rekonUrl; }
+                return;
+            }
 
             fetch(scanForm.action, {
                 method: 'POST',

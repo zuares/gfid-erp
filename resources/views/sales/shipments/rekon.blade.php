@@ -269,6 +269,16 @@ body[data-theme="dark"] .rk-order-card {
 .rk-order-card.decided-fulfill { border-left: 3.5px solid var(--shp-ok); }
 .rk-order-card.decided-pending { border-left: 3.5px solid #f59e0b; }
 .rk-order-card.decided-skip    { border-left: 3.5px solid rgba(148,163,184,.5); }
+.rk-order-card.rk-dupe         { border-left: 3.5px solid #f43f5e !important; }
+.rk-dupe-badge { display:inline-flex; align-items:center; gap:.25rem;
+    background:#fda4af; color:#9f1239; font-size:.72rem; font-weight:700;
+    border-radius:6px; padding:.1rem .45rem; letter-spacing:.02em; }
+body[data-theme="dark"] .rk-dupe-badge { background:#4c0519; color:#fda4af; }
+@keyframes rkDupePulse {
+    0%,100% { box-shadow: 0 0 0 0 rgba(244,63,94,.0); }
+    50%      { box-shadow: 0 0 0 5px rgba(244,63,94,.35); }
+}
+.rk-order-card.rk-dupe-flash { animation: rkDupePulse .35s ease 4; }
 
 .rk-order-hdr {
     display: flex; align-items: center; gap: .6rem; flex-wrap: wrap;
@@ -1257,17 +1267,21 @@ function tone(freq, dur = 0.14, vol = 0.2, delay = 0, type = 'sine') {
     }
 }
 
-function beep(ok) {
-    if (ok) {
-        tone(1900, 0.08, 0.62, 0, 'square');
-        tone(2600, 0.08, 0.58, 0.09, 'square');
-        return;
-    }
-
-    tone(240, 0.16, 0.72, 0, 'sawtooth');
-    tone(150, 0.2, 0.72, 0.16, 'sawtooth');
-    tone(110, 0.24, 0.7, 0.36, 'sawtooth');
-}
+/* ── Named sounds ── */
+/* order ditemukan, semua stok cukup — 3-nada arpeggio naik, nyaring */
+function sndOrderReady()   { tone(880, 0.13, 0.80, 0, 'square'); tone(1100, 0.13, 0.78, 0.14, 'square'); tone(1320, 0.16, 0.75, 0.28, 'square'); }
+/* order ditemukan, stok kurang — ok lalu turun (waspada) */
+function sndOrderPartial() { tone(880, 0.13, 0.78, 0, 'square'); tone(660,  0.16, 0.75, 0.14, 'triangle'); }
+/* order tidak ditemukan di batch — 2-nada rendah agak nyaring */
+function sndOrderNoMatch() { tone(660, 0.18, 0.72, 0, 'triangle'); tone(500, 0.18, 0.70, 0.19, 'triangle'); }
+/* duplikat / blocked — buzz pendek double */
+function sndGuard()        { tone(450, 0.09, 0.72, 0, 'square'); tone(380,  0.11, 0.70, 0.10, 'square'); }
+/* server / network error — 3-nada turun sawtooth */
+function sndErr()          { tone(240, 0.16, 0.72, 0, 'sawtooth'); tone(150, 0.20, 0.72, 0.16, 'sawtooth'); tone(110, 0.24, 0.70, 0.36, 'sawtooth'); }
+/* pindah mode (NEXT) — 3-nada sweep naik halus */
+function sndNav()          { tone(700, 0.06, 0.38, 0, 'sine'); tone(1100, 0.06, 0.38, 0.07, 'sine'); tone(1700, 0.10, 0.38, 0.14, 'sine'); }
+/* compat shim */
+function beep(ok) { ok ? sndOrderReady() : sndErr(); }
 
 ['pointerdown', 'keydown', 'touchstart'].forEach(eventName => {
     document.addEventListener(eventName, unlockAudio, { once: true, passive: true });
@@ -1323,11 +1337,23 @@ orderInput?.addEventListener('keydown', e => {
 ══════════════════════════════════════════════ */
 async function processOrder(no) {
     unlockAudio();
+    /* ── Barcode navigasi: scan NEXT → kembali ke Scan Barang ── */
+    if (no.toUpperCase() === 'NEXT') { sndNav(); window.location.href = EDIT_URL; return; }
     no = normalizeOrderNo(no);
     if (!no) return;
-    if (orders.find(o => normalizeOrderNo(o.no) === no)) {
-        setTimeout(() => beep(false), 20);
+    const dupeIdx = orders.findIndex(o => normalizeOrderNo(o.no) === no);
+    if (dupeIdx >= 0) {
+        setTimeout(() => sndGuard(), 20);
         toast('err', 'Pesanan ' + no + ' sudah ada dalam daftar.');
+        /* tandai card yang sudah ada */
+        orders[dupeIdx].dupe = true;
+        renderAll();
+        const card = document.getElementById('ocard-' + dupeIdx);
+        if (card) {
+            card.scrollIntoView({ behavior: 'smooth', block: 'center' });
+            card.classList.add('rk-dupe-flash');
+            setTimeout(() => card.classList.remove('rk-dupe-flash'), 1500);
+        }
         orderInput.value = ''; refocusScan(); return;
     }
     orderInput.value = '';
@@ -1357,19 +1383,21 @@ async function processOrder(no) {
                 poolUsed[id] = (poolUsed[id] || 0) + qty;
             }
             saveState();
-            beep(true);
             const s = data.order.status;
+            if (s === 'ready')        sndOrderReady();
+            else if (s === 'partial') sndOrderPartial();
+            else                      sndOrderNoMatch();
             toast(s === 'ready' ? 'ok' : 'warn', no + (data.order?.source === 'manual_scan' ? ' dicatat' : (s === 'ready' ? ' - semua item tersedia' : s === 'partial' ? ' - stok kurang' : ' - item tidak ada di batch')));
         } else {
             saveState();
-            beep(false);
+            sndOrderNoMatch();
             toast('warn', no + ' dicatat tanpa tautan');
         }
 
         renderAll();
         refocusScan();
     } catch (err) {
-        beep(false);
+        sndErr();
         toast('err', err.message);
         refocusScan();
     }
@@ -1409,7 +1437,8 @@ function renderAll() {
 
 function renderCard(o, idx) {
     const { no, found, order, decision } = o;
-    const cls = 'rk-order-card' + (decision ? ' decided-' + decision : '');
+    const dupeBadge = o.dupe ? '<span class="rk-dupe-badge">⚠ Duplikat</span>' : '';
+    const cls = 'rk-order-card' + (decision ? ' decided-' + decision : '') + (o.dupe ? ' rk-dupe' : '');
 
     const isLast = idx === orders.length - 1;
 
@@ -1417,7 +1446,7 @@ function renderCard(o, idx) {
         return `<div class="${cls}" id="ocard-${idx}">
           <div class="rk-order-hdr" onclick="toggleCard(${idx})">
             <span class="rk-order-no">${no}</span>
-            ${statusBadge('not_found')}
+            ${statusBadge('not_found')}${dupeBadge}
             <span class="rk-order-chev" id="chev-${idx}">▼</span>
           </div>
           <div id="obody-${idx}" style="display:none">
@@ -1442,7 +1471,7 @@ function renderCard(o, idx) {
           <div class="rk-order-hdr" onclick="toggleCard(${idx})">
             <span class="rk-order-no">${no}</span>
             <span class="rk-order-store">Belum tertaut</span>
-            ${decBadge}
+            ${decBadge}${dupeBadge}
             <span class="rk-order-chev" id="chev-${idx}">▼</span>
           </div>
           <div id="obody-${idx}" style="display:none">
@@ -1565,7 +1594,7 @@ function renderCard(o, idx) {
         ${order.store_name ? `<span class="rk-order-store">${order.store_name}</span>` : ''}
         ${mpBadge}
         ${order.date ? `<span style="font-size:.73rem;color:#94a3b8">${fmtDate(order.date)}</span>` : ''}
-        ${decBadge}
+        ${decBadge}${dupeBadge}
         <span class="rk-order-chev" id="chev-${idx}">▼</span>
       </div>
       <div id="obody-${idx}" style="display:none">
