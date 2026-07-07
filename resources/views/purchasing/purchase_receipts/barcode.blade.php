@@ -1,7 +1,7 @@
-{{-- resources/views/production/sewing_returns/barcode.blade.php --}}
+{{-- resources/views/purchasing/purchase_receipts/barcode.blade.php --}}
 @extends('layouts.app')
 
-@section('title', 'Cetak Barcode • ' . $return->code)
+@section('title', 'Cetak Barcode GRN')
 
 @push('head')
 <style>
@@ -14,22 +14,24 @@ body[data-theme="light"] .shp-wrap { background:#f3f4f6; }
 body[data-theme="dark"]  .shp-wrap { background:#020617; }
 
 .shp-topbar {
-    position:sticky; top:0; z-index:300; display:flex; align-items:center; gap:.6rem;
-    padding:.5rem .85rem; background:rgba(248,250,252,.97); border-bottom:1px solid rgba(148,163,184,.22);
+    position:sticky; top:0; z-index:300;
+    display:flex; align-items:center; gap:.6rem;
+    padding:.5rem .85rem; background:rgba(248,250,252,.97);
+    border-bottom:1px solid rgba(148,163,184,.22);
     backdrop-filter:blur(14px); -webkit-backdrop-filter:blur(14px); flex-wrap:wrap;
 }
 body[data-theme="dark"] .shp-topbar { background:rgba(2,6,23,.96); border-bottom-color:rgba(51,65,85,.85); }
 .shp-topbar-code { font-weight:900; font-size:1.05rem; letter-spacing:.02em; white-space:nowrap; }
 body[data-theme="dark"] .shp-topbar-code { color:#e5e7eb; }
 .shp-badge {
-    border-radius:999px; padding:.15rem .65rem; font-size:.7rem; letter-spacing:.06em; text-transform:uppercase;
-    white-space:nowrap; border:1px solid rgba(148,163,184,.55); color:#475569; background:transparent;
+    border-radius:999px; padding:.15rem .65rem; font-size:.7rem; letter-spacing:.06em;
+    text-transform:uppercase; white-space:nowrap; border:1px solid rgba(148,163,184,.55); color:#475569; background:transparent;
 }
 body[data-theme="dark"] .shp-badge { color:#cbd5e1; border-color:rgba(71,85,105,.8); }
 .shp-topbar-spacer { flex:1; min-width:.5rem; }
 .shp-pill {
-    border-radius:999px; padding:.2rem .75rem; font-size:.77rem; border:1px solid rgba(148,163,184,.32);
-    background:rgba(248,250,252,.96); white-space:nowrap; color:inherit;
+    border-radius:999px; padding:.2rem .75rem; font-size:.77rem;
+    border:1px solid rgba(148,163,184,.32); background:rgba(248,250,252,.96); white-space:nowrap; color:inherit;
 }
 body[data-theme="dark"] .shp-pill { background:rgba(15,23,42,.98); border-color:rgba(51,65,85,.85); color:#e5e7eb; }
 .shp-pill b { font-size:.87rem; }
@@ -55,7 +57,10 @@ body[data-theme="dark"] .btn-shp-outline { color:#d1d5db; border-color:rgba(71,8
     box-shadow:0 4px 18px rgba(15,23,42,.05); margin-top:.85rem; overflow:hidden;
 }
 body[data-theme="dark"] .shp-table-card { border-color:rgba(51,65,85,.85); }
-.shp-table-head { display:flex; align-items:center; gap:.65rem; flex-wrap:wrap; padding:.85rem 1.25rem .7rem; border-bottom:1px solid rgba(148,163,184,.14); }
+.shp-table-head {
+    display:flex; align-items:center; gap:.65rem; flex-wrap:wrap;
+    padding:.85rem 1.25rem .7rem; border-bottom:1px solid rgba(148,163,184,.14);
+}
 .shp-table-title { font-size:.68rem; text-transform:uppercase; letter-spacing:.1em; color:#9ca3af; font-weight:700; }
 .shp-table-title small { display:block; text-transform:none; letter-spacing:0; font-size:.74rem; color:#9ca3af; font-weight:400; margin-top:.15rem; }
 
@@ -63,8 +68,9 @@ body[data-theme="dark"] .shp-table-card { border-color:rgba(51,65,85,.85); }
 body[data-theme="dark"] .shp-scan { border-bottom-color:rgba(51,65,85,.6); }
 .shp-scan-label { font-size:.68rem; text-transform:uppercase; letter-spacing:.1em; color:#9ca3af; font-weight:700; margin-bottom:.4rem; }
 .shp-scan-wrap {
-    display:flex; gap:.5rem; align-items:center; background:rgba(148,163,184,.1); border:1px solid rgba(148,163,184,.28);
-    border-radius:8px; padding:.45rem .55rem; transition:border-color .12s, box-shadow .12s;
+    display:flex; gap:.5rem; align-items:center; background:rgba(148,163,184,.1);
+    border:1px solid rgba(148,163,184,.28); border-radius:8px; padding:.45rem .55rem;
+    transition:border-color .12s, box-shadow .12s;
 }
 .shp-scan-wrap:focus-within { border-color:var(--shp-accent); box-shadow:0 0 0 3px var(--shp-accent-ring); }
 body[data-theme="dark"] .shp-scan-wrap { background:rgba(15,23,42,.7); border-color:rgba(51,65,85,.85); }
@@ -73,7 +79,10 @@ body[data-theme="dark"] .shp-scan-wrap { background:rgba(15,23,42,.7); border-co
     font-family:ui-monospace,SFMono-Regular,Menlo,monospace; outline:none; text-transform:uppercase;
 }
 .shp-scan-wrap input::placeholder { color:#94a3b8; font-weight:400; font-family:inherit; text-transform:none; }
-.shp-scan-btn { background:var(--shp-accent); border:none; border-radius:6px; padding:.5rem 1.1rem; color:#fff; font-weight:700; font-size:.86rem; cursor:pointer; transition:background .15s; white-space:nowrap; }
+.shp-scan-btn {
+    background:var(--shp-accent); border:none; border-radius:6px; padding:.5rem 1.1rem; color:#fff;
+    font-weight:700; font-size:.86rem; cursor:pointer; transition:background .15s; white-space:nowrap;
+}
 .shp-scan-btn:hover { background:var(--shp-accent-2); }
 .shp-scan-status { margin-top:.4rem; font-size:.78rem; min-height:1.1rem; color:#94a3b8; }
 .shp-scan-status.ok { color:#15803d; }
@@ -85,8 +94,9 @@ body[data-theme="dark"] .shp-scan-wrap { background:rgba(15,23,42,.7); border-co
 
 .shp-table { width:100%; border-collapse:collapse; margin-bottom:0; }
 .shp-table thead th {
-    position:sticky; top:0; z-index:5; background:rgba(248,250,252,.98); font-size:.7rem; text-transform:uppercase;
-    letter-spacing:.05em; color:#6b7280; border-bottom:1px solid rgba(148,163,184,.16); padding:.45rem .85rem; text-align:left; white-space:nowrap;
+    position:sticky; top:0; z-index:5; background:rgba(248,250,252,.98);
+    font-size:.7rem; text-transform:uppercase; letter-spacing:.05em; color:#6b7280;
+    border-bottom:1px solid rgba(148,163,184,.16); padding:.45rem .85rem; text-align:left; white-space:nowrap;
 }
 body[data-theme="dark"] .shp-table thead th { background:rgba(15,23,42,.98); border-bottom-color:rgba(51,65,85,.7); color:#6b7280; }
 .shp-table tbody td { vertical-align:middle; padding:.4rem .85rem; border-top:1px solid rgba(148,163,184,.1); }
@@ -102,16 +112,23 @@ body[data-theme="dark"] .shp-table tbody td { border-top-color:rgba(51,65,85,.6)
 .item-name { font-size:.82rem; color:#6b7280; }
 body[data-theme="dark"] .item-name { color:#94a3b8; }
 
-.qty-stepper { display:inline-flex; align-items:stretch; border:1px solid rgba(148,163,184,.4); border-radius:9px; overflow:hidden; background:var(--card,#fff); width:100%; max-width:150px; margin-left:auto; }
+.qty-stepper {
+    display:inline-flex; align-items:stretch; border:1px solid rgba(148,163,184,.4);
+    border-radius:9px; overflow:hidden; background:var(--card,#fff); width:100%; max-width:150px; margin-left:auto;
+}
 body[data-theme="dark"] .qty-stepper { background:rgba(15,23,42,.6); border-color:rgba(51,65,85,.85); }
 .qty-stepper:focus-within { border-color:var(--shp-accent); box-shadow:0 0 0 3px var(--shp-accent-ring); }
 .qty-stepper .line-qty {
     flex:1; width:auto!important; min-width:0; border:none!important; outline:none; background:transparent;
-    text-align:center; font-size:1rem; font-weight:800; font-variant-numeric:tabular-nums; padding:.4rem .25rem; color:inherit;
-    box-shadow:none!important; border-radius:0!important; -moz-appearance:textfield;
+    text-align:center; font-size:1rem; font-weight:800; font-variant-numeric:tabular-nums;
+    padding:.4rem .25rem; color:inherit; box-shadow:none!important; border-radius:0!important; -moz-appearance:textfield;
 }
 .qty-stepper .line-qty::-webkit-outer-spin-button, .qty-stepper .line-qty::-webkit-inner-spin-button { -webkit-appearance:none; margin:0; }
-.qty-btn { border:none; background:rgba(148,163,184,.14); color:var(--shp-accent); width:38px; flex:0 0 38px; font-size:1.2rem; font-weight:700; line-height:1; cursor:pointer; display:flex; align-items:center; justify-content:center; user-select:none; transition:background .12s; }
+.qty-btn {
+    border:none; background:rgba(148,163,184,.14); color:var(--shp-accent); width:38px; flex:0 0 38px;
+    font-size:1.2rem; font-weight:700; line-height:1; cursor:pointer; display:flex; align-items:center; justify-content:center;
+    user-select:none; transition:background .12s;
+}
 .qty-btn:hover { background:var(--shp-accent); color:#fff; }
 body[data-theme="dark"] .qty-btn { color:#cbd5e1; background:rgba(51,65,85,.5); }
 @media (max-width:640px) {
@@ -121,29 +138,38 @@ body[data-theme="dark"] .qty-btn { color:#cbd5e1; background:rgba(51,65,85,.5); 
     .qty-stepper .line-qty { font-size:1.05rem; padding:.55rem .25rem; }
 }
 
-.btn-del { border-radius:999px; border:1px solid rgba(248,113,113,.6); background:transparent; color:#ef4444; font-size:.74rem; font-weight:700; padding:.28rem .8rem; cursor:pointer; transition:background .12s, color .12s; }
+.btn-del {
+    border-radius:999px; border:1px solid rgba(248,113,113,.6); background:transparent; color:#ef4444;
+    font-size:.74rem; font-weight:700; padding:.28rem .8rem; cursor:pointer; transition:background .12s, color .12s;
+}
 .btn-del:hover { background:rgba(239,68,68,.1); }
 .empty-row td { text-align:center; color:#9ca3af; padding:2.2rem 1rem!important; font-size:.85rem; }
 
-.shp-foot { display:flex; justify-content:space-between; align-items:center; gap:.75rem; flex-wrap:wrap; padding:.8rem 1.25rem; border-top:1px solid rgba(148,163,184,.12); }
+.shp-foot {
+    display:flex; justify-content:space-between; align-items:center; gap:.75rem; flex-wrap:wrap;
+    padding:.8rem 1.25rem; border-top:1px solid rgba(148,163,184,.12);
+}
 .shp-foot .muted { color:#6b7280; font-size:.82rem; }
 </style>
 @endpush
 
 @section('content')
-<form id="barcodeForm" method="GET" action="{{ route('production.sewing.returns.barcode_print') }}" target="_blank">
-    <input type="hidden" name="back" value="{{ route('production.sewing.returns.barcode', $return->id, false) }}">
+<form id="barcodeForm" method="GET" action="{{ route('purchasing.purchase_receipts.barcode_print') }}" target="_blank">
+    <input type="hidden" name="back" value="{{ route('purchasing.purchase_receipts.barcode', $receipt->id, false) }}">
 
     <div class="shp-topbar">
         <span class="shp-topbar-code">Cetak Barcode</span>
-        <span class="shp-badge">{{ $return->code }}</span>
+        <span class="shp-badge">GRN {{ $receipt->code ?? ('#'.$receipt->id) }}</span>
+        @if ($receipt->supplier)
+            <span class="shp-badge">{{ $receipt->supplier->name }}</span>
+        @endif
 
         <span class="shp-topbar-spacer"></span>
 
         <span class="shp-pill">Baris <b id="summaryLines">0</b></span>
         <span class="shp-pill shp-pill-accent">Total Label <b id="totalLabels">0</b></span>
 
-        <a href="{{ route('production.sewing.returns.show', $return->id) }}" class="btn-shp-outline">Kembali</a>
+        <a href="{{ route('purchasing.purchase_receipts.show', $receipt->id) }}" class="btn-shp-outline">Kembali</a>
         <button type="submit" class="btn-shp-submit">Preview &amp; Cetak</button>
     </div>
 
@@ -152,7 +178,7 @@ body[data-theme="dark"] .qty-btn { color:#cbd5e1; background:rgba(51,65,85,.5); 
             <div class="shp-table-head">
                 <div class="shp-table-title">
                     Daftar Barang
-                    <small>Jumlah label default = qty OK diterima. Sesuaikan bila perlu.</small>
+                    <small>Jumlah label default = qty diterima. Sesuaikan bila perlu.</small>
                 </div>
             </div>
 
@@ -187,7 +213,7 @@ body[data-theme="dark"] .qty-btn { color:#cbd5e1; background:rgba(51,65,85,.5); 
             <div class="shp-foot">
                 <div class="muted">Barcode berisi kode item (SKU). Nama varian ikut tercetak di label.</div>
                 <div style="display:flex; gap:.5rem">
-                    <button type="button" class="btn-shp-outline" id="btnReset">Reset ke Qty OK</button>
+                    <button type="button" class="btn-shp-outline" id="btnReset">Reset ke Qty Terima</button>
                     <button type="submit" class="btn-shp-submit">Preview &amp; Cetak</button>
                 </div>
             </div>
@@ -249,7 +275,7 @@ body[data-theme="dark"] .qty-btn { color:#cbd5e1; background:rgba(51,65,85,.5); 
         return tr;
     }
 
-    function seedFromReturn(){
+    function seedFromReceipt(){
         tbody.innerHTML = '';
         if (Array.isArray(seedLines) && seedLines.length) {
             seedLines.forEach(l => renderItemRow({ id:l.id, code:l.code, name:l.name }, l.qty));
@@ -285,6 +311,7 @@ body[data-theme="dark"] .qty-btn { color:#cbd5e1; background:rgba(51,65,85,.5); 
             .catch(()=> setStatus('❌ Gagal memuat data','err'));
     };
 
+    // stepper +/- & select-all
     tbody.addEventListener('click', (e)=>{
         const btn = e.target.closest('.qty-minus, .qty-plus'); if (!btn) return;
         const inp = btn.closest('tr')?.querySelector('.line-qty'); if (!inp) return;
@@ -293,8 +320,9 @@ body[data-theme="dark"] .qty-btn { color:#cbd5e1; background:rgba(51,65,85,.5); 
     });
     tbody.addEventListener('focusin', (e)=>{ if (e.target.classList?.contains('line-qty')) setTimeout(()=>e.target.select(),0); });
 
-    document.getElementById('btnReset').addEventListener('click', ()=>{ seedFromReturn(); setStatus(''); focusScan(); });
+    document.getElementById('btnReset').addEventListener('click', ()=>{ seedFromReceipt(); setStatus(''); focusScan(); });
 
+    // auto-fokus scan (termasuk mobile)
     function focusScan(){ if(!scanInput) return; try{ scanInput.focus({preventScroll:true}); }catch(_){ scanInput.focus(); } scanInput.select?.(); }
     function refocusOnEmpty(e){ if (e.target.closest('input, textarea, select, button, a, label, .qty-stepper')) return; focusScan(); }
     document.addEventListener('click', refocusOnEmpty);
@@ -313,7 +341,7 @@ body[data-theme="dark"] .qty-btn { color:#cbd5e1; background:rgba(51,65,85,.5); 
     });
 
     // init
-    seedFromReturn();
+    seedFromReceipt();
     setTimeout(focusScan, 60);
 })();
 </script>

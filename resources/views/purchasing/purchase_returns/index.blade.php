@@ -34,6 +34,7 @@
     border:1px solid var(--line);
   }
   .purchase-return-index .status-draft{ background:rgba(245,158,11,.12); color:#b45309; }
+  .purchase-return-index .status-submitted{ background:rgba(14,165,233,.14); color:#0369a1; }
   .purchase-return-index .status-posted{ background:rgba(34,197,94,.12); color:#15803d; }
   .purchase-return-index .status-void{ background:rgba(239,68,68,.12); color:#b91c1c; }
   .purchase-return-index .effect-text{
@@ -86,6 +87,7 @@
   $canSeeMoney = auth()->user()?->isOwner() ?? false;
   $totalReturns = (int) ($summary->total_returns ?? 0);
   $draftCount = (int) ($summary->draft_count ?? 0);
+  $submittedCount = (int) ($summary->submitted_count ?? 0);
   $postedCount = (int) ($summary->posted_count ?? 0);
   $voidCount = (int) ($summary->void_count ?? 0);
 @endphp
@@ -111,10 +113,15 @@
     @endif
 
     <div class="row g-2 mb-3">
-      <div class="col-6 col-md-3"><div class="stat"><span class="lbl">Total Return</span><span class="val mono">{{ angka($totalReturns) }}</span></div></div>
-      <div class="col-6 col-md-3"><div class="stat"><span class="lbl">Draft</span><span class="val mono">{{ angka($draftCount) }}</span></div></div>
-      <div class="col-6 col-md-3"><div class="stat"><span class="lbl">Posted</span><span class="val mono">{{ angka($postedCount) }}</span></div></div>
-      <div class="col-6 col-md-3"><div class="stat"><span class="lbl">Void</span><span class="val mono">{{ angka($voidCount) }}</span></div></div>
+      <div class="col-6 col-md"><div class="stat"><span class="lbl">Total Return</span><span class="val mono">{{ angka($totalReturns) }}</span></div></div>
+      <div class="col-6 col-md"><div class="stat"><span class="lbl">Draft</span><span class="val mono">{{ angka($draftCount) }}</span></div></div>
+      <div class="col-6 col-md">
+        <a href="{{ route('purchasing.purchase_returns.index', ['status' => 'submitted']) }}" class="text-decoration-none">
+          <div class="stat"><span class="lbl">Menunggu Approval</span><span class="val mono {{ $submittedCount > 0 ? 'text-info' : '' }}">{{ angka($submittedCount) }}</span></div>
+        </a>
+      </div>
+      <div class="col-6 col-md"><div class="stat"><span class="lbl">Posted</span><span class="val mono">{{ angka($postedCount) }}</span></div></div>
+      <div class="col-6 col-md"><div class="stat"><span class="lbl">Void</span><span class="val mono">{{ angka($voidCount) }}</span></div></div>
     </div>
 
     <form method="GET" class="card-clean p-3 mb-3">
@@ -129,6 +136,7 @@
           <select name="status" class="form-select form-select-sm">
             <option value="">Semua</option>
             <option value="draft" @selected($status === 'draft')>Draft</option>
+            <option value="submitted" @selected($status === 'submitted')>Menunggu Approval</option>
             <option value="posted" @selected($status === 'posted')>Posted</option>
             <option value="void" @selected($status === 'void')>Void</option>
           </select>
@@ -169,8 +177,8 @@
             @forelse($returns as $ret)
               @php
                 $isVoid = (bool) $ret->voided_at;
-                $statusCss = $isVoid ? 'status-void' : (($ret->status === 'posted') ? 'status-posted' : 'status-draft');
-                $statusText = $isVoid ? 'VOID' : strtoupper((string) $ret->status);
+                $statusCss = $isVoid ? 'status-void' : (($ret->status === 'posted') ? 'status-posted' : (($ret->status === 'submitted') ? 'status-submitted' : 'status-draft'));
+                $statusText = $isVoid ? 'VOID' : (($ret->status === 'submitted') ? 'MENUNGGU' : strtoupper((string) $ret->status));
                 $effectText = $isVoid
                   ? 'Stok balik, jurnal batal'
                   : (($ret->status === 'posted') ? 'Stok keluar, jurnal masuk' : 'Belum ubah stok/jurnal');

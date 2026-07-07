@@ -138,7 +138,7 @@ class FinishingJobController extends Controller
         $defaultDestinationId = $this->defaultDestinationIdForUser($request->user(), $destinationWarehouses);
 
         $operators = Employee::query()
-            ->where('role', 'sewing')
+            ->whereIn('role', ['sewing', 'operating'])
             ->orderBy('name')
             ->get(['id', 'code', 'name']);
 

@@ -94,6 +94,12 @@ Route::middleware(['web', 'auth', 'access:purchasing'])
             Route::post('purchase-receipts/{purchase_receipt}/unpost', [PurchaseReceiptController::class, 'unpost'])
                 ->name('purchase_receipts.unpost');
 
+            // ✅ CETAK BARCODE (qty label default = qty diterima, bisa disesuaikan)
+            Route::get('purchase-receipts/{purchase_receipt}/barcode', [PurchaseReceiptController::class, 'barcode'])
+                ->name('purchase_receipts.barcode');
+            Route::get('purchase-receipts-barcode/print', [\App\Http\Controllers\Inventory\BarcodeLabelController::class, 'print'])
+                ->name('purchase_receipts.barcode_print');
+
             // ✅ RETURN FROM GRN (create from posted GRN)
             Route::post('purchase-receipts/{purchase_receipt}/returns/create',
                 [PurchaseReturnController::class, 'createFromGrn']
@@ -149,6 +155,13 @@ Route::middleware(['web', 'auth', 'access:purchasing'])
             Route::put('purchase-returns/{purchase_return}', [PurchaseReturnController::class, 'update'])
                 ->name('purchase_returns.update');
 
+            // RETURN — submit (draft -> submitted) + post (owner+admin)
+            Route::post('purchase-returns/{purchase_return}/submit', [PurchaseReturnController::class, 'submit'])
+                ->name('purchase_returns.submit');
+
+            Route::post('purchase-returns/{purchase_return}/post', [PurchaseReturnController::class, 'post'])
+                ->name('purchase_returns.post');
+
             // Tahap 9 — QC resolve route (owner+admin)
             Route::post(
                 'purchase-receipt-qcs/{qc}/resolve',
@@ -172,10 +185,7 @@ Route::middleware(['web', 'auth', 'access:purchasing'])
             Route::post('purchase-orders/{purchase_order}/close', [PurchaseOrderController::class, 'close'])
                 ->name('purchase_orders.close');
 
-            // RETURN — post + void (owner only — jurnal + stok)
-            Route::post('purchase-returns/{purchase_return}/post', [PurchaseReturnController::class, 'post'])
-                ->name('purchase_returns.post');
-
+            // RETURN — void (owner only — reversal jurnal + stok)
             Route::post('purchase-returns/{purchase_return}/void', [PurchaseReturnController::class, 'void'])
                 ->name('purchase_returns.void');
         });

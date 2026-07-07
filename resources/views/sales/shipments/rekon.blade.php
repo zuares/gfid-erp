@@ -176,6 +176,31 @@ body[data-theme="dark"] .rk-sku-chip {
 }
 .rk-sku-chip .c { font-weight: 800; font-family: monospace; font-size: .78rem; }
 .rk-sku-chip .q { font-weight: 800; color: var(--shp-accent); }
+.rk-tabs {
+    display: flex; gap: .25rem; margin-bottom: .75rem;
+    border-bottom: 1px solid rgba(148,163,184,.2); flex-wrap: wrap;
+}
+body[data-theme="dark"] .rk-tabs { border-bottom-color: rgba(30,64,175,.35); }
+.rk-tab {
+    appearance: none; display: inline-flex; align-items: center; gap: .4rem;
+    border: none; background: transparent; color: #94a3b8;
+    font-family: inherit; font-weight: 800; font-size: .84rem;
+    padding: .55rem .85rem; cursor: pointer;
+    border-bottom: 2px solid transparent; margin-bottom: -1px;
+}
+.rk-tab:hover { color: #475569; }
+body[data-theme="dark"] .rk-tab:hover { color: #cbd5e1; }
+.rk-tab.active { color: var(--shp-accent); border-bottom-color: var(--shp-accent); }
+body[data-theme="dark"] .rk-tab.active { color: #93c5fd; border-bottom-color: #93c5fd; }
+.rk-tab-count {
+    display: inline-flex; align-items: center; justify-content: center;
+    min-width: 1.35rem; height: 1.35rem; padding: 0 .3rem; border-radius: 999px;
+    background: rgba(148,163,184,.18); color: #64748b;
+    font-family: monospace; font-size: .72rem; font-weight: 900;
+}
+.rk-tab.active .rk-tab-count { background: var(--shp-accent); color: #fff; }
+.rk-tabpane { display: none; }
+.rk-tabpane.active { display: block; }
 
 /* ══════════════════════════════════════════════════
    HERO SCAN CARD — identik dengan edit.blade.php
@@ -291,6 +316,8 @@ body[data-theme="dark"] .rk-order-hdr:hover { background: rgba(30,41,59,.5); }
 
 .rk-order-no   { font-weight: 900; font-family: monospace; font-size: .98rem; }
 body[data-theme="dark"] .rk-order-no { color: #e2e8f0; }
+.rk-order-num  { font-weight: 900; font-family: monospace; font-size: .9rem; color: #94a3b8; flex-shrink: 0; }
+body[data-theme="dark"] .rk-order-num { color: #64748b; }
 .rk-order-store {
     padding: .13rem .55rem; border-radius: 999px;
     border: 1px solid rgba(148,163,184,.4); font-size: .72rem; font-weight: 700; color: #475569;
@@ -995,45 +1022,55 @@ body[data-theme="dark"] .shp-scan-card:focus-within {
         <span class="rk-phase" id="ph3">Konfirmasi Pesanan</span>
     </div>
 
-    {{-- BATCH SKU CHIPS --}}
-    <div class="rk-batch-bar">
-        <span style="font-size:.68rem;font-weight:700;color:#94a3b8;text-transform:uppercase;letter-spacing:.08em;white-space:nowrap">Isi Batch:</span>
-        @forelse ($batchPool as $item)
-            <span class="rk-sku-chip">
-                <span class="c">{{ $item['item_code'] }}</span>
-                <span style="color:#d1d5db">·</span>
-                <span class="q">{{ number_format($item['qty'], 0, ',', '.') }}</span>
-            </span>
-        @empty
-            <span style="color:#94a3b8;font-size:.82rem">Belum ada item di batch.</span>
-        @endforelse
+    {{-- TABS --}}
+    <div class="rk-tabs" role="tablist">
+        <button type="button" class="rk-tab active" data-tab="pesanan">Pesanan <span class="rk-tab-count" id="rkOrderCount">0</span></button>
+        <button type="button" class="rk-tab" data-tab="batch">Isi Batch <span class="rk-tab-count">{{ $batchPool->count() }}</span></button>
     </div>
 
-    {{-- HERO SCAN CARD --}}
-    <div class="shp-scan-card">
-        <div class="shp-scan-header">
-            <span class="shp-scan-label">Scan Pesanan</span>
-            <span class="shp-scan-counter" id="scanCounter">0 pesanan</span>
+    {{-- TAB: PESANAN --}}
+    <div class="rk-tabpane active" id="rk-tab-pesanan" role="tabpanel">
+        {{-- HERO SCAN CARD --}}
+        <div class="shp-scan-card">
+            <div class="shp-scan-header">
+                <span class="shp-scan-label">Scan Pesanan</span>
+                <span class="shp-scan-counter" id="scanCounter">0 pesanan</span>
+            </div>
+
+            <input type="text" id="orderInput" class="shp-scan-input"
+                   placeholder="Scan atau ketik nomor pesanan, lalu Enter"
+                   autocomplete="off" spellcheck="false">
+
         </div>
 
-        <input type="text" id="orderInput" class="shp-scan-input"
-               placeholder="Scan atau ketik nomor pesanan, lalu Enter"
-               autocomplete="off" spellcheck="false">
+        {{-- ORDER LIST --}}
+        <div id="orderList"></div>
 
+        {{-- EMPTY STATE --}}
+        <div class="rk-empty" id="emptyState">
+            <div class="rk-empty-icon"></div>
+            <div class="rk-empty-title">Scan nomor pesanan</div>
+            <div class="rk-empty-sub">Bisa dari barcode scanner atau ketik manual lalu tekan Enter</div>
+        </div>
+
+        {{-- SISA STOK CARD --}}
+        <div id="sisaCard" style="display:none"></div>
     </div>
 
-    {{-- ORDER LIST --}}
-    <div id="orderList"></div>
-
-    {{-- EMPTY STATE --}}
-    <div class="rk-empty" id="emptyState">
-        <div class="rk-empty-icon"></div>
-        <div class="rk-empty-title">Scan nomor pesanan</div>
-        <div class="rk-empty-sub">Bisa dari barcode scanner atau ketik manual lalu tekan Enter</div>
+    {{-- TAB: ISI BATCH --}}
+    <div class="rk-tabpane" id="rk-tab-batch" role="tabpanel">
+        <div class="rk-batch-bar" style="margin-bottom:0">
+            @forelse ($batchPool as $item)
+                <span class="rk-sku-chip">
+                    <span class="c">{{ $item['item_code'] }}</span>
+                    <span style="color:#d1d5db">·</span>
+                    <span class="q">{{ number_format($item['qty'], 0, ',', '.') }}</span>
+                </span>
+            @empty
+                <span style="color:#94a3b8;font-size:.82rem">Belum ada item di batch.</span>
+            @endforelse
+        </div>
     </div>
-
-    {{-- SISA STOK CARD --}}
-    <div id="sisaCard" style="display:none"></div>
 
 </div>
 
@@ -1407,6 +1444,8 @@ async function processOrder(no) {
    RENDER
 ══════════════════════════════════════════════ */
 function renderAll() {
+    var _rkc = document.getElementById('rkOrderCount');
+    if (_rkc) _rkc.textContent = orders.length;
     if (!orders.length) {
         emptyState.style.display = '';
         orderList.innerHTML = '';
@@ -1445,7 +1484,7 @@ function renderCard(o, idx) {
     if (!found) {
         return `<div class="${cls}" id="ocard-${idx}">
           <div class="rk-order-hdr" onclick="toggleCard(${idx})">
-            <span class="rk-order-no">${no}</span>
+            <span class="rk-order-num">${idx + 1}.</span><span class="rk-order-no">${no}</span>
             ${statusBadge('not_found')}${dupeBadge}
             <span class="rk-order-chev" id="chev-${idx}">▼</span>
           </div>
@@ -1469,7 +1508,7 @@ function renderCard(o, idx) {
         const decBadge = decision ? statusBadge(decision) : statusBadge('pending');
         return `<div class="${cls}" id="ocard-${idx}">
           <div class="rk-order-hdr" onclick="toggleCard(${idx})">
-            <span class="rk-order-no">${no}</span>
+            <span class="rk-order-num">${idx + 1}.</span><span class="rk-order-no">${no}</span>
             <span class="rk-order-store">Belum tertaut</span>
             ${decBadge}${dupeBadge}
             <span class="rk-order-chev" id="chev-${idx}">▼</span>
@@ -1590,7 +1629,7 @@ function renderCard(o, idx) {
 
     return `<div class="${cls}" id="ocard-${idx}">
       <div class="rk-order-hdr" onclick="toggleCard(${idx})">
-        <span class="rk-order-no">${no}</span>
+        <span class="rk-order-num">${idx + 1}.</span><span class="rk-order-no">${no}</span>
         ${order.store_name ? `<span class="rk-order-store">${order.store_name}</span>` : ''}
         ${mpBadge}
         ${order.date ? `<span style="font-size:.73rem;color:#94a3b8">${fmtDate(order.date)}</span>` : ''}
@@ -1896,6 +1935,26 @@ topConfirmBtn.addEventListener('click', function () {
     saveState();
     window.location.href = CONFIRM_URL;
 });
+
+/* ── tabs ── */
+(function(){
+    var tabs  = document.querySelectorAll('.rk-tab');
+    var panes = document.querySelectorAll('.rk-tabpane');
+    window.rkActivateTab = function(name){
+        tabs.forEach(function(t){ t.classList.toggle('active', t.dataset.tab === name); });
+        panes.forEach(function(p){ p.classList.toggle('active', p.id === 'rk-tab-' + name); });
+        if (name === 'pesanan') {
+            var oi = document.getElementById('orderInput');
+            if (oi) { try { oi.focus(); } catch(e){} }
+        }
+    };
+    tabs.forEach(function(t){
+        t.addEventListener('click', function(){ rkActivateTab(t.dataset.tab); });
+    });
+    // Kembali ke tab Pesanan otomatis saat mulai scan (mis. via barcode scanner)
+    var inp = document.getElementById('orderInput');
+    if (inp) inp.addEventListener('focus', function(){ rkActivateTab('pesanan'); });
+})();
 
 /* ── init ── */
 window.addEventListener('load', async function () {

@@ -107,9 +107,28 @@ class SewingReturnController extends Controller
             'warehouse',
             'operator',
             'lines.sewingPickupLine.bundle.finishedItem',
+            'lines.sewingPickupLine.finishedItem',
         ]);
 
-        return view('production.sewing_returns.barcode', compact('return'));
+        // Seed baris: default jumlah label per item = qty OK (barang jadi diterima)
+        $lines = $return->lines
+            ->map(function ($line) {
+                $pl   = $line->sewingPickupLine;
+                $item = $pl?->bundle?->finishedItem ?? $pl?->finishedItem;
+                if (!$item || !$item->code) {
+                    return null;
+                }
+                return [
+                    'id'   => $item->id,
+                    'code' => $item->code,
+                    'name' => $item->name,
+                    'qty'  => max(1, (int) round((float) ($line->qty_ok ?? 1))),
+                ];
+            })
+            ->filter()
+            ->values();
+
+        return view('production.sewing_returns.barcode', compact('return', 'lines'));
     }
 
     public function show(SewingReturn $return): View

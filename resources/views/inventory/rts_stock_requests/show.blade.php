@@ -531,6 +531,9 @@
             <div class="actions">
                 <x-status-pill :status="$stockRequest->status" />
                 <a href="{{ route('rts.stock-requests.index') }}" class="btn btn-outline">← List</a>
+                <a href="{{ route('rts.stock-requests.barcode', $stockRequest->id) }}" target="_blank" class="btn btn-outline">
+                    <i class="bi bi-upc-scan"></i> Cetak Barcode
+                </a>
                 @if ($canManage && $canReceive)
                     <a href="{{ route('rts.stock-requests.confirm', $stockRequest) }}" class="btn btn-primary">Terima Jadi</a>
                 @endif

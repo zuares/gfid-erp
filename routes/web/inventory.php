@@ -49,6 +49,12 @@ Route::middleware(['web', 'auth', 'access:inventory'])->group(function () {
         Route::get('stock-card', [StockCardController::class, 'index'])->name('stock_card.index');
         Route::get('stock-card/export', [StockCardController::class, 'export'])->name('stock_card.export');
 
+        // ================== BARCODE LABEL GENERATOR (admin) ==================
+        Route::middleware('role:admin')->prefix('barcodes')->name('barcodes.')->group(function () {
+            Route::get('/', [\App\Http\Controllers\Inventory\BarcodeLabelController::class, 'create'])->name('create');
+            Route::get('/print', [\App\Http\Controllers\Inventory\BarcodeLabelController::class, 'print'])->name('print');
+        });
+
         // ================== INTERNAL TRANSFERS ==================
         Route::resource('transfers', TransferController::class)
             ->only(['index', 'create', 'store', 'show'])
@@ -167,6 +173,14 @@ Route::middleware(['web', 'auth', 'access:inventory'])->group(function () {
     Route::prefix('rts/stock-requests')->name('rts.stock-requests.')->group(function () {
 
         Route::get('/', [RtsStockRequestController::class, 'index'])->name('index');
+
+        // ✅ Cetak barcode (qty label default = qty diterima/diminta, bisa disesuaikan)
+        Route::get('/{stockRequest}/barcode', [RtsStockRequestController::class, 'barcode'])
+            ->whereNumber('stockRequest')
+            ->name('barcode');
+        Route::get('/{stockRequest}/barcode-print', [\App\Http\Controllers\Inventory\BarcodeLabelController::class, 'print'])
+            ->whereNumber('stockRequest')
+            ->name('barcode_print');
 
         Route::get('/{stockRequest}', [RtsStockRequestController::class, 'show'])
             ->whereNumber('stockRequest')

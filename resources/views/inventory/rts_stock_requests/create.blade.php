@@ -135,7 +135,7 @@
         }
 
         .col-receive {
-            width: 140px;
+            width: 170px;
             text-align: right;
         }
 
@@ -273,10 +273,127 @@
         :root{
             --shp-accent:#334155;
             --shp-accent-2:#1f2937;
+            --shp-accent-ring:rgba(148,163,184,.18);
             --shp-border:rgba(148,163,184,.18);
             --shp-border-strong:rgba(148,163,184,.30);
             --shp-muted:#64748b;
         }
+
+        /* ── Scan box (selaras dengan Shipment) ── */
+        .rts-scan{ margin-top:.75rem; }
+        .rts-scan-label{
+            font-size:.68rem; text-transform:uppercase; letter-spacing:.1em;
+            color:#9ca3af; font-weight:700; margin-bottom:.4rem;
+        }
+        .rts-scan-wrap{
+            display:flex; gap:.5rem; align-items:center;
+            background:rgba(148,163,184,.1);
+            border:1px solid rgba(148,163,184,.28);
+            border-radius:8px; padding:.45rem .55rem;
+            transition:border-color .12s, box-shadow .12s;
+        }
+        .rts-scan-wrap:focus-within{ border-color:var(--shp-accent); box-shadow:0 0 0 3px var(--shp-accent-ring); }
+        body[data-theme="dark"] .rts-scan-wrap{ background:rgba(15,23,42,.7); border-color:rgba(51,65,85,.85); }
+        .rts-scan-wrap input{
+            flex:1; background:transparent; border:none; padding:.2rem .3rem;
+            color:inherit; font-size:1rem; font-weight:700;
+            font-family:ui-monospace,SFMono-Regular,Menlo,monospace; outline:none; text-transform:uppercase;
+        }
+        .rts-scan-wrap input::placeholder{ color:#94a3b8; font-weight:400; font-family:inherit; text-transform:none; }
+        .rts-scan-btn{
+            background:var(--shp-accent); border:none; border-radius:6px; padding:.5rem 1.1rem;
+            color:#fff; font-weight:700; font-size:.86rem; cursor:pointer; transition:background .15s; white-space:nowrap;
+        }
+        .rts-scan-btn:hover{ background:var(--shp-accent-2); }
+        .rts-scan-status{ margin-top:.4rem; font-size:.78rem; min-height:1.1rem; color:#94a3b8; }
+        .rts-scan-status.ok{ color:#15803d; }
+        .rts-scan-status.err{ color:#b91c1c; }
+
+        /* ── Tombol tambah baris (di bawah tabel) ── */
+        .rts-addrow-wrap{ margin-top:.7rem; }
+        .btn-addrow{
+            border-radius:8px;
+            border:1px dashed rgba(148,163,184,.55)!important;
+            background:transparent!important;
+            color:var(--shp-muted)!important;
+            font-weight:700; font-size:.85rem;
+            padding:.5rem 1rem;
+        }
+        .btn-addrow:hover{ border-color:var(--shp-accent)!important; color:var(--shp-accent)!important; }
+        @media (max-width:767.98px){
+            .rts-addrow-wrap{ margin-top:.85rem; }
+            .btn-addrow{ width:100%; justify-content:center; padding:.7rem 1rem; }
+        }
+
+        /* ── Kolom Stok WH-PRD: muted, bukan focal point ── */
+        .js-prd-stock{ font-weight:400!important; font-size:.82rem; opacity:.6; color:var(--shp-muted)!important; }
+
+        /* ── Input Terima: stepper user-friendly ── */
+        .qty-stepper{
+            display:inline-flex; align-items:stretch;
+            border:1px solid rgba(148,163,184,.4); border-radius:9px;
+            overflow:hidden; background:var(--card,#fff);
+            width:100%; max-width:150px; margin-left:auto;
+        }
+        body[data-theme="dark"] .qty-stepper{ background:rgba(15,23,42,.6); border-color:rgba(51,65,85,.85); }
+        .qty-stepper:focus-within{ border-color:var(--shp-accent); box-shadow:0 0 0 3px var(--shp-accent-ring); }
+        .qty-stepper .line-qty{
+            flex:1; width:auto!important; min-width:0;
+            border:none!important; outline:none; background:transparent;
+            text-align:center; font-size:1rem; font-weight:800; font-variant-numeric:tabular-nums;
+            padding:.4rem .25rem; color:inherit; box-shadow:none!important; border-radius:0!important;
+            -moz-appearance:textfield;
+        }
+        .qty-stepper .line-qty::-webkit-outer-spin-button,
+        .qty-stepper .line-qty::-webkit-inner-spin-button{ -webkit-appearance:none; margin:0; }
+        .qty-btn{
+            border:none; background:rgba(148,163,184,.14); color:var(--shp-accent);
+            width:38px; flex:0 0 38px; font-size:1.2rem; font-weight:700; line-height:1; cursor:pointer;
+            display:flex; align-items:center; justify-content:center; user-select:none;
+            transition:background .12s;
+        }
+        .qty-btn:hover{ background:var(--shp-accent); color:#fff; }
+        .qty-btn:active{ background:var(--shp-accent-2); color:#fff; }
+        body[data-theme="dark"] .qty-btn{ color:#cbd5e1; background:rgba(51,65,85,.5); }
+        body[data-theme="dark"] .qty-btn:hover{ background:var(--shp-accent); color:#fff; }
+        @media (max-width:767.98px){
+            .qty-stepper{ max-width:none; }
+            .qty-btn{ width:44px; flex-basis:44px; font-size:1.35rem; }
+            .qty-stepper .line-qty{ font-size:1.05rem; padding:.55rem .25rem; }
+        }
+
+        /* ── Summary pills ── */
+        .rts-summary{ display:flex; gap:.4rem; flex-wrap:wrap; margin-top:.7rem; }
+        .rts-pill{
+            border-radius:999px; padding:.24rem .8rem; font-size:.78rem;
+            border:1px solid rgba(148,163,184,.32); background:rgba(248,250,252,.96); color:inherit; white-space:nowrap;
+        }
+        body[data-theme="dark"] .rts-pill{ background:rgba(15,23,42,.98); border-color:rgba(51,65,85,.85); color:#e5e7eb; }
+        .rts-pill b{ font-size:.9rem; }
+        .rts-pill-accent{ border-color:var(--shp-accent)!important; background:var(--shp-accent-bg,rgba(148,163,184,.08))!important; color:var(--shp-accent)!important; font-weight:700; }
+        body[data-theme="dark"] .rts-pill-accent{ color:#cbd5e1!important; }
+        .rts-pill-danger{ border-color:rgba(239,68,68,.55)!important; background:rgba(239,68,68,.08)!important; color:#b91c1c!important; font-weight:700; }
+
+        /* ── Modal selaras Shipment ── */
+        #confirmReceiveModal .modal-content{
+            border-radius:12px!important; border:1px solid var(--shp-border-strong); box-shadow:0 24px 60px rgba(15,23,42,.25);
+        }
+        #confirmReceiveModal .modal-header,
+        #confirmReceiveModal .modal-footer{ border-color:var(--shp-border); padding:.85rem 1.15rem; }
+        #confirmReceiveModal .modal-title{ font-weight:800; font-size:1rem; }
+        #confirmReceiveModal .modal-body{ padding:1.15rem; }
+        #confirmReceiveModal .btn{
+            border-radius:999px!important; font-size:.8rem!important; font-weight:700!important;
+            padding:.4rem 1.2rem!important; text-transform:uppercase; letter-spacing:.03em;
+        }
+        #confirmReceiveModal .btn-confirm-primary{
+            background:var(--shp-accent)!important; border:1px solid var(--shp-accent)!important; color:#fff!important;
+        }
+        #confirmReceiveModal .btn-confirm-primary:hover{ background:var(--shp-accent-2)!important; border-color:var(--shp-accent-2)!important; }
+        #confirmReceiveModal .btn-confirm-outline{
+            background:transparent!important; border:1px solid rgba(148,163,184,.5)!important; color:#6b7280!important;
+        }
+        #confirmReceiveModal .btn-confirm-outline:hover{ background:rgba(226,232,240,.7)!important; color:#374151!important; }
 
         .page-wrap{
             max-width:1040px!important;
@@ -687,9 +804,23 @@
                             <div style="font-weight:900">Item Terima Jadi</div>
                             <div class="muted small">Pilih item, cek stok WH-PRD, lalu isi qty yang diterima.</div>
                         </div>
+                    </div>
 
-                        <div class="btns">
-                            <button type="button" class="btn" id="btnAddRow">+ Tambah Baris</button>
+                    {{-- Scan box (selaras dengan Shipment) --}}
+                    <div class="rts-scan">
+                        <div class="rts-scan-label">Scan / Ketik Kode Barang</div>
+                        <div class="rts-scan-wrap">
+                            <input id="scanInput" type="text" autocomplete="off" autofocus
+                                   placeholder="Scan barcode atau ketik kode item lalu Enter"
+                                   onkeydown="if(event.key==='Enter'){event.preventDefault();window.__rtsScan()}">
+                            <button type="button" class="rts-scan-btn" id="scanBtn" onclick="window.__rtsScan()">Tambah</button>
+                        </div>
+                        <div class="rts-scan-status" id="scanStatus"></div>
+
+                        <div class="rts-summary">
+                            <span class="rts-pill">Item <b id="sumItems">0</b></span>
+                            <span class="rts-pill rts-pill-accent">Total Terima <b id="sumTotal">0</b></span>
+                            <span class="rts-pill rts-pill-danger d-none" id="sumShortWrap">Stok Kurang <b id="sumShort">0</b></span>
                         </div>
                     </div>
 
@@ -708,6 +839,10 @@
                                 <tbody id="linesTbody"></tbody>
                             </table>
                         </div>
+                    </div>
+
+                    <div class="rts-addrow-wrap">
+                        <button type="button" class="btn btn-addrow" id="btnAddRow">+ Tambah Baris</button>
                     </div>
 
                     @error('lines')
@@ -796,9 +931,9 @@
                         </div>
 
                         <div class="modal-footer">
-                            <button type="button" class="btn btn-sm btn-outline-secondary"
+                            <button type="button" class="btn btn-sm btn-confirm-outline"
                                 data-bs-dismiss="modal">Batal</button>
-                            <button type="button" class="btn btn-sm btn-success" id="btn-confirm-submit">Simpan</button>
+                            <button type="button" class="btn btn-sm btn-confirm-primary" id="btn-confirm-submit">Simpan</button>
                         </div>
                     </div>
                 </div>
@@ -886,16 +1021,15 @@
                 const qty = num(tr.querySelector('.line-qty')?.value);
                 const sisa = stock - qty;
 
-                stockCell.classList.remove('muted');
+                // Selalu muted — bukan focal point. Info kurang stok ada di summary "Stok Kurang".
+                stockCell.classList.add('muted');
+                stockCell.style.color = '';
                 if (qty > 0) {
                     stockCell.textContent = fmtQty(sisa);
-                    stockCell.style.color = sisa < -0.0000001 ? '#ef4444' : (sisa < 0.0000001 ? '#f59e0b' : '');
                     stockCell.title = `Stok PRD: ${fmtQty(stock)} | Terima: ${fmtQty(qty)} | Sisa: ${fmtQty(sisa)}`;
                 } else {
                     stockCell.textContent = fmtQty(stock);
-                    stockCell.style.color = '';
                     stockCell.title = '';
-                    stockCell.classList.toggle('muted', Math.abs(stock) <= 0.0000001);
                 }
             }
 
@@ -942,6 +1076,16 @@
                 const total = rows.reduce((sum, row) => sum + row.qty, 0);
                 const shortageCount = rows.filter(row => row.qty > row.stock + 0.0000001).length;
 
+                const sItems = document.getElementById('sumItems');
+                const sTotal = document.getElementById('sumTotal');
+                const sShort = document.getElementById('sumShort');
+                const sShortWrap = document.getElementById('sumShortWrap');
+                if (sItems) sItems.textContent = rows.length;
+                if (sTotal) sTotal.textContent = fmtQty(total);
+                if (sShort) sShort.textContent = shortageCount;
+                if (sShortWrap) sShortWrap.classList.toggle('d-none', shortageCount === 0);
+
+                if (typeof saveState === 'function') saveState();
             }
 
             function escapeHtml(value) {
@@ -959,7 +1103,11 @@
                     <td class="mono col-no" data-no style="opacity:.75">1</td>
                     <td class="cell-item"></td>
                     <td class="td-num">
-                        <input data-name="qty_request" class="line-qty" type="number" step="0.01" min="0" value="" placeholder="0">
+                        <div class="qty-stepper">
+                            <button type="button" class="qty-btn qty-minus" tabindex="-1" aria-label="Kurangi">−</button>
+                            <input data-name="qty_request" class="line-qty" type="number" inputmode="numeric" step="1" min="0" value="" placeholder="0">
+                            <button type="button" class="qty-btn qty-plus" tabindex="-1" aria-label="Tambah">+</button>
+                        </div>
                     </td>
                     <td class="mono js-prd-stock muted td-num">-</td>
                     <td class="col-action">
@@ -1061,11 +1209,49 @@
                 setRowData(tr, data);
             }
 
+            /* ── Simpan/pulihkan item terscan agar tidak hilang saat reload ── */
+            const LS_KEY = 'rts_terima_jadi_lines_v1';
+
+            function saveState() {
+                try {
+                    const data = [...tbody.querySelectorAll('tr')].map(tr => {
+                        const id = (tr.querySelector('.js-item-suggest-id')?.value || '').trim();
+                        const qty = num(tr.querySelector('.line-qty')?.value);
+                        return id ? { item_id: id, qty_request: qty } : null;
+                    }).filter(Boolean);
+                    const dateVal = document.querySelector('[name="date"]')?.value || '';
+                    localStorage.setItem(LS_KEY, JSON.stringify({ date: dateVal, lines: data }));
+                } catch (_) {}
+            }
+
+            function loadState() {
+                try {
+                    const raw = localStorage.getItem(LS_KEY);
+                    if (!raw) return null;
+                    const obj = JSON.parse(raw);
+                    return (obj && Array.isArray(obj.lines)) ? obj : null;
+                } catch (_) { return null; }
+            }
+
+            function clearState() {
+                try { localStorage.removeItem(LS_KEY); } catch (_) {}
+            }
+
             function seedInitialRows() {
+                // 1) Prioritas: hasil validasi server (old input)
                 if (Array.isArray(oldLines) && oldLines.length > 0) {
                     oldLines.forEach(l => addRow(l));
                     return;
                 }
+                // 2) Pulihkan dari localStorage (belum sempat submit / ke-reload)
+                const saved = loadState();
+                if (saved && saved.lines.length > 0) {
+                    const dateInput = document.querySelector('[name="date"]');
+                    if (dateInput && saved.date) dateInput.value = saved.date;
+                    saved.lines.forEach(l => addRow(l));
+                    return;
+                }
+                // 3) Baris kosong default
                 addRow({});
             }
 
@@ -1101,6 +1287,7 @@
 
             function submitConfirmed() {
                 confirmed = true;
+                clearState(); // sudah disimpan ke server → jangan pulihkan lagi
                 form?.submit();
             }
 
@@ -1249,9 +1436,107 @@
                 });
             }
 
+            /* ─────────── SCAN barcode / kode item ─────────── */
+            const scanInput  = document.getElementById('scanInput');
+            const scanStatus = document.getElementById('scanStatus');
+
+            function setScanStatus(msg, kind) {
+                if (!scanStatus) return;
+                scanStatus.textContent = msg || '';
+                scanStatus.className = 'rts-scan-status' + (kind ? ' ' + kind : '');
+            }
+
+            function findEmptyRow() {
+                for (const tr of tbody.querySelectorAll('tr')) {
+                    const v = (tr.querySelector('.js-item-suggest-id')?.value || '').trim();
+                    if (!v) return tr;
+                }
+                return null;
+            }
+
+            window.__rtsScan = function () {
+                const code = (scanInput?.value || '').trim();
+                if (!code) { scanInput?.focus(); return; }
+
+                const up = code.toUpperCase();
+                const it = items.find(x => String(x.code || '').toUpperCase() === up)
+                        || items.find(x => String(x.code || '').toUpperCase().startsWith(up));
+
+                if (!it) { setScanStatus('❌ "' + code + '" tidak ditemukan (hanya barang jadi)', 'err'); return; }
+
+                const existingTr = findRowByItemId(it.id);
+                if (existingTr) {
+                    const q = existingTr.querySelector('.line-qty');
+                    if (q) q.value = num(q.value) + 1;
+                    updatePrdStock(existingTr);
+                    flashRow(existingTr);
+                } else {
+                    const empty = findEmptyRow();
+                    if (empty) setRowData(empty, { item_id: it.id, qty_request: 1 });
+                    else addRow({ item_id: it.id, qty_request: 1 });
+                }
+
+                renderDashboard();
+                setScanStatus('✅ ' + String(it.code).toUpperCase() + ' ditambahkan', 'ok');
+                scanInput.value = '';
+                scanInput.focus();
+            };
+
+            /* ── Auto-fokus selalu di input scan (termasuk mobile) ── */
+            function focusScan() {
+                if (!scanInput) return;
+                try { scanInput.focus({ preventScroll: true }); } catch (_) { scanInput.focus(); }
+                scanInput.select?.();
+            }
+
+            // Balik ke scan saat tap/klik area kosong (bukan input/tombol/dropdown suggest)
+            function refocusOnEmpty(e) {
+                if (e.target.closest('input, textarea, select, button, a, label, .item-suggest-wrap, .modal, .qty-stepper')) return;
+                focusScan();
+            }
+            document.addEventListener('click', refocusOnEmpty);
+            document.addEventListener('touchend', refocusOnEmpty, { passive: true });
+
+            // Mobile: fokus otomatis diblokir sebelum ada gesture → fokus pada interaksi pertama
+            const isTouch = window.matchMedia('(hover: none)').matches || 'ontouchstart' in window;
+            if (isTouch) {
+                const firstFocus = () => {
+                    focusScan();
+                    document.removeEventListener('touchstart', firstFocus);
+                    document.removeEventListener('pointerdown', firstFocus);
+                };
+                document.addEventListener('touchstart', firstFocus, { once: true, passive: true });
+                document.addEventListener('pointerdown', firstFocus, { once: true });
+            }
+
+            // Select-all otomatis saat fokus input "Terima" → ketik langsung ganti qty
+            tbody.addEventListener('focusin', (e) => {
+                const el = e.target;
+                if (el && el.classList && el.classList.contains('line-qty')) {
+                    setTimeout(() => el.select(), 0);
+                }
+            });
+
+            // Tombol +/- stepper pada kolom Terima
+            tbody.addEventListener('click', (e) => {
+                const btn = e.target.closest('.qty-minus, .qty-plus');
+                if (!btn) return;
+                const tr = btn.closest('tr');
+                const inp = tr?.querySelector('.line-qty');
+                if (!inp) return;
+                const step = btn.classList.contains('qty-plus') ? 1 : -1;
+                const next = Math.max(0, num(inp.value) + step);
+                inp.value = next;
+                inp.dispatchEvent(new Event('input', { bubbles: true }));
+            });
+
+            // Simpan juga saat tanggal diubah
+            document.querySelector('[name="date"]')?.addEventListener('change', () => saveState());
+
             // init
             seedInitialRows();
             setTimeout(() => patchFixedDropdown(document), 0);
+            setTimeout(focusScan, 60);
 
         })();
     </script>

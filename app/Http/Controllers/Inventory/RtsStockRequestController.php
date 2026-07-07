@@ -334,6 +334,34 @@ class RtsStockRequestController extends Controller
     }
 
     /**
+     * Halaman cetak barcode stock request.
+     * Default jumlah label per item = qty diterima (jika ada), fallback qty diminta.
+     */
+    public function barcode(StockRequest $stockRequest): View
+    {
+        abort_unless($stockRequest->purpose === 'rts_replenish', 404);
+
+        $stockRequest->load(['lines.item', 'destinationWarehouse']);
+
+        $lines = $stockRequest->lines
+            ->filter(fn ($l) => $l->item && $l->item->code)
+            ->map(function ($l) {
+                $received = (float) ($l->qty_received ?? 0);
+                $request  = (float) ($l->qty_request ?? 0);
+                $qty      = $received > 0 ? $received : $request;
+                return [
+                    'id'   => $l->item->id,
+                    'code' => $l->item->code,
+                    'name' => $l->item->name,
+                    'qty'  => max(1, (int) round($qty)),
+                ];
+            })
+            ->values();
+
+        return view('inventory.rts_stock_requests.barcode', compact('stockRequest', 'lines'));
+    }
+
+    /**
      * Receive form: input qty yang diambil langsung dari WH-PRD ke WH-RTS.
      */
     public function confirmReceive(StockRequest $stockRequest): View

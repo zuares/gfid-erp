@@ -84,6 +84,12 @@ Route::middleware(['web', 'auth', 'access:sales'])
 
                 Route::get('{shipmentReturn}/scan-lookup', 'scanLookup')->name('scan_lookup');
                 Route::get('{shipmentReturn}/edit', 'edit')->name('edit');
+
+                // ✅ Cetak barcode (qty label default = qty retur, bisa disesuaikan)
+                Route::get('{shipmentReturn}/barcode', 'barcode')->name('barcode');
+                Route::get('{shipmentReturn}/barcode-print', [\App\Http\Controllers\Inventory\BarcodeLabelController::class, 'print'])
+                    ->name('barcode_print');
+
                 Route::get('{shipmentReturn}', 'show')->name('show');
 
                 Route::post('{shipmentReturn}/orders/bulk', 'bulkOrders')->name('bulk_orders');

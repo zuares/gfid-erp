@@ -1,7 +1,7 @@
-{{-- resources/views/production/sewing_returns/barcode.blade.php --}}
+{{-- resources/views/sales/shipment_returns/barcode.blade.php --}}
 @extends('layouts.app')
 
-@section('title', 'Cetak Barcode • ' . $return->code)
+@section('title', 'Cetak Barcode • ' . ($shipmentReturn->code ?? ('#'.$shipmentReturn->id)))
 
 @push('head')
 <style>
@@ -131,19 +131,22 @@ body[data-theme="dark"] .qty-btn { color:#cbd5e1; background:rgba(51,65,85,.5); 
 @endpush
 
 @section('content')
-<form id="barcodeForm" method="GET" action="{{ route('production.sewing.returns.barcode_print') }}" target="_blank">
-    <input type="hidden" name="back" value="{{ route('production.sewing.returns.barcode', $return->id, false) }}">
+<form id="barcodeForm" method="GET" action="{{ route('sales.shipment_returns.barcode_print', $shipmentReturn->id) }}" target="_blank">
+    <input type="hidden" name="back" value="{{ route('sales.shipment_returns.barcode', $shipmentReturn->id, false) }}">
 
     <div class="shp-topbar">
         <span class="shp-topbar-code">Cetak Barcode</span>
-        <span class="shp-badge">{{ $return->code }}</span>
+        <span class="shp-badge">RETUR {{ $shipmentReturn->code ?? ('#'.$shipmentReturn->id) }}</span>
+        @if ($shipmentReturn->store)
+            <span class="shp-badge">{{ $shipmentReturn->store->name ?? $shipmentReturn->store->code }}</span>
+        @endif
 
         <span class="shp-topbar-spacer"></span>
 
         <span class="shp-pill">Baris <b id="summaryLines">0</b></span>
         <span class="shp-pill shp-pill-accent">Total Label <b id="totalLabels">0</b></span>
 
-        <a href="{{ route('production.sewing.returns.show', $return->id) }}" class="btn-shp-outline">Kembali</a>
+        <a href="{{ route('sales.shipment_returns.show', $shipmentReturn->id) }}" class="btn-shp-outline">Kembali</a>
         <button type="submit" class="btn-shp-submit">Preview &amp; Cetak</button>
     </div>
 
@@ -152,7 +155,7 @@ body[data-theme="dark"] .qty-btn { color:#cbd5e1; background:rgba(51,65,85,.5); 
             <div class="shp-table-head">
                 <div class="shp-table-title">
                     Daftar Barang
-                    <small>Jumlah label default = qty OK diterima. Sesuaikan bila perlu.</small>
+                    <small>Jumlah label default = qty retur. Sesuaikan bila perlu.</small>
                 </div>
             </div>
 
@@ -187,7 +190,7 @@ body[data-theme="dark"] .qty-btn { color:#cbd5e1; background:rgba(51,65,85,.5); 
             <div class="shp-foot">
                 <div class="muted">Barcode berisi kode item (SKU). Nama varian ikut tercetak di label.</div>
                 <div style="display:flex; gap:.5rem">
-                    <button type="button" class="btn-shp-outline" id="btnReset">Reset ke Qty OK</button>
+                    <button type="button" class="btn-shp-outline" id="btnReset">Reset ke Qty Retur</button>
                     <button type="submit" class="btn-shp-submit">Preview &amp; Cetak</button>
                 </div>
             </div>

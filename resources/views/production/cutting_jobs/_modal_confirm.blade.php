@@ -23,7 +23,7 @@
                                 <option value="">- Pilih Operator -</option>
                                 @foreach ($operators as $op)
                                     <option value="{{ $op->id }}" @selected($selectedOperatorId == $op->id)>
-                                        {{ $op->code }} - {{ $op->name }}
+                                        {{ $op->code }} - {{ $op->name }}@if ($op->role === 'operating') (operating)@endif
                                     </option>
                                 @endforeach
                             </select>

@@ -404,7 +404,12 @@
             <h1 class="sr-title">{{ $shipmentReturn->code }}</h1>
             <div class="sr-sub">Detail retur shipment</div>
         </div>
-        <a href="{{ route('sales.shipment_returns.index') }}" class="sr-btn">Daftar</a>
+        <div style="display:flex;gap:.5rem;align-items:center;flex-wrap:wrap">
+            <a href="{{ route('sales.shipment_returns.barcode', $shipmentReturn->id) }}" target="_blank" class="sr-btn">
+                <i class="bi bi-upc-scan"></i> Cetak Barcode
+            </a>
+            <a href="{{ route('sales.shipment_returns.index') }}" class="sr-btn">Daftar</a>
+        </div>
     </div>
 
     <div class="sr-shell">

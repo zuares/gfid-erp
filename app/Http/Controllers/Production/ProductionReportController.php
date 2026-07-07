@@ -43,7 +43,7 @@ class ProductionReportController extends Controller
             'statuses' => $this->flow->statuses(),
             'itemOptions' => Item::where('type', 'finished_good')->orderBy('code')->get(),
             'categoryOptions' => ItemCategory::where('active', 1)->orderBy('name')->get(),
-            'operatorOptions' => Employee::where('role', 'sewing')->orderBy('code')->get(),
+            'operatorOptions' => Employee::whereIn('role', ['sewing', 'operating'])->orderBy('code')->get(),
         ]);
     }
 

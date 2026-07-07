@@ -48,6 +48,17 @@
 .sd-total td{font-weight:900;color:#111827;background:rgba(148,163,184,.04)}
 .sd-meta{display:grid;grid-template-columns:repeat(3,minmax(0,1fr));gap:.5rem}
 .sd-meta-box{border:1px solid rgba(148,163,184,.16);border-radius:8px;padding:.55rem .65rem}
+.sd-order-num{display:inline-flex;align-items:center;justify-content:center;min-width:1.5rem;height:1.5rem;padding:0 .35rem;border-radius:6px;background:rgba(148,163,184,.12);color:#475569;font-family:ui-monospace,SFMono-Regular,Menlo,Consolas,monospace;font-weight:900;font-size:.78rem;flex-shrink:0}
+.sd-order-lead{display:flex;align-items:flex-start;gap:.55rem;min-width:0}
+.sd-tabs{display:flex;gap:.25rem;margin-bottom:.65rem;border-bottom:1px solid rgba(148,163,184,.18);flex-wrap:wrap}
+.sd-tab{appearance:none;display:inline-flex;align-items:center;gap:.4rem;border:none;background:transparent;color:#64748b;font-weight:800;font-size:.82rem;padding:.55rem .8rem;cursor:pointer;border-bottom:2px solid transparent;margin-bottom:-1px}
+.sd-tab:hover{color:#334155}
+.sd-tab.active{color:#111827;border-bottom-color:#334155}
+.sd-tab-count{display:inline-flex;align-items:center;justify-content:center;min-width:1.35rem;height:1.35rem;padding:0 .3rem;border-radius:999px;background:rgba(148,163,184,.16);color:#475569;font-family:ui-monospace,SFMono-Regular,Menlo,Consolas,monospace;font-size:.7rem;font-weight:900}
+.sd-tab.active .sd-tab-count{background:#334155;color:#fff}
+.sd-tabpane{display:none}
+.sd-tabpane.active{display:block}
+.sd-tabpane .sd-card{margin-bottom:0}
 @media(max-width:860px){
   .sd-wrap{padding:.5rem .5rem 3.5rem}
   .sd-topbar{padding:.5rem}
@@ -143,6 +154,13 @@
         @endif
     </div>
 
+    <div class="sd-tabs" role="tablist">
+        <button type="button" class="sd-tab active" data-tab="pesanan">Pesanan <span class="sd-tab-count">{{ number_format($orderScans->count(),0,',','.') }}</span></button>
+        <button type="button" class="sd-tab" data-tab="item">Item Batch <span class="sd-tab-count">{{ number_format($totalLines,0,',','.') }}</span></button>
+        <button type="button" class="sd-tab" data-tab="info">Info Shipment</button>
+    </div>
+
+    <div class="sd-tabpane active" id="sd-tab-pesanan" role="tabpanel">
     <div class="sd-card">
         <div class="sd-head">
             <div>
@@ -169,13 +187,16 @@
                             $scanLabel = $scanStatus === 'skip' ? 'Diabaikan' : 'Ditunda';
                         @endphp
                         <div class="sd-order">
-                            <div>
-                                <div class="sd-order-no">{{ $scan->order_no }}</div>
-                                <div class="sd-muted">
-                                    {{ $scan->source === 'manual_scan' ? 'Belum tertaut' : $scan->source }}
-                                    @if($scan->confirmed_at)
-                                        · {{ $scan->confirmed_at->format('d M Y H:i') }}
-                                    @endif
+                            <div class="sd-order-lead">
+                                <span class="sd-order-num">{{ $loop->iteration }}</span>
+                                <div>
+                                    <div class="sd-order-no">{{ $scan->order_no }}</div>
+                                    <div class="sd-muted">
+                                        {{ $scan->source === 'manual_scan' ? 'Belum tertaut' : $scan->source }}
+                                        @if($scan->confirmed_at)
+                                            · {{ $scan->confirmed_at->format('d M Y H:i') }}
+                                        @endif
+                                    </div>
                                 </div>
                             </div>
                             <span class="sd-badge {{ $scanStatus }}">{{ $scanLabel }}</span>
@@ -185,7 +206,9 @@
             @endif
         </div>
     </div>
+    </div>{{-- /sd-tab-pesanan --}}
 
+    <div class="sd-tabpane" id="sd-tab-item" role="tabpanel">
     <div class="sd-card">
         <div class="sd-head">
             <div>
@@ -243,7 +266,9 @@
             @endif
         </div>
     </div>
+    </div>{{-- /sd-tab-item --}}
 
+    <div class="sd-tabpane" id="sd-tab-info" role="tabpanel">
     <div class="sd-card">
         <div class="sd-head">
             <div class="sd-title">Info Shipment</div>
@@ -268,7 +293,25 @@
             </div>
         </div>
     </div>
+    </div>{{-- /sd-tab-info --}}
 </div>
+
+<script>
+(function(){
+    var tabs = document.querySelectorAll('.sd-tab');
+    var panes = document.querySelectorAll('.sd-tabpane');
+    function activate(name){
+        tabs.forEach(function(t){ t.classList.toggle('active', t.dataset.tab === name); });
+        panes.forEach(function(p){ p.classList.toggle('active', p.id === 'sd-tab-' + name); });
+        try { history.replaceState(null, '', '#' + name); } catch(e){}
+    }
+    tabs.forEach(function(t){
+        t.addEventListener('click', function(){ activate(t.dataset.tab); });
+    });
+    var hash = (location.hash || '').replace('#','');
+    if (['pesanan','item','info'].indexOf(hash) !== -1) activate(hash);
+})();
+</script>
 @endsection
 
 @if (session('stock_insufficient'))

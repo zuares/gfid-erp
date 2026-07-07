@@ -30,6 +30,7 @@
     $hasInvStocksItems = $router->has('inventory.stocks.items');
     $hasInvStocksLots = $router->has('inventory.stocks.lots');
     $hasInvStockCard = $router->has('inventory.stock_card.index');
+    $hasInvBarcodes = $router->has('inventory.barcodes.create') && ($isOwner || $isAdmin);
     $hasInvTransfersIndex = $router->has('inventory.transfers.index');
     $hasInvTransfersCreate = $router->has('inventory.transfers.create');
     $hasInvAdjustmentsIndex = $router->has('inventory.adjustments.index');
@@ -785,6 +786,13 @@
                     <x-sidebar.simple-link href="{{ route('inventory.stocks.items') }}" icon="bi bi-box-seam"
                         :active="request()->routeIs('inventory.stocks.items')">
                         Stok Barang
+                    </x-sidebar.simple-link>
+                @endif
+
+                @if ($hasInvBarcodes)
+                    <x-sidebar.simple-link href="{{ route('inventory.barcodes.create') }}" icon="bi bi-upc-scan"
+                        :active="request()->routeIs('inventory.barcodes.*')">
+                        Cetak Barcode
                     </x-sidebar.simple-link>
                 @endif
 
@@ -1610,6 +1618,12 @@
                             <x-sidebar.sub-link href="{{ route('inventory.stock_card.index') }}" icon="bi bi-list-ul"
                                 :active="request()->routeIs('inventory.stock_card.*')">
                                 Kartu Stok
+                            </x-sidebar.sub-link>
+                        @endif
+                        @if ($hasInvBarcodes)
+                            <x-sidebar.sub-link href="{{ route('inventory.barcodes.create') }}" icon="bi bi-upc-scan"
+                                :active="request()->routeIs('inventory.barcodes.*')">
+                                Cetak Barcode
                             </x-sidebar.sub-link>
                         @endif
                         @if ($hasInvTransfersIndex)

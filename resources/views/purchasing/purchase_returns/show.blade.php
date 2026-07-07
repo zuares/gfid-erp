@@ -82,6 +82,15 @@
   .row-main-action { display:flex; gap:.3rem; justify-content:flex-end; flex-wrap:wrap; margin-top:.3rem; }
   .return-input-wrap { display:flex; flex-direction:column; align-items:flex-end; }
   .return-mobile-head { display:none; }
+
+  /* Reason + foto per baris */
+  .return-line-extra { display:flex; flex-direction:column; gap:.4rem; }
+  .return-photo-box { display:flex; flex-wrap:wrap; align-items:center; gap:.4rem; }
+  .return-photo-thumbs { display:flex; flex-wrap:wrap; gap:.4rem; }
+  .return-photo-thumb { position:relative; display:inline-flex; flex-direction:column; align-items:center; border:1px solid var(--line); border-radius:8px; padding:2px; background:var(--card); }
+  .return-photo-thumb img { width:52px; height:52px; object-fit:cover; border-radius:6px; display:block; }
+  .return-photo-del { font-size:.62rem; color:#dc2626; display:flex; align-items:center; gap:.15rem; margin-top:2px; cursor:pointer; }
+  .return-photo-add { display:inline-flex; align-items:center; font-size:.72rem; color:#2563eb; border:1px dashed rgba(37,99,235,.5); border-radius:8px; padding:.3rem .6rem; cursor:pointer; background:rgba(37,99,235,.04); }
   .effect-card {
     border:1px solid var(--line);
     border-radius:14px;
@@ -151,14 +160,18 @@
 @php
   $canSeeMoney = auth()->user()?->isOwner() ?? false;
   $isDraft = ($ret->status ?? '') === 'draft';
+  $isSubmitted = ($ret->status ?? '') === 'submitted';
   $isPosted = ($ret->status ?? '') === 'posted';
   $isVoided = (bool) ($ret->voided_at);
+  $isEditable = ($isDraft || $isSubmitted) && ! $isVoided;
+  $reasons = \App\Models\PurchaseReturnLine::REASONS;
 
   $statusLabel = strtoupper((string)($ret->status ?? '-'));
 
   $statusClass = 'bg-secondary-subtle text-secondary border border-secondary-subtle';
   if ($isPosted) $statusClass = 'bg-success-subtle text-success border border-success-subtle';
   if ($isDraft)  $statusClass = 'bg-warning-subtle text-warning border border-warning-subtle';
+  if ($isSubmitted) $statusClass = 'bg-info-subtle text-info border border-info-subtle';
   if ($isVoided) $statusClass = 'bg-danger-subtle text-danger border border-danger-subtle';
 
   $grand = (float)($ret->total ?? 0);
@@ -381,12 +394,12 @@
           </div>
 
           <div class="p-2 p-sm-3">
-            <form method="POST" action="{{ route('purchasing.purchase_returns.update', $ret->id) }}">
+            <form method="POST" action="{{ route('purchasing.purchase_returns.update', $ret->id) }}" enctype="multipart/form-data">
               @csrf
               @method('PUT')
 
-              {{-- Formbar hanya untuk draft --}}
-              @if($isDraft && !$isVoided)
+              {{-- Formbar untuk draft / submitted --}}
+              @if($isEditable)
               <div class="return-formbar mb-3">
                 <div>
                   <label class="form-label">Tanggal</label>
@@ -417,7 +430,7 @@
               <input type="hidden" name="notes" value="{{ $ret->notes }}">
               @endif
 
-              @if($isDraft && !$isVoided)
+              @if($isEditable)
                 <div class="return-tools mb-2">
                   <button type="button" class="btn btn-sm btn-outline-secondary" id="btn-zero-all">Reset</button>
                   <button type="button" class="btn btn-sm btn-outline-primary" id="btn-max-all">Maks Semua</button>
@@ -476,14 +489,56 @@
                             <span class="d-none d-md-inline"> • Terima {{ rtrim(rtrim(number_format($received, 4, ',', '.'), '0'), ',') }}</span>
                           </div>
 
-                          @if($isDraft && !$isVoided)
+                          @if($isEditable)
                             <input type="hidden" name="lines[{{ $i }}][id]" value="{{ $ln?->id }}">
                             <input type="hidden" name="lines[{{ $i }}][purchase_receipt_line_id]" value="{{ $row->purchase_receipt_line_id }}">
-                            <input type="text"
-                              name="lines[{{ $i }}][notes]"
-                              class="form-control form-control-sm mt-2"
-                              placeholder="Catatan item (opsional)"
-                              value="{{ old("lines.$i.notes", $row->notes) }}">
+
+                            <div class="return-line-extra mt-2">
+                              <select name="lines[{{ $i }}][reason_code]" class="form-select form-select-sm">
+                                <option value="">- Alasan retur -</option>
+                                @foreach($reasons as $code => $label)
+                                  <option value="{{ $code }}" @selected(old("lines.$i.reason_code", $ln?->reason_code) === $code)>{{ $label }}</option>
+                                @endforeach
+                              </select>
+
+                              <input type="text"
+                                name="lines[{{ $i }}][notes]"
+                                class="form-control form-control-sm"
+                                placeholder="Catatan item (opsional)"
+                                value="{{ old("lines.$i.notes", $row->notes) }}">
+
+                              {{-- Foto bukti (banyak) --}}
+                              <div class="return-photo-box">
+                                @if($ln && $ln->photos && $ln->photos->count())
+                                  <div class="return-photo-thumbs">
+                                    @foreach($ln->photos as $photo)
+                                      <label class="return-photo-thumb" title="{{ $photo->original_name }}">
+                                        <img src="{{ $photo->url }}" alt="foto">
+                                        <span class="return-photo-del">
+                                          <input type="checkbox" name="delete_photos[]" value="{{ $photo->id }}"> hapus
+                                        </span>
+                                      </label>
+                                    @endforeach
+                                  </div>
+                                @endif
+                                <label class="return-photo-add">
+                                  <i class="bi bi-camera me-1"></i> Tambah foto
+                                  <input type="file" name="lines[{{ $i }}][photos][]" accept="image/*" multiple hidden>
+                                </label>
+                              </div>
+                            </div>
+                          @elseif($row->reason_label ?? ($ln?->reason_label))
+                            <div class="item-sub mt-1">Alasan: <strong>{{ $ln?->reason_label }}</strong></div>
+                          @endif
+
+                          @if(!$isEditable && $ln && $ln->photos && $ln->photos->count())
+                            <div class="return-photo-thumbs mt-1">
+                              @foreach($ln->photos as $photo)
+                                <a href="{{ $photo->url }}" target="_blank" class="return-photo-thumb" title="{{ $photo->original_name }}">
+                                  <img src="{{ $photo->url }}" alt="foto">
+                                </a>
+                              @endforeach
+                            </div>
                           @endif
                         </td>
 
@@ -503,7 +558,7 @@
                         </td>
 
                         <td class="text-end" data-label="Return">
-                          @if($isDraft && !$isVoided)
+                          @if($isEditable)
                             <div class="return-input-wrap">
                               <input type="number"
                                 name="lines[{{ $i }}][qty]"
@@ -537,7 +592,7 @@
                 </table>
               </div>
 
-              @if($isDraft && !$isVoided)
+              @if($isEditable)
                 <div class="d-flex justify-content-end gap-2 mt-3">
                   <button class="btn btn-primary btn-sm btn-pill" type="submit">
                     <i class="bi bi-save2 me-1"></i> Simpan Item Return
@@ -550,15 +605,27 @@
 
             <div class="d-flex justify-content-between align-items-center flex-wrap gap-2">
               <div>
-                @if($isDraft && !$stockReady)
+                @if($isSubmitted)
+                  <span class="status-badge bg-info-subtle text-info border border-info-subtle">Menunggu persetujuan</span>
+                @endif
+                @if($isEditable && !$stockReady)
                   <span class="status-badge bg-danger-subtle text-danger border border-danger-subtle">Stok kurang</span>
-                @elseif($isDraft)
+                @elseif($isEditable)
                   <span class="status-badge bg-success-subtle text-success border border-success-subtle">Siap diposting</span>
                 @endif
               </div>
 
               <div class="d-flex gap-2">
                 @if($isDraft && !$isVoided)
+                  <form method="POST" action="{{ route('purchasing.purchase_returns.submit', $ret->id) }}" class="js-submit-return">
+                    @csrf
+                    <button class="btn btn-outline-primary btn-sm btn-pill" type="submit">
+                      <i class="bi bi-send me-1"></i> Ajukan
+                    </button>
+                  </form>
+                @endif
+
+                @if($isEditable)
                   <form method="POST" action="{{ route('purchasing.purchase_returns.post', $ret->id) }}" class="js-post-return">
                     @csrf
                     <button class="btn {{ $stockReady ? 'btn-success' : 'btn-outline-danger' }} btn-sm btn-pill"

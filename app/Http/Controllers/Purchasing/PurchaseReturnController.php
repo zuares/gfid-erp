@@ -11,10 +11,13 @@ use App\Models\PurchaseOrder;
 use App\Models\PurchaseReceipt;
 use App\Models\PurchaseReturn;
 use App\Models\PurchaseReturnLine;
+use App\Models\PurchaseReturnLinePhoto;
 use App\Services\Accounting\JournalService;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Schema;
+use Illuminate\Support\Facades\Storage;
+use Illuminate\Validation\Rule;
 use Illuminate\Validation\ValidationException;
 
 class PurchaseReturnController extends Controller
@@ -44,7 +47,7 @@ class PurchaseReturnController extends Controller
         }
 
         $status = (string) $request->input('status', '');
-        if (in_array($status, ['draft', 'posted'], true)) {
+        if (in_array($status, ['draft', 'submitted', 'posted'], true)) {
             $query->where('status', $status)->whereNull('voided_at');
         } elseif ($status === 'void') {
             $query->whereNotNull('voided_at');
@@ -64,6 +67,7 @@ class PurchaseReturnController extends Controller
             ->reorder()
             ->selectRaw('COUNT(*) as total_returns')
             ->selectRaw("SUM(CASE WHEN status = 'draft' AND voided_at IS NULL THEN 1 ELSE 0 END) as draft_count")
+            ->selectRaw("SUM(CASE WHEN status = 'submitted' AND voided_at IS NULL THEN 1 ELSE 0 END) as submitted_count")
             ->selectRaw("SUM(CASE WHEN status = 'posted' AND voided_at IS NULL THEN 1 ELSE 0 END) as posted_count")
             ->selectRaw("SUM(CASE WHEN voided_at IS NOT NULL THEN 1 ELSE 0 END) as void_count")
             ->selectRaw('COALESCE(SUM(total), 0) as total_value')
@@ -79,6 +83,21 @@ class PurchaseReturnController extends Controller
 
         if ($purchase_receipt->status !== 'posted') {
             return back()->with('error', 'Return hanya boleh dari GRN yang sudah POSTED.');
+        }
+
+        // Dedup: kalau sudah ada draft aktif (belum posted, belum void) untuk GRN ini,
+        // arahkan ke draft itu daripada bikin baru — mencegah draft ganda.
+        $existingDraft = PurchaseReturn::query()
+            ->where('purchase_receipt_id', (int) $purchase_receipt->id)
+            ->where('status', 'draft')
+            ->whereNull('voided_at')
+            ->orderByDesc('id')
+            ->first();
+
+        if ($existingDraft) {
+            return redirect()
+                ->route('purchasing.purchase_returns.show', $existingDraft->id)
+                ->with('success', "Sudah ada draft retur ({$existingDraft->code}) untuk GRN ini. Melanjutkan draft tersebut.");
         }
 
         $ret = PurchaseReturn::create([
@@ -99,14 +118,15 @@ class PurchaseReturnController extends Controller
                 continue;
             }
 
+            // Default qty 0 — operator isi sendiri hanya yang perlu diretur.
             PurchaseReturnLine::create([
                 'purchase_return_id' => $ret->id,
                 'purchase_receipt_line_id' => (int) $ln->id,
                 'item_id' => (int) $ln->item_id,
                 'lot_id' => $ln->lot_id ? (int) $ln->lot_id : null,
-                'qty' => round($rem, 4),
+                'qty' => 0,
                 'unit_price' => (float) $ln->unit_price,
-                'line_total' => round($rem * (float) $ln->unit_price, 2),
+                'line_total' => 0,
                 'notes' => null,
             ]);
         }
@@ -118,7 +138,7 @@ class PurchaseReturnController extends Controller
 
     public function show(PurchaseReturn $purchase_return)
     {
-        $purchase_return->loadMissing(['grn.warehouse', 'grn.lines.item', 'lines.item', 'lines.grnLine', 'supplier', 'order']);
+        $purchase_return->loadMissing(['grn.warehouse', 'grn.lines.item', 'lines.item', 'lines.grnLine', 'lines.photos', 'supplier', 'order']);
         $remainingMap = $this->remainingByGrnLine($purchase_return->grn, excludeReturnId: (int) $purchase_return->id);
         $returnLineByGrnLine = $purchase_return->lines->keyBy('purchase_receipt_line_id');
 
@@ -140,7 +160,7 @@ class PurchaseReturnController extends Controller
         $lineInventoryMap = [];
         $returnRows = collect();
 
-        $sourceLines = ($purchase_return->status === 'draft' && ! $purchase_return->voided_at)
+        $sourceLines = (in_array($purchase_return->status, ['draft', 'submitted'], true) && ! $purchase_return->voided_at)
             ? ($purchase_return->grn?->lines ?? collect())
             : $purchase_return->lines
                 ->map(fn ($line) => $line->grnLine)
@@ -246,7 +266,7 @@ class PurchaseReturnController extends Controller
 
     public function update(Request $request, PurchaseReturn $purchase_return)
     {
-        if ($purchase_return->status !== 'draft' || $purchase_return->voided_at) {
+        if (!in_array($purchase_return->status, ['draft', 'submitted'], true) || $purchase_return->voided_at) {
             return back()->with('error', 'Return tidak bisa diubah (sudah posted/void).');
         }
 
@@ -262,6 +282,11 @@ class PurchaseReturnController extends Controller
             'lines.*.purchase_receipt_line_id' => ['required', 'integer'],
             'lines.*.qty' => ['nullable', 'string'],
             'lines.*.notes' => ['nullable', 'string', 'max:255'],
+            'lines.*.reason_code' => ['nullable', Rule::in(array_keys(PurchaseReturnLine::REASONS))],
+            'lines.*.photos' => ['nullable', 'array'],
+            'lines.*.photos.*' => ['file', 'image', 'max:5120'],
+            'delete_photos' => ['nullable', 'array'],
+            'delete_photos.*' => ['integer'],
         ]);
 
         $purchase_return->loadMissing(['grn.lines']);
@@ -269,12 +294,25 @@ class PurchaseReturnController extends Controller
 
         $remainingMap = $this->remainingByGrnLine($purchase_return->grn, excludeReturnId: (int) $purchase_return->id);
 
-        DB::transaction(function () use ($purchase_return, $data, $remainingMap, $grnLines) {
+        DB::transaction(function () use ($request, $purchase_return, $data, $remainingMap, $grnLines) {
             $purchase_return->date = $data['date'];
             $purchase_return->notes = $data['notes'] ?? null;
             $purchase_return->save();
 
-            foreach (($data['lines'] ?? []) as $row) {
+            // 0) Hapus foto yang diminta (hanya foto milik return ini)
+            $deleteIds = array_map('intval', $data['delete_photos'] ?? []);
+            if (!empty($deleteIds)) {
+                $photos = PurchaseReturnLinePhoto::query()
+                    ->whereIn('id', $deleteIds)
+                    ->whereHas('line', fn($q) => $q->where('purchase_return_id', (int) $purchase_return->id))
+                    ->get();
+                foreach ($photos as $photo) {
+                    Storage::disk('public')->delete($photo->path);
+                    $photo->delete();
+                }
+            }
+
+            foreach (($data['lines'] ?? []) as $idx => $row) {
                 $grnLineId = (int) ($row['purchase_receipt_line_id'] ?? 0);
                 $grnLine = $grnLines->get($grnLineId);
                 if (!$grnLine) {
@@ -296,12 +334,21 @@ class PurchaseReturnController extends Controller
                     ->where('purchase_receipt_line_id', $grnLineId)
                     ->first();
 
-                if ($line && $qty <= 0.0001) {
-                    $line->delete();
-                    continue;
-                }
+                $reason = $row['reason_code'] ?? null;
+                $newFiles = $request->file("lines.$idx.photos", []);
+                $newFiles = is_array($newFiles) ? array_filter($newFiles) : ($newFiles ? [$newFiles] : []);
+                $existingPhotoCount = $line ? $line->photos()->count() : 0;
 
-                if (!$line && $qty <= 0.0001) {
+                // Baris dipertahankan jika ada qty, alasan, atau bukti foto.
+                $keep = $qty > 0.0001 || !empty($reason) || !empty($newFiles) || $existingPhotoCount > 0;
+
+                if (!$keep) {
+                    if ($line) {
+                        foreach ($line->photos as $photo) {
+                            Storage::disk('public')->delete($photo->path);
+                        }
+                        $line->delete();
+                    }
                     continue;
                 }
 
@@ -322,7 +369,18 @@ class PurchaseReturnController extends Controller
                 $line->qty = $qty;
                 $line->line_total = round($qty * $unit, 2);
                 $line->notes = $row['notes'] ?? null;
+                $line->reason_code = $reason;
                 $line->save();
+
+                // Simpan foto baru
+                foreach ($newFiles as $file) {
+                    $path = $file->store("purchase_returns/{$purchase_return->id}", 'public');
+                    PurchaseReturnLinePhoto::create([
+                        'purchase_return_line_id' => (int) $line->id,
+                        'path' => $path,
+                        'original_name' => $file->getClientOriginalName(),
+                    ]);
+                }
             }
 
             $total = (float) $purchase_return->lines()->sum('line_total');
@@ -331,6 +389,29 @@ class PurchaseReturnController extends Controller
         });
 
         return back()->with('success', 'Draft Return tersimpan.');
+    }
+
+    /**
+     * SUBMIT Return: draft -> submitted (masuk antrean approval).
+     */
+    public function submit(Request $request, PurchaseReturn $purchase_return)
+    {
+        if ($purchase_return->voided_at) {
+            return back()->with('error', 'Return sudah void.');
+        }
+
+        if ($purchase_return->status !== 'draft') {
+            return back()->with('error', 'Hanya draft yang bisa diajukan.');
+        }
+
+        $hasQty = $purchase_return->lines()->where('qty', '>', 0.0001)->exists();
+        if (!$hasQty) {
+            return back()->with('error', 'Isi minimal satu qty retur sebelum mengajukan.');
+        }
+
+        $purchase_return->forceFill(['status' => 'submitted'])->save();
+
+        return back()->with('success', 'Return diajukan untuk persetujuan.');
     }
 
     /**
@@ -344,7 +425,7 @@ class PurchaseReturnController extends Controller
             return back()->with('error', 'Return sudah void.');
         }
 
-        if ($purchase_return->status !== 'draft') {
+        if (!in_array($purchase_return->status, ['draft', 'submitted'], true)) {
             return back()->with('error', 'Return sudah posted.');
         }
 
@@ -440,7 +521,7 @@ class PurchaseReturnController extends Controller
                 ->lockForUpdate()
                 ->firstOrFail();
 
-            if ($lockedReturn->status !== 'draft' || $lockedReturn->voided_at) {
+            if (!in_array($lockedReturn->status, ['draft', 'submitted'], true) || $lockedReturn->voided_at) {
                 throw ValidationException::withMessages([
                     'return' => 'Return sudah diproses. Muat ulang halaman.',
                 ]);

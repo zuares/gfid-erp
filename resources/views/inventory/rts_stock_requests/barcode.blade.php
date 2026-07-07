@@ -1,7 +1,7 @@
-{{-- resources/views/production/sewing_returns/barcode.blade.php --}}
+{{-- resources/views/inventory/rts_stock_requests/barcode.blade.php --}}
 @extends('layouts.app')
 
-@section('title', 'Cetak Barcode • ' . $return->code)
+@section('title', 'Cetak Barcode • ' . ($stockRequest->code ?? ('#'.$stockRequest->id)))
 
 @push('head')
 <style>
@@ -131,19 +131,19 @@ body[data-theme="dark"] .qty-btn { color:#cbd5e1; background:rgba(51,65,85,.5); 
 @endpush
 
 @section('content')
-<form id="barcodeForm" method="GET" action="{{ route('production.sewing.returns.barcode_print') }}" target="_blank">
-    <input type="hidden" name="back" value="{{ route('production.sewing.returns.barcode', $return->id, false) }}">
+<form id="barcodeForm" method="GET" action="{{ route('rts.stock-requests.barcode_print', $stockRequest->id) }}" target="_blank">
+    <input type="hidden" name="back" value="{{ route('rts.stock-requests.barcode', $stockRequest->id, false) }}">
 
     <div class="shp-topbar">
         <span class="shp-topbar-code">Cetak Barcode</span>
-        <span class="shp-badge">{{ $return->code }}</span>
+        <span class="shp-badge">RTS {{ $stockRequest->code ?? ('#'.$stockRequest->id) }}</span>
 
         <span class="shp-topbar-spacer"></span>
 
         <span class="shp-pill">Baris <b id="summaryLines">0</b></span>
         <span class="shp-pill shp-pill-accent">Total Label <b id="totalLabels">0</b></span>
 
-        <a href="{{ route('production.sewing.returns.show', $return->id) }}" class="btn-shp-outline">Kembali</a>
+        <a href="{{ route('rts.stock-requests.show', $stockRequest->id) }}" class="btn-shp-outline">Kembali</a>
         <button type="submit" class="btn-shp-submit">Preview &amp; Cetak</button>
     </div>
 
@@ -152,7 +152,7 @@ body[data-theme="dark"] .qty-btn { color:#cbd5e1; background:rgba(51,65,85,.5); 
             <div class="shp-table-head">
                 <div class="shp-table-title">
                     Daftar Barang
-                    <small>Jumlah label default = qty OK diterima. Sesuaikan bila perlu.</small>
+                    <small>Jumlah label default = qty diterima/diminta. Sesuaikan bila perlu.</small>
                 </div>
             </div>
 
@@ -187,7 +187,7 @@ body[data-theme="dark"] .qty-btn { color:#cbd5e1; background:rgba(51,65,85,.5); 
             <div class="shp-foot">
                 <div class="muted">Barcode berisi kode item (SKU). Nama varian ikut tercetak di label.</div>
                 <div style="display:flex; gap:.5rem">
-                    <button type="button" class="btn-shp-outline" id="btnReset">Reset ke Qty OK</button>
+                    <button type="button" class="btn-shp-outline" id="btnReset">Reset ke Qty</button>
                     <button type="submit" class="btn-shp-submit">Preview &amp; Cetak</button>
                 </div>
             </div>
@@ -249,7 +249,7 @@ body[data-theme="dark"] .qty-btn { color:#cbd5e1; background:rgba(51,65,85,.5); 
         return tr;
     }
 
-    function seedFromReturn(){
+    function seedFromDoc(){
         tbody.innerHTML = '';
         if (Array.isArray(seedLines) && seedLines.length) {
             seedLines.forEach(l => renderItemRow({ id:l.id, code:l.code, name:l.name }, l.qty));
@@ -293,7 +293,7 @@ body[data-theme="dark"] .qty-btn { color:#cbd5e1; background:rgba(51,65,85,.5); 
     });
     tbody.addEventListener('focusin', (e)=>{ if (e.target.classList?.contains('line-qty')) setTimeout(()=>e.target.select(),0); });
 
-    document.getElementById('btnReset').addEventListener('click', ()=>{ seedFromReturn(); setStatus(''); focusScan(); });
+    document.getElementById('btnReset').addEventListener('click', ()=>{ seedFromDoc(); setStatus(''); focusScan(); });
 
     function focusScan(){ if(!scanInput) return; try{ scanInput.focus({preventScroll:true}); }catch(_){ scanInput.focus(); } scanInput.select?.(); }
     function refocusOnEmpty(e){ if (e.target.closest('input, textarea, select, button, a, label, .qty-stepper')) return; focusScan(); }
@@ -313,7 +313,7 @@ body[data-theme="dark"] .qty-btn { color:#cbd5e1; background:rgba(51,65,85,.5); 
     });
 
     // init
-    seedFromReturn();
+    seedFromDoc();
     setTimeout(focusScan, 60);
 })();
 </script>

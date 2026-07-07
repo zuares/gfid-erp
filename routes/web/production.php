@@ -163,6 +163,10 @@ Route::middleware(['web', 'auth', 'access:production'])
                     ->whereNumber('return')
                     ->name('barcode');
 
+                // ✅ Cetak label barcode (reuse generic printer)
+                Route::get('/barcode-print', [\App\Http\Controllers\Inventory\BarcodeLabelController::class, 'print'])
+                    ->name('barcode_print');
+
                 Route::post('/{return}/void', [SewingReturnController::class, 'void'])
                     ->whereNumber('return')
                     ->name('void');

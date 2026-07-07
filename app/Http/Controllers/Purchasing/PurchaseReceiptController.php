@@ -271,6 +271,30 @@ class PurchaseReceiptController extends Controller
     }
 
     /**
+     * Halaman cetak barcode GRN.
+     * Default jumlah label per item = qty diterima, tapi bisa disesuaikan sebelum cetak.
+     */
+    public function barcode(PurchaseReceipt $purchase_receipt)
+    {
+        $purchase_receipt->load(['supplier', 'lines.item']);
+
+        $lines = $purchase_receipt->lines
+            ->filter(fn($l) => $l->item && $l->item->code)
+            ->map(fn($l) => [
+                'id'   => $l->item->id,
+                'code' => $l->item->code,
+                'name' => $l->item->name,
+                'qty'  => max(1, (int) round((float) ($l->qty_received ?? 0))),
+            ])
+            ->values();
+
+        return view('purchasing.purchase_receipts.barcode', [
+            'receipt' => $purchase_receipt,
+            'lines'   => $lines,
+        ]);
+    }
+
+    /**
      * Form edit GRN (hanya draft).
      */
     public function edit(PurchaseReceipt $purchase_receipt)

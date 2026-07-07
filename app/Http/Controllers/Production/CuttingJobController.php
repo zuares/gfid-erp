@@ -245,8 +245,8 @@ class CuttingJobController extends Controller
 
         // 4️⃣ Data master operator cutting
         $operators = Employee::query()
-            ->select('id', 'code', 'name')
-            ->where('role', 'cutting')
+            ->select('id', 'code', 'name', 'role')
+            ->whereIn('role', ['cutting', 'operating'])
             ->orderBy('code')
             ->get();
 
@@ -435,8 +435,8 @@ class CuttingJobController extends Controller
 
         // 4) operators
         $operators = Employee::query()
-            ->select('id', 'code', 'name')
-            ->where('role', 'cutting')
+            ->select('id', 'code', 'name', 'role')
+            ->whereIn('role', ['cutting', 'operating'])
             ->orderBy('code')
             ->get();
 

@@ -454,6 +454,27 @@ class ShipmentReturnController extends Controller
     }
 
     /**
+     * Halaman cetak barcode retur.
+     * Default jumlah label per item = qty retur, tapi bisa disesuaikan sebelum cetak.
+     */
+    public function barcode(ShipmentReturn $shipmentReturn)
+    {
+        $shipmentReturn->load(['store', 'lines.item']);
+
+        $lines = $shipmentReturn->lines
+            ->filter(fn ($l) => $l->item && $l->item->code)
+            ->map(fn ($l) => [
+                'id'   => $l->item->id,
+                'code' => $l->item->code,
+                'name' => $l->item->name,
+                'qty'  => max(1, (int) round((float) ($l->qty ?? 1))),
+            ])
+            ->values();
+
+        return view('sales.shipment_returns.barcode', compact('shipmentReturn', 'lines'));
+    }
+
+    /**
      * Scan item yang dikembalikan → tambah / update line retur.
      * Support AJAX.
      */

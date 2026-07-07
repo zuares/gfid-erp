@@ -222,6 +222,11 @@
           <i class="bi bi-arrow-left me-1"></i>Kembali
         </a>
 
+        <a href="{{ route('purchasing.purchase_receipts.barcode', $receipt->id) }}"
+           class="btn btn-outline-dark btn-sm" target="_blank">
+          <i class="bi bi-upc-scan me-1"></i>Cetak Barcode
+        </a>
+
         @if ($isDraft && $canManage)
           <a href="{{ route('purchasing.purchase_receipts.edit', $receipt->id) }}"
              class="btn btn-outline-primary btn-sm">

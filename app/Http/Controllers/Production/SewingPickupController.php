@@ -200,7 +200,7 @@ class SewingPickupController extends Controller
      */
     public function create()
     {
-        $operators = Employee::where('role', 'sewing')
+        $operators = Employee::whereIn('role', ['sewing', 'operating'])
             ->orderBy('code')
             ->get();
 
