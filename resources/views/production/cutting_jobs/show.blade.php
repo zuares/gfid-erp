@@ -361,6 +361,15 @@
             && ! $hasSewingPickup
             && Route::has('production.cutting_jobs.void');
 
+        // Kembalikan ke Bahan Baku: owner, QC sudah diposting, tapi belum ditarik jahit.
+        // Ini kasus di mana Void biasa diblok (harus Batalkan QC dulu) — aksi ini
+        // menggabungkan Batalkan QC + Void jadi satu klik.
+        $canRevertToRaw = $isOwner
+            && $status !== 'voided'
+            && ($hasQcCutting || $hasWipPosted)
+            && ! $hasSewingPickup
+            && Route::has('production.cutting_jobs.revert_to_raw');
+
         // ========= QC operator (1 orang utk header) =========
         $qcOperator = null;
         if ($hasQcCutting) {
@@ -460,6 +469,7 @@
                 $canCancelQc,
                 $canOverproduction,
                 $canVoid,
+                $canRevertToRaw,
             ) {
                 $btn = $isMobile ? 'btn btn-sm' : 'btn btn-sm';
                 $wrapClass = $isMobile ? '' : 'cutting-actions';
@@ -533,6 +543,18 @@
                             onsubmit="return confirm(\'⚠️ VOID Cutting Job ' . e($job->code) . '?\\n\\nStok kain akan dikembalikan ke LOT semula.\\nAksi ini tidak bisa dibatalkan.\')">';
                     echo csrf_field();
                     echo '<button type="submit" class="' . e($btn) . ' btn-outline-danger">🗑 Void</button>';
+                    echo '</form>';
+                }
+
+                // Kembalikan ke Bahan Baku (owner, QC sudah diposting, belum ditarik jahit)
+                // = Batalkan QC + Void dalam satu klik.
+                if ($canRevertToRaw) {
+                    echo '<form action="' .
+                        e(route('production.cutting_jobs.revert_to_raw', $job)) .
+                        '" method="post" class="d-inline"
+                            onsubmit="return confirm(\'↩️ Kembalikan ' . e($job->code) . ' ke Bahan Baku?\\n\\nQC dibatalkan, WIP-CUT dibalik, dan kain kembali ke RM/LOT. Jurnal ikut ter-void.\\nDitolak jika bundle sudah ditarik jahit.\')">';
+                    echo csrf_field();
+                    echo '<button type="submit" class="' . e($btn) . ' btn-outline-danger">↩️ Kembalikan ke Bahan Baku</button>';
                     echo '</form>';
                 }
 

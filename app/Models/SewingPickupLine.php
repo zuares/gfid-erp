@@ -23,6 +23,15 @@ class SewingPickupLine extends Model
         'voided_at',
         'voided_by',
         'qty_direct_picked',
+        // ── penutupan administratif (WIP Cleanup) ──
+        'qty_closed',
+        'close_action',
+        'closed_at',
+        'closed_by',
+    ];
+
+    protected $casts = [
+        'closed_at' => 'datetime',
     ];
 
     // 🔹 Header Sewing Pickup

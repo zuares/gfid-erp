@@ -32,22 +32,49 @@ class CuttingJobController extends Controller
         protected LotCostService $lotCost,
     ) {}
 
+    /** Kata konfirmasi yang harus diketik untuk membersihkan data produksi. */
+    public const CLEAN_PROD_PHRASE = 'BERSIHKAN PRODUKSI';
+
     /**
-     * DEV ONLY — Bersihkan SEMUA data transaksi produksi.
-     * Guard ganda: role owner + APP_DB_MODE=dev.
+     * Bersihkan SEMUA data transaksi produksi (owner-only).
+     *
+     * Tersedia di semua mode (dev/ops/production), TAPI dikunci berlapis:
+     *   1) role owner
+     *   2) konfirmasi ketik frasa CLEAN_PROD_PHRASE (anti klik tidak sengaja)
      *
      * Menghapus: cutting/sewing/QC/finishing/packing/WIP-opname + mutasi &
      * jurnal produksi + adjustment yang ber-referensi dokumen produksi,
      * lalu menghitung ulang stok gudang & saldo lot dari mutasi tersisa.
      * Master data, GRN/pembelian, stock opname, & storefront TIDAK disentuh.
+     *
+     * ⚠️ Data transaksi yang dihapus TIDAK bisa dikembalikan. Backup dulu di prod.
      */
     public function devCleanProductionData(Request $request)
     {
-        if (env('APP_DB_MODE') !== 'dev') {
-            abort(403, 'Bersihkan data hanya tersedia di mode dev.');
-        }
         if (!$request->user() || $request->user()->role !== 'owner') {
             abort(403, 'Hanya owner yang bisa membersihkan data produksi.');
+        }
+
+        // Konfirmasi ketik — wajib, terutama di lingkungan ops/production.
+        $typed = strtoupper(trim((string) $request->input('confirm_text')));
+        if ($typed !== self::CLEAN_PROD_PHRASE) {
+            return back()->with('error',
+                'Konfirmasi salah. Ketik persis "' . self::CLEAN_PROD_PHRASE . '" untuk membersihkan data produksi.'
+            );
+        }
+
+        // 🔐 Verifikasi password owner (re-auth) — lapis terakhir sebelum hapus.
+        $password = (string) $request->input('confirm_password');
+        if ($password === '' || !\Illuminate\Support\Facades\Hash::check($password, (string) $request->user()->password)) {
+            return back()->with('error', 'Password owner salah. Pembersihan dibatalkan.');
+        }
+
+        // 🛡️ BACKUP DB DULU — wajib. Kalau backup gagal, pembersihan DIBATALKAN.
+        $backupRel = $this->backupDatabaseBeforeClean();
+        if ($backupRel === null) {
+            return back()->with('error',
+                'Backup database gagal / tidak didukung (butuh SQLite). Pembersihan dibatalkan demi keamanan.'
+            );
         }
 
         // Source type mutasi & jurnal milik alur produksi (lihat JournalService::SRC_*)
@@ -159,12 +186,65 @@ class CuttingJobController extends Controller
             ->map(fn($v, $k) => "{$k}: {$v}")
             ->implode(', ');
 
-        Log::warning('[DEV] Data produksi dibersihkan oleh ' . $request->user()->name, $deleted);
+        Log::warning('Data produksi dibersihkan oleh ' . $request->user()->name . ' (backup: ' . $backupRel . ')', $deleted);
+
+        // Audit trail (tabel production_logs) — aman walau tabel belum di-migrate.
+        \App\Models\ProductionLog::record(
+            event: 'clean_production',
+            summary: 'Bersihkan data produksi oleh ' . $request->user()->name . '. '
+                . ($summary !== '' ? "Terhapus — {$summary}." : 'Tidak ada data yang dihapus.')
+                . ' Backup: ' . $backupRel,
+            meta: ['deleted' => $deleted, 'backup' => $backupRel],
+        );
 
         return redirect()
             ->route('production.cutting_jobs.index')
             ->with('success', 'Data produksi berhasil dibersihkan & stok dihitung ulang. '
-                . ($summary !== '' ? "Terhapus — {$summary}." : 'Tidak ada data yang perlu dihapus.'));
+                . ($summary !== '' ? "Terhapus — {$summary}. " : 'Tidak ada data yang perlu dihapus. ')
+                . '📦 Backup tersimpan: ' . $backupRel);
+    }
+
+    /**
+     * Backup DB (SQLite) sebelum pembersihan. Return path relatif untuk
+     * ditampilkan, atau null jika gagal / bukan SQLite (pemanggil membatalkan).
+     * Menyisakan maksimal 30 file backup_*.sqlite terbaru.
+     */
+    protected function backupDatabaseBeforeClean(): ?string
+    {
+        try {
+            $conn = config('database.default');
+            if ($conn !== 'sqlite') {
+                return null;
+            }
+            $dbPath = config('database.connections.sqlite.database');
+            if (!$dbPath || !is_file($dbPath)) {
+                return null;
+            }
+
+            $backupDir = storage_path('backups');
+            if (!is_dir($backupDir)) {
+                @mkdir($backupDir, 0755, true);
+            }
+
+            $name = 'backup_before_clean_prod_' . now()->format('Ymd_His') . '.sqlite';
+            $target = $backupDir . DIRECTORY_SEPARATOR . $name;
+
+            if (!@copy($dbPath, $target) || !is_file($target)) {
+                return null;
+            }
+
+            // Batasi jumlah backup (maks 30 terbaru).
+            $files = glob($backupDir . DIRECTORY_SEPARATOR . 'backup_*.sqlite') ?: [];
+            usort($files, fn ($a, $b) => filemtime($b) <=> filemtime($a));
+            foreach (array_slice($files, 30) as $old) {
+                @unlink($old);
+            }
+
+            return 'storage/backups/' . $name;
+        } catch (\Throwable $e) {
+            \Log::error('Backup sebelum bersihkan produksi gagal: ' . $e->getMessage());
+            return null;
+        }
     }
 
     /**
@@ -985,7 +1065,7 @@ class CuttingJobController extends Controller
         try {
             $this->journal->postCuttingJob($job);
         } catch (\Throwable $e) {
-            Log::warning('Gagal membuat jurnal cutting_job', [
+            Log::error('Gagal membuat jurnal cutting_job', [
                 'cutting_job_id' => $job->id,
                 'message' => $e->getMessage(),
             ]);
@@ -994,7 +1074,7 @@ class CuttingJobController extends Controller
         try {
             $this->journal->postCuttingJobWage($job);
         } catch (\Throwable $e) {
-            Log::warning('Gagal membuat jurnal upah cutting_job', [
+            Log::error('Gagal membuat jurnal upah cutting_job', [
                 'cutting_job_id' => $job->id,
                 'message' => $e->getMessage(),
             ]);
@@ -1464,6 +1544,60 @@ class CuttingJobController extends Controller
         return redirect()
             ->route('production.cutting_jobs.show', $cuttingJob)
             ->with('success', "Cutting Job {$cuttingJob->code} berhasil di-void. Stok kain sudah dikembalikan ke LOT.");
+    }
+
+    /**
+     * Kembalikan ke Bahan Baku — orkestrator satu klik.
+     *
+     * Menggabungkan dua langkah yang sudah ada, TANPA logika stok baru:
+     *   1) Batalkan QC (QcService::cancelCuttingQc) bila QC sudah diposting
+     *      → WIP-CUT dibalik + jurnal cutting_wip di-void.
+     *   2) Void Cutting Job (method void() yang sudah ada)
+     *      → kain balik ke RM/LOT + jurnal cutting_job & upah di-void.
+     *
+     * Diblok kalau bundle sudah ditarik jahit (fabric sudah di sewing).
+     */
+    public function revertToRaw(Request $request, CuttingJob $cuttingJob)
+    {
+        if ((auth()->user()->role ?? null) !== 'owner') {
+            return back()->with('error', 'Hanya Owner yang bisa mengembalikan cutting ke bahan baku.');
+        }
+
+        $cuttingJob->loadMissing('bundles');
+
+        // Fabric yang sudah ditarik ke jahit tidak bisa di-"un-cut".
+        $hasSewingPickup = $cuttingJob->bundles->contains(fn ($b) => ((float) ($b->sewing_picked_qty ?? 0)) > 0);
+        if ($hasSewingPickup) {
+            return back()->with('error',
+                'Tidak bisa dikembalikan ke bahan baku: sebagian bundle sudah ditarik untuk jahit. Batalkan pickup-nya dulu (WIP Cleanup → Batalkan).'
+            );
+        }
+
+        // 1) Batalkan QC dulu jika QC sudah diposting.
+        $hasQc = \App\Models\QcResult::query()
+            ->where('stage', \App\Models\QcResult::STAGE_CUTTING)
+            ->where('cutting_job_id', $cuttingJob->id)
+            ->exists();
+        $hasWipPosted = $cuttingJob->bundles->contains(fn ($b) => ! empty($b->wip_posted_at));
+
+        if ($hasQc || $hasWipPosted) {
+            try {
+                app(\App\Services\Production\QcService::class)->cancelCuttingQc($cuttingJob);
+            } catch (\Throwable $e) {
+                return back()->with('error', 'Gagal membatalkan QC saat kembalikan ke bahan baku: ' . $e->getMessage());
+            }
+        }
+
+        // 2) Void cutting job (reuse). Job sudah fresh: WIP cleared, status voidable.
+        $response = $this->void($request, $cuttingJob->fresh());
+
+        // Pesan lebih jelas untuk aksi gabungan (tanpa mengubah logika void).
+        if ($response instanceof \Illuminate\Http\RedirectResponse
+            && $cuttingJob->fresh()->status === 'voided') {
+            $response->with('success', "Cutting Job {$cuttingJob->code} dikembalikan ke bahan baku — WIP dibatalkan, kain balik ke RM/LOT, jurnal ter-void.");
+        }
+
+        return $response;
     }
 
     public function sendToQc(CuttingJob $cuttingJob)

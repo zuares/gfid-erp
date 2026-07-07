@@ -3,6 +3,8 @@
 use App\Http\Controllers\Inventory\InventoryAdjustmentController;
 use App\Http\Controllers\Production\CuttingJobController;
 use App\Http\Controllers\Production\WipOpnameController;
+use App\Http\Controllers\Production\WipCleanupController;
+use App\Http\Controllers\Production\WipNormalizationController;
 use App\Http\Controllers\Production\FinishingJobController;
 use App\Http\Controllers\Production\FinishingRepairController;
 use App\Http\Controllers\Production\PackingJobController;
@@ -45,6 +47,37 @@ Route::middleware(['web', 'auth', 'access:production'])
             Route::post('/{wipOpnamePeriod}/approve', [WipOpnameController::class, 'approve'])->name('approve');
         });
 
+        /*
+        |----------------------------------------------------------------------
+        | WIP CLEANUP — preview WIP menggantung (READ-ONLY, tahap 1)
+        |----------------------------------------------------------------------
+         */
+        Route::get('log', [\App\Http\Controllers\Production\ProductionLogController::class, 'index'])->name('log.index');
+
+        Route::prefix('wip-cleanup')->name('wip_cleanup.')->group(function () {
+            Route::get('/',            [WipCleanupController::class, 'index'])->name('index');
+            Route::get('/action',      [WipCleanupController::class, 'actionForm'])->name('action');
+            Route::post('/action',     [WipCleanupController::class, 'storeAction'])->name('store_action');
+            Route::get('/pickup-close',  [WipCleanupController::class, 'pickupCloseForm'])->name('pickup_close');
+            Route::post('/pickup-close', [WipCleanupController::class, 'pickupCloseStore'])->name('pickup_close_store');
+            Route::get('/{wipCleanup}',        [WipCleanupController::class, 'show'])->name('show');
+            Route::post('/{wipCleanup}/void',  [WipCleanupController::class, 'void'])->name('void');
+        });
+
+        /*
+        |----------------------------------------------------------------------
+        | WIP NORMALIZATION (opname WIP) — draft → approval → generate
+        |----------------------------------------------------------------------
+         */
+        Route::prefix('wip-normalization')->name('wip_normalization.')->group(function () {
+            Route::get('/',        [WipNormalizationController::class, 'index'])->name('index');
+            Route::get('/create',  [WipNormalizationController::class, 'create'])->name('create');
+            Route::post('/',       [WipNormalizationController::class, 'store'])->name('store');
+            Route::get('/{wipNormalization}',          [WipNormalizationController::class, 'show'])->name('show');
+            Route::post('/{wipNormalization}/approve', [WipNormalizationController::class, 'approve'])->name('approve');
+            Route::post('/{wipNormalization}/void',    [WipNormalizationController::class, 'void'])->name('void');
+        });
+
         Route::prefix('cutting-jobs')->name('cutting_jobs.')->group(function () {
             Route::get('/', [CuttingJobController::class, 'index'])->name('index');
             Route::get('/create', [CuttingJobController::class, 'create'])->name('create');
@@ -60,6 +93,9 @@ Route::middleware(['web', 'auth', 'access:production'])
 
             Route::post('/{cuttingJob}/void', [CuttingJobController::class, 'void'])
                 ->name('void');
+
+            Route::post('/{cuttingJob}/revert-to-raw', [CuttingJobController::class, 'revertToRaw'])
+                ->name('revert_to_raw');
 
             Route::post('/{cuttingJob}/sisa-fabric', [CuttingJobController::class, 'recordSisaFabric'])
                 ->name('sisa_fabric');

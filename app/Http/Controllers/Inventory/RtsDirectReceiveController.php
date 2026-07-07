@@ -126,8 +126,9 @@ class RtsDirectReceiveController extends Controller
                 $returnedRej = (float) ($l->qty_returned_reject ?? 0);
                 $directPick = (float) ($l->qty_direct_picked ?? 0);
                 $progressAdj = (float) ($l->qty_progress_adjusted ?? 0);
+                $closed = (float) ($l->qty_closed ?? 0); // ditutup via WIP Cleanup (write-off/cancel)
 
-                $remaining = max($qtyBundle - ($returnedOk + $returnedRej + $directPick + $progressAdj), 0);
+                $remaining = max($qtyBundle - ($returnedOk + $returnedRej + $directPick + $progressAdj + $closed), 0);
 
                 $item = $l->bundle?->finishedItem;
                 $itemId = (int) ($item?->id ?? 0);
@@ -376,8 +377,9 @@ class RtsDirectReceiveController extends Controller
                 $returnedRej = (float) ($pl->qty_returned_reject ?? 0);
                 $directPick = (float) ($pl->qty_direct_picked ?? 0);
                 $progressAdj = (float) ($pl->qty_progress_adjusted ?? 0);
+                $closed = (float) ($pl->qty_closed ?? 0); // ditutup via WIP Cleanup
 
-                $remainingByPlId[$pl->id] = max($qtyBundle - ($returnedOk + $returnedRej + $directPick + $progressAdj), 0);
+                $remainingByPlId[$pl->id] = max($qtyBundle - ($returnedOk + $returnedRej + $directPick + $progressAdj + $closed), 0);
             }
 
             // Clamp per pickup line: total <= remaining

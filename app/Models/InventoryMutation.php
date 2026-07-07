@@ -20,6 +20,7 @@ class InventoryMutation extends Model
         'lot_id', // ⭐ WAJIB
         'unit_cost', // ⭐ WAJIB
         'total_cost', // ⭐ WAJIB
+        'created_by',
     ];
 
     protected $casts = [

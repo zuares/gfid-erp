@@ -566,7 +566,7 @@ class SewingPickupController extends Controller
         try {
             $this->journal->postSewingPickup($pickup);
         } catch (\Throwable $e) {
-            Log::warning('Gagal membuat jurnal sewing pickup', [
+            Log::error('Gagal membuat jurnal sewing pickup', [
                 'sewing_pickup_id' => $pickup->id,
                 'message' => $e->getMessage(),
             ]);
@@ -576,7 +576,7 @@ class SewingPickupController extends Controller
             try {
                 $this->journal->postSewingPickupLineWage($line);
             } catch (\Throwable $e) {
-                Log::warning('Gagal membuat jurnal upah sewing pickup line', [
+                Log::error('Gagal membuat jurnal upah sewing pickup line', [
                     'sewing_pickup_line_id' => $line->id,
                     'message' => $e->getMessage(),
                 ]);
@@ -586,7 +586,7 @@ class SewingPickupController extends Controller
         try {
             $this->journal->postSewingPickupSupply($pickup);
         } catch (\Throwable $e) {
-            Log::warning('Gagal membuat jurnal kelengkapan sewing pickup', [
+            Log::error('Gagal membuat jurnal kelengkapan sewing pickup', [
                 'sewing_pickup_id' => $pickup->id,
                 'message' => $e->getMessage(),
             ]);
@@ -1029,7 +1029,7 @@ class SewingPickupController extends Controller
         try {
             $this->journal->postSewingPickupSupply($pickup);
         } catch (\Throwable $e) {
-            Log::warning('Gagal membuat jurnal kelengkapan sewing pickup (updateSupplies)', [
+            Log::error('Gagal membuat jurnal kelengkapan sewing pickup (updateSupplies)', [
                 'sewing_pickup_id' => $pickup->id,
                 'message'          => $e->getMessage(),
             ]);
@@ -2025,7 +2025,7 @@ class SewingPickupController extends Controller
         try {
             $this->journal->postSewingPickupLineVoid($line->fresh());
         } catch (\Throwable $e) {
-            Log::warning('Gagal membuat jurnal void pickup line (WIP)', [
+            Log::error('Gagal membuat jurnal void pickup line (WIP)', [
                 'sewing_pickup_line_id' => $lineId,
                 'message' => $e->getMessage(),
             ]);
@@ -2044,7 +2044,7 @@ class SewingPickupController extends Controller
         try {
             $this->journal->postSewingPickupSupplyVoidLine($line->fresh());
         } catch (\Throwable $e) {
-            Log::warning('Gagal membuat jurnal void kelengkapan pickup line', [
+            Log::error('Gagal membuat jurnal void kelengkapan pickup line', [
                 'sewing_pickup_line_id' => $lineId,
                 'message' => $e->getMessage(),
             ]);

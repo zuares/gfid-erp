@@ -49,6 +49,20 @@ class AccountSeeder extends Seeder
                 'is_cash' => 0,
                 'is_active' => 1,
             ]);
+            DB::table('accounts')->updateOrInsert(['code' => '1204'], [
+                'code' => '1204',
+                'name' => 'Persediaan Barang Cacat',
+                'type' => 'asset',
+                'is_cash' => 0,
+                'is_active' => 1,
+            ]);
+            DB::table('accounts')->updateOrInsert(['code' => '1205'], [
+                'code' => '1205',
+                'name' => 'Persediaan Packaging',
+                'type' => 'asset',
+                'is_cash' => 0,
+                'is_active' => 1,
+            ]);
             DB::table('accounts')->updateOrInsert(['code' => '1301'], [
                 'code' => '1301',
                 'name' => 'Piutang Dagang',
@@ -150,6 +164,27 @@ class AccountSeeder extends Seeder
             DB::table('accounts')->updateOrInsert(['code' => '6110'], [
                 'code' => '6110',
                 'name' => 'Biaya Packing',
+                'type' => 'expense',
+                'is_cash' => 0,
+                'is_active' => 1,
+            ]);
+            DB::table('accounts')->updateOrInsert(['code' => '6115'], [
+                'code' => '6115',
+                'name' => 'Selisih Stock Opname',
+                'type' => 'expense',
+                'is_cash' => 0,
+                'is_active' => 1,
+            ]);
+            DB::table('accounts')->updateOrInsert(['code' => '6116'], [
+                'code' => '6116',
+                'name' => 'Koreksi Persediaan Legacy',
+                'type' => 'expense',
+                'is_cash' => 0,
+                'is_active' => 1,
+            ]);
+            DB::table('accounts')->updateOrInsert(['code' => '6120'], [
+                'code' => '6120',
+                'name' => 'Kerugian Produksi / Reject',
                 'type' => 'expense',
                 'is_cash' => 0,
                 'is_active' => 1,

@@ -1467,6 +1467,7 @@ class SewingReturnController extends Controller
         });
 
         if ($postedSewingReturn && ($postedSewingReturn->status ?? null) !== 'pending_qc') {
+            $journalErrors = [];
             foreach ([
                 'postSewingReturnOk',
                 'postSewingReturnReject',
@@ -1475,11 +1476,22 @@ class SewingReturnController extends Controller
                 try {
                     $this->journal->{$method}($postedSewingReturn);
                 } catch (\Throwable $journalError) {
-                    Log::warning("Gagal membuat jurnal {$method}", [
+                    // Jangan ditelan diam-diam: stok sudah commit, tapi jurnal gagal.
+                    Log::error("Gagal membuat jurnal {$method}", [
                         'sewing_return_id' => $postedSewingReturn->id,
                         'message' => $journalError->getMessage(),
                     ]);
+                    $journalErrors[] = $journalError->getMessage();
                 }
+            }
+
+            // Surel ke pengguna: nilai akuntansi belum terbentuk, perlu tindak lanjut.
+            if ($journalErrors && $response instanceof \Illuminate\Http\RedirectResponse) {
+                $response->with('journal_warning',
+                    'Stok setoran jahit tersimpan, tetapi jurnal akuntansi GAGAL dibuat ('
+                    . implode('; ', array_unique($journalErrors))
+                    . '). Nilai WIP belum berpindah — hubungi admin accounting untuk posting ulang.'
+                );
             }
         }
 

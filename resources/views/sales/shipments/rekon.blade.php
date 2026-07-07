@@ -201,6 +201,39 @@ body[data-theme="dark"] .rk-tab.active { color: #93c5fd; border-bottom-color: #9
 .rk-tab.active .rk-tab-count { background: var(--shp-accent); color: #fff; }
 .rk-tabpane { display: none; }
 .rk-tabpane.active { display: block; }
+/* Item Batch table (mirip halaman detail) */
+.rk-batch-head {
+    display: flex; align-items: center; justify-content: space-between; gap: .55rem;
+    padding: .8rem 1.1rem; border-bottom: 1px solid rgba(148,163,184,.12);
+}
+body[data-theme="dark"] .rk-batch-head { border-bottom-color: rgba(30,64,175,.2); }
+.rk-batch-title { font-weight: 900; color: #334155; font-size: .95rem; }
+body[data-theme="dark"] .rk-batch-title { color: #e2e8f0; }
+.rk-batch-sub { color: #64748b; font-size: .78rem; margin-top: .1rem; }
+.rk-batch-pill {
+    display: inline-flex; align-items: center; border-radius: 999px;
+    border: 1px solid rgba(148,163,184,.3); padding: .18rem .55rem;
+    font-size: .72rem; font-weight: 800; color: #64748b; white-space: nowrap;
+}
+.rk-batch-tbl { padding: 0 .55rem; }
+.rk-batch-tbl th { padding: .55rem 1.1rem; }
+.rk-batch-tbl td { padding: .6rem 1.1rem; }
+.rk-batch-name { color: #64748b; font-size: .78rem; margin-top: .1rem; }
+.rk-batch-cat { color: #94a3b8; font-size: .74rem; margin-top: .08rem; }
+.rk-qty-badge {
+    display: inline-flex; align-items: center; justify-content: center;
+    border-radius: 7px; border: 1px solid rgba(148,163,184,.25);
+    padding: .16rem .5rem; font-size: .78rem; font-weight: 800; color: #475569; white-space: nowrap;
+}
+body[data-theme="dark"] .rk-qty-badge { color: #cbd5e1; border-color: rgba(71,85,105,.6); }
+.rk-batch-total td { font-weight: 900; color: #111827; background: rgba(148,163,184,.05); }
+body[data-theme="dark"] .rk-batch-total td { color: #e2e8f0; background: rgba(30,41,59,.5); }
+.rk-batch-empty { padding: 1.6rem 1rem; text-align: center; color: #64748b; font-size: .84rem; }
+.rk-show-sm { display: none; }
+@media (max-width: 640px) {
+    .rk-hide-sm { display: none; }
+    .rk-show-sm { display: block; }
+}
 
 /* ══════════════════════════════════════════════════
    HERO SCAN CARD — identik dengan edit.blade.php
@@ -1059,16 +1092,48 @@ body[data-theme="dark"] .shp-scan-card:focus-within {
 
     {{-- TAB: ISI BATCH --}}
     <div class="rk-tabpane" id="rk-tab-batch" role="tabpanel">
-        <div class="rk-batch-bar" style="margin-bottom:0">
-            @forelse ($batchPool as $item)
-                <span class="rk-sku-chip">
-                    <span class="c">{{ $item['item_code'] }}</span>
-                    <span style="color:#d1d5db">·</span>
-                    <span class="q">{{ number_format($item['qty'], 0, ',', '.') }}</span>
-                </span>
-            @empty
-                <span style="color:#94a3b8;font-size:.82rem">Belum ada item di batch.</span>
-            @endforelse
+        <div class="rk-order-card">
+            <div class="rk-batch-head">
+                <div>
+                    <div class="rk-batch-title">Item Batch</div>
+                    <div class="rk-batch-sub">Ringkasan barang yang discan untuk shipment ini.</div>
+                </div>
+                <span class="rk-batch-pill">{{ $batchPool->count() }} SKU</span>
+            </div>
+            @if ($batchPool->isEmpty())
+                <div class="rk-batch-empty">Belum ada item di batch.</div>
+            @else
+                <div style="overflow-x:auto">
+                    <table class="rk-tbl rk-batch-tbl">
+                        <thead>
+                            <tr>
+                                <th>Item</th>
+                                <th class="rk-hide-sm">Kategori</th>
+                                <th style="text-align:right">Qty</th>
+                            </tr>
+                        </thead>
+                        <tbody>
+                            @foreach ($batchPool as $item)
+                                <tr>
+                                    <td>
+                                        <div class="rk-icode">{{ $item['item_code'] }}</div>
+                                        <div class="rk-batch-name">{{ $item['item_name'] }}</div>
+                                        <div class="rk-batch-cat rk-show-sm">{{ $item['category_name'] ?? 'Tanpa Kategori' }}</div>
+                                    </td>
+                                    <td class="rk-hide-sm">{{ $item['category_name'] ?? 'Tanpa Kategori' }}</td>
+                                    <td style="text-align:right">
+                                        <span class="rk-qty-badge">{{ number_format($item['qty'], 0, ',', '.') }} pcs</span>
+                                    </td>
+                                </tr>
+                            @endforeach
+                            <tr class="rk-batch-total">
+                                <td colspan="2" style="text-align:right">Total</td>
+                                <td style="text-align:right">{{ number_format($totalQty, 0, ',', '.') }}</td>
+                            </tr>
+                        </tbody>
+                    </table>
+                </div>
+            @endif
         </div>
     </div>
 

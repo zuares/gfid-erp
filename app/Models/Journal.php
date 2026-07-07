@@ -16,13 +16,30 @@ class Journal extends Model
         'source_id',
         'posted_at',
         'voided_at', // ✅ added
+        // ── traceability (nullable, aditif) ──
+        'reference_no',
+        'notes',
+        'created_by',
+        'approved_by',
+        'approved_at',
     ];
 
     protected $casts = [
         'date' => 'date',
         'posted_at' => 'datetime',
         'voided_at' => 'datetime', // ✅ added
+        'approved_at' => 'datetime',
     ];
+
+    public function creator(): BelongsTo
+    {
+        return $this->belongsTo(User::class, 'created_by');
+    }
+
+    public function approver(): BelongsTo
+    {
+        return $this->belongsTo(User::class, 'approved_by');
+    }
 
     /**
      * Lines (debit/credit) for this journal.

@@ -28,6 +28,9 @@ class JournalService
     public const CODE_ADV_PURCHASE = '1151'; // Uang Muka Pembelian
     public const CODE_SUPPLIER_CLAIM = '1305'; // Piutang Supplier
     public const CODE_EXP_OPEX = '6101'; // Biaya Operasional Umum (untuk selisih adjustment)
+    public const CODE_STOCK_VARIANCE = '6115'; // Selisih Stock Opname
+    public const CODE_LEGACY_CORRECTION = '6116'; // Koreksi Persediaan Legacy (close as legacy)
+    public const CODE_PRODUCTION_LOSS = '6120'; // Kerugian Produksi / Reject (scrap & write-off)
 
     // ====== SOURCE TYPES ======
     public const SRC_PURCHASE_PAYMENT = 'purchase_payment';
@@ -55,6 +58,8 @@ class JournalService
     public const SRC_SHIPMENT_COGS = 'shipment_cogs';
     public const SRC_WIP_FIN_ADJUSTMENT = 'wip_fin_adjustment';
     public const SRC_INVENTORY_ADJUSTMENT = 'inventory_adjustment';
+    public const SRC_WIP_NORMALIZATION = 'wip_normalization';
+    public const SRC_WIP_CLEANUP = 'wip_cleanup';
 
     // public const SRC_PO_EXPENSE_APPROVE = 'purchase_order_expense_approve';
 
@@ -73,9 +78,10 @@ class JournalService
         string $sourceType,
         ?int $sourceId,
         string $description,
-        array $lines
+        array $lines,
+        array $meta = []
     ): Journal {
-        return DB::transaction(function () use ($date, $sourceType, $sourceId, $description, $lines) {
+        return DB::transaction(function () use ($date, $sourceType, $sourceId, $description, $lines, $meta) {
 
             $date = $this->dateOnly($date);
 
@@ -134,13 +140,25 @@ class JournalService
                 }
             }
 
-            $journal = Journal::create([
+            $payload = [
                 'date' => $date,
                 'description' => $description,
                 'source_type' => $sourceType,
                 'source_id' => $sourceId,
                 'posted_at' => now(),
-            ]);
+            ];
+
+            // ── traceability (opsional & aman: hanya diisi kalau kolomnya sudah ada,
+            //    supaya kode tetap jalan bila migration belum dijalankan) ──
+            if (Schema::hasColumn('journals', 'reference_no')) {
+                $payload['reference_no'] = $meta['reference_no'] ?? null;
+                $payload['notes'] = $meta['notes'] ?? null;
+                $payload['created_by'] = $meta['created_by'] ?? (auth()->id() ?? null);
+                $payload['approved_by'] = $meta['approved_by'] ?? null;
+                $payload['approved_at'] = $meta['approved_at'] ?? null;
+            }
+
+            $journal = Journal::create($payload);
 
             $journal->lines()->createMany(array_map(function ($line) {
                 return [
@@ -1422,6 +1440,133 @@ class JournalService
     public function voidInventoryAdjustment(\App\Models\InventoryAdjustment $adjustment, ?string $reason = null): ?Journal
     {
         return $this->voidBySource(self::SRC_INVENTORY_ADJUSTMENT, (int) $adjustment->id, $reason);
+    }
+
+    /**
+     * Jurnal WIP Normalization (opname WIP).
+     *
+     * Nilai diambil dari inventory_mutations (source_type=wip_normalization,
+     * source_id=adjustment id). Selisih WIP dibebankan ke 6115 Selisih Stock Opname:
+     *   - WIP bertambah (fisik > sistem): Dr 1202 WIP / Cr 6115
+     *   - WIP berkurang (fisik < sistem): Dr 6115 / Cr 1202 WIP
+     *
+     * Idempotent via (SRC_WIP_NORMALIZATION, adjustment id).
+     */
+    public function postWipNormalization(\App\Models\InventoryAdjustment $adjustment): ?Journal
+    {
+        $existing = Journal::query()
+            ->where('source_type', self::SRC_WIP_NORMALIZATION)
+            ->where('source_id', (int) $adjustment->id)
+            ->whereNull('voided_at')
+            ->first();
+        if ($existing) {
+            return $existing;
+        }
+
+        $totalIn  = $this->mutationAmount(self::SRC_WIP_NORMALIZATION, (int) $adjustment->id, 'in');
+        $totalOut = $this->mutationAmount(self::SRC_WIP_NORMALIZATION, (int) $adjustment->id, 'out');
+
+        if ($totalIn <= 0 && $totalOut <= 0) {
+            return null; // tidak ada nilai → tidak ada jurnal (mis. item tanpa cost)
+        }
+
+        $wipId      = $this->accountIdByCode(self::CODE_INV_WIP);
+        $varianceId = $this->accountIdByCode(self::CODE_STOCK_VARIANCE);
+
+        $lines = [];
+        if ($totalIn > 0) {
+            $lines[] = ['account_id' => $wipId,      'debit' => $totalIn, 'credit' => 0];
+            $lines[] = ['account_id' => $varianceId, 'debit' => 0, 'credit' => $totalIn];
+        }
+        if ($totalOut > 0) {
+            $lines[] = ['account_id' => $varianceId, 'debit' => $totalOut, 'credit' => 0];
+            $lines[] = ['account_id' => $wipId,      'debit' => 0, 'credit' => $totalOut];
+        }
+
+        return $this->post(
+            $this->dateOnly($adjustment->date),
+            self::SRC_WIP_NORMALIZATION,
+            (int) $adjustment->id,
+            "Normalisasi WIP {$adjustment->code}",
+            $lines,
+            [
+                'reference_no' => $adjustment->code,
+                'notes' => $adjustment->reason,
+                'created_by' => $adjustment->created_by,
+                'approved_by' => $adjustment->approved_by,
+                'approved_at' => $adjustment->approved_at,
+            ]
+        );
+    }
+
+    public function voidWipNormalization(\App\Models\InventoryAdjustment $adjustment, ?string $reason = null): ?Journal
+    {
+        return $this->voidBySource(self::SRC_WIP_NORMALIZATION, (int) $adjustment->id, $reason);
+    }
+
+    /**
+     * Jurnal WIP Cleanup — nilai (WIP keluar) dari inventory_mutations
+     * (source_type=wip_cleanup, source_id=adjustment id).
+     *
+     * Mapping per action (WIP 1202 selalu di kredit; debit sesuai tujuan):
+     *   write_off    → Dr 6120 Kerugian Produksi / Reject
+     *   close_legacy → Dr 6116 Koreksi Persediaan Legacy
+     *   reject       → Dr 1204 Persediaan Barang Cacat
+     *   finish       → Dr 1203 Persediaan Barang Jadi
+     *   move         → tidak ada jurnal (nilai tetap di 1202)
+     *   keep_open    → tidak ada jurnal
+     *
+     * Idempotent via (SRC_WIP_CLEANUP, adjustment id).
+     */
+    public function postWipCleanup(\App\Models\InventoryAdjustment $adjustment): ?Journal
+    {
+        $existing = Journal::query()
+            ->where('source_type', self::SRC_WIP_CLEANUP)
+            ->where('source_id', (int) $adjustment->id)
+            ->whereNull('voided_at')
+            ->first();
+        if ($existing) {
+            return $existing;
+        }
+
+        $debitCode = match ($adjustment->action) {
+            \App\Models\InventoryAdjustment::ACTION_WRITE_OFF    => self::CODE_PRODUCTION_LOSS,   // 6120
+            \App\Models\InventoryAdjustment::ACTION_CLOSE_LEGACY => self::CODE_LEGACY_CORRECTION, // 6116
+            \App\Models\InventoryAdjustment::ACTION_REJECT       => self::CODE_INV_DEFECT,        // 1204
+            \App\Models\InventoryAdjustment::ACTION_FINISH       => self::CODE_INV_FG,            // 1203
+            default => null, // move / keep_open → nilai tetap di WIP, tanpa jurnal
+        };
+        if ($debitCode === null) {
+            return null;
+        }
+
+        $amount = $this->mutationAmount(self::SRC_WIP_CLEANUP, (int) $adjustment->id, 'out');
+        if ($amount <= 0) {
+            return null;
+        }
+
+        return $this->post(
+            $this->dateOnly($adjustment->date),
+            self::SRC_WIP_CLEANUP,
+            (int) $adjustment->id,
+            "WIP Cleanup {$adjustment->code} ({$adjustment->action})",
+            [
+                ['account_id' => $this->accountIdByCode($debitCode), 'debit' => $amount, 'credit' => 0],
+                ['account_id' => $this->accountIdByCode(self::CODE_INV_WIP), 'debit' => 0, 'credit' => $amount],
+            ],
+            [
+                'reference_no' => $adjustment->code,
+                'notes' => $adjustment->reason,
+                'created_by' => $adjustment->created_by,
+                'approved_by' => $adjustment->approved_by,
+                'approved_at' => $adjustment->approved_at,
+            ]
+        );
+    }
+
+    public function voidWipCleanup(\App\Models\InventoryAdjustment $adjustment, ?string $reason = null): ?Journal
+    {
+        return $this->voidBySource(self::SRC_WIP_CLEANUP, (int) $adjustment->id, $reason);
     }
 
     protected function postInventoryMovementFromMutations(

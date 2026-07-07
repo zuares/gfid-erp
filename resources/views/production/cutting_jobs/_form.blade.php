@@ -673,6 +673,19 @@
                 text-transform: uppercase;
             }
 
+            /* Warna item jadi beda dari warna kain → input merah + baris ditandai */
+            .bundles-table .js-item-suggest-input.is-invalid {
+                border-color: #dc2626 !important;
+                background: rgba(220, 38, 38, .06) !important;
+                color: #b91c1c !important;
+            }
+            .bundles-table tr.bundle-row-color-mismatch td {
+                background: rgba(220, 38, 38, .04);
+            }
+            .bundles-table tr.bundle-row-color-mismatch .js-item-suggest-input {
+                box-shadow: 0 0 0 .12rem rgba(220, 38, 38, .18);
+            }
+
             .bundles-table .item-suggest-dropdown {
                 min-width: min(92vw, 340px);
                 max-height: 48vh;
@@ -1822,11 +1835,56 @@
                 return valid;
             }
 
+            // ── Cek warna: item jadi harus sewarna dengan kain ──
+            // Kode warna = gugus huruf paling belakang pada kode item
+            // (mis. FLC280BLK → BLK, J7BLK → BLK, K5ABT → ABT).
+            function wcColorCode(code) {
+                if (!code) return '';
+                const m = String(code).toUpperCase().trim().match(/[A-Z]+$/);
+                return m ? m[0] : '';
+            }
+
+            function wcFabricColor() {
+                const sel = document.getElementById('fabric_item_id');
+                if (!sel || !sel.value) return '';
+                const opt = sel.options[sel.selectedIndex];
+                const code = (opt ? (opt.textContent || '') : '').split('—')[0].trim();
+                return wcColorCode(code);
+            }
+
+            // Tandai baris yang warnanya beda (input merah) + return true jika ada mismatch.
+            function markColorMismatches() {
+                const fabColor = wcFabricColor();
+                let anyMismatch = false;
+                bundlesTbody.querySelectorAll('.bundle-row').forEach(tr => {
+                    const hiddenItem = tr.querySelector('[name*="finished_item_id"]');
+                    const itemInput = tr.querySelector('.js-item-suggest-input');
+                    if (!itemInput) return;
+                    const hasItem = !!(hiddenItem && hiddenItem.value);
+                    if (!hasItem || !fabColor) {
+                        tr.classList.remove('bundle-row-color-mismatch');
+                        return;
+                    }
+                    const fgColor = wcColorCode(itemInput.value);
+                    const mismatch = !!fgColor && fgColor !== fabColor;
+                    tr.classList.toggle('bundle-row-color-mismatch', mismatch);
+                    if (mismatch) {
+                        itemInput.classList.add('is-invalid');
+                        itemInput.title = `Warna item jadi (${fgColor}) beda dengan warna kain (${fabColor}).`;
+                        anyMismatch = true;
+                    } else if (itemInput.title && itemInput.title.startsWith('Warna item jadi')) {
+                        itemInput.title = '';
+                    }
+                });
+                return anyMismatch;
+            }
+
             function refreshSubmitStateForBom(markMissingItems = false) {
                 const submitBtn = document.getElementById('btn-save-cutting');
                 const fabBtn = document.getElementById('cutting-save-fab');
 
                 const hasMissingItem = !validateBundleItems(markMissingItems);
+                const hasColorMismatch = markColorMismatches();
                 let disabled = false;
                 let title = '';
                 if (hasMissingItem) {
@@ -1835,6 +1893,9 @@
                 } else if (hasBomExceedRows()) {
                     disabled = true;
                     title = 'Ada pemakaian kain melebihi standar BOM. Update BOM atau turunkan pemakaian dulu.';
+                } else if (hasColorMismatch) {
+                    disabled = true;
+                    title = 'Warna item jadi tidak sama dengan warna kain. Perbaiki dulu.';
                 }
 
                 if (submitBtn) {

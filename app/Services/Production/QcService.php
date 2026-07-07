@@ -8,6 +8,7 @@ use App\Models\FinishingJob;
 use App\Models\QcResult;
 use App\Models\SewingReturn;
 use App\Models\Warehouse;
+use App\Services\Accounting\JournalService;
 use App\Services\Costing\FinishingRmHppService;
 use App\Services\Inventory\InventoryService;
 use Illuminate\Support\Facades\DB;
@@ -17,6 +18,7 @@ class QcService
     public function __construct(
         protected InventoryService $inventory,
         protected FinishingRmHppService $finishingRmHpp,
+        protected JournalService $journal,
     ) {}
 
     /* ============================================================
@@ -761,6 +763,12 @@ class QcService
                 notesPrefix: "VOID QC CUTTING {$job->code}",
                 date: now(), // atau pakai tanggal cancel
             );
+
+            // 1b) Void jurnal hasil QC cutting supaya akuntansi ikut bersih.
+            //     (Sebelumnya hanya stok yang dibalik; jurnal cutting_wip tertinggal aktif.)
+            //     voidBySource idempotent → aman diulang; postCuttingWip akan bikin
+            //     jurnal baru saat QC ulang.
+            $this->journal->voidBySource(JournalService::SRC_CUTTING_WIP, (int) $job->id, "VOID QC Cutting {$job->code}");
 
             // 2) Reset bundle QC fields supaya bisa QC ulang
             $job->loadMissing(['bundles']);

@@ -167,6 +167,9 @@
 
     $hasProdDashboard  = $router->has('production.dashboard');
     $hasProdReconcile  = $router->has('production.reconcile.index');
+    $hasProdWipNormalization = $router->has('production.wip_normalization.index');
+    $hasProdWipCleanup       = $router->has('production.wip_cleanup.index');
+    $hasProdLog              = $router->has('production.log.index');
 
     // Akuntansi
     $hasAccountsIndex = $router->has('accounting.accounts.index');
@@ -1125,6 +1128,20 @@
                         </x-sidebar.simple-link>
                     @endif
 
+                    @if ($hasProdWipNormalization)
+                        <x-sidebar.simple-link href="{{ route('production.wip_normalization.index') }}" icon="bi bi-clipboard-check"
+                            :active="request()->routeIs('production.wip_normalization.*')">
+                            Normalisasi WIP
+                        </x-sidebar.simple-link>
+                    @endif
+
+                    @if ($hasProdWipCleanup)
+                        <x-sidebar.simple-link href="{{ route('production.wip_cleanup.index') }}" icon="bi bi-eraser"
+                            :active="request()->routeIs('production.wip_cleanup.*')">
+                            WIP Cleanup
+                        </x-sidebar.simple-link>
+                    @endif
+
                     @if ($hasProdPriorityIndex)
                         <x-sidebar.simple-link href="{{ route('production.priority.index') }}" icon="bi bi-bullseye"
                             :active="request()->routeIs('production.priority.*')">
@@ -1136,6 +1153,13 @@
                         <x-sidebar.simple-link href="{{ route('production.reports.index') }}" icon="bi bi-graph-up"
                             :active="request()->routeIs('production.reports.*')">
                             Laporan Produksi
+                        </x-sidebar.simple-link>
+                    @endif
+
+                    @if ($hasProdLog)
+                        <x-sidebar.simple-link href="{{ route('production.log.index') }}" icon="bi bi-list-columns-reverse"
+                            :active="request()->routeIs('production.log.*')">
+                            Log Produksi
                         </x-sidebar.simple-link>
                     @endif
 
@@ -1767,6 +1791,13 @@
                             </x-sidebar.sub-link>
                         @endif
 
+                        @if ($hasProdLog)
+                            <x-sidebar.sub-link href="{{ route('production.log.index') }}" icon="bi bi-list-columns-reverse"
+                                :active="request()->routeIs('production.log.*')">
+                                Log Produksi
+                            </x-sidebar.sub-link>
+                        @endif
+
                         @if ($hasProdReconcile)
                             <x-sidebar.sub-link href="{{ route('production.reconcile.index') }}" icon="bi bi-search"
                                 :active="request()->routeIs('production.reconcile.*')">
@@ -1821,6 +1852,22 @@
                             <x-sidebar.sub-link href="{{ route('production.packing_jobs.index') }}" icon="bi bi-box-seam"
                                 :active="request()->routeIs('production.packing_jobs.*')">
                                 Packing
+                            </x-sidebar.sub-link>
+                        @endif
+
+                        @if ($hasProdWipNormalization || $hasProdWipCleanup)
+                            @php $subhead('Normalisasi & Cleanup WIP'); @endphp
+                        @endif
+                        @if ($hasProdWipNormalization)
+                            <x-sidebar.sub-link href="{{ route('production.wip_normalization.index') }}" icon="bi bi-clipboard-check"
+                                :active="request()->routeIs('production.wip_normalization.*')">
+                                Normalisasi WIP
+                            </x-sidebar.sub-link>
+                        @endif
+                        @if ($hasProdWipCleanup)
+                            <x-sidebar.sub-link href="{{ route('production.wip_cleanup.index') }}" icon="bi bi-eraser"
+                                :active="request()->routeIs('production.wip_cleanup.*')">
+                                WIP Cleanup
                             </x-sidebar.sub-link>
                         @endif
                     </div>

@@ -205,16 +205,79 @@ body[data-theme="dark"] .cj-code { color: #93c5fd; background: rgba(37,99,235,.1
             <div class="text-sub">Semua cutting job produksi</div>
         </div>
         <div class="d-flex align-items-center gap-2 flex-wrap">
-            @if (env('APP_DB_MODE') === 'dev' && auth()->user()?->role === 'owner')
-                <form method="POST" action="{{ route('production.cutting_jobs.dev_clean_production') }}"
-                      onsubmit="return confirm('⚠️ HAPUS SEMUA data transaksi produksi?\n\nCutting, sewing, QC, finishing, packing, mutasi & jurnal produksi akan dihapus, lalu stok kain & lot dikembalikan seperti sebelum produksi.\n\nMaster data, pembelian (GRN), dan stock opname TIDAK disentuh.\n\nLanjutkan?')">
+            @if (auth()->user()?->role === 'owner')
+                <form method="POST" action="{{ route('production.cutting_jobs.dev_clean_production') }}" id="cleanProdForm">
                     @csrf
-                    <button type="submit" class="btn btn-outline-danger btn-sm"
+                    <input type="hidden" name="confirm_text" id="cleanProdConfirm">
+                    <input type="hidden" name="confirm_password" id="cleanProdPassword">
+                    <button type="button" id="cleanProdBtn" class="btn btn-outline-danger btn-sm"
                             style="border-radius:999px;font-weight:700"
-                            title="DEV ONLY — hapus semua transaksi produksi & hitung ulang stok">
+                            title="Owner — hapus semua transaksi produksi & hitung ulang stok (ketik frasa + password owner)">
                         🧹 Bersihkan Data Produksi
                     </button>
                 </form>
+                <script>
+                (function () {
+                function cleanProdConfirm() {
+                    var EXP = @json(\App\Http\Controllers\Production\CuttingJobController::CLEAN_PROD_PHRASE);
+                    function go(phrase, pass) {
+                        document.getElementById('cleanProdConfirm').value = phrase;
+                        document.getElementById('cleanProdPassword').value = pass;
+                        document.getElementById('cleanProdForm').submit();
+                    }
+                    var body = '⚠️ <b>HAPUS SEMUA</b> transaksi produksi (cutting, sewing, QC, finishing, packing, mutasi &amp; jurnal produksi), lalu stok kain &amp; lot dikembalikan seperti sebelum produksi. Master data, GRN, dan stock opname <b>TIDAK</b> disentuh.<br><br>Backup DB dibuat otomatis dulu. <b>Tidak bisa dibatalkan.</b> Ketik <code>' + EXP + '</code> untuk lanjut.';
+                    if (!window.Swal) {
+                        var t = prompt('Ketik "' + EXP + '" untuk HAPUS SEMUA data transaksi produksi:');
+                        if (!t || t.trim().toUpperCase() !== EXP) return;
+                        var p = prompt('Masukkan password owner untuk konfirmasi:');
+                        if (p) go(t, p);
+                        return;
+                    }
+                    // Langkah 1: ketik frasa
+                    window.Swal.fire({
+                        icon: 'warning',
+                        title: 'Bersihkan Data Produksi?',
+                        html: body,
+                        input: 'text',
+                        inputPlaceholder: EXP,
+                        showCancelButton: true,
+                        confirmButtonText: 'Lanjut',
+                        cancelButtonText: 'Batal',
+                        confirmButtonColor: '#dc2626',
+                        inputValidator: function (v) {
+                            return (String(v || '').trim().toUpperCase() !== EXP)
+                                ? ('Ketik persis: ' + EXP) : undefined;
+                        },
+                    }).then(function (r1) {
+                        if (!r1.isConfirmed) return;
+                        var phrase = r1.value;
+                        // Langkah 2: password owner
+                        window.Swal.fire({
+                            icon: 'warning',
+                            title: 'Konfirmasi Password Owner',
+                            text: 'Masukkan password owner untuk menghapus data produksi.',
+                            input: 'password',
+                            inputPlaceholder: 'Password owner',
+                            inputAttributes: { autocomplete: 'off' },
+                            showCancelButton: true,
+                            confirmButtonText: 'Hapus Sekarang',
+                            cancelButtonText: 'Batal',
+                            confirmButtonColor: '#dc2626',
+                            inputValidator: function (v) {
+                                return (!v) ? 'Password wajib diisi.' : undefined;
+                            },
+                        }).then(function (r2) {
+                            if (r2.isConfirmed) go(phrase, r2.value);
+                        });
+                    });
+                }
+
+                // Bind lewat addEventListener (bukan inline onclick) supaya andal
+                // walau ada CSP / urutan eksekusi script.
+                var _cpb = document.getElementById('cleanProdBtn');
+                if (_cpb) _cpb.addEventListener('click', cleanProdConfirm);
+                })();
+                </script>
             @endif
             <a href="{{ route('production.cutting_jobs.create') }}" class="btn btn-primary btn-sm" style="border-radius:999px;font-weight:700">
                 + Cutting Job Baru

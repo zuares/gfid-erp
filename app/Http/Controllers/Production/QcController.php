@@ -204,7 +204,7 @@ class QcController extends Controller
             try {
                 $this->journal->postCuttingWip($cuttingJob->fresh(), $validated['qc_date']);
             } catch (\Throwable $journalError) {
-                Log::warning('Gagal membuat jurnal cutting_wip', [
+                Log::error('Gagal membuat jurnal cutting_wip', [
                     'cutting_job_id' => $cuttingJob->id,
                     'message' => $journalError->getMessage(),
                 ]);
@@ -278,7 +278,7 @@ class QcController extends Controller
             try {
                 $this->journal->postCuttingWip($cuttingJob->fresh(), $qcDate);
             } catch (\Throwable $journalError) {
-                Log::warning('Gagal membuat jurnal cutting_wip', [
+                Log::error('Gagal membuat jurnal cutting_wip', [
                     'cutting_job_id' => $cuttingJob->id,
                     'message' => $journalError->getMessage(),
                 ]);
@@ -358,7 +358,7 @@ class QcController extends Controller
             try {
                 $this->journal->postCuttingWip($cuttingJob->fresh(), $qcDate);
             } catch (\Throwable $journalError) {
-                Log::warning('Gagal membuat jurnal cutting_wip (quickOkBundle)', [
+                Log::error('Gagal membuat jurnal cutting_wip (quickOkBundle)', [
                     'cutting_job_id' => $cuttingJob->id,
                     'bundle_id'      => $bundle->id,
                     'message'        => $journalError->getMessage(),
@@ -426,7 +426,7 @@ class QcController extends Controller
             try {
                 $this->journal->postCuttingWip($cuttingJob->fresh(), $qcDate);
             } catch (\Throwable $journalError) {
-                Log::warning('Gagal membuat jurnal cutting_wip (saveBundleEdit)', [
+                Log::error('Gagal membuat jurnal cutting_wip (saveBundleEdit)', [
                     'cutting_job_id' => $cuttingJob->id,
                     'bundle_id'      => $bundle->id,
                     'message'        => $journalError->getMessage(),

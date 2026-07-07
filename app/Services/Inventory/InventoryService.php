@@ -81,6 +81,7 @@ class InventoryService
             'lot_id' => $lotId ?: null,
             'unit_cost' => $unitCostValue,
             'total_cost' => $totalCost,
+            'created_by' => auth()->id(),
         ]);
 
         // UPDATE LOT COST (HANYA JIKA MEMANG MAU PENGARUHI LOT KAIN)
@@ -204,6 +205,7 @@ class InventoryService
             'lot_id' => $lotId,
             'unit_cost' => $avgCost,
             'total_cost' => $totalCost,
+            'created_by' => auth()->id(),
         ]);
 
         // UPDATE LotCost HANYA UNTUK PEMAKAIAN KAIN MENTAH
@@ -794,24 +796,34 @@ class InventoryService
     ): void {
         $date = $this->normalizeDate($date);
 
-        // Guard: jangan sampai double void
-        $already = InventoryMutation::query()
+        // Reversal repeatable & idempotent.
+        //
+        // Dulu: guard keras "sudah pernah di-reverse" yang mengunci reversal
+        // seumur (voidSourceType, voidSourceId). Masalahnya untuk siklus yang
+        // bisa berulang (mis. QC cutting dibatalkan → QC ulang → batalkan lagi),
+        // penanda lama memblok reversal yang sah.
+        //
+        // Sekarang: hanya membalik mutasi asli yang DIBUAT SETELAH reversal
+        // terakhir (id lebih besar dari reversal terakhir). Kalau tidak ada
+        // yang baru → no-op (tidak melempar error), sehingga aman diulang.
+        $lastReversalId = (int) InventoryMutation::query()
             ->where('source_type', $voidSourceType)
             ->where('source_id', $voidSourceId)
-            ->exists();
-
-        if ($already) {
-            throw new \RuntimeException("Sudah pernah di-reverse ({$voidSourceType} #{$voidSourceId}).");
-        }
+            ->max('id');
 
         $rows = InventoryMutation::query()
             ->whereIn('source_type', $originalSourceTypes)
             ->where('source_id', $originalSourceId)
+            ->when($lastReversalId > 0, fn ($q) => $q->where('id', '>', $lastReversalId))
             ->orderBy('id')
             ->lockForUpdate()
             ->get();
 
         if ($rows->isEmpty()) {
+            // Sudah ter-reverse sebelumnya & tidak ada mutasi baru → idempotent no-op.
+            if ($lastReversalId > 0) {
+                return;
+            }
             throw new \RuntimeException("Mutasi sumber tidak ditemukan untuk reverse.");
         }
 

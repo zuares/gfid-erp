@@ -381,6 +381,22 @@
     </script>
   @endif
 
+  {{-- ⚠️ Peringatan jurnal gagal — sengaja modal (bukan toast) agar tidak terlewat --}}
+  @if (session('journal_warning'))
+    <script>
+      document.addEventListener('DOMContentLoaded', function() {
+        if (!window.Swal) return;
+        window.Swal.fire({
+          icon: 'warning',
+          title: 'Jurnal Akuntansi Gagal',
+          text: @json(session('journal_warning')),
+          confirmButtonText: 'Mengerti',
+          confirmButtonColor: '#b45309'
+        });
+      });
+    </script>
+  @endif
+
   {{-- THEME TOGGLER SCRIPT --}}
   @include('layouts.partials.theme-script')
 

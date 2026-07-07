@@ -21,13 +21,26 @@ class InventoryAdjustmentLine extends Model
         'cutting_job_bundle_id',
         'sewing_pickup_line_id',
         'finishing_job_line_id',
+
+        // ── WIP cleanup / normalization (aditif) ──
+        'action',
+        'process_date',
+        'operator_id',
+        'qty_physical',
     ];
 
     protected $casts = [
         'qty_before' => 'decimal:3',
         'qty_after' => 'decimal:3',
         'qty_change' => 'decimal:3',
+        'qty_physical' => 'decimal:3',
+        'process_date' => 'date',
     ];
+
+    public function operator(): BelongsTo
+    {
+        return $this->belongsTo(Employee::class, 'operator_id');
+    }
 
     public function adjustment(): BelongsTo
     {

@@ -1233,10 +1233,11 @@ class ShipmentController extends Controller
         // Ringkasan batch: {item_id => {code, name, qty, qty_remaining}}
         $batchPool = $shipment->lines->mapWithKeys(fn ($l) => [
             $l->item_id => [
-                'item_id'   => $l->item_id,
-                'item_code' => $l->item?->code ?? '-',
-                'item_name' => $l->item?->name ?? '-',
-                'qty'       => (int) $l->qty_scanned,
+                'item_id'       => $l->item_id,
+                'item_code'     => $l->item?->code ?? '-',
+                'item_name'     => $l->item?->name ?? '-',
+                'category_name' => $l->item?->category?->name ?? 'Tanpa Kategori',
+                'qty'           => (int) $l->qty_scanned,
             ],
         ]);
 

@@ -42,11 +42,40 @@ class InventoryAdjustment extends Model
         'reference_type',
         'reference_id',
         'operator_id',
+        // ── WIP cleanup / normalization (aditif) ──
+        'action',
+        'process_date',
+        'from_location_id',
+        'to_location_id',
+        'is_legacy',
+    ];
+
+    // ── Action WIP Cleanup ──
+    public const ACTION_KEEP_OPEN   = 'keep_open';
+    public const ACTION_MOVE        = 'move';
+    public const ACTION_FINISH      = 'finish';       // → WH-PRD / FG
+    public const ACTION_REPAIR      = 'repair';
+    public const ACTION_REJECT      = 'reject';
+    public const ACTION_WRITE_OFF   = 'write_off';    // fisik tidak ditemukan
+    public const ACTION_LINK_BUNDLE = 'link_bundle';
+    public const ACTION_CLOSE_LEGACY = 'close_legacy';
+    public const ACTION_NORMALIZE   = 'normalize';    // hasil opname WIP
+    public const ACTION_PICKUP_SETTLE = 'pickup_settle'; // tutup pickup: dianggap disetor → WIP-FIN
+    public const ACTION_PICKUP_CANCEL = 'pickup_cancel'; // tutup pickup: batalkan → balik WIP-CUT
+
+    /** Action "besar" yang wajib approval owner/admin. */
+    public const ACTIONS_REQUIRE_APPROVAL = [
+        self::ACTION_FINISH,
+        self::ACTION_REJECT,
+        self::ACTION_WRITE_OFF,
+        self::ACTION_CLOSE_LEGACY,
     ];
 
     protected $casts = [
         'date' => 'date',
         'approved_at' => 'datetime',
+        'process_date' => 'date',
+        'is_legacy' => 'boolean',
     ];
 
     // 🔗 Relasi
