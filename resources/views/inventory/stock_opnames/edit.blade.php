@@ -530,7 +530,7 @@
 
                                         <div>
                                             <label class="pill-label mb-1">Qty Fisik</label>
-                                            <x-number-input name="physical_qty" :value="old('physical_qty')" mode="integer"
+                                            <x-number-input name="physical_qty" :value="old('physical_qty')" mode="decimal" :decimals="3"
                                                 min="0" class="text-end js-opening-qty-mobile" />
                                         </div>
 
@@ -573,7 +573,7 @@
 
                                         <div>
                                             <label class="pill-label mb-1">Qty Fisik</label>
-                                            <x-number-input name="physical_qty" :value="old('physical_qty')" mode="integer"
+                                            <x-number-input name="physical_qty" :value="old('physical_qty')" mode="decimal" :decimals="3"
                                                 min="0" class="text-end js-opening-qty" />
                                         </div>
 

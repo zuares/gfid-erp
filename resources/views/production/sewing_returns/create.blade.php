@@ -646,8 +646,8 @@
     $lineReturnedTotal = (float) $lines->sum(fn($l) => (float) ($l->qty_returned_ok ?? 0) + (float) ($l->qty_returned_reject ?? 0));
     $lineMaxSetorTotal = (float) $lines->sum(function ($l) {
         $remaining = (float) ($l->remaining_qty ?? 0);
-        $wip = (float) ($l->wip_stock ?? 0);
-        $max = max(0, min($remaining, $wip));
+        // Max setor berbasis sisa pickup line (bukan saldo WIP-SEW).
+        $max = max(0, $remaining);
         if ((bool) ($l->supply_partial ?? false)) {
             $max = max(0, min($max, (float) ($l->supply_max_setor ?? 0)));
         }
@@ -1082,7 +1082,8 @@
                                 $supplyIncomplete    = (bool) ($line->supply_incomplete ?? false);
                                 $supplyPartial       = (bool) ($line->supply_partial ?? false);
                                 $supplyMaxSetor      = (int) ($line->supply_max_setor ?? 0);
-                                $maxSetor = max(0, min($remaining, $wip));
+                                // Max setor berbasis sisa pickup line (bukan saldo WIP-SEW).
+                                $maxSetor = max(0, $remaining);
                                 if (!$isRejectLine && $supplyPartial) {
                                     $maxSetor = max(0, min($maxSetor, $supplyMaxSetor));
                                 }
@@ -1527,8 +1528,8 @@ document.addEventListener('DOMContentLoaded', () => {
 
     function maxSetorForCard(card) {
         const rem = parseFloat(card.dataset.remaining || '0') || 0;
-        const wip = parseFloat(card.dataset.wip || '0') || 0;
-        const base = Math.max(0, Math.min(rem, wip));
+        // Max setor berbasis sisa pickup line (data-remaining), bukan saldo WIP-SEW.
+        const base = Math.max(0, rem);
         const supplyMax = parseFloat(card.dataset.supplyMaxSetor || '');
 
         if ((card.dataset.supplyPartial || '0') === '1' && Number.isFinite(supplyMax)) {

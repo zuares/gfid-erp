@@ -130,6 +130,13 @@ class WipPickupCloseService
                     $bundle = CuttingJobBundle::query()->lockForUpdate()->find($line->cutting_job_bundle_id);
                     if ($bundle) {
                         $bundle->sewing_picked_qty = max(0, (float) $bundle->sewing_picked_qty - $qty);
+                        // ✅ Pick dibatalkan → kalau tidak ada lagi yang terpick, status bundle
+                        // harus kembali ke 'cut' (siap diambil-jahit lagi). Tanpa ini bundle
+                        // tetap berlabel 'in_sewing' padahal stok sudah balik ke WIP-CUT,
+                        // sehingga tampil rancu di WIP cleanup (seolah masih di WIP-SEW).
+                        if ((float) $bundle->sewing_picked_qty < 0.0000001) {
+                            $bundle->status = 'cut';
+                        }
                         $bundle->save();
                     }
                 }
@@ -146,6 +153,10 @@ class WipPickupCloseService
                 $line->closed_by = $userId;
             }
             $line->save();
+
+            // ✅ Sinkronkan status header pickup (draft/partial/completed/closed) setelah
+            // line ditutup, supaya list pickup tidak lagi tampil "draft/sisa" padahal tuntas.
+            $this->syncPickupStatus((int) $line->sewing_pickup_id);
 
             $adj->status = InventoryAdjustment::STATUS_APPROVED;
             $adj->approved_by = $userId;

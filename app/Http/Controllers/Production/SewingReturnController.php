@@ -351,8 +351,11 @@ class SewingReturnController extends Controller
             $returnedRj = (float) ($l->qty_returned_reject ?? 0);
             $directPick = (float) ($l->qty_direct_picked ?? 0);
             $progressAdj = (float) ($l->qty_progress_adjusted ?? 0);
+            // ✅ qty_closed = qty yang sudah di-cancel/settle/write-off lewat WIP cleanup.
+            // Wajib ikut dikurangi, kalau tidak baris yang sudah dibatalkan tetap muncul di sini.
+            $closed = (float) ($l->qty_closed ?? 0);
 
-            $l->remaining_qty = max($qtyBundle - ($returnedOk + $returnedRj + $directPick + $progressAdj), 0);
+            $l->remaining_qty = max($qtyBundle - ($returnedOk + $returnedRj + $directPick + $progressAdj + $closed), 0);
 
             $itemId = (int) ($l->finished_item_id ?? 0);
             if ($itemId > 0) {
@@ -477,7 +480,11 @@ class SewingReturnController extends Controller
             })->filter()->implode('; ');
 
             return $l;
-        })->filter(fn($l) => (float) $l->wip_stock > 0.000001)->values();
+            // ✅ Kandidat setor = pickup line yang masih punya sisa (remaining_qty),
+            // SAMA dengan definisi "belum kembali" di WIP cleanup. Sebelumnya di-filter
+            // oleh saldo WIP-SEW (wip_stock), sehingga normalisasi stok yang tidak
+            // menutup pickup line membuat baris hilang di sini walau di WIP cleanup ada.
+        })->filter(fn($l) => (float) ($l->remaining_qty ?? 0) > 0.000001)->values();
 
         return view('production.sewing_returns.create', compact(
             'operators',
@@ -1166,8 +1173,10 @@ class SewingReturnController extends Controller
                 $returnedRej = (float) ($pl->qty_returned_reject ?? 0);
                 $directPick = (float) ($pl->qty_direct_picked ?? 0);
                 $progressAdj = (float) ($pl->qty_progress_adjusted ?? 0);
+                // ✅ qty_closed (cancel/settle/write-off via WIP cleanup) tidak boleh disetor lagi.
+                $closed = (float) ($pl->qty_closed ?? 0);
 
-                $remainingPickup = max($qtyBundle - ($returnedOk + $returnedRej + $directPick + $progressAdj), 0);
+                $remainingPickup = max($qtyBundle - ($returnedOk + $returnedRej + $directPick + $progressAdj + $closed), 0);
 
                 if ((float) $r['total'] > $remainingPickup + 0.000001) {
                     throw ValidationException::withMessages([
@@ -1417,30 +1426,10 @@ class SewingReturnController extends Controller
                     ->whereNull('voided_at')
                     ->get();
 
-                $totalRemaining = (float) $pls->sum(function (SewingPickupLine $pl) {
-                    $qtyBundle = (float) ($pl->qty_bundle ?? 0);
-                    $returnedOk = (float) ($pl->qty_returned_ok ?? 0);
-                    $returnedRej = (float) ($pl->qty_returned_reject ?? 0);
-                    $directPick = (float) ($pl->qty_direct_picked ?? 0);
-                    $progressAdj = (float) ($pl->qty_progress_adjusted ?? 0);
-
-                    return max($qtyBundle - ($returnedOk + $returnedRej + $directPick + $progressAdj), 0);
-                });
-
-                $totalProgress = (float) $pls->sum(function (SewingPickupLine $pl) {
-                    return (float) ($pl->qty_returned_ok ?? 0)
-                     + (float) ($pl->qty_returned_reject ?? 0)
-                     + (float) ($pl->qty_direct_picked ?? 0)
-                     + (float) ($pl->qty_progress_adjusted ?? 0);
-                });
-
                 if ($pickup->isFillable('status')) {
-                    if ($totalRemaining <= 0.000001) {
-                        $pickup->status = 'completed';
-                    } else {
-                        $pickup->status = ($totalProgress > 0.000001) ? 'partial' : 'draft';
-                    }
-
+                    // Satu sumber kebenaran: recalcStatus() (sudah menghitung qty_closed).
+                    $pickup->setRelation('lines', $pls);
+                    $pickup->status = $pickup->recalcStatus();
                     $pickup->save();
                 }
             }

@@ -1,129 +1,163 @@
-{{-- resources/views/inventory/adjustments/manual_create.blade.php --}}
 @extends('layouts.app')
 
 @section('title', 'Adjustment Manual')
 
 @push('head')
-    <style>
-        .page-wrap {
-            max-width: 1000px;
-            margin-inline: auto;
-            padding: .75rem .75rem 4rem;
-        }
+<style>
+    :root{
+        --adj-accent:#334155;
+        --adj-accent-2:#1f2937;
+        --adj-border:rgba(148,163,184,.18);
+        --adj-muted:#64748b;
+    }
 
-        body[data-theme="light"] .page-wrap {
-            background: radial-gradient(circle at top left,
-                    rgba(56, 189, 248, 0.12) 0,
-                    rgba(129, 140, 248, 0.12) 26%,
-                    #f9fafb 60%);
-        }
+    /* ── Topbar ─────────────────────────────────────────────── */
+    .adj-topbar{
+        position:sticky;
+        top:0;
+        z-index:300;
+        display:flex;
+        align-items:center;
+        gap:.45rem;
+        flex-wrap:wrap;
+        padding:.45rem .75rem;
+        background:var(--card,#fff);
+        border-bottom:1px solid var(--adj-border);
+    }
+    body[data-theme="dark"] .adj-topbar{ background:var(--card,#0f172a); }
+    .adj-topbar-title{ font-weight:750; font-size:.95rem; letter-spacing:0; white-space:nowrap; }
+    .adj-topbar-spacer{ flex:1; min-width:.5rem; }
+    .adj-badge{
+        border-radius:7px; padding:.16rem .44rem;
+        font-size:.68rem; letter-spacing:0; text-transform:none;
+        border:1px solid rgba(148,163,184,.28);
+        color:var(--adj-muted); background:transparent;
+        display:inline-flex; align-items:center; gap:.3rem;
+        white-space:nowrap;
+    }
+    .adj-badge::before{ content:''; width:7px; height:7px; border-radius:999px; background:rgba(100,116,139,.95); display:inline-block; }
+    .adj-badge.is-owner{ color:#1d4ed8; border-color:rgba(59,130,246,.30); }
+    .adj-badge.is-owner::before{ background:rgba(59,130,246,.95); }
+    .btn-adj-outline{
+        color:#475569!important; background:transparent!important;
+        border:1px solid rgba(148,163,184,.35)!important;
+        border-radius:7px!important; font-size:.74rem!important;
+        padding:.28rem .62rem!important; box-shadow:none!important;
+        text-decoration:none; white-space:nowrap;
+    }
+    .btn-adj-outline:hover{ background:rgba(148,163,184,.08)!important; color:#111827!important; }
+    .btn-adj-primary{
+        background:var(--adj-accent)!important; border-color:var(--adj-accent)!important;
+        color:#fff!important; border-radius:7px!important; font-weight:600!important;
+        box-shadow:none!important;
+    }
+    .btn-adj-primary:hover{ background:var(--adj-accent-2)!important; border-color:var(--adj-accent-2)!important; color:#fff!important; }
 
-        .card-main {
-            background: var(--card);
-            border-radius: 14px;
-            border: 1px solid rgba(148, 163, 184, .25);
-            box-shadow:
-                0 10px 26px rgba(15, 23, 42, .06),
-                0 0 0 1px rgba(15, 23, 42, .03);
-        }
+    /* ── Card ────────────────────────────────────────────────── */
+    .adj-card{
+        background:var(--card);
+        border-radius:8px;
+        border:1px solid var(--adj-border);
+        box-shadow:none;
+    }
+    body[data-theme="dark"] .adj-card{ border-color:rgba(51,65,85,.85); box-shadow:none; }
+    .adj-card-body{ padding:.85rem; }
+    .adj-section-label{
+        font-size:.66rem; font-weight:700; text-transform:uppercase;
+        letter-spacing:.04em; color:#94a3b8; margin-bottom:.55rem;
+        display:flex; align-items:center; gap:.35rem;
+    }
+    .adj-section-label::after{ content:''; flex:1; height:1px; background:rgba(148,163,184,.20); }
+    body[data-theme="dark"] .adj-section-label::after{ background:rgba(51,65,85,.85); }
 
-        .table-wrap {
-            margin-top: .5rem;
-            border-radius: 12px;
-            border: 1px solid rgba(148, 163, 184, .24);
-            overflow: hidden;
-        }
+    /* ── Form ────────────────────────────────────────────────── */
+    .adj-form-row{ --bs-gutter-x:.5rem; --bs-gutter-y:.42rem; }
+    .adj-field-label{
+        display:block; font-size:.68rem; font-weight:600;
+        color:#64748b; margin-bottom:.2rem; white-space:nowrap;
+    }
+    body[data-theme="dark"] .adj-field-label{ color:#9ca3af; }
+    .form-control-sm,.form-select-sm{
+        border-radius:8px; border-color:rgba(148,163,184,.35);
+        box-shadow:none!important; font-size:.82rem; min-height:34px;
+    }
+    .form-control-sm:focus,.form-select-sm:focus{
+        border-color:rgba(71,85,105,.75); box-shadow:none!important;
+    }
 
-        .table thead th {
-            font-size: .75rem;
-            text-transform: uppercase;
-            letter-spacing: .06em;
-            color: rgba(100, 116, 139, 1);
-            background: rgba(15, 23, 42, 0.02);
-        }
+    /* ── KPI mini ────────────────────────────────────────────── */
+    .adj-kpi-row{ display:grid; grid-template-columns:repeat(4,minmax(0,1fr)); gap:.4rem; margin-top:.6rem; }
+    .adj-kpi{
+        border:1px solid rgba(148,163,184,.18); border-radius:8px;
+        padding:.4rem .5rem; background:transparent; min-width:0;
+    }
+    body[data-theme="dark"] .adj-kpi{ background:rgba(15,23,42,.20); }
+    .adj-kpi .lbl{ display:block; font-size:.58rem; font-weight:700; color:#94a3b8; line-height:1; white-space:nowrap; overflow:hidden; text-overflow:ellipsis; }
+    .adj-kpi .val{ display:block; margin-top:.14rem; font-size:.88rem; font-weight:800; line-height:1; white-space:nowrap; overflow:hidden; text-overflow:ellipsis; font-variant-numeric:tabular-nums; }
+    .adj-kpi.is-main .val{ color:#16a34a; }
 
-        .pill-label {
-            font-size: .78rem;
-            text-transform: uppercase;
-            letter-spacing: .06em;
-            color: #94a3b8;
-        }
+    /* ── Table ───────────────────────────────────────────────── */
+    .adj-table-scroll{
+        max-height:calc(100vh - 320px);
+        overflow-y:auto;
+        overflow-x:hidden;
+        overscroll-behavior:contain;
+    }
+    .adj-table{ margin-bottom:0; }
+    .adj-table thead th{
+        position:sticky; top:0; z-index:2;
+        font-size:.66rem; text-transform:uppercase; letter-spacing:.03em;
+        color:#6b7280; background:var(--card,#fff);
+        padding:.42rem .5rem; white-space:nowrap; border-bottom-width:1px;
+    }
+    body[data-theme="dark"] .adj-table thead th{
+        background:rgba(15,23,42,.98); color:#9ca3af;
+        border-bottom-color:rgba(30,64,175,.6);
+    }
+    .adj-table tbody td{
+        vertical-align:middle; padding:.38rem .5rem;
+        border-top-color:rgba(148,163,184,.16);
+    }
+    body[data-theme="dark"] .adj-table tbody td{ border-top-color:rgba(51,65,85,.85); }
+    .text-mono{ font-variant-numeric:tabular-nums; font-family:ui-monospace,SFMono-Regular,Menlo,Monaco,Consolas,monospace; }
+    .diff-plus{ color:#16a34a; }
+    .diff-minus{ color:#dc2626; }
+    .item-badge{
+        display:inline-flex; align-items:center; border-radius:7px;
+        padding:.1rem .35rem; font-size:.6rem; font-weight:700;
+        border:1px solid rgba(34,197,94,.25); color:#166534;
+        background:rgba(34,197,94,.06); margin-left:.3rem;
+    }
 
-        .text-mono {
-            font-variant-numeric: tabular-nums;
-        }
+    /* ── Footer bar ─────────────────────────────────────────── */
+    .adj-footer{
+        display:flex; justify-content:space-between; align-items:center;
+        padding:.6rem 0 0; gap:.5rem; flex-wrap:wrap;
+    }
+    .adj-footer-hint{ font-size:.76rem; color:#94a3b8; }
 
-        .diff-plus {
-            color: #16a34a;
-        }
+    /* ── Divider ────────────────────────────────────────────── */
+    .adj-divider{ height:1px; background:rgba(148,163,184,.20); margin:.65rem 0; }
+    body[data-theme="dark"] .adj-divider{ background:rgba(51,65,85,.85); }
 
-        .diff-minus {
-            color: #dc2626;
-        }
+    /* ── Empty ──────────────────────────────────────────────── */
+    .adj-empty{ padding:2rem 1rem; text-align:center; color:#94a3b8; font-size:.84rem; }
 
-        .card-main .card-body { padding: .8rem .9rem; }
-        .page-head { display: flex; align-items: flex-start; justify-content: space-between; gap: .75rem; margin-bottom: .75rem; }
-        .page-title { margin: 0; font-size: 1rem; font-weight: 900; letter-spacing: -.01em; }
-        .status-chip { display: inline-flex; align-items: center; border-radius: 999px; padding: .18rem .52rem; border: 1px solid rgba(148, 163, 184, .22); background: rgba(148, 163, 184, .06); color: #64748b; font-size: .68rem; font-weight: 900; }
-        .status-chip.is-owner { color: #2563eb; border-color: rgba(37, 99, 235, .20); background: rgba(37, 99, 235, .06); }
-        .form-box, .filter-box { border: 1px solid rgba(148, 163, 184, .18); border-radius: 12px; padding: .6rem; background: rgba(148, 163, 184, .05); }
-        body[data-theme="dark"] .form-box, body[data-theme="dark"] .filter-box { background: rgba(15, 23, 42, .32); }
-        .filter-row { --bs-gutter-x: .45rem; --bs-gutter-y: .42rem; }
-        .pill-label { display: block; margin-bottom: .18rem; font-size: .62rem; text-transform: none; letter-spacing: 0; color: #94a3b8; font-weight: 900; line-height: 1.05; white-space: nowrap; }
-        .form-control-sm, .form-select-sm { min-height: 36px; border-radius: 10px; padding: .34rem .45rem; font-size: .8rem; }
-        .btn-pill { border-radius: 999px; font-weight: 900; }
-        .mini-kpis { display: grid; grid-template-columns: repeat(4, minmax(0, 1fr)); gap: .4rem; margin: .55rem 0 .35rem; }
-        .mini-kpi { border: 1px solid rgba(148, 163, 184, .18); border-radius: 10px; padding: .4rem .45rem; background: rgba(255, 255, 255, .45); min-width: 0; }
-        body[data-theme="dark"] .mini-kpi { background: rgba(15, 23, 42, .20); }
-        .mini-kpi .lbl { display: block; color: #64748b; font-size: .58rem; font-weight: 900; line-height: 1; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
-        .mini-kpi .val { display: block; margin-top: .16rem; font-size: .86rem; line-height: 1; font-weight: 950; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
-        .mini-kpi.is-main { border-color: rgba(37, 99, 235, .20); background: rgba(37, 99, 235, .06); }
-        .mini-kpi.is-main .val { color: #2563eb; }
-        .table-wrap { overflow-x: auto; overflow-y: auto; max-height: 560px; }
-        .item-badge { display: inline-flex; align-items: center; border-radius: 999px; padding: .1rem .4rem; font-size: .62rem; font-weight: 900; border: 1px solid rgba(37, 99, 235, .18); color: #2563eb; background: rgba(37, 99, 235, .06); }
-
-        @media (max-width: 767.98px) {
-            .page-wrap {
-                padding-inline: .5rem;
-            }
-
-            .card-main .card-body { padding: .65rem; }
-            .page-head { margin-bottom: .55rem; }
-            .form-box, .filter-box { padding: .5rem; border-radius: 12px; }
-            .mini-kpis { gap: .32rem; }
-            .mini-kpi { padding: .36rem .38rem; }
-            .mini-kpi .val { font-size: .78rem; }
-
-            .table thead {
-                display: none;
-            }
-
-            .table tbody tr {
-                display: block;
-                border-bottom: 1px solid rgba(148, 163, 184, .25);
-                padding: .35rem .75rem;
-            }
-
-            .table tbody tr:last-child {
-                border-bottom: none;
-            }
-
-            .table tbody td {
-                display: flex;
-                justify-content: space-between;
-                gap: .75rem;
-                padding: .15rem 0;
-                border-top: none;
-                font-size: .85rem;
-            }
-
-            .table tbody td::before {
-                content: attr(data-label);
-                font-weight: 500;
-                color: #64748b;
-            }
-        }
-    </style>
+    @media(max-width:768px){
+        .adj-topbar{ padding:.5rem; }
+        .adj-topbar-title{ font-size:1rem; }
+        .adj-kpi-row{ grid-template-columns:repeat(2,1fr); gap:.32rem; }
+        .adj-card-body{ padding:.65rem; }
+        .adj-table-scroll{ max-height:none; overflow:visible; }
+        .adj-table thead{ display:none; }
+        .adj-table,.adj-table tbody,.adj-table tr,.adj-table td{ display:block; width:100%; }
+        .adj-table tbody tr{ padding:.55rem; border-top:1px solid rgba(148,163,184,.16); }
+        .adj-table tbody td{ border:0; padding:0; }
+        .adj-table tbody td.mobile-hide{ display:none; }
+        .adj-row-main{ display:flex; align-items:flex-start; justify-content:space-between; gap:.75rem; }
+        .adj-row-meta{ display:flex; align-items:center; gap:.4rem; flex-wrap:wrap; margin-top:.3rem; color:#64748b; font-size:.76rem; }
+    }
+</style>
 @endpush
 
 @section('content')
@@ -132,222 +166,180 @@
         $isOwner = $user && ($user->role ?? null) === 'owner';
     @endphp
 
-    <div class="page-wrap">
-        <div class="card card-main">
-            <div class="card-body">
-                <div class="page-head">
-                    <div>
-                        <h1 class="page-title">Adjustment Manual</h1>
-                        <span class="status-chip {{ $isOwner ? 'is-owner' : '' }}">
-                            {{ $isOwner ? 'Langsung koreksi stok' : 'Menunggu Owner' }}
-                        </span>
+    {{-- TOPBAR --}}
+    <div class="adj-topbar">
+        <span class="adj-topbar-title">Adjustment Manual</span>
+        <span class="adj-badge {{ $isOwner ? 'is-owner' : '' }}">
+            {{ $isOwner ? 'Langsung koreksi stok' : 'Menunggu Owner' }}
+        </span>
+        <span class="adj-topbar-spacer"></span>
+        <a href="{{ route('inventory.adjustments.index') }}" class="btn-adj-outline">Daftar Adjustment</a>
+    </div>
+
+    <form method="POST" action="{{ route('inventory.adjustments.manual.store') }}" id="adj-form">
+        @csrf
+
+        {{-- STEP 1: Header --}}
+        <div class="adj-card" style="margin-top:.65rem;">
+            <div class="adj-card-body">
+                <div class="adj-section-label">Informasi Adjustment</div>
+                <div class="row adj-form-row">
+                    <div class="col-6 col-lg-3">
+                        <label class="adj-field-label">Gudang</label>
+                        <select name="warehouse_id" id="warehouse_id" class="form-select form-select-sm" required>
+                            <option value="">Pilih gudang…</option>
+                            @foreach ($warehouses as $wh)
+                                <option value="{{ $wh->id }}" {{ old('warehouse_id') == $wh->id ? 'selected' : '' }}>{{ $wh->code }} — {{ $wh->name }}</option>
+                            @endforeach
+                        </select>
+                        @error('warehouse_id') <div class="text-danger small mt-1">{{ $message }}</div> @enderror
                     </div>
-                    <div>
-                        <a href="{{ route('inventory.adjustments.index') }}" class="btn btn-sm btn-outline-secondary btn-pill">
-                            ← Kembali
-                        </a>
+                    <div class="col-6 col-lg-2">
+                        <label class="adj-field-label">Tanggal</label>
+                        <input type="date" class="form-control form-control-sm" name="date" value="{{ old('date', now()->toDateString()) }}" required>
+                        @error('date') <div class="text-danger small mt-1">{{ $message }}</div> @enderror
+                    </div>
+                    <div class="col-12 col-lg-3">
+                        <label class="adj-field-label">Alasan</label>
+                        <input type="text" name="reason" class="form-control form-control-sm" value="{{ old('reason') }}" placeholder="Koreksi rak A1">
+                        @error('reason') <div class="text-danger small mt-1">{{ $message }}</div> @enderror
+                    </div>
+                    <div class="col-12 col-lg-4">
+                        <label class="adj-field-label">Catatan</label>
+                        <input type="text" name="notes" class="form-control form-control-sm" placeholder="Opsional" value="{{ old('notes') }}">
+                        @error('notes') <div class="text-danger small mt-1">{{ $message }}</div> @enderror
                     </div>
                 </div>
-
-                <form method="POST" action="{{ route('inventory.adjustments.manual.store') }}" id="adj-form">
-                    @csrf
-
-                    {{-- HEADER --}}
-                    <div class="form-box mb-2">
-                    <div class="row g-2">
-                        <div class="col-7 col-lg-3">
-                            <label class="form-label form-label-sm">Gudang</label>
-                            <select name="warehouse_id" id="warehouse_id" class="form-select form-select-sm" required>
-                                <option value="">Pilih gudang…</option>
-                                @foreach ($warehouses as $wh)
-                                    <option value="{{ $wh->id }}"
-                                        {{ old('warehouse_id') == $wh->id ? 'selected' : '' }}>
-                                        {{ $wh->code }} — {{ $wh->name }}
-                                    </option>
-                                @endforeach
-                            </select>
-                            @error('warehouse_id')
-                                <div class="text-danger small">{{ $message }}</div>
-                            @enderror
-                        </div>
-
-                        <div class="col-5 col-lg-2">
-                            <label class="form-label form-label-sm">Tanggal</label>
-                            <input type="date" class="form-control form-control-sm" name="date"
-                                value="{{ old('date', now()->toDateString()) }}" required>
-                            @error('date')
-                                <div class="text-danger small">{{ $message }}</div>
-                            @enderror
-                        </div>
-
-                        <div class="col-12 col-lg-3">
-                            <label class="form-label form-label-sm">Alasan</label>
-                            <input type="text" name="reason" class="form-control form-control-sm"
-                                value="{{ old('reason') }}" placeholder="Koreksi rak A1">
-                            @error('reason')
-                                <div class="text-danger small">{{ $message }}</div>
-                            @enderror
-                        </div>
-
-                        <div class="col-12 col-lg-4">
-                            <label class="form-label form-label-sm">Catatan</label>
-                            <input type="text" name="notes" class="form-control form-control-sm"
-                                placeholder="Opsional" value="{{ old('notes') }}">
-                            @error('notes')
-                                <div class="text-danger small">{{ $message }}</div>
-                            @enderror
-                        </div>
-                    </div>
-                    </div>
-
-                    {{-- TOOLBAR --}}
-                    <div class="filter-box mb-2">
-                        <div class="row align-items-end filter-row">
-                            <div class="col-12 col-lg-4">
-                                <label class="pill-label">Item</label>
-                                <div id="manual-adjustment-item-suggest">
-                                    <x-item-suggest idName="quick_item_id" :idValue="old('quick_item_id')" :displayValue="''"
-                                        placeholder="Kode / nama barang" :autofocus="true" :autoSelectFirst="false"
-                                        :maxResults="3" />
-                                </div>
-                            </div>
-                            <div class="col-5 col-lg-2">
-                                <label class="pill-label">Fisik</label>
-                                <input type="number" id="quick-physical-qty" class="form-control form-control-sm text-end"
-                                    step="0.01" min="0" inputmode="decimal" placeholder="Qty">
-                            </div>
-                            <div class="col-3 col-lg-2">
-                                <label class="pill-label">&nbsp;</label>
-                                <button type="button" class="btn btn-sm btn-primary btn-pill w-100" id="add-search-item">
-                                    Tambah
-                                </button>
-                            </div>
-                        </div>
-                        <div class="mini-kpis">
-                            <div class="mini-kpi">
-                                <span class="lbl">Item</span>
-                                <span class="val text-mono" id="kpi-items">0</span>
-                            </div>
-                            <div class="mini-kpi">
-                                <span class="lbl">Diubah</span>
-                                <span class="val text-mono" id="kpi-changed">0</span>
-                            </div>
-                            <div class="mini-kpi is-main">
-                                <span class="lbl">Selisih</span>
-                                <span class="val text-mono" id="kpi-diff">0.00</span>
-                            </div>
-                            <div class="mini-kpi">
-                                <span class="lbl">Item Baru</span>
-                                <span class="val text-mono" id="kpi-new">0</span>
-                            </div>
-                        </div>
-                    </div>
-
-                    <div class="filter-box mb-2">
-                        <div class="row align-items-end filter-row">
-                            <div class="col-7 col-lg-4">
-                                <label class="pill-label">Cari di tabel</label>
-                                <input type="text" id="item-search" class="form-control form-control-sm" placeholder="Kode / nama">
-                            </div>
-                            <div class="col-5 col-lg-3">
-                                <label class="pill-label">Tampilan</label>
-                                <select id="show_changed_only" class="form-select form-select-sm">
-                                    <option value="0">Semua item</option>
-                                    <option value="1">Ada selisih</option>
-                                </select>
-                            </div>
-                        </div>
-                    </div>
-
-                    {{-- TABLE --}}
-                    <div class="table-wrap mb-2">
-                        <table class="table table-sm mb-0 align-middle" id="lines-table">
-                            <thead>
-                                <tr>
-                                    <th style="width: 40px;">#</th>
-                                    <th>Item</th>
-                                    <th class="text-end" style="width: 120px;">Stok</th>
-                                    <th class="text-end" style="width: 140px;">Fisik</th>
-                                    <th class="text-end" style="width: 120px;">Selisih</th>
-                                    <th>Catatan</th>
-                                </tr>
-                            </thead>
-                            <tbody>
-                                {{-- render via JS --}}
-                            </tbody>
-                        </table>
-                    </div>
-
-                    <div class="d-flex justify-content-between align-items-center mb-3 flex-wrap gap-2">
-                        <div class="text-muted" id="items-hint" style="font-size: .78rem;">
-                            Pilih gudang dulu.
-                        </div>
-                        <div class="text-muted" id="summary-change" style="font-size: .78rem;">
-                            Selisih: 0.00
-                        </div>
-                    </div>
-
-                    <div class="d-flex justify-content-end gap-2">
-                        <button type="button" class="btn btn-outline-secondary btn-sm btn-pill" id="clear-all">
-                            Reset Qty Fisik
-                        </button>
-                        <button type="submit" class="btn btn-primary btn-sm btn-pill">
-                            Simpan Adjustment
-                        </button>
-                    </div>
-                </form>
             </div>
         </div>
 
-        <div class="modal fade" id="quickItemModal" tabindex="-1" aria-hidden="true">
-            <div class="modal-dialog modal-dialog-centered">
-                <div class="modal-content" style="border-radius:16px;">
-                    <div class="modal-header py-2">
-                        <h5 class="modal-title mb-0">Item Baru</h5>
-                        <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
-                    </div>
-                    <div class="modal-body">
-                        <div class="row g-2">
-                            <div class="col-5">
-                                <label class="form-label form-label-sm">Kode</label>
-                                <input type="text" id="quick-item-code" class="form-control form-control-sm text-mono" autocomplete="off">
-                            </div>
-                            <div class="col-7">
-                                <label class="form-label form-label-sm">Nama</label>
-                                <input type="text" id="quick-item-name" class="form-control form-control-sm" autocomplete="off">
-                            </div>
-                            <div class="col-4">
-                                <label class="form-label form-label-sm">Satuan</label>
-                                <input type="text" id="quick-item-unit" class="form-control form-control-sm" value="pcs" autocomplete="off">
-                            </div>
-                            <div class="col-8">
-                                <label class="form-label form-label-sm">Role</label>
-                                <select id="quick-item-role" class="form-select form-select-sm">
-                                    @foreach (($itemRoles ?? collect()) as $role)
-                                        <option value="{{ $role->id }}" @selected($role->code === 'RM')>
-                                            {{ $role->code }} — {{ $role->name }}
-                                        </option>
-                                    @endforeach
-                                </select>
-                            </div>
-                            <div class="col-12">
-                                <label class="form-label form-label-sm">Kategori</label>
-                                <select id="quick-item-category" class="form-select form-select-sm">
-                                    <option value="">Tanpa kategori</option>
-                                    @foreach (($itemCategories ?? collect()) as $category)
-                                        <option value="{{ $category->id }}">
-                                            {{ $category->code }} — {{ $category->name }}
-                                        </option>
-                                    @endforeach
-                                </select>
-                            </div>
+        {{-- STEP 2: Tambah Item --}}
+        <div class="adj-card" style="margin-top:.5rem;">
+            <div class="adj-card-body">
+                <div class="adj-section-label">Tambah Item</div>
+                <div class="row adj-form-row align-items-end">
+                    <div class="col-12 col-lg-5">
+                        <label class="adj-field-label">Cari Item</label>
+                        <div id="manual-adjustment-item-suggest">
+                            <x-item-suggest idName="quick_item_id" :idValue="old('quick_item_id')" :displayValue="''"
+                                placeholder="Kode / nama barang" :autofocus="true" :autoSelectFirst="false"
+                                :maxResults="3" />
                         </div>
-                        <div class="text-danger small mt-2 d-none" id="quick-item-error"></div>
                     </div>
-                    <div class="modal-footer py-2">
-                        <button type="button" class="btn btn-sm btn-outline-secondary btn-pill" data-bs-dismiss="modal">Batal</button>
-                        <button type="button" class="btn btn-sm btn-primary btn-pill" id="quick-item-save">Buat & Tambah</button>
+                    <div class="col-4 col-lg-2">
+                        <label class="adj-field-label">Qty Fisik</label>
+                        <input type="number" id="quick-physical-qty" class="form-control form-control-sm text-end" step="0.01" min="0" inputmode="decimal" placeholder="0">
                     </div>
+                    <div class="col-4 col-lg-2">
+                        <label class="adj-field-label">&nbsp;</label>
+                        <button type="button" class="btn btn-sm btn-adj-primary w-100" id="add-search-item">Tambah</button>
+                    </div>
+                    <div class="col-4 col-lg-3">
+                        <label class="adj-field-label">&nbsp;</label>
+                        <button type="button" class="btn btn-sm btn-adj-outline w-100" data-bs-toggle="modal" data-bs-target="#quickItemModal">+ Item Baru</button>
+                    </div>
+                </div>
+
+                <div class="adj-kpi-row">
+                    <div class="adj-kpi"><span class="lbl">Item</span><span class="val text-mono" id="kpi-items">0</span></div>
+                    <div class="adj-kpi"><span class="lbl">Diubah</span><span class="val text-mono" id="kpi-changed">0</span></div>
+                    <div class="adj-kpi is-main"><span class="lbl">Selisih</span><span class="val text-mono" id="kpi-diff">0.00</span></div>
+                    <div class="adj-kpi"><span class="lbl">Item Baru</span><span class="val text-mono" id="kpi-new">0</span></div>
+                </div>
+            </div>
+        </div>
+
+        {{-- STEP 3: Tabel --}}
+        <div class="adj-card" style="margin-top:.5rem;">
+            <div class="adj-card-body" style="padding:.5rem .6rem .6rem;">
+                <div class="d-flex justify-content-between align-items-center" style="margin-bottom:.4rem;">
+                    <div class="adj-section-label" style="margin:0;">Daftar Item</div>
+                    <div class="d-flex gap-2 align-items-center">
+                        <input type="text" id="item-search" class="form-control form-control-sm" placeholder="Cari kode / nama" style="width:160px;font-size:.76rem;height:28px;">
+                        <select id="show_changed_only" class="form-select form-select-sm" style="width:120px;font-size:.76rem;height:28px;">
+                            <option value="0">Semua item</option>
+                            <option value="1">Ada selisih</option>
+                        </select>
+                    </div>
+                </div>
+
+                <div class="adj-table-scroll">
+                    <table class="table table-sm align-middle adj-table" id="lines-table">
+                        <thead>
+                            <tr>
+                                <th style="width:36px;">#</th>
+                                <th>Item</th>
+                                <th class="text-end" style="width:100px;">Stok</th>
+                                <th class="text-end" style="width:120px;">Fisik</th>
+                                <th class="text-end" style="width:100px;">Selisih</th>
+                                <th style="width:140px;">Catatan</th>
+                            </tr>
+                        </thead>
+                        <tbody>
+                            {{-- render via JS --}}
+                        </tbody>
+                    </table>
+                </div>
+
+                <div class="adj-divider"></div>
+
+                <div class="adj-footer">
+                    <span class="adj-footer-hint" id="items-hint">Pilih gudang dulu.</span>
+                    <div class="d-flex gap-2 align-items-center">
+                        <span class="adj-footer-hint" id="summary-change">Selisih: 0.00</span>
+                        <button type="button" class="btn btn-sm btn-adj-outline" id="clear-all">Reset</button>
+                        <button type="submit" class="btn btn-sm btn-adj-primary">Simpan Adjustment</button>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </form>
+
+    {{-- MODAL: Item Baru --}}
+    <div class="modal fade" id="quickItemModal" tabindex="-1" aria-hidden="true">
+        <div class="modal-dialog modal-dialog-centered">
+            <div class="modal-content" style="border-radius:8px;border:1px solid var(--adj-border);box-shadow:none;">
+                <div class="modal-header py-2" style="border-bottom-color:rgba(148,163,184,.18);">
+                    <h6 class="modal-title mb-0" style="font-weight:700;font-size:.88rem;">Item Baru</h6>
+                    <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
+                </div>
+                <div class="modal-body">
+                    <div class="row adj-form-row">
+                        <div class="col-5">
+                            <label class="adj-field-label">Kode</label>
+                            <input type="text" id="quick-item-code" class="form-control form-control-sm text-mono" autocomplete="off">
+                        </div>
+                        <div class="col-7">
+                            <label class="adj-field-label">Nama</label>
+                            <input type="text" id="quick-item-name" class="form-control form-control-sm" autocomplete="off">
+                        </div>
+                        <div class="col-4">
+                            <label class="adj-field-label">Satuan</label>
+                            <input type="text" id="quick-item-unit" class="form-control form-control-sm" value="pcs" autocomplete="off">
+                        </div>
+                        <div class="col-8">
+                            <label class="adj-field-label">Role</label>
+                            <select id="quick-item-role" class="form-select form-select-sm">
+                                @foreach (($itemRoles ?? collect()) as $role)
+                                    <option value="{{ $role->id }}" @selected($role->code === 'RM')>{{ $role->code }} — {{ $role->name }}</option>
+                                @endforeach
+                            </select>
+                        </div>
+                        <div class="col-12">
+                            <label class="adj-field-label">Kategori</label>
+                            <select id="quick-item-category" class="form-select form-select-sm">
+                                <option value="">Tanpa kategori</option>
+                                @foreach (($itemCategories ?? collect()) as $category)
+                                    <option value="{{ $category->id }}">{{ $category->code }} — {{ $category->name }}</option>
+                                @endforeach
+                            </select>
+                        </div>
+                    </div>
+                    <div class="text-danger small mt-2 d-none" id="quick-item-error"></div>
+                </div>
+                <div class="modal-footer py-2" style="border-top-color:rgba(148,163,184,.18);">
+                    <button type="button" class="btn btn-sm btn-adj-outline" data-bs-dismiss="modal">Batal</button>
+                    <button type="button" class="btn btn-sm btn-adj-primary" id="quick-item-save">Buat & Tambah</button>
                 </div>
             </div>
         </div>
@@ -386,7 +378,7 @@
             const itemsUrl = @json(route('inventory.adjustments.items_for_warehouse'));
             const quickItemUrl = @json(route('inventory.adjustments.items.quick_store'));
 
-            let warehouseItems = []; // {id, code, name, on_hand}
+            let warehouseItems = [];
             let searchTimer = null;
 
             function fmt(n) {
@@ -405,36 +397,36 @@
                 tr.dataset.notInWarehouse = item.not_in_warehouse ? '1' : '0';
 
                 tr.innerHTML = `
-            <td data-label="#">${idx + 1}</td>
-
-            <td data-label="Item">
-                <div class="fw-semibold text-mono">${item.code ?? ''} ${item.not_in_warehouse ? '<span class="item-badge">baru</span>' : ''}</div>
-                <div class="text-muted" style="font-size:.82rem;">${item.name ?? ''}</div>
-
+            <td class="text-muted small mobile-hide">${idx + 1}</td>
+            <td>
+                <div class="adj-row-main">
+                    <div>
+                        <span class="text-mono fw-semibold" style="font-size:.86rem;">${item.code ?? ''}</span>
+                        ${item.not_in_warehouse ? '<span class="item-badge">baru</span>' : ''}
+                        <div style="font-size:.78rem;color:#6b7280;margin-top:.1rem;">${item.name ?? ''}</div>
+                    </div>
+                    <span class="diff-display mobile-hide text-mono" style="font-size:.8rem;">0.00</span>
+                </div>
+                <div class="adj-row-meta mobile-hide">
+                    <span>Stok: <strong class="text-mono"><span class="on-hand" data-on-hand="${onHand}">${fmt(onHand)}</span></strong></span>
+                </div>
                 <input type="hidden" class="row-item-id" value="${item.id}">
             </td>
-
-            <td data-label="Stok saat ini" class="text-end text-mono">
-                <span class="on-hand" data-on-hand="${onHand}">${fmt(onHand)}</span>
+            <td class="text-end mobile-hide text-mono">
+                <span class="on-hand desktop-only" data-on-hand="${onHand}">${fmt(onHand)}</span>
             </td>
-
-            <td data-label="Qty fisik" class="text-end">
-                <input type="number"
-                       class="form-control form-control-sm text-end physical-input"
-                       step="0.01" min="0" inputmode="decimal" placeholder="Fisik">
+            <td class="text-end">
+                <input type="number" class="form-control form-control-sm text-end physical-input" style="width:90px;display:inline-block;" step="0.01" min="0" inputmode="decimal" placeholder="Fisik">
                 <input type="hidden" class="qty-change-input" value="">
             </td>
-
-            <td data-label="Selisih" class="text-end text-mono">
+            <td class="text-end mobile-hide text-mono">
                 <span class="diff-display">0.00</span>
             </td>
-
-            <td data-label="Catatan">
-                <input type="text" class="form-control form-control-sm notes-input" placeholder="Opsional">
+            <td class="mobile-hide">
+                <input type="text" class="form-control form-control-sm notes-input" style="font-size:.76rem;" placeholder="Opsional">
             </td>
         `;
 
-                // events
                 const physical = tr.querySelector('.physical-input');
                 physical.addEventListener('focus', () => physical.select());
                 physical.addEventListener('blur', () => {
@@ -454,44 +446,34 @@
             function recalcRow(tr) {
                 const onHandSpan = tr.querySelector('.on-hand');
                 const physicalInp = tr.querySelector('.physical-input');
-                const diffSpan = tr.querySelector('.diff-display');
+                const diffSpans = tr.querySelectorAll('.diff-display');
                 const qtyChangeInp = tr.querySelector('.qty-change-input');
 
-                const onHand = parseFloat(onHandSpan.dataset.onHand || '0') || 0;
+                const onHand = parseFloat(onHandSpan?.dataset.onHand || '0') || 0;
                 const physical = parseFloat(physicalInp.value);
 
-                diffSpan.classList.remove('diff-plus', 'diff-minus');
+                diffSpans.forEach(s => s.classList.remove('diff-plus', 'diff-minus'));
 
                 if (isNaN(physical)) {
-                    diffSpan.textContent = '0.00';
+                    diffSpans.forEach(s => s.textContent = '0.00');
                     qtyChangeInp.value = '';
                     tr.dataset.changed = '0';
                     return;
                 }
 
-                const diff = physical - onHand; // signed
+                const diff = physical - onHand;
                 qtyChangeInp.value = diff.toFixed(2);
-
                 tr.dataset.changed = (Math.abs(diff) > 0.000001) ? '1' : '0';
 
                 let text = diff.toFixed(2);
-                if (diff > 0) {
-                    text = '+' + text;
-                    diffSpan.classList.add('diff-plus');
-                }
-                if (diff < 0) {
-                    diffSpan.classList.add('diff-minus');
-                }
-                diffSpan.textContent = text;
+                if (diff > 0) { text = '+' + text; diffSpans.forEach(s => s.classList.add('diff-plus')); }
+                if (diff < 0) { diffSpans.forEach(s => s.classList.add('diff-minus')); }
+                diffSpans.forEach(s => s.textContent = text);
             }
 
             function renderRows() {
                 tbody.innerHTML = '';
-
-                warehouseItems.forEach((item, idx) => {
-                    tbody.appendChild(buildRow(item, idx));
-                });
-
+                warehouseItems.forEach((item, idx) => { tbody.appendChild(buildRow(item, idx)); });
                 applyFilter();
                 updateSummary();
             }
@@ -499,39 +481,29 @@
             function applyFilter() {
                 const term = (itemSearch.value || '').trim().toLowerCase();
                 const changedOnly = showChangedOnly.value === '1';
-
                 tbody.querySelectorAll('tr').forEach(tr => {
                     const code = tr.dataset.code || '';
                     const name = tr.dataset.name || '';
                     const changed = tr.dataset.changed === '1';
-
                     let ok = true;
-
                     if (term) ok = (code.includes(term) || name.includes(term));
                     if (ok && changedOnly) ok = changed;
-
                     tr.style.display = ok ? '' : 'none';
                 });
             }
 
             function updateSummary() {
-                let total = 0;
-                let changed = 0;
-                let newItems = 0;
-
+                let total = 0, changed = 0, newItems = 0;
                 tbody.querySelectorAll('tr').forEach(tr => {
                     if (tr.dataset.changed === '1') changed++;
                     if (tr.dataset.notInWarehouse === '1') newItems++;
                 });
-
                 tbody.querySelectorAll('.qty-change-input').forEach(inp => {
                     const v = parseFloat(inp.value);
                     if (!isNaN(v)) total += v;
                 });
-
                 let text = fmt(total);
                 if (total > 0) text = '+' + text;
-
                 summaryChange.textContent = 'Selisih: ' + text;
                 if (kpiItems) kpiItems.textContent = String(warehouseItems.length);
                 if (kpiChanged) kpiChanged.textContent = String(changed);
@@ -568,11 +540,8 @@
                 const byId = new Map(warehouseItems.map(item => [String(item.id), item]));
                 (items || []).forEach(item => {
                     const key = String(item.id);
-                    if (byId.has(key)) {
-                        byId.set(key, { ...byId.get(key), ...item });
-                    } else {
-                        byId.set(key, item);
-                    }
+                    if (byId.has(key)) { byId.set(key, { ...byId.get(key), ...item }); }
+                    else { byId.set(key, item); }
                 });
                 warehouseItems = Array.from(byId.values()).sort((a, b) => String(a.code || '').localeCompare(String(b.code || '')));
             }
@@ -580,340 +549,159 @@
             function focusItemByTerm(term) {
                 const needle = (term || '').trim().toLowerCase();
                 if (!needle) return false;
-
                 const rows = Array.from(tbody.querySelectorAll('tr'));
-                const row = rows.find(tr => {
-                    return (tr.dataset.code || '').includes(needle)
-                        || (tr.dataset.name || '').includes(needle);
-                });
-
+                const row = rows.find(tr => (tr.dataset.code || '').includes(needle) || (tr.dataset.name || '').includes(needle));
                 if (!row) return false;
-
                 row.style.display = '';
                 row.scrollIntoView({ block: 'center', behavior: 'smooth' });
                 const input = row.querySelector('.physical-input');
-                if (input) {
-                    setTimeout(() => {
-                        input.focus();
-                        input.select();
-                    }, 200);
-                }
-
+                if (input) setTimeout(() => { input.focus(); input.select(); }, 200);
                 return true;
             }
 
             function fetchSearchItems(term, focusAfter = false) {
                 const warehouseId = warehouseSelect.value || '';
-                if (!warehouseId) {
-                    itemsHint.textContent = 'Pilih gudang dulu.';
-                    return Promise.resolve([]);
-                }
-                if (term.length < 2) {
-                    itemsHint.textContent = 'Ketik minimal 2 huruf kode/nama.';
-                    return Promise.resolve([]);
-                }
-
+                if (!warehouseId) { itemsHint.textContent = 'Pilih gudang dulu.'; return Promise.resolve([]); }
+                if (term.length < 2) { itemsHint.textContent = 'Ketik minimal 2 huruf.'; return Promise.resolve([]); }
                 itemsHint.textContent = 'Mencari item…';
                 return fetch(itemsUrl + '?warehouse_id=' + encodeURIComponent(warehouseId) + '&q=' + encodeURIComponent(term))
-                    .then(res => {
-                        if (!res.ok) throw new Error('HTTP ' + res.status);
-                        return res.json();
-                    })
+                    .then(res => { if (!res.ok) throw new Error('HTTP ' + res.status); return res.json(); })
                     .then(data => {
                         const state = snapshotInputs();
                         mergeItems(Array.isArray(data) ? data : []);
-                        renderRows();
-                        restoreInputs(state);
-                        applyFilter();
-                        updateSummary();
+                        renderRows(); restoreInputs(state); applyFilter(); updateSummary();
                         itemsHint.textContent = data.length ? 'Item ditemukan. Isi Fisik untuk menambahkan.' : 'Item tidak ditemukan.';
                         if (focusAfter && data.length) focusItemByTerm(term);
                         return data;
                     })
-                    .catch(err => {
-                        console.error(err);
-                        itemsHint.textContent = 'Gagal mencari item.';
-                        return [];
-                    });
+                    .catch(err => { console.error(err); itemsHint.textContent = 'Gagal mencari item.'; return []; });
             }
 
-            function resetQuickItemError() {
-                if (!quickError) return;
-                quickError.textContent = '';
-                quickError.classList.add('d-none');
-            }
-
-            function showQuickItemError(message) {
-                if (!quickError) return;
-                quickError.textContent = message || 'Data belum bisa disimpan.';
-                quickError.classList.remove('d-none');
-            }
+            function resetQuickItemError() { if (quickError) { quickError.textContent = ''; quickError.classList.add('d-none'); } }
+            function showQuickItemError(msg) { if (quickError) { quickError.textContent = msg || 'Data belum bisa disimpan.'; quickError.classList.remove('d-none'); } }
 
             function addItemToTable(item) {
                 const state = snapshotInputs();
-                mergeItems([item]);
-                renderRows();
-                restoreInputs(state);
-                itemSearch.value = '';
-                applyFilter();
-                updateSummary();
+                mergeItems([item]); renderRows(); restoreInputs(state);
+                itemSearch.value = ''; applyFilter(); updateSummary();
                 focusItemByTerm(item.code || item.name || '');
             }
 
             function addSuggestedItemToTable() {
                 const warehouseId = warehouseSelect.value || '';
                 const id = quickItemId?.value || '';
-
-                if (!warehouseId) {
-                    itemsHint.textContent = 'Pilih gudang dulu.';
-                    return;
-                }
-
-                if (!id) {
-                    itemsHint.textContent = 'Pilih item dulu.';
-                    quickItemText?.focus();
-                    return;
-                }
-
+                if (!warehouseId) { itemsHint.textContent = 'Pilih gudang dulu.'; return; }
+                if (!id) { itemsHint.textContent = 'Pilih item dulu.'; quickItemText?.focus(); return; }
                 itemsHint.textContent = 'Menambahkan item…';
-
                 fetch(itemsUrl + '?warehouse_id=' + encodeURIComponent(warehouseId) + '&item_id=' + encodeURIComponent(id))
-                    .then(res => {
-                        if (!res.ok) throw new Error('HTTP ' + res.status);
-                        return res.json();
-                    })
+                    .then(res => { if (!res.ok) throw new Error('HTTP ' + res.status); return res.json(); })
                     .then(data => {
                         const item = Array.isArray(data) ? data[0] : null;
-                        if (!item) {
-                            itemsHint.textContent = 'Item tidak ditemukan.';
-                            return;
-                        }
-
+                        if (!item) { itemsHint.textContent = 'Item tidak ditemukan.'; return; }
                         addItemToTable(item);
-
-                        const row = Array.from(tbody.querySelectorAll('tr')).find(tr => {
-                            return tr.querySelector('.row-item-id')?.value === String(item.id);
-                        });
-
+                        const row = Array.from(tbody.querySelectorAll('tr')).find(tr => tr.querySelector('.row-item-id')?.value === String(item.id));
                         if (row && quickPhysicalQty?.value !== '') {
                             const physical = row.querySelector('.physical-input');
-                            if (physical) {
-                                physical.value = quickPhysicalQty.value;
-                                recalcRow(row);
-                                updateSummary();
-                            }
+                            if (physical) { physical.value = quickPhysicalQty.value; recalcRow(row); updateSummary(); }
                         }
-
                         if (quickItemId) quickItemId.value = '';
                         if (quickItemText) quickItemText.value = '';
                         if (quickPhysicalQty) quickPhysicalQty.value = '';
                         itemsHint.textContent = 'Item ditambahkan.';
                         setTimeout(() => quickItemText?.focus(), 250);
                     })
-                    .catch(err => {
-                        console.error(err);
-                        itemsHint.textContent = 'Gagal menambahkan item.';
-                    });
+                    .catch(err => { console.error(err); itemsHint.textContent = 'Gagal menambahkan item.'; });
             }
 
             quickModalEl?.addEventListener('shown.bs.modal', () => {
                 resetQuickItemError();
-                if (quickCode) {
-                    quickCode.value = (itemSearch.value || '').trim().toUpperCase();
-                    quickCode.focus();
-                    quickCode.select();
-                }
+                if (quickCode) { quickCode.value = (itemSearch.value || '').trim().toUpperCase(); quickCode.focus(); quickCode.select(); }
             });
-
             quickCode?.addEventListener('input', () => {
-                const start = quickCode.selectionStart;
-                const end = quickCode.selectionEnd;
+                const s = quickCode.selectionStart, e = quickCode.selectionEnd;
                 quickCode.value = quickCode.value.toUpperCase();
-                try { quickCode.setSelectionRange(start, end); } catch (_) {}
+                try { quickCode.setSelectionRange(s, e); } catch (_) {}
             });
-
             quickSave?.addEventListener('click', async () => {
                 resetQuickItemError();
-
                 const code = (quickCode?.value || '').trim().toUpperCase();
                 const name = (quickName?.value || '').trim();
                 const unit = (quickUnit?.value || 'pcs').trim();
-
-                if (!code || !name) {
-                    showQuickItemError('Kode dan nama wajib diisi.');
-                    return;
-                }
-
-                quickSave.disabled = true;
-                quickSave.textContent = 'Menyimpan…';
-
+                if (!code || !name) { showQuickItemError('Kode dan nama wajib diisi.'); return; }
+                quickSave.disabled = true; quickSave.textContent = 'Menyimpan…';
                 try {
                     const res = await fetch(quickItemUrl, {
                         method: 'POST',
-                        headers: {
-                            'Accept': 'application/json',
-                            'Content-Type': 'application/json',
-                            'X-CSRF-TOKEN': document.querySelector('meta[name="csrf-token"]')?.content || '',
-                            'X-Requested-With': 'XMLHttpRequest',
-                        },
-                        body: JSON.stringify({
-                            code,
-                            name,
-                            unit,
-                            item_role_id: quickRole?.value || null,
-                            item_category_id: quickCategory?.value || null,
-                        }),
+                        headers: { 'Accept':'application/json','Content-Type':'application/json','X-CSRF-TOKEN':document.querySelector('meta[name="csrf-token"]')?.content||'','X-Requested-With':'XMLHttpRequest' },
+                        body: JSON.stringify({ code, name, unit, item_role_id: quickRole?.value||null, item_category_id: quickCategory?.value||null }),
                     });
-
                     const json = await res.json();
-                    if (!res.ok || !json.ok) {
-                        const errors = json.errors || {};
-                        const first = Object.values(errors).flat()[0] || json.message || 'Data belum bisa disimpan.';
-                        showQuickItemError(first);
-                        return;
-                    }
-
+                    if (!res.ok || !json.ok) { const errors = json.errors||{}; showQuickItemError(Object.values(errors).flat()[0]||json.message||'Data belum bisa disimpan.'); return; }
                     addItemToTable(json.item);
-                    itemsHint.textContent = 'Item baru dibuat. Isi Fisik untuk adjustment.';
+                    itemsHint.textContent = 'Item baru dibuat.';
                     bootstrap.Modal.getOrCreateInstance(quickModalEl).hide();
-
                     if (quickName) quickName.value = '';
                     if (quickUnit) quickUnit.value = 'pcs';
-                } catch (err) {
-                    console.error(err);
-                    showQuickItemError('Gagal membuat item baru.');
-                } finally {
-                    quickSave.disabled = false;
-                    quickSave.textContent = 'Buat & Tambah';
-                }
+                } catch (err) { console.error(err); showQuickItemError('Gagal membuat item baru.'); }
+                finally { quickSave.disabled = false; quickSave.textContent = 'Buat & Tambah'; }
             });
 
             function loadItemsForWarehouse(warehouseId) {
-                if (!warehouseId) {
-                    warehouseItems = [];
-                    tbody.innerHTML = '';
-                    itemsHint.textContent = 'Pilih gudang dulu.';
-                    summaryChange.textContent = 'Selisih: 0.00';
-                    updateSummary();
-                    return;
-                }
-
+                if (!warehouseId) { warehouseItems = []; tbody.innerHTML = ''; itemsHint.textContent = 'Pilih gudang dulu.'; summaryChange.textContent = 'Selisih: 0.00'; updateSummary(); return; }
                 itemsHint.textContent = 'Memuat item…';
-
                 fetch(itemsUrl + '?warehouse_id=' + encodeURIComponent(warehouseId))
-                    .then(res => {
-                        if (!res.ok) throw new Error('HTTP ' + res.status);
-                        return res.json();
-                    })
+                    .then(res => { if (!res.ok) throw new Error('HTTP ' + res.status); return res.json(); })
                     .then(data => {
                         warehouseItems = Array.isArray(data) ? data : [];
-                        itemsHint.textContent = warehouseItems.length ?
-                            'Isi Fisik. Cari kode untuk tambah item lain.' :
-                            'Belum ada stok. Cari kode untuk tambah item.';
+                        itemsHint.textContent = warehouseItems.length ? 'Isi Qty Fisik untuk setiap item.' : 'Belum ada stok. Cari kode untuk tambah item.';
                         renderRows();
                     })
-                    .catch(err => {
-                        console.error(err);
-                        warehouseItems = [];
-                        tbody.innerHTML = '';
-                        itemsHint.textContent = 'Gagal memuat item. Coba reload halaman.';
-                        summaryChange.textContent = 'Selisih: 0.00';
-                        updateSummary();
-                    });
+                    .catch(err => { console.error(err); warehouseItems = []; tbody.innerHTML = ''; itemsHint.textContent = 'Gagal memuat item.'; summaryChange.textContent = 'Selisih: 0.00'; updateSummary(); });
             }
 
-            // ✅ KRUSIAL: hanya kirim baris yang berubah (qty_change != 0)
             form.addEventListener('submit', function() {
                 let outIndex = 0;
-
                 tbody.querySelectorAll('tr').forEach(tr => {
-                    // hapus input "named" dari submit sebelumnya (kalau user submit ulang setelah validation error)
                     tr.querySelectorAll('[data-named="1"]').forEach(el => el.remove());
-
                     const changed = tr.dataset.changed === '1';
                     const qtyChange = parseFloat(tr.querySelector('.qty-change-input').value || '0');
-
-                    if (!changed || isNaN(qtyChange) || Math.abs(qtyChange) < 0.000001) {
-                        return;
-                    }
-
+                    if (!changed || isNaN(qtyChange) || Math.abs(qtyChange) < 0.000001) return;
                     const itemId = tr.querySelector('.row-item-id').value;
                     const notes = tr.querySelector('.notes-input').value || '';
-
-                    // create hidden named inputs
-                    const h1 = document.createElement('input');
-                    h1.type = 'hidden';
-                    h1.name = `lines[${outIndex}][item_id]`;
-                    h1.value = itemId;
-                    h1.dataset.named = '1';
-
-                    const h2 = document.createElement('input');
-                    h2.type = 'hidden';
-                    h2.name = `lines[${outIndex}][qty_change]`;
-                    h2.value = qtyChange.toFixed(2);
-                    h2.dataset.named = '1';
-
-                    const h3 = document.createElement('input');
-                    h3.type = 'hidden';
-                    h3.name = `lines[${outIndex}][notes]`;
-                    h3.value = notes;
-                    h3.dataset.named = '1';
-
-                    tr.appendChild(h1);
-                    tr.appendChild(h2);
-                    tr.appendChild(h3);
-
+                    [['item_id', itemId], ['qty_change', qtyChange.toFixed(2)], ['notes', notes]].forEach(([name, value]) => {
+                        const h = document.createElement('input');
+                        h.type = 'hidden'; h.name = `lines[${outIndex}][${name}]`; h.value = value; h.dataset.named = '1';
+                        tr.appendChild(h);
+                    });
                     outIndex++;
                 });
             });
 
-            // reset qty fisik
             clearAllBtn.addEventListener('click', function() {
                 tbody.querySelectorAll('tr').forEach(tr => {
                     const inp = tr.querySelector('.physical-input');
                     const notes = tr.querySelector('.notes-input');
-                    inp.value = '';
-                    notes.value = '';
-                    recalcRow(tr);
+                    inp.value = ''; notes.value = ''; recalcRow(tr);
                 });
-                applyFilter();
-                updateSummary();
+                applyFilter(); updateSummary();
             });
 
             warehouseSelect.addEventListener('change', () => loadItemsForWarehouse(warehouseSelect.value || null));
             itemSearch.addEventListener('focus', () => setTimeout(() => itemSearch.select(), 0));
             itemSearch.addEventListener('input', () => {
-                const start = itemSearch.selectionStart;
-                const end = itemSearch.selectionEnd;
+                const s = itemSearch.selectionStart, e = itemSearch.selectionEnd;
                 itemSearch.value = itemSearch.value.toUpperCase();
-                try { itemSearch.setSelectionRange(start, end); } catch (_) {}
-
-                applyFilter();
-                clearTimeout(searchTimer);
+                try { itemSearch.setSelectionRange(s, e); } catch (_) {}
+                applyFilter(); clearTimeout(searchTimer);
                 searchTimer = setTimeout(() => fetchSearchItems((itemSearch.value || '').trim()), 350);
             });
-            itemSearch.addEventListener('keydown', (e) => {
-                if (e.key !== 'Enter') return;
-                e.preventDefault();
-                clearTimeout(searchTimer);
-                fetchSearchItems((itemSearch.value || '').trim(), true);
-            });
-            addSearchBtn.addEventListener('click', () => {
-                clearTimeout(searchTimer);
-                addSuggestedItemToTable();
-            });
+            itemSearch.addEventListener('keydown', (e) => { if (e.key !== 'Enter') return; e.preventDefault(); clearTimeout(searchTimer); fetchSearchItems((itemSearch.value || '').trim(), true); });
+            addSearchBtn.addEventListener('click', () => { clearTimeout(searchTimer); addSuggestedItemToTable(); });
             quickPhysicalQty?.addEventListener('focus', () => quickPhysicalQty.select());
-            quickPhysicalQty?.addEventListener('keydown', (e) => {
-                if (e.key !== 'Enter') return;
-                e.preventDefault();
-                addSuggestedItemToTable();
-            });
+            quickPhysicalQty?.addEventListener('keydown', (e) => { if (e.key !== 'Enter') return; e.preventDefault(); addSuggestedItemToTable(); });
             showChangedOnly.addEventListener('change', applyFilter);
 
-            // initial load (kalau old('warehouse_id') kebaca)
-            if (warehouseSelect.value) {
-                loadItemsForWarehouse(warehouseSelect.value);
-            }
+            if (warehouseSelect.value) loadItemsForWarehouse(warehouseSelect.value);
         })();
     </script>
 @endpush

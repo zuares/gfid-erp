@@ -228,6 +228,23 @@ body[data-theme="dark"] .rk-batch-title { color: #e2e8f0; }
 body[data-theme="dark"] .rk-qty-badge { color: #cbd5e1; border-color: rgba(71,85,105,.6); }
 .rk-batch-total td { font-weight: 900; color: #111827; background: rgba(148,163,184,.05); }
 body[data-theme="dark"] .rk-batch-total td { color: #e2e8f0; background: rgba(30,41,59,.5); }
+.rk-batch-group td {
+    padding: .28rem 1.1rem;
+    font-size: .6rem;
+    font-weight: 800;
+    text-transform: uppercase;
+    letter-spacing: .04em;
+    color: #475569;
+    background: rgba(148,163,184,.12);
+    border-top: 1px solid rgba(148,163,184,.18);
+}
+.rk-batch-tbl .rk-icode { font-size: .8rem; }
+body[data-theme="dark"] .rk-batch-group td {
+    color: #cbd5e1;
+    background: rgba(30,41,59,.65);
+    border-top-color: rgba(51,65,85,.6);
+}
+.rk-batch-group-count { font-weight: 700; color: #94a3b8; }
 .rk-batch-empty { padding: 1.6rem 1rem; text-align: center; color: #64748b; font-size: .84rem; }
 .rk-show-sm { display: none; }
 @media (max-width: 640px) {
@@ -1103,31 +1120,46 @@ body[data-theme="dark"] .shp-scan-card:focus-within {
             @if ($batchPool->isEmpty())
                 <div class="rk-batch-empty">Belum ada item di batch.</div>
             @else
+                @php
+                    $batchGrouped = $batchPool
+                        ->groupBy(fn ($i) => $i['category_name'] ?? 'Tanpa Kategori')
+                        ->sortKeys();
+                @endphp
                 <div style="overflow-x:auto">
                     <table class="rk-tbl rk-batch-tbl">
                         <thead>
                             <tr>
                                 <th>Item</th>
-                                <th class="rk-hide-sm">Kategori</th>
                                 <th style="text-align:right">Qty</th>
                             </tr>
                         </thead>
                         <tbody>
-                            @foreach ($batchPool as $item)
-                                <tr>
+                            @foreach ($batchGrouped as $catName => $items)
+                                @php
+                                    $catQty = collect($items)->sum('qty');
+                                    $catSku = count($items);
+                                @endphp
+                                <tr class="rk-batch-group">
                                     <td>
-                                        <div class="rk-icode">{{ $item['item_code'] }}</div>
-                                        <div class="rk-batch-name">{{ $item['item_name'] }}</div>
-                                        <div class="rk-batch-cat rk-show-sm">{{ $item['category_name'] ?? 'Tanpa Kategori' }}</div>
+                                        {{ $catName }}
+                                        <span class="rk-batch-group-count">· {{ $catSku }} SKU</span>
                                     </td>
-                                    <td class="rk-hide-sm">{{ $item['category_name'] ?? 'Tanpa Kategori' }}</td>
-                                    <td style="text-align:right">
-                                        <span class="rk-qty-badge">{{ number_format($item['qty'], 0, ',', '.') }} pcs</span>
-                                    </td>
+                                    <td style="text-align:right">{{ number_format($catQty, 0, ',', '.') }} pcs</td>
                                 </tr>
+                                @foreach ($items as $item)
+                                    <tr>
+                                        <td>
+                                            <div class="rk-icode">{{ $item['item_code'] }}</div>
+                                            <div class="rk-batch-name">{{ $item['item_name'] }}</div>
+                                        </td>
+                                        <td style="text-align:right">
+                                            <span class="rk-qty-badge">{{ number_format($item['qty'], 0, ',', '.') }} pcs</span>
+                                        </td>
+                                    </tr>
+                                @endforeach
                             @endforeach
                             <tr class="rk-batch-total">
-                                <td colspan="2" style="text-align:right">Total</td>
+                                <td style="text-align:right">Total</td>
                                 <td style="text-align:right">{{ number_format($totalQty, 0, ',', '.') }}</td>
                             </tr>
                         </tbody>

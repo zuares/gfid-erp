@@ -141,7 +141,10 @@
                 return (float) ($l->qty_returned_ok ?? 0)
                     + (float) ($l->qty_returned_reject ?? 0)
                     + (float) ($l->qty_direct_picked ?? 0)
-                    + (float) ($l->qty_progress_adjusted ?? 0);
+                    + (float) ($l->qty_progress_adjusted ?? 0)
+                    // ✅ qty_closed = qty yang sudah di-cancel/settle/write-off via WIP cleanup;
+                    // dianggap tuntas agar pickup tidak tampil "sisa" padahal sudah dibatalkan.
+                    + (float) ($l->qty_closed ?? 0);
             });
             $doneQty = min($doneQty, $totalQty);
             $remaining = max($totalQty - $doneQty, 0);

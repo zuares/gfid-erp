@@ -1096,6 +1096,85 @@ body[data-theme="dark"] .shp-scan-card:focus-within {
         font-size: .9rem;
     }
 }
+
+/* ══════════════════════════════════════════════════
+   ITEM SUGGEST DROPDOWN (autocomplete)
+══════════════════════════════════════════════════ */
+#scanForm { position: relative; }
+.shp-suggest {
+    display: none;
+    position: absolute;
+    top: calc(100% + 3px);
+    left: 0;
+    right: 0;
+    z-index: 400;
+    max-height: 108px;
+    overflow-y: auto;
+    background: var(--card, #fff);
+    border: 1px solid rgba(148,163,184,.28);
+    border-radius: 8px;
+    box-shadow: 0 6px 18px rgba(15,23,42,.1);
+    padding: .18rem;
+    scrollbar-width: thin;
+}
+body[data-theme="dark"] .shp-suggest {
+    background: #0f172a;
+    border-color: rgba(51,65,85,.8);
+    box-shadow: 0 8px 22px rgba(0,0,0,.5);
+}
+.shp-suggest.is-open { display: block; }
+.shp-suggest-item {
+    display: flex;
+    align-items: baseline;
+    gap: .5rem;
+    padding: .32rem .5rem;
+    border-radius: 6px;
+    cursor: pointer;
+    line-height: 1.2;
+}
+.shp-suggest-item:hover,
+.shp-suggest-item.is-active {
+    background: rgba(148,163,184,.14);
+}
+body[data-theme="dark"] .shp-suggest-item:hover,
+body[data-theme="dark"] .shp-suggest-item.is-active {
+    background: rgba(148,163,184,.16);
+}
+.shp-suggest-code {
+    font-family: monospace;
+    font-weight: 700;
+    font-size: .8rem;
+    letter-spacing: 0;
+    white-space: nowrap;
+    color: #334155;
+}
+body[data-theme="dark"] .shp-suggest-code { color: #e2e8f0; }
+.shp-suggest-name {
+    font-size: .74rem;
+    color: #64748b;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+}
+body[data-theme="dark"] .shp-suggest-name { color: #94a3b8; }
+.shp-suggest-cat {
+    margin-left: auto;
+    font-size: .64rem;
+    color: #94a3b8;
+    white-space: nowrap;
+    flex-shrink: 0;
+}
+.shp-suggest-empty {
+    padding: .42rem .5rem;
+    font-size: .76rem;
+    color: #94a3b8;
+}
+.shp-suggest mark {
+    background: rgba(250,204,21,.4);
+    color: inherit;
+    padding: 0;
+    border-radius: 2px;
+}
 </style>
 @endpush
 
@@ -1210,8 +1289,13 @@ body[data-theme="dark"] .shp-scan-card:focus-within {
             @csrf
             <input type="text" name="scan_code"
                    class="form-control shp-scan-input" id="scanInput"
-                   placeholder="Arahkan scanner ke sini"
-                   autocomplete="off" spellcheck="false" required>
+                   placeholder="Scan / ketik kode atau nama barang"
+                   autocomplete="off" spellcheck="false"
+                   role="combobox" aria-autocomplete="list"
+                   aria-expanded="false" aria-controls="scanSuggest" required>
+
+            {{-- autocomplete suggestions --}}
+            <div class="shp-suggest" id="scanSuggest" role="listbox"></div>
         </form>
 
         {{-- last scanned ticker --}}
@@ -2216,6 +2300,151 @@ body[data-theme="dark"] .shp-scan-card:focus-within {
                     showToast('ok', data.message || 'Berhasil scan.');
                 }
             }).catch(() => scanForm.submit());
+        });
+    }
+
+    /* ══════════════════════════════════════════════
+       ITEM SUGGEST (autocomplete kode / nama barang)
+    ══════════════════════════════════════════════ */
+    const suggestBox = document.getElementById('scanSuggest');
+    const SUGGEST_URL = @json(route('web_api.items.suggest'));
+
+    if (scanInput && suggestBox) {
+        let suggestItems   = [];
+        let activeIndex    = -1;
+        let suggestTimer   = null;
+        let suggestAbort   = null;
+        let lastQuery      = '';
+
+        const escHtml = (s) => String(s ?? '').replace(/[&<>"']/g, ch => ({
+            '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#039;',
+        })[ch]);
+
+        function highlight(text, term) {
+            const safe = escHtml(text);
+            const t = (term || '').trim();
+            if (!t) return safe;
+            try {
+                const re = new RegExp('(' + t.replace(/[.*+?^${}()|[\]\\]/g, '\\$&') + ')', 'ig');
+                return safe.replace(re, '<mark>$1</mark>');
+            } catch (e) { return safe; }
+        }
+
+        function closeSuggest() {
+            suggestBox.classList.remove('is-open');
+            suggestBox.innerHTML = '';
+            suggestItems = [];
+            activeIndex  = -1;
+            scanInput.setAttribute('aria-expanded', 'false');
+        }
+
+        function setActive(idx) {
+            const nodes = suggestBox.querySelectorAll('.shp-suggest-item');
+            nodes.forEach(n => n.classList.remove('is-active'));
+            activeIndex = idx;
+            if (idx >= 0 && nodes[idx]) {
+                nodes[idx].classList.add('is-active');
+                nodes[idx].scrollIntoView({ block: 'nearest' });
+            }
+        }
+
+        function pickItem(item) {
+            if (!item) return;
+            closeSuggest();
+            scanInput.value = (item.code || '').toUpperCase();
+            /* submit ke alur scan yang sudah ada → nambah baris */
+            if (typeof scanForm.requestSubmit === 'function') scanForm.requestSubmit();
+            else scanForm.dispatchEvent(new Event('submit', { cancelable: true }));
+        }
+
+        function renderSuggest(items, term) {
+            suggestItems = items || [];
+            activeIndex  = -1;
+            if (!suggestItems.length) {
+                suggestBox.innerHTML = '<div class="shp-suggest-empty">Tidak ada barang cocok.</div>';
+                suggestBox.classList.add('is-open');
+                scanInput.setAttribute('aria-expanded', 'true');
+                return;
+            }
+            suggestBox.innerHTML = suggestItems.map((it, i) => (
+                '<div class="shp-suggest-item" role="option" data-idx="' + i + '">' +
+                    '<span class="shp-suggest-code">' + highlight(it.code || '-', term) + '</span>' +
+                    '<span class="shp-suggest-name">' + highlight(it.name || '', term) + '</span>' +
+                    (it.item_category ? '<span class="shp-suggest-cat">' + escHtml(it.item_category) + '</span>' : '') +
+                '</div>'
+            )).join('');
+            suggestBox.classList.add('is-open');
+            scanInput.setAttribute('aria-expanded', 'true');
+        }
+
+        function fetchSuggest(term) {
+            if (suggestAbort) suggestAbort.abort();
+            suggestAbort = new AbortController();
+            const url = SUGGEST_URL + '?type=finished_good&limit=3&q=' + encodeURIComponent(term);
+            fetch(url, {
+                headers: { 'Accept': 'application/json', 'X-Requested-With': 'XMLHttpRequest' },
+                signal: suggestAbort.signal,
+            }).then(res => res.ok ? res.json() : null)
+              .then(data => {
+                  if (!data) { closeSuggest(); return; }
+                  /* only render if the input still matches this query */
+                  if (scanInput.value.trim() !== term) return;
+                  renderSuggest(data.data || [], term);
+              })
+              .catch(err => { if (err.name !== 'AbortError') closeSuggest(); });
+        }
+
+        scanInput.addEventListener('input', function () {
+            const term = this.value.trim();
+            lastQuery = term;
+            clearTimeout(suggestTimer);
+            if (term.length < 2) { closeSuggest(); return; }
+            /* debounce → barcode scanner (Enter cepat) tidak akan memicu dropdown */
+            suggestTimer = setTimeout(() => {
+                if (scanInput.value.trim() === term) fetchSuggest(term);
+            }, 220);
+        });
+
+        scanInput.addEventListener('keydown', function (e) {
+            const open = suggestBox.classList.contains('is-open') && suggestItems.length;
+            if (e.key === 'ArrowDown') {
+                if (!open) return;
+                e.preventDefault();
+                setActive((activeIndex + 1) % suggestItems.length);
+            } else if (e.key === 'ArrowUp') {
+                if (!open) return;
+                e.preventDefault();
+                setActive((activeIndex - 1 + suggestItems.length) % suggestItems.length);
+            } else if (e.key === 'Enter') {
+                /* kalau ada item ter-highlight → pilih itu, jangan submit mentah */
+                if (open && activeIndex >= 0) {
+                    e.preventDefault();
+                    pickItem(suggestItems[activeIndex]);
+                } else {
+                    closeSuggest();
+                }
+            } else if (e.key === 'Escape') {
+                if (open || suggestBox.classList.contains('is-open')) {
+                    e.preventDefault();
+                    closeSuggest();
+                }
+            }
+        });
+
+        suggestBox.addEventListener('mousedown', function (e) {
+            /* mousedown supaya jalan sebelum blur/refocus */
+            const row = e.target.closest('.shp-suggest-item');
+            if (!row) return;
+            e.preventDefault();
+            pickItem(suggestItems[Number(row.dataset.idx)]);
+        });
+
+        /* tutup dropdown setiap form discan/submit */
+        scanForm.addEventListener('submit', () => closeSuggest());
+
+        /* klik di luar → tutup */
+        document.addEventListener('click', function (e) {
+            if (!suggestBox.contains(e.target) && e.target !== scanInput) closeSuggest();
         });
     }
 

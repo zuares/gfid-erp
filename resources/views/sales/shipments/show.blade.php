@@ -46,6 +46,14 @@
 .sd-name{color:#64748b;font-size:.8rem;margin-top:.08rem}
 .sd-r{text-align:right}
 .sd-total td{font-weight:900;color:#111827;background:rgba(148,163,184,.04)}
+.sd-group{cursor:pointer;user-select:none}
+.sd-group td{background:rgba(148,163,184,.10);font-weight:900;color:#334155}
+.sd-group:hover td{background:rgba(148,163,184,.16)}
+.sd-caret{display:inline-block;margin-right:.4rem;color:#94a3b8;font-size:.62rem;transition:transform .15s}
+.sd-group.is-open .sd-caret{transform:rotate(90deg)}
+.sd-group-cat{font-size:.72rem;letter-spacing:.02em}
+.sd-group-count{margin-left:.4rem;color:#94a3b8;font-weight:700;font-size:.66rem}
+.sd-collapsed{display:none!important}
 .sd-meta{display:grid;grid-template-columns:repeat(3,minmax(0,1fr));gap:.5rem}
 .sd-meta-box{border:1px solid rgba(148,163,184,.16);border-radius:8px;padding:.55rem .65rem}
 .sd-order-num{display:inline-flex;align-items:center;justify-content:center;min-width:1.5rem;height:1.5rem;padding:0 .35rem;border-radius:6px;background:rgba(148,163,184,.12);color:#475569;font-family:ui-monospace,SFMono-Regular,Menlo,Consolas,monospace;font-weight:900;font-size:.78rem;flex-shrink:0}
@@ -221,12 +229,16 @@
             @if($shipment->lines->isEmpty())
                 <div class="sd-empty">Belum ada item.</div>
             @else
+                @php
+                    $linesGrouped = $shipment->lines
+                        ->groupBy(fn ($l) => $l->item?->category?->name ?: 'Tanpa Kategori')
+                        ->sortKeys();
+                @endphp
                 <div class="sd-table-wrap">
-                    <table class="sd-table">
+                    <table class="sd-table" id="sdBatchTable">
                         <thead>
                             <tr>
                                 <th>Item</th>
-                                <th class="sd-hide-mobile">Kategori</th>
                                 <th class="sd-r">Qty</th>
                                 @if($canSeeNominal)
                                     <th class="sd-r sd-hide-mobile">Unit HPP</th>
@@ -235,25 +247,43 @@
                             </tr>
                         </thead>
                         <tbody>
-                            @foreach($shipment->lines as $line)
-                                <tr>
+                            @foreach($linesGrouped as $catName => $group)
+                                @php
+                                    $gIdx = $loop->index;
+                                    $catQty = (int) $group->sum(fn ($l) => (int)($l->qty_scanned ?? 0));
+                                    $catHpp = (float) $group->sum(fn ($l) => (float)($l->total_hpp ?? 0));
+                                    $catSku = $group->count();
+                                @endphp
+                                <tr class="sd-group" data-group="{{ $gIdx }}" aria-expanded="false">
                                     <td>
-                                        <div class="sd-code-cell">{{ $line->item?->code ?? '-' }}</div>
-                                        <div class="sd-name">{{ $line->item?->name ?? '-' }}</div>
-                                        <div class="sd-muted sd-mobile-muted">{{ $line->item?->category?->name ?? 'Tanpa Kategori' }}</div>
+                                        <span class="sd-caret">▶</span>
+                                        <span class="sd-group-cat">{{ $catName }}</span>
+                                        <span class="sd-group-count">{{ $catSku }} SKU</span>
                                     </td>
-                                    <td class="sd-hide-mobile">{{ $line->item?->category?->name ?? 'Tanpa Kategori' }}</td>
-                                    <td class="sd-r">
-                                        <span class="sd-badge">{{ number_format((int)($line->qty_scanned ?? 0),0,',','.') }} pcs</span>
-                                    </td>
+                                    <td class="sd-r"><span class="sd-badge">{{ number_format($catQty,0,',','.') }} pcs</span></td>
                                     @if($canSeeNominal)
-                                        <td class="sd-r sd-hide-mobile">{{ number_format((float)($line->unit_hpp ?? 0),0,',','.') }}</td>
-                                        <td class="sd-r sd-hide-mobile">{{ number_format((float)($line->total_hpp ?? 0),0,',','.') }}</td>
+                                        <td class="sd-r sd-hide-mobile"></td>
+                                        <td class="sd-r sd-hide-mobile">{{ number_format($catHpp,0,',','.') }}</td>
                                     @endif
                                 </tr>
+                                @foreach($group as $line)
+                                    <tr class="sd-item-row sd-collapsed" data-group-row="{{ $gIdx }}">
+                                        <td>
+                                            <div class="sd-code-cell">{{ $line->item?->code ?? '-' }}</div>
+                                            <div class="sd-name">{{ $line->item?->name ?? '-' }}</div>
+                                        </td>
+                                        <td class="sd-r">
+                                            <span class="sd-badge">{{ number_format((int)($line->qty_scanned ?? 0),0,',','.') }} pcs</span>
+                                        </td>
+                                        @if($canSeeNominal)
+                                            <td class="sd-r sd-hide-mobile">{{ number_format((float)($line->unit_hpp ?? 0),0,',','.') }}</td>
+                                            <td class="sd-r sd-hide-mobile">{{ number_format((float)($line->total_hpp ?? 0),0,',','.') }}</td>
+                                        @endif
+                                    </tr>
+                                @endforeach
                             @endforeach
                             <tr class="sd-total">
-                                <td colspan="2" class="sd-r">Total</td>
+                                <td class="sd-r">Total</td>
                                 <td class="sd-r">{{ number_format($totalQty,0,',','.') }}</td>
                                 @if($canSeeNominal)
                                     <td></td>
@@ -310,6 +340,21 @@
     });
     var hash = (location.hash || '').replace('#','');
     if (['pesanan','item','info'].indexOf(hash) !== -1) activate(hash);
+
+    /* ── accordion Item Batch per kategori (default tertutup) ── */
+    var batchTable = document.getElementById('sdBatchTable');
+    if (batchTable) {
+        batchTable.querySelectorAll('.sd-group').forEach(function (header) {
+            header.addEventListener('click', function () {
+                var idx = header.dataset.group;
+                var open = header.classList.toggle('is-open');
+                header.setAttribute('aria-expanded', open ? 'true' : 'false');
+                batchTable.querySelectorAll('.sd-item-row[data-group-row="' + idx + '"]').forEach(function (row) {
+                    row.classList.toggle('sd-collapsed', !open);
+                });
+            });
+        });
+    }
 })();
 </script>
 @endsection
